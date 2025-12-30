@@ -39,6 +39,31 @@ class ImmediateBehavior(TransitionBehavior):
             )
     """
     
+    def _is_signal_place(self, place) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+    
     def can_fire(self) -> Tuple[bool, str]:
         """Check if transition can fire (sufficient tokens in input places).
         
@@ -74,13 +99,14 @@ class ImmediateBehavior(TransitionBehavior):
         
         # Check each input place for sufficient tokens
         for arc in input_arcs:
-            # Skip inhibitor arcs in enablement check (they have inverted logic)
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            if kind == 'inhibitor':
+            # Skip inhibitor arcs in enablement check (they have inverted logic handled elsewhere)
+            from shypn.netobjs.inhibitor_arc import InhibitorArc
+            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+            if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
                 continue
             
-            # Test arcs (catalysts) SHOULD be checked for token presence
-            # They require enzyme to be present but won't consume the tokens
+            # Test arcs (catalysts) check token presence without consuming
+            # They require tokens to be present for enablement
             
             # Get source place directly from arc reference
             source_place = arc.source
@@ -137,12 +163,7 @@ class ImmediateBehavior(TransitionBehavior):
             # Phase 1: Consume tokens from input places (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    # Skip inhibitor arcs (they don't consume)
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    if kind != 'normal':
-                        continue
-                    
-                    # Skip test arcs - they check enablement but don't consume tokens
+                    # Skip test arcs and inhibitor arcs - they don't consume tokens
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     

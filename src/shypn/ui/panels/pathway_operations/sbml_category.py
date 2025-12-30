@@ -36,6 +36,7 @@ try:
     from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
     from shypn.data.pathway.pathway_converter import PathwayConverter
     from shypn.data.pathway_document import PathwayDocument
+    from shypn.services.sbml_compartment_module_service import SBMLCompartmentModuleService
 except ImportError as e:
     print(f'Warning: SBML backend not available: {e}', file=sys.stderr)
     SBMLParser = None
@@ -43,6 +44,7 @@ except ImportError as e:
     PathwayPostProcessor = None
     PathwayConverter = None
     PathwayDocument = None
+    SBMLCompartmentModuleService = None
 
 
 class SBMLCategory(BasePathwayCategory):
@@ -489,6 +491,46 @@ class SBMLCategory(BasePathwayCategory):
                 self.logger.info("Converting to Petri net...")
                 document_model = self.converter.convert(processed_pathway)
                 
+                # 4. Convert SBML compartments to modules (if service available)
+                if SBMLCompartmentModuleService and document_model and processed_pathway:
+                    try:
+                        # Build species_id → Place mapping using metadata
+                        # The original species.id is stored in place.metadata['original_species_id']
+                        species_to_place = {}
+                        for place in document_model.places:
+                            if hasattr(place, 'metadata') and place.metadata:
+                                original_species_id = place.metadata.get('original_species_id')
+                                if original_species_id:
+                                    species_to_place[original_species_id] = place
+                        
+                        # Build reaction_id → Transition mapping
+                        # The original reaction.id is stored in transition.metadata['reaction_id']
+                        reaction_to_transition = {}
+                        for transition in document_model.transitions:
+                            if hasattr(transition, 'metadata') and transition.metadata:
+                                reaction_id = transition.metadata.get('reaction_id')
+                                if reaction_id:
+                                    reaction_to_transition[reaction_id] = transition
+                        
+                        module_service = SBMLCompartmentModuleService()
+                        conversion_result = module_service.convert_compartments_to_modules(
+                            document=document_model,
+                            pathway=processed_pathway,
+                            species_to_place=species_to_place,
+                            reaction_to_transition=reaction_to_transition,
+                            auto_detect_signals=True,
+                            validate=True
+                        )
+                        
+                        if conversion_result and conversion_result.get('success'):
+                            # Add modules to document so they're saved
+                            modules = conversion_result.get('modules', [])
+                            for module in modules:
+                                document_model.add_module(module)
+                    except Exception as e:
+                        # Module conversion failed, continue without modules
+                        pass
+                
                 return {
                     'filepath': filepath,
                     'parsed_pathway': processed_pathway,
@@ -696,7 +738,8 @@ class SBMLCategory(BasePathwayCategory):
                             canvas_manager.load_objects(
                                 places=document_model.places,
                                 transitions=document_model.transitions,
-                                arcs=document_model.arcs
+                                arcs=document_model.arcs,
+                                modules=document_model.modules
                             )
                         except Exception as e:
                             raise ValueError(f"Failed to load objects to canvas: {e}")
@@ -1407,6 +1450,36 @@ class SBMLCategory(BasePathwayCategory):
                 else:
                     self.metadata_store.append(events_root, [
                         "", "No events", "", "", "", ""
+                    ])
+                
+                # Function Definitions section
+                metadata = getattr(pathway, 'metadata', {})
+                function_count = metadata.get('function_definitions_count', 0)
+                functions_root = self.metadata_store.append(None, [
+                    "ƒ", "Function Definitions", f"{function_count} items",
+                    "section", "", "User-defined mathematical functions"
+                ])
+                if function_count > 0:
+                    function_names = metadata.get('function_definitions', [])
+                    for func_name in function_names:
+                        # Extract function name and arguments
+                        if '(' in func_name:
+                            name_part = func_name.split('(')[0]
+                            args_part = func_name.split('(', 1)[1].rstrip(')')
+                            self.metadata_store.append(functions_root, [
+                                "ƒ", name_part, args_part,
+                                "function", name_part,
+                                f"Function: {func_name}"
+                            ])
+                        else:
+                            self.metadata_store.append(functions_root, [
+                                "ƒ", func_name, "",
+                                "function", func_name,
+                                f"Function: {func_name}"
+                            ])
+                else:
+                    self.metadata_store.append(functions_root, [
+                        "", "No function definitions", "", "", "", ""
                     ])
                 
                 # Expand top level

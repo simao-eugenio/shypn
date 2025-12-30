@@ -547,7 +547,7 @@ class ModelCanvasManager:
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
     
-    def load_objects(self, places=None, transitions=None, arcs=None):
+    def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
         """Load objects into the model in bulk (for import/deserialize operations).
         
         This method ensures all objects are added through proper channels with
@@ -568,6 +568,7 @@ class ModelCanvasManager:
             places: List of Place objects to add (default: None = no places)
             transitions: List of Transition objects to add (default: None = no transitions)
             arcs: List of Arc objects to add (default: None = no arcs)
+            modules: Dict of Module objects to add (default: None = no modules)
         
         Example:
             # For imports/loads:
@@ -587,7 +588,15 @@ class ModelCanvasManager:
             transitions = []
         if arcs is None:
             arcs = []
+        if modules is None:
+            modules = {}
         
+        # Add modules to document_controller if it exists
+        if modules and hasattr(self, 'document_controller'):
+            if not hasattr(self.document_controller, 'modules'):
+                self.document_controller.modules = {}
+            self.document_controller.modules.update(modules)
+            logger.info(f"[LOAD_OBJECTS] Loaded {len(modules)} modules to document_controller")
         
         # Add places with proper notification
         for place in places:
@@ -2323,6 +2332,11 @@ class ModelCanvasManager:
         """
         import os
         self.filepath = filepath
+        
+        # Update viewport controller's model filepath for view state persistence
+        if hasattr(self, 'viewport_controller'):
+            self.viewport_controller.model_filepath = filepath
+        
         if filepath:
             # Extract base filename without extension
             base_name = os.path.splitext(os.path.basename(filepath))[0]
@@ -2385,10 +2399,10 @@ class ModelCanvasManager:
             transition.border_color = Transition.DEFAULT_BORDER_COLOR
             transition.fill_color = Transition.DEFAULT_COLOR
         
-        # Reset place colors (but preserve compartment/signal places)
+        # Reset place colors (but preserve compartment/signal/regulatory places)
         for place in self.places:
-            # Skip compartment and signal places - they have semantic colors
-            if place.is_compartment_place or place.is_signal_place:
+            # Skip compartment, signal, and regulatory places - they have semantic colors
+            if place.is_compartment_place or place.is_signal_place or getattr(place, 'is_regulatory_place', False):
                 continue
             place.border_color = Place.DEFAULT_BORDER_COLOR
         
@@ -2405,35 +2419,103 @@ class ModelCanvasManager:
         # Trigger redraw to show the reset colors
         self.mark_needs_redraw()
     
+    def _reset_analysis_colors_for_save(self):
+        """Temporarily reset analysis colors for save, then restore them.
+        
+        Returns the original colors so they can be restored after serialization.
+        This allows saving with default colors without modifying the live canvas.
+        
+        Returns:
+            dict: Original colors for transitions, places, and arcs
+        """
+        from shypn.netobjs import Transition, Place
+        from shypn.netobjs.arc import Arc
+        
+        # Store original colors
+        original_colors = {
+            'transitions': [],
+            'places': [],
+            'arcs': []
+        }
+        
+        # Reset transition colors (but preserve source/sink)
+        for transition in self.transitions:
+            if transition.is_source or transition.is_sink:
+                original_colors['transitions'].append(None)
+                continue
+            original_colors['transitions'].append((transition.border_color, transition.fill_color))
+            transition.border_color = Transition.DEFAULT_BORDER_COLOR
+            transition.fill_color = Transition.DEFAULT_COLOR
+        
+        # Reset place colors (but preserve compartment/signal/regulatory places)
+        for place in self.places:
+            if place.is_compartment_place or place.is_signal_place or getattr(place, 'is_regulatory_place', False):
+                original_colors['places'].append(None)
+                continue
+            original_colors['places'].append(place.border_color)
+            place.border_color = Place.DEFAULT_BORDER_COLOR
+        
+        # Reset arc colors (but preserve boundary species arcs)
+        for arc in self.arcs:
+            if arc.color != Arc.DEFAULT_COLOR:
+                original_colors['arcs'].append(None)
+                continue
+            original_colors['arcs'].append(arc.color)
+            arc.color = Arc.DEFAULT_COLOR
+        
+        return original_colors
+    
+    def _restore_analysis_colors(self, original_colors):
+        """Restore colors after save.
+        
+        Args:
+            original_colors: Dictionary returned by _reset_analysis_colors_for_save()
+        """
+        # Restore transition colors
+        for i, transition in enumerate(self.transitions):
+            if original_colors['transitions'][i] is not None:
+                transition.border_color, transition.fill_color = original_colors['transitions'][i]
+        
+        # Restore place colors
+        for i, place in enumerate(self.places):
+            if original_colors['places'][i] is not None:
+                place.border_color = original_colors['places'][i]
+        
+        # Restore arc colors
+        for i, arc in enumerate(self.arcs):
+            if original_colors['arcs'][i] is not None:
+                arc.color = original_colors['arcs'][i]
+    
     def to_document_model(self):
         """Convert canvas manager's Petri net objects to a DocumentModel.
         
         This creates a DocumentModel instance that can be saved/loaded by
         the persistency manager.
         
-        CRITICAL: Before saving, reset any temporary analysis colors to defaults
-        so the saved file doesn't contain highlighting from Analyses panel.
-        
         Returns:
             DocumentModel: Document model containing all Petri net objects
         """
         from shypn.data.canvas import DocumentModel
         
-        # CRITICAL: Reset analysis colors before saving
-        # When transitions/places are selected in Analyses panel, they get colored
-        # with plot colors for visualization. These are temporary and should NOT
-        # be saved to the file.
-        self._reset_analysis_colors()
+        # Reset analysis colors before serialization
+        # This ensures plot colors don't get saved to the file
+        original_colors = self._reset_analysis_colors_for_save()
         
+        # Create document with direct references to canvas objects
+        # Note: We don't need to deep copy since DocumentModel.to_dict() will
+        # serialize the objects, and we're not modifying them during save anymore
         document = DocumentModel()
         document.places = list(self.places)
         document.transitions = list(self.transitions)
         document.arcs = list(self.arcs)
         
+        # Copy modules if they exist in the document_controller
+        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
+            document.modules = dict(self.document_controller.modules)
         
         # Sync ID counters from DocumentController's IDManager to DocumentModel's IDManager
-        place_id, trans_id, arc_id = self.document_controller.id_manager.get_state()
-        document.id_manager.set_state(place_id, trans_id, arc_id)
+        place_id, trans_id, arc_id, module_id = self.document_controller.id_manager.get_state()
+        document.id_manager.set_state(place_id, trans_id, arc_id, module_id)
         
         # Sync view state (zoom, pan, and transformations including rotation)
         document.view_state = {
@@ -2442,6 +2524,10 @@ class ModelCanvasManager:
             "pan_y": self.pan_y,
             "transformations": self.transformation_manager.to_dict()
         }
+        
+        # Restore analysis colors after serialization
+        # This restores plot colors to the canvas without saving them
+        self._restore_analysis_colors(original_colors)
         
         return document
     
@@ -2474,8 +2560,20 @@ class ModelCanvasManager:
             # Clamp zoom to valid range
             self.zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, self.zoom))
             
+            # CRITICAL: Sync viewport controller state BEFORE clamping
+            # The clamp_pan() delegates to viewport_controller.clamp_pan()
+            # so viewport_controller must have the correct values first
+            self.viewport_controller.pan_x = self.pan_x
+            self.viewport_controller.pan_y = self.pan_y
+            self.viewport_controller.zoom = self.zoom
+            self.viewport_controller._initial_pan_set = True  # Prevent auto-centering
+            
             # Clamp pan to infinite canvas bounds
             self.clamp_pan()
+            
+            # Sync back after clamping (clamp_pan modifies viewport_controller)
+            self.pan_x = self.viewport_controller.pan_x
+            self.pan_y = self.viewport_controller.pan_y
             
             # Restore transformations (rotation)
             if 'transformations' in view_state:

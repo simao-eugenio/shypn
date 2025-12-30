@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the paper."
+type: software
+title: "SHYpn: Stochastic Hybrid Petri Nets for Systems Biology"
+version: 2.4.6
+date-released: 2025-12-22
+url: "https://github.com/simao-eugenio/shypn"
+repository-code: "https://github.com/simao-eugenio/shypn"
+license: MIT
+authors:
+  - family-names: "Simão"
+    given-names: "Eugénio"
+    email: "simao-eugenio@github.com"
+    affiliation: "Federal University of Santa Catarina (UFSC)"
+preferred-citation:
+  type: article
+  title: "Weak Independence and Coupled Parallelism in Biological Petri Nets"
+  authors:
+    - family-names: "Simão"
+      given-names: "Eugénio"
+  year: 2025
+  journal: "arXiv preprint"
+  identifiers:
+    - type: other
+      value: "arXiv:2512.17106"
+      description: "arXiv identifier"
+  url: "https://arxiv.org/abs/2512.17106"
+keywords:
+  - Petri nets
+  - biological modeling
+  - systems biology
+  - stochastic simulation
+  - hybrid systems
+  - weak independence
+  - pathway analysis

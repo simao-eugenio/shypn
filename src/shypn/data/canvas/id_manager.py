@@ -89,6 +89,7 @@ class IDManager:
         self._next_place_id = 1
         self._next_transition_id = 1
         self._next_arc_id = 1
+        self._next_module_id = 1  # Module counter for modular Bio-PN
     
     def generate_place_id(self) -> str:
         """Generate a new place ID.
@@ -150,6 +151,19 @@ class IDManager:
         self._next_arc_id += 1
         return arc_id
     
+    def generate_module_id(self) -> str:
+        """Generate a new module ID.
+        
+        Returns:
+            String ID in format "M1", "M2", etc.
+            
+        Note:
+            Modules are document-level, not lifecycle-scoped (no delegation)
+        """
+        module_id = f"M{self._next_module_id}"
+        self._next_module_id += 1
+        return module_id
+    
     def register_place_id(self, place_id: str):
         """Register an existing place ID to prevent duplicates.
         
@@ -210,6 +224,21 @@ class IDManager:
         if numeric_id >= self._next_arc_id:
             self._next_arc_id = numeric_id + 1
     
+    def register_module_id(self, module_id: str):
+        """Register an existing module ID to prevent duplicates.
+        
+        Updates the counter if the registered ID is higher than current.
+        
+        Args:
+            module_id: Existing ID (e.g., "M5", "5", or numeric)
+            
+        Note:
+            Modules are document-level (no lifecycle delegation)
+        """
+        numeric_id = self.extract_numeric_id(module_id, 'M')
+        if numeric_id >= self._next_module_id:
+            self._next_module_id = numeric_id + 1
+    
     @staticmethod
     def extract_numeric_id(id_value: any, prefix: str = '') -> int:
         """Extract numeric part from an ID.
@@ -247,23 +276,26 @@ class IDManager:
         self._next_place_id = 1
         self._next_transition_id = 1
         self._next_arc_id = 1
+        self._next_module_id = 1
     
-    def get_state(self) -> Tuple[int, int, int]:
+    def get_state(self) -> Tuple[int, int, int, int]:
         """Get current counter state.
         
         Returns:
-            Tuple of (next_place_id, next_transition_id, next_arc_id)
+            Tuple of (next_place_id, next_transition_id, next_arc_id, next_module_id)
         """
-        return (self._next_place_id, self._next_transition_id, self._next_arc_id)
+        return (self._next_place_id, self._next_transition_id, self._next_arc_id, self._next_module_id)
     
-    def set_state(self, place_id: int, transition_id: int, arc_id: int):
+    def set_state(self, place_id: int, transition_id: int, arc_id: int, module_id: int = 1):
         """Set counter state directly.
         
         Args:
             place_id: Next place counter value
             transition_id: Next transition counter value
             arc_id: Next arc counter value
+            module_id: Next module counter value (default: 1 for backward compatibility)
         """
         self._next_place_id = place_id
         self._next_transition_id = transition_id
         self._next_arc_id = arc_id
+        self._next_module_id = module_id

@@ -54,6 +54,7 @@ def capture_delete_snapshots(manager, objects: List[object]) -> List[Dict[str, A
 			'label': getattr(arc, 'label', None),
 			'source_id': getattr(arc.source, 'id', None),
 			'target_id': getattr(arc.target, 'id', None),
+			'arc_type': getattr(arc, 'arc_type', 'normal'),  # Preserve arc type for correct restoration
 		}
 
 	# Collect object type names (simplistic classification)

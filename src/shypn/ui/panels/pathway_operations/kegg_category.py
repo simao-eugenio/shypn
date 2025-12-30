@@ -102,6 +102,33 @@ class KEGGCategory(BasePathwayCategory):
         """
         self.file_panel_loader = file_panel_loader
     
+    def _is_signaling_pathway(self, pathway_id: str) -> bool:
+        """Detect if a pathway is a signaling pathway based on KEGG classification.
+        
+        KEGG pathway classification:
+        - 01xxx: Metabolism (need filtering to remove isolated compounds)
+        - 02xxx: Genetic Information Processing
+        - 03xxx: Environmental Information Processing  
+        - 04xxx: Cellular Processes (mostly signaling, no filtering)
+        - 05xxx: Human Diseases
+        
+        Signaling pathways (04xxx) have many proteins with only regulatory relations
+        (no reactions), so filtering would remove most of the network.
+        
+        Args:
+            pathway_id: KEGG pathway ID (e.g., 'hsa04010', 'hsa00010')
+            
+        Returns:
+            True if signaling pathway (should NOT be filtered), False otherwise
+        """
+        # Extract numeric part (e.g., 'hsa04010' -> '04010')
+        numeric_id = ''.join(c for c in pathway_id if c.isdigit())
+        if len(numeric_id) >= 5:
+            # Check first two digits
+            category = numeric_id[:2]
+            return category == '04'  # Signaling and cellular processes
+        return False
+    
     def _build_content(self):
         """Build and return the content widget.
         
@@ -295,22 +322,60 @@ class KEGGCategory(BasePathwayCategory):
         return box
     
     def _build_preview(self):
-        """Build preview section showing comprehensive import details.
+        """Build preview section with metadata tree view.
         
         Returns:
-            Gtk.Box: Preview widgets
+            Gtk.Frame: Preview widgets (Notebook with tabs)
         """
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        frame = Gtk.Frame()
+        frame.set_label("KEGG Metadata Inspector")
         
-        label = Gtk.Label()
-        label.set_markup("<b>Preview:</b>")
-        label.set_xalign(0)
-        box.pack_start(label, False, False, 0)
+        # Main container with notebook for tabs
+        notebook = Gtk.Notebook()
+        notebook.set_tab_pos(Gtk.PositionType.TOP)
         
-        # Scrolled window for preview text
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_size_request(-1, 150)
+        # Tab 1: Tree view for structured metadata
+        tree_scroll = Gtk.ScrolledWindow()
+        tree_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        tree_scroll.set_size_request(-1, 200)
+        
+        # Tree store: [icon, name, value, type, object_id, tooltip]
+        self.metadata_store = Gtk.TreeStore(str, str, str, str, str, str)
+        self.metadata_tree = Gtk.TreeView(model=self.metadata_store)
+        self.metadata_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
+        self.metadata_tree.set_enable_tree_lines(True)
+        self.metadata_tree.set_tooltip_column(5)  # Tooltip from column 5
+        
+        # Icon column
+        icon_renderer = Gtk.CellRendererText()
+        icon_col = Gtk.TreeViewColumn("", icon_renderer, text=0)
+        icon_col.set_fixed_width(30)
+        self.metadata_tree.append_column(icon_col)
+        
+        # Name column
+        name_renderer = Gtk.CellRendererText()
+        name_col = Gtk.TreeViewColumn("Name", name_renderer, text=1)
+        name_col.set_resizable(True)
+        name_col.set_expand(True)
+        self.metadata_tree.append_column(name_col)
+        
+        # Value column
+        value_renderer = Gtk.CellRendererText()
+        value_renderer.set_property("family", "monospace")
+        value_col = Gtk.TreeViewColumn("Value", value_renderer, text=2)
+        value_col.set_resizable(True)
+        value_col.set_expand(True)
+        self.metadata_tree.append_column(value_col)
+        
+        # Connect click handler for details
+        self.metadata_tree.connect("row-activated", self._on_metadata_row_clicked)
+        
+        tree_scroll.add(self.metadata_tree)
+        notebook.append_page(tree_scroll, Gtk.Label(label="📊 Metadata Tree"))
+        
+        # Tab 2: Text view for summary
+        text_scroll = Gtk.ScrolledWindow()
+        text_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         
         self.preview_text = Gtk.TextView()
         self.preview_text.set_editable(False)
@@ -320,20 +385,19 @@ class KEGGCategory(BasePathwayCategory):
         self.preview_text.set_top_margin(6)
         self.preview_text.set_bottom_margin(6)
         
-        # Initial placeholder text
         buffer = self.preview_text.get_buffer()
-        buffer.set_text("Pathway information will appear here after import...\n\n"
-                       "The preview will show:\n"
-                       "• Pathway name and organism\n"
-                       "• Number of entries (compounds, enzymes, genes)\n"
-                       "• Number of reactions and relations")
+        buffer.set_text(
+            "Pathway summary will appear here after import...\n\n"
+            "Click the 'Metadata Tree' tab to see detailed KEGG information."
+        )
         
-        scrolled.add(self.preview_text)
-        box.pack_start(scrolled, True, True, 0)
+        text_scroll.add(self.preview_text)
+        notebook.append_page(text_scroll, Gtk.Label(label="📄 Summary"))
         
         self.preview_widget = self.preview_text
         
-        return box
+        frame.add(notebook)
+        return frame
     
     def _get_status_widget(self):
         """Get the status label widget.
@@ -548,6 +612,27 @@ class KEGGCategory(BasePathwayCategory):
                 # 2. Parse KGML
                 parsed_pathway = self.parser.parse(kgml_data)
                 
+                # VALIDATION: Check if pathway has reactions
+                # shypn models biochemical and gene regulatory networks (with reactions/transitions)
+                # Pure signaling pathways (only relations, no reactions) are not yet supported
+                if not parsed_pathway.reactions:
+                    is_signaling = self._is_signaling_pathway(pathway_id)
+                    if is_signaling:
+                        raise ValueError(
+                            f"Pure signaling pathway detected ({pathway_id}).\n\n"
+                            f"shypn is designed for biochemical and gene regulatory networks "
+                            f"that have metabolic reactions or gene expression reactions.\n\n"
+                            f"This pathway has {len(parsed_pathway.relations)} regulatory relations "
+                            f"but no reactions to regulate.\n\n"
+                            f"Signaling-only networks (protein-protein interactions without biochemical "
+                            f"reactions) are not yet supported in the current model."
+                        )
+                    else:
+                        raise ValueError(
+                            f"No reactions found in pathway {pathway_id}. "
+                            f"Cannot convert pathway without reactions."
+                        )
+                
                 # 3. Convert to Petri net
                 filter_cofactors = self.filter_cofactors_check.get_active()
                 show_catalysts = self.show_catalysts_check.get_active()
@@ -559,12 +644,14 @@ class KEGGCategory(BasePathwayCategory):
                     enable_metadata_enhancement=True
                 )
                 
+                # Apply filtering for metabolic pathways to remove isolated compounds
+                # (cleaner visualization)
                 self.logger.info(f"Converting pathway (cofactors={filter_cofactors}, catalysts={show_catalysts})")
                 document_model = convert_pathway_enhanced(
                     parsed_pathway,
                     coordinate_scale=coordinate_scale,
                     include_cofactors=filter_cofactors,
-                    filter_isolated_compounds=True,
+                    filter_isolated_compounds=True,  # Filter isolated compounds for cleaner layout
                     create_enzyme_places=show_catalysts,  # ← NEW: Pass catalyst option
                     enhancement_options=enhancement_options
                 )
@@ -610,6 +697,27 @@ class KEGGCategory(BasePathwayCategory):
                 # 2. Parse KGML
                 parsed_pathway = self.parser.parse(kgml_data)
                 
+                # VALIDATION: Check if pathway has reactions
+                # shypn models biochemical and gene regulatory networks (with reactions/transitions)
+                # Pure signaling pathways (only relations, no reactions) are not yet supported
+                if not parsed_pathway.reactions:
+                    is_signaling = self._is_signaling_pathway(pathway_id)
+                    if is_signaling:
+                        raise ValueError(
+                            f"Pure signaling pathway detected ({pathway_id}).\n\n"
+                            f"shypn is designed for biochemical and gene regulatory networks "
+                            f"that have metabolic reactions or gene expression reactions.\n\n"
+                            f"This pathway has {len(parsed_pathway.relations)} regulatory relations "
+                            f"but no reactions to regulate.\n\n"
+                            f"Signaling-only networks (protein-protein interactions without biochemical "
+                            f"reactions) are not yet supported in the current model."
+                        )
+                    else:
+                        raise ValueError(
+                            f"No reactions found in pathway {pathway_id}. "
+                            f"Cannot convert pathway without reactions."
+                        )
+                
                 # 3. Convert to Petri net
                 filter_cofactors = self.filter_cofactors_check.get_active()
                 show_catalysts = self.show_catalysts_check.get_active()
@@ -621,13 +729,15 @@ class KEGGCategory(BasePathwayCategory):
                     enable_metadata_enhancement=True
                 )
                 
+                # Apply filtering for metabolic pathways to remove isolated compounds
+                # (cleaner visualization)
                 self.logger.info(f"Converting pathway (cofactors={filter_cofactors}, catalysts={show_catalysts})")
                 document_model = convert_pathway_enhanced(
                     parsed_pathway,
                     coordinate_scale=coordinate_scale,
                     include_cofactors=filter_cofactors,
-                    filter_isolated_compounds=True,  # Remove isolated places/compounds
-                    create_enzyme_places=show_catalysts,  # ← NEW: Pass catalyst option
+                    filter_isolated_compounds=True,  # Filter isolated compounds for cleaner layout
+                    create_enzyme_places=show_catalysts,
                     enhancement_options=enhancement_options
                 )
                 
@@ -666,14 +776,6 @@ class KEGGCategory(BasePathwayCategory):
             parsed_pathway = result['parsed_pathway']
             document_model = result['document_model']
             coordinate_scale = result.get('coordinate_scale', 2.5)  # Get scale, default to 2.5
-            
-            self.logger.info(f"Import complete, saving files...")
-            
-            # Store current data (including document_model for enrichment)
-            self.current_pathway_id = pathway_id
-            self.current_kgml = kgml_data
-            self.current_pathway = parsed_pathway
-            self.current_pathway_doc = document_model  # Store for enrichment
             
             # Update preview
             self._update_preview(parsed_pathway)
@@ -721,11 +823,18 @@ class KEGGCategory(BasePathwayCategory):
                     # - Callback setup
                     # Benefits: No reuse logic complexity, consistent behavior, no stale state
                     self.logger.info(f"Creating fresh canvas for KEGG import: {base_name}")
-                    page_index, drawing_area = canvas_loader.add_document(filename=base_name)
+                    
+                    # CRITICAL: Create canvas with temporary filename to avoid loading
+                    # stale view state from previous imports of same pathway ID
+                    page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
                     canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
                     
                     if not canvas_manager:
                         raise ValueError("Failed to get canvas manager after tab creation")
+                    
+                    # CRITICAL: Set filepath FIRST before load_objects
+                    # This ensures the correct filename is used for any auto-save operations
+                    canvas_manager.set_filepath(saved_filepath)
                     
                     # ===== UNIFIED OBJECT LOADING =====
                     # Use load_objects() for consistent initialization (same as File → Open)
@@ -735,14 +844,21 @@ class KEGGCategory(BasePathwayCategory):
                         arcs=document_model.arcs
                     )
                     
+                    # CRITICAL: Restore viewport from document (center on model)
+                    # KEGG models are positioned in KEGG coordinate space (not at origin)
+                    # The converter already calculated optimal viewport (centered on model bounds)
+                    # This MUST happen AFTER load_objects to override any auto-centering
+                    if hasattr(document_model, 'view_state') and document_model.view_state:
+                        self.logger.info(f"Restoring viewport: pan=({document_model.view_state.get('pan_x', 0):.1f}, {document_model.view_state.get('pan_y', 0):.1f})")
+                        canvas_manager.set_view_state(document_model.view_state)
+                    
                     # CRITICAL: Set change callback for proper state management
                     # (This is what File → Open does)
                     canvas_manager.document_controller.set_change_callback(
                         canvas_manager._on_object_changed
                     )
                     
-                    # Set filepath and mark as clean (just imported/saved)
-                    canvas_manager.set_filepath(saved_filepath)
+                    # Mark as clean (just imported/saved)
                     canvas_manager.mark_clean()
                     
                     # Mark as imported (Canvas Health standard)
@@ -770,14 +886,10 @@ class KEGGCategory(BasePathwayCategory):
                         else:
                             self.logger.warning("Could not find drawing_area for simulation reset")
                     
-                    # Fit to page to show entire model (with padding)
-                    self.logger.info("Calling fit_to_page...")
-                    canvas_manager.fit_to_page(
-                        padding_percent=15,
-                        deferred=True,
-                        horizontal_offset_percent=30,  # Shift content RIGHT for left panels
-                        vertical_offset_percent=-10    # Shift content UP for bottom panels
-                    )
+                    # NOTE: We do NOT call fit_to_page() here because the converter already
+                    # set the optimal viewport (centered on model bounds at zoom=1.0).
+                    # fit_to_page() would recalculate and apply offsets which could push
+                    # the model out of view. User can manually fit if needed (Ctrl+0).
                     
                     # Force redraw to display loaded objects
                     self.logger.info("Calling mark_needs_redraw...")
@@ -898,61 +1010,19 @@ class KEGGCategory(BasePathwayCategory):
         return False  # Don't repeat
     
     def _update_preview(self, pathway):
-        """Update preview text with comprehensive pathway information and metadata.
+        """Update preview with comprehensive pathway information.
+        
+        Updates both the metadata tree and text summary tabs.
         
         Args:
-            pathway: Parsed KEGG pathway object
+            pathway: Parsed KEGG pathway object (KEGGPathway)
         """
-        if not pathway or not self.preview_text:
+        if not pathway:
             return
         
-        # Build comprehensive preview text
-        lines = []
-        
-        # === BASIC INFORMATION ===
-        lines.append("=== PATHWAY INFORMATION ===")
-        lines.append(f"Name: {pathway.name}")
-        lines.append(f"Title: {pathway.title or 'N/A'}")
-        lines.append(f"Organism: {pathway.org}")
-        lines.append(f"Number: {pathway.number}")
-        lines.append("")
-        
-        # === CONTENT STATISTICS ===
-        lines.append("=== CONTENT ===")
-        lines.append(f"Total Entries: {len(pathway.entries)}")
-        lines.append(f"Reactions: {len(pathway.reactions)}")
-        lines.append(f"Relations: {len(pathway.relations)}")
-        lines.append("")
-        
-        # Count entry types
-        compounds = sum(1 for e in pathway.entries.values() if e.type == 'compound')
-        genes = sum(1 for e in pathway.entries.values() if e.type == 'gene')
-        enzymes = sum(1 for e in pathway.entries.values() if e.type == 'enzyme')
-        maps = sum(1 for e in pathway.entries.values() if e.type == 'map')
-        groups = sum(1 for e in pathway.entries.values() if e.type == 'group')
-        
-        lines.append(f"Entry Types:")
-        lines.append(f"  Compounds: {compounds}")
-        lines.append(f"  Genes: {genes}")
-        lines.append(f"  Enzymes: {enzymes}")
-        if maps > 0:
-            lines.append(f"  Maps: {maps}")
-        if groups > 0:
-            lines.append(f"  Groups: {groups}")
-        lines.append("")
-        
-        # === METADATA ===
-        lines.append("=== METADATA ===")
-        lines.append(f"Source: KEGG API")
-        lines.append(f"Pathway ID: {pathway.name}")
-        lines.append(f"Image Available: {pathway.image or 'No'}")
-        lines.append(f"Link: {pathway.link or 'N/A'}")
-        
-        preview_text = "\n".join(lines)
-        
-        # Set text in TextView
-        buffer = self.preview_text.get_buffer()
-        buffer.set_text(preview_text)
+        # Update both tabs
+        self._populate_metadata_tree(pathway)
+        self._update_text_summary(pathway)
     
     def _save_to_project(self, pathway_id, kgml_data, parsed_pathway, document_model, coordinate_scale=2.5):
         """Save imported pathway files to project.
@@ -1217,3 +1287,367 @@ class KEGGCategory(BasePathwayCategory):
         self._show_error(f"Enrichment failed: {error}")
         
         return False  # Don't repeat
+    
+    def _populate_metadata_tree(self, pathway):
+        """Populate metadata tree with KEGG pathway information.
+        
+        Args:
+            pathway: KEGGPathway object with all metadata
+        """
+        def do_populate():
+            try:
+                self.metadata_store.clear()
+                
+                # === PATHWAY INFO ===
+                pathway_root = self.metadata_store.append(None, [
+                    "🗺️", "Pathway Info", pathway.title or pathway.name,
+                    "section", "", f"KEGG Pathway: {pathway.name}"
+                ])
+                
+                self.metadata_store.append(pathway_root, [
+                    "🔖", "Name", pathway.name,
+                    "info", "", f"Pathway identifier: {pathway.name}"
+                ])
+                
+                self.metadata_store.append(pathway_root, [
+                    "🔖", "Title", pathway.title or "N/A",
+                    "info", "", f"Pathway title: {pathway.title}"
+                ])
+                
+                self.metadata_store.append(pathway_root, [
+                    "🌐", "Organism", pathway.org or "N/A",
+                    "info", "", f"Organism code: {pathway.org}"
+                ])
+                
+                self.metadata_store.append(pathway_root, [
+                    "🔢", "Number", pathway.number or "N/A",
+                    "info", "", f"Pathway number: {pathway.number}"
+                ])
+                
+                if pathway.link:
+                    self.metadata_store.append(pathway_root, [
+                        "🔗", "Link", pathway.link[:50] + "..." if len(pathway.link) > 50 else pathway.link,
+                        "url", "", f"KEGG database link: {pathway.link}"
+                    ])
+                
+                # === STATISTICS ===
+                stats_root = self.metadata_store.append(None, [
+                    "📊", "Statistics", f"{len(pathway.entries)} entries",
+                    "section", "", "Pathway content statistics"
+                ])
+                
+                self.metadata_store.append(stats_root, [
+                    "📍", "Total Entries", str(len(pathway.entries)),
+                    "stat", "", f"Total nodes in pathway"
+                ])
+                
+                self.metadata_store.append(stats_root, [
+                    "🔶", "Total Reactions", str(len(pathway.reactions)),
+                    "stat", "", f"Metabolic reactions"
+                ])
+                
+                self.metadata_store.append(stats_root, [
+                    "🔗", "Total Relations", str(len(pathway.relations)),
+                    "stat", "", f"Regulatory interactions"
+                ])
+                
+                # Entry type breakdown
+                entry_types = pathway.count_entry_types()
+                types_iter = self.metadata_store.append(stats_root, [
+                    "📦", "Entry Types", f"{len(entry_types)} types",
+                    "section", "", "Distribution of entry types"
+                ])
+                
+                for etype, count in sorted(entry_types.items()):
+                    icon = self._get_entry_type_icon(etype)
+                    self.metadata_store.append(types_iter, [
+                        icon, etype.capitalize(), str(count),
+                        "type_stat", "", f"{count} {etype} entries"
+                    ])
+                
+                # === ENTRIES BY TYPE ===
+                entries_root = self.metadata_store.append(None, [
+                    "📦", "Entries", f"{len(pathway.entries)} items",
+                    "section", "", "All pathway entries"
+                ])
+                
+                # Group entries by type
+                entries_by_type = pathway.group_entries_by_type()
+                
+                # Add each type group
+                for etype in sorted(entries_by_type.keys()):
+                    entries = entries_by_type[etype]
+                    icon = self._get_entry_type_icon(etype)
+                    type_root = self.metadata_store.append(entries_root, [
+                        icon, f"{etype.capitalize()}s", f"{len(entries)} items",
+                        "entry_type", "", f"{len(entries)} {etype} entries"
+                    ])
+                    
+                    # Add individual entries (limit to first 50)
+                    for entry in entries[:50]:
+                        display_name = entry.graphics.name if entry.graphics else entry.name
+                        entry_iter = self.metadata_store.append(type_root, [
+                            icon, display_name or entry.id,
+                            entry.id,
+                            "entry", entry.id,
+                            f"{etype}: {display_name or entry.id}"
+                        ])
+                        
+                        # Add entry details as children
+                        if entry.graphics:
+                            self.metadata_store.append(entry_iter, [
+                                "📍", "Position",
+                                f"({entry.graphics.x:.0f}, {entry.graphics.y:.0f})",
+                                "position", "", f"Canvas coordinates"
+                            ])
+                        
+                        if entry.reaction:
+                            self.metadata_store.append(entry_iter, [
+                                "🔶", "Reaction",
+                                entry.reaction,
+                                "reaction_ref", "", f"Associated reaction: {entry.reaction}"
+                            ])
+                        
+                        if entry.components:
+                            comp_iter = self.metadata_store.append(entry_iter, [
+                                "🔗", "Components",
+                                f"{len(entry.components)} members",
+                                "components", "", f"Group with {len(entry.components)} members"
+                            ])
+                            for comp_id in entry.components[:10]:
+                                self.metadata_store.append(comp_iter, [
+                                    "➜", f"Entry {comp_id}", "",
+                                    "component", comp_id, f"Component entry ID: {comp_id}"
+                                ])
+                    
+                    if len(entries) > 50:
+                        self.metadata_store.append(type_root, [
+                            "⋯", f"... {len(entries) - 50} more", "",
+                            "", "", f"Total: {len(entries)} entries"
+                        ])
+                
+                # === REACTIONS ===
+                reactions_root = self.metadata_store.append(None, [
+                    "🔶", "Reactions", f"{len(pathway.reactions)} items",
+                    "section", "", "Metabolic reactions"
+                ])
+                
+                for rxn in pathway.reactions[:100]:  # Limit to first 100
+                    rxn_type = "⇌" if rxn.is_reversible() else "→"
+                    reaction_iter = self.metadata_store.append(reactions_root, [
+                        "🔶", rxn.name,
+                        f"{rxn_type} {rxn.type}",
+                        "reaction", rxn.id,
+                        f"Reaction {rxn.name} ({rxn.type})"
+                    ])
+                    
+                    # Substrates
+                    if rxn.substrates:
+                        subs_iter = self.metadata_store.append(reaction_iter, [
+                            "⬅️", "Substrates",
+                            f"{len(rxn.substrates)} items",
+                            "substrates", "", "Reaction inputs"
+                        ])
+                        for sub in rxn.substrates:
+                            self.metadata_store.append(subs_iter, [
+                                "🧪", sub.name,
+                                f"Entry {sub.id}",
+                                "substrate", sub.id,
+                                f"Substrate: {sub.name}"
+                            ])
+                    
+                    # Products
+                    if rxn.products:
+                        prods_iter = self.metadata_store.append(reaction_iter, [
+                            "➡️", "Products",
+                            f"{len(rxn.products)} items",
+                            "products", "", "Reaction outputs"
+                        ])
+                        for prod in rxn.products:
+                            self.metadata_store.append(prods_iter, [
+                                "🧪", prod.name,
+                                f"Entry {prod.id}",
+                                "product", prod.id,
+                                f"Product: {prod.name}"
+                            ])
+                
+                if len(pathway.reactions) > 100:
+                    self.metadata_store.append(reactions_root, [
+                        "⋯", f"... {len(pathway.reactions) - 100} more", "",
+                        "", "", f"Total: {len(pathway.reactions)} reactions"
+                    ])
+                
+                # === RELATIONS ===
+                relations_root = self.metadata_store.append(None, [
+                    "🔗", "Relations", f"{len(pathway.relations)} items",
+                    "section", "", "Regulatory interactions"
+                ])
+                
+                # Group relations by type
+                relations_by_type = pathway.group_relations_by_type()
+                
+                for rel_type in sorted(relations_by_type.keys()):
+                    relations = relations_by_type[rel_type]
+                    type_iter = self.metadata_store.append(relations_root, [
+                        self._get_relation_type_icon(rel_type),
+                        rel_type,
+                        f"{len(relations)} items",
+                        "relation_type", "", f"{len(relations)} {rel_type} relations"
+                    ])
+                    
+                    for rel in relations[:50]:  # Limit per type
+                        rel_iter = self.metadata_store.append(type_iter, [
+                            "🔗", f"{rel.entry1} → {rel.entry2}",
+                            rel.type,
+                            "relation", f"{rel.entry1}_{rel.entry2}",
+                            f"{rel.type} relation: {rel.entry1} to {rel.entry2}"
+                        ])
+                        
+                        # Add subtypes
+                        if rel.subtypes:
+                            for subtype in rel.subtypes:
+                                self.metadata_store.append(rel_iter, [
+                                    "➜", subtype.name,
+                                    subtype.value or "",
+                                    "subtype", "", f"{subtype.name}: {subtype.value or 'N/A'}"
+                                ])
+                    
+                    if len(relations) > 50:
+                        self.metadata_store.append(type_iter, [
+                            "⋯", f"... {len(relations) - 50} more", "",
+                            "", "", f"Total: {len(relations)} {rel_type} relations"
+                        ])
+                
+                # Expand top-level nodes
+                for i in range(5):  # First 5 sections
+                    path = Gtk.TreePath.new_from_indices([i])
+                    if path:
+                        self.metadata_tree.expand_row(path, False)
+                
+            except Exception as e:
+                self.logger.error(f"Error populating metadata tree: {e}", exc_info=True)
+            
+            return False
+        
+        GLib.idle_add(do_populate)
+    
+    def _update_text_summary(self, pathway):
+        """Update text summary tab.
+        
+        Args:
+            pathway: KEGGPathway object
+        """
+        def do_update():
+            try:
+                buffer = self.preview_text.get_buffer()
+                
+                lines = []
+                lines.append("=== KEGG PATHWAY ===")
+                lines.append(f"Name: {pathway.name}")
+                lines.append(f"Title: {pathway.title or 'N/A'}")
+                lines.append(f"Organism: {pathway.org or 'N/A'}")
+                lines.append(f"Number: {pathway.number or 'N/A'}")
+                lines.append("")
+                
+                lines.append("=== STATISTICS ===")
+                lines.append(f"Total Entries: {len(pathway.entries)}")
+                lines.append(f"Total Reactions: {len(pathway.reactions)}")
+                lines.append(f"Total Relations: {len(pathway.relations)}")
+                lines.append("")
+                
+                lines.append("=== ENTRY TYPES ===")
+                entry_types = pathway.count_entry_types()
+                for etype, count in sorted(entry_types.items()):
+                    lines.append(f"  {etype.capitalize()}: {count}")
+                
+                if pathway.relations:
+                    lines.append("")
+                    lines.append("=== RELATION TYPES ===")
+                    relation_types = pathway.count_relation_types()
+                    for rtype, count in sorted(relation_types.items()):
+                        lines.append(f"  {rtype}: {count}")
+                
+                lines.append("")
+                lines.append("=== REACTIONS ===")
+                reversible_count = sum(1 for r in pathway.reactions if r.is_reversible())
+                irreversible_count = len(pathway.reactions) - reversible_count
+                lines.append(f"  Reversible: {reversible_count}")
+                lines.append(f"  Irreversible: {irreversible_count}")
+                
+                buffer.set_text("\n".join(lines))
+            except Exception as e:
+                self.logger.error(f"Error updating text summary: {e}", exc_info=True)
+            
+            return False
+        
+        GLib.idle_add(do_update)
+    
+    def _get_entry_type_icon(self, entry_type: str) -> str:
+        """Get icon for entry type.
+        
+        Args:
+            entry_type: Type of entry
+            
+        Returns:
+            Unicode icon string
+        """
+        icons = {
+            'compound': '🧪',
+            'gene': '🧬',
+            'enzyme': '⚗️',
+            'ortholog': '🔬',
+            'map': '🗺️',
+            'group': '📦',
+            'other': '📍'
+        }
+        return icons.get(entry_type, '📍')
+    
+    def _get_relation_type_icon(self, relation_type: str) -> str:
+        """Get icon for relation type.
+        
+        Args:
+            relation_type: Type of relation
+            
+        Returns:
+            Unicode icon string
+        """
+        icons = {
+            'ECrel': '⚗️',     # Enzyme-enzyme relation
+            'PPrel': '🔗',     # Protein-protein interaction
+            'GErel': '🧬',     # Gene expression interaction
+            'PCrel': '🧪',     # Protein-compound interaction
+            'maplink': '🗺️'   # Link to another map
+        }
+        return icons.get(relation_type, '🔗')
+    
+    def _on_metadata_row_clicked(self, tree_view, path, column):
+        """Handle metadata tree row activation.
+        
+        Shows a dialog with full information about the clicked item.
+        
+        Args:
+            tree_view: TreeView widget
+            path: TreePath of clicked row
+            column: TreeViewColumn of clicked cell
+        """
+        model = tree_view.get_model()
+        iter_node = model.get_iter(path)
+        
+        obj_type = model.get_value(iter_node, 3)
+        obj_id = model.get_value(iter_node, 4)
+        tooltip = model.get_value(iter_node, 5)
+        
+        if not tooltip:
+            return
+        
+        # Show info dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.parent_window,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=model.get_value(iter_node, 1)
+        )
+        dialog.format_secondary_text(tooltip)
+        dialog.run()
+        dialog.destroy()

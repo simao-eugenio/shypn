@@ -35,12 +35,14 @@ try:
     from shypn.data.pathway.pathway_validator import PathwayValidator
     from shypn.data.pathway.pathway_postprocessor import PathwayPostProcessor
     from shypn.data.pathway.pathway_converter import PathwayConverter
+    from shypn.services.sbml_compartment_module_service import SBMLCompartmentModuleService
 except ImportError as e:
     print(f'Warning: SBML importer not available: {e}', file=sys.stderr)
     SBMLParser = None
     PathwayValidator = None
     PathwayPostProcessor = None
     PathwayConverter = None
+    SBMLCompartmentModuleService = None
 
 
 class SBMLImportPanel:
@@ -77,6 +79,9 @@ class SBMLImportPanel:
         self.parent_window = parent_window  # WAYLAND FIX: Store parent for dialogs
         self.project = project
         self.logger = logging.getLogger(self.__class__.__name__)
+        
+        # DEBUG: Confirm module conversion code is loaded
+        print(f"[SBML_INIT] SBMLCompartmentModuleService available: {SBMLCompartmentModuleService is not None}", flush=True)
         
         # Initialize backend components
         if SBMLParser and PathwayValidator and PathwayPostProcessor and PathwayConverter:
@@ -660,6 +665,57 @@ class SBMLImportPanel:
                 # Convert ProcessedPathwayData to Petri net
                 document_model = self.converter.convert(processed)
                 
+                # DEBUG: Check if we reach module conversion
+                print(f"[MODULE_CONV_DEBUG] Reached module conversion block", flush=True)
+                print(f"[MODULE_CONV_DEBUG] SBMLCompartmentModuleService available: {SBMLCompartmentModuleService is not None}", flush=True)
+                print(f"[MODULE_CONV_DEBUG] document_model: {document_model is not None}", flush=True)
+                print(f"[MODULE_CONV_DEBUG] processed: {processed is not None}", flush=True)
+                
+                # Convert SBML compartments to modules (if service available)
+                if SBMLCompartmentModuleService and document_model and processed:
+                    try:
+                        print("🔍 Converting SBML compartments to modules...", flush=True)
+                        
+                        # Build species_id → Place mapping from document
+                        species_to_place = {}
+                        for place in document_model.places:
+                            # Place.id might be the species ID
+                            if hasattr(place, 'id'):
+                                species_to_place[place.id] = place
+                        
+                        # Build reaction_id → Transition mapping
+                        reaction_to_transition = {}
+                        for transition in document_model.transitions:
+                            if hasattr(transition, 'id'):
+                                reaction_to_transition[transition.id] = transition
+                        
+                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
+                        
+                        module_service = SBMLCompartmentModuleService()
+                        conversion_result = module_service.convert_compartments_to_modules(
+                            document=document_model,
+                            pathway=processed,
+                            species_to_place=species_to_place,
+                            reaction_to_transition=reaction_to_transition,
+                            auto_detect_signals=True,
+                            validate=True
+                        )
+                        if conversion_result and conversion_result.get('success'):
+                            modules = conversion_result.get('modules', [])
+                            signals = conversion_result.get('boundary_signals', [])
+                            print(f"✓ Module conversion successful:", flush=True)
+                            print(f"  - Modules created: {len(modules)}", flush=True)
+                            for mod in modules:
+                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
+                            print(f"  - Boundary signals: {len(signals)}", flush=True)
+                        else:
+                            error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
+                            print(f"⚠ Module conversion failed: {error}", flush=True)
+                    except Exception as e:
+                        import traceback
+                        print(f"❌ Module conversion exception: {e}", flush=True)
+                        traceback.print_exc()
+                
                 # Pass results back to main thread for saving
                 GLib.idle_add(self._on_load_and_save_complete, document_model, pathway_name)
                 
@@ -905,6 +961,11 @@ class SBMLImportPanel:
                 self.current_pathway_doc.metadata['reactions_count'] = len(parsed_pathway.reactions)
                 self.current_pathway_doc.metadata['compartments'] = list(parsed_pathway.compartments.keys())
                 
+                # Add function definitions metadata if present
+                if 'function_definitions_count' in parsed_pathway.metadata:
+                    self.current_pathway_doc.metadata['function_definitions_count'] = parsed_pathway.metadata['function_definitions_count']
+                    self.current_pathway_doc.metadata['function_definitions'] = parsed_pathway.metadata['function_definitions']
+                
                 # Save updated metadata
                 self.project.save()
                 
@@ -937,13 +998,13 @@ class SBMLImportPanel:
         if self.sbml_parse_button:
             self.sbml_parse_button.set_sensitive(True)
         
-        # Auto-load to canvas after parse
-        # NOTE: Canvas was already created in _on_import_clicked() for lazy loading
-        if self.model_canvas:
-            self.logger.info("Auto-loading to canvas after parse")
-            self._on_load_clicked(None)
-        else:
-            self.logger.debug("Canvas not available, skipping auto-load")
+        # Auto-continue to load/convert only if triggered by unified Import button
+        if self._import_button_flow:
+            if self.model_canvas:
+                self.logger.info("Auto-loading to canvas after parse")
+                self._on_load_clicked(None)
+            else:
+                self.logger.debug("Canvas not available, skipping auto-load")
         
         return False
     
@@ -1052,6 +1113,19 @@ class SBMLImportPanel:
                 lines.append(f"  • {comp_name or comp_id}")
             if len(pathway.compartments) > 5:
                 lines.append(f"  ... and {len(pathway.compartments) - 5} more")
+            lines.append("")
+        
+        # Function definitions info (if any)
+        function_count = pathway.metadata.get('function_definitions_count', 0)
+        if function_count > 0:
+            lines.append(f"Function Definitions: {function_count}")
+            function_names = pathway.metadata.get('function_definitions', [])
+            if function_names:
+                for func_name in function_names[:5]:
+                    lines.append(f"  • {func_name}")
+                if len(function_names) > 5:
+                    lines.append(f"  ... and {len(function_names) - 5} more")
+            lines.append("")
         
         preview_text = "\n".join(lines)
         

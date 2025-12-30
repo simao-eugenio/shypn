@@ -216,12 +216,63 @@ pip install python-libsbml
 - Increase time step for continuous transitions
 - Close other applications
 
+## Modular Architecture (Advanced)
+
+### Signal Places and Modules
+
+SHYpn supports **modular Bio-PN** with signal places (Ψ) for information flow:
+
+#### When to Use Modules
+- Multi-compartment models (nucleus, cytoplasm, mitochondria)
+- Large pathway networks (glycolysis + TCA cycle)
+- Multi-cellular systems (quorum sensing)
+
+#### Quick Example: Energy Sensing
+
+```python
+# Signal place for ATP/ADP ratio (read-only)
+atp_ratio = create_place("ATP_Ratio")
+atp_ratio.is_signal_place = True
+atp_ratio.signal_type = SignalType.ENERGY
+atp_ratio.tokens = 0.8  # High energy state
+
+# Transition reads signal without consuming
+pfk = create_transition("Phosphofructokinase")
+pfk.rate_function = "Vmax * Glucose * (1 - ATP_Ratio)"
+```
+
+#### SBML Auto-Import with Modules
+
+When importing SBML with compartments:
+1. **File → Import → SBML**
+2. Compartments become modules automatically
+3. Cross-compartment modifiers become signal places
+4. Analyze with: `python -m cli.analysis.module_analysis model.json`
+
+#### Manual Module Creation
+
+1. **Create module**: Right-click → "Create Module"
+2. **Assign places/transitions**: Select → Set "Module ID" in properties
+3. **Designate signals**: Check "Is Signal Place" in place properties
+4. **Validate**: Use CLI analysis tool to check architecture quality
+
+**Learn more**: See [doc/MODULAR_BIOPN_GUIDE.md](doc/MODULAR_BIOPN_GUIDE.md) for comprehensive guide
+
 ## Next Steps
 
 - **Full Documentation**: See `doc/` directory for in-depth guides
+- **Modular Architecture**: [doc/MODULAR_BIOPN_GUIDE.md](doc/MODULAR_BIOPN_GUIDE.md) for modules and signals
 - **Installation Guide**: [INSTALL.md](INSTALL.md) for advanced setup
 - **API Reference**: Explore `src/shypn/` for programmatic access
 - **Examples**: Study models in `workspace/projects/Biochemical-Examples/`
+
+## Publication
+
+SHYpn is based on the weak independence theory published on arXiv:
+
+**[arXiv:2512.17106](https://arxiv.org/abs/2512.17106)** - *Weak Independence and Coupled Parallelism in Biological Petri Nets*
+
+If you use SHYpn in your research, please cite this paper.
 
 ## Getting Help
 

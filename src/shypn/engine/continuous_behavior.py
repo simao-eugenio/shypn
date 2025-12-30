@@ -155,6 +155,31 @@ class ContinuousBehavior(TransitionBehavior):
                 self._rate_function_error = str(e)
             return 0.0
     
+    def _is_signal_place(self, place) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+    
     def _compile_rate_function(self, expr: str) -> Callable:
         """Compile rate function expression to callable.
         
@@ -480,6 +505,12 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place is None:
                 return False, f"missing-place-{place_id}"
             
+            # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
+            # They broadcast information without token consumption
+            # Skip token threshold check for signal places
+            if self._is_signal_place(source_place):
+                continue  # Signal places don't block enablement
+            
             # Normal/Test arcs: Require positive tokens for continuous enablement
             # Continuous requires tokens above threshold
             if source_place.tokens <= self.min_token_threshold:
@@ -705,6 +736,11 @@ class ContinuousBehavior(TransitionBehavior):
                     source_place = self._get_place(place_id)
                     if source_place is None:
                         continue
+                    
+                    # SIGNAL PLACE SEMANTICS: Skip signal places in flow clamping
+                    # Signal places are read-only and don't limit available flow
+                    if self._is_signal_place(source_place):
+                        continue  # Signal places have unlimited "read" capacity
                     
                     # Calculate max flow possible from this arc
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')

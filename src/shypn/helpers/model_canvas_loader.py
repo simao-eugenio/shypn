@@ -34,6 +34,11 @@ except ImportError as e:
     print(f'ERROR: Cannot import ModelCanvasManager: {e}', file=sys.stderr)
     sys.exit(1)
 try:
+    from shypn.rendering import ModuleRenderer
+except ImportError as e:
+    print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr, flush=True)
+    ModuleRenderer = None
+try:
     from shypn.netobjs import Place, Transition, Arc
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
@@ -1417,7 +1422,13 @@ class ModelCanvasLoader:
                     manager.set_screen_dpi(dpi)
         except Exception as e:
             pass
-        manager.load_view_state_from_file()
+        
+        # Only load view state for non-temporary filenames
+        # Temporary names like "importing_temp" are used during imports
+        # to prevent loading stale view states
+        if filename != "importing_temp":
+            manager.load_view_state_from_file()
+        
         validation = manager.create_new_document(filename=filename)
         
         # Create Knowledge Base for intelligent model repair
@@ -2825,7 +2836,9 @@ class ModelCanvasLoader:
                             widget.queue_draw()
                             return True
             
+            # Check for objects (places, transitions, arcs)
             clicked_obj = manager.find_object_at_position(world_x, world_y)
+            
             is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
             if clicked_obj is not None:
                 import time
@@ -3366,6 +3379,9 @@ class ModelCanvasLoader:
         # Grid bounds are calculated to cover the entire rotated viewport
         manager.draw_grid(cr)
         
+        # STEP 4: Module boundaries removed - signal communication happens via formulas
+        # Signal places can be referenced in transition rate formulas without visual arcs
+        
         # Render all objects (these will be rotated)
         all_objects = manager.get_all_objects()
         for obj in all_objects:
@@ -3618,6 +3634,39 @@ class ModelCanvasLoader:
             pass
             # For normal objects, include "Edit Mode" option
             menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
+        
+        # Add signal place conversion options for places
+        if isinstance(obj, Place):
+            is_signal = getattr(obj, 'is_signal_place', False)
+            
+            if is_signal:
+                # If already a signal place, offer to remove designation
+                menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
+            else:
+                # If not a signal place, offer conversion submenu
+                signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
+                signal_submenu = Gtk.Menu()
+                
+                signal_types = [
+                    ('energy', 'Ψₑ - Energy/Metabolic State'),
+                    ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
+                    ('quorum', 'Ψq - Quorum/Cell Communication'),
+                    ('spatial', 'Ψₛ - Spatial/Compartment Sensing')
+                ]
+                
+                for type_value, type_label in signal_types:
+                    signal_item = Gtk.MenuItem(label=type_label)
+                    signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
+                    signal_item.show()
+                    signal_submenu.append(signal_item)
+                
+                signal_submenu_item.set_submenu(signal_submenu)
+                signal_submenu_item.show()
+                menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
+            
+            # Add separator after signal place options
+            menu_items.insert(3, None)
+        
         if isinstance(obj, Transition):
             type_submenu_item = Gtk.MenuItem(label='Change Type ►')
             type_submenu = Gtk.Menu()
@@ -4856,7 +4905,7 @@ class ModelCanvasLoader:
         # Toggle recording state
         obj_id = obj.id
         
-        # Define recording indicator color (orange/amber for visibility)
+        # Define recording indicator color (orange for all recorded objects)
         RECORDING_COLOR = (1.0, 0.6, 0.0)  # RGB: orange
         
         # Import default colors
@@ -4865,16 +4914,22 @@ class ModelCanvasLoader:
         if settings.is_object_recorded(obj_id):
             settings.remove_recorded_object(obj_id)
             
-            # Restore default colors
+            # Restore default colors based on object type
             if isinstance(obj, Place):
-                obj.border_color = Place.DEFAULT_BORDER_COLOR
+                # Signal places use blue color, others use default black
+                if getattr(obj, 'is_signal_place', False):
+                    obj.border_color = (0.0, 0.4, 0.8)  # Blue for signal places
+                elif getattr(obj, 'is_compartment_place', False):
+                    obj.border_color = (0.6, 0.0, 0.8)  # Violet for compartment places
+                else:
+                    obj.border_color = Place.DEFAULT_BORDER_COLOR
             elif isinstance(obj, Transition):
                 obj.border_color = Transition.DEFAULT_BORDER_COLOR
                 obj.fill_color = Transition.DEFAULT_COLOR
         else:
             settings.add_recorded_object(obj_id)
             
-            # Apply recording color
+            # Apply recording color (orange for all types)
             if isinstance(obj, Place):
                 obj.border_color = RECORDING_COLOR
             elif isinstance(obj, Transition):
@@ -5177,6 +5232,57 @@ class ModelCanvasLoader:
             
             # Redraw canvas
             drawing_area.queue_draw()
+    
+    def _on_convert_to_signal(self, place, signal_type, manager, drawing_area):
+        """Convert place to signal place with specified type.
+        
+        Args:
+            place: Place object to convert
+            signal_type: Signal type ('energy', 'regulatory', 'quorum', 'spatial')
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Set signal place properties
+        place.is_signal_place = True
+        place.signal_type = signal_type
+        
+        # Mark document dirty
+        if self.persistency:
+            self.persistency.mark_dirty()
+        
+        # Redraw canvas
+        drawing_area.queue_draw()
+        
+        # Show confirmation
+        type_labels = {
+            'energy': 'Ψₑ - Energy/Metabolic State',
+            'regulatory': 'Ψᵣ - Regulatory/Gene Expression',
+            'quorum': 'Ψq - Quorum/Cell Communication',
+            'spatial': 'Ψₛ - Spatial/Compartment Sensing'
+        }
+        type_label = type_labels.get(signal_type, signal_type)
+        print(f"Converted '{place.name}' to signal place: {type_label}")
+    
+    def _on_remove_signal_designation(self, place, manager, drawing_area):
+        """Remove signal place designation from place.
+        
+        Args:
+            place: Place object to modify
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        # Clear signal place properties
+        place.is_signal_place = False
+        place.signal_type = None
+        
+        # Mark document dirty
+        if self.persistency:
+            self.persistency.mark_dirty()
+        
+        # Redraw canvas
+        drawing_area.queue_draw()
+        
+        print(f"Removed signal designation from '{place.name}'")
 
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.

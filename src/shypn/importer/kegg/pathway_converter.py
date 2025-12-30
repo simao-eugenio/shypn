@@ -3,8 +3,9 @@
 import logging
 from typing import Dict, Optional, Callable, List
 from shypn.data.canvas.document_model import DocumentModel
-from shypn.netobjs import Place, Transition
+from shypn.netobjs import Place, Transition, Arc
 from shypn.netobjs.test_arc import TestArc
+from shypn.netobjs.inhibitor_arc import InhibitorArc
 from .converter_base import ConversionStrategy, ConversionOptions
 from .models import KEGGPathway, KEGGEntry
 from shypn.crossfetch.inference import HeuristicInferenceEngine
@@ -131,6 +132,272 @@ class KEGGEnzymeConverter:
         return test_arcs
 
 
+class KEGGRelationConverter:
+    """Converts KEGG relations to signal arcs (Information Flow - Signal Partition Theory).
+    
+    In KEGG pathways, relation elements represent regulatory/signal interactions distinct
+    from material flow (reactions). This converter implements signal place architecture:
+    
+    Relations → Signal Arcs:
+    - ECrel: Enzyme-enzyme relations (activation/inhibition)
+    - PPrel: Protein-protein interactions
+    - GErel: Gene expression control
+    - PCrel: Protein-compound interactions
+    
+    Subtypes → Arc Types:
+    - activation, expression, indirect effect → Test arc (enabling)
+    - inhibition, repression → Inhibitor arc (suppression)
+    - compound → Material flow (already handled by reactions)
+    
+    Signal Place Marking:
+    - Enzyme/gene/protein entries → Signal places (Ψ_regulatory)
+    - Mark as is_signal_place=True
+    - Apply signal_type='Ψ_regulatory'
+    - Orange arc coloring per SIGNAL_VISUAL_CODING.md
+    
+    Theoretical Foundation:
+    - Material flow (P_m): Compounds connected by regular arcs
+    - Information flow (P_s ⊆ Ψ): Enzymes/genes connected by signal arcs
+    - Partition constraint: P_m ∩ P_s = ∅
+    """
+    
+    def __init__(self, pathway: KEGGPathway, document: DocumentModel,
+                 entry_to_place: Dict[str, Place],
+                 entry_to_transition: Dict[str, Transition]):
+        """Initialize KEGG relation converter.
+        
+        Args:
+            pathway: KEGG pathway with entries and relations
+            document: Target document model
+            entry_to_place: Mapping from entry ID to Place object (for enzymes/proteins)
+            entry_to_transition: Mapping from entry ID to Transition object (for reactions)
+        """
+        self.pathway = pathway
+        self.document = document
+        self.entry_to_place = entry_to_place
+        self.entry_to_transition = entry_to_transition
+        self.logger = logging.getLogger(__name__)
+    
+    def convert(self) -> List[TestArc]:
+        """Convert KEGG relations to signal arcs.
+        
+        Returns:
+            List of signal arcs (TestArc or InhibitorArc) created
+        """
+        signal_arcs = []
+        relation_count = 0
+        skipped_no_source = 0
+        skipped_no_target = 0
+        skipped_no_subtype = 0
+        skipped_compound_only = 0
+        
+        activation_types = {'activation', 'expression', 'indirect effect', 'state change'}
+        inhibition_types = {'inhibition', 'repression'}
+        
+        # Process all relations
+        for relation in self.pathway.relations:
+            relation_count += 1
+            
+            # Get source entry (regulator: enzyme, gene, protein)
+            source_entry = self.pathway.entries.get(relation.entry1)
+            if not source_entry:
+                skipped_no_source += 1
+                self.logger.debug(f"Skipping relation: entry1 {relation.entry1} not found")
+                continue
+            
+            # Get target entry (regulated: enzyme, gene, protein, compound)
+            target_entry = self.pathway.entries.get(relation.entry2)
+            if not target_entry:
+                skipped_no_target += 1
+                self.logger.debug(f"Skipping relation: entry2 {relation.entry2} not found")
+                continue
+            
+            # Check if relation has regulatory subtypes (not just compound)
+            subtype_names = relation.get_subtype_names()
+            if not subtype_names:
+                skipped_no_subtype += 1
+                self.logger.debug(f"Skipping relation {relation.entry1}→{relation.entry2}: no subtypes")
+                continue
+            
+            # Skip relations that only have 'compound' subtype (these are material flow, handled by reactions)
+            regulatory_subtypes = [st for st in subtype_names if st not in ['compound', 'binding', 'association', 'dissociation']]
+            if not regulatory_subtypes:
+                skipped_compound_only += 1
+                self.logger.debug(f"Skipping relation {relation.entry1}→{relation.entry2}: only compound/binding subtypes")
+                continue
+            
+            # Get source place (enzyme/protein/gene acting as regulator)
+            source_place = self.entry_to_place.get(relation.entry1)
+            if not source_place:
+                # Source might not have a place if it was filtered out
+                self.logger.debug(
+                    f"Skipping relation: source entry {relation.entry1} ({source_entry.name}) "
+                    f"has no place (filtered or not created)"
+                )
+                skipped_no_source += 1
+                continue
+            
+            # Mark source place as signal place (Ψ_regulatory)
+            source_place.is_signal_place = True
+            if not hasattr(source_place, 'metadata'):
+                source_place.metadata = {}
+            source_place.metadata['signal_type'] = 'Ψ_regulatory'
+            source_place.metadata['is_regulator'] = True
+            
+            # Get target (could be transition for metabolic pathways, or place for signaling pathways)
+            target_transition = None
+            target_place = self.entry_to_place.get(relation.entry2)
+            
+            # CASE 1: Target is an enzyme with a reaction (metabolic pathway)
+            # Find the transition that the enzyme catalyzes
+            if target_entry.is_gene() and target_entry.reaction:
+                # Find transition corresponding to this reaction
+                for transition in self.document.transitions:
+                    if hasattr(transition, 'metadata') and transition.metadata:
+                        if transition.metadata.get('kegg_reaction_name') == target_entry.reaction:
+                            target_transition = transition
+                            break
+            
+            # CASE 2: Target is a protein/gene in signaling pathway (no reaction)
+            # In signaling pathways, proteins regulate other proteins directly
+            # We need to create a "dummy" transition representing the protein's activity
+            # This transition is then regulated by signal arcs
+            elif target_place and target_entry.is_gene():
+                # For signaling pathways: create transition representing protein activity
+                # This allows protein A to activate/inhibit protein B's activity
+                # Find or create transition for this protein
+                transition_id = self.document.id_manager.generate_transition_id()
+                transition_name = transition_id
+                label = f"{target_place.label}_activity"
+                
+                # Position transition near the target place
+                x = target_place.x
+                y = target_place.y + 50  # Offset below the place
+                
+                target_transition = Transition(x, y, transition_id, transition_name, label=label)
+                target_transition.metadata = {
+                    'source': 'kegg_signaling',
+                    'kegg_entry_id': relation.entry2,
+                    'kegg_entry_name': target_entry.name,
+                    'protein_activity': True,
+                    'regulated_protein': target_place.label
+                }
+                
+                # Add transition to document
+                self.document.transitions.append(target_transition)
+                
+                # Create arcs: target_place → transition → target_place (protein cycle)
+                # This represents protein being active/inactive
+                arc_id_in = self.document.id_manager.generate_arc_id()
+                arc_in = Arc(
+                    source=target_place,
+                    target=target_transition,
+                    id=arc_id_in,
+                    name=f"A{arc_id_in[1:]}",
+                    weight=1
+                )
+                self.document.arcs.append(arc_in)
+                
+                arc_id_out = self.document.id_manager.generate_arc_id()
+                arc_out = Arc(
+                    source=target_transition,
+                    target=target_place,
+                    id=arc_id_out,
+                    name=f"A{arc_id_out[1:]}",
+                    weight=1
+                )
+                self.document.arcs.append(arc_out)
+            
+            # CASE 3: Target is compound (less common, skip for now)
+            elif target_place and not target_entry.is_gene():
+                # If target is a compound, we need to find transitions that consume/produce it
+                # For now, we'll skip these - relations between genes/enzymes and compounds
+                # are typically handled differently (they affect enzyme activity, not compound)
+                self.logger.debug(
+                    f"Skipping relation {relation.entry1}→{relation.entry2}: "
+                    f"target is compound, not gene/enzyme"
+                )
+                continue
+            
+            if not target_transition:
+                self.logger.debug(
+                    f"Skipping relation {relation.entry1}→{relation.entry2}: "
+                    f"no target transition found"
+                )
+                skipped_no_target += 1
+                continue
+            
+            # Create signal arcs based on subtype
+            for subtype in regulatory_subtypes:
+                if subtype in activation_types:
+                    # Activation: test arc (enables transition)
+                    arc_id = self.document.id_manager.generate_arc_id()
+                    arc = TestArc(
+                        source=source_place,
+                        target=target_transition,
+                        id=arc_id,
+                        name=f"TA{arc_id[1:]}",
+                        weight=1
+                    )
+                    arc.metadata = {
+                        'source': 'kegg_relation',
+                        'relation_type': relation.type,
+                        'subtype': subtype,
+                        'entry1_id': relation.entry1,
+                        'entry1_name': source_entry.name,
+                        'entry2_id': relation.entry2,
+                        'entry2_name': target_entry.name,
+                        'signal_type': 'Ψ_regulatory',
+                        'regulatory_effect': 'activation'
+                    }
+                    self.document.arcs.append(arc)
+                    signal_arcs.append(arc)
+                    
+                    self.logger.debug(
+                        f"Created activation test arc: {source_place.label} → {target_transition.label} "
+                        f"({relation.type}: {subtype})"
+                    )
+                
+                elif subtype in inhibition_types:
+                    # Inhibition: inhibitor arc (suppresses transition)
+                    arc_id = self.document.id_manager.generate_arc_id()
+                    arc = InhibitorArc(
+                        source=source_place,
+                        target=target_transition,
+                        id=arc_id,
+                        name=f"I{arc_id[1:]}",
+                        weight=1
+                    )
+                    arc.metadata = {
+                        'source': 'kegg_relation',
+                        'relation_type': relation.type,
+                        'subtype': subtype,
+                        'entry1_id': relation.entry1,
+                        'entry1_name': source_entry.name,
+                        'entry2_id': relation.entry2,
+                        'entry2_name': target_entry.name,
+                        'signal_type': 'Ψ_regulatory',
+                        'regulatory_effect': 'inhibition'
+                    }
+                    self.document.arcs.append(arc)
+                    signal_arcs.append(arc)
+                    
+                    self.logger.debug(
+                        f"Created inhibition arc: {source_place.label} ⊣ {target_transition.label} "
+                        f"({relation.type}: {subtype})"
+                    )
+        
+        # Log summary
+        self.logger.info(
+            f"KEGG relation conversion: {len(signal_arcs)} signal arcs created from "
+            f"{relation_count} relations "
+            f"(skipped: {skipped_no_source} no source, {skipped_no_target} no target, "
+            f"{skipped_no_subtype} no subtype, {skipped_compound_only} compound-only)"
+        )
+        
+        return signal_arcs
+
+
 class StandardConversionStrategy(ConversionStrategy):
     """Standard conversion strategy using composition of mapper objects.
     
@@ -189,17 +456,23 @@ class StandardConversionStrategy(ConversionStrategy):
                         place_map[entry.id] = place
             
             # NEW: Optionally create places for enzyme entries (gene, enzyme, ortholog types)
-            # These represent catalysts in Biological Petri Nets
+            # These represent catalysts in Biological Petri Nets (metabolic pathways)
+            # OR regulatory proteins in signaling pathways (protein-protein interactions)
             # Set options.create_enzyme_places = True to enable biological analysis
-            # Set False (default) to maintain clean KEGG layout
-            # DESIGN: Enzyme places use KGML coordinates and participate in normal layout
-            # (not positioned separately above reactions - let them be part of the network)
+            # DESIGN: Enzyme/protein places use KGML coordinates and participate in normal layout
             if options.create_enzyme_places:
+                # Check if this is a signaling pathway (no reactions, only protein interactions)
+                is_signaling_pathway = len(pathway.reactions) == 0 and len(pathway.relations) > 0
+                
                 for entry_id, entry in pathway.entries.items():
-                    if entry.is_gene() and entry.reaction:
-                        # CRITICAL: Only create enzyme place if its reaction is in the pathway
-                        # This prevents isolated enzyme places for reactions not in this pathway
-                        if entry.reaction not in pathway_reaction_names:
+                    if entry.is_gene():
+                        # For metabolic pathways: only create places for enzymes with reactions
+                        # For signaling pathways: create places for all proteins/genes
+                        if not is_signaling_pathway and not entry.reaction:
+                            continue
+                        
+                        # For metabolic pathways: ensure reaction is in this pathway
+                        if entry.reaction and entry.reaction not in pathway_reaction_names:
                             logger.debug(
                                 f"Skipping enzyme entry {entry_id} ({entry.name}): "
                                 f"reaction {entry.reaction} not in pathway reactions"
@@ -230,7 +503,8 @@ class StandardConversionStrategy(ConversionStrategy):
                         # from dependency graphs to prevent treating them as network inputs.
                         place.is_catalyst = True  # Direct attribute for fast checking
                         
-                        # Mark as enzyme in metadata
+                        # Mark as enzyme and signal place (Ψ_regulatory) for signal partition theory
+                        place.is_signal_place = True  # Information flow, not mass transfer
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -240,6 +514,7 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['is_enzyme'] = True
                         place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
+                        place.metadata['signal_type'] = 'Ψ_regulatory'  # Regulatory signal place
                         
                         document.places.append(place)
                         place_map[entry.id] = place
@@ -286,6 +561,8 @@ class StandardConversionStrategy(ConversionStrategy):
                         # CRITICAL: Mark as catalyst for layout algorithm exclusion
                         place.is_catalyst = True  # Direct attribute for fast checking
                         
+                        # Mark as signal place (Ψ_regulatory) for signal partition theory
+                        place.is_signal_place = True  # Information flow, not mass transfer
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -295,6 +572,7 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['is_enzyme'] = True
                         place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
+                        place.metadata['signal_type'] = 'Ψ_regulatory'  # Regulatory signal place
                         
                         document.places.append(place)
                         place_map[entry.id] = place
@@ -328,6 +606,7 @@ class StandardConversionStrategy(ConversionStrategy):
         # Phase 2: Create transitions and arcs from reactions
         reaction_transition_map = {}  # Track reactions for kinetics enhancement
         reaction_name_to_transition = {}  # Map reaction names to transitions for enzyme conversion
+        entry_to_transition = {}  # Map entry IDs to transitions for relation conversion
         
         # Track reaction name occurrences for disambiguation
         reaction_name_counter = {}
@@ -360,6 +639,18 @@ class StandardConversionStrategy(ConversionStrategy):
                 # Map reaction name (e.g., "rn:R00710") to transition for enzyme linking
                 # This allows enzyme entries with reaction="rn:R00710" to find their transition
                 reaction_name_to_transition[reaction.name] = transition
+                
+                # Store reaction name in transition metadata for relation converter
+                if not hasattr(transition, 'metadata'):
+                    transition.metadata = {}
+                transition.metadata['kegg_reaction_name'] = reaction.name
+                transition.metadata['kegg_reaction_id'] = reaction.id
+                
+                # Map entry IDs to transitions for relation converter (if entry has this reaction)
+                # Find all entries that reference this reaction
+                for entry_id, entry in pathway.entries.items():
+                    if entry.reaction == reaction.name:
+                        entry_to_transition[entry_id] = transition
                 
                 # Create arcs for this transition
                 # CRITICAL: Pass document so arc builder uses unified arc ID counter
@@ -397,6 +688,44 @@ class StandardConversionStrategy(ConversionStrategy):
                     f"(enzymes/catalysts)"
                 )
         
+        # Phase 2.7: Convert KEGG relations to signal arcs (Information Flow - Signal Partition Theory)
+        # Relations represent regulatory/signal interactions distinct from material flow
+        # - activation, expression → test arcs (enabling)
+        # - inhibition, repression → inhibitor arcs (suppression)
+        # NOTE: This creates arcs from regulatory places (enzymes/genes) to transitions
+        # Enzymes/genes are marked as signal places (Ψ_regulatory) - information, not mass
+        if pathway.relations:
+            relation_converter = KEGGRelationConverter(
+                pathway=pathway,
+                document=document,
+                entry_to_place=place_map,
+                entry_to_transition=entry_to_transition
+            )
+            relation_arcs = relation_converter.convert()
+            
+            # Update document metadata
+            if relation_arcs:
+                if not hasattr(document, 'metadata') or document.metadata is None:
+                    document.metadata = {}
+                document.metadata['has_relations'] = True
+                document.metadata['relation_arc_count'] = len(relation_arcs)
+                
+                # Count activation vs inhibition
+                activation_count = sum(1 for arc in relation_arcs if isinstance(arc, TestArc))
+                inhibition_count = sum(1 for arc in relation_arcs if isinstance(arc, InhibitorArc))
+                document.metadata['activation_count'] = activation_count
+                document.metadata['inhibition_count'] = inhibition_count
+                
+                logger.info(
+                    f"Converted {len(relation_arcs)} KEGG relations to signal arcs "
+                    f"({activation_count} activation, {inhibition_count} inhibition)"
+                )
+        
+        # Phase 2.8: Color signal arcs (orange) per Signal Visual Coding System
+        # Signal places (Ψ) represent information flow, distinct from mass transfer
+        # Orange arcs = information/regulatory, Violet = compartment transport, Blue = boundary
+        self._color_signal_arcs(document)
+        
         # Phase 3: Enhance transitions with kinetic properties
         if options.enhance_kinetics:
             self._enhance_transition_kinetics(document, reaction_transition_map, pathway)
@@ -412,7 +741,111 @@ class StandardConversionStrategy(ConversionStrategy):
         # LOGGING: Log conversion statistics
         self._log_conversion_statistics(document, pathway)
         
+        # Phase 5: Set initial viewport to center on model
+        # KEGG pathways are positioned in world coordinates (e.g., 400-2000 range)
+        # GUI needs to know where to center the viewport
+        self._set_initial_viewport(document)
+        
         return document
+    
+    def _color_signal_arcs(self, document: DocumentModel) -> None:
+        """Color arcs connected to signal places with orange (SIGNAL_VISUAL_CODING.md).
+        
+        Signal places (Ψ) represent information flow, not mass transfer.
+        Their arcs should be visually distinct from:
+        - Metabolic arcs (black)
+        - Compartment transport arcs (violet)
+        - Boundary species arcs (blue)
+        
+        Color priority: Orange > Blue > Violet > Black
+        Signal arcs get highest priority since they represent information coupling.
+        """
+        ORANGE_COLOR = (1.0, 0.6, 0.0)  # Orange for signal communication
+        signal_arc_count = 0
+        
+        # Find all signal places
+        signal_places = [p for p in document.places if getattr(p, 'is_signal_place', False)]
+        
+        if not signal_places:
+            return
+        
+        # Color arcs connected to signal places
+        for arc in document.arcs:
+            # Check if arc connects to signal place
+            is_signal_arc = False
+            if hasattr(arc, 'source') and arc.source in signal_places:
+                is_signal_arc = True
+            elif hasattr(arc, 'target') and hasattr(arc.target, '__class__') and arc.target.__class__.__name__ == 'Place':
+                # For arcs where target is a place (though typically signal arcs go Place→Transition)
+                if arc.target in signal_places:
+                    is_signal_arc = True
+            
+            if is_signal_arc:
+                # Only color if not already colored by higher priority (none higher than orange)
+                arc.color = ORANGE_COLOR
+                signal_arc_count += 1
+        
+        logger.info(
+            f"Colored {signal_arc_count} signal arcs (orange) for "
+            f"{len(signal_places)} signal places (Ψ_regulatory)"
+        )
+    
+    def _set_initial_viewport(self, document: DocumentModel) -> None:
+        """Set initial viewport to center on the model.
+        
+        KEGG pathways have objects positioned in KEGG coordinate space
+        (typically 400-2000 range). GUI needs viewport centered on model.
+        
+        Sets document.view_state['pan_x'] and ['pan_y'] to model center.
+        """
+        if not document.places and not document.transitions:
+            return
+        
+        # Calculate bounding box of all objects
+        all_objects = []
+        for place in document.places:
+            all_objects.append((place.x, place.y))
+        for transition in document.transitions:
+            all_objects.append((transition.x, transition.y))
+        
+        if not all_objects:
+            return
+        
+        # Find bounds
+        xs = [obj[0] for obj in all_objects]
+        ys = [obj[1] for obj in all_objects]
+        
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        
+        # Calculate center
+        center_x = (min_x + max_x) / 2
+        center_y = (min_y + max_y) / 2
+        
+        # Set viewport to center on model
+        # Note: pan values are typically negative (viewport center in world coords)
+        document.view_state['pan_x'] = center_x
+        document.view_state['pan_y'] = center_y
+        
+        # Also store model bounds in metadata for reference
+        if not hasattr(document, 'metadata') or document.metadata is None:
+            document.metadata = {}
+        
+        document.metadata['model_bounds'] = {
+            'min_x': min_x,
+            'max_x': max_x,
+            'min_y': min_y,
+            'max_y': max_y,
+            'width': max_x - min_x,
+            'height': max_y - min_y,
+            'center_x': center_x,
+            'center_y': center_y
+        }
+        
+        logger.info(
+            f"Set initial viewport to center ({center_x:.1f}, {center_y:.1f}), "
+            f"model bounds: {max_x - min_x:.1f}x{max_y - min_y:.1f}"
+        )
     
     def _validate_bipartite_property(self, document: DocumentModel, pathway: KEGGPathway):
         """Validate that all arcs satisfy bipartite property.
@@ -931,7 +1364,7 @@ def convert_pathway(pathway: KEGGPathway,
                    split_reversible: bool = False,
                    add_initial_marking: bool = False,
                    filter_isolated_compounds: bool = True,
-                   create_enzyme_places: bool = False) -> DocumentModel:
+                   create_enzyme_places: bool = True) -> DocumentModel:
     """Quick function to convert pathway with common options.
     
     Args:
@@ -941,9 +1374,9 @@ def convert_pathway(pathway: KEGGPathway,
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
-        create_enzyme_places: Create explicit places for enzymes and test arcs (default: False)
-            When False: Clean KEGG layout, classical PN (recommended for visualization)
-            When True: Biological PN with enzyme places and test arcs (recommended for analysis)
+        create_enzyme_places: Create explicit places for enzymes and test arcs (default: True)
+            When True: Biological PN with enzyme places and signal arcs (biological correctness)
+            When False: Classical PN without enzymes (simplified visualization only)
         
     Returns:
         DocumentModel
@@ -953,11 +1386,11 @@ def convert_pathway(pathway: KEGGPathway,
         >>> kgml = fetch_pathway("hsa00010")
         >>> pathway = parse_kgml(kgml)
         >>> 
-        >>> # Clean layout (default - recommended)
+        >>> # Biological model with enzymes and signal arcs (default - recommended)
         >>> document = convert_pathway(pathway, coordinate_scale=3.0, include_cofactors=False)
         >>> 
-        >>> # Biological analysis (with enzyme places)
-        >>> document = convert_pathway(pathway, create_enzyme_places=True)
+        >>> # Simplified visualization without enzymes (classical PN)
+        >>> document = convert_pathway(pathway, create_enzyme_places=False)
     """
     options = ConversionOptions(
         coordinate_scale=coordinate_scale,
@@ -978,7 +1411,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             split_reversible: bool = False,
                             add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
-                            create_enzyme_places: bool = False,
+                            create_enzyme_places: bool = True,
                             enhancement_options: 'EnhancementOptions' = None) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
     
@@ -997,9 +1430,9 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         split_reversible: Split reversible reactions into two transitions
         add_initial_marking: Add initial tokens to places (default: False - KEGG has no concentrations)
         filter_isolated_compounds: Remove compounds not involved in any reaction
-        create_enzyme_places: Create explicit places for enzymes and test arcs (default: False)
-            When False: Clean KEGG layout, classical PN (recommended for visualization)
-            When True: Biological PN with enzyme places and test arcs (recommended for analysis)
+        create_enzyme_places: Create explicit places for enzymes and test arcs (default: True)
+            When True: Biological PN with enzyme places and signal arcs (biological correctness)
+            When False: Classical PN without enzymes (simplified visualization only)
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.
             Set enable_enhancements=False to skip all enhancements.

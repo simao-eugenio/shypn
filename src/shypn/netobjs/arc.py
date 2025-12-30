@@ -75,10 +75,11 @@ class Arc(PetriNetObject):
         """Get the arc type identifier.
         
         Returns:
-            str: Arc type - "normal", "inhibitor", "test", "curved_arc", "curved_inhibitor_arc"
+            str: Arc type - "normal", "inhibitor", "test", "signal_flow", "curved_arc", "curved_inhibitor_arc"
         """
         from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.netobjs.test_arc import TestArc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.netobjs.curved_arc import CurvedArc
         from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
         
@@ -86,6 +87,8 @@ class Arc(PetriNetObject):
             return "curved_inhibitor_arc"
         if isinstance(self, CurvedArc):
             return "curved_arc"
+        if isinstance(self, SignalFlowArc):
+            return "signal_flow"
         if isinstance(self, TestArc):
             return "test"
         if isinstance(self, InhibitorArc):
@@ -94,6 +97,8 @@ class Arc(PetriNetObject):
     
     def set_arc_type(self, arc_type: str):
         """Set the arc type by converting to appropriate class.
+        
+        Supported types: 'normal', 'test', 'inhibitor', 'signal_flow'
         
         This method should be called by the dialog to trigger transformation.
         The actual transformation is handled by arc_transform utilities and
@@ -125,6 +130,29 @@ class Arc(PetriNetObject):
             self._manager.replace_arc(self, new_arc)
         else:
             raise RuntimeError("Arc has no manager reference - cannot perform transformation")
+    
+    def _is_signal_arc(self) -> bool:
+        """Check if this arc connects to a signal place.
+        
+        Signal arcs (connecting to Ψ places) are rendered with dashed lines
+        to visually distinguish information flow from mass transfer.
+        
+        Returns:
+            bool: True if source or target is a signal place
+        """
+        from shypn.netobjs.place import Place
+        
+        # Check if source is a signal place
+        if isinstance(self.source, Place):
+            if hasattr(self.source, 'is_signal_place') and self.source.is_signal_place:
+                return True
+        
+        # Check if target is a signal place
+        if isinstance(self.target, Place):
+            if hasattr(self.target, 'is_signal_place') and self.target.is_signal_place:
+                return True
+        
+        return False
     
     @staticmethod
     def _validate_connection(source, target):
@@ -261,6 +289,17 @@ class Arc(PetriNetObject):
                 control_x = mid_x + self.control_offset_x
                 control_y = mid_y + self.control_offset_y
         
+        # Check if this arc connects to a signal place (for dashed rendering)
+        is_signal_arc = self._is_signal_arc()
+        
+        # Set dash pattern for signal arcs
+        if is_signal_arc:
+            # Dashed line: 8px dash, 4px gap (scaled by zoom)
+            cr.set_dash([8.0 / zoom, 4.0 / zoom])
+        else:
+            # Solid line
+            cr.set_dash([])
+        
         # Add glow effect for colored arcs (CSS-like styling)
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
@@ -286,6 +325,9 @@ class Arc(PetriNetObject):
         cr.set_line_width(self.width / max(zoom, 1e-6))  # Compensate for zoom
         cr.stroke()
         
+        # Reset dash pattern for arrowhead (always solid)
+        cr.set_dash([])
+        
         # Calculate direction at end point for arrowhead
         if render_as_curved:
             # For curved arc, calculate tangent at end point
@@ -302,6 +344,7 @@ class Arc(PetriNetObject):
             arrow_dx, arrow_dy = dx_world, dy_world
         
         # Draw arrowhead at target (with zoom compensation)
+        # Signal flow arcs now use same arrowhead as normal arcs
         self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
         
         # Draw weight label if different from 1 (convention: weight=1 is implicit)
@@ -426,6 +469,54 @@ class Arc(PetriNetObject):
         right_y = y - arrow_size * math.sin(angle + arrow_angle)
         
         # Draw two lines (legacy style, not filled triangle)
+        cr.set_source_rgb(*self.color)
+        cr.set_line_width(self.width / max(zoom, 1e-6))
+        
+        # Left wing line
+        cr.move_to(x, y)
+        cr.line_to(left_x, left_y)
+        cr.stroke()
+        
+        # Right wing line
+        cr.move_to(x, y)
+        cr.line_to(right_x, right_y)
+        cr.stroke()
+    
+    def _render_angled_arrowhead(self, cr, x: float, y: float, dx: float, dy: float, zoom: float = 1.0):
+        """Render angled arrowhead for signal flow arcs (information transfer).
+        
+        Signal flow arcs use an angled arrowhead (15° offset) to distinguish
+        from test arcs (hollow diamond marker, catalytic read) and normal arcs.
+        
+        Visual encoding:
+        - Two lines at asymmetric angles (15° offset)
+        - 15px length (zoom-compensated)
+        - Same color and width as arc line
+        
+        Args:
+            cr: Cairo context
+            x, y: Arrow tip position (world coords)
+            dx, dy: Direction vector (normalized, world space)
+            zoom: Current zoom level for size compensation
+        """
+        # Base angle from direction vector
+        angle = math.atan2(dy, dx)
+        
+        # Angled arrowhead: asymmetric wings (15° offset for distinction)
+        angle_offset = math.radians(15)  # 15° angle offset
+        arrow_angle = math.pi / 5  # 36 degrees wing spread
+        
+        # Arrow size compensated for zoom
+        arrow_size = self.ARROW_SIZE / zoom
+        
+        # Calculate wing endpoints with angle offset
+        left_x = x - arrow_size * math.cos(angle - arrow_angle + angle_offset)
+        left_y = y - arrow_size * math.sin(angle - arrow_angle + angle_offset)
+        
+        right_x = x - arrow_size * math.cos(angle + arrow_angle + angle_offset)
+        right_y = y - arrow_size * math.sin(angle + arrow_angle + angle_offset)
+        
+        # Draw two lines (angled style for information transfer)
         cr.set_source_rgb(*self.color)
         cr.set_line_width(self.width / max(zoom, 1e-6))
         
@@ -725,6 +816,9 @@ class Arc(PetriNetObject):
         elif arc_type == 'inhibitor':
             from shypn.netobjs.inhibitor_arc import InhibitorArc
             arc_class = InhibitorArc
+        elif arc_type == 'signal_flow':
+            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+            arc_class = SignalFlowArc
         elif arc_type in ('curved_arc', 'curved'):  # Support both for backward compatibility
             from shypn.netobjs.curved_arc import CurvedArc
             arc_class = CurvedArc

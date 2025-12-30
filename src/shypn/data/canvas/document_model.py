@@ -1,11 +1,11 @@
 """Document Model - Core data structure for Petri net models.
 
 This module defines the DocumentModel class, which represents a complete
-Petri net model including places, transitions, arcs, and metadata.
+Petri net model including places, transitions, arcs, modules, and metadata.
 """
 
 from typing import List, Dict, Optional, Any, Tuple
-from shypn.netobjs import Place, Transition, Arc, PetriNetObject
+from shypn.netobjs import Place, Transition, Arc, PetriNetObject, Module
 from .id_manager import IDManager, suspend_lifecycle_delegation
 
 
@@ -27,6 +27,10 @@ class DocumentModel:
         self.places: List[Place] = []
         self.transitions: List[Transition] = []
         self.arcs: List[Arc] = []
+        
+        # Module collection (modular Bio-PN architecture)
+        # Dict mapping module_id → Module object
+        self.modules: Dict[str, Module] = {}
         
         # Centralized ID management
         self.id_manager = IDManager()
@@ -90,7 +94,7 @@ class DocumentModel:
             source: Source object (Place or Transition)
             target: Target object (must be different type from source)
             weight: Arc weight (default 1)
-            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'curved', 'curved_inhibitor_arc')
+            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'signal_flow', 'curved', 'curved_inhibitor_arc')
             
         Returns:
             The created Arc object (proper subclass), or None if connection is invalid
@@ -103,6 +107,17 @@ class DocumentModel:
             # Both same type → invalid
             return None
         
+        # AUTO-DETECT signal_flow arc: if connecting to/from signal place and arc_type is 'normal'
+        if arc_type == 'normal':
+            source_is_signal = (source_is_place and 
+                               getattr(source, 'is_signal_place', False))
+            target_is_signal = (target_is_place and 
+                               getattr(target, 'is_signal_place', False))
+            
+            if source_is_signal or target_is_signal:
+                # Automatically create signal_flow arc when connecting to signal places
+                arc_type = 'signal_flow'
+        
         arc_id = self.id_manager.generate_arc_id()
         arc_name = arc_id  # Name matches ID
         
@@ -114,6 +129,9 @@ class DocumentModel:
             elif arc_type == 'inhibitor':
                 from shypn.netobjs.inhibitor_arc import InhibitorArc
                 arc = InhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'signal_flow':
+                from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                arc = SignalFlowArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
             elif arc_type == 'curved':
                 from shypn.netobjs.curved_arc import CurvedArc
                 arc = CurvedArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
@@ -159,6 +177,115 @@ class DocumentModel:
         """
         if arc not in self.arcs:
             self.arcs.append(arc)
+    
+    # ============================================================================
+    # Module Management (Modular Bio-PN Architecture)
+    # ============================================================================
+    
+    def create_module(self, name: str, compartment_id: Optional[str] = None) -> Module:
+        """Create a new module (interactive creation path).
+        
+        Args:
+            name: Display name (e.g., "Cytoplasm", "Mitochondria")
+            compartment_id: SBML compartment ID if mapping from SBML
+            
+        Returns:
+            The created Module object
+            
+        Note:
+            Supports both SBML auto-creation and manual interactive creation
+        """
+        module_id = self.id_manager.generate_module_id()
+        module = Module(module_id=module_id, name=name, compartment_id=compartment_id)
+        self.modules[module_id] = module
+        return module
+    
+    def add_module(self, module: Module):
+        """Add an existing module to the model (loading path).
+        
+        Args:
+            module: Module object to add
+            
+        Note:
+            Registers module ID to prevent duplicates
+        """
+        if module.module_id not in self.modules:
+            self.modules[module.module_id] = module
+            self.id_manager.register_module_id(module.module_id)
+    
+    def get_module(self, module_id: str) -> Optional[Module]:
+        """Get module by ID.
+        
+        Args:
+            module_id: Module identifier
+            
+        Returns:
+            Module object or None if not found
+        """
+        return self.modules.get(module_id)
+    
+    def get_module_by_name(self, name: str) -> Optional[Module]:
+        """Get module by name.
+        
+        Args:
+            name: Module name
+            
+        Returns:
+            First module with matching name, or None
+        """
+        for module in self.modules.values():
+            if module.name == name:
+                return module
+        return None
+    
+    def get_module_by_compartment(self, compartment_id: str) -> Optional[Module]:
+        """Get module by SBML compartment ID.
+        
+        Args:
+            compartment_id: SBML compartment identifier
+            
+        Returns:
+            Module object or None if not found
+        """
+        for module in self.modules.values():
+            if module.compartment_id == compartment_id:
+                return module
+        return None
+    
+    def remove_module(self, module_id: str) -> bool:
+        """Remove a module and clear object assignments.
+        
+        Args:
+            module_id: Module identifier
+            
+        Returns:
+            True if removed, False if not found
+            
+        Note:
+            Clears module_id from all places/transitions in the module
+        """
+        if module_id not in self.modules:
+            return False
+        
+        module = self.modules[module_id]
+        
+        # Clear module assignment from all objects
+        for place in module.places:
+            place.module_id = None
+        for transition in module.transitions:
+            transition.module_id = None
+        
+        # Remove from collection
+        del self.modules[module_id]
+        return True
+    
+    def get_modules_list(self) -> List[Module]:
+        """Get list of all modules.
+        
+        Returns:
+            List of Module objects
+        """
+        return list(self.modules.values())
     
     # ============================================================================
     # Object Removal
@@ -410,7 +537,8 @@ class DocumentModel:
         metadata["object_counts"] = {
             "places": len(self.places),
             "transitions": len(self.transitions),
-            "arcs": len(self.arcs)
+            "arcs": len(self.arcs),
+            "modules": len(self.modules)
         }
         
         return {
@@ -419,7 +547,8 @@ class DocumentModel:
             "view_state": self.view_state,
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
-            "arcs": [arc.to_dict() for arc in self.arcs]
+            "arcs": [arc.to_dict() for arc in self.arcs],
+            "modules": [module.to_dict() for module in self.modules.values()]
         }
     
     @classmethod
@@ -470,6 +599,16 @@ class DocumentModel:
             # Register ID to update counter (LOCAL ONLY)
             with suspend_lifecycle_delegation():
                 document.id_manager.register_arc_id(arc.id)
+        
+        # Restore modules (if present)
+        from shypn.netobjs.module import Module
+        for module_data in data.get("modules", []):
+            try:
+                module = Module.from_dict(module_data, place_lookup=places_dict, transition_lookup=transitions_dict)
+                document.add_module(module)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
         
         # IMPORTANT: Reset all places to their initial marking
         # When loading a saved file, we want to start with the initial state,

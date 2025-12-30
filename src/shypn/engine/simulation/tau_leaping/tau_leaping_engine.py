@@ -8,6 +8,7 @@ Phase 3: Will add parallel execution for weakly independent transitions
 """
 
 import logging
+import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 
 from .leap_selector import LeapSelector
@@ -241,6 +242,62 @@ class TauLeapingEngine:
         
         # Sequential sampling (original implementation)
         firings_map = {}
+        
+        # Diagnostic: Check for extreme propensities before sampling
+        if np.any(np.array(propensities) > 1e10):
+            max_prop = max(propensities)
+            max_idx = propensities.index(max_prop)
+            problem_transition = transitions[max_idx]
+            
+            # Get transition details - try multiple attribute names
+            trans_name = getattr(problem_transition, 'label', getattr(problem_transition, 'name', f"T{max_idx}"))
+            trans_id = getattr(problem_transition, 'id', f"transition_{max_idx}")
+            
+            # Try to get behavior and formula
+            formula_str = 'N/A'
+            input_info = []
+            
+            try:
+                behavior = self._get_behavior(problem_transition)
+                if behavior:
+                    # Get formula from behavior
+                    if hasattr(behavior, 'formula'):
+                        formula_str = str(behavior.formula)
+                    elif hasattr(behavior, 'rate_expression'):
+                        formula_str = str(behavior.rate_expression)
+                    
+                    # Get input places and their markings
+                    if hasattr(behavior, 'input_places'):
+                        for place in behavior.input_places:
+                            place_name = getattr(place, 'label', getattr(place, 'name', getattr(place, 'id', 'unknown')))
+                            marking = getattr(place, 'marking', 0)
+                            input_info.append(f"{place_name}={marking:.2e}")
+                    
+                    # Also try to evaluate the formula with current context to see what values are being used
+                    if hasattr(behavior, 'context') or hasattr(behavior, '_context'):
+                        context = getattr(behavior, 'context', getattr(behavior, '_context', {}))
+                        if context and isinstance(context, dict):
+                            # Show a sample of context values
+                            context_items = list(context.items())[:5]
+                            context_str = ", ".join([f"{k}={v:.2e}" if isinstance(v, (int, float)) else f"{k}={v}" 
+                                                    for k, v in context_items])
+                            formula_str += f" [Context sample: {context_str}]"
+            except Exception as diag_err:
+                # Don't let diagnostic failure block the error report
+                formula_str += f" [Diagnostic error: {diag_err}]"
+            
+            inputs_str = ", ".join(input_info) if input_info else "Unknown inputs"
+            
+            self.logger.warning(
+                f"Extreme propensity detected:\n"
+                f"  Transition #{max_idx}: {trans_name} (id={trans_id})\n"
+                f"  Propensity: {max_prop:.2e}\n"
+                f"  Tau: {tau:.2e}\n"
+                f"  Lambda (propensity*tau): {max_prop*tau:.2e}\n"
+                f"  Input places: {inputs_str}\n"
+                f"  Kinetic law: {formula_str[:200]}{'...' if len(formula_str) > 200 else ''}"
+            )
+        
         firings_array = self.poisson_sampler.sample_batch(propensities, tau)
         
         for transition, firings in zip(transitions, firings_array):

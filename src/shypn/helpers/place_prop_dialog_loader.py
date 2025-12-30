@@ -50,6 +50,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self.topology_loader = None
         self._load_ui()
         self._setup_color_picker()
+        self._setup_signal_handlers()
         self._populate_fields()
         self._setup_topology_tab()
 
@@ -74,6 +75,12 @@ class PlacePropDialogLoader(GObject.GObject):
         self.color_picker = setup_color_picker_in_dialog(self.builder, 'place_color_picker', current_color=current_color, button_size=28)
         if self.color_picker:
             self.color_picker.connect('color-selected', self._on_color_selected)
+    
+    def _setup_signal_handlers(self):
+        """Setup signal place checkbox and combo handlers."""
+        signal_checkbox = self.builder.get_object('signal_place_checkbox')
+        if signal_checkbox:
+            signal_checkbox.connect('toggled', self._on_signal_checkbox_toggled)
 
     def _on_color_selected(self, picker, color_rgb):
         """Handle color selection from picker.
@@ -83,6 +90,17 @@ class PlacePropDialogLoader(GObject.GObject):
             color_rgb: Selected RGB tuple (0.0-1.0)
         """
         r, g, b = color_rgb
+    
+    def _on_signal_checkbox_toggled(self, checkbox):
+        """Handle signal place checkbox toggle.
+        
+        Args:
+            checkbox: The signal place checkbox widget
+        """
+        is_active = checkbox.get_active()
+        signal_type_combo = self.builder.get_object('signal_type_combo')
+        if signal_type_combo:
+            signal_type_combo.set_sensitive(is_active)
 
     def _populate_fields(self):
         """Populate dialog fields with current Place properties."""
@@ -123,6 +141,31 @@ class PlacePropDialogLoader(GObject.GObject):
         if description_text and hasattr(self.place_obj, 'label'):
             buffer = description_text.get_buffer()
             buffer.set_text(str(self.place_obj.label) if self.place_obj.label else '')
+        
+        # Signal place properties
+        signal_checkbox = self.builder.get_object('signal_place_checkbox')
+        if signal_checkbox:
+            is_signal = getattr(self.place_obj, 'is_signal_place', False)
+            signal_checkbox.set_active(is_signal)
+            
+        signal_type_combo = self.builder.get_object('signal_type_combo')
+        if signal_type_combo:
+            signal_type = getattr(self.place_obj, 'signal_type', None)
+            if signal_type:
+                # Map signal type to combo box index
+                type_map = {
+                    'energy': 0,
+                    'regulatory': 1,
+                    'quorum': 2,
+                    'spatial': 3
+                }
+                idx = type_map.get(signal_type, 0)
+                signal_type_combo.set_active(idx)
+            else:
+                signal_type_combo.set_active(0)  # Default to energy
+            
+            # Enable/disable based on checkbox
+            signal_type_combo.set_sensitive(getattr(self.place_obj, 'is_signal_place', False))
 
     def _on_response(self, dialog, response_id):
         """Handle dialog response (OK/Cancel).
@@ -201,6 +244,26 @@ class PlacePropDialogLoader(GObject.GObject):
             end_iter = buffer.get_end_iter()
             new_description = buffer.get_text(start_iter, end_iter, True).strip()
             self.place_obj.label = new_description if new_description else None
+        
+        # Signal place properties
+        signal_checkbox = self.builder.get_object('signal_place_checkbox')
+        if signal_checkbox:
+            is_signal = signal_checkbox.get_active()
+            self.place_obj.is_signal_place = is_signal
+            
+            # If enabling signal place, set signal type
+            if is_signal:
+                signal_type_combo = self.builder.get_object('signal_type_combo')
+                if signal_type_combo:
+                    active_idx = signal_type_combo.get_active()
+                    type_map = ['energy', 'regulatory', 'quorum', 'spatial']
+                    if 0 <= active_idx < len(type_map):
+                        self.place_obj.signal_type = type_map[active_idx]
+                    else:
+                        self.place_obj.signal_type = 'energy'  # Default
+            else:
+                # Clear signal type when unchecked
+                self.place_obj.signal_type = None
 
     def _setup_topology_tab(self):
         """Setup topology information tab using PlaceTopologyTabLoader.

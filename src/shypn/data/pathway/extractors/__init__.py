@@ -14,6 +14,7 @@ from .parameter import ParameterExtractor
 from .event import EventExtractor
 from .annotation import AnnotationExtractor
 from .unit import UnitExtractor
+from .function import FunctionDefinitionExtractor, FunctionDefinition
 
 __all__ = [
     'BaseExtractor',
@@ -24,4 +25,6 @@ __all__ = [
     'EventExtractor',
     'AnnotationExtractor',
     'UnitExtractor',
+    'FunctionDefinitionExtractor',
+    'FunctionDefinition',
 ]

@@ -76,6 +76,22 @@ class KEGGEntry:
     def is_gene(self) -> bool:
         """Check if this entry represents a gene/enzyme."""
         return self.type in ("gene", "enzyme", "ortholog")
+    
+    def get_display_info(self) -> Dict[str, str]:
+        """Get formatted information for display.
+        
+        Returns:
+            Dictionary with display-friendly fields
+        """
+        return {
+            'id': self.id,
+            'name': self.graphics.name if self.graphics else self.name,
+            'type': self.type,
+            'kegg_ids': ', '.join(self.get_kegg_ids()),
+            'position': f"({self.graphics.x:.0f}, {self.graphics.y:.0f})" if self.graphics else "N/A",
+            'reaction': self.reaction or "None",
+            'components': f"{len(self.components)} members" if self.components else "None"
+        }
 
 
 @dataclass
@@ -235,3 +251,51 @@ class KEGGPathway:
             KEGGEntry or None if not found
         """
         return self.entries.get(entry_id)
+    
+    def count_entry_types(self) -> Dict[str, int]:
+        """Count entries by type (compound, gene, enzyme, etc.).
+        
+        Returns:
+            Dictionary mapping type name to count
+        """
+        type_counts = {}
+        for entry in self.entries.values():
+            type_counts[entry.type] = type_counts.get(entry.type, 0) + 1
+        return type_counts
+    
+    def count_relation_types(self) -> Dict[str, int]:
+        """Count relations by type (ECrel, PPrel, etc.).
+        
+        Returns:
+            Dictionary mapping relation type to count
+        """
+        type_counts = {}
+        for relation in self.relations:
+            type_counts[relation.type] = type_counts.get(relation.type, 0) + 1
+        return type_counts
+    
+    def group_entries_by_type(self) -> Dict[str, List[KEGGEntry]]:
+        """Group entries by type for organized display.
+        
+        Returns:
+            Dictionary mapping type name to list of entries
+        """
+        groups = {}
+        for entry in self.entries.values():
+            if entry.type not in groups:
+                groups[entry.type] = []
+            groups[entry.type].append(entry)
+        return groups
+    
+    def group_relations_by_type(self) -> Dict[str, List[KEGGRelation]]:
+        """Group relations by type for organized display.
+        
+        Returns:
+            Dictionary mapping relation type to list of relations
+        """
+        groups = {}
+        for relation in self.relations:
+            if relation.type not in groups:
+                groups[relation.type] = []
+            groups[relation.type].append(relation)
+        return groups

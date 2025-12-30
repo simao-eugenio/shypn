@@ -5,7 +5,9 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
+from typing import Optional, List
 from shypn.netobjs.petri_net_object import PetriNetObject
+from shypn.netobjs.signal_type import SignalType
 
 
 class Place(PetriNetObject):
@@ -16,7 +18,7 @@ class Place(PetriNetObject):
     """
     
     # Default styling (proportional metrics at 1:1 scale)
-    DEFAULT_RADIUS = 30.0  # 30px radius = 60px diameter at 100% zoom
+    DEFAULT_RADIUS = 40.0  # 40px radius = 80px diameter at 100% zoom
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
@@ -49,14 +51,23 @@ class Place(PetriNetObject):
         self.initial_marking = 0  # Initial marking for simulation reset
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
         
-        # Signal place marker (13-tuple Bio-PN formalism: Ψ)
-        # True if this place is referenced in rate formulas but has no arc connections
-        # (quorum sensing, environment sensing, paracrine signaling)
-        self.is_signal_place = False
+        # Signal place properties (13-tuple Bio-PN formalism: Ψ)
+        # Signal places enable modular architecture through information flow without mass transfer
+        self.is_signal_place = False  # True if this place has no arc connections (read-only sensing)
+        self.signal_type: Optional[SignalType] = None  # Classification: quorum, energy, regulatory, spatial
+        self.signal_scope: List[str] = []  # Module IDs that can read this signal (empty = global scope)
         
-        # Compartment place marker (14-tuple Bio-PN formalism)
+        # Regulatory place properties (gene loci, constant resources)
+        # Regulatory places represent genetic elements or constant resource pools
+        self.is_regulatory_place = False  # True if this is a gene locus or constant resource
+        
+        # Module assignment (modular Bio-PN architecture)
+        # Places belong to modules, enabling network partitioning and compartmentalization
+        self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
+        
+        # Compartment place marker (backward compatibility)
         # is_compartment_place: True if in non-default compartment (e.g., extracellular)
-        #   Rendered as green circle (NOT hexagon - those are only for signal places)
+        #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
     
     def render(self, cr, zoom=1.0):
@@ -77,8 +88,20 @@ class Place(PetriNetObject):
         # Legacy approach: cr.scale() is already applied, so we draw in world space
         
         # Color coding for different place types
-        if self.is_signal_place:
-            display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
+        # Use self.border_color if it's been modified (e.g., for recording)
+        # Otherwise use default colors based on place type
+        if self.is_regulatory_place:
+            # Regulatory places (genes/constant resources): purple border
+            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.4, 0.0, 0.6):
+                display_color = self.border_color  # Use recording color (orange) if marked
+            else:
+                display_color = (0.4, 0.0, 0.6)  # Purple for regulatory places
+        elif self.is_signal_place:
+            # Check if border_color has been modified from default (e.g., orange for recording)
+            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.0, 0.4, 0.8):
+                display_color = self.border_color  # Use recording color (orange) or custom color
+            else:
+                display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
         elif self.is_compartment_place:
             display_color = (0.6, 0.0, 0.8)  # Violet for non-default compartment (has arcs)
         else:
@@ -89,6 +112,9 @@ class Place(PetriNetObject):
             if self.is_signal_place:
                 # Hexagons only for signal places (no arcs)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_regulatory_place:
+                # Double circles for regulatory places (genes/resources)
+                cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
             else:
                 # Circles for compartment places (have arcs)
                 cr.arc(self.x, self.y, self.radius + 2 / zoom, 0, 2 * math.pi)
@@ -110,6 +136,10 @@ class Place(PetriNetObject):
         cr.stroke()
         
         # Selection rendering moved to ObjectEditingTransforms in src/shypn/api/edit/
+        
+        # Draw Ψ symbol for signal places (when no tokens shown)
+        if self.is_signal_place and self.tokens == 0:
+            self._render_signal_symbol(cr, self.x, self.y, self.radius, zoom)
         
         # Draw tokens if any
         if self.tokens > 0:
@@ -153,6 +183,58 @@ class Place(PetriNetObject):
         cr.fill()
         
         # Clear path to prevent spurious lines to text position
+        cr.new_path()
+    
+    def _render_signal_symbol(self, cr, x: float, y: float, radius: float, zoom: float = 1.0):
+        """Render Ψ (psi) symbol inside signal place hexagons.
+        
+        Signal places are marked with the Greek letter Ψ (psi) to indicate
+        information flow without mass transfer. Optional subscript shows signal type.
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Hexagon radius (world space)
+            zoom: Current zoom level for font size compensation
+        """
+        # Draw Ψ symbol (Unicode U+03A8)
+        cr.set_source_rgb(0.0, 0.4, 0.8)  # Blue color matching signal place border
+        cr.select_font_face("Sans", 0, 0)  # Normal weight for Ψ
+        cr.set_font_size(16 / zoom)  # Slightly larger than tokens
+        
+        psi_symbol = "Ψ"
+        extents = cr.text_extents(psi_symbol)
+        text_x = x - extents.width / 2
+        text_y = y + extents.height / 2
+        
+        cr.move_to(text_x, text_y)
+        cr.show_text(psi_symbol)
+        cr.fill()
+        
+        # Draw subscript type indicator if signal_type is set
+        if self.signal_type:
+            # Map signal types to subscripts
+            type_subscripts = {
+                'quorum': 'q',
+                'energy': 'e',
+                'regulatory': 'r',
+                'spatial': 's'
+            }
+            
+            signal_type_name = self.signal_type.value if hasattr(self.signal_type, 'value') else str(self.signal_type)
+            subscript = type_subscripts.get(signal_type_name, '?')
+            
+            # Draw subscript (smaller, slightly offset)
+            cr.set_font_size(10 / zoom)
+            sub_extents = cr.text_extents(subscript)
+            sub_x = text_x + extents.width - 2 / zoom
+            sub_y = text_y + 6 / zoom  # Below baseline
+            
+            cr.move_to(sub_x, sub_y)
+            cr.show_text(subscript)
+            cr.fill()
+        
+        # Clear path
         cr.new_path()
     
     def _render_label(self, cr, x: float, y: float, radius: float, zoom: float = 1.0):
@@ -283,7 +365,8 @@ class Place(PetriNetObject):
             "border_color": list(self.border_color),
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
-            "is_signal_place": getattr(self, 'is_signal_place', False)  # Save signal place flag (13-tuple Ψ)
+            "is_signal_place": getattr(self, 'is_signal_place', False),  # Save signal place flag (13-tuple Ψ)
+            "is_regulatory_place": getattr(self, 'is_regulatory_place', False)  # Save regulatory place flag
         })
         
         # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
@@ -341,6 +424,8 @@ class Place(PetriNetObject):
         place.is_catalyst = data.get("is_catalyst", False)
         # Restore signal place flag (13-tuple formalism: Ψ)
         place.is_signal_place = data.get("is_signal_place", False)
+        # Restore regulatory place flag (genes/resources)
+        place.is_regulatory_place = data.get("is_regulatory_place", False)
         if "capacity" in data:
             capacity_value = data["capacity"]
             # Normalize capacity: handle string "Infinity" or "inf"

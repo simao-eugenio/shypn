@@ -84,6 +84,31 @@ class TimedBehavior(TransitionBehavior):
         self._was_too_early = False  # Track if we've been checked while too early
         self._was_in_window = False  # Track if we've been in the firing window
 
+    def _is_signal_place(self, place) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+
     def set_enablement_time(self, time: float):
         """Set the time when transition became enabled.
         
@@ -149,6 +174,13 @@ class TimedBehavior(TransitionBehavior):
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
                     return (False, f'missing-source-place-{arc.source_id}')
+                
+                # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
+                # They broadcast information without token consumption
+                # Skip token requirement checks for signal places
+                if self._is_signal_place(source_place):
+                    continue  # Signal places don't block enablement
+                
                 if source_place.tokens < arc.weight:
                     return (False, f'insufficient-tokens-P{arc.source_id}')
         
@@ -224,6 +256,7 @@ class TimedBehavior(TransitionBehavior):
                     source_place = self._get_place(arc.source_id)
                     if source_place is None:
                         return (False, {'reason': 'missing-source-place', 'place_id': arc.source_id, 'timed_mode': True})
+                    
                     if source_place.tokens < arc.weight:
                         return (False, {'reason': 'insufficient-tokens', 'place_id': arc.source_id, 'required': arc.weight, 'available': source_place.tokens, 'timed_mode': True})
                     

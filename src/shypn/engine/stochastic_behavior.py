@@ -184,6 +184,31 @@ class StochasticBehavior(TransitionBehavior):
             self.transition.signal_places = []
             self.transition.is_environment_aware = False
     
+    def _is_signal_place(self, place) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+    
     def _evaluate_rate_at_enablement(self, time: float) -> float:
         """Evaluate rate (λ) at enablement time.
         
@@ -505,6 +530,12 @@ class StochasticBehavior(TransitionBehavior):
                         return False, f"inhibited-by-P{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold})"
                     # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
                     continue
+                
+                # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
+                # They broadcast information without token consumption
+                # Skip token requirement checks for signal places
+                if self._is_signal_place(source_place):
+                    continue  # Signal places don't require tokens for burst
                 
                 # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
