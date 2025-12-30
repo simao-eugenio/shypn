@@ -344,11 +344,8 @@ class Arc(PetriNetObject):
             arrow_dx, arrow_dy = dx_world, dy_world
         
         # Draw arrowhead at target (with zoom compensation)
-        # Use angled arrowhead for signal flow arcs
-        if self.arc_type == "signal_flow":
-            self._render_angled_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
-        else:
-            self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
+        # Signal flow arcs now use same arrowhead as normal arcs
+        self._render_arrowhead(cr, display_end_x, display_end_y, arrow_dx, arrow_dy, zoom)
         
         # Draw weight label if different from 1 (convention: weight=1 is implicit)
         # This includes stoichiometric coefficients and inhibitor thresholds (Ki values)

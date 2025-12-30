@@ -38,6 +38,7 @@ python src/shypn.py
 ## Features
 
 - ✅ **Stochastic Hybrid Petri Nets** - Extended biological Petri net formalism with immediate, timed, stochastic, and continuous transitions
+- ✅ **Signal Hierarchy Theory** - Information-theoretic framework for hierarchical control (validated December 2025)
 - ✅ **Weak Independence Theory** - Efficient simulation through dependency analysis and partial order reduction
 - ✅ **Visual Editor** - Intuitive GTK3-based pathway modeling interface
 - ✅ **KEGG/SBML Import** - Direct import from major pathway databases
