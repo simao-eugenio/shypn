@@ -366,12 +366,13 @@ class SBMLValidator:
             ))
     
     def _check_reversible_formulas_stochastic_risk(self):
-        """Check for reversible reaction formulas that risk negative rates in stochastic mode.
+        """Inform about reversible reaction formulas and Skellam distribution support.
         
-        Reversible reactions with net rate formulas (k_f*A - k_r*B) can produce negative
-        rates, which are incompatible with Poisson sampling in stochastic simulation.
+        Reversible reactions with net rate formulas (k_f*A - k_r*B) produce difference
+        of Poisson random variables, which follows a Skellam distribution. The τ-leaping
+        engine automatically detects these patterns and uses Skellam sampling.
         """
-        problematic_reactions = []
+        reversible_reactions = []
         
         for i in range(self.model.getNumReactions()):
             reaction = self.model.getReaction(i)
@@ -395,40 +396,45 @@ class SBMLValidator:
             if has_subtraction or has_reverse_keywords:
                 reaction_id = reaction.getId()
                 reaction_name = reaction.getName() or reaction_id
-                problematic_reactions.append((reaction_name, formula))
+                reversible_reactions.append((reaction_name, formula))
         
-        if problematic_reactions:
-            reactions_list = ", ".join([name for name, _ in problematic_reactions[:3]])
-            if len(problematic_reactions) > 3:
-                reactions_list += f", ... (+{len(problematic_reactions)-3} more)"
+        if reversible_reactions:
+            reactions_list = ", ".join([name for name, _ in reversible_reactions[:3]])
+            if len(reversible_reactions) > 3:
+                reactions_list += f", ... (+{len(reversible_reactions)-3} more)"
             
             # Detailed list for UI display
             reactions_detail = "\n".join([f"  • {name}: {formula[:60]}{'...' if len(formula) > 60 else ''}" 
-                                          for name, formula in problematic_reactions[:5]])
-            if len(problematic_reactions) > 5:
-                reactions_detail += f"\n  ... and {len(problematic_reactions)-5} more"
+                                          for name, formula in reversible_reactions[:5]])
+            if len(reversible_reactions) > 5:
+                reactions_detail += f"\n  ... and {len(reversible_reactions)-5} more"
             
             self.issues.append(ValidationIssue(
-                severity=ValidationSeverity.WARNING,
+                severity=ValidationSeverity.INFO,
                 category="reversible_formulas",
-                message=f"Reversible reaction formulas detected ({len(problematic_reactions)} reactions): {reactions_list}",
+                message=f"Reversible reaction formulas detected ({len(reversible_reactions)} reactions): {reactions_list}",
                 suggestion=(
-                    "⚠️  STOCHASTIC SIMULATION RISK:\n"
-                    "Reversible reactions with net rate formulas (e.g., k_f*A - k_r*B) can produce\n"
-                    "NEGATIVE rates when reverse direction dominates. Negative rates are incompatible\n"
-                    "with Poisson sampling in stochastic simulation (λ parameter must be ≥ 0).\n"
+                    "ℹ️  REVERSIBLE REACTIONS WITH SKELLAM DISTRIBUTION:\n"
+                    "Reversible reactions with net rate formulas (e.g., k_f*A - k_r*B) are now\n"
+                    "FULLY SUPPORTED in stochastic simulation using the Skellam distribution.\n"
                     "\n"
-                    "RECOMMENDATIONS:\n"
-                    "  ✓ Use CONTINUOUS mode (handles negative rates correctly)\n"
-                    "  ✓ Use HYBRID mode (continuous for reversible reactions)\n"
-                    "  ✗ Avoid STOCHASTIC mode (will fail if rates become negative)\n"
+                    "The τ-leaping engine automatically:\n"
+                    "  ✓ Detects reversible reaction patterns (formulas with subtraction)\n"
+                    "  ✓ Uses Skellam sampling: X ~ Poisson(λ_forward) - Poisson(λ_reverse)\n"
+                    "  ✓ Handles net reverse flux correctly (negative Δn values)\n"
+                    "  ✓ Maintains thermodynamic consistency\n"
+                    "\n"
+                    "SIMULATION MODE RECOMMENDATIONS:\n"
+                    "  ✓ STOCHASTIC with τ-leaping: Automatically uses Skellam (recommended)\n"
+                    "  ✓ CONTINUOUS mode: Alternative for very fast reactions\n"
+                    "  ✓ HYBRID mode: Combines both approaches\n"
                     "\n"
                     f"Reactions with reversible patterns:\n{reactions_detail}"
                 )
             ))
             
             self.logger.info(
-                f"Detected {len(problematic_reactions)} reactions with reversible formulas"
+                f"Detected {len(reversible_reactions)} reactions with reversible formulas (Skellam distribution will be used)"
             )
     
     def _check_formula_dependencies(self):
