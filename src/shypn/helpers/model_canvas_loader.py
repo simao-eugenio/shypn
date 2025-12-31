@@ -3337,7 +3337,7 @@ class ModelCanvasLoader:
         
         # Execute deferred fit_to_page if pending (after viewport size is known)
         if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
-            print(f"[DRAW_DEBUG] Executing deferred fit_to_page", flush=True)
+            # Debug prints removed to reduce console noise
             horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
             vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
             manager._fit_to_page_pending = False  # Clear flag before execution
@@ -3347,7 +3347,6 @@ class ModelCanvasLoader:
                 horizontal_offset_percent=horizontal_offset,
                 vertical_offset_percent=vertical_offset
             )
-            print(f"[DRAW_DEBUG] Fit to page complete", flush=True)
         
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.paint()
@@ -4915,13 +4914,8 @@ class ModelCanvasLoader:
             
             # Restore default colors based on object type
             if isinstance(obj, Place):
-                # Signal places use blue color, others use default black
-                if getattr(obj, 'is_signal_place', False):
-                    obj.border_color = (0.0, 0.4, 0.8)  # Blue for signal places
-                elif getattr(obj, 'is_compartment_place', False):
-                    obj.border_color = (0.6, 0.0, 0.8)  # Violet for compartment places
-                else:
-                    obj.border_color = Place.DEFAULT_BORDER_COLOR
+                # All places use black border (normalized color scheme)
+                obj.border_color = Place.DEFAULT_BORDER_COLOR  # Black for all places
             elif isinstance(obj, Transition):
                 obj.border_color = Transition.DEFAULT_BORDER_COLOR
                 obj.fill_color = Transition.DEFAULT_COLOR
@@ -5245,6 +5239,11 @@ class ModelCanvasLoader:
         place.is_signal_place = True
         place.signal_type = signal_type
         
+        # Apply normalized color schema (2025-12-31):
+        # Signal places have hexagonal shape with BLUE border
+        place.shape = 'hexagon'
+        place.border_color = (0.0, 0.4, 0.8)  # Blue border
+        
         # Mark document dirty
         if self.persistency:
             self.persistency.mark_dirty()
@@ -5260,7 +5259,7 @@ class ModelCanvasLoader:
             'spatial': 'Ψₛ - Spatial/Compartment Sensing'
         }
         type_label = type_labels.get(signal_type, signal_type)
-        print(f"Converted '{place.name}' to signal place: {type_label}")
+        # print(f"Converted '{place.name}' to signal place: {type_label}")
     
     def _on_remove_signal_designation(self, place, manager, drawing_area):
         """Remove signal place designation from place.
@@ -5273,6 +5272,11 @@ class ModelCanvasLoader:
         # Clear signal place properties
         place.is_signal_place = False
         place.signal_type = None
+        
+        # Restore default appearance (normalized color schema):
+        # Regular places have circular shape with black border
+        place.shape = 'circle'
+        place.border_color = (0.0, 0.0, 0.0)  # Black border (default)
         
         # Mark document dirty
         if self.persistency:

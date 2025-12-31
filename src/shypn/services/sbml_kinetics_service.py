@@ -143,13 +143,10 @@ class SBMLKineticsIntegrationService:
             f"{integrated_count} integrated, {skipped_count} skipped"
         )
         
-        # Validate and fix transition types based on formulas (detect reversible reactions)
-        validation_stats = self.validate_and_fix_transition_types(transitions)
-        if validation_stats['converted'] > 0:
-            self.logger.info(
-                f"Auto-fixed {validation_stats['converted']} stochastic transitions "
-                f"with reversible formulas → converted to continuous"
-            )
+        # NOTE: Removed automatic transition type conversion (validate_and_fix_transition_types)
+        # Validation issues are now presented to user in import dialog for informed decision.
+        # User can choose: auto-convert to continuous | use hybrid | proceed anyway | cancel
+        # This prevents silent behavior modifications that change modeler's intent.
         
         return results
     

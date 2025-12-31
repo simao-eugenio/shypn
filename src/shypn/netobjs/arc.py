@@ -3,6 +3,15 @@
 
 Arcs connect places to transitions or transitions to places.
 Rendered as an arrow with optional weight label.
+
+COLOR NORMALIZATION (2025-12-31):
+- Normal arcs: Black (0.0, 0.0, 0.0) - default
+- Test arcs: Blue (0.0, 0.0, 1.0) - ONLY colored element
+- Inhibitor arcs: Black (0.0, 0.0, 0.0) - inherits from Arc
+- Signal arcs (enzyme→transition): Black (0.0, 0.0, 0.0)
+- Signal flow arcs: Light gray (0.7, 0.7, 0.7) - special signal type
+
+See doc/COLOR_NORMALIZATION.md for details.
 """
 import math
 from typing import List, Tuple

@@ -20,6 +20,10 @@ from shypn.netobjs.arc import Arc
 
 
 class SignalFlowArc(Arc):
+    """Signal flow arc with light gray color."""
+    
+    # Default styling for signal flow arcs
+    DEFAULT_COLOR = (0.7, 0.7, 0.7)  # Light gray for signal communication
     """Arc transmitting information with token consumption.
     
     Signal flow arcs represent information channels in hierarchical control
@@ -62,6 +66,9 @@ class SignalFlowArc(Arc):
             ValueError: If neither source nor target is a signal place
         """
         super().__init__(source, target, id, name, weight)
+        
+        # Set signal flow arc default color to light gray
+        self.color = self.DEFAULT_COLOR
         
         # Validate that at least one endpoint is a signal place
         self._validate_signal_connection()

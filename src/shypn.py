@@ -19,6 +19,9 @@ import warnings
 # Suppress matplotlib Axes3D import warning (harmless - system matplotlib visible in path)
 warnings.filterwarnings('ignore', message='Unable to import Axes3D')
 
+# Suppress matplotlib parseString deprecation warnings (matplotlib internal issue with pyparsing)
+warnings.filterwarnings('ignore', message="'parseString' deprecated")
+
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
 
@@ -409,7 +412,8 @@ def main(argv=None):
 		try:
 			pathway_panel_loader = create_pathway_panel(
 				model_canvas=model_canvas_loader,
-				workspace_settings=workspace_settings
+				workspace_settings=workspace_settings,
+				parent_window=window  # WAYLAND FIX: Pass main window for dialog parent
 			)
 
 			# Store on canvas loader so it can keep it in sync on tab switches
@@ -417,12 +421,6 @@ def main(argv=None):
 				model_canvas_loader.pathway_panel_loader = pathway_panel_loader
 			except Exception:
 				pass
-			
-			# WAYLAND FIX: Set parent window for SBML Import panel immediately
-			# This ensures FileChooserDialog has valid parent before panel is attached
-			if pathway_panel_loader and hasattr(pathway_panel_loader, 'sbml_import_controller'):
-				if pathway_panel_loader.sbml_import_controller:
-					pathway_panel_loader.sbml_import_controller.set_parent_window(window)
 			
 			# Wire topology panel to pathway import events (if both panels loaded)
 			if topology_panel_loader and topology_panel_loader.controller and pathway_panel_loader:
