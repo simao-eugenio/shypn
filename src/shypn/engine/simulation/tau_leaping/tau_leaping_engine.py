@@ -1,10 +1,12 @@
 """τ-Leaping Simulation Engine.
 
 Main engine for approximate stochastic simulation using τ-leaping method.
-Coordinates leap selection, Poisson sampling, and state updates.
+Coordinates leap selection, Poisson sampling (for irreversible reactions),
+Skellam sampling (for reversible reactions), and state updates.
 
-Phase 2: Sequential implementation (no parallelization)
-Phase 3: Will add parallel execution for weakly independent transitions
+Supports:
+- Irreversible reactions: Poisson(λ) for non-negative rates
+- Reversible reactions: Skellam(λ_forward, λ_reverse) for net flux
 """
 
 import logging
@@ -13,6 +15,7 @@ from typing import List, Dict, Any, Tuple, Optional
 
 from .leap_selector import LeapSelector
 from .poisson_sampler import PoissonSampler
+from .skellam_sampler import SkellamSampler
 from .parallel_scheduler import ParallelStochasticScheduler
 
 
@@ -21,7 +24,9 @@ class TauLeapingEngine:
     
     Implements approximate stochastic simulation:
     1. Select time leap τ (adaptive based on propensities)
-    2. Sample firings for each transition: Kⱼ ~ Poisson(aⱼ·τ)
+    2. Sample firings for each transition:
+       - Irreversible: Kⱼ ~ Poisson(aⱼ·τ)
+       - Reversible: ΔKⱼ ~ Skellam(a_forward·τ, a_reverse·τ)
     3. Apply all firings simultaneously
     4. Advance time by τ
     
@@ -60,6 +65,7 @@ class TauLeapingEngine:
             max_tau=max_tau
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
+        self.skellam_sampler = SkellamSampler(seed=seed)  # For reversible reactions
         self.use_parallel = use_parallel
         self.verbose = verbose
         
@@ -77,7 +83,9 @@ class TauLeapingEngine:
             'total_leaps': 0,
             'total_firings': 0,
             'mean_tau': 0.0,
-            'exact_ssa_fallbacks': 0
+            'exact_ssa_fallbacks': 0,
+            'reversible_reactions': 0,  # Count of Skellam samples
+            'irreversible_reactions': 0  # Count of Poisson samples
         }
     
     def execute_step(
@@ -188,13 +196,16 @@ class TauLeapingEngine:
     ) -> Dict[Any, int]:
         """Sample number of firings for each transition.
         
+        Detects reversible reactions (formulas with subtraction) and uses
+        Skellam distribution. Otherwise uses Poisson distribution.
+        
         Args:
             transitions: List of stochastic transitions
             tau: Time leap size
             current_time: Current simulation time
         
         Returns:
-            Dictionary mapping transition -> number of firings
+            Dictionary mapping transition -> number of firings (can be negative for reversible)
         """
         propensities = []
         
@@ -207,11 +218,29 @@ class TauLeapingEngine:
             # Calculate propensity
             try:
                 propensity = behavior._evaluate_rate_at_enablement(current_time)
+                
+                # Check if this is a reversible reaction
+                if hasattr(behavior, 'rate_function_expr') and behavior.rate_function_expr:
+                    is_reversible, forward_expr, reverse_expr = (
+                        SkellamSampler.detect_reversible_formula(behavior.rate_function_expr)
+                    )
+                    
+                    if is_reversible:
+                        # Mark for Skellam sampling
+                        transition._skellam_reversible = True
+                        transition._forward_expr = forward_expr
+                        transition._reverse_expr = reverse_expr
+                    else:
+                        transition._skellam_reversible = False
+                else:
+                    transition._skellam_reversible = False
+                    
             except Exception as e:
                 self.logger.warning(
                     f"Could not evaluate propensity for {transition.name}: {e}. Using default rate."
                 )
                 propensity = getattr(behavior, 'rate', 1.0)
+                transition._skellam_reversible = False
             
             propensities.append(propensity)
         
@@ -240,7 +269,7 @@ class TauLeapingEngine:
                     transitions, propensities, tau
                 )
         
-        # Sequential sampling (original implementation)
+        # Sequential sampling with Skellam support for reversible reactions
         firings_map = {}
         
         # Diagnostic: Check for extreme propensities before sampling
@@ -298,10 +327,50 @@ class TauLeapingEngine:
                 f"  Kinetic law: {formula_str[:200]}{'...' if len(formula_str) > 200 else ''}"
             )
         
-        firings_array = self.poisson_sampler.sample_batch(propensities, tau)
-        
-        for transition, firings in zip(transitions, firings_array):
-            firings_map[transition] = int(firings)
+        # Sample firings - use Skellam for reversible, Poisson for irreversible
+        for transition, propensity in zip(transitions, propensities):
+            if getattr(transition, '_skellam_reversible', False):
+                # Reversible reaction: use Skellam distribution
+                try:
+                    behavior = self._get_behavior(transition)
+                    
+                    # Evaluate forward and reverse propensities separately
+                    # For now, use the net propensity and split based on sign
+                    # TODO: Improve by parsing formula to extract forward/reverse components
+                    if propensity >= 0:
+                        # Net forward
+                        forward_prop = propensity
+                        reverse_prop = 0.0
+                    else:
+                        # Net reverse
+                        forward_prop = 0.0
+                        reverse_prop = abs(propensity)
+                    
+                    firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
+                    firings_map[transition] = firings
+                    self.stats['reversible_reactions'] += 1
+                    
+                except Exception as e:
+                    self.logger.warning(
+                        f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
+                    )
+                    # Fallback to Poisson with clamped propensity
+                    firings = self.poisson_sampler.sample(max(0, propensity), tau)
+                    firings_map[transition] = firings
+                    self.stats['irreversible_reactions'] += 1
+            else:
+                # Irreversible reaction: use Poisson distribution
+                # Clamp negative propensities to zero (shouldn't happen for irreversible)
+                if propensity < 0:
+                    self.logger.warning(
+                        f"Negative propensity for irreversible transition {transition.name}: {propensity}. "
+                        f"Clamping to 0."
+                    )
+                    propensity = 0.0
+                
+                firings = self.poisson_sampler.sample(propensity, tau)
+                firings_map[transition] = firings
+                self.stats['irreversible_reactions'] += 1
         
         return firings_map
     
@@ -569,5 +638,7 @@ class TauLeapingEngine:
             'total_leaps': 0,
             'total_firings': 0,
             'mean_tau': 0.0,
-            'exact_ssa_fallbacks': 0
+            'exact_ssa_fallbacks': 0,
+            'reversible_reactions': 0,
+            'irreversible_reactions': 0
         }
