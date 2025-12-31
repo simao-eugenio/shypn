@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "description": "Compound identifier mappings between KEGG and ChEBI databases",
+  "source": "Manually curated from KEGG and ChEBI",
+  "compounds": {
+    "C00002": {
+      "kegg_id": "C00002",
+      "chebi_id": "CHEBI:15422",
+      "names": ["ATP", "adenosine triphosphate", "adenosine 5'-triphosphate"]
+    },
+    "C00008": {
+      "kegg_id": "C00008",
+      "chebi_id": "CHEBI:16761",
+      "names": ["ADP", "adenosine diphosphate", "adenosine 5'-diphosphate"]
+    },
+    "C00020": {
+      "kegg_id": "C00020",
+      "chebi_id": "CHEBI:16027",
+      "names": ["AMP", "adenosine monophosphate", "adenosine 5'-monophosphate"]
+    },
+    "C00009": {
+      "kegg_id": "C00009",
+      "chebi_id": "CHEBI:43474",
+      "names": ["phosphate", "Pi", "orthophosphate", "inorganic phosphate"]
+    },
+    "C00001": {
+      "kegg_id": "C00001",
+      "chebi_id": "CHEBI:15377",
+      "names": ["H2O", "water", "dihydrogen monoxide"]
+    },
+    "C00003": {
+      "kegg_id": "C00003",
+      "chebi_id": "CHEBI:15846",
+      "names": ["NAD+", "NAD", "nicotinamide adenine dinucleotide", "oxidized NAD"]
+    },
+    "C00004": {
+      "kegg_id": "C00004",
+      "chebi_id": "CHEBI:16908",
+      "names": ["NADH", "reduced NAD", "nicotinamide adenine dinucleotide reduced"]
+    },
+    "C00006": {
+      "kegg_id": "C00006",
+      "chebi_id": "CHEBI:18009",
+      "names": ["NADP+", "NADP", "nicotinamide adenine dinucleotide phosphate"]
+    },
+    "C00005": {
+      "kegg_id": "C00005",
+      "chebi_id": "CHEBI:16474",
+      "names": ["NADPH", "reduced NADP", "NADP reduced"]
+    },
+    "C00031": {
+      "kegg_id": "C00031",
+      "chebi_id": "CHEBI:17234",
+      "names": ["glucose", "D-glucose", "dextrose"]
+    },
+    "C00092": {
+      "kegg_id": "C00092",
+      "chebi_id": "CHEBI:17665",
+      "names": ["glucose-6-phosphate", "G6P", "D-glucose 6-phosphate"]
+    },
+    "C00085": {
+      "kegg_id": "C00085",
+      "chebi_id": "CHEBI:15946",
+      "names": ["fructose-6-phosphate", "F6P", "D-fructose 6-phosphate"]
+    },
+    "C00022": {
+      "kegg_id": "C00022",
+      "chebi_id": "CHEBI:15361",
+      "names": ["pyruvate", "pyruvic acid", "2-oxopropanoate"]
+    },
+    "C00024": {
+      "kegg_id": "C00024",
+      "chebi_id": "CHEBI:15351",
+      "names": ["acetyl-CoA", "acetyl coenzyme A", "acetyl-coenzyme A"]
+    },
+    "C00010": {
+      "kegg_id": "C00010",
+      "chebi_id": "CHEBI:15346",
+      "names": ["CoA", "coenzyme A", "CoASH"]
+    },
+    "C00011": {
+      "kegg_id": "C00011",
+      "chebi_id": "CHEBI:16526",
+      "names": ["CO2", "carbon dioxide", "carbonic anhydride"]
+    },
+    "C00007": {
+      "kegg_id": "C00007",
+      "chebi_id": "CHEBI:15379",
+      "names": ["oxygen", "O2", "dioxygen", "molecular oxygen"]
+    }
+  }
+}
