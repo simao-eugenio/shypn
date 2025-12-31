@@ -66,16 +66,10 @@ class SimulationDataCollector:
             time: Current simulation time
         """
         self.step_count += 1
-        # Debug output disabled to reduce console spam
-        # if self.step_count <= 3:
-        #     print(f"[OLD_DC] Step {self.step_count} at time {time:.4f}")
-        #     print(f"[OLD_DC]   Collecting data for {len(controller.model.places)} places")
         
         for place in controller.model.places:
             data = self.place_data[place.id]
             data.append((time, place.tokens))
-            # if self.step_count <= 3:
-            #     print(f"[OLD_DC]     Place {place.id} ({place.name}): {place.tokens} tokens")
             if len(data) > self.downsample_threshold:
                 self._downsample_place_data(place.id)
 

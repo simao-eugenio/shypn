@@ -286,8 +286,8 @@ def convert_to_test(arc):
         weight=arc.weight
     )
     
-    # Copy all properties
-    new_arc.color = arc.color
+    # Copy all properties (except color - use TestArc's blue DEFAULT_COLOR)
+    # new_arc.color is already set to (0.0, 0.0, 1.0) by TestArc.__init__
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points
@@ -375,8 +375,8 @@ def convert_to_signal_flow(arc):
         weight=arc.weight
     )
     
-    # Copy all properties
-    new_arc.color = arc.color
+    # Copy all properties (except color - use SignalFlowArc's light gray DEFAULT_COLOR)
+    # new_arc.color is already set to (0.7, 0.7, 0.7) by SignalFlowArc.__init__
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points

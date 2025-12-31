@@ -55,7 +55,7 @@ class RightPanelLoader:
         # Convenience accessors for backward compatibility
         self.place_panel = None
         self.transition_panel = None
-        self.diagnostics_panel = None
+        self.plotting_panel = None
         self.context_menu_handler = None
     
     def load(self):
@@ -131,7 +131,7 @@ class RightPanelLoader:
         # Set up convenience accessors for backward compatibility
         self.place_panel = self.dynamic_analyses_panel.places_category.panel
         self.transition_panel = self.dynamic_analyses_panel.transitions_category.panel
-        self.diagnostics_panel = self.dynamic_analyses_panel.diagnostics_category.panel
+        self.plotting_panel = self.dynamic_analyses_panel.plotting_category.panel
         
         # Context menu handler will be created later in recreate_context_menu_handler()
         # after model_canvas_loader is set. This ensures viability panel support.
@@ -158,7 +158,7 @@ class RightPanelLoader:
             place_panel=self.place_panel,
             transition_panel=self.transition_panel,
             model=self.model,
-            diagnostics_panel=self.diagnostics_panel,
+            diagnostics_panel=self.plotting_panel,
             model_canvas_loader=self.model_canvas_loader
         )
         

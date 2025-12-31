@@ -70,15 +70,31 @@ class AnalysisPlotPanel(Gtk.Box):
         self.rate_calculator = RateCalculator()
         self.selected_objects: List[Any] = []
         self.needs_update = False
-        self.update_interval = 250  # Increased from 100ms to 250ms for better performance
+        self.update_interval = 500  # Increased from 250ms to 500ms to reduce CPU load during simulation
         self.last_data_length = {}
         self._model_manager = None  # Will be set by register_with_model()
         self._plot_lines = {}  # Cache matplotlib line objects for efficient updates
+        self._timeout_ids = []  # Store timeout IDs for cleanup
         self._setup_ui()
-        GLib.timeout_add(self.update_interval, self._periodic_update)
+        self._timeout_ids.append(GLib.timeout_add(self.update_interval, self._periodic_update))
         # Periodic cleanup of stale objects (safety net)
-        GLib.timeout_add(5000, self._cleanup_stale_objects)
+        self._timeout_ids.append(GLib.timeout_add(5000, self._cleanup_stale_objects))
+        # Connect destroy signal to cleanup timeouts
+        self.connect('destroy', self._on_destroy)
 
+    def _on_destroy(self, widget):
+        """Cleanup resources when widget is destroyed."""
+        # Remove all timeout sources to allow clean exit
+        for timeout_id in self._timeout_ids:
+            if timeout_id:
+                GLib.source_remove(timeout_id)
+        self._timeout_ids.clear()
+        
+        # Unregister from model manager
+        if self._model_manager is not None:
+            self._model_manager.unregister_observer(self._on_model_changed)
+            self._model_manager = None
+    
     def register_with_model(self, model_manager):
         """Register this panel to observe model changes.
         

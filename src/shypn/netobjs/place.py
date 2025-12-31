@@ -70,6 +70,24 @@ class Place(PetriNetObject):
         #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
     
+    def get_bounding_box(self):
+        """Calculate bounding box for the place.
+        
+        Returns bounding box containing the circle or hexagon.
+        
+        Returns:
+            dict: {'x': min_x, 'y': min_y, 'width': width, 'height': height}
+        """
+        # Circle/hexagon is centered at (x, y) with radius
+        # Bounding box is square centered at position
+        diameter = 2 * self.radius
+        return {
+            'x': self.x - self.radius,
+            'y': self.y - self.radius,
+            'width': diameter,
+            'height': diameter
+        }
+    
     def render(self, cr, zoom=1.0):
         """Render the place as a hollow circle (or hexagon for signal places).
         
@@ -88,24 +106,9 @@ class Place(PetriNetObject):
         # Legacy approach: cr.scale() is already applied, so we draw in world space
         
         # Color coding for different place types
-        # Use self.border_color if it's been modified (e.g., for recording)
-        # Otherwise use default colors based on place type
-        if self.is_regulatory_place:
-            # Regulatory places (genes/constant resources): purple border
-            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.4, 0.0, 0.6):
-                display_color = self.border_color  # Use recording color (orange) if marked
-            else:
-                display_color = (0.4, 0.0, 0.6)  # Purple for regulatory places
-        elif self.is_signal_place:
-            # Check if border_color has been modified from default (e.g., orange for recording)
-            if self.border_color != self.DEFAULT_BORDER_COLOR and self.border_color != (0.0, 0.4, 0.8):
-                display_color = self.border_color  # Use recording color (orange) or custom color
-            else:
-                display_color = (0.0, 0.4, 0.8)  # Blue for signal places (no arcs)
-        elif self.is_compartment_place:
-            display_color = (0.6, 0.0, 0.8)  # Violet for non-default compartment (has arcs)
-        else:
-            display_color = self.border_color  # Black for normal places (cytosol, uncompartmentalized)
+        # Normalized color scheme (2025-12-31): All black by default
+        # Signal places distinguished by hexagonal shape, not color
+        display_color = self.border_color  # Black for all places unless recording
         
         # Add glow effect for colored objects (CSS-like styling)
         if display_color != self.DEFAULT_BORDER_COLOR:
@@ -198,7 +201,7 @@ class Place(PetriNetObject):
             zoom: Current zoom level for font size compensation
         """
         # Draw Ψ symbol (Unicode U+03A8)
-        cr.set_source_rgb(0.0, 0.4, 0.8)  # Blue color matching signal place border
+        cr.set_source_rgb(0.0, 0.0, 0.0)  # Black color (normalized color scheme)
         cr.select_font_face("Sans", 0, 0)  # Normal weight for Ψ
         cr.set_font_size(16 / zoom)  # Slightly larger than tokens
         

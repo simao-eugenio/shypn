@@ -92,9 +92,6 @@ source .venv/bin/activate
 
 # Launch GUI
 python src/shypn.py
-
-# Or run example
-python examples/01_hexokinase_simple.py
 ```
 
 ---
@@ -377,12 +374,11 @@ SHYpn core simulation does not require GTK. For headless servers:
 pip install -e . --no-deps
 pip install networkx numpy scipy matplotlib
 
-# Run simulation scripts
-python examples/01_hexokinase_simple.py
-
-# Use Matplotlib non-interactive backend
+# Use Matplotlib non-interactive backend for batch processing
 export MPLBACKEND=Agg
-python your_simulation_script.py
+
+# Launch GUI application
+python src/shypn.py
 ```
 
 ---

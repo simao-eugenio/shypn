@@ -340,17 +340,19 @@ class PathwayPanelLoader:
             self.panel.cleanup()
 
 
-def create_pathway_panel(ui_path=None, model_canvas=None, workspace_settings=None):
+def create_pathway_panel(ui_path=None, model_canvas=None, workspace_settings=None, parent_window=None):
     """Convenience function to create and load the pathway panel.
     
     Args:
         ui_path: Deprecated - not used in CategoryFrame architecture
         model_canvas: Optional ModelCanvasManager
         workspace_settings: Optional WorkspaceSettings
+        parent_window: Optional parent window for dialogs (Wayland compatibility)
         
     Returns:
         PathwayPanelLoader: The loaded pathway panel loader instance.
     """
     loader = PathwayPanelLoader(ui_path, model_canvas, workspace_settings)
+    loader.parent_window = parent_window  # Set before load() so panel gets it
     loader.load()
     return loader

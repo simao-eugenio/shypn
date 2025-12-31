@@ -320,8 +320,8 @@ class FileExplorerPanel:
         - Focus management
         """
         self.context_menu = Gtk.Menu()
-        # Attach menu to tree_view for proper Wayland parent window handling
-        self.context_menu.attach_to_widget(self.tree_view, None)
+        # Note: Don't use attach_to_widget() as it causes Wayland warnings
+        # popup_at_pointer() handles parent relationships correctly
         
         # Store references to menu items that need dynamic enable/disable
         self.menu_items_refs = {}

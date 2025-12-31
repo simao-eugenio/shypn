@@ -35,11 +35,41 @@ pip install -e .
 python src/shypn.py
 ```
 
+See [QUICKSTART.md](QUICKSTART.md) for detailed getting started guide.
+
+## Model Examples
+
+SHYpn includes **22 ready-to-use biochemical model examples** in the workspace:
+
+**Location:** `workspace/projects/Biochemical-Examples/`
+
+**Examples include:**
+- 01_ATP_Hydrolysis - Basic energy metabolism
+- 03_Hexokinase_MM - Michaelis-Menten kinetics
+- 07_Upper_Glycolysis_Pathway - Multi-step pathways
+- 09_Complete_Glycolysis - Full glycolytic pathway
+- 17_Lac_Operon_Regulation - Gene regulation
+- 19_Bacterial_Quorum_Sensing - Signal hierarchy (13-tuple formalism)
+- 21_Hybrid_Glucose_Insulin - Hybrid simulation
+
+**To use examples:**
+1. Launch SHYpn: `python src/shypn.py`
+2. Open File Explorer panel (left sidebar)
+3. Navigate to `workspace/projects/Biochemical-Examples/`
+4. Double-click any example folder to load the model
+
+Each example includes complete documentation, simulation parameters, and expected results.
+
+See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog.
+
 ## Features
 
 - ✅ **Stochastic Hybrid Petri Nets** - Extended biological Petri net formalism with immediate, timed, stochastic, and continuous transitions
-- ✅ **Signal Hierarchy Theory** - Information-theoretic framework for hierarchical control (validated December 2025)
-- ✅ **Weak Independence Theory** - Efficient simulation through dependency analysis and partial order reduction
+- ✅ **Unified 13-Tuple Formalism** - Complete Extended Bio-PN definition integrating weak independence and signal hierarchy (December 2025)
+- ✅ **Signal Hierarchy Theory** - Information-theoretic framework for hierarchical control with signal token consumption semantics
+- ✅ **Weak Independence Theory** - Efficient simulation through dependency analysis (convergent, competitive, regulatory coupling)
+- ✅ **Two-Phase Execution** - Hierarchical constraint propagation via signal flow arcs (enabling check vs. consumption)
+- ✅ **Arc Type Classification** - Normal, test, signal_flow, and inhibitor arcs with distinct consumption semantics
 - ✅ **Visual Editor** - Intuitive GTK3-based pathway modeling interface
 - ✅ **KEGG/SBML Import** - Direct import from major pathway databases
 - ✅ **Real-time Simulation** - Multiple firing policies with live visualization
@@ -98,6 +128,14 @@ MIT License - See [LICENSE](LICENSE) file for details.
 If you use SHYpn in your research, please cite:
 
 ```bibtex
+@article{simao2025unified,
+  title={Unifying Weak Independence and Signal Hierarchy Theory: Extended Biological Petri Net Formalism with Application to Vibrio fischeri Quorum Sensing},
+  author={Sim{\~a}o, Eug{\'e}nio},
+  journal={arXiv preprint},
+  year={2025},
+  note={Submitted to arXiv, December 2025}
+}
+
 @article{simao2025weak,
   title={Weak Independence and Coupled Parallelism in Biological Petri Nets},
   author={Sim{\~a}o, Eug{\'e}nio},
@@ -107,7 +145,10 @@ If you use SHYpn in your research, please cite:
 }
 ```
 
-**Paper:** [arXiv:2512.17106](https://arxiv.org/abs/2512.17106) - Weak Independence and Coupled Parallelism in Biological Petri Nets  
+**Latest Publications:**
+- **Unified Formalism (2025)** - Extended 13-tuple Bio-PN integrating Weak Independence and Signal Hierarchy theories with V. fischeri quorum sensing validation
+- **Foundation Paper (2025)** - [arXiv:2512.17106](https://arxiv.org/abs/2512.17106) - Weak Independence and Coupled Parallelism in Biological Petri Nets
+
 **Software:** https://github.com/simao-eugenio/shypn
 
 ## Contact
@@ -122,6 +163,13 @@ Contributions are welcome! Please see the [development documentation](doc/README
 
 ## Version
 
-Current version: **v2.5.2** (December 2025)
+Current version: **v2.5.3** (December 2025)
 
-See [CHANGELOG](doc/README.md) for version history and project status.
+**Recent Updates:**
+- Unified Extended Bio-PN formalism manuscript (13-tuple definition)
+- V. fischeri quorum sensing model with 133-fold bistability
+- Signal saturation cascade figures (basin of attraction analysis)
+- ArXiv submission package prepared
+- Comprehensive directory cleanup (1.6GB freed)
+
+See [CHANGELOG](doc/CHANGELOG.md) for complete version history.
