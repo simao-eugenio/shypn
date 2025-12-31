@@ -40,6 +40,7 @@ from .base import (
 # Export concrete implementations
 from .gibbs_calculator import GibbsCalculator
 from .compound_resolver import CompoundResolver, CompoundIdentity
+from .thermodynamic_corrector import ThermodynamicCorrector
 
 # Export validators
 from .validators import EquilibriumValidator
@@ -70,6 +71,7 @@ __all__ = [
     "GibbsCalculator",
     "CompoundResolver",
     "CompoundIdentity",
+    "ThermodynamicCorrector",
     
     # Validators
     "EquilibriumValidator",
