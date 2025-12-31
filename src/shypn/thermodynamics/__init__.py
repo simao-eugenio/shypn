@@ -22,7 +22,7 @@ Example:
     >>> print(f"K_eq = {thermo.k_eq:.2e}")
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Export models
 from .models import (
@@ -40,6 +40,9 @@ from .base import (
 # Export concrete implementations
 from .gibbs_calculator import GibbsCalculator
 from .compound_resolver import CompoundResolver, CompoundIdentity
+
+# Export validators
+from .validators import EquilibriumValidator
 
 # Export database providers
 from .database import (
@@ -67,6 +70,9 @@ __all__ = [
     "GibbsCalculator",
     "CompoundResolver",
     "CompoundIdentity",
+    
+    # Validators
+    "EquilibriumValidator",
     
     # Database providers
     "CacheProvider",

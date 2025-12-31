@@ -5,7 +5,7 @@ properties of biochemical compounds and reactions.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 
 @dataclass(frozen=True)
@@ -106,25 +106,21 @@ class ThermodynamicValidation:
     """Result of thermodynamic consistency validation.
     
     Attributes:
-        reaction_id: Reaction identifier
-        k_eq_thermodynamic: K_eq from ΔG° (thermodynamic)
-        k_eq_kinetic: K_eq from k_f/k_r ratio (kinetic)
-        relative_difference: |K_thermo - K_kinetic| / K_thermo
-        is_consistent: Whether difference is within tolerance
-        severity: "OK", "WARNING", or "ERROR"
-        message: Detailed validation message
-        suggestion: Suggestion for fixing inconsistency
+        is_valid: Whether validation passed
+        message: Human-readable validation message
+        delta_g_reaction: Standard Gibbs free energy (kJ/mol)
+        k_eq: Equilibrium constant
+        details: Additional validation details (k_forward, k_reverse, etc.)
     """
-    reaction_id: str
-    k_eq_thermodynamic: float
-    k_eq_kinetic: float
-    relative_difference: float
-    is_consistent: bool
-    severity: str  # "OK", "WARNING", "ERROR"
+    is_valid: bool
     message: str
-    suggestion: Optional[str] = None
+    delta_g_reaction: Optional[float] = None
+    k_eq: Optional[float] = None
+    details: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
-        """Validate severity levels."""
-        if self.severity not in ("OK", "WARNING", "ERROR"):
-            raise ValueError(f"Invalid severity: {self.severity}")
+        """Validate and convert details if needed."""
+        if self.details is None:
+            # Use object.__setattr__ because dataclass is frozen
+            object.__setattr__(self, 'details', {})
+
