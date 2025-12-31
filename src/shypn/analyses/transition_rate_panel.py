@@ -116,8 +116,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         index = len(self.selected_objects)
         color_hex = self._get_color(index)
         
-        logger.debug(f"[COLOR] add_object: transition={obj.id}, index={index}, color={color_hex}")
-        
         # Convert hex color to RGB tuple for Cairo rendering
         import matplotlib.colors as mcolors
         color_rgb = mcolors.hex2color(color_hex)
@@ -125,14 +123,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
         # Set both border and fill color to match the plot color
         obj.border_color = color_rgb
         obj.fill_color = color_rgb
-        logger.debug(f"[COLOR] Set border_color={color_rgb}, fill_color={color_rgb}")
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
-            logger.debug(f"[COLOR] Calling on_changed callback")
             obj.on_changed()
-        else:
-            logger.warning(f"[COLOR] No on_changed callback for transition {obj.id}!")
         
         self.selected_objects.append(obj)
         # Use full rebuild to show locality places in UI list
@@ -141,7 +135,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         
         # Trigger canvas redraw to show the new colors
         if self._model_manager:
-            logger.debug(f"[COLOR] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
         
         # Detect locality and add locality places
@@ -149,8 +142,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if self._model_manager:
             detector = LocalityDetector(self._model_manager)
             locality = detector.get_locality_for_transition(obj)
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"[LOCALITY] Transition {obj.name} added, locality valid: {locality.is_valid if locality else False}")
             
             # Add locality places to PlaceRatePanel
             if locality and locality.is_valid:
@@ -158,15 +149,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             
             # Notify Report panel of selection change (if callback is set)
             if self.on_selection_changed_callback:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"[LOCALITY_SYNC] Calling callback with transition {obj.id} and locality")
                 self.on_selection_changed_callback(obj, locality)
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("[LOCALITY_SYNC] Callback completed")
-            else:
-                logger.debug("[LOCALITY_SYNC] No callback set for transition selection")
-        else:
-            logger.debug("[LOCALITY] No model_manager, cannot detect locality")
     
     def _get_rate_data(self, transition_id: Any) -> List[Tuple[float, float]]:
         """Get behavior-specific data for a transition.
@@ -184,15 +167,8 @@ class TransitionRatePanel(AnalysisPlotPanel):
         Returns:
             List of (time, rate) tuples
         """
-        DEBUG_PLOT_DATA = True  # Enable debug output
-        
-        if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[PLOT] _get_rate_data() called for transition {transition_id}")
-        
         # Safety check: return empty if no data collector
         if not self.data_collector:
-            if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
-                logger.debug("[PLOT] ERROR: No data collector")
             return []
         
         # PRIORITY 1: Check if we have instantaneous rate data (for rate functions)
@@ -203,25 +179,13 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 # We have rate time-series data - use it!
                 # This will show varying rates for transitions with rate functions like "0.1*P1"
                 rate_series = list(zip(times, rates))
-                if DEBUG_PLOT_DATA and rate_series:
-                    logger.debug(f"[PLOT] Using instantaneous rate data: {len(rate_series)} points")
-                    # Check if rate varies (not flat line)
-                    if len(set(rates[:min(10, len(rates))])) > 1:
-                        logger.debug(f"[PLOT] Rate varies: min={min(rates):.3f}, max={max(rates):.3f}")
-                    else:
-                        logger.debug(f"[PLOT] Rate appears constant: {rates[0] if rates else 0:.3f}")
                 return rate_series
         
         # PRIORITY 2: Fall back to checking event details (continuous transitions)
         # Get raw firing event data from collector
         raw_events = self.data_collector.get_transition_data(transition_id)
         
-        if DEBUG_PLOT_DATA:
-            pass
-        
         if not raw_events:
-            if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"[PLOT] WARNING: No raw events for transition {transition_id}")
             return []
         
         # Determine transition type by checking if details contain 'rate' field
@@ -243,14 +207,10 @@ class TransitionRatePanel(AnalysisPlotPanel):
             return rate_series
         else:
             # DISCRETE TRANSITION: Plot cumulative firing count (fallback)
-            if DEBUG_PLOT_DATA:
-                pass
             firing_times = [t for t, event_type, _ in raw_events 
                            if event_type == 'fired']
             
             if len(firing_times) < 1:
-                if DEBUG_PLOT_DATA and logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"[PLOT] No firing events for transition {transition_id}")
                 return []
             
             # Convert to cumulative count series
@@ -744,10 +704,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
             transition: Transition object
             locality: Locality object with input/output places
         """
-        logger.debug(f"[LOCALITY] add_locality_places called: transition={transition.id}, locality.is_valid={locality.is_valid}, place_panel={self._place_panel is not None}")
-        
         if not locality.is_valid:
-            logger.warning(f"[LOCALITY] Locality is invalid, skipping")
             return
         
         # Store locality information (including catalysts)
@@ -757,33 +714,23 @@ class TransitionRatePanel(AnalysisPlotPanel):
             'catalyst_places': list(locality.catalyst_places),
             'transition': transition
         }
-        logger.debug(f"[LOCALITY] Stored locality: {len(locality.input_places)} inputs, {len(locality.output_places)} outputs, {len(locality.catalyst_places)} catalysts")
         
         # Get transition's plot color (should already be set from add_object)
         transition_color = getattr(transition, 'border_color', None)
-        logger.debug(f"[LOCALITY] Transition color: {transition_color}")
         
         # Actually add the locality places to the PlaceRatePanel for plotting
         if self._place_panel is not None:
-            logger.debug(f"[LOCALITY] Adding {len(locality.input_places)} input places, {len(locality.output_places)} output places, and {len(locality.catalyst_places)} catalyst places to PlaceRatePanel")
             # Add input places
             for place in locality.input_places:
-                logger.debug(f"[LOCALITY] Adding input place {place.id} to place_panel")
                 self._place_panel.add_object(place)
             
             # Add output places
             for place in locality.output_places:
-                logger.debug(f"[LOCALITY] Adding output place {place.id} to place_panel")
                 self._place_panel.add_object(place)
             
             # Add catalyst places (enzymes, cofactors - non-consuming)
             for place in locality.catalyst_places:
-                logger.debug(f"[LOCALITY] Adding catalyst place {place.id} to place_panel")
                 self._place_panel.add_object(place)
-            
-            logger.debug(f"[LOCALITY] All places added to PlaceRatePanel")
-        else:
-            logger.warning(f"[LOCALITY] _place_panel is None! Cannot add locality places to place panel")
         
         # Color the arcs that belong to this locality with transition's plot color
         if transition_color and self._model_manager:

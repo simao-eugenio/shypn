@@ -3,6 +3,15 @@
 
 Arcs connect places to transitions or transitions to places.
 Rendered as an arrow with optional weight label.
+
+COLOR NORMALIZATION (2025-12-31):
+- Normal arcs: Black (0.0, 0.0, 0.0) - default
+- Test arcs: Blue (0.0, 0.0, 1.0) - ONLY colored element
+- Inhibitor arcs: Black (0.0, 0.0, 0.0) - inherits from Arc
+- Signal arcs (enzyme→transition): Black (0.0, 0.0, 0.0)
+- Signal flow arcs: Light gray (0.7, 0.7, 0.7) - special signal type
+
+See doc/COLOR_NORMALIZATION.md for details.
 """
 import math
 from typing import List, Tuple
@@ -130,6 +139,55 @@ class Arc(PetriNetObject):
             self._manager.replace_arc(self, new_arc)
         else:
             raise RuntimeError("Arc has no manager reference - cannot perform transformation")
+    
+    def get_bounding_box(self):
+        """Calculate bounding box for the arc.
+        
+        Returns bounding box containing the entire arc path including arrowheads.
+        For straight arcs, this is the rectangle containing start and end points.
+        For curved arcs, includes the control point extent.
+        
+        Returns:
+            dict: {'x': min_x, 'y': min_y, 'width': width, 'height': height}
+        """
+        # DEFENSIVE: Check for corrupted arc references
+        if not hasattr(self.source, 'x') or not hasattr(self.source, 'y'):
+            return {'x': 0, 'y': 0, 'width': 0, 'height': 0}
+        if not hasattr(self.target, 'x') or not hasattr(self.target, 'y'):
+            return {'x': 0, 'y': 0, 'width': 0, 'height': 0}
+        
+        # Get source and target positions
+        src_x, src_y = self.source.x, self.source.y
+        tgt_x, tgt_y = self.target.x, self.target.y
+        
+        # Calculate bounds
+        min_x = min(src_x, tgt_x)
+        max_x = max(src_x, tgt_x)
+        min_y = min(src_y, tgt_y)
+        max_y = max(src_y, tgt_y)
+        
+        # For curved arcs, include control point
+        if self.is_curved:
+            mid_x = (src_x + tgt_x) / 2 + self.control_offset_x
+            mid_y = (src_y + tgt_y) / 2 + self.control_offset_y
+            min_x = min(min_x, mid_x)
+            max_x = max(max_x, mid_x)
+            min_y = min(min_y, mid_y)
+            max_y = max(max_y, mid_y)
+        
+        # Add padding for arrowhead and line width
+        padding = max(self.ARROW_SIZE, self.width) + 5
+        min_x -= padding
+        min_y -= padding
+        max_x += padding
+        max_y += padding
+        
+        return {
+            'x': min_x,
+            'y': min_y,
+            'width': max_x - min_x,
+            'height': max_y - min_y
+        }
     
     def _is_signal_arc(self) -> bool:
         """Check if this arc connects to a signal place.

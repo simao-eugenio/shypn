@@ -64,6 +64,10 @@ class StochasticBehavior(TransitionBehavior):
         # Logger for warnings
         self.logger = logging.getLogger(self.__class__.__name__)
         
+        # Rate limiting for negative rate warnings (avoid console spam)
+        self._negative_rate_warnings = {}  # transition_name -> (count, last_logged_time)
+        self._negative_rate_log_interval = 100  # Log every 100 occurrences
+        
         # Log creation with all details
         self.logger.info(
             f"Creating StochasticBehavior for transition '{transition.name}' (ID={transition.id}), "
@@ -140,7 +144,7 @@ class StochasticBehavior(TransitionBehavior):
         self._sampled_burst = None
     
     def _detect_signal_places(self):
-        """Detect signal places (Ψ) for this transition's rate formula.
+        r"""Detect signal places (Ψ) for this transition's rate formula.
         
         Signal places are referenced in the rate function but have no
         arc connection (input, output, or regulatory). They represent
@@ -294,12 +298,30 @@ class StochasticBehavior(TransitionBehavior):
             if rate <= 0:
                 # Only log warning if rate is significantly negative (formula error)
                 if rate < -1e-6:
-                    self.logger.warning(
-                        f"Stochastic transition '{self.transition.name}' formula evaluated to "
-                        f"negative rate {rate:.6f}, which may indicate a reversible reaction "
-                        f"that should be modeled as continuous. Clamping to 0.0. "
-                        f"Expression: {self.rate_function_expr}"
-                    )
+                    # Rate-limit warnings to avoid console spam
+                    transition_name = self.transition.name
+                    if transition_name not in self._negative_rate_warnings:
+                        self._negative_rate_warnings[transition_name] = [0, None]
+                    
+                    count_info = self._negative_rate_warnings[transition_name]
+                    count_info[0] += 1
+                    
+                    # Log first occurrence and then every N occurrences
+                    if count_info[0] == 1 or count_info[0] % self._negative_rate_log_interval == 0:
+                        self.logger.warning(
+                            f"Stochastic transition '{transition_name}' formula evaluated to "
+                            f"negative rate {rate:.6f} ({count_info[0]} times), which indicates "
+                            f"a reversible reaction that should be modeled as continuous. "
+                            f"Clamping to 0.0. Expression: {self.rate_function_expr}"
+                        )
+                        if count_info[0] >= 200:
+                            self.logger.warning(
+                                f"  → Negative rate warnings for '{transition_name}' will now be "
+                                f"suppressed after {count_info[0]} occurrences. Consider using "
+                                f"continuous or hybrid mode for this model."
+                            )
+                            # Stop logging after 200 warnings
+                            self._negative_rate_log_interval = 1000000
                 return 0.0  # Transition inactive, but not an error
             
             return rate

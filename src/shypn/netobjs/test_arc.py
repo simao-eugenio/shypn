@@ -9,6 +9,10 @@ from shypn.netobjs.arc import Arc
 
 
 class TestArc(Arc):
+    """Test arc with blue dashed line."""
+    
+    # Default styling for test arcs
+    DEFAULT_COLOR = (0.0, 0.0, 1.0)  # Blue for test arcs
     """
     Represents a test arc (read arc) in a Petri net - Biological PN / Catalyst Semantics.
     
@@ -139,7 +143,7 @@ class TestArc(Arc):
             )
         
         # Visual styling for test arcs (distinguishable from normal arcs)
-        self.color = (0.4, 0.4, 0.4)  # Gray (less prominent than normal arcs)
+        # Blue color for test arcs (already set in __init__ via DEFAULT_COLOR)
         self.width = 2.5  # Slightly thinner to indicate non-consumption
     
     @property

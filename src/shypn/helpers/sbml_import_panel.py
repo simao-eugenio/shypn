@@ -665,16 +665,9 @@ class SBMLImportPanel:
                 # Convert ProcessedPathwayData to Petri net
                 document_model = self.converter.convert(processed)
                 
-                # DEBUG: Check if we reach module conversion
-                print(f"[MODULE_CONV_DEBUG] Reached module conversion block", flush=True)
-                print(f"[MODULE_CONV_DEBUG] SBMLCompartmentModuleService available: {SBMLCompartmentModuleService is not None}", flush=True)
-                print(f"[MODULE_CONV_DEBUG] document_model: {document_model is not None}", flush=True)
-                print(f"[MODULE_CONV_DEBUG] processed: {processed is not None}", flush=True)
-                
                 # Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed:
                     try:
-                        print("🔍 Converting SBML compartments to modules...", flush=True)
                         
                         # Build species_id → Place mapping from document
                         species_to_place = {}
@@ -689,8 +682,6 @@ class SBMLImportPanel:
                             if hasattr(transition, 'id'):
                                 reaction_to_transition[transition.id] = transition
                         
-                        print(f"  Found {len(species_to_place)} places, {len(reaction_to_transition)} transitions", flush=True)
-                        
                         module_service = SBMLCompartmentModuleService()
                         conversion_result = module_service.convert_compartments_to_modules(
                             document=document_model,
@@ -702,19 +693,13 @@ class SBMLImportPanel:
                         )
                         if conversion_result and conversion_result.get('success'):
                             modules = conversion_result.get('modules', [])
-                            signals = conversion_result.get('boundary_signals', [])
-                            print(f"✓ Module conversion successful:", flush=True)
-                            print(f"  - Modules created: {len(modules)}", flush=True)
-                            for mod in modules:
-                                print(f"    • {mod.name}: {len(mod.places)} places, {len(mod.transitions)} transitions", flush=True)
-                            print(f"  - Boundary signals: {len(signals)}", flush=True)
+                            # Modules successfully created
                         else:
-                            error = conversion_result.get('error', 'Unknown error') if conversion_result else 'No result'
-                            print(f"⚠ Module conversion failed: {error}", flush=True)
+                            # Module conversion failed, continue without modules
+                            pass
                     except Exception as e:
-                        import traceback
-                        print(f"❌ Module conversion exception: {e}", flush=True)
-                        traceback.print_exc()
+                        # Module conversion exception, continue without modules
+                        pass
                 
                 # Pass results back to main thread for saving
                 GLib.idle_add(self._on_load_and_save_complete, document_model, pathway_name)
@@ -912,17 +897,24 @@ class SBMLImportPanel:
         def parse_thread():
             try:
                 # Parse SBML file
+                print(f"[PARSE_THREAD_DEBUG] Calling parser.parse_file()...", flush=True)
                 parsed_pathway = self.parser.parse_file(filepath)
+                print(f"[PARSE_THREAD_DEBUG] Parse complete: {parsed_pathway is not None}", flush=True)
                 
                 if not parsed_pathway:
+                    print(f"[PARSE_THREAD_DEBUG] Parse failed - calling _on_parse_error", flush=True)
                     GLib.idle_add(self._on_parse_error, "Failed to parse SBML file")
                     return
                 
                 # Validate pathway
+                print(f"[PARSE_THREAD_DEBUG] Calling validator.validate()...", flush=True)
                 validation_result = self.validator.validate(parsed_pathway)
+                print(f"[PARSE_THREAD_DEBUG] Validation complete", flush=True)
                 
                 # Pass results back to main thread
+                print(f"[PARSE_THREAD_DEBUG] Calling GLib.idle_add(_on_parse_complete)...", flush=True)
                 GLib.idle_add(self._on_parse_complete, parsed_pathway, validation_result)
+                print(f"[PARSE_THREAD_DEBUG] GLib.idle_add called successfully", flush=True)
                 
             except Exception as e:
                 GLib.idle_add(self._on_parse_error, str(e))
@@ -984,12 +976,37 @@ class SBMLImportPanel:
                 self.sbml_parse_button.set_sensitive(True)
             return False
         
-        # Show warnings if any
-        if validation_result.warnings:
-            warning_count = len(validation_result.warnings)
-            self._show_status(f"✅ Parsed with {warning_count} warning(s)")
+        # Check for stochastic compatibility warnings (assignment rules, reversible formulas)
+        # These are stored in parsed_pathway.metadata['validation_issues']
+        stochastic_warnings = self._get_stochastic_compatibility_issues(parsed_pathway)
+        
+        if stochastic_warnings:
+            # Show dialog with options: auto-convert | proceed anyway | cancel
+            user_choice = self._show_stochastic_warning_dialog(stochastic_warnings)
+            
+            if user_choice == 'cancel':
+                self._show_status("Import cancelled by user")
+                self._import_button_flow = False  # Stop auto-continue workflow
+                if self.sbml_parse_button:
+                    self.sbml_parse_button.set_sensitive(True)
+                return False
+            elif user_choice == 'convert_continuous':
+                # Store choice for later application during conversion
+                parsed_pathway.metadata['user_choice_transition_type'] = 'continuous'
+                self._show_status(f"✅ Parsed (will convert to continuous mode)")
+            elif user_choice == 'convert_hybrid':
+                parsed_pathway.metadata['user_choice_transition_type'] = 'hybrid'
+                self._show_status(f"✅ Parsed (will use hybrid mode)")
+            else:  # proceed_anyway
+                parsed_pathway.metadata['user_choice_transition_type'] = 'stochastic'
+                self._show_status(f"✅ Parsed (stochastic mode - may fail during simulation)")
         else:
-            self._show_status(f"✅ Parsed and validated successfully")
+            # Show warnings if any (other types)
+            if validation_result.warnings:
+                warning_count = len(validation_result.warnings)
+                self._show_status(f"✅ Parsed with {warning_count} warning(s)")
+            else:
+                self._show_status(f"✅ Parsed and validated successfully")
         
         # Update preview with pathway info
         self._update_preview()
@@ -1052,6 +1069,109 @@ class SBMLImportPanel:
         error_text = "\n".join(lines)
         buffer = self.sbml_preview_text.get_buffer()
         buffer.set_text(error_text)
+    
+    def _get_stochastic_compatibility_issues(self, parsed_pathway):
+        """Extract stochastic compatibility issues from validation metadata.
+        
+        Args:
+            parsed_pathway: PathwayData with metadata['validation_issues']
+        
+        Returns:
+            List of validation issues related to stochastic compatibility
+            (assignment_rules, reversible_formulas), or empty list if none
+        """
+        if not parsed_pathway or not hasattr(parsed_pathway, 'metadata'):
+            return []
+        
+        validation_issues = parsed_pathway.metadata.get('validation_issues', [])
+        
+        # Filter for stochastic-related issues
+        stochastic_categories = {'assignment_rules', 'reversible_formulas'}
+        stochastic_issues = [
+            issue for issue in validation_issues
+            if issue.get('category') in stochastic_categories
+        ]
+        
+        return stochastic_issues
+    
+    def _show_stochastic_warning_dialog(self, issues):
+        """Show dialog with stochastic compatibility warnings and user options.
+        
+        Args:
+            issues: List of validation issue dicts with 'category', 'message', 'suggestion'
+        
+        Returns:
+            User choice: 'convert_continuous' | 'convert_hybrid' | 'proceed_anyway' | 'cancel'
+        """
+        # Build detailed message
+        message_lines = [
+            "⚠️  Model Compatibility Issues Detected",
+            "",
+            "The SBML model has features that may be incompatible with STOCHASTIC simulation:",
+            ""
+        ]
+        
+        for i, issue in enumerate(issues, 1):
+            category = issue.get('category', 'unknown')
+            message = issue.get('message', '')
+            suggestion = issue.get('suggestion', '')
+            
+            message_lines.append(f"{i}. {message}")
+            if suggestion:
+                # Show first few lines of suggestion
+                suggestion_lines = suggestion.split('\n')[:8]
+                for line in suggestion_lines:
+                    if line.strip():
+                        message_lines.append(f"   {line}")
+            message_lines.append("")
+        
+        message_lines.extend([
+            "How would you like to proceed?",
+            "",
+            "• CONTINUOUS MODE: All transitions use ODEs (safe, handles all cases)",
+            "• HYBRID MODE: Problematic transitions use ODEs, others use stochastic",
+            "• PROCEED ANYWAY: Keep stochastic (may fail during simulation)",
+            "• CANCEL: Abort import"
+        ])
+        
+        message_text = "\n".join(message_lines)
+        
+        # Create dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.parent_window,
+            flags=0,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.NONE,
+            text="Model Compatibility Warning"
+        )
+        dialog.format_secondary_text(message_text)
+        
+        # Add custom buttons
+        dialog.add_button("Convert to Continuous", 1)  # Response ID 1
+        dialog.add_button("Use Hybrid Mode", 2)        # Response ID 2
+        dialog.add_button("Proceed Anyway", 3)         # Response ID 3
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        
+        # Set default to safest option
+        dialog.set_default_response(1)
+        
+        # Run dialog
+        response = dialog.run()
+        dialog.destroy()
+        
+        # Map response to choice
+        choice_map = {
+            1: 'convert_continuous',
+            2: 'convert_hybrid',
+            3: 'proceed_anyway',
+            Gtk.ResponseType.CANCEL: 'cancel',
+            Gtk.ResponseType.DELETE_EVENT: 'cancel'  # Window closed
+        }
+        
+        user_choice = choice_map.get(response, 'cancel')
+        self.logger.info(f"User choice for stochastic compatibility: {user_choice}")
+        
+        return user_choice
     
     def _update_preview(self):
         """Update preview text with pathway information."""

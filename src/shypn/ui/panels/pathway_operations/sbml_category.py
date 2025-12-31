@@ -482,6 +482,48 @@ class SBMLCategory(BasePathwayCategory):
                 # 1. Parse SBML → PathwayData
                 parsed_pathway = self.parser.parse_file(filepath)
                 
+                # 1.5. Check for stochastic compatibility warnings and show dialog
+                # Must be done on main thread (GTK requirement), so queue it
+                validation_issues = parsed_pathway.metadata.get('validation_issues', [])
+                stochastic_warnings = [
+                    issue for issue in validation_issues
+                    if issue.get('category') in ['assignment_rules', 'reversible_formulas']
+                    and issue.get('severity') in ['warning', 'error']
+                ]
+                
+                if stochastic_warnings:
+                    # Show dialog on main thread and wait for user choice
+                    user_choice_holder = [None]  # Mutable container for thread communication
+                    
+                    def show_dialog_on_main_thread():
+                        user_choice = self._show_stochastic_warning_dialog(stochastic_warnings)
+                        user_choice_holder[0] = user_choice
+                        return False  # Don't repeat
+                    
+                    # Queue dialog on main thread and wait for completion
+                    GLib.idle_add(show_dialog_on_main_thread)
+                    
+                    # Wait for user choice (with timeout)
+                    timeout = 60  # 60 seconds
+                    elapsed = 0
+                    while user_choice_holder[0] is None and elapsed < timeout:
+                        time.sleep(0.1)
+                        elapsed += 0.1
+                    
+                    user_choice = user_choice_holder[0]
+                    
+                    if user_choice == 'cancel' or user_choice is None:
+                        # User cancelled or timeout
+                        raise ValueError("Import cancelled by user")
+                    elif user_choice in ['convert_continuous', 'convert_hybrid']:
+                        # Store user choice in metadata for converter to apply
+                        choice_map = {
+                            'convert_continuous': 'continuous',
+                            'convert_hybrid': 'hybrid',
+                            'proceed_anyway': 'stochastic'
+                        }
+                        parsed_pathway.metadata['user_choice_transition_type'] = choice_map[user_choice]
+                
                 # 2. Post-process → ProcessedPathwayData
                 self.logger.info("Post-processing pathway data...")
                 postprocessor = PathwayPostProcessor(scale_factor=1.0)
@@ -1667,3 +1709,63 @@ class SBMLCategory(BasePathwayCategory):
         """
         self.parent_window = parent_window
         self.logger.debug(f"Parent window set: {parent_window}")
+    
+    def _show_stochastic_warning_dialog(self, warnings):
+        """Show dialog warning about stochastic incompatibility with user choices.
+        
+        Args:
+            warnings: List of validation issues related to stochastic simulation
+            
+        Returns:
+            str: User choice - 'convert_continuous', 'convert_hybrid', 'proceed_anyway', or 'cancel'
+        """
+        # Build message
+        message = "⚠️  STOCHASTIC SIMULATION WARNING\n\n"
+        message += "This SBML model contains features incompatible with stochastic simulation:\n\n"
+        
+        for warning in warnings:
+            category = warning.get('category', 'Unknown')
+            if category == 'assignment_rules':
+                message += "• Assignment Rules detected\n"
+                message += "  May cause stale values and extreme propensities\n\n"
+            elif category == 'reversible_formulas':
+                message += "• Reversible reaction formulas detected\n"
+                message += "  Can produce NEGATIVE rates (λ < 0), breaking Poisson sampling\n\n"
+        
+        message += "\nRECOMMENDED ACTIONS:\n"
+        message += "✓ Convert to CONTINUOUS mode (handles all edge cases)\n"
+        message += "✓ Use HYBRID mode (continuous for problem reactions)\n"
+        message += "✗ Avoid STOCHASTIC mode (will fail with negative rates)\n\n"
+        message += "What would you like to do?"
+        
+        # Create dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.parent_window,
+            modal=True,
+            message_type=Gtk.MessageType.WARNING,
+            text="Stochastic Simulation Incompatibility"
+        )
+        dialog.format_secondary_text(message)
+        
+        # Add buttons (right to left order)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Proceed Anyway (Stochastic)", Gtk.ResponseType.NO)
+        dialog.add_button("Use Hybrid Mode", Gtk.ResponseType.APPLY)
+        dialog.add_button("Convert to Continuous", Gtk.ResponseType.YES)
+        
+        # Set default to "Convert to Continuous"
+        dialog.set_default_response(Gtk.ResponseType.YES)
+        
+        # Show dialog and get response
+        response = dialog.run()
+        dialog.destroy()
+        
+        # Map response to choice
+        if response == Gtk.ResponseType.YES:
+            return 'convert_continuous'
+        elif response == Gtk.ResponseType.APPLY:
+            return 'convert_hybrid'
+        elif response == Gtk.ResponseType.NO:
+            return 'proceed_anyway'
+        else:
+            return 'cancel'

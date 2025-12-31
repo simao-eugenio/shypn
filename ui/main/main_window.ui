@@ -44,6 +44,15 @@
       </object>
     </child>
     <child>
+      <object class="GtkMenuItem" id="file_export_pdf">
+        <property name="visible">True</property>
+        <property name="label">Export to _PDF...</property>
+        <property name="use-underline">True</property>
+        <property name="action-name">app.export-pdf</property>
+        <property name="tooltip-text">Export current model as vector PDF (Ctrl+E)</property>
+      </object>
+    </child>
+    <child>
       <object class="GtkSeparatorMenuItem">
         <property name="visible">True</property>
       </object>

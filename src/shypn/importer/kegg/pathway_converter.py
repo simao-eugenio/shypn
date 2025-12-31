@@ -497,14 +497,10 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.tokens = 1  # Enzymes typically have 1 token (present/active)
                         place.initial_marking = 1
                         
-                        # CRITICAL: Mark as catalyst for layout algorithm exclusion
-                        # Catalysts are NOT input places - they're "decorations" that indicate
-                        # presence/absence of enzymes. Layout algorithms should exclude them
-                        # from dependency graphs to prevent treating them as network inputs.
-                        place.is_catalyst = True  # Direct attribute for fast checking
-                        
                         # Mark as enzyme and signal place (Ψ_regulatory) for signal partition theory
                         place.is_signal_place = True  # Information flow, not mass transfer
+                        place.shape = 'hexagon'  # Hexagonal shape for visual distinction
+                        place.border_color = (0.0, 0.4, 0.8)  # Blue border for signal places
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -512,7 +508,6 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['kegg_type'] = entry.type
                         place.metadata['source'] = 'KEGG'
                         place.metadata['is_enzyme'] = True
-                        place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
                         place.metadata['signal_type'] = 'Ψ_regulatory'  # Regulatory signal place
                         
@@ -558,11 +553,10 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.tokens = 1
                         place.initial_marking = 1
                         
-                        # CRITICAL: Mark as catalyst for layout algorithm exclusion
-                        place.is_catalyst = True  # Direct attribute for fast checking
-                        
                         # Mark as signal place (Ψ_regulatory) for signal partition theory
                         place.is_signal_place = True  # Information flow, not mass transfer
+                        place.shape = 'hexagon'  # Hexagonal shape for visual distinction
+                        place.border_color = (0.0, 0.4, 0.8)  # Blue border for signal places
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -570,7 +564,6 @@ class StandardConversionStrategy(ConversionStrategy):
                         place.metadata['kegg_type'] = entry.type
                         place.metadata['source'] = 'KEGG'
                         place.metadata['is_enzyme'] = True
-                        place.metadata['is_catalyst'] = True  # Redundant but explicit
                         place.metadata['catalyzes_reaction'] = entry.reaction
                         place.metadata['signal_type'] = 'Ψ_regulatory'  # Regulatory signal place
                         
@@ -749,19 +742,24 @@ class StandardConversionStrategy(ConversionStrategy):
         return document
     
     def _color_signal_arcs(self, document: DocumentModel) -> None:
-        """Color arcs connected to signal places with orange (SIGNAL_VISUAL_CODING.md).
+        """Color arcs connected to signal places (test arcs blue, others black).
         
         Signal places (Ψ) represent information flow, not mass transfer.
-        Their arcs should be visually distinct from:
-        - Metabolic arcs (black)
-        - Compartment transport arcs (violet)
-        - Boundary species arcs (blue)
+        They are visually distinct through hexagonal shape with blue borders.
         
-        Color priority: Orange > Blue > Violet > Black
-        Signal arcs get highest priority since they represent information coupling.
+        Normalized color scheme (2025-12-31):
+        - All net objects: Black by default (0.0, 0.0, 0.0)
+        - Signal places: Hexagonal shape with blue borders (0.0, 0.4, 0.8)
+        - Test arcs: Blue (0.0, 0.0, 1.0) - colored for visibility
+        - Signal flow arcs: Light gray (0.7, 0.7, 0.7) - signal communication
+        - Inhibitor arcs: Black (0.0, 0.0, 0.0)
         """
-        ORANGE_COLOR = (1.0, 0.6, 0.0)  # Orange for signal communication
-        signal_arc_count = 0
+        from shypn.netobjs.test_arc import TestArc
+        
+        BLUE_COLOR = (0.0, 0.0, 1.0)  # Blue for test arcs
+        BLACK_COLOR = (0.0, 0.0, 0.0)  # Black for other arcs (normalized schema)
+        test_arc_count = 0
+        other_arc_count = 0
         
         # Find all signal places
         signal_places = [p for p in document.places if getattr(p, 'is_signal_place', False)]
@@ -781,12 +779,17 @@ class StandardConversionStrategy(ConversionStrategy):
                     is_signal_arc = True
             
             if is_signal_arc:
-                # Only color if not already colored by higher priority (none higher than orange)
-                arc.color = ORANGE_COLOR
-                signal_arc_count += 1
+                # Test arcs (catalytic/enabling) get blue color for visibility
+                if isinstance(arc, TestArc):
+                    arc.color = BLUE_COLOR
+                    test_arc_count += 1
+                else:
+                    # Other signal arcs remain black (normalized schema)
+                    arc.color = BLACK_COLOR
+                    other_arc_count += 1
         
         logger.info(
-            f"Colored {signal_arc_count} signal arcs (orange) for "
+            f"Colored {test_arc_count} test arcs (blue) and {other_arc_count} other signal arcs (black) for "
             f"{len(signal_places)} signal places (Ψ_regulatory)"
         )
     
@@ -1412,7 +1415,9 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
                             create_enzyme_places: bool = True,
-                            enhancement_options: 'EnhancementOptions' = None) -> DocumentModel:
+                            enhancement_options: 'EnhancementOptions' = None,
+                            auto_classify_signals: bool = True,
+                            signal_confidence_threshold: float = 0.70) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
     
     This function extends convert_pathway() with an optional enhancement
@@ -1421,7 +1426,12 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
     - Arc routing (add curved arcs)
     - Metadata enrichment (KEGG data)
     - Kinetic parameter estimation (handled by convert_pathway via KineticsAssigner)
+    - Signal classification (NEW - December 2024)
     - Visual validation (optional)
+    
+    NOTE: KEGG models are topological with limited kinetic metadata.
+    Signal classification works but with lower confidence than SBML models.
+    Classification relies more on name patterns and topology than rate functions.
     
     Args:
         pathway: Parsed KEGG pathway
@@ -1436,6 +1446,10 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         enhancement_options: Options for post-processing pipeline.
             If None, standard enhancements are applied.
             Set enable_enhancements=False to skip all enhancements.
+        auto_classify_signals: If True, automatically classify signal types (default: True)
+            Uses name patterns and topology since KEGG has limited kinetic metadata
+        signal_confidence_threshold: Minimum confidence for signal classification (0-1, default: 0.70)
+            Lower than SBML (0.75) because KEGG has less kinetic information
         
     Returns:
         DocumentModel (optionally enhanced)
@@ -1447,17 +1461,21 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         >>> kgml = fetch_pathway("hsa00010")
         >>> pathway = parse_kgml(kgml)
         >>> 
-        >>> # With standard enhancements
+        >>> # With standard enhancements + signal classification
         >>> options = EnhancementOptions.get_standard_options()
-        >>> document = convert_pathway_enhanced(pathway, enhancement_options=options)
+        >>> document = convert_pathway_enhanced(pathway, 
+        ...                                     enhancement_options=options,
+        ...                                     auto_classify_signals=True)
         >>> 
-        >>> # With custom enhancements
+        >>> # With custom enhancements (disable signal classification)
         >>> options = EnhancementOptions(
         ...     enable_layout_optimization=True,
         ...     enable_arc_routing=False,
         ...     layout_min_spacing=80.0
         ... )
-        >>> document = convert_pathway_enhanced(pathway, enhancement_options=options)
+        >>> document = convert_pathway_enhanced(pathway, 
+        ...                                     enhancement_options=options,
+        ...                                     auto_classify_signals=False)
     """
     # Standard conversion
     document = convert_pathway(
@@ -1505,5 +1523,91 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
         # Print report if verbose
         if enhancement_options.verbose:
             pipeline.print_report()
+    
+    # ========================================================================
+    # Signal Classification (NEW - December 2024)
+    # ========================================================================
+    # Apply signal classification after enhancements
+    # NOTE: KEGG models have limited kinetic metadata, so classification
+    # relies more on name patterns and topology than rate functions
+    if auto_classify_signals:
+        try:
+            from shypn.analysis.signal_classification import SignalClassifierManager
+            
+            import logging
+            logger = logging.getLogger("KEGGConverter")
+            logger.info("Applying signal classification to KEGG pathway...")
+            logger.info(f"Note: KEGG models have limited kinetic metadata. "
+                       f"Classification uses name patterns and topology primarily.")
+            
+            # Create model wrapper for classifier
+            class ModelWrapper:
+                def __init__(self, places, transitions, arcs):
+                    self.places = places
+                    self.transitions = transitions
+                    self.arcs = arcs
+            
+            model_wrapper = ModelWrapper(
+                document.places,
+                document.transitions,
+                document.arcs
+            )
+            
+            # Run classification
+            manager = SignalClassifierManager(model_wrapper, confidence_threshold=signal_confidence_threshold)
+            classifications = manager.classify_all_signals(signal_places_only=True)
+            
+            # Apply results
+            classified_count = 0
+            for place_name, (signal_type, confidence) in classifications.items():
+                # Find place by name
+                place = next((p for p in document.places if p.name == place_name), None)
+                if place:
+                    # Convert string signal_type to enum if needed
+                    from shypn.netobjs.signal_type import SignalType
+                    if isinstance(signal_type, str):
+                        signal_type = SignalType[signal_type.upper()]
+                    
+                    place.signal_type = signal_type
+                    classified_count += 1
+                    
+                    logger.debug(
+                        f"Classified {place.name} as {signal_type.name if hasattr(signal_type, 'name') else signal_type} "
+                        f"(confidence: {confidence:.2f})"
+                    )
+            
+            logger.info(
+                f"Signal classification complete: {classified_count} signals classified "
+                f"(threshold: {signal_confidence_threshold:.0%})"
+            )
+            
+            # Generate simple summary from classifications
+            summary = {}
+            for place_name, (sig_type, confidence) in classifications.items():
+                type_key = sig_type.upper() if isinstance(sig_type, str) else sig_type.name.upper()
+                summary[type_key] = summary.get(type_key, 0) + 1
+            
+            if summary:
+                logger.info(
+                    f"Classification summary: "
+                    f"ENERGY: {summary.get('ENERGY', 0)}, "
+                    f"SPATIAL: {summary.get('SPATIAL', 0)}, "
+                    f"QUORUM: {summary.get('QUORUM', 0)}, "
+                    f"REGULATORY: {summary.get('REGULATORY', 0)}"
+                )
+            
+        except ImportError as e:
+            import logging
+            logger = logging.getLogger("KEGGConverter")
+            logger.warning(
+                f"Signal classification not available: {e}. "
+                f"Install signal classification package to enable this feature."
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger("KEGGConverter")
+            logger.error(f"Signal classification failed: {e}")
+            import traceback
+            traceback.print_exc()
     
     return document
