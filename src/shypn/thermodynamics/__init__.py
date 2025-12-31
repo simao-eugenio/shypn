@@ -6,20 +6,23 @@ derived from Gibbs free energy calculations.
 
 Main Components:
     - GibbsCalculator: Calculate ΔG°, K_eq from compound data
+    - CompoundResolver: Map between KEGG/ChEBI identifiers
+    - MultiSourceProvider: Database access with caching
     - CompoundThermodynamics: Data model for compound properties
     - ReactionThermodynamics: Data model for reaction thermodynamics
     - ThermodynamicValidation: Validation results for K_eq consistency
 
 Example:
-    >>> from shypn.thermodynamics import GibbsCalculator
-    >>> calculator = GibbsCalculator()
+    >>> from shypn.thermodynamics import GibbsCalculator, MultiSourceProvider
+    >>> provider = MultiSourceProvider()
+    >>> calculator = GibbsCalculator(provider)
     >>> reactants = {"C00002": 1}  # ATP
     >>> products = {"C00008": 1}   # ADP
     >>> thermo = calculator.calculate_delta_g_reaction(reactants, products)
     >>> print(f"K_eq = {thermo.k_eq:.2e}")
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Export models
 from .models import (
@@ -36,6 +39,14 @@ from .base import (
 
 # Export concrete implementations
 from .gibbs_calculator import GibbsCalculator
+from .compound_resolver import CompoundResolver, CompoundIdentity
+
+# Export database providers
+from .database import (
+    CacheProvider,
+    StaticDataProvider,
+    MultiSourceProvider
+)
 
 __all__ = [
     # Version
@@ -52,4 +63,11 @@ __all__ = [
     
     # Implementations
     "GibbsCalculator",
+    "CompoundResolver",
+    "CompoundIdentity",
+    
+    # Database providers
+    "CacheProvider",
+    "StaticDataProvider",
+    "MultiSourceProvider",
 ]
