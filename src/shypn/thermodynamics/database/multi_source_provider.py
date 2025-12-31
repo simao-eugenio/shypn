@@ -13,6 +13,7 @@ from ..base import CompoundDataProviderBase
 from ..models import CompoundThermodynamics
 from .cache_provider import CacheProvider
 from .static_provider import StaticDataProvider
+from .equilibrator_provider import EquilibratorProvider
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +24,12 @@ class MultiSourceProvider(CompoundDataProviderBase):
     Query order:
     1. Cache - Fast, returns immediately if available
     2. Static - Curated core metabolites (~100 compounds)
-    3. Web services - Future: eQuilibrator, MetaCyc APIs
+    3. eQuilibrator - Web API with ~10,000 compounds (requires internet)
     
     Results are automatically cached for future queries.
     
     Example:
-        >>> provider = MultiSourceProvider()
+        >>> provider = MultiSourceProvider(enable_web=True)
         >>> compound = provider.get_compound("C00002")  # ATP
         >>> # First query: cache miss → static hit → cache stored
         >>> compound2 = provider.get_compound("C00002")
@@ -39,14 +40,14 @@ class MultiSourceProvider(CompoundDataProviderBase):
         self,
         enable_cache: bool = True,
         enable_static: bool = True,
-        enable_web: bool = False  # Future implementation
+        enable_web: bool = True
     ):
         """Initialize multi-source provider.
         
         Args:
             enable_cache: Use disk cache
             enable_static: Use static data file
-            enable_web: Use web services (not implemented yet)
+            enable_web: Use eQuilibrator web API
         """
         self.providers: List[CompoundDataProviderBase] = []
         
@@ -74,7 +75,15 @@ class MultiSourceProvider(CompoundDataProviderBase):
             self.static = None
         
         if enable_web:
-            logger.warning("Web services not yet implemented")
+            try:
+                self.equilibrator = EquilibratorProvider()
+                self.providers.append(self.equilibrator)
+                logger.info("eQuilibrator provider enabled")
+            except Exception as e:
+                logger.warning(f"eQuilibrator provider failed to initialize: {e}")
+                self.equilibrator = None
+        else:
+            self.equilibrator = None
         
         if not self.providers:
             logger.error("No data providers available!")

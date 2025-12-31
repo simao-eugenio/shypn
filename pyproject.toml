@@ -15,6 +15,12 @@ dependencies = [
     "weasyprint>=60.0",
     "openpyxl>=3.1.0",
     "platformdirs>=4.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+thermodynamics = [
+    "requests>=2.31.0",
 ]
 
 license = { file = "LICENSE" }
