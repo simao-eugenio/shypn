@@ -45,7 +45,9 @@ from .compound_resolver import CompoundResolver, CompoundIdentity
 from .database import (
     CacheProvider,
     StaticDataProvider,
-    MultiSourceProvider
+    MultiSourceProvider,
+    EquilibratorProvider,
+    MockEquilibratorProvider
 )
 
 __all__ = [
@@ -70,4 +72,6 @@ __all__ = [
     "CacheProvider",
     "StaticDataProvider",
     "MultiSourceProvider",
+    "EquilibratorProvider",
+    "MockEquilibratorProvider",
 ]
