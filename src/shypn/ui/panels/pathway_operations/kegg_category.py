@@ -13,6 +13,7 @@ Date: 2025-10-29
 """
 import os
 import sys
+import time
 import logging
 import threading
 from typing import Optional, Dict, Any
@@ -282,7 +283,7 @@ class KEGGCategory(BasePathwayCategory):
         
         # Show catalysts checkbox (Biological Petri Net mode)
         self.show_catalysts_check = Gtk.CheckButton(label="Show catalysts (Biological Petri Net)")
-        self.show_catalysts_check.set_active(False)
+        self.show_catalysts_check.set_active(True)  # Default: Show enzyme places
         self.show_catalysts_check.set_tooltip_text(
             "Create enzyme/catalyst places with test arcs (dashed lines).\n"
             "Enables Biological Petri Net analysis but increases visual complexity.\n\n"
@@ -612,6 +613,52 @@ class KEGGCategory(BasePathwayCategory):
                 # 2. Parse KGML
                 parsed_pathway = self.parser.parse(kgml_data)
                 
+                # 2.5. Check for reversible reactions and show dialog
+                # Reversible KEGG reactions can produce negative rates with mass-action kinetics
+                reversible_reactions = [r for r in parsed_pathway.reactions if r.is_reversible()]
+                
+                if reversible_reactions:
+                    # Create synthetic validation issues for dialog compatibility
+                    validation_warning = {
+                        'category': 'reversible_reactions',
+                        'severity': 'warning',
+                        'message': f'Reversible reactions detected ({len(reversible_reactions)} reactions)',
+                        'reactions': [r.name for r in reversible_reactions]
+                    }
+                    
+                    # Show dialog on main thread and wait for user choice
+                    user_choice_holder = [None]
+                    
+                    def show_dialog_on_main_thread():
+                        user_choice = self._show_stochastic_warning_dialog([validation_warning])
+                        user_choice_holder[0] = user_choice
+                        return False
+                    
+                    GLib.idle_add(show_dialog_on_main_thread)
+                    
+                    # Wait for user choice (with timeout)
+                    timeout = 60
+                    elapsed = 0
+                    while user_choice_holder[0] is None and elapsed < timeout:
+                        time.sleep(0.1)
+                        elapsed += 0.1
+                    
+                    user_choice = user_choice_holder[0]
+                    
+                    if user_choice == 'cancel' or user_choice is None:
+                        raise ValueError("Import cancelled by user")
+                    elif user_choice in ['convert_continuous', 'convert_hybrid']:
+                        # Store user choice in metadata for converter to apply
+                        choice_map = {
+                            'convert_continuous': 'continuous',
+                            'convert_hybrid': 'hybrid',
+                            'proceed_anyway': 'stochastic'
+                        }
+                        # Store in parsed_pathway metadata (will be passed to converter)
+                        if not hasattr(parsed_pathway, 'metadata'):
+                            parsed_pathway.metadata = {}
+                        parsed_pathway.metadata['user_choice_transition_type'] = choice_map[user_choice]
+                
                 # VALIDATION: Check if pathway has reactions
                 # shypn models biochemical and gene regulatory networks (with reactions/transitions)
                 # Pure signaling pathways (only relations, no reactions) are not yet supported
@@ -696,6 +743,52 @@ class KEGGCategory(BasePathwayCategory):
                 
                 # 2. Parse KGML
                 parsed_pathway = self.parser.parse(kgml_data)
+                
+                # 2.5. Check for reversible reactions and show dialog
+                # Reversible KEGG reactions can produce negative rates with mass-action kinetics
+                reversible_reactions = [r for r in parsed_pathway.reactions if r.is_reversible()]
+                
+                if reversible_reactions:
+                    # Create synthetic validation issues for dialog compatibility
+                    validation_warning = {
+                        'category': 'reversible_reactions',
+                        'severity': 'warning',
+                        'message': f'Reversible reactions detected ({len(reversible_reactions)} reactions)',
+                        'reactions': [r.name for r in reversible_reactions]
+                    }
+                    
+                    # Show dialog on main thread and wait for user choice
+                    user_choice_holder = [None]
+                    
+                    def show_dialog_on_main_thread():
+                        user_choice = self._show_stochastic_warning_dialog([validation_warning])
+                        user_choice_holder[0] = user_choice
+                        return False
+                    
+                    GLib.idle_add(show_dialog_on_main_thread)
+                    
+                    # Wait for user choice (with timeout)
+                    timeout = 60
+                    elapsed = 0
+                    while user_choice_holder[0] is None and elapsed < timeout:
+                        time.sleep(0.1)
+                        elapsed += 0.1
+                    
+                    user_choice = user_choice_holder[0]
+                    
+                    if user_choice == 'cancel' or user_choice is None:
+                        raise ValueError("Import cancelled by user")
+                    elif user_choice in ['convert_continuous', 'convert_hybrid']:
+                        # Store user choice in metadata for converter to apply
+                        choice_map = {
+                            'convert_continuous': 'continuous',
+                            'convert_hybrid': 'hybrid',
+                            'proceed_anyway': 'stochastic'
+                        }
+                        # Store in parsed_pathway metadata (will be passed to converter)
+                        if not hasattr(parsed_pathway, 'metadata'):
+                            parsed_pathway.metadata = {}
+                        parsed_pathway.metadata['user_choice_transition_type'] = choice_map[user_choice]
                 
                 # VALIDATION: Check if pathway has reactions
                 # shypn models biochemical and gene regulatory networks (with reactions/transitions)
@@ -1651,3 +1744,63 @@ class KEGGCategory(BasePathwayCategory):
         dialog.format_secondary_text(tooltip)
         dialog.run()
         dialog.destroy()
+    
+    def _show_stochastic_warning_dialog(self, warnings):
+        """Show dialog warning about stochastic incompatibility with user choices.
+        
+        Args:
+            warnings: List of validation issues related to stochastic simulation
+            
+        Returns:
+            str: User choice - 'convert_continuous', 'convert_hybrid', 'proceed_anyway', or 'cancel'
+        """
+        # Build message
+        message = "⚠️  STOCHASTIC SIMULATION WARNING\n\n"
+        message += "This KEGG pathway contains reversible reactions that may be incompatible\n"
+        message += "with stochastic simulation:\n\n"
+        
+        for warning in warnings:
+            category = warning.get('category', 'Unknown')
+            if category == 'reversible_reactions':
+                reaction_count = len(warning.get('reactions', []))
+                message += f"• {reaction_count} reversible reactions detected\n"
+                message += "  When heuristic rates are applied, reversible reactions can produce\n"
+                message += "  NEGATIVE rates (λ < 0), breaking Poisson sampling in stochastic mode\n\n"
+        
+        message += "\nRECOMMENDED ACTIONS:\n"
+        message += "✓ Convert to CONTINUOUS mode (handles all edge cases)\n"
+        message += "✓ Use HYBRID mode (continuous for reversible reactions)\n"
+        message += "✗ Avoid STOCHASTIC mode (may fail with negative rates)\n\n"
+        message += "What would you like to do?"
+        
+        # Create dialog
+        dialog = Gtk.MessageDialog(
+            transient_for=self.parent_window,
+            modal=True,
+            message_type=Gtk.MessageType.WARNING,
+            text="Stochastic Simulation Incompatibility"
+        )
+        dialog.format_secondary_text(message)
+        
+        # Add buttons (right to left order)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Proceed Anyway (Stochastic)", Gtk.ResponseType.NO)
+        dialog.add_button("Use Hybrid Mode", Gtk.ResponseType.APPLY)
+        dialog.add_button("Convert to Continuous", Gtk.ResponseType.YES)
+        
+        # Set default to "Convert to Continuous"
+        dialog.set_default_response(Gtk.ResponseType.YES)
+        
+        # Show dialog and get response
+        response = dialog.run()
+        dialog.destroy()
+        
+        # Map response to choice
+        if response == Gtk.ResponseType.YES:
+            return 'convert_continuous'
+        elif response == Gtk.ResponseType.APPLY:
+            return 'convert_hybrid'
+        elif response == Gtk.ResponseType.NO:
+            return 'proceed_anyway'
+        else:
+            return 'cancel'

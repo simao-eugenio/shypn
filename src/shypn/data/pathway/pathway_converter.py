@@ -1171,99 +1171,27 @@ class PathwayConverter:
         )
         return default_comp
     
-    def _color_compartment_arcs(self, document: DocumentModel) -> None:
-        """Color arcs for cross-compartment transport with violet.
-        
-        Transport arcs (import/export between compartments) are colored violet
-        to unify the visual representation of mass transfer, distinguishing them
-        from information transfer (signal arcs in orange).
-        
-        Unified transport coloring:
-        - Import (extracellular → cytosol): VIOLET
-        - Export (cytosol → extracellular): VIOLET
-        - Signal arcs (already orange): preserved
-        
-        Priority: Signal arcs (orange) and boundary arcs (blue) take precedence,
-        so we only color arcs that are still black or need to be standardized.
-        
-        Args:
-            document: DocumentModel with places and arcs
-        """
-        VIOLET_COLOR = (0.6, 0.0, 0.8)  # Violet for compartment transport
-        compartment_arc_count = 0
-        
-        # Find all compartment places (non-default compartments)
-        compartment_places = [p for p in document.places if p.is_compartment_place]
-        
-        # Find all signal places (to preserve their orange arcs)
-        signal_places = [p for p in document.places if p.is_signal_place]
-        
-        if not compartment_places:
-            return
-        
-        # Color arcs for cross-compartment transport (unified import/export)
-        for arc in document.arcs:
-            # Skip if already colored by higher priority (orange for signals, blue for boundary)
-            ORANGE = (1.0, 0.6, 0.0)
-            BLUE = (0.0, 0.498, 1.0)
-            BLACK = (0.0, 0.0, 0.0)
-            
-            # Preserve signal arcs (orange) - don't color transport if it's a signal
-            if arc.source in signal_places or arc.target in signal_places:
-                continue
-            
-            # Preserve boundary arcs (blue)
-            if arc.color == BLUE:
-                continue
-            
-            # Color cross-compartment transport arcs (both import and export)
-            if arc.source in compartment_places or arc.target in compartment_places:
-                arc.color = VIOLET_COLOR
-                compartment_arc_count += 1
-        
-        # Also handle test arcs for compartment places (modifiers from other compartments)
-        if hasattr(document, 'test_arcs'):
-            for test_arc in document.test_arcs:
-                # Skip signal place test arcs
-                if test_arc.place in signal_places:
-                    continue
-                
-                # Skip boundary arcs
-                BLUE = (0.0, 0.498, 1.0)
-                if test_arc.color == BLUE:
-                    continue
-                
-                if test_arc.place in compartment_places:
-                    test_arc.color = VIOLET_COLOR
-                    compartment_arc_count += 1
-        
-        if compartment_arc_count > 0:
-            self.logger.info(
-                f"Colored {compartment_arc_count} transport arcs (violet) - "
-                f"unified import/export between compartments"
-            )
-    
     def _color_signal_arcs(self, document: DocumentModel) -> None:
         """Color arcs connected to signal places with light gray.
         
         Signal places (Ψ) represent information flow, not mass transfer.
         Their arcs should be visually distinct from:
         - Metabolic arcs (black)
-        - Compartment transport arcs (violet)
-        - Boundary species arcs (blue)
+        - Test arcs (blue dashed)
         
         This is the HIGHEST priority coloring - applied first.
         Other coloring functions check if arc is still black before coloring.
         
         Color coding:
         - LIGHT GRAY = Signal communication (information transfer)
-        - VIOLET = Compartment transport (mass transfer across membrane)
-        - BLUE = Boundary species (infinite reservoir)
+        - BLUE DASHED = Test/catalyst arcs (non-consuming)
         - BLACK = Default metabolic reactions
         
         Args:
             document: DocumentModel with places and arcs
         """
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
         SIGNAL_COLOR = (0.7, 0.7, 0.7)  # Light gray RGB for signal communication
         signal_arc_count = 0
         
@@ -1273,17 +1201,12 @@ class PathwayConverter:
         if not signal_places:
             return
         
-        # Color arcs connected to signal places (both regular and test arcs)
+        # Color ONLY SignalFlowArcs connected to signal places (light gray)
+        # TestArcs remain blue, regular Arcs remain black per normalized color schema
         for arc in document.arcs:
-            if arc.source in signal_places or arc.target in signal_places:
-                arc.color = SIGNAL_COLOR
-                signal_arc_count += 1
-        
-        # Also color test arcs from signal places
-        if hasattr(document, 'test_arcs'):
-            for test_arc in document.test_arcs:
-                if test_arc.place in signal_places:
-                    test_arc.color = SIGNAL_COLOR
+            if isinstance(arc, SignalFlowArc):
+                if arc.source in signal_places or arc.target in signal_places:
+                    arc.color = SIGNAL_COLOR
                     signal_arc_count += 1
         
         if signal_arc_count > 0:
@@ -1313,36 +1236,123 @@ class PathwayConverter:
             document: DocumentModel to add transitions/arcs to
             species_to_place: Mapping from species ID to Place
         """
-        boundary_places = []
-        BLUE_COLOR = (0.0, 0.498, 1.0)  # Blue RGB(0,127,255) for boundary species
-        
+        boundary_count = 0
         for species in pathway.species:
             # Check if this is a boundary species
-            if not (hasattr(species, 'metadata') and species.metadata.get('boundary_condition')):
-                continue
-            
-            place = species_to_place.get(species.id)
-            if place:
-                boundary_places.append(place)
+            if hasattr(species, 'metadata') and species.metadata.get('boundary_condition'):
+                boundary_count += 1
         
-        # Color ALL arcs connected to boundary places BLUE (both regular and test arcs)
-        if boundary_places:
-            for arc in document.arcs:
-                if arc.source in boundary_places or arc.target in boundary_places:
-                    arc.color = BLUE_COLOR
-            
-            # Also color test arcs (catalysts using boundary species)
-            if hasattr(document, 'test_arcs'):
-                for test_arc in document.test_arcs:
-                    if test_arc.place in boundary_places:
-                        test_arc.color = BLUE_COLOR
-            
+        if boundary_count > 0:
             self.logger.info(
-                f"Colored arcs for {len(boundary_places)} boundary species (blue, no source/sink)"
+                f"Found {boundary_count} boundary species (no special coloring)"
             )
             
             document.metadata['has_boundary_species'] = True
-            document.metadata['boundary_species_count'] = len(boundary_places)
+            document.metadata['boundary_species_count'] = boundary_count
+    
+    def _apply_transition_type_override(self, document: DocumentModel, 
+                                       user_choice: str,
+                                       pathway: ProcessedPathwayData) -> None:
+        """Apply user-chosen transition type override after validation warnings.
+        
+        This is called when user saw stochastic compatibility warnings during import
+        (assignment rules, reversible formulas) and chose how to proceed.
+        
+        Choices:
+        - 'continuous': Convert ALL transitions to continuous mode
+        - 'hybrid': Convert only problematic transitions to continuous
+        - 'stochastic': Keep as is (no changes)
+        
+        Args:
+            document: DocumentModel with transitions already created
+            user_choice: User's choice from validation dialog
+            pathway: PathwayData with metadata about which transitions are problematic
+        """
+        if user_choice == 'stochastic':
+            # User chose to proceed with stochastic, no changes needed
+            self.logger.info("User chose stochastic mode - no transition type changes")
+            return
+        
+        validation_issues = pathway.metadata.get('validation_issues', [])
+        
+        if user_choice == 'continuous':
+            # Convert ALL transitions to continuous
+            converted_count = 0
+            for transition in document.transitions:
+                if transition.transition_type == 'stochastic':
+                    transition.transition_type = 'continuous'
+                    converted_count += 1
+                    self.logger.debug(
+                        f"Converted {transition.name} from stochastic to continuous (user choice)"
+                    )
+            
+            self.logger.info(
+                f"User chose continuous mode: Converted {converted_count} "
+                f"stochastic transitions to continuous"
+            )
+            document.metadata['conversion_mode'] = 'continuous'
+            document.metadata['conversion_reason'] = 'User choice after validation warnings'
+        
+        elif user_choice == 'hybrid':
+            # Convert only problematic transitions to continuous
+            # Identify which reactions have issues based on validation
+            problematic_reactions = set()
+            
+            # Check for assignment rules - affects transitions using rule-defined species
+            has_assignment_rules = any(
+                issue.get('category') == 'assignment_rules'
+                for issue in validation_issues
+            )
+            
+            # Check for reversible formulas - affects specific reactions
+            reversible_issues = [
+                issue for issue in validation_issues
+                if issue.get('category') == 'reversible_formulas'
+            ]
+            
+            converted_count = 0
+            for transition in document.transitions:
+                should_convert = False
+                
+                # Get reaction metadata
+                reaction_id = transition.metadata.get('reaction_id') if hasattr(transition, 'metadata') else None
+                
+                # Check if has reversible formula (stored in properties)
+                if hasattr(transition, 'properties'):
+                    is_reversible = transition.metadata.get('reversible', False)
+                    rate_function = transition.properties.get('rate_function', '')
+                    
+                    # Check for subtraction or reverse rate keywords
+                    has_subtraction = ' - ' in rate_function
+                    has_reverse_keywords = any(
+                        keyword in rate_function.lower()
+                        for keyword in ['k_r', 'kr_', 'k_rev', 'krev', 'k_backward']
+                    )
+                    
+                    if has_subtraction or has_reverse_keywords or is_reversible:
+                        should_convert = True
+                        problematic_reactions.add(transition.name)
+                
+                # If assignment rules present, convert all transitions to be safe
+                # (hard to determine which transitions use rule-defined species)
+                if has_assignment_rules:
+                    should_convert = True
+                
+                if should_convert and transition.transition_type == 'stochastic':
+                    transition.transition_type = 'continuous'
+                    converted_count += 1
+                    self.logger.debug(
+                        f"Converted {transition.name} from stochastic to continuous "
+                        f"(hybrid mode - problematic formula)"
+                    )
+            
+            self.logger.info(
+                f"User chose hybrid mode: Converted {converted_count} problematic "
+                f"stochastic transitions to continuous, kept others as stochastic"
+            )
+            document.metadata['conversion_mode'] = 'hybrid'
+            document.metadata['conversion_reason'] = 'User choice after validation warnings'
+            document.metadata['problematic_reactions'] = list(problematic_reactions)
     
     def convert(self, pathway: ProcessedPathwayData) -> DocumentModel:
         """
@@ -1401,6 +1411,15 @@ class PathwayConverter:
         )
         reaction_to_transition = reaction_converter.convert()
         
+        # ==============================================================================
+        # USER CHOICE: Apply transition type override if user chose during validation
+        # ==============================================================================
+        # If user saw stochastic compatibility warnings (assignment rules, reversible
+        # formulas) and chose to convert to continuous/hybrid mode, apply that choice now.
+        user_choice = pathway.metadata.get('user_choice_transition_type')
+        if user_choice:
+            self._apply_transition_type_override(document, user_choice, pathway)
+        
         # Convert stoichiometry to arcs
         arc_converter = ArcConverter(
             pathway, document,
@@ -1421,12 +1440,6 @@ class PathwayConverter:
         # SBML models handle boundary species through parameters and formulas, not
         # explicit source/sink transitions. We only mark them visually with blue color.
         self._color_boundary_arcs(pathway, document, species_to_place)
-        
-        # ==============================================================================
-        # COMPARTMENT ARCS: Color arcs connected to compartment places
-        # ==============================================================================
-        # Arcs originating from or targeting non-default compartment places get violet color
-        self._color_compartment_arcs(document)
         
         # ==============================================================================
         # BIOLOGICAL PETRI NET: Convert modifiers to test arcs (catalysts/enzymes)
@@ -1589,33 +1602,10 @@ class PathwayConverter:
             
             # PROBLEM PATTERN: test arcs but no normal inputs
             if test_inputs and not normal_inputs and outputs:
-                self.logger.warning(
-                    f"\n{'='*70}\n"
-                    f"⚠️  MODELING ERROR: Transition '{transition.name}'\n"
-                    f"{'='*70}\n"
-                    f"Structure:\n"
-                    f"  - Catalyst arcs (test): {len(test_inputs)}\n"
-                    f"  - Reactant arcs (normal input): {len(normal_inputs)} ← MISSING!\n"
-                    f"  - Product arcs (output): {len(outputs)}\n"
-                    f"\n"
-                    f"Problem:\n"
-                    f"  This transition has catalysts but NO SUBSTRATES.\n"
-                    f"  It CANNOT FIRE because test arcs are non-consuming.\n"
-                    f"  Simulation will be blocked at this transition!\n"
-                    f"\n"
-                    f"Catalysts involved:\n"
-                )
-                for arc in test_inputs:
-                    catalyst_name = arc.source.name if hasattr(arc.source, 'name') else 'Unknown'
-                    self.logger.warning(f"  - {catalyst_name}")
-                
-                self.logger.warning(
-                    f"\n"
-                    f"Possible fixes:\n"
-                    f"  1. Add missing reactant species to SBML <listOfReactants>\n"
-                    f"  2. Mark transition as SOURCE if it represents external input\n"
-                    f"  3. Check if catalyst should be a reactant instead of modifier\n"
-                    f"{'='*70}\n"
+                # Changed to debug level to reduce console noise
+                self.logger.debug(
+                    f"Modeling issue: Transition '{transition.name}' has catalysts but no substrates. "
+                    f"Catalysts: {[arc.source.name for arc in test_inputs]}"
                 )
     
     def _validate_mixed_role_species(
@@ -1676,66 +1666,11 @@ class PathwayConverter:
             if has_modifier and has_substrate:
                 mixed_role_species.append((species_id, roles))
         
-        # Log warnings for mixed-role species
+        # Log warnings for mixed-role species (changed to debug level)
         if mixed_role_species:
-            self.logger.warning(
-                f"\n{'='*70}\n"
-                f"⚠️  CATALYST DEPLETION WARNING\n"
-                f"{'='*70}\n"
-                f"Found {len(mixed_role_species)} species with MIXED ROLES:\n"
-            )
-            
-            for species_id, roles in mixed_role_species[:5]:  # Show first 5
-                place = species_to_place.get(species_id)
-                species_name = place.name if place else species_id
-                
-                self.logger.warning(
-                    f"\n"
-                    f"Species: {species_name} (ID: {species_id})\n"
-                    f"  Roles:\n"
-                )
-                
-                if roles['modifier_reactions']:
-                    self.logger.warning(
-                        f"    - CATALYST in {len(roles['modifier_reactions'])} reactions: "
-                        f"{', '.join(roles['modifier_reactions'][:3])}"
-                        f"{'...' if len(roles['modifier_reactions']) > 3 else ''}"
-                    )
-                
-                if roles['reactant_reactions']:
-                    self.logger.warning(
-                        f"    - REACTANT in {len(roles['reactant_reactions'])} reactions: "
-                        f"{', '.join(roles['reactant_reactions'][:3])}"
-                        f"{'...' if len(roles['reactant_reactions']) > 3 else ''}"
-                    )
-                
-                if roles['product_reactions']:
-                    self.logger.warning(
-                        f"    - PRODUCT in {len(roles['product_reactions'])} reactions: "
-                        f"{', '.join(roles['product_reactions'][:3])}"
-                        f"{'...' if len(roles['product_reactions']) > 3 else ''}"
-                    )
-                
-                self.logger.warning(
-                    f"  \n"
-                    f"  ⚠️  Issue: Consuming as substrate depletes catalyst pool!\n"
-                )
-            
-            if len(mixed_role_species) > 5:
-                self.logger.warning(
-                    f"\n... and {len(mixed_role_species) - 5} more species\n"
-                )
-            
-            self.logger.warning(
-                f"\n"
-                f"This may represent:\n"
-                f"  1. ✅ Correct model: Resource competition for limited cofactor\n"
-                f"     (e.g., ATP used as both substrate and allosteric regulator)\n"
-                f"  2. ❌ Modeling error: Should be separate species/compartments\n"
-                f"     (e.g., AMP-free vs AMP-enzyme-bound)\n"
-                f"\n"
-                f"Review SBML model to verify intended semantics.\n"
-                f"{'='*70}\n"
+            self.logger.debug(
+                f"Found {len(mixed_role_species)} species with mixed catalyst/substrate roles. "
+                f"Species: {[species_id for species_id, _ in mixed_role_species[:3]]}"
             )
 
 

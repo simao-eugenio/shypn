@@ -91,7 +91,8 @@ class SBMLValidator:
         self._validate_species_initial_values()
         self._validate_compartment_sizes()
         
-        # Check formula validity
+        # Check formula validity and stochastic compatibility
+        self._check_reversible_formulas_stochastic_risk()
         self._check_formula_dependencies()
         
         # Determine if model is valid (no errors or critical issues)
@@ -103,7 +104,7 @@ class SBMLValidator:
         return is_valid, self.issues
     
     def _check_assignment_rules(self):
-        """Check for assignment rules (currently unsupported)."""
+        """Check for assignment rules (incompatible with stochastic simulation)."""
         num_rules = self.model.getNumRules()
         assignment_rules = []
         
@@ -119,24 +120,37 @@ class SBMLValidator:
             if len(assignment_rules) > 3:
                 variables += f", ... (+{len(assignment_rules)-3} more)"
             
+            # Store detailed rule information for UI display
+            rules_detail = "\n".join([f"  • {var} = {formula[:50]}{'...' if len(formula) > 50 else ''}" 
+                                      for var, formula in assignment_rules[:5]])
+            if len(assignment_rules) > 5:
+                rules_detail += f"\n  ... and {len(assignment_rules)-5} more"
+            
             self.issues.append(ValidationIssue(
                 severity=ValidationSeverity.WARNING,
                 category="assignment_rules",
-                message=f"Model contains {len(assignment_rules)} assignment rule(s): {variables}",
+                message=f"Assignment rules detected ({len(assignment_rules)} rules): {variables}",
                 suggestion=(
-                    "Assignment rules are evaluated once at t=0 but NOT re-evaluated during simulation. "
-                    "This may cause incorrect results if rules define species used in reactions.\n"
-                    "If simulation fails with extreme propensities, this is likely the cause.\n"
-                    "WORKAROUND: Try manually setting initial concentrations, or use hybrid/continuous mode.\n"
-                    f"Affected variables: {[var for var, _ in assignment_rules]}"
+                    "⚠️  STOCHASTIC SIMULATION RISK:\n"
+                    "Assignment rules are evaluated ONCE at t=0 but NOT re-evaluated during simulation.\n"
+                    "This causes species values to become stale, leading to:\n"
+                    "  • Incorrect reaction rates\n"
+                    "  • Extreme propensities (>1e17) → simulation failure\n"
+                    "\n"
+                    "RECOMMENDATIONS:\n"
+                    "  ✓ Use CONTINUOUS mode (evaluates formulas at each timestep)\n"
+                    "  ✓ Use HYBRID mode (continuous for reactions using rule-defined species)\n"
+                    "  ✗ Avoid STOCHASTIC mode (will likely fail)\n"
+                    "\n"
+                    f"Affected variables:\n{rules_detail}"
                 )
             ))
             
-            # Log details for each rule
-            for variable, formula in assignment_rules:
-                self.logger.warning(
-                    f"Assignment rule detected: {variable} = {formula}"
-                )
+            # Log details for each rule (commented out to reduce console noise)
+            # for variable, formula in assignment_rules:
+            #     self.logger.warning(
+            #         f"Assignment rule detected: {variable} = {formula}"
+            #     )
     
     def _check_rate_rules(self):
         """Check for rate rules (currently unsupported)."""
@@ -351,6 +365,72 @@ class SBMLValidator:
                 suggestion="Extreme compartment sizes may cause numerical issues in rate calculations."
             ))
     
+    def _check_reversible_formulas_stochastic_risk(self):
+        """Check for reversible reaction formulas that risk negative rates in stochastic mode.
+        
+        Reversible reactions with net rate formulas (k_f*A - k_r*B) can produce negative
+        rates, which are incompatible with Poisson sampling in stochastic simulation.
+        """
+        problematic_reactions = []
+        
+        for i in range(self.model.getNumReactions()):
+            reaction = self.model.getReaction(i)
+            kinetic_law = reaction.getKineticLaw()
+            
+            if kinetic_law is None:
+                continue
+            
+            # Get formula as string
+            math_ast = kinetic_law.getMath()
+            if math_ast is None:
+                continue
+            
+            formula = libsbml.formulaToL3String(math_ast)
+            
+            # Detect reversible patterns
+            has_subtraction = ' - ' in formula
+            has_reverse_keywords = any(keyword in formula.lower() 
+                                      for keyword in ['k_r', 'kr_', 'k_rev', 'krev', 'k_backward'])
+            
+            if has_subtraction or has_reverse_keywords:
+                reaction_id = reaction.getId()
+                reaction_name = reaction.getName() or reaction_id
+                problematic_reactions.append((reaction_name, formula))
+        
+        if problematic_reactions:
+            reactions_list = ", ".join([name for name, _ in problematic_reactions[:3]])
+            if len(problematic_reactions) > 3:
+                reactions_list += f", ... (+{len(problematic_reactions)-3} more)"
+            
+            # Detailed list for UI display
+            reactions_detail = "\n".join([f"  • {name}: {formula[:60]}{'...' if len(formula) > 60 else ''}" 
+                                          for name, formula in problematic_reactions[:5]])
+            if len(problematic_reactions) > 5:
+                reactions_detail += f"\n  ... and {len(problematic_reactions)-5} more"
+            
+            self.issues.append(ValidationIssue(
+                severity=ValidationSeverity.WARNING,
+                category="reversible_formulas",
+                message=f"Reversible reaction formulas detected ({len(problematic_reactions)} reactions): {reactions_list}",
+                suggestion=(
+                    "⚠️  STOCHASTIC SIMULATION RISK:\n"
+                    "Reversible reactions with net rate formulas (e.g., k_f*A - k_r*B) can produce\n"
+                    "NEGATIVE rates when reverse direction dominates. Negative rates are incompatible\n"
+                    "with Poisson sampling in stochastic simulation (λ parameter must be ≥ 0).\n"
+                    "\n"
+                    "RECOMMENDATIONS:\n"
+                    "  ✓ Use CONTINUOUS mode (handles negative rates correctly)\n"
+                    "  ✓ Use HYBRID mode (continuous for reversible reactions)\n"
+                    "  ✗ Avoid STOCHASTIC mode (will fail if rates become negative)\n"
+                    "\n"
+                    f"Reactions with reversible patterns:\n{reactions_detail}"
+                )
+            ))
+            
+            self.logger.info(
+                f"Detected {len(problematic_reactions)} reactions with reversible formulas"
+            )
+    
     def _check_formula_dependencies(self):
         """Check if reaction formulas reference species defined by assignment rules."""
         num_rules = self.model.getNumRules()
@@ -423,9 +503,12 @@ def format_validation_report(issues: List[ValidationIssue]) -> str:
         by_severity[issue.severity].append(issue)
     
     lines = []
-    lines.append("=" * 80)
-    lines.append("SBML VALIDATION REPORT")
-    lines.append("=" * 80)
+    # Validation report commented out to reduce console noise
+    # Only errors/critical issues will be shown via logger
+    # lines.append("=" * 80)
+    # lines.append("SBML VALIDATION REPORT")
+    # lines.append("=" * 80)
+    return ""  # Return early to skip verbose report
     
     # Show critical issues first
     for severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR, 

@@ -566,7 +566,9 @@ class KEGGImportPanel:
                     self.current_pathway,
                     coordinate_scale=coordinate_scale,
                     include_cofactors=filter_cofactors,
-                    enhancement_options=enhancement_options
+                    enhancement_options=enhancement_options,
+                    auto_classify_signals=True,  # Enable signal classification
+                    signal_confidence_threshold=0.70  # Lower than SBML (0.75) due to limited kinetics
                 )
                 
                 self.logger.info(f"Conversion complete - model has {len(document_model.places) if document_model else 0} places")

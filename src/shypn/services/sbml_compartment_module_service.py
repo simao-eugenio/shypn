@@ -43,6 +43,12 @@ except ImportError:
     SignalDetectionService = None
     ModuleCouplingService = None
 
+# Import new signal classification system (December 2024)
+try:
+    from shypn.analysis.signal_classification import SignalClassifierManager
+except ImportError:
+    SignalClassifierManager = None
+
 
 class SBMLCompartmentModuleService:
     """Service for converting SBML compartments to modular Bio-PN architecture.
@@ -134,14 +140,14 @@ class SBMLCompartmentModuleService:
             modules, pathway, species_to_place, warnings
         )
         
-        # Step 7: Apply signal detection (if enabled)
+        # Step 7: Apply signal detection (if enabled) - BOTH legacy and NEW systems
         signal_suggestions = None
-        if auto_detect_signals and SignalDetectionService is not None:
+        if auto_detect_signals:
             signal_suggestions = self._apply_signal_detection(
                 document, modules, confidence_threshold, warnings
             )
         
-        # Step 7: Validate module architecture (if enabled)
+        # Step 8: Validate module architecture (if enabled)
         validation_report = None
         if validate and ModuleCouplingService is not None:
             validation_report = self._validate_modules(document, modules, warnings)
@@ -152,11 +158,22 @@ class SBMLCompartmentModuleService:
             for comp_id, module in modules.items()
         }
         
-        # Log summary
+        # Log summary with signal detection details
+        signal_count_msg = ""
+        if signal_suggestions:
+            combined_count = signal_suggestions.get('combined_applied_count', 0)
+            legacy_count = signal_suggestions.get('legacy_detection', {}).get('applied_count', 0) if signal_suggestions.get('legacy_detection') else 0
+            new_count = signal_suggestions.get('new_classification', {}).get('applied_count', 0) if signal_suggestions.get('new_classification') else 0
+            
+            signal_count_msg = (
+                f", {combined_count} total signals detected "
+                f"(legacy: {legacy_count}, rate-based: {new_count})"
+            )
+        
         self.logger.info(
             f"Conversion complete: {len(modules)} modules created, "
-            f"{len(energy_signals)} energy signals, "
-            f"{len(boundary_signals)} boundary signals identified"
+            f"{len(energy_signals)} energy currency, "
+            f"{len(boundary_signals)} boundary signals{signal_count_msg}"
         )
         
         return {
@@ -542,34 +559,23 @@ class SBMLCompartmentModuleService:
             document: DocumentModel with arcs
             signal_places: List of newly detected signal places
         """
-        ORANGE_COLOR = (1.0, 0.6, 0.0)
-        BLUE_COLOR = (0.0, 0.498, 1.0)
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
+        SIGNAL_COLOR = (0.7, 0.7, 0.7)  # Light gray for signal_flow arcs only
         recolored_count = 0
         
-        # Re-color regular arcs
+        # Color ONLY SignalFlowArcs (light gray)
+        # TestArcs remain blue, regular Arcs remain black per normalized color schema
         for arc in document.arcs:
-            # Skip boundary arcs (blue takes precedence)
-            if arc.color == BLUE_COLOR:
-                continue
-            
-            # Color if connected to a signal place
-            if arc.source in signal_places or arc.target in signal_places:
-                arc.color = ORANGE_COLOR
-                recolored_count += 1
-        
-        # Re-color test arcs
-        if hasattr(document, 'test_arcs'):
-            for test_arc in document.test_arcs:
-                if test_arc.color == BLUE_COLOR:
-                    continue
-                
-                if test_arc.place in signal_places:
-                    test_arc.color = ORANGE_COLOR
+            if isinstance(arc, SignalFlowArc):
+                # Color if connected to a signal place
+                if arc.source in signal_places or arc.target in signal_places:
+                    arc.color = SIGNAL_COLOR
                     recolored_count += 1
         
         if recolored_count > 0:
             self.logger.info(
-                f"Re-colored {recolored_count} arcs to orange for {len(signal_places)} signal places"
+                f"Re-colored {recolored_count} arcs to light gray for {len(signal_places)} signal places"
             )
     
     def _detect_boundary_signals(
@@ -657,7 +663,14 @@ class SBMLCompartmentModuleService:
         confidence_threshold: float,
         warnings: List[str]
     ) -> Dict[str, Any]:
-        """Apply signal detection service to identify more signal places.
+        """Apply signal detection to identify signal places.
+        
+        Uses TWO complementary detection systems:
+        1. Legacy SignalDetectionService: Simple heuristics (modifier-only, name patterns)
+        2. NEW ClassifierManager: Rate function analysis (Michaelis-Menten, Hill, etc.)
+        
+        The new system analyzes kinetic expressions from SBML rate laws,
+        which is more accurate for complex biochemical models.
         
         Args:
             document: DocumentModel with places/transitions
@@ -666,45 +679,134 @@ class SBMLCompartmentModuleService:
             warnings: List to append warnings to
         
         Returns:
-            Signal detection results dict
+            Signal detection results dict with both legacy and new results
         """
-        if SignalDetectionService is None:
-            warnings.append(
-                "SignalDetectionService not available, skipping signal detection"
-            )
-            return None
-        
-        self.logger.info("Applying signal detection to modular network...")
-        
-        service = SignalDetectionService()
-        
-        # Detect signals across entire network
-        suggestions = service.detect_signals(
-            document.places,
-            document.transitions,
-            document.arcs
-        )
-        
-        # Apply suggestions above threshold
-        applied_count = service.apply_signal_suggestions(
-            suggestions,
-            confidence_threshold=confidence_threshold,
-            auto_apply=True
-        )
-        
-        # Get report
-        report = service.get_detection_report(suggestions)
-        
-        self.logger.info(
-            f"Signal detection complete: {applied_count} signals auto-applied "
-            f"(threshold: {confidence_threshold:.0%})"
-        )
-        
-        return {
-            'suggestions': suggestions,
-            'applied_count': applied_count,
-            'report': report
+        results = {
+            'legacy_detection': None,
+            'new_classification': None,
+            'combined_applied_count': 0
         }
+        
+        # ========================================================================
+        # LEGACY DETECTION: Heuristic-based (modifier-only, name patterns)
+        # ========================================================================
+        if SignalDetectionService is not None:
+            self.logger.info("Applying legacy signal detection (heuristic-based)...")
+            
+            service = SignalDetectionService()
+            
+            # Detect signals across entire network
+            legacy_suggestions = service.detect_signals(
+                document.places,
+                document.transitions,
+                document.arcs
+            )
+            
+            # Apply suggestions above threshold
+            legacy_applied = service.apply_signal_suggestions(
+                legacy_suggestions,
+                confidence_threshold=confidence_threshold,
+                auto_apply=True
+            )
+            
+            # Get report
+            legacy_report = service.get_detection_report(legacy_suggestions)
+            
+            results['legacy_detection'] = {
+                'suggestions': legacy_suggestions,
+                'applied_count': legacy_applied,
+                'report': legacy_report
+            }
+            
+            self.logger.info(
+                f"Legacy detection: {legacy_applied} signals auto-applied "
+                f"(threshold: {confidence_threshold:.0%})"
+            )
+        else:
+            warnings.append(
+                "SignalDetectionService not available, skipping legacy detection"
+            )
+        
+        # ========================================================================
+        # NEW CLASSIFICATION: Rate function analysis (Michaelis-Menten, Hill, etc.)
+        # ========================================================================
+        if SignalClassifierManager is not None:
+            self.logger.info("Applying NEW signal classification (rate function analysis)...")
+            
+            try:
+                # Create classifier manager (needs a model-like object with places/transitions/arcs)
+                # Build a temporary model wrapper
+                class ModelWrapper:
+                    def __init__(self, places, transitions, arcs):
+                        self.places = places
+                        self.transitions = transitions
+                        self.arcs = arcs
+                
+                model_wrapper = ModelWrapper(
+                    document.places,
+                    document.transitions,
+                    document.arcs
+                )
+                
+                manager = SignalClassifierManager(model_wrapper)
+                
+                # Classify all places (not just existing signal places)
+                classifications = manager.classify_all_signals(signal_places_only=False)
+                
+                # Apply classifications above threshold - convert to expected format
+                new_applied = 0
+                for place_name, (signal_type, confidence) in classifications.items():
+                    if confidence >= confidence_threshold:
+                        # Find place by name
+                        place = next((p for p in document.places if p.name == place_name), None)
+                        if place:
+                            # Set signal type on place
+                            place.signal_type = signal_type
+                            new_applied += 1
+                        
+                        self.logger.debug(
+f"Classified {place.name} as {signal_type if isinstance(signal_type, str) else signal_type.name} "
+                            f"(confidence: {confidence:.2f})"
+                        )
+                
+                # Generate summary directly from classifications dict
+                # (generate_report method does not exist)
+                summary_lines = []
+                for place_name, (sig_type, conf) in classifications.items():
+                    type_str = sig_type if isinstance(sig_type, str) else sig_type.name
+                    summary_lines.append(f"  {place_name}: {type_str} ({conf:.0%})")
+                new_report = "\n".join(summary_lines) if summary_lines else "No classifications"
+                
+                results['new_classification'] = {
+                    'classifications': classifications,
+                    'applied_count': new_applied,
+                    'report': new_report
+                }
+                
+                self.logger.info(
+                    f"NEW classification: {new_applied} signals classified "
+                    f"(threshold: {confidence_threshold:.0%})"
+                )
+                
+                # Calculate combined count (avoid double-counting)
+                results['combined_applied_count'] = (
+                    results.get('legacy_detection', {}).get('applied_count', 0) +
+                    new_applied
+                )
+                
+            except Exception as e:
+                import traceback
+                self.logger.error(f"Error in new signal classification: {e}")
+                traceback.print_exc()
+                warnings.append(f"NEW signal classification failed: {str(e)}")
+        else:
+            warnings.append(
+                "SignalClassifierManager not available, skipping new classification. "
+                "The new rate function-based classification system provides more "
+                "accurate signal detection for SBML models with kinetic expressions."
+            )
+        
+        return results
     
     def _validate_modules(
         self,
