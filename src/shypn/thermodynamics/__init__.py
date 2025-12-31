@@ -45,6 +45,9 @@ from .thermodynamic_corrector import ThermodynamicCorrector
 # Export validators
 from .validators import EquilibriumValidator
 
+# Export simulation integration
+from .simulation_integration import ThermodynamicSimulationValidator
+
 # Export database providers
 from .database import (
     CacheProvider,
@@ -75,6 +78,9 @@ __all__ = [
     
     # Validators
     "EquilibriumValidator",
+    
+    # Simulation integration
+    "ThermodynamicSimulationValidator",
     
     # Database providers
     "CacheProvider",
