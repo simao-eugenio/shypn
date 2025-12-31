@@ -86,12 +86,12 @@ class StochasticBehavior(TransitionBehavior):
         if self.has_rate_function and self.rate_function_expr:
             self._detect_signal_places()
             
-            # Warn if stochastic transition has complex formula (likely should be continuous)
+            # Detect reversible reactions (formulas with subtraction)
             formula_lower = str(self.rate_function_expr).lower()
             if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
-                self.logger.warning(
-                    f"Stochastic transition '{transition.name}' has formula with subtraction, "
-                    f"which may produce negative rates. Consider converting to continuous transition. "
+                self.logger.info(
+                    f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
+                    f"τ-leaping will use Skellam distribution for net flux sampling. "
                     f"Formula: {self.rate_function_expr[:80]}..."
                 )
         
