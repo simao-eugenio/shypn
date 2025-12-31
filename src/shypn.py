@@ -1497,6 +1497,13 @@ def main(argv=None):
 			maximized = window.is_maximized()
 			workspace_settings.set_window_geometry(width, height, x, y, maximized)
 			
+			# Clean up matplotlib to allow clean exit
+			try:
+				import matplotlib.pyplot as plt
+				plt.close('all')
+			except:
+				pass
+			
 			return False  # Allow window to close
 		
 		window.connect('delete-event', on_window_delete)

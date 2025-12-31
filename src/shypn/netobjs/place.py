@@ -70,6 +70,24 @@ class Place(PetriNetObject):
         #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
     
+    def get_bounding_box(self):
+        """Calculate bounding box for the place.
+        
+        Returns bounding box containing the circle or hexagon.
+        
+        Returns:
+            dict: {'x': min_x, 'y': min_y, 'width': width, 'height': height}
+        """
+        # Circle/hexagon is centered at (x, y) with radius
+        # Bounding box is square centered at position
+        diameter = 2 * self.radius
+        return {
+            'x': self.x - self.radius,
+            'y': self.y - self.radius,
+            'width': diameter,
+            'height': diameter
+        }
+    
     def render(self, cr, zoom=1.0):
         """Render the place as a hollow circle (or hexagon for signal places).
         
