@@ -89,6 +89,33 @@ class Transition(PetriNetObject):
         # Transitions belong to modules, enabling network partitioning
         self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
     
+    def get_bounding_box(self):
+        """Calculate bounding box for the transition.
+        
+        Returns bounding box containing the rectangle.
+        Rectangle is centered at (x, y) with width and height.
+        Dimensions swap based on horizontal/vertical orientation.
+        
+        Returns:
+            dict: {'x': min_x, 'y': min_y, 'width': width, 'height': height}
+        """
+        # Rectangle is centered at (x, y)
+        # Dimensions swap if vertical
+        w = self.width
+        h = self.height
+        if not self.horizontal:
+            w, h = h, w
+        
+        half_w = w / 2
+        half_h = h / 2
+        
+        return {
+            'x': self.x - half_w,
+            'y': self.y - half_h,
+            'width': w,
+            'height': h
+        }
+    
     def render(self, cr, zoom=1.0):
         """Render the transition as a filled rectangle with optional markers.
         

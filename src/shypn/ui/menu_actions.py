@@ -86,6 +86,51 @@ class MenuActions:
 			traceback.print_exc()
 			self._show_error_dialog("Save As Error", f"Failed to save document: {e}")
 	
+	def on_file_export_pdf(self, action, param):
+		"""Export current model to PDF."""
+		try:
+			if not self.model_canvas_loader:
+				self._show_error_dialog("Export Error", "No canvas available")
+				return
+			
+			# Get current document
+			drawing_area = self.model_canvas_loader.get_current_document()
+			if not drawing_area:
+				self._show_info_dialog("Export to PDF", "No model is currently open.")
+				return
+			
+			# Get canvas manager
+			manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+			if not manager:
+				self._show_error_dialog("Export Error", "Failed to access model data")
+				return
+			
+			# Import exporter (lazy import to avoid circular dependencies)
+			from shypn.export import PDFExporter, ExportError
+			
+			# Create exporter with Wayland-safe parent window
+			exporter = PDFExporter(parent_window=self.window)
+			
+			# Show file dialog
+			default_filename = manager.filename if manager.filename != "default" else "model"
+			filepath = exporter.show_file_dialog(default_filename=default_filename)
+			
+			if filepath:
+				# Perform export
+				success = exporter.export(manager, filepath)
+				
+				if success:
+					import os
+					self._show_info_dialog("Export Successful", 
+						f"Model exported to:\n{os.path.basename(filepath)}")
+				
+		except ExportError as e:
+			self._show_error_dialog("Export Failed", str(e))
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			self._show_error_dialog("Export PDF Error", f"Failed to export: {e}")
+	
 	def on_file_reset_canvas(self, action, param):
 		"""Reset the current canvas (clear all elements, restart IDs).
 		
@@ -268,6 +313,7 @@ class MenuActions:
 		self._register_action("open", self.on_file_open, "<Primary>o")
 		self._register_action("save", self.on_file_save, "<Primary>s")
 		self._register_action("save-as", self.on_file_save_as, "<Primary><Shift>s")
+		self._register_action("export-pdf", self.on_file_export_pdf, "<Primary>e")
 		self._register_action("reset-canvas", self.on_file_reset_canvas, "<Primary><Shift>n")
 		self._register_action("quit", self.on_file_quit, "<Primary>q")
 		

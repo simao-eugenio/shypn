@@ -140,7 +140,7 @@ class StochasticBehavior(TransitionBehavior):
         self._sampled_burst = None
     
     def _detect_signal_places(self):
-        """Detect signal places (Ψ) for this transition's rate formula.
+        r"""Detect signal places (Ψ) for this transition's rate formula.
         
         Signal places are referenced in the rate function but have no
         arc connection (input, output, or regulatory). They represent

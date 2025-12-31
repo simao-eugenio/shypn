@@ -16,7 +16,7 @@ from gi.repository import Gtk
 
 from .transitions_category import TransitionsCategory
 from .places_category import PlacesCategory
-from .diagnostics_category import DiagnosticsCategory
+from .plotting_category import PlottingCategory
 
 
 class DynamicAnalysesPanel(Gtk.Box):
@@ -82,17 +82,17 @@ class DynamicAnalysesPanel(Gtk.Box):
             place_panel=self.places_category.panel  # Wire place panel for locality
         )
         
-        self.diagnostics_category = DiagnosticsCategory(
+        self.plotting_category = PlottingCategory(
             model=self.model,
             data_collector=self.data_collector,
-            expanded=True  # Expanded by default
+            expanded=False  # Collapsed by default
         )
         
         # Store categories in list for easy iteration
         self.categories = [
             self.transitions_category,
             self.places_category,
-            self.diagnostics_category,
+            self.plotting_category,
         ]
         
         # Set parent panel reference for all categories (for report notifications)
@@ -134,7 +134,7 @@ class DynamicAnalysesPanel(Gtk.Box):
             # Get panel references from categories
             place_panel = self.places_category.panel if self.places_category else None
             transition_panel = self.transitions_category.panel if self.transitions_category else None
-            diagnostics_panel = self.diagnostics_category.panel if self.diagnostics_category else None
+            plotting_panel = self.plotting_category.panel if self.plotting_category else None
             
             # CRITICAL: Set place_panel reference on transitions category
             # This is essential for locality plotting to work from app startup
@@ -151,7 +151,7 @@ class DynamicAnalysesPanel(Gtk.Box):
                     place_panel=place_panel,
                     transition_panel=transition_panel,
                     model=self.model,
-                    diagnostics_panel=diagnostics_panel,
+                    diagnostics_panel=plotting_panel,
                     model_canvas_loader=existing_model_canvas_loader
                 )
         except Exception as e:

@@ -3774,9 +3774,8 @@ class ModelCanvasLoader:
         
         self._active_context_menu = menu
         
-        # Attach menu to drawing_area for proper Wayland parent window handling
-        menu.attach_to_widget(drawing_area, None)
-        # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
+        # Note: Don't use attach_to_widget() as it causes Wayland warnings
+        # popup_at_pointer() handles parent relationships correctly
         menu.popup_at_pointer(None)
 
     def get_canvas_manager(self, drawing_area=None):
@@ -4379,8 +4378,8 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance.
         """
         menu = Gtk.Menu()
-        # Attach menu to drawing_area for proper Wayland parent window handling
-        menu.attach_to_widget(drawing_area, None)
+        # Note: Don't use attach_to_widget() as it causes Wayland warnings
+        # popup_at_pointer() handles parent relationships correctly
         menu_items = [
             ('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)),
             ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)),

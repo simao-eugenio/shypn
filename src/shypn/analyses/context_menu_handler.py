@@ -327,6 +327,11 @@ class ContextMenuHandler:
         else:
             logger.warning(f"[CTX_MENU] Panel missing add_locality_places method! Panel type: {type(panel)}")
         
+        # Also add to plotting panel (which will detect locality automatically)
+        if self.diagnostics_panel:
+            logger.debug(f"[CTX_MENU] Also adding transition to plotting panel (locality will be detected automatically)")
+            self.diagnostics_panel.set_transition(transition)
+        
         # Request canvas redraw to show new border colors
         if self.model:
             self.model.mark_needs_redraw()
@@ -535,8 +540,11 @@ class ContextMenuHandler:
         if self.model:
             self.model.mark_needs_redraw()
         
-        # If it's a transition, also update the diagnostics panel
-        if isinstance(obj, Transition) and self.diagnostics_panel:
-            self.diagnostics_panel.set_transition(obj)
+        # Also add to plotting panel (formerly diagnostics panel)
+        if self.diagnostics_panel:
+            if isinstance(obj, Transition):
+                self.diagnostics_panel.set_transition(obj)
+            elif isinstance(obj, Place):
+                self.diagnostics_panel.set_place(obj)
         
         obj_type = "place" if isinstance(obj, Place) else "transition"
