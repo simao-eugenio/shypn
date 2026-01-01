@@ -1107,14 +1107,22 @@ class SBMLImportPanel:
         message_lines = [
             "⚠️  Model Compatibility Issues Detected",
             "",
-            "The SBML model has features that may be incompatible with STOCHASTIC simulation:",
+            "The SBML model has features that require attention for STOCHASTIC simulation:",
             ""
         ]
+        
+        has_assignment_rules = False
+        has_reversible_formulas = False
         
         for i, issue in enumerate(issues, 1):
             category = issue.get('category', 'unknown')
             message = issue.get('message', '')
             suggestion = issue.get('suggestion', '')
+            
+            if category == 'assignment_rules':
+                has_assignment_rules = True
+            elif category == 'reversible_formulas':
+                has_reversible_formulas = True
             
             message_lines.append(f"{i}. {message}")
             if suggestion:
@@ -1125,12 +1133,20 @@ class SBMLImportPanel:
                         message_lines.append(f"   {line}")
             message_lines.append("")
         
+        # Add clarification about Skellam support
+        if has_reversible_formulas and not has_assignment_rules:
+            message_lines.extend([
+                "ℹ️  NOTE: Reversible reactions are fully supported in stochastic mode",
+                "   via Skellam distribution (automatic detection in τ-leaping).",
+                ""
+            ])
+        
         message_lines.extend([
             "How would you like to proceed?",
             "",
             "• CONTINUOUS MODE: All transitions use ODEs (safe, handles all cases)",
             "• HYBRID MODE: Problematic transitions use ODEs, others use stochastic",
-            "• PROCEED ANYWAY: Keep stochastic (may fail during simulation)",
+            "• PROCEED ANYWAY: Keep stochastic" + (" (reversible reactions supported)" if has_reversible_formulas else ""),
             "• CANCEL: Abort import"
         ])
         

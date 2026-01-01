@@ -156,6 +156,10 @@ class TauLeapingEngine:
         # Step 4: Advance time
         controller.time += tau
         
+        # Step 4.5: Update assignment rule-defined species (Option 3)
+        if hasattr(controller, 'enable_assignment_rule_reevaluation') and controller.enable_assignment_rule_reevaluation:
+            self._update_assignment_rules(controller)
+        
         # CRITICAL: Record state after time advancement
         # This captures updated firing counts and place tokens for automation experiments
         if controller.data_collector:
@@ -642,3 +646,34 @@ class TauLeapingEngine:
             'reversible_reactions': 0,
             'irreversible_reactions': 0
         }
+    
+    def _update_assignment_rules(self, controller: Any) -> None:
+        """Update all assignment rule-defined species.
+        
+        Re-evaluates assignment rule formulas and updates place tokens.
+        Called after each τ-leap to maintain algebraic constraints.
+        
+        Args:
+            controller: Simulation controller with model and time
+        """
+        # Get any stochastic behavior (they all share the same assignment rules)
+        stochastic_transitions = [
+            t for t in controller.model.transitions
+            if t.transition_type == 'stochastic'
+        ]
+        
+        if not stochastic_transitions:
+            return
+        
+        # Get behavior of first stochastic transition
+        behavior = self._get_behavior(stochastic_transitions[0])
+        if behavior is None or not hasattr(behavior, 'update_rule_defined_species'):
+            return
+        
+        # Update all rule-defined species
+        updated = behavior.update_rule_defined_species(controller.time)
+        
+        if updated > 0:
+            self.logger.debug(
+                f"Updated {updated} assignment rule-defined species at time {controller.time:.4f}"
+            )

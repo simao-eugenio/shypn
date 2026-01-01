@@ -91,6 +91,7 @@ class SBMLCategory(BasePathwayCategory):
         self.parsed_pathway = None
         self.processed_pathway = None
         self.current_pathway_doc = None
+        self.controller = None  # Set via set_controller()
         
         # Workflow flags
         self._import_button_flow = False
@@ -126,6 +127,10 @@ class SBMLCategory(BasePathwayCategory):
         # Preview section
         preview_box = self._build_preview_section()
         main_box.pack_start(preview_box, True, True, 0)
+        
+        # Thermodynamic validation section
+        thermodynamic_box = self._build_thermodynamic_section()
+        main_box.pack_start(thermodynamic_box, False, False, 0)
         
         # Status label
         self.status_label = Gtk.Label()
@@ -326,6 +331,480 @@ class SBMLCategory(BasePathwayCategory):
         frame.add(notebook)
         return frame
     
+    def _build_thermodynamic_section(self) -> Gtk.Widget:
+        """Build thermodynamic validation results section.
+        
+        Shows validation status for reversible reactions imported from SBML.
+        Initially hidden, shown after import completes.
+        """
+        self.thermodynamic_frame = Gtk.Frame()
+        self.thermodynamic_frame.set_label("Thermodynamic Validation")
+        self.thermodynamic_frame.set_no_show_all(True)  # Hidden until data available
+        self.thermodynamic_frame.set_visible(False)
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
+        
+        # Status label
+        self.thermodynamic_status = Gtk.Label()
+        self.thermodynamic_status.set_xalign(0)
+        self.thermodynamic_status.set_line_wrap(True)
+        box.pack_start(self.thermodynamic_status, False, False, 0)
+        
+        # Create TreeView for detailed results
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(200)
+        scrolled.set_max_content_height(400)
+        
+        # Create ListStore: status_icon, transition_id, transition_name, status, k_forward, k_reverse, k_ratio, k_eq, delta_g, deviation, message
+        self.thermodynamic_store = Gtk.ListStore(
+            str,    # Status icon (✅/⚠️/❌/ℹ️)
+            str,    # Transition ID
+            str,    # Transition name/description
+            str,    # Status text
+            float,  # k_forward (editable)
+            float,  # k_reverse (editable)
+            float,  # k_ratio (k_f/k_r)
+            float,  # K_eq (thermodynamic)
+            float,  # ΔG° (kJ/mol)
+            float,  # Deviation (orders of magnitude)
+            str     # Message
+        )
+        
+        self.thermodynamic_tree = Gtk.TreeView(model=self.thermodynamic_store)
+        self.thermodynamic_tree.set_enable_search(True)
+        self.thermodynamic_tree.set_search_column(1)  # Search by transition ID
+        
+        # Column 0: Status icon
+        renderer_icon = Gtk.CellRendererText()
+        column_icon = Gtk.TreeViewColumn("", renderer_icon, text=0)
+        column_icon.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        self.thermodynamic_tree.append_column(column_icon)
+        
+        # Column 1: Transition ID
+        renderer_id = Gtk.CellRendererText()
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=1)
+        column_id.set_sort_column_id(1)
+        column_id.set_resizable(True)
+        column_id.set_min_width(100)
+        self.thermodynamic_tree.append_column(column_id)
+        
+        # Column 2: Transition name
+        renderer_name = Gtk.CellRendererText()
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=2)
+        column_name.set_sort_column_id(2)
+        column_name.set_resizable(True)
+        column_name.set_min_width(150)
+        self.thermodynamic_tree.append_column(column_name)
+        
+        # Column 3: Status
+        renderer_status = Gtk.CellRendererText()
+        column_status = Gtk.TreeViewColumn("Status", renderer_status, text=3)
+        column_status.set_sort_column_id(3)
+        column_status.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_status)
+        
+        # Column 4: k_forward (editable)
+        renderer_kf = Gtk.CellRendererText()
+        renderer_kf.set_property("editable", True)
+        renderer_kf.connect("edited", self._on_k_forward_edited)
+        column_kf = Gtk.TreeViewColumn("k_forward", renderer_kf, text=4)
+        column_kf.set_sort_column_id(4)
+        column_kf.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_kf)
+        
+        # Column 5: k_reverse (editable)
+        renderer_kr = Gtk.CellRendererText()
+        renderer_kr.set_property("editable", True)
+        renderer_kr.connect("edited", self._on_k_reverse_edited)
+        column_kr = Gtk.TreeViewColumn("k_reverse", renderer_kr, text=5)
+        column_kr.set_sort_column_id(5)
+        column_kr.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_kr)
+        
+        # Column 6: k_ratio
+        renderer_ratio = Gtk.CellRendererText()
+        column_ratio = Gtk.TreeViewColumn("k_f/k_r", renderer_ratio, text=6)
+        column_ratio.set_sort_column_id(6)
+        column_ratio.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_ratio)
+        
+        # Column 7: K_eq
+        renderer_keq = Gtk.CellRendererText()
+        column_keq = Gtk.TreeViewColumn("K_eq (thermo)", renderer_keq, text=7)
+        column_keq.set_sort_column_id(7)
+        column_keq.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_keq)
+        
+        # Column 8: ΔG°
+        renderer_dg = Gtk.CellRendererText()
+        column_dg = Gtk.TreeViewColumn("ΔG° (kJ/mol)", renderer_dg, text=8)
+        column_dg.set_sort_column_id(8)
+        column_dg.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_dg)
+        
+        # Column 9: Deviation
+        renderer_dev = Gtk.CellRendererText()
+        column_dev = Gtk.TreeViewColumn("Δlog", renderer_dev, text=9)
+        column_dev.set_sort_column_id(9)
+        column_dev.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_dev)
+        
+        # Column 10: Message (hidden by default, shown on selection)
+        renderer_msg = Gtk.CellRendererText()
+        renderer_msg.set_property("wrap-mode", Gtk.WrapMode.WORD)
+        renderer_msg.set_property("wrap-width", 400)
+        column_msg = Gtk.TreeViewColumn("Details", renderer_msg, text=10)
+        column_msg.set_visible(False)  # Hidden by default
+        column_msg.set_resizable(True)
+        self.thermodynamic_tree.append_column(column_msg)
+        
+        scrolled.add(self.thermodynamic_tree)
+        box.pack_start(scrolled, True, True, 0)
+        
+        # Add button to toggle message column
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.show_details_btn = Gtk.Button(label="Show Details")
+        self.show_details_btn.connect("clicked", self._on_toggle_details)
+        btn_box.pack_start(self.show_details_btn, False, False, 0)
+        box.pack_start(btn_box, False, False, 0)
+        
+        self.thermodynamic_frame.add(box)
+        return self.thermodynamic_frame
+    
+    def _update_thermodynamic_display(self, results: dict):
+        """Update thermodynamic validation display with results.
+        
+        Args:
+            results: Dictionary with keys 'valid', 'warnings', 'violations', 'insufficient_data'
+        """
+        if not results:
+            # No results - hide frame
+            self.thermodynamic_frame.set_visible(False)
+            return
+        
+        # Count results by category
+        valid_count = len(results.get('valid', []))
+        warning_count = len(results.get('warnings', []))
+        violation_count = len(results.get('violations', []))
+        insufficient_count = len(results.get('insufficient_data', []))
+        total_count = valid_count + warning_count + violation_count + insufficient_count
+        
+        if total_count == 0:
+            # No reversible transitions to validate
+            self.thermodynamic_frame.set_visible(False)
+            return
+        
+        # Determine status emoji and text
+        if violation_count > 0:
+            status_emoji = "❌"
+            status_text = "Violations detected"
+        elif warning_count > 0:
+            status_emoji = "⚠️"
+            status_text = "Warnings present"
+        elif insufficient_count > 0:
+            status_emoji = "ℹ️"
+            status_text = "Incomplete data"
+        else:
+            status_emoji = "✅"
+            status_text = "All valid"
+        
+        # Update status label with summary
+        summary_text = f"{total_count} transitions: {valid_count} valid, {warning_count} warnings, {violation_count} violations, {insufficient_count} insufficient"
+        self.thermodynamic_status.set_markup(
+            f'<span size="large">{status_emoji}</span> <b>{status_text}</b> — {summary_text}'
+        )
+        
+        # Clear and populate table
+        self.thermodynamic_store.clear()
+        
+        # Helper to safely get float value
+        def safe_float(value, default=0.0):
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
+        # Helper to get transition rates
+        def get_transition_rates(transition_name):
+            """Get k_forward and k_reverse from model."""
+            if not self.controller:
+                return 0.0, 0.0
+            for t in self.controller.model.transitions:
+                if t.name == transition_name:
+                    kf = getattr(t, 'rate_forward', None)
+                    kr = getattr(t, 'rate_reverse', None)
+                    return (safe_float(kf), safe_float(kr))
+            return 0.0, 0.0
+        
+        # Helper to get transition details
+        def get_transition_details(transition_name):
+            """Get transition ID and label from model."""
+            if not self.controller:
+                return transition_name, transition_name
+            for t in self.controller.model.transitions:
+                if t.name == transition_name:
+                    t_id = getattr(t, 'id', transition_name)
+                    t_label = getattr(t, 'label', transition_name)
+                    return t_id, t_label if t_label else transition_name
+            return transition_name, transition_name
+        
+        # Helper to get delta_g from transition properties
+        def get_delta_g(transition_name):
+            """Get ΔG° from transition validation data."""
+            if not self.controller:
+                return 0.0
+            for t in self.controller.model.transitions:
+                if t.name == transition_name:
+                    validation = t.properties.get('thermodynamic_validation', {})
+                    return safe_float(validation.get('delta_g'))
+            return 0.0
+        
+        # Add valid transitions
+        for item in results.get('valid', []):
+            transition_name = item.get('transition', 'Unknown')
+            transition_id, transition_label = get_transition_details(transition_name)
+            k_forward, k_reverse = get_transition_rates(transition_name)
+            k_ratio = safe_float(item.get('k_ratio'), k_forward / k_reverse if k_reverse > 0 else 0)
+            self.thermodynamic_store.append([
+                "✅",
+                transition_id,     # ID (T1, T2, etc.)
+                transition_label,  # Label/description
+                "Valid",
+                k_forward,
+                k_reverse,
+                k_ratio,
+                safe_float(item.get('k_eq')),
+                get_delta_g(transition_name),
+                safe_float(item.get('deviation')),
+                "Kinetic rates consistent with thermodynamics"
+            ])
+        
+        # Add warnings
+        for item in results.get('warnings', []):
+            transition_name = item.get('transition', 'Unknown')
+            transition_id, transition_label = get_transition_details(transition_name)
+            k_forward, k_reverse = get_transition_rates(transition_name)
+            k_ratio = safe_float(item.get('k_ratio'), k_forward / k_reverse if k_reverse > 0 else 0)
+            self.thermodynamic_store.append([
+                "⚠️",
+                transition_id,     # ID (T1, T2, etc.)
+                transition_label,  # Label/description
+                "Warning",
+                k_forward,
+                k_reverse,
+                k_ratio,
+                safe_float(item.get('k_eq')),
+                get_delta_g(transition_name),
+                safe_float(item.get('deviation')),
+                item.get('message', 'Minor thermodynamic inconsistency')
+            ])
+        
+        # Add violations
+        for item in results.get('violations', []):
+            transition_name = item.get('transition', 'Unknown')
+            transition_id, transition_label = get_transition_details(transition_name)
+            k_forward, k_reverse = get_transition_rates(transition_name)
+            k_ratio = safe_float(item.get('k_ratio'), k_forward / k_reverse if k_reverse > 0 else 0)
+            self.thermodynamic_store.append([
+                "❌",
+                transition_id,     # ID (T1, T2, etc.)
+                transition_label,  # Label/description
+                "Violation",
+                k_forward,
+                k_reverse,
+                k_ratio,
+                safe_float(item.get('k_eq')),
+                get_delta_g(transition_name),
+                safe_float(item.get('deviation')),
+                item.get('message', 'Significant thermodynamic inconsistency')
+            ])
+        
+        # Add insufficient data
+        for item in results.get('insufficient_data', []):
+            transition_name = item.get('transition', 'Unknown')
+            transition_id, transition_label = get_transition_details(transition_name)
+            k_forward, k_reverse = get_transition_rates(transition_name)
+            self.thermodynamic_store.append([
+                "ℹ️",
+                transition_id,     # ID (T1, T2, etc.)
+                transition_label,  # Label/description
+                "Insufficient Data",
+                k_forward,
+                k_reverse,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                item.get('message', 'Cannot validate: missing thermodynamic data')
+            ])
+        
+        # Show the frame (need both set_visible and show_all for no_show_all widgets)
+        self.thermodynamic_frame.set_no_show_all(False)
+        self.thermodynamic_frame.show_all()
+        self.thermodynamic_frame.set_visible(True)
+    
+    def _on_toggle_details(self, button):
+        """Toggle visibility of details column."""
+        # Find the details column (index 10)
+        columns = self.thermodynamic_tree.get_columns()
+        if len(columns) > 10:
+            details_col = columns[10]
+            is_visible = details_col.get_visible()
+            details_col.set_visible(not is_visible)
+            button.set_label("Hide Details" if not is_visible else "Show Details")
+    
+    def _on_k_forward_edited(self, renderer, path, new_text):
+        """Handle editing of k_forward value."""
+        try:
+            new_value = float(new_text)
+            if new_value <= 0:
+                self.logger.warning("k_forward must be positive")
+                return
+            
+            # Update store
+            iter_obj = self.thermodynamic_store.get_iter(path)
+            old_kf = self.thermodynamic_store.get_value(iter_obj, 4)
+            self.thermodynamic_store.set_value(iter_obj, 4, new_value)
+            
+            # Recalculate k_ratio
+            k_reverse = self.thermodynamic_store.get_value(iter_obj, 5)
+            if k_reverse > 0:
+                k_ratio = new_value / k_reverse
+                self.thermodynamic_store.set_value(iter_obj, 6, k_ratio)
+            
+            # Update transition in model
+            transition_name = self.thermodynamic_store.get_value(iter_obj, 1)
+            self._update_transition_rate(transition_name, 'forward', new_value)
+            
+            self.logger.info(f"Updated {transition_name} k_forward: {old_kf:.2e} → {new_value:.2e}")
+            
+            # Re-validate
+            self._revalidate_transition(path)
+            
+        except ValueError:
+            self.logger.warning(f"Invalid k_forward value: {new_text}")
+    
+    def _on_k_reverse_edited(self, renderer, path, new_text):
+        """Handle editing of k_reverse value."""
+        try:
+            new_value = float(new_text)
+            if new_value <= 0:
+                self.logger.warning("k_reverse must be positive")
+                return
+            
+            # Update store
+            iter_obj = self.thermodynamic_store.get_iter(path)
+            old_kr = self.thermodynamic_store.get_value(iter_obj, 5)
+            self.thermodynamic_store.set_value(iter_obj, 5, new_value)
+            
+            # Recalculate k_ratio
+            k_forward = self.thermodynamic_store.get_value(iter_obj, 4)
+            if new_value > 0:
+                k_ratio = k_forward / new_value
+                self.thermodynamic_store.set_value(iter_obj, 6, k_ratio)
+            
+            # Update transition in model
+            transition_name = self.thermodynamic_store.get_value(iter_obj, 1)
+            self._update_transition_rate(transition_name, 'reverse', new_value)
+            
+            self.logger.info(f"Updated {transition_name} k_reverse: {old_kr:.2e} → {new_value:.2e}")
+            
+            # Re-validate
+            self._revalidate_transition(path)
+            
+        except ValueError:
+            self.logger.warning(f"Invalid k_reverse value: {new_text}")
+    
+    def _update_transition_rate(self, transition_name: str, direction: str, value: float):
+        """Update rate constant in the model."""
+        if not self.controller:
+            self.logger.warning("No controller available to update transition")
+            return
+        
+        # Find transition in model
+        for transition in self.controller.model.transitions:
+            if transition.name == transition_name:
+                if direction == 'forward':
+                    transition.rate_forward = value
+                    # Update rate_function if it exists
+                    if hasattr(transition, 'rate_function') and transition.rate_function:
+                        # Update k_f or k_forward in the formula
+                        import re
+                        formula = transition.rate_function
+                        formula = re.sub(r'\bk_f\b', str(value), formula)
+                        formula = re.sub(r'\bk_forward\b', str(value), formula)
+                        transition.rate_function = formula
+                elif direction == 'reverse':
+                    transition.rate_reverse = value
+                    # Update rate_function if it exists
+                    if hasattr(transition, 'rate_function') and transition.rate_function:
+                        import re
+                        formula = transition.rate_function
+                        formula = re.sub(r'\bk_r\b', str(value), formula)
+                        formula = re.sub(r'\bk_reverse\b', str(value), formula)
+                        transition.rate_function = formula
+                
+                self.logger.debug(f"Updated {transition_name}.{direction} = {value}")
+                return
+        
+        self.logger.warning(f"Transition {transition_name} not found in model")
+    
+    def _revalidate_transition(self, path: str):
+        """Re-validate a transition after editing."""
+        if not self.controller:
+            return
+        
+        iter_obj = self.thermodynamic_store.get_iter(path)
+        transition_name = self.thermodynamic_store.get_value(iter_obj, 1)
+        k_forward = self.thermodynamic_store.get_value(iter_obj, 4)
+        k_reverse = self.thermodynamic_store.get_value(iter_obj, 5)
+        k_eq = self.thermodynamic_store.get_value(iter_obj, 7)
+        
+        if k_eq <= 0:
+            # Can't validate without K_eq
+            return
+        
+        # Calculate new ratio
+        k_ratio = k_forward / k_reverse if k_reverse > 0 else 0
+        
+        # Calculate deviation (orders of magnitude)
+        import math
+        if k_ratio > 0 and k_eq > 0:
+            log_deviation = abs(math.log10(k_ratio) - math.log10(k_eq))
+        else:
+            log_deviation = 0
+        
+        # Determine new status (using 1.0 order of magnitude as threshold for violations)
+        tolerance = 1.0  # From validator default
+        if log_deviation <= tolerance:
+            status_icon = "✅"
+            status_text = "Valid"
+            message = f"Kinetic ratio {k_ratio:.2e} matches K_eq {k_eq:.2e}"
+        elif log_deviation <= 2.0:
+            status_icon = "⚠️"
+            status_text = "Warning"
+            message = f"Deviation {log_deviation:.2f} orders of magnitude"
+        else:
+            status_icon = "❌"
+            status_text = "Violation"
+            message = f"Large deviation {log_deviation:.2f} orders of magnitude"
+        
+        # Update row
+        self.thermodynamic_store.set_value(iter_obj, 0, status_icon)
+        self.thermodynamic_store.set_value(iter_obj, 3, status_text)
+        self.thermodynamic_store.set_value(iter_obj, 6, k_ratio)
+        self.thermodynamic_store.set_value(iter_obj, 9, log_deviation)
+        self.thermodynamic_store.set_value(iter_obj, 10, message)
+        
+        self.logger.info(f"Re-validated {transition_name}: {status_text} (Δlog={log_deviation:.2f})")
+    
     # Event handlers
     
     def _on_mode_changed(self, radio_button):
@@ -515,12 +994,13 @@ class SBMLCategory(BasePathwayCategory):
                     if user_choice == 'cancel' or user_choice is None:
                         # User cancelled or timeout
                         raise ValueError("Import cancelled by user")
-                    elif user_choice in ['convert_continuous', 'convert_hybrid']:
+                    elif user_choice in ['convert_continuous', 'convert_hybrid', 'stochastic_with_reevaluation']:
                         # Store user choice in metadata for converter to apply
                         choice_map = {
                             'convert_continuous': 'continuous',
                             'convert_hybrid': 'hybrid',
-                            'proceed_anyway': 'stochastic'
+                            'proceed_anyway': 'stochastic',
+                            'stochastic_with_reevaluation': 'stochastic_with_reevaluation'
                         }
                         parsed_pathway.metadata['user_choice_transition_type'] = choice_map[user_choice]
                 
@@ -836,9 +1316,47 @@ class SBMLCategory(BasePathwayCategory):
                                         if report_panel_loader and hasattr(report_panel_loader, 'panel'):
                                             self.logger.info("Triggering Report Panel refresh after SBML import (deferred)")
                                             simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                            if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                                                report_panel_loader.panel.set_controller(simulation_controller)
-                                                self.logger.info("✅ Report Panel refreshed")
+                                            if simulation_controller:
+                                                # Set controller on report panel
+                                                if hasattr(report_panel_loader.panel, 'set_controller'):
+                                                    report_panel_loader.panel.set_controller(simulation_controller)
+                                                    self.logger.info("✅ Report Panel controller set")
+                                                
+                                                # Set controller on SBML category for thermodynamic validation
+                                                self.set_controller(simulation_controller)
+                                                self.logger.info("✅ SBML category controller set")
+                                                
+                                                # Enable assignment rule re-evaluation if user chose Option 3
+                                                if hasattr(processed_pathway, 'metadata'):
+                                                    user_choice = processed_pathway.metadata.get('user_choice_transition_type')
+                                                    if user_choice == 'stochastic_with_reevaluation':
+                                                        simulation_controller.enable_assignment_rule_reevaluation = True
+                                                        simulation_controller.initialize_assignment_rules(processed_pathway)
+                                                        self.logger.info("✅ Option 3 enabled: Assignment rule runtime re-evaluation")
+                                                
+                                                # Schedule thermodynamic validation (needs additional deferral for UI updates)
+                                                def run_validation():
+                                                    try:
+                                                        self.logger.info("Running thermodynamic validation...")
+                                                        simulation_controller.validate_thermodynamics()
+                                                        
+                                                        # Get results and update display
+                                                        results = simulation_controller.thermodynamic_results
+                                                        if results:
+                                                            self._update_thermodynamic_display(results)
+                                                            self.logger.info(f"Thermodynamic validation complete: "
+                                                                           f"{len(results.get('valid', []))} valid, "
+                                                                           f"{len(results.get('warnings', []))} warnings, "
+                                                                           f"{len(results.get('violations', []))} violations")
+                                                        else:
+                                                            self.logger.info("No thermodynamic validation results (no reversible transitions)")
+                                                    except Exception as e:
+                                                        self.logger.error(f"Thermodynamic validation failed: {e}")
+                                                        import traceback
+                                                        traceback.print_exc()
+                                                    return False
+                                                
+                                                GLib.idle_add(run_validation)
                                 except Exception as e:
                                     self.logger.warning(f"Failed to refresh report panel: {e}")
                                 return False  # Don't repeat
@@ -1710,6 +2228,15 @@ class SBMLCategory(BasePathwayCategory):
         self.parent_window = parent_window
         self.logger.debug(f"Parent window set: {parent_window}")
     
+    def set_controller(self, controller):
+        """Set simulation controller for thermodynamic validation.
+        
+        Args:
+            controller: SimulationController instance
+        """
+        self.controller = controller
+        self.logger.debug(f"Controller set for thermodynamic validation")
+    
     def _show_stochastic_warning_dialog(self, warnings):
         """Show dialog warning about stochastic incompatibility with user choices.
         
@@ -1721,40 +2248,59 @@ class SBMLCategory(BasePathwayCategory):
         """
         # Build message
         message = "⚠️  STOCHASTIC SIMULATION WARNING\n\n"
-        message += "This SBML model contains features incompatible with stochastic simulation:\n\n"
+        message += "This SBML model contains features that may require attention:\n\n"
+        
+        has_assignment_rules = False
+        has_reversible_formulas = False
         
         for warning in warnings:
             category = warning.get('category', 'Unknown')
             if category == 'assignment_rules':
+                has_assignment_rules = True
                 message += "• Assignment Rules detected\n"
                 message += "  May cause stale values and extreme propensities\n\n"
             elif category == 'reversible_formulas':
+                has_reversible_formulas = True
                 message += "• Reversible reaction formulas detected\n"
-                message += "  Can produce NEGATIVE rates (λ < 0), breaking Poisson sampling\n\n"
+                message += "  ✅ Fully supported via Skellam distribution (τ-leaping)\n\n"
         
         message += "\nRECOMMENDED ACTIONS:\n"
-        message += "✓ Convert to CONTINUOUS mode (handles all edge cases)\n"
-        message += "✓ Use HYBRID mode (continuous for problem reactions)\n"
-        message += "✗ Avoid STOCHASTIC mode (will fail with negative rates)\n\n"
-        message += "What would you like to do?"
+        if has_assignment_rules:
+            message += "⚠️  Assignment Rules detected:\n"
+            message += "   ✓ OPTION 1: CONTINUOUS mode (evaluates formulas at each step)\n"
+            message += "   ✓ OPTION 2: HYBRID mode (continuous only for affected reactions)\n"
+            message += "   ✓ OPTION 3: STOCHASTIC with runtime re-evaluation (~7% overhead)\n"
+            message += "   ✗ STOCHASTIC without re-evaluation may fail with extreme propensities\n"
+        if has_reversible_formulas and not has_assignment_rules:
+            message += "✅ Reversible reactions are fully supported in stochastic mode\n"
+            message += "   (Skellam distribution handles net forward/reverse flux)\n"
+        message += "\nWhat would you like to do?"
         
         # Create dialog
         dialog = Gtk.MessageDialog(
             transient_for=self.parent_window,
             modal=True,
-            message_type=Gtk.MessageType.WARNING,
-            text="Stochastic Simulation Incompatibility"
+            message_type=Gtk.MessageType.WARNING if has_assignment_rules else Gtk.MessageType.INFO,
+            text="Stochastic Simulation Compatibility" if has_assignment_rules else "Reversible Reactions Detected"
         )
         dialog.format_secondary_text(message)
         
         # Add buttons (right to left order)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        dialog.add_button("Proceed Anyway (Stochastic)", Gtk.ResponseType.NO)
-        dialog.add_button("Use Hybrid Mode", Gtk.ResponseType.APPLY)
-        dialog.add_button("Convert to Continuous", Gtk.ResponseType.YES)
         
-        # Set default to "Convert to Continuous"
-        dialog.set_default_response(Gtk.ResponseType.YES)
+        if has_assignment_rules:
+            # Assignment rules detected - offer all 3 options
+            dialog.add_button("Proceed Anyway (Stochastic)", Gtk.ResponseType.NO)
+            dialog.add_button("Option 3: Stochastic + Re-eval", Gtk.ResponseType.OK)
+            dialog.add_button("Option 2: Hybrid Mode", Gtk.ResponseType.APPLY)
+            dialog.add_button("Option 1: Convert to Continuous", Gtk.ResponseType.YES)
+            dialog.set_default_response(Gtk.ResponseType.YES)
+        else:
+            # Only reversible formulas - stochastic is safe with Skellam
+            dialog.add_button("Convert to Continuous", Gtk.ResponseType.YES)
+            dialog.add_button("Use Hybrid Mode", Gtk.ResponseType.APPLY)
+            dialog.add_button("Continue with Stochastic", Gtk.ResponseType.NO)
+            dialog.set_default_response(Gtk.ResponseType.NO)
         
         # Show dialog and get response
         response = dialog.run()
@@ -1765,6 +2311,8 @@ class SBMLCategory(BasePathwayCategory):
             return 'convert_continuous'
         elif response == Gtk.ResponseType.APPLY:
             return 'convert_hybrid'
+        elif response == Gtk.ResponseType.OK:
+            return 'stochastic_with_reevaluation'
         elif response == Gtk.ResponseType.NO:
             return 'proceed_anyway'
         else:

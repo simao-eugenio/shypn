@@ -171,6 +171,13 @@ class SimulationController:
         from shypn.ui.interaction import InteractionGuard
         self.interaction_guard = InteractionGuard(self.state_detector)
         
+        # Thermodynamic validation results (populated on demand)
+        self.thermodynamic_results = None
+        
+        # Option 3: Assignment rule re-evaluation support
+        self.enable_assignment_rule_reevaluation = False
+        self.pathway_data = None  # Store for assignment rule initialization
+        
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
@@ -213,6 +220,9 @@ class SimulationController:
         self.behavior_cache.clear()
         self.transition_states.clear()
         self._round_robin_index = 0
+        
+        # Clear thermodynamic validation results
+        self.thermodynamic_results = None
         
         # Reset τ-leaping engine (if it exists)
         if hasattr(self, '_tau_leaping_engine'):
@@ -261,6 +271,217 @@ class SimulationController:
                 # print(f"[CALLBACK_TRACE]   {line.strip()}")
         
         self._on_simulation_complete = value
+    
+    def validate_thermodynamics(self) -> Dict[str, Any]:
+        """
+        Validate thermodynamic consistency of reversible transitions.
+        
+        Checks all reversible transitions in the model to ensure their rate
+        constants are consistent with thermodynamic equilibrium constants
+        derived from Gibbs free energy.
+        
+        Results are cached in self.thermodynamic_results for GUI display.
+        
+        Returns:
+            Dict with validation results:
+            - 'summary': Overall summary statistics
+            - 'violations': List of transitions with violations
+            - 'warnings': List of transitions with warnings
+            - 'valid': List of valid transitions
+            - 'insufficient_data': List with missing data
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
+            
+            # Initialize validator
+            validator = ThermodynamicSimulationValidator()
+            
+            # Get reversible transitions from model
+            reversible_transitions = [
+                t for t in self.model.transitions
+                if t.properties.get('is_reversible', False)
+            ]
+            
+            if not reversible_transitions:
+                logger.info("No reversible transitions found for thermodynamic validation")
+                self.thermodynamic_results = {
+                    'summary': {
+                        'total': 0,
+                        'valid': 0,
+                        'warnings': 0,
+                        'violations': 0,
+                        'insufficient_data': 0,
+                    },
+                    'violations': [],
+                    'warnings': [],
+                    'valid': [],
+                    'insufficient_data': [],
+                }
+                return self.thermodynamic_results
+            
+            logger.info(f"Validating {len(reversible_transitions)} reversible transitions")
+            
+            # Collect results from transition properties
+            violations = []
+            warnings = []
+            valid = []
+            insufficient_data = []
+            
+            for transition in reversible_transitions:
+                # Get validation result from properties (stored during SBML import)
+                validation = transition.properties.get('thermodynamic_validation')
+                
+                if validation is None:
+                    # No validation stored - mark as insufficient data
+                    insufficient_data.append({
+                        'transition': transition.name,
+                        'message': 'Validation not performed during import'
+                    })
+                    continue
+                
+                status = validation.get('status', 'unknown')
+                
+                if status == 'valid':
+                    valid.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                    })
+                elif status == 'warning':
+                    warnings.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                        'message': validation.get('message', 'Exceeded warning threshold'),
+                    })
+                elif status == 'violation':
+                    violations.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                        'message': validation.get('message', 'Exceeded violation threshold'),
+                    })
+                else:
+                    # insufficient_data, no_rate_constants, error
+                    insufficient_data.append({
+                        'transition': transition.name,
+                        'status': status,
+                        'message': validation.get('message', 'Unknown issue'),
+                    })
+            
+            # Build summary
+            summary = {
+                'total': len(reversible_transitions),
+                'valid': len(valid),
+                'warnings': len(warnings),
+                'violations': len(violations),
+                'insufficient_data': len(insufficient_data),
+            }
+            
+            # Store results
+            self.thermodynamic_results = {
+                'summary': summary,
+                'violations': violations,
+                'warnings': warnings,
+                'valid': valid,
+                'insufficient_data': insufficient_data,
+            }
+            
+            logger.info(
+                f"Thermodynamic validation complete: "
+                f"{summary['valid']} valid, "
+                f"{summary['warnings']} warnings, "
+                f"{summary['violations']} violations, "
+                f"{summary['insufficient_data']} insufficient data"
+            )
+            
+            return self.thermodynamic_results
+            
+        except ImportError as e:
+            logger.warning(f"Thermodynamic validation not available: {e}")
+            self.thermodynamic_results = None
+            return None
+        except Exception as e:
+            logger.error(f"Thermodynamic validation failed: {e}")
+            self.thermodynamic_results = None
+            return None
+    
+    def initialize_assignment_rules(self, pathway_data: Any = None) -> None:
+        """Initialize assignment rules for runtime re-evaluation (Option 3).
+        
+        Extracts assignment rules from pathway species and passes them to
+        stochastic behaviors for runtime evaluation during τ-leaping.
+        
+        Called after SBML/KEGG import with enable_assignment_rule_reevaluation=True.
+        
+        Args:
+            pathway_data: PathwayData object with species containing assignment_rule field
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if pathway_data is None:
+            logger.warning("No pathway_data provided for assignment rule initialization")
+            return
+        
+        self.pathway_data = pathway_data
+        
+        # Initialize assignment rules on stochastic behaviors
+        stochastic_transitions = [
+            t for t in self.model.transitions
+            if t.transition_type == 'stochastic'
+        ]
+        
+        if not stochastic_transitions:
+            logger.info("No stochastic transitions found - assignment rule re-evaluation not applicable")
+            return
+        
+        # Get behavior of first stochastic transition and initialize
+        behavior = self._get_behavior(stochastic_transitions[0])
+        if behavior and hasattr(behavior, 'initialize_assignment_rules'):
+            behavior.initialize_assignment_rules(pathway_data)
+            
+            if behavior.assignment_rules:
+                logger.info(
+                    f"✅ Option 3 enabled: Runtime re-evaluation initialized for "
+                    f"{len(behavior.assignment_rules)} assignment rule(s)"
+                )
+            else:
+                logger.info("No assignment rules found in pathway data")
+        else:
+            logger.warning(
+                "StochasticBehavior does not support assignment rule re-evaluation. "
+                "Update StochasticBehavior class to add initialize_assignment_rules() method."
+            )
+    
+    def get_thermodynamic_summary(self) -> Optional[Dict[str, int]]:
+        """
+        Get summary of thermodynamic validation results.
+        
+        Returns cached results from last validation, or performs validation
+        if not yet cached.
+        
+        Returns:
+            Dict with summary statistics or None if validation unavailable:
+            - 'total': Total reversible transitions
+            - 'valid': Number passing validation
+            - 'warnings': Number with warnings
+            - 'violations': Number with violations
+            - 'insufficient_data': Number with missing data
+        """
+        if self.thermodynamic_results is None:
+            self.validate_thermodynamics()
+        
+        if self.thermodynamic_results is None:
+            return None
+        
+        return self.thermodynamic_results.get('summary')
 
     def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
         """Handle model change notifications.
@@ -2284,6 +2505,9 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.clear()
         self.transition_states.clear()
+        
+        # Clear thermodynamic validation results
+        self.thermodynamic_results = None
         
         # Reset firing counts for all transitions
         for transition in self.model.transitions:

@@ -142,6 +142,11 @@ class StochasticBehavior(TransitionBehavior):
         self._enablement_time = None
         self._scheduled_fire_time = None
         self._sampled_burst = None
+        
+        # Assignment rule support (Option 3: Runtime Re-evaluation)
+        self.assignment_rules: Dict[int, str] = {}  # place_id -> formula
+        self._compiled_rules: Dict[int, Any] = {}  # place_id -> compiled code
+        self._rules_initialized = False
     
     def _detect_signal_places(self):
         r"""Detect signal places (Ψ) for this transition's rate formula.
@@ -767,3 +772,178 @@ class StochasticBehavior(TransitionBehavior):
                 required[arc.source_id] = arc.weight * burst
         
         return required
+    
+    # ============================================================================
+    # Assignment Rule Re-evaluation (Option 3: Temporal Evaluation)
+    # ============================================================================
+    
+    def initialize_assignment_rules(self, pathway_data: Any = None) -> None:
+        """Initialize assignment rules from pathway data.
+        
+        Extract assignment rules from species and prepare for runtime evaluation.
+        Called once during simulation initialization.
+        
+        Args:
+            pathway_data: PathwayData object with species containing assignment_rule field
+        """
+        if self._rules_initialized:
+            return
+            
+        if pathway_data is None:
+            self._rules_initialized = True
+            return
+        
+        # Extract assignment rules from species
+        for species in pathway_data.species:
+            if hasattr(species, 'assignment_rule') and species.assignment_rule:
+                # Find corresponding place in model
+                place = None
+                for p in self.model.places:
+                    if p.name == species.id or p.name == species.name:
+                        place = p
+                        break
+                
+                if place:
+                    self.assignment_rules[place.id] = species.assignment_rule
+                    self.logger.info(
+                        f"Registered assignment rule for place '{place.name}' (ID={place.id}): "
+                        f"{species.assignment_rule[:60]}..."
+                    )
+        
+        # Precompile formulas for performance
+        self._compile_assignment_rules()
+        self._rules_initialized = True
+        
+        if self.assignment_rules:
+            self.logger.info(
+                f"Initialized {len(self.assignment_rules)} assignment rule(s) for "
+                f"runtime re-evaluation in stochastic mode"
+            )
+    
+    def _compile_assignment_rules(self) -> None:
+        """Precompile assignment rule formulas for performance.
+        
+        Uses compile() to avoid repeated parsing overhead during simulation.
+        Caches compiled code objects in _compiled_rules.
+        """
+        for place_id, formula in self.assignment_rules.items():
+            try:
+                # Compile formula to bytecode
+                compiled_code = compile(formula, f'<assignment_rule_{place_id}>', 'eval')
+                self._compiled_rules[place_id] = compiled_code
+                self.logger.debug(f"Compiled assignment rule for place ID={place_id}")
+            except SyntaxError as e:
+                self.logger.error(
+                    f"Failed to compile assignment rule for place ID={place_id}: {e}. "
+                    f"Formula: {formula}"
+                )
+    
+    def _build_evaluation_context(self, time: float) -> Dict[str, Any]:
+        """Build evaluation context for assignment rule formulas.
+        
+        Creates dictionary with:
+        - All place tokens (by name)
+        - Common math functions
+        - Time variable
+        - Function catalog
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Dictionary for eval() context
+        """
+        from .function_catalog import FUNCTION_CATALOG
+        import numpy as np
+        
+        context = {
+            'time': time,
+            't': time,
+            'min': min,
+            'max': max,
+            'abs': abs,
+            'math': math,
+            'np': np,
+            'numpy': np,
+            'log': math.log,
+            'log10': math.log10,
+            'exp': math.exp,
+            'sqrt': math.sqrt,
+            'pow': pow,
+            'sin': math.sin,
+            'cos': math.cos,
+            'tan': math.tan
+        }
+        
+        # Add function catalog
+        for func_name, func_impl in FUNCTION_CATALOG.items():
+            context[func_name] = func_impl
+        
+        # Add all place tokens (by name)
+        for place in self.model.places:
+            context[place.name] = place.tokens
+        
+        return context
+    
+    def _safe_eval(self, formula: str, context: Dict[str, Any], place_id: int) -> float:
+        """Safely evaluate formula with error handling.
+        
+        Args:
+            formula: Formula string to evaluate
+            context: Evaluation context dictionary
+            place_id: Place ID for logging
+            
+        Returns:
+            Evaluated value (float)
+        """
+        try:
+            # Use precompiled code if available
+            if place_id in self._compiled_rules:
+                result = eval(self._compiled_rules[place_id], {"__builtins__": {}}, context)
+            else:
+                result = eval(formula, {"__builtins__": {}}, context)
+            
+            return float(result)
+        except Exception as e:
+            place = self.model.get_object_by_id(place_id)
+            place_name = place.name if place else f"ID={place_id}"
+            self.logger.error(
+                f"Failed to evaluate assignment rule for place '{place_name}': {e}. "
+                f"Formula: {formula[:60]}... Keeping current value."
+            )
+            # Return current value as fallback
+            return place.tokens if place else 0.0
+    
+    def update_rule_defined_species(self, time: float) -> int:
+        """Update all species with assignment rules.
+        
+        Re-evaluates assignment rule formulas and updates place tokens.
+        Called after each τ-leap or SSA step.
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Number of species updated
+        """
+        if not self.assignment_rules:
+            return 0
+        
+        # Build evaluation context once
+        context = self._build_evaluation_context(time)
+        
+        # Update each rule-defined species
+        updated = 0
+        for place_id, formula in self.assignment_rules.items():
+            place = self.model.get_object_by_id(place_id)
+            if not place:
+                continue
+            
+            # Evaluate formula
+            new_value = self._safe_eval(formula, context, place_id)
+            
+            # Update tokens (ensure non-negative)
+            place.tokens = max(0.0, new_value)
+            updated += 1
+        
+        return updated

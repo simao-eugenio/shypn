@@ -64,14 +64,31 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 
 ## Features
 
+### Core Simulation & Theory
 - ✅ **Stochastic Hybrid Petri Nets** - Extended biological Petri net formalism with immediate, timed, stochastic, and continuous transitions
 - ✅ **Unified 13-Tuple Formalism** - Complete Extended Bio-PN definition integrating weak independence and signal hierarchy (December 2025)
 - ✅ **Signal Hierarchy Theory** - Information-theoretic framework for hierarchical control with signal token consumption semantics
 - ✅ **Weak Independence Theory** - Efficient simulation through dependency analysis (convergent, competitive, regulatory coupling)
 - ✅ **Two-Phase Execution** - Hierarchical constraint propagation via signal flow arcs (enabling check vs. consumption)
+- ✅ **τ-Leaping Engine** - Approximate stochastic simulation with Skellam distribution for reversible reactions (v0.3.0)
+
+### SBML Import & Assignment Rules
+- ✅ **Intelligent SBML Import** - Automatic detection of assignment rules and reversible reactions
+- ✅ **Option 1: Continuous Mode** - Full ODE integration for maximum accuracy
+- ✅ **Option 2: Enhanced Hybrid Mode** - Smart dependency tracking converts only affected transitions (v0.5.0)
+- ✅ **Option 3: Stochastic with Re-evaluation** - Runtime formula evaluation maintains constraints (~7% overhead) (v0.5.0)
+- ✅ **Skellam Distribution** - Net flux sampling for reversible reactions (forward - reverse)
+
+### Thermodynamic Validation
+- ✅ **Gibbs Free Energy Integration** - Validates rate constants against thermodynamic equilibrium (v0.4.0)
+- ✅ **KEGG/ChEBI Database** - Automatic ΔG° lookup for compounds
+- ✅ **K_eq vs k_ratio Validation** - Flags thermodynamically inconsistent reactions
+- ✅ **Automated Warnings** - Clear categorization (valid, warning, violation, insufficient data)
+
+### User Interface & Import
 - ✅ **Arc Type Classification** - Normal, test, signal_flow, and inhibitor arcs with distinct consumption semantics
 - ✅ **Visual Editor** - Intuitive GTK3-based pathway modeling interface
-- ✅ **KEGG/SBML Import** - Direct import from major pathway databases
+- ✅ **KEGG/SBML Import** - Direct import from major pathway databases with smart mode detection
 - ✅ **Real-time Simulation** - Multiple firing policies with live visualization
 - ✅ **Topology Analysis** - Structural analysis including P/T-invariants, deadlocks, and liveness properties
 - ✅ **Graph Layouts** - Automatic, hierarchical, force-directed, and manual layout algorithms
@@ -83,7 +100,13 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 
 📚 **[Quick Start Guide](QUICKSTART.md)** - Get started in minutes  
 📚 **[Installation Guide](INSTALL.md)** - Detailed installation instructions  
-📚 **[User Documentation](doc/README.md)** - Comprehensive guides and tutorials (locally available)
+📚 **[User Documentation](doc/README.md)** - Comprehensive guides and tutorials
+
+**Key Documentation:**
+- **[Assignment Rules Options 2 & 3](doc/ASSIGNMENT_RULES_OPTIONS_2_3_IMPLEMENTATION.md)** - Smart SBML import handling (v0.5.0)
+- **[Thermodynamic Validation](doc/thermodynamics_simulation_integration.md)** - Gibbs free energy integration (v0.4.0)
+- **[Skellam Distribution](doc/SKELLAM_IMPLEMENTATION.md)** - Reversible reaction handling (v0.3.0)
+- **[τ-Leaping Engine](doc/tau_leaping/)** - Approximate stochastic simulation
 
 For development documentation, architecture details, and API reference, see the local `doc/` directory after cloning.
 
@@ -92,12 +115,16 @@ For development documentation, architecture details, and API reference, see the 
 ```
 shypn/
 ├── src/shypn/          # Main application source code
-│   ├── core/           # Core Petri net engine
-│   ├── simulation/     # Simulation algorithms
-│   ├── ui/             # GTK user interface
-│   └── analysis/       # Topology and structural analysis
+│   ├── engine/         # Simulation engines (stochastic, continuous, τ-leaping)
+│   ├── data/           # Data models and pathway structures
+│   ├── ui/             # GTK user interface components
+│   ├── thermodynamics/ # Gibbs free energy validation (v0.4.0)
+│   └── core/           # Core Petri net objects and behaviors
 ├── cli/                # Command-line interface tools
 ├── ui/                 # GTK UI definitions (XML)
+├── scripts/            # Utility scripts and demos
+├── tests/              # Test suite (pytest)
+├── doc/                # Documentation and guides
 ├── workspace/          # User workspace and example projects
 │   └── projects/Biochemical-Examples/  # Demo models
 ├── QUICKSTART.md       # Quick start guide
@@ -163,13 +190,23 @@ Contributions are welcome! Please see the [development documentation](doc/README
 
 ## Version
 
-Current version: **v2.5.3** (December 2025)
+Current version: **v0.5.0** (January 2026)
 
-**Recent Updates:**
+**Recent Updates (v0.5.0):**
+- ✅ **Option 2: Enhanced Hybrid Mode** - Smart dependency tracking for assignment rules
+- ✅ **Option 3: Stochastic with Runtime Re-evaluation** - Full stochastic mode support for SBML assignment rules
+- ✅ **Assignment Rule Infrastructure** - Formula compilation, caching, and temporal evaluation
+- ✅ **Enhanced SBML Import Dialog** - Clear options for handling assignment rules and reversible reactions
+- ✅ **Comprehensive Testing** - 11/11 tests passing for Options 2 & 3
+- ✅ **Documentation** - Complete implementation guides in doc/ directory
+
+**Previous Updates (v0.3.0 - v0.4.0):**
+- Skellam distribution for reversible reactions in τ-leaping
+- Thermodynamic validation with Gibbs free energy
+- KEGG/ChEBI database integration for ΔG° values
 - Unified Extended Bio-PN formalism manuscript (13-tuple definition)
 - V. fischeri quorum sensing model with 133-fold bistability
-- Signal saturation cascade figures (basin of attraction analysis)
-- ArXiv submission package prepared
+- Signal saturation cascade analysis
 - Comprehensive directory cleanup (1.6GB freed)
 
-See [CHANGELOG](doc/CHANGELOG.md) for complete version history.
+See [doc/CHANGELOG.md](doc/CHANGELOG.md) for complete version history.

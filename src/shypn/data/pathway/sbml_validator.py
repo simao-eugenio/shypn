@@ -104,53 +104,88 @@ class SBMLValidator:
         return is_valid, self.issues
     
     def _check_assignment_rules(self):
-        """Check for assignment rules (incompatible with stochastic simulation)."""
+        """Check for assignment rules (may be incompatible with stochastic simulation).
+        
+        Assignment rules define algebraic constraints that should be maintained throughout
+        the simulation. SBML distinguishes between:
+        - Assignment rules for SPECIES: Problematic in stochastic (not re-evaluated)
+        - Assignment rules for PARAMETERS: Usually fine (computed constants)
+        - Initial assignments: Safe (only evaluated at t=0)
+        """
         num_rules = self.model.getNumRules()
-        assignment_rules = []
+        assignment_rules_species = []
+        assignment_rules_parameters = []
         
         for i in range(num_rules):
             rule = self.model.getRule(i)
             if rule.isAssignment():
                 variable = rule.getVariable()
                 formula = libsbml.formulaToL3String(rule.getMath())
-                assignment_rules.append((variable, formula))
+                
+                # Check what type of entity this rule targets
+                species = self.model.getSpecies(variable)
+                parameter = self.model.getParameter(variable)
+                
+                if species is not None:
+                    # Assignment rule for a species
+                    # Check if it's a boundary species (external reservoir)
+                    is_boundary = species.getBoundaryCondition()
+                    
+                    if not is_boundary:
+                        # Non-boundary species with assignment rule = PROBLEMATIC
+                        assignment_rules_species.append((variable, formula, "internal species"))
+                    else:
+                        # Boundary species with assignment rule = usually fine
+                        self.logger.debug(f"Assignment rule for boundary species '{variable}' (acceptable)")
+                elif parameter is not None:
+                    # Assignment rule for a parameter (computed constant)
+                    # This is generally fine - just a derived parameter
+                    assignment_rules_parameters.append((variable, formula))
+                else:
+                    # Unknown target - could be compartment size, etc.
+                    self.logger.debug(f"Assignment rule for '{variable}' (unknown entity type)")
         
-        if assignment_rules:
-            variables = ", ".join([var for var, _ in assignment_rules[:3]])
-            if len(assignment_rules) > 3:
-                variables += f", ... (+{len(assignment_rules)-3} more)"
+        # Only warn about assignment rules on internal (non-boundary) species
+        if assignment_rules_species:
+            variables = ", ".join([var for var, _, _ in assignment_rules_species[:3]])
+            if len(assignment_rules_species) > 3:
+                variables += f", ... (+{len(assignment_rules_species)-3} more)"
             
             # Store detailed rule information for UI display
-            rules_detail = "\n".join([f"  • {var} = {formula[:50]}{'...' if len(formula) > 50 else ''}" 
-                                      for var, formula in assignment_rules[:5]])
-            if len(assignment_rules) > 5:
-                rules_detail += f"\n  ... and {len(assignment_rules)-5} more"
+            rules_detail = "\n".join([f"  • {var} ({vtype}): {formula[:50]}{'...' if len(formula) > 50 else ''}" 
+                                      for var, formula, vtype in assignment_rules_species[:5]])
+            if len(assignment_rules_species) > 5:
+                rules_detail += f"\n  ... and {len(assignment_rules_species)-5} more"
             
             self.issues.append(ValidationIssue(
                 severity=ValidationSeverity.WARNING,
                 category="assignment_rules",
-                message=f"Assignment rules detected ({len(assignment_rules)} rules): {variables}",
+                message=f"Assignment rules on species detected ({len(assignment_rules_species)} rules): {variables}",
                 suggestion=(
                     "⚠️  STOCHASTIC SIMULATION RISK:\n"
-                    "Assignment rules are evaluated ONCE at t=0 but NOT re-evaluated during simulation.\n"
-                    "This causes species values to become stale, leading to:\n"
-                    "  • Incorrect reaction rates\n"
+                    "Assignment rules on internal species are evaluated ONCE at t=0 but NOT\n"
+                    "re-evaluated during stochastic simulation. This causes species values to\n"
+                    "become stale, leading to:\n"
+                    "  • Incorrect reaction rates (uses outdated species values)\n"
                     "  • Extreme propensities (>1e17) → simulation failure\n"
                     "\n"
                     "RECOMMENDATIONS:\n"
-                    "  ✓ Use CONTINUOUS mode (evaluates formulas at each timestep)\n"
+                    "  ✓ Use CONTINUOUS mode (re-evaluates formulas at each timestep)\n"
                     "  ✓ Use HYBRID mode (continuous for reactions using rule-defined species)\n"
                     "  ✗ Avoid STOCHASTIC mode (will likely fail)\n"
                     "\n"
-                    f"Affected variables:\n{rules_detail}"
+                    f"Affected species:\n{rules_detail}\n"
+                    "\n"
+                    "NOTE: Assignment rules on parameters or boundary species are acceptable."
                 )
             ))
-            
-            # Log details for each rule (commented out to reduce console noise)
-            # for variable, formula in assignment_rules:
-            #     self.logger.warning(
-            #         f"Assignment rule detected: {variable} = {formula}"
-            #     )
+        
+        # Log parameter assignment rules as INFO (not problematic)
+        if assignment_rules_parameters:
+            self.logger.info(
+                f"Found {len(assignment_rules_parameters)} assignment rule(s) on parameters "
+                f"(acceptable - computed constants)"
+            )
     
     def _check_rate_rules(self):
         """Check for rate rules (currently unsupported)."""

@@ -224,8 +224,8 @@ class SBMLParser:
             species = all_species
             self.logger.debug("Including all species (no filtering)")
         
-        # Step 6.5: Evaluate assignment rules at t=0 (NEW)
-        self._evaluate_assignment_rules(model, species, parameters)
+        # Step 6.5: Evaluate assignment rules at t=0 and store for runtime (NEW)
+        assignment_rule_info = self._evaluate_assignment_rules(model, species, parameters)
         
         # Step 7: Merge compartment sizes into parameters (for kinetic formulas)
         for comp_id, comp in compartments_enhanced.items():
@@ -234,6 +234,14 @@ class SBMLParser:
         
         # Step 8: Create metadata
         metadata = self._create_metadata(model, filepath)
+        
+        # Store assignment rule metadata (NEW)
+        if assignment_rule_info['count'] > 0:
+            metadata['assignment_rules'] = assignment_rule_info
+            self.logger.info(
+                f"Stored {len(assignment_rule_info['species_rules'])} species assignment rules, "
+                f"{len(assignment_rule_info['parameter_rules'])} parameter rules"
+            )
         
         # Store validation issues in metadata (NEW)
         if hasattr(self, '_validation_issues'):
@@ -496,7 +504,10 @@ class SBMLParser:
                     if variable in species_dict:
                         spec = species_dict[variable]
                         spec.initial_concentration = value
-                        self.logger.debug(f"  Rule: {variable} = {value:.6g}")
+                        # Store the assignment rule formula for potential runtime re-evaluation
+                        spec.assignment_rule = formula
+                        spec.metadata['has_assignment_rule'] = True
+                        self.logger.debug(f"  Rule: {variable} = {value:.6g} (formula stored)")
                     elif variable in parameters:
                         parameters[variable] = value
                         self.logger.debug(f"  Rule: {variable} = {value:.6g}")
@@ -518,6 +529,27 @@ class SBMLParser:
                 f"Could not evaluate assignment rules for: {', '.join(unevaluated)}. "
                 f"These may have circular dependencies or use unsupported functions."
             )
+        
+        # Collect metadata about assignment rules
+        species_dict = {s.id: s for s in species}
+        species_rules = [
+            {'variable': var, 'formula': libsbml.formulaToL3String(math_ast)}
+            for var, math_ast in assignment_rules
+            if var in species_dict
+        ]
+        parameter_rules = [
+            {'variable': var, 'formula': libsbml.formulaToL3String(math_ast)}
+            for var, math_ast in assignment_rules
+            if var in parameters
+        ]
+        
+        return {
+            'count': len(assignment_rules),
+            'species_rules': species_rules,
+            'parameter_rules': parameter_rules,
+            'evaluated': list(evaluated),
+            'unevaluated': list(unevaluated)
+        }
         else:
             self.logger.info(f"✓ Evaluated all {len(assignment_rules)} assignment rules")
     
