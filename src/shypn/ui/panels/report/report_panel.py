@@ -520,11 +520,10 @@ class ReportPanel(Gtk.Box):
         """
         self.controller = controller
         
-        # Update dynamic analyses category with controller reference
+        # Update categories with controller reference
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
                 category.set_controller(controller)
-                break
     
     def on_file_opened(self, filepath):
         """Called when a file is opened (File → Open or double-click).

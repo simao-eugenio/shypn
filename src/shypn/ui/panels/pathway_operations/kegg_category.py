@@ -1746,7 +1746,7 @@ class KEGGCategory(BasePathwayCategory):
         dialog.destroy()
     
     def _show_stochastic_warning_dialog(self, warnings):
-        """Show dialog warning about stochastic incompatibility with user choices.
+        """Show dialog informing about reversible reactions and Skellam distribution support.
         
         Args:
             warnings: List of validation issues related to stochastic simulation
@@ -1755,41 +1755,40 @@ class KEGGCategory(BasePathwayCategory):
             str: User choice - 'convert_continuous', 'convert_hybrid', 'proceed_anyway', or 'cancel'
         """
         # Build message
-        message = "⚠️  STOCHASTIC SIMULATION WARNING\n\n"
-        message += "This KEGG pathway contains reversible reactions that may be incompatible\n"
-        message += "with stochastic simulation:\n\n"
+        message = "ℹ️  REVERSIBLE REACTIONS DETECTED\n\n"
+        message += "This KEGG pathway contains reversible reactions:\n\n"
         
         for warning in warnings:
             category = warning.get('category', 'Unknown')
             if category == 'reversible_reactions':
                 reaction_count = len(warning.get('reactions', []))
                 message += f"• {reaction_count} reversible reactions detected\n"
-                message += "  When heuristic rates are applied, reversible reactions can produce\n"
-                message += "  NEGATIVE rates (λ < 0), breaking Poisson sampling in stochastic mode\n\n"
+                message += "  ✅ Fully supported in stochastic mode via Skellam distribution\n"
+                message += "  (τ-leaping automatically uses Skellam for net forward/reverse flux)\n\n"
         
-        message += "\nRECOMMENDED ACTIONS:\n"
-        message += "✓ Convert to CONTINUOUS mode (handles all edge cases)\n"
-        message += "✓ Use HYBRID mode (continuous for reversible reactions)\n"
-        message += "✗ Avoid STOCHASTIC mode (may fail with negative rates)\n\n"
+        message += "\nSIMULATION MODE OPTIONS:\n"
+        message += "✓ STOCHASTIC mode: Uses Skellam distribution (recommended, accurate)\n"
+        message += "✓ CONTINUOUS mode: Uses ODEs (alternative for fast reactions)\n"
+        message += "✓ HYBRID mode: Combines stochastic and continuous approaches\n\n"
         message += "What would you like to do?"
         
         # Create dialog
         dialog = Gtk.MessageDialog(
             transient_for=self.parent_window,
             modal=True,
-            message_type=Gtk.MessageType.WARNING,
-            text="Stochastic Simulation Incompatibility"
+            message_type=Gtk.MessageType.INFO,
+            text="Reversible Reactions - Skellam Distribution Support"
         )
         dialog.format_secondary_text(message)
         
         # Add buttons (right to left order)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        dialog.add_button("Proceed Anyway (Stochastic)", Gtk.ResponseType.NO)
+        dialog.add_button("Use Continuous Mode", Gtk.ResponseType.YES)
         dialog.add_button("Use Hybrid Mode", Gtk.ResponseType.APPLY)
-        dialog.add_button("Convert to Continuous", Gtk.ResponseType.YES)
+        dialog.add_button("Continue with Stochastic", Gtk.ResponseType.NO)
         
-        # Set default to "Convert to Continuous"
-        dialog.set_default_response(Gtk.ResponseType.YES)
+        # Set default to "Continue with Stochastic" (now fully supported)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         
         # Show dialog and get response
         response = dialog.run()

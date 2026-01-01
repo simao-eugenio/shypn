@@ -26,6 +26,8 @@ from shypn.data.kinetics import (
     ConfidenceLevel,
     KineticSource
 )
+from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
+from shypn.thermodynamics.sbml_compound_mapper import SBMLCompoundMapper
 
 
 class SBMLKineticsIntegrationService:
@@ -36,9 +38,20 @@ class SBMLKineticsIntegrationService:
     Creates SBMLKineticMetadata for definitive kinetic tracking.
     """
     
-    def __init__(self):
-        """Initialize the service."""
+    def __init__(self, enable_thermodynamic_validation: bool = True):
+        """
+        Initialize the service.
+        
+        Args:
+            enable_thermodynamic_validation: Enable automatic thermodynamic validation
+                                           for reversible reactions (default: True)
+        """
         self.logger = logging.getLogger(__name__)
+        self.enable_thermodynamic_validation = enable_thermodynamic_validation
+        
+        # Initialize thermodynamic validator (lazy instantiation)
+        self._thermodynamic_validator = None
+        self._compound_mapper = None
     
     def integrate_kinetics(
         self,
@@ -417,6 +430,38 @@ class SBMLKineticsIntegrationService:
                     self.logger.debug(
                         f"  Reversible reaction - marked in properties (net rate formula)"
                     )
+                    
+                    # Validate thermodynamic consistency of reversible reaction
+                    validation_result = self._validate_reversible_reaction(
+                        reaction,
+                        transition,
+                        kinetic_law
+                    )
+                    
+                    if validation_result:
+                        transition.properties['thermodynamic_validation'] = validation_result
+                        
+                        # Log validation status
+                        status = validation_result.get('status', 'unknown')
+                        if status == 'valid':
+                            self.logger.debug(
+                                f"  Thermodynamic validation: PASSED "
+                                f"(deviation: {validation_result.get('deviation', 'N/A')})"
+                            )
+                        elif status == 'warning':
+                            self.logger.warning(
+                                f"  Thermodynamic validation: WARNING for {transition.name} - "
+                                f"{validation_result.get('message', 'Unknown issue')}"
+                            )
+                        elif status == 'violation':
+                            self.logger.warning(
+                                f"  Thermodynamic validation: VIOLATION for {transition.name} - "
+                                f"deviation: {validation_result.get('deviation', 'N/A')}"
+                            )
+                        else:
+                            self.logger.debug(
+                                f"  Thermodynamic validation: {status.upper()}"
+                            )
             
             # Also update transition.rate if parameters available
             if kinetic_law.parameters:
@@ -561,6 +606,190 @@ class SBMLKineticsIntegrationService:
             'other_kinetics': with_other_kinetics,
             'without_kinetics': without_kinetics,
         }
+    
+    def _get_thermodynamic_validator(self) -> ThermodynamicSimulationValidator:
+        """
+        Get or create thermodynamic validator (lazy instantiation).
+        
+        Returns:
+            Configured ThermodynamicSimulationValidator
+        """
+        if self._thermodynamic_validator is None:
+            self._thermodynamic_validator = ThermodynamicSimulationValidator()
+            self.logger.debug("Initialized thermodynamic validator")
+        
+        return self._thermodynamic_validator
+    
+    def _get_compound_mapper(self) -> SBMLCompoundMapper:
+        """
+        Get or create compound mapper (lazy instantiation).
+        
+        Returns:
+            Configured SBMLCompoundMapper
+        """
+        if self._compound_mapper is None:
+            self._compound_mapper = SBMLCompoundMapper(
+                use_cache=True,
+                use_name_fallback=True
+            )
+            self.logger.debug("Initialized SBML compound mapper")
+        
+        return self._compound_mapper
+    
+    def _validate_reversible_reaction(
+        self,
+        reaction: Reaction,
+        transition,
+        kinetic_law: KineticLaw
+    ) -> Optional[Dict]:
+        """
+        Validate thermodynamic consistency of reversible reaction.
+        
+        Checks if forward/reverse rate constants are consistent with
+        equilibrium constant derived from Gibbs free energy.
+        
+        Args:
+            reaction: SBML Reaction object
+            transition: Petri net Transition object
+            kinetic_law: KineticLaw with rate constants
+        
+        Returns:
+            Validation result dict or None if validation disabled/failed
+        """
+        if not self.enable_thermodynamic_validation:
+            return None
+        
+        try:
+            # Get validator and mapper
+            validator = self._get_thermodynamic_validator()
+            mapper = self._get_compound_mapper()
+            
+            # Map reactants and products to KEGG compound IDs
+            reactant_ids = []
+            product_ids = []
+            
+            for reactant in reaction.reactants:
+                # Handle both SpeciesReference objects and tuples
+                if hasattr(reactant, 'species'):
+                    species_id = reactant.species
+                elif isinstance(reactant, tuple) and len(reactant) >= 1:
+                    species_id = reactant[0]  # (species_id, stoichiometry) tuple
+                else:
+                    continue
+                
+                # Get species object from pathway_data
+                species = self._find_species(species_id)
+                if species:
+                    compound_id = mapper.map_species(species)
+                    if compound_id:
+                        reactant_ids.append(compound_id)
+            
+            for product in reaction.products:
+                # Handle both SpeciesReference objects and tuples
+                if hasattr(product, 'species'):
+                    species_id = product.species
+                elif isinstance(product, tuple) and len(product) >= 1:
+                    species_id = product[0]  # (species_id, stoichiometry) tuple
+                else:
+                    continue
+                
+                species = self._find_species(species_id)
+                if species:
+                    compound_id = mapper.map_species(species)
+                    if compound_id:
+                        product_ids.append(compound_id)
+            
+            # Check if we have enough data for validation
+            if not reactant_ids or not product_ids:
+                self.logger.debug(
+                    f"Cannot validate {transition.name}: "
+                    f"insufficient compound mappings "
+                    f"(reactants: {len(reactant_ids)}, products: {len(product_ids)})"
+                )
+                return {
+                    'status': 'insufficient_data',
+                    'message': 'Could not map species to KEGG compounds',
+                    'reactants_mapped': len(reactant_ids),
+                    'products_mapped': len(product_ids)
+                }
+            
+            # Extract rate constants from kinetic law
+            k_forward = None
+            k_reverse = None
+            
+            # Try to extract from parameters
+            if kinetic_law.parameters:
+                # Common forward rate constant names
+                for k_name in ['k_f', 'kf', 'k1', 'k_forward', 'kforward']:
+                    if k_name in kinetic_law.parameters:
+                        k_forward = kinetic_law.parameters[k_name]
+                        break
+                
+                # Common reverse rate constant names
+                for k_name in ['k_r', 'kr', 'k2', 'k_reverse', 'kreverse', 'k_rev']:
+                    if k_name in kinetic_law.parameters:
+                        k_reverse = kinetic_law.parameters[k_name]
+                        break
+            
+            # If rate constants not found, validation not possible
+            if k_forward is None or k_reverse is None:
+                self.logger.debug(
+                    f"Cannot validate {transition.name}: "
+                    f"rate constants not found in kinetic law parameters"
+                )
+                return {
+                    'status': 'no_rate_constants',
+                    'message': 'Could not extract k_forward and k_reverse from kinetic law',
+                    'parameters': list(kinetic_law.parameters.keys()) if kinetic_law.parameters else []
+                }
+            
+            # Perform validation
+            result = validator.validate_reversible_transition(
+                reactant_ids=reactant_ids,
+                product_ids=product_ids,
+                k_forward=k_forward,
+                k_reverse=k_reverse,
+                transition_name=transition.name
+            )
+            
+            self.logger.debug(
+                f"Validated {transition.name}: "
+                f"status={result.get('is_valid', False)}, "
+                f"deviation={result.get('deviation', 'N/A')}"
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.logger.warning(
+                f"Thermodynamic validation failed for {transition.name}: {e}"
+            )
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
+    
+    def _find_species(self, species_id: str):
+        """
+        Find species object by ID in pathway_data.
+        
+        Args:
+            species_id: Species identifier
+        
+        Returns:
+            Species object or None
+        """
+        if not hasattr(self, 'pathway_data'):
+            return None
+        
+        if not hasattr(self.pathway_data, 'species'):
+            return None
+        
+        for species in self.pathway_data.species:
+            if getattr(species, 'id', None) == species_id:
+                return species
+        
+        return None
 
 
 # Convenience function for importers
