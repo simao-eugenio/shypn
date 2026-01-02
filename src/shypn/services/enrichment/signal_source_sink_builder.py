@@ -92,6 +92,14 @@ class SignalSourceSinkBuilder:
                 )
                 continue
             
+            # Check if place is already connected to biochemical reactions
+            # If so, skip adding artificial source/sink transitions
+            if self._is_connected_to_reactions(document, place):
+                self.logger.debug(
+                    f"Skipping {place.label or place.name}: Already connected to biochemical reactions"
+                )
+                continue
+            
             # Check if already has source/sink
             has_source, has_sink = self._check_existing_source_sink(document, place)
             
@@ -156,6 +164,94 @@ class SignalSourceSinkBuilder:
                 # Check if it's a SignalFlowArc (consuming)
                 if isinstance(arc, SignalFlowArc):
                     return True
+        
+        return False
+    
+    def _is_connected_to_reactions(self, document, place: Place) -> bool:
+        """Check if signal place is connected to biochemical reactions.
+        
+        Signal places that are stoichiometrically connected to real reactions
+        (KEGG reactions with EC numbers, metabolic transformations) don't need
+        artificial source/sink transitions. They get their inputs/outputs from
+        the actual biochemical network.
+        
+        This prevents the "artificial pattern" where enriched cofactors (NAD,
+        CoA, ATP) are properly connected via SignalFlowArcs to reactions but
+        then also get unnecessary source/sink plumbing.
+        
+        Args:
+            document: DocumentModel
+            place: Signal place to check
+        
+        Returns:
+            True if connected to at least one real biochemical reaction
+        """
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
+        for arc in document.arcs:
+            # Check if arc connects to this place and is a SignalFlowArc
+            if not isinstance(arc, SignalFlowArc):
+                continue
+            
+            if arc.source == place:
+                # Place → Transition: check if transition is a real reaction
+                target_transition = arc.target
+                if isinstance(target_transition, Transition):
+                    if self._is_biochemical_reaction(target_transition):
+                        return True
+            
+            elif arc.target == place:
+                # Transition → Place: check if transition is a real reaction
+                source_transition = arc.source
+                if isinstance(source_transition, Transition):
+                    if self._is_biochemical_reaction(source_transition):
+                        return True
+        
+        return False
+    
+    def _is_biochemical_reaction(self, transition: Transition) -> bool:
+        """Check if transition represents a real biochemical reaction.
+        
+        Real reactions have:
+        - KEGG reaction IDs (R00001, etc.)
+        - EC numbers
+        - Source metadata = 'KEGG' or 'kegg_import'
+        - NOT marked as source/sink
+        
+        Args:
+            transition: Transition to check
+        
+        Returns:
+            True if represents a biochemical reaction, False if artificial
+        """
+        # Skip artificial source/sink transitions
+        if getattr(transition, 'is_source', False) or getattr(transition, 'is_sink', False):
+            return False
+        
+        # Check metadata for KEGG origin
+        if hasattr(transition, 'metadata') and transition.metadata:
+            metadata = transition.metadata
+            
+            # Check if from KEGG import
+            if metadata.get('source') == 'KEGG':
+                return True
+            if metadata.get('data_source') == 'kegg_import':
+                return True
+            
+            # Check if has KEGG reaction ID
+            if 'kegg_reaction_id' in metadata or 'kegg_reaction_name' in metadata:
+                return True
+            
+            # Check if has EC number (enzyme classification)
+            if 'ec_numbers' in metadata and metadata['ec_numbers']:
+                return True
+        
+        # Check transition label for KEGG reaction patterns (R00001, rn:R00001)
+        if hasattr(transition, 'label') and transition.label:
+            label = transition.label
+            # KEGG reaction pattern: R followed by 5 digits
+            if 'R' in label and any(c.isdigit() for c in label):
+                return True
         
         return False
     
