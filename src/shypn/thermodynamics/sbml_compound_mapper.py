@@ -22,6 +22,7 @@ import logging
 
 from shypn.thermodynamics.compound_mapper_base import CompoundMapperBase
 from shypn.thermodynamics.compound_resolver import CompoundResolver
+from shypn.thermodynamics.database.xref import CrossReferenceDatabase
 
 
 class SBMLCompoundMapper(CompoundMapperBase):
@@ -35,7 +36,8 @@ class SBMLCompoundMapper(CompoundMapperBase):
     def __init__(
         self,
         use_cache: bool = True,
-        use_name_fallback: bool = True
+        use_name_fallback: bool = True,
+        use_xref: bool = True
     ):
         """
         Initialize SBML compound mapper.
@@ -43,15 +45,33 @@ class SBMLCompoundMapper(CompoundMapperBase):
         Args:
             use_cache: Enable mapping cache
             use_name_fallback: Use name matching when annotations missing
+            use_xref: Use cross-reference database for ID conversion
         """
         super().__init__(use_cache=use_cache)
         self.use_name_fallback = use_name_fallback
+        self.use_xref = use_xref
         
         # Initialize compound resolver for name matching
         if use_name_fallback:
             self.resolver = CompoundResolver()
         else:
             self.resolver = None
+        
+        # Initialize cross-reference database for ChEBI/BiGG conversion
+        if use_xref:
+            try:
+                self.xref = CrossReferenceDatabase()
+                if not self.xref.is_available():
+                    self.logger.warning(
+                        "Cross-reference database not available. "
+                        "Run scripts/xref_builder.py to generate mapping files."
+                    )
+                    self.xref = None
+            except Exception as e:
+                self.logger.warning(f"Cross-reference database initialization failed: {e}")
+                self.xref = None
+        else:
+            self.xref = None
     
     def map_species(self, species) -> Optional[str]:
         """
@@ -77,25 +97,27 @@ class SBMLCompoundMapper(CompoundMapperBase):
             self.logger.debug(f"Mapped {species_id} → {kegg_id} (KEGG annotation)")
             return kegg_id
         
-        # 2. Try ChEBI annotation (requires cross-reference database)
+        # 2. Try ChEBI annotation + cross-reference conversion
         chebi_id = self._extract_chebi_annotation(species)
-        if chebi_id:
-            # TODO: Convert ChEBI to KEGG using cross-reference database
-            # For now, log and continue to fallback
-            self.logger.debug(
-                f"Found ChEBI ID {chebi_id} for {species_id} "
-                f"(ChEBI→KEGG conversion not yet implemented)"
-            )
+        if chebi_id and self.xref:
+            kegg_id = self.xref.chebi_to_kegg(chebi_id)
+            if kegg_id:
+                self.logger.debug(
+                    f"Mapped {species_id} → {kegg_id} "
+                    f"(ChEBI {chebi_id} via xref database)"
+                )
+                return kegg_id
         
-        # 3. Try BiGG annotation (requires cross-reference database)
+        # 3. Try BiGG annotation + cross-reference conversion
         bigg_id = self._extract_bigg_annotation(species)
-        if bigg_id:
-            # TODO: Convert BiGG to KEGG using cross-reference database
-            # For now, log and continue to fallback
-            self.logger.debug(
-                f"Found BiGG ID {bigg_id} for {species_id} "
-                f"(BiGG→KEGG conversion not yet implemented)"
-            )
+        if bigg_id and self.xref:
+            kegg_id = self.xref.bigg_to_kegg(bigg_id)
+            if kegg_id:
+                self.logger.debug(
+                    f"Mapped {species_id} → {kegg_id} "
+                    f"(BiGG {bigg_id} via xref database)"
+                )
+                return kegg_id
         
         # 4. Fallback to name matching
         if self.use_name_fallback and self.resolver:

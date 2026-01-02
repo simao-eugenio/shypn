@@ -727,6 +727,10 @@ class Transition(PetriNetObject):
         if "kinetic_metadata" in data and create_metadata_from_dict is not None:
             transition.kinetic_metadata = create_metadata_from_dict(data["kinetic_metadata"])
         
+        # Restore generic metadata (added by importers/enrichers)
+        if "metadata" in data:
+            transition.metadata = data["metadata"]
+        
         # Restore signal places (quorum sensing)
         if "signal_places" in data:
             transition.signal_places = data["signal_places"]

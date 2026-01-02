@@ -252,14 +252,17 @@ class PathwayBuilder:
         """
         for species_id in sorted(species):  # Sort for deterministic order
             place_id = self.id_manager.generate_place_id()
-            place_name = place_id  # Name matches ID
+            # CRITICAL: Use species_id as place name (biochemical identifier)
+            # place.name is used in rate formulas and must be biologically meaningful
+            # NOT the system ID (P1, P2) which is for internal references only
+            place_name = species_id  # Biochemical identifier (ATP, Glucose, etc.)
             
             # Create place at origin (will be positioned later)
             place = Place(
                 x=0.0,
                 y=0.0,
                 id=place_id,
-                name=place_name,
+                name=place_name,  # Biochemical name used in formulas
                 label=species_id  # Use species ID as label
             )
             

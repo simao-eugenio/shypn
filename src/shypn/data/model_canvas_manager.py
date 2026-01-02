@@ -2400,21 +2400,28 @@ class ModelCanvasManager:
             transition.fill_color = Transition.DEFAULT_COLOR
         
         # Reset place colors (but preserve compartment/signal/regulatory places)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         for place in self.places:
-            # Skip compartment, signal, and regulatory places - they have semantic colors
-            if place.is_compartment_place or place.is_signal_place or getattr(place, 'is_regulatory_place', False):
+            # Skip places with semantic colors (signal, compartment, regulatory)
+            if ColorSchemaManager.is_semantic_place_color(place):
                 continue
             place.border_color = Place.DEFAULT_BORDER_COLOR
         
         # Reset arc colors (but preserve boundary species arcs)
         # Boundary species arcs are cyan (0.0, 0.5, 0.5)
+        # SignalFlowArcs are light gray (0.7, 0.7, 0.7)
         # We assume any non-black arc is a semantic color and should be preserved
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
         for arc in self.arcs:
             # Skip arcs with semantic colors (non-black)
             if arc.color != Arc.DEFAULT_COLOR:
                 continue
-            # This arc is already black, keep it black
-            arc.color = Arc.DEFAULT_COLOR
+            # Reset arc to its type-specific default color
+            if isinstance(arc, SignalFlowArc):
+                arc.color = SignalFlowArc.DEFAULT_COLOR
+            else:
+                arc.color = Arc.DEFAULT_COLOR
         
         # Trigger redraw to show the reset colors
         self.mark_needs_redraw()
@@ -2448,20 +2455,31 @@ class ModelCanvasManager:
             transition.fill_color = Transition.DEFAULT_COLOR
         
         # Reset place colors (but preserve compartment/signal/regulatory places)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         for place in self.places:
-            if place.is_compartment_place or place.is_signal_place or getattr(place, 'is_regulatory_place', False):
+            if ColorSchemaManager.is_semantic_place_color(place):
                 original_colors['places'].append(None)
                 continue
             original_colors['places'].append(place.border_color)
             place.border_color = Place.DEFAULT_BORDER_COLOR
         
-        # Reset arc colors (but preserve boundary species arcs)
+        # Reset arc colors (but preserve boundary species arcs and SignalFlowArcs)
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
         for arc in self.arcs:
-            if arc.color != Arc.DEFAULT_COLOR:
-                original_colors['arcs'].append(None)
-                continue
-            original_colors['arcs'].append(arc.color)
-            arc.color = Arc.DEFAULT_COLOR
+            # Skip arcs with semantic colors (non-default)
+            if isinstance(arc, SignalFlowArc):
+                if arc.color != SignalFlowArc.DEFAULT_COLOR:
+                    original_colors['arcs'].append(None)
+                    continue
+                original_colors['arcs'].append(arc.color)
+                arc.color = SignalFlowArc.DEFAULT_COLOR
+            else:
+                if arc.color != Arc.DEFAULT_COLOR:
+                    original_colors['arcs'].append(None)
+                    continue
+                original_colors['arcs'].append(arc.color)
+                arc.color = Arc.DEFAULT_COLOR
         
         return original_colors
     

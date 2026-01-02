@@ -123,6 +123,17 @@ class PathwayPanelLoader:
         
         self.logger.info("Model canvas updated")
     
+    def on_tab_switched(self, drawing_area):
+        """Called when user switches between model tabs.
+        
+        Forwards the notification to the PathwayOperationsPanel.
+        
+        Args:
+            drawing_area: The newly active drawing area
+        """
+        if self.panel and hasattr(self.panel, 'on_tab_switched'):
+            self.panel.on_tab_switched(drawing_area)
+    
     def set_project(self, project):
         """Set or update the current project.
         

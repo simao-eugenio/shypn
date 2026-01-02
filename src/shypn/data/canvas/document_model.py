@@ -65,6 +65,9 @@ class DocumentModel:
         place_name = place_id  # Name matches ID
         
         place = Place(x=x, y=y, id=place_id, name=place_name, label=label or place_name)
+        # Apply default color schema
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        ColorSchemaManager.reset_place_color(place)
         self.places.append(place)
         return place
     
@@ -140,6 +143,11 @@ class DocumentModel:
                 arc = CurvedInhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
             else:  # 'normal' or default
                 arc = Arc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            
+            # Apply color schema to semantic arcs (TestArc, SignalFlowArc, InhibitorArc)
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            if ColorSchemaManager.is_semantic_arc_color(arc):
+                ColorSchemaManager.reset_arc_color(arc)
             
             self.arcs.append(arc)
             return arc
@@ -629,6 +637,49 @@ class DocumentModel:
                        if k not in ("created", "object_counts")}
             if metadata:
                 document.metadata = metadata
+        
+        # POST-LOAD FIX: Convert regular Arcs to SignalFlowArcs if connecting to signal places
+        # This fixes files saved before SignalFlowArc auto-detection was implemented
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        
+        arcs_to_convert = []
+        for i, arc in enumerate(document.arcs):
+            # Skip if already a SignalFlowArc or TestArc or InhibitorArc
+            if not isinstance(arc, Arc) or arc.__class__ != Arc:
+                continue
+            
+            # Check if arc connects to/from signal place
+            source_is_signal = (isinstance(arc.source, Place) and 
+                               getattr(arc.source, 'is_signal_place', False))
+            target_is_signal = (isinstance(arc.target, Place) and 
+                               getattr(arc.target, 'is_signal_place', False))
+            
+            if source_is_signal or target_is_signal:
+                # Convert to SignalFlowArc
+                signal_arc = SignalFlowArc(
+                    source=arc.source,
+                    target=arc.target,
+                    id=arc.id,
+                    name=arc.name,
+                    weight=arc.weight
+                )
+                # Copy other properties
+                signal_arc.label = arc.label
+                signal_arc.width = arc.width
+                signal_arc.control_points = arc.control_points.copy() if arc.control_points else []
+                
+                # Apply correct color
+                ColorSchemaManager.reset_arc_color(signal_arc)
+                
+                arcs_to_convert.append((i, signal_arc))
+        
+        # Replace converted arcs
+        for i, signal_arc in arcs_to_convert:
+            document.arcs[i] = signal_arc
+        
+        if arcs_to_convert:
+            print(f"[INFO] Post-load fix: Converted {len(arcs_to_convert)} regular Arc(s) to SignalFlowArc(s) for signal place connections")
         
         return document
     

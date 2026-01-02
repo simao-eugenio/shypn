@@ -12,6 +12,7 @@ with KEGG's usage policies and cite KEGG appropriately in publications.
 
 import urllib.request
 import urllib.error
+from urllib.error import HTTPError, URLError
 from typing import Optional, List, Tuple
 import time
 

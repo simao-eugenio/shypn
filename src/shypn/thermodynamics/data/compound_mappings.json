@@ -87,6 +87,372 @@
       "kegg_id": "C00007",
       "chebi_id": "CHEBI:15379",
       "names": ["oxygen", "O2", "dioxygen", "molecular oxygen"]
+    },
+    "C00469": {
+      "kegg_id": "C00469",
+      "chebi_id": "CHEBI:16236",
+      "names": ["ethanol", "ethyl alcohol", "EtOH"]
+    },
+    "C00186": {
+      "kegg_id": "C00186",
+      "chebi_id": "CHEBI:17968",
+      "names": ["lactate", "lactic acid", "L-lactate"]
+    },
+    "C00074": {
+      "kegg_id": "C00074",
+      "chebi_id": "CHEBI:16452",
+      "names": ["phosphoenolpyruvate", "PEP", "phosphoenolpyruvic acid"]
+    },
+    "C00118": {
+      "kegg_id": "C00118",
+      "chebi_id": "CHEBI:16716",
+      "names": ["D-glyceraldehyde-3-phosphate", "G3P", "GADP", "GAP"]
+    },
+    "C00236": {
+      "kegg_id": "C00236",
+      "chebi_id": "CHEBI:16761",
+      "names": ["1,3-bisphosphoglycerate", "1,3-BPG", "BPG"]
+    },
+    "C00197": {
+      "kegg_id": "C00197",
+      "chebi_id": "CHEBI:17835",
+      "names": ["3-phosphoglycerate", "3-PG", "3-phosphoglyceric acid"]
+    },
+    "C00631": {
+      "kegg_id": "C00631",
+      "chebi_id": "CHEBI:17835",
+      "names": ["2-phosphoglycerate", "2-PG", "2-phosphoglyceric acid"]
+    },
+    "C00158": {
+      "kegg_id": "C00158",
+      "chebi_id": "CHEBI:15414",
+      "names": ["citrate", "citric acid", "2-hydroxypropane-1,2,3-tricarboxylate"]
+    },
+    "C00036": {
+      "kegg_id": "C00036",
+      "chebi_id": "CHEBI:30744",
+      "names": ["oxaloacetate", "OAA", "oxalacetic acid"]
+    },
+    "C00149": {
+      "kegg_id": "C00149",
+      "chebi_id": "CHEBI:15589",
+      "names": ["malate", "L-malate", "malic acid"]
+    },
+    "C00122": {
+      "kegg_id": "C00122",
+      "chebi_id": "CHEBI:16454",
+      "names": ["fumarate", "fumaric acid", "trans-butenedioate"]
+    },
+    "C00042": {
+      "kegg_id": "C00042",
+      "chebi_id": "CHEBI:15741",
+      "names": ["succinate", "succinic acid", "butanedioate"]
+    },
+    "C00091": {
+      "kegg_id": "C00091",
+      "chebi_id": "CHEBI:15956",
+      "names": ["succinyl-CoA", "succinyl coenzyme A"]
+    },
+    "C00026": {
+      "kegg_id": "C00026",
+      "chebi_id": "CHEBI:16452",
+      "names": ["2-oxoglutarate", "alpha-ketoglutarate", "2-ketoglutarate"]
+    },
+    "C00311": {
+      "kegg_id": "C00311",
+      "chebi_id": "CHEBI:16842",
+      "names": ["isocitrate", "isocitric acid", "1-hydroxypropane-1,2,3-tricarboxylate"]
+    },
+    "C00417": {
+      "kegg_id": "C00417",
+      "chebi_id": "CHEBI:16947",
+      "names": ["cis-aconitate", "cis-aconitic acid"]
+    },
+    "C00058": {
+      "kegg_id": "C00058",
+      "chebi_id": "CHEBI:16189",
+      "names": ["formate", "formic acid", "methanoate"]
+    },
+    "C00033": {
+      "kegg_id": "C00033",
+      "chebi_id": "CHEBI:30838",
+      "names": ["acetate", "acetic acid", "ethanoate"]
+    },
+    "C00100": {
+      "kegg_id": "C00100",
+      "chebi_id": "CHEBI:16737",
+      "names": ["propanoate", "propionate", "propionic acid"]
+    },
+    "C00136": {
+      "kegg_id": "C00136",
+      "chebi_id": "CHEBI:16761",
+      "names": ["butanoate", "butyrate", "butyric acid"]
+    },
+    "C00044": {
+      "kegg_id": "C00044",
+      "chebi_id": "CHEBI:15996",
+      "names": ["GTP", "guanosine triphosphate"]
+    },
+    "C00035": {
+      "kegg_id": "C00035",
+      "chebi_id": "CHEBI:17552",
+      "names": ["GDP", "guanosine diphosphate"]
+    },
+    "C00144": {
+      "kegg_id": "C00144",
+      "chebi_id": "CHEBI:17345",
+      "names": ["GMP", "guanosine monophosphate"]
+    },
+    "C00063": {
+      "kegg_id": "C00063",
+      "chebi_id": "CHEBI:17361",
+      "names": ["CTP", "cytidine triphosphate"]
+    },
+    "C00081": {
+      "kegg_id": "C00081",
+      "chebi_id": "CHEBI:17361",
+      "names": ["ITP", "inosine triphosphate"]
+    },
+    "C00075": {
+      "kegg_id": "C00075",
+      "chebi_id": "CHEBI:16704",
+      "names": ["UTP", "uridine triphosphate"]
+    },
+    "C00015": {
+      "kegg_id": "C00015",
+      "chebi_id": "CHEBI:17659",
+      "names": ["UDP", "uridine diphosphate"]
+    },
+    "C00013": {
+      "kegg_id": "C00013",
+      "chebi_id": "CHEBI:33019",
+      "names": ["diphosphate", "PPi", "pyrophosphate"]
+    },
+    "C00014": {
+      "kegg_id": "C00014",
+      "chebi_id": "CHEBI:16134",
+      "names": ["ammonia", "NH3", "azane"]
+    },
+    "C00041": {
+      "kegg_id": "C00041",
+      "chebi_id": "CHEBI:15843",
+      "names": ["alanine", "L-alanine", "Ala"]
+    },
+    "C00025": {
+      "kegg_id": "C00025",
+      "chebi_id": "CHEBI:16015",
+      "names": ["glutamate", "L-glutamic acid", "Glu"]
+    },
+    "C00064": {
+      "kegg_id": "C00064",
+      "chebi_id": "CHEBI:16474",
+      "names": ["glutamine", "L-glutamine", "Gln"]
+    },
+    "C00037": {
+      "kegg_id": "C00037",
+      "chebi_id": "CHEBI:15356",
+      "names": ["glycine", "Gly", "aminoacetic acid"]
+    },
+    "C00049": {
+      "kegg_id": "C00049",
+      "chebi_id": "CHEBI:17053",
+      "names": ["aspartate", "L-aspartic acid", "Asp"]
+    },
+    "C00062": {
+      "kegg_id": "C00062",
+      "chebi_id": "CHEBI:17558",
+      "names": ["arginine", "L-arginine", "Arg"]
+    },
+    "C00065": {
+      "kegg_id": "C00065",
+      "chebi_id": "CHEBI:17196",
+      "names": ["serine", "L-serine", "Ser"]
+    },
+    "C00079": {
+      "kegg_id": "C00079",
+      "chebi_id": "CHEBI:17334",
+      "names": ["phenylalanine", "L-phenylalanine", "Phe"]
+    },
+    "C00082": {
+      "kegg_id": "C00082",
+      "chebi_id": "CHEBI:17895",
+      "names": ["tyrosine", "L-tyrosine", "Tyr"]
+    },
+    "C00123": {
+      "kegg_id": "C00123",
+      "chebi_id": "CHEBI:16761",
+      "names": ["leucine", "L-leucine", "Leu"]
+    },
+    "C00047": {
+      "kegg_id": "C00047",
+      "chebi_id": "CHEBI:15603",
+      "names": ["lysine", "L-lysine", "Lys"]
+    },
+    "C00183": {
+      "kegg_id": "C00183",
+      "chebi_id": "CHEBI:17513",
+      "names": ["valine", "L-valine", "Val"]
+    },
+    "C00188": {
+      "kegg_id": "C00188",
+      "chebi_id": "CHEBI:17891",
+      "names": ["threonine", "L-threonine", "Thr"]
+    },
+    "C00078": {
+      "kegg_id": "C00078",
+      "chebi_id": "CHEBI:17822",
+      "names": ["tryptophan", "L-tryptophan", "Trp"]
+    },
+    "C00135": {
+      "kegg_id": "C00135",
+      "chebi_id": "CHEBI:17890",
+      "names": ["histidine", "L-histidine", "His"]
+    },
+    "C00097": {
+      "kegg_id": "C00097",
+      "chebi_id": "CHEBI:17561",
+      "names": ["cysteine", "L-cysteine", "Cys"]
+    },
+    "C00051": {
+      "kegg_id": "C00051",
+      "chebi_id": "CHEBI:16828",
+      "names": ["glutathione", "GSH", "gamma-glutamylcysteinylglycine"]
+    },
+    "C00127": {
+      "kegg_id": "C00127",
+      "chebi_id": "CHEBI:17051",
+      "names": ["glutathione disulfide", "GSSG", "oxidized glutathione"]
+    },
+    "C00101": {
+      "kegg_id": "C00101",
+      "chebi_id": "CHEBI:16919",
+      "names": ["tetrahydrofolate", "THF", "5,6,7,8-tetrahydrofolate"]
+    },
+    "C00080": {
+      "kegg_id": "C00080",
+      "chebi_id": "CHEBI:15378",
+      "names": ["proton", "H+", "hydrogen ion"]
+    },
+    "C00016": {
+      "kegg_id": "C00016",
+      "chebi_id": "CHEBI:16238",
+      "names": ["FAD", "flavin adenine dinucleotide"]
+    },
+    "C00017": {
+      "kegg_id": "C00017",
+      "chebi_id": "CHEBI:17544",
+      "names": ["FADH2", "reduced FAD"]
+    },
+    "C00031": {
+      "kegg_id": "C00031",
+      "chebi_id": "CHEBI:17634",
+      "names": ["glucose", "D-glucose", "dextrose"]
+    },
+    "C00103": {
+      "kegg_id": "C00103",
+      "chebi_id": "CHEBI:16077",
+      "names": ["G1P", "glucose-1-phosphate", "D-glucose 1-phosphate"]
+    },
+    "C00668": {
+      "kegg_id": "C00668",
+      "chebi_id": "CHEBI:4170",
+      "names": ["G6P", "glucose-6-phosphate", "alpha-D-glucose 6-phosphate"]
+    },
+    "C05345": {
+      "kegg_id": "C05345",
+      "chebi_id": "CHEBI:15946",
+      "names": ["F6P", "fructose-6-phosphate", "beta-D-fructose 6-phosphate"]
+    },
+    "C05378": {
+      "kegg_id": "C05378",
+      "chebi_id": "CHEBI:16084",
+      "names": ["FBP", "fructose-1,6-bisphosphate", "F1,6BP"]
+    },
+    "C00111": {
+      "kegg_id": "C00111",
+      "chebi_id": "CHEBI:16108",
+      "names": ["DHAP", "dihydroxyacetone phosphate", "glycerone phosphate"]
+    },
+    "C00118": {
+      "kegg_id": "C00118",
+      "chebi_id": "CHEBI:17138",
+      "names": ["G3P", "glyceraldehyde-3-phosphate", "D-glyceraldehyde 3-phosphate"]
+    },
+    "C00236": {
+      "kegg_id": "C00236",
+      "chebi_id": "CHEBI:16001",
+      "names": ["3PG", "3-phosphoglycerate", "D-3-phosphoglycerate"]
+    },
+    "C00197": {
+      "kegg_id": "C00197",
+      "chebi_id": "CHEBI:17794",
+      "names": ["2PG", "2-phosphoglycerate", "D-2-phosphoglycerate"]
+    },
+    "C00074": {
+      "kegg_id": "C00074",
+      "chebi_id": "CHEBI:18021",
+      "names": ["PEP", "phosphoenolpyruvate", "phosphoenolpyruvic acid"]
+    },
+    "C00022": {
+      "kegg_id": "C00022",
+      "chebi_id": "CHEBI:15361",
+      "names": ["pyruvate", "pyruvic acid", "2-oxopropanoate"]
+    },
+    "C00024": {
+      "kegg_id": "C00024",
+      "chebi_id": "CHEBI:15351",
+      "names": ["acetyl-CoA", "acetyl coenzyme A"]
+    },
+    "C00026": {
+      "kegg_id": "C00026",
+      "chebi_id": "CHEBI:16947",
+      "names": ["2-oxoglutarate", "alpha-ketoglutarate", "2-ketoglutarate"]
+    },
+    "C00091": {
+      "kegg_id": "C00091",
+      "chebi_id": "CHEBI:17984",
+      "names": ["succinate", "succinic acid", "butanedioate"]
+    },
+    "C00122": {
+      "kegg_id": "C00122",
+      "chebi_id": "CHEBI:16106",
+      "names": ["fumarate", "fumaric acid", "trans-butenedioate"]
+    },
+    "C00149": {
+      "kegg_id": "C00149",
+      "chebi_id": "CHEBI:30775",
+      "names": ["malate", "L-malate", "malic acid"]
+    },
+    "C00036": {
+      "kegg_id": "C00036",
+      "chebi_id": "CHEBI:30744",
+      "names": ["oxaloacetate", "oxaloacetic acid", "OAA"]
+    },
+    "C00158": {
+      "kegg_id": "C00158",
+      "chebi_id": "CHEBI:15428",
+      "names": ["citrate", "citric acid", "2-hydroxypropane-1,2,3-tricarboxylate"]
+    },
+    "C00311": {
+      "kegg_id": "C00311",
+      "chebi_id": "CHEBI:16947",
+      "names": ["isocitrate", "isocitric acid", "1-hydroxypropane-1,2,3-tricarboxylate"]
+    },
+    "C00010": {
+      "kegg_id": "C00010",
+      "chebi_id": "CHEBI:15846",
+      "names": ["CoA", "coenzyme A", "CoA-SH"]
+    },
+    "C00399": {
+      "kegg_id": "C00399",
+      "chebi_id": "CHEBI:16908",
+      "names": ["ubiquinone", "coenzyme Q", "CoQ"]
+    },
+    "C00390": {
+      "kegg_id": "C00390",
+      "chebi_id": "CHEBI:16474",
+      "names": ["ubiquinol", "reduced coenzyme Q", "CoQH2"]
     }
   }
 }
+

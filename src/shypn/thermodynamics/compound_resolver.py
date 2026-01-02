@@ -69,8 +69,8 @@ class CompoundResolver:
                      If None, uses default data directory.
         """
         if data_dir is None:
-            # Default to package data directory
-            data_dir = Path(__file__).parent.parent / "data"
+            # Default to thermodynamics data directory
+            data_dir = Path(__file__).parent / "data"
         
         self.data_dir = Path(data_dir)
         self._kegg_to_chebi: Dict[str, str] = {}

@@ -20,6 +20,14 @@ from ..models.transition_types import (
 from ..fetchers.sabio_rk_kinetics_fetcher import SabioRKKineticsFetcher
 from ..database.heuristic_db import HeuristicDatabase
 from ..learning.heuristic_learner import HeuristicLearner
+from .initial_marking_inferrer import InitialMarkingInferrer, CompoundClassifier, CompoundClass
+
+# Try to import CompoundResolver (may not be available)
+try:
+    from ...thermodynamics.compound_resolver import CompoundResolver
+    _resolver = CompoundResolver()
+except Exception:
+    _resolver = None
 
 
 # Reaction mechanism patterns (learned from KEGG, applicable to any source)
@@ -90,6 +98,9 @@ REACTION_MECHANISM_PATTERNS = {
 
 class TransitionTypeDetector:
     """Detects transition type from model properties."""
+    
+    # Shared compound classifier for substrate analysis
+    _classifier = CompoundClassifier()
     
     @staticmethod
     def detect_type(transition: Any) -> TransitionType:
@@ -184,6 +195,17 @@ class TransitionTypeDetector:
             return TransitionType.TIMED
         
         # ============================================================
+        # Stage 1.5: Substrate-based type inference (NEW - Enhanced)
+        # ============================================================
+        # Uses CompoundResolver + CompoundClassifier to check substrate types
+        # Energy currencies (ATP) + cofactors (NAD) → CONTINUOUS (enzyme kinetics)
+        # Small molecules only → Potentially STOCHASTIC (mass-action)
+        substrate_type = TransitionTypeDetector._analyze_substrates(transition)
+        if substrate_type is not None:
+            logger.debug(f"{transition.id}: Substrate analysis suggests {substrate_type.value}")
+            return substrate_type
+        
+        # ============================================================
         # Stage 2: Analyze label/name for mechanism patterns (universal)
         # ============================================================
         label = getattr(transition, 'label', '').lower()
@@ -266,6 +288,134 @@ class TransitionTypeDetector:
             return BiologicalSemantics.ENZYME_KINETICS
         
         return BiologicalSemantics.UNKNOWN
+    
+    @staticmethod
+    def _analyze_substrates(transition: Any) -> Optional[TransitionType]:
+        """Analyze substrate compounds to infer transition type.
+        
+        **Enhanced Strategy (Post-Enrichment):**
+        After KEGG enrichment with CompoundResolver, places have:
+        - Biological names (ATP, glucose, NAD+)
+        - Potential KEGG IDs in metadata
+        
+        Classification logic:
+        1. Extract substrate places from input arcs
+        2. Resolve compound IDs/names using CompoundResolver
+        3. Classify compounds using CompoundClassifier
+        4. Determine reaction type:
+           - Energy currencies (ATP, GTP) present → CONTINUOUS
+           - Cofactors (NAD, FAD) present → CONTINUOUS
+           - CoA compounds present → CONTINUOUS
+           - Only small molecules/metabolites → Consider STOCHASTIC
+           - Mixed or unknown → Return None (fall through to patterns)
+        
+        Args:
+            transition: Transition object with input arcs
+            
+        Returns:
+            Suggested TransitionType or None if inconclusive
+        """
+        if _resolver is None:
+            # CompoundResolver not available, skip substrate analysis
+            return None
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Extract substrate places
+            substrates = []
+            if hasattr(transition, 'input_arcs'):
+                for arc in transition.input_arcs:
+                    if hasattr(arc, 'source'):
+                        substrates.append(arc.source)
+            
+            if not substrates:
+                return None
+            
+            # Classify each substrate
+            substrate_classes = []
+            for place in substrates:
+                # Try to get KEGG ID from metadata or name
+                kegg_id = None
+                if hasattr(place, 'metadata') and isinstance(place.metadata, dict):
+                    kegg_id = place.metadata.get('kegg_id') or place.metadata.get('compound_id')
+                
+                # Get place name
+                place_name = getattr(place, 'name', None) or getattr(place, 'label', None)
+                
+                # Resolve compound if KEGG ID available
+                compound_names = []
+                if kegg_id and isinstance(kegg_id, str) and kegg_id.startswith('C'):
+                    identity = _resolver.resolve(kegg_id)
+                    if identity and identity.names:
+                        compound_names = identity.names
+                elif place_name:
+                    compound_names = [place_name]
+                
+                # Classify compound
+                compound_class = TransitionTypeDetector._classifier.classify(kegg_id, compound_names)
+                substrate_classes.append(compound_class)
+                
+                logger.debug(
+                    f"{transition.id}: Substrate {place.id} → {compound_class.value} "
+                    f"(names: {', '.join(compound_names[:2])})"
+                )
+            
+            # Decision logic based on substrate classes
+            has_energy_currency = any(c == CompoundClass.ENERGY_CURRENCY for c in substrate_classes)
+            has_cofactor = any(c == CompoundClass.COFACTOR for c in substrate_classes)
+            has_coenzyme_a = any(c == CompoundClass.COENZYME_A for c in substrate_classes)
+            all_small_metabolites = all(
+                c in (CompoundClass.CENTRAL_METABOLITE, CompoundClass.SECONDARY_METABOLITE, CompoundClass.UNKNOWN)
+                for c in substrate_classes
+            )
+            
+            # Reactions with ATP/GTP/NAD/CoA are almost always continuous enzyme kinetics
+            if has_energy_currency or has_cofactor or has_coenzyme_a:
+                logger.debug(
+                    f"{transition.id}: Energy currency/cofactor/CoA detected → CONTINUOUS (confidence: high)"
+                )
+                return TransitionType.CONTINUOUS
+            
+            # Reactions with only small metabolites might be stochastic
+            # BUT: Most metabolic reactions are still enzymatic, so be conservative
+            # Only suggest STOCHASTIC if also lacking EC number or enzyme keywords
+            if all_small_metabolites and len(substrate_classes) >= 1:
+                # Check if transition has enzyme markers
+                label = getattr(transition, 'label', '').lower()
+                name = getattr(transition, 'name', '').lower()
+                ec_number = getattr(transition, 'ec_number', None)
+                reaction_id = getattr(transition, 'reaction_id', None)
+                
+                has_enzyme_marker = (
+                    ec_number is not None or
+                    reaction_id is not None or
+                    any(keyword in label or keyword in name 
+                        for keyword in ['ase', 'kinase', 'dehydrogenase', 'synthase', 
+                                       'oxidase', 'reductase', 'transferase'])
+                )
+                
+                if not has_enzyme_marker:
+                    # Small molecules + no enzyme markers → Could be mass-action
+                    logger.debug(
+                        f"{transition.id}: Small metabolites + no enzyme markers → "
+                        f"STOCHASTIC (confidence: medium)"
+                    )
+                    return TransitionType.STOCHASTIC
+                else:
+                    # Has enzyme markers → Still likely continuous
+                    logger.debug(
+                        f"{transition.id}: Small metabolites but enzyme markers present → "
+                        f"CONTINUOUS (confidence: medium)"
+                    )
+                    return TransitionType.CONTINUOUS
+            
+            # Mixed or unclear substrate composition → Let other stages decide
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Substrate analysis failed for {transition.id}: {e}")
+            return None
 
 
 class HeuristicInferenceEngine:
@@ -289,12 +439,14 @@ class HeuristicInferenceEngine:
     - BRENDA: Future, additional validation
     """
     
-    def __init__(self, use_background_fetch: bool = False, db_path: Optional[str] = None):
+    def __init__(self, use_background_fetch: bool = False, db_path: Optional[str] = None, 
+                 scale_factor: float = 10.0):
         """Initialize inference engine.
         
         Args:
             use_background_fetch: If True, enhance with database queries in background
             db_path: Optional path to database file (default: ~/.shypn/heuristic_parameters.db)
+            scale_factor: Tokens per mM for initial marking inference (default: 10.0)
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         
@@ -312,6 +464,9 @@ class HeuristicInferenceEngine:
         
         # Type detector
         self.type_detector = TransitionTypeDetector()
+        
+        # Initial marking inferrer (NEW)
+        self.marking_inferrer = InitialMarkingInferrer(scale_factor=scale_factor)
         
         # Local cache for database results (in-memory cache for session)
         self._parameter_cache: Dict[Tuple[str, str], ContinuousParameters] = {}
@@ -1581,5 +1736,105 @@ class HeuristicInferenceEngine:
             source="Heuristic + Stoichiometry",
             notes=notes
         )
+
+
+    def analyze_places(self, places: List[Any]) -> List[Dict[str, Any]]:
+        """Analyze places and infer initial markings.
+        
+        NEW METHOD: Infers biochemically-realistic initial markings
+        for places without tokens using compound identity resolution.
+        
+        Args:
+            places: List of place objects
+            
+        Returns:
+            List of dictionaries with place analysis results
+        """
+        self.logger.info(f"Analyzing {len(places)} places for initial marking inference...")
+        
+        # Infer markings using compound resolver
+        suggestions = self.marking_inferrer.infer_markings_batch(places)
+        
+        # Convert to dictionary format for results
+        results = []
+        for suggestion in suggestions:
+            result = {
+                'place_id': suggestion.place_id,
+                'tokens': suggestion.tokens,
+                'confidence': suggestion.confidence,
+                'reasoning': suggestion.reasoning,
+                'compound_class': suggestion.compound_class.value,
+                'compound_id': suggestion.compound_id,
+                'compound_names': suggestion.compound_names,
+                'suggestion': suggestion  # Include full object
+            }
+            results.append(result)
+        
+        self.logger.info(
+            f"Generated {len(results)} initial marking suggestions "
+            f"(avg confidence: {sum(r['confidence'] for r in results) / len(results):.0%})"
+            if results else "No suggestions generated"
+        )
+        
+        return results
+    
+    def analyze_model(self, 
+                     transitions: List[Any], 
+                     places: Optional[List[Any]] = None,
+                     organism: str = "generic") -> Dict[str, Any]:
+        """Analyze complete model: transitions AND places.
+        
+        ENHANCED METHOD: Now includes initial marking inference for places.
+        
+        Args:
+            transitions: List of transition objects
+            places: Optional list of place objects for initial marking inference
+            organism: Target organism
+            
+        Returns:
+            Dictionary with transition parameters and place suggestions:
+            {
+                'transitions': {
+                    'continuous': [results],
+                    'stochastic': [results],
+                    'timed': [results],
+                    'immediate': [results]
+                },
+                'places': [suggestions]  # NEW
+            }
+        """
+        self.logger.info(f"Analyzing model with {len(transitions)} transitions...")
+        
+        # Analyze transitions (existing functionality)
+        transition_results = {
+            'continuous': [],
+            'stochastic': [],
+            'timed': [],
+            'immediate': []
+        }
+        
+        for transition in transitions:
+            result = self.infer_parameters(transition, organism=organism)
+            
+            # Categorize by type
+            if isinstance(result.parameters, ContinuousParameters):
+                transition_results['continuous'].append(result)
+            elif isinstance(result.parameters, StochasticParameters):
+                transition_results['stochastic'].append(result)
+            elif isinstance(result.parameters, TimedParameters):
+                transition_results['timed'].append(result)
+            elif isinstance(result.parameters, ImmediateParameters):
+                transition_results['immediate'].append(result)
+        
+        # Analyze places (NEW)
+        place_results = []
+        if places:
+            self.logger.info(f"Analyzing {len(places)} places for initial markings...")
+            place_results = self.analyze_places(places)
+        
+        return {
+            'transitions': transition_results,
+            'places': place_results  # NEW
+        }
 
 

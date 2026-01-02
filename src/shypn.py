@@ -476,6 +476,7 @@ def main(argv=None):
 				# 	sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
 				
 		except Exception as e:
+			import logging
 			logging.getLogger(__name__).warning('Failed to load pathway panel: %s', e)
 			pathway_panel_loader = None
 			topology_panel_loader = None
