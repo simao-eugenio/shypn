@@ -95,13 +95,13 @@ class MichaelisMentenEstimator(KineticEstimator):
         
         # Single substrate - standard MM with named parameters
         if len(substrate_places) == 1:
-            return f"michaelis_menten({str(substrate_places[0].name)}, vmax={vmax}, km={km})"
+            return f"michaelis_menten({str(substrate_places[0].id)}, vmax={vmax}, km={km})"
         
         # Multiple substrates - sequential MM with named parameters
-        rate_func = f"michaelis_menten({str(substrate_places[0].name)}, vmax={vmax}, km={km})"
+        rate_func = f"michaelis_menten({str(substrate_places[0].id)}, vmax={vmax}, km={km})"
         
         for substrate in substrate_places[1:]:
-            rate_func += f" * ({str(substrate.name)} / ({km} + {str(substrate.name)}))"
+            rate_func += f" * ({str(substrate.id)} / ({km} + {str(substrate.id)}))"
         
         return rate_func
     

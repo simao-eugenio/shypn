@@ -236,7 +236,7 @@ class SBMLParser:
         metadata = self._create_metadata(model, filepath)
         
         # Store assignment rule metadata (NEW)
-        if assignment_rule_info['count'] > 0:
+        if assignment_rule_info and assignment_rule_info['count'] > 0:
             metadata['assignment_rules'] = assignment_rule_info
             self.logger.info(
                 f"Stored {len(assignment_rule_info['species_rules'])} species assignment rules, "
@@ -427,7 +427,7 @@ class SBMLParser:
         """
         num_rules = model.getNumRules()
         if num_rules == 0:
-            return
+            return {'count': 0, 'species_rules': [], 'parameter_rules': [], 'evaluated': [], 'unevaluated': []}
         
         assignment_rules = []
         for i in range(num_rules):
@@ -438,7 +438,7 @@ class SBMLParser:
                 assignment_rules.append((variable, math_ast))
         
         if not assignment_rules:
-            return
+            return {'count': 0, 'species_rules': [], 'parameter_rules': [], 'evaluated': [], 'unevaluated': []}
         
         self.logger.info(f"Evaluating {len(assignment_rules)} assignment rule(s) at t=0...")
         
@@ -529,6 +529,8 @@ class SBMLParser:
                 f"Could not evaluate assignment rules for: {', '.join(unevaluated)}. "
                 f"These may have circular dependencies or use unsupported functions."
             )
+        else:
+            self.logger.info(f"✓ Evaluated all {len(assignment_rules)} assignment rules")
         
         # Collect metadata about assignment rules
         species_dict = {s.id: s for s in species}
@@ -550,8 +552,6 @@ class SBMLParser:
             'evaluated': list(evaluated),
             'unevaluated': list(unevaluated)
         }
-        else:
-            self.logger.info(f"✓ Evaluated all {len(assignment_rules)} assignment rules")
     
     def _link_compartments(self,
                            species: List[Species],

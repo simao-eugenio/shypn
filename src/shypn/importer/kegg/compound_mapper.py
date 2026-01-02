@@ -1,8 +1,16 @@
 """Standard compound to place mapping strategy."""
 
 from shypn.netobjs import Place
+from shypn.netobjs.signal_type import SignalType
 from .converter_base import CompoundMapper, ConversionOptions
 from .models import KEGGEntry
+
+# Import CompoundResolver for cross-reference database lookups
+try:
+    from shypn.thermodynamics.compound_resolver import CompoundResolver
+    _resolver = CompoundResolver()
+except ImportError:
+    _resolver = None
 
 
 # Common cofactors that can be filtered out to reduce clutter
@@ -33,6 +41,26 @@ COMMON_COFACTORS = {
     'C00131',  # dATP
     'C00144',  # GMP
     'C00206',  # UTP
+}
+
+# Energy metabolites that should be marked as signal places (Ψₑ)
+# These are universal currency metabolites that couple multiple pathways
+KEY_ENERGY_COFACTORS = {
+    'C00002',  # ATP - primary energy currency
+    'C00008',  # ADP - energy currency
+    'C00020',  # AMP - energy currency
+    'C00003',  # NAD+ - redox currency
+    'C00004',  # NADH - redox currency
+    'C00006',  # NADP+ - redox currency
+    'C00005',  # NADPH - redox currency
+    'C00016',  # FAD - redox currency
+    'C00010',  # CoA - acyl group carrier
+    'C00024',  # Acetyl-CoA - central metabolite
+    'C00044',  # GTP - energy/signaling
+    'C00035',  # GDP - energy currency
+    'C00063',  # CTP - nucleotide synthesis
+    'C00009',  # Pi - phosphate group donor
+    'C00013',  # PPi - energy coupling
 }
 
 
@@ -86,11 +114,12 @@ class StandardCompoundMapper(CompoundMapper):
         CRITICAL: Names must be biological identifiers, NOT database codes!
         Names represent actual biochemical entities (glucose, ATP, pyruvate).
         
-        Priority order (AGGRESSIVE - biological names only):
-        1. Common abbreviation from KEGG code (ATP, ADP, NAD+, etc.)
-        2. Graphics display name - actual compound name (Glucose, Pyruvate, etc.)
-        3. Entry name cleaned (if not a code)
-        4. KEGG compound ID ONLY as absolute last resort
+        Priority order (ENHANCED with cross-reference database):
+        1. Cross-reference database lookup (most comprehensive)
+        2. Common abbreviation from KEGG code (ATP, ADP, NAD+, etc.)
+        3. Graphics display name - actual compound name (Glucose, Pyruvate, etc.)
+        4. Entry name cleaned (if not a code)
+        5. KEGG compound ID ONLY as absolute last resort
         
         Args:
             entry: KEGG compound entry
@@ -101,23 +130,54 @@ class StandardCompoundMapper(CompoundMapper):
         # Extract KEGG compound ID from entry.name (e.g., "cpd:C00002" -> "C00002")
         compound_id = entry.name.split(':')[-1].strip() if ':' in entry.name else entry.name.strip()
         
-        # 1. Check for common abbreviation (ATP, not C00002)
+        # 1. NEW: Try cross-reference database first (most comprehensive)
+        if _resolver is not None:
+            try:
+                identity = _resolver.resolve(compound_id)
+                if identity and identity.names:
+                    # Use primary name (first in list)
+                    name = identity.primary_name
+                    # Prefer shorter names if available
+                    if len(identity.names) > 1:
+                        # Find shortest non-empty name
+                        short_names = [n for n in identity.names if n and len(n) <= 20]
+                        if short_names:
+                            name = min(short_names, key=len)
+                    return name
+            except Exception:
+                pass  # Fall back to other methods
+        
+        # 2. Check for common abbreviation (ATP, not C00002)
         if compound_id in self.COMMON_ABBREVIATIONS:
             return self.COMMON_ABBREVIATIONS[compound_id]
         
-        # 2. Try graphics display name (actual compound name - HIGHEST PRIORITY)
+        # 3. Try graphics display name (actual compound name)
         if entry.graphics and entry.graphics.name:
             display_name = entry.graphics.name.strip()
-            if display_name and display_name.lower() not in ('undefined', 'unknown', ''):
-                # Take first word if multi-word name
-                first_word = display_name.split()[0] if ' ' in display_name else display_name
-                # Remove common prefixes/suffixes
-                first_word = first_word.rstrip(',;:')
-                # Must be actual name, not a code
-                if first_word and len(first_word) > 1 and not (first_word.startswith('C') and first_word[1:].isdigit()):
-                    return first_word
+            # Skip invalid placeholders: undefined, unknown, empty, ellipsis, asterisk
+            invalid_names = ('undefined', 'unknown', '', '...', '*', '.', '..', 'n/a', 'na', 'null')
+            if display_name and display_name.lower() not in invalid_names:
+                # IMPROVED: More aggressive name extraction
+                # Handle multi-word names better (e.g., "D-Glucose 6-phosphate")
+                # Take full name if reasonable length, otherwise first word
+                if len(display_name) <= 25:
+                    # Use full name if short enough
+                    clean_name = display_name.rstrip(',;:')
+                    if clean_name and len(clean_name) >= 3:
+                        # Check if it's not a KEGG code (C00002 format)
+                        if not (clean_name.startswith('C') and len(clean_name) == 6 and clean_name[1:].isdigit()):
+                            return clean_name
+                else:
+                    # Take first meaningful word for long names
+                    first_word = display_name.split()[0]
+                    first_word = first_word.rstrip(',;:')
+                    if (first_word and 
+                        len(first_word) >= 3 and 
+                        not (first_word.startswith('C') and first_word[1:].isdigit()) and
+                        not first_word.replace('.', '').replace('*', '').replace('-', '') == ''):
+                        return first_word
         
-        # 3. Try entry name if it's not a compound code
+        # 4. Try entry name if it's not a compound code
         if hasattr(entry, 'data') and entry.data:
             # Entry.data might contain actual names
             for line in str(entry.data).split('\n')[:3]:  # Check first few lines
@@ -129,13 +189,15 @@ class StandardCompoundMapper(CompoundMapper):
                         if first_word and not (first_word.startswith('C') and len(first_word) == 6):
                             return first_word
         
-        # 4. LAST RESORT: Use KEGG compound ID (but this is NOT ideal)
-        # This means we couldn't find the actual biological name
+        # 5. LAST RESORT: Use prefixed KEGG compound ID
+        # CRITICAL: Never return bare KEGG codes (C00002) as place names!
+        # They look like database IDs and should not be used in rate formulas.
+        # Use descriptive format: Compound_C00002 (eval-safe, descriptive)
         if compound_id.startswith('C') and len(compound_id) == 6:
-            return compound_id
+            return f"Compound_{compound_id}"
         
-        # 5. Final fallback
-        return f"C{entry.id}"
+        # 6. Final fallback
+        return f"Compound_C{entry.id}"
     
     def should_include(self, entry: KEGGEntry, options: ConversionOptions) -> bool:
         """Determine if a compound should be included.
@@ -171,9 +233,6 @@ class StandardCompoundMapper(CompoundMapper):
         x = entry.graphics.x * options.coordinate_scale + options.center_x
         y = entry.graphics.y * options.coordinate_scale + options.center_y
         
-        # Get clean compound name from graphics
-        label = self.get_compound_name(entry)
-        
         # Create place ID using IDManager if available
         if id_manager:
             place_id = id_manager.generate_place_id()
@@ -181,14 +240,18 @@ class StandardCompoundMapper(CompoundMapper):
             # Fallback to old behavior for backwards compatibility
             place_id = f"P{entry.id}"
         
-        # Get biological name for the place
-        place_name = self._get_biological_name(entry)
+        # Get biological name for the place (ATP, Glucose, etc.)
+        biological_name = self._get_biological_name(entry)
         
         # Determine initial marking
         marking = options.initial_tokens if options.add_initial_marking else 0
         
         # Create place with correct arguments: (x, y, id, name, radius, label)
-        place = Place(x, y, place_id, place_name, label=label)
+        # Architecture:
+        # - id: System ID (P1, P2, etc.) - read-only, never changes
+        # - name: User-editable alias (ATP, Glucose, etc.) - used in rate formulas
+        # - label: Display text (same as name typically, or description)
+        place = Place(x, y, place_id, biological_name, label=biological_name)
         
         # Set initial marking
         place.tokens = marking
@@ -205,6 +268,18 @@ class StandardCompoundMapper(CompoundMapper):
         # Add compound type if available
         if hasattr(entry, 'type'):
             place.metadata['kegg_type'] = entry.type
+        
+        # Mark energy metabolites as signal places (Ψₑ)
+        # Extract clean compound ID from entry.name (e.g., "cpd:C00002" -> "C00002")
+        compound_id = entry.name.split(':')[-1] if ':' in entry.name else entry.name
+        if compound_id in KEY_ENERGY_COFACTORS:
+            place.is_signal_place = True
+            place.signal_type = SignalType.ENERGY
+            # Apply color schema immediately after setting semantic flag
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(place)
+            place.metadata['signal_type'] = 'Ψₑ'  # Energy signal type
+            place.metadata['is_energy_signal'] = True
         
         return place
     

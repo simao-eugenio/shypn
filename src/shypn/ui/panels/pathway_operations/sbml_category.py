@@ -1010,8 +1010,13 @@ class SBMLCategory(BasePathwayCategory):
                 processed_pathway = postprocessor.process(parsed_pathway)
                 
                 # 3. Convert to Petri net → DocumentModel
-                self.logger.info("Converting to Petri net...")
-                document_model = self.converter.convert(processed_pathway)
+                # Get user options
+                filter_cofactors = False
+                if hasattr(self, 'filter_cofactors_check') and self.filter_cofactors_check:
+                    filter_cofactors = self.filter_cofactors_check.get_active()
+                
+                self.logger.info(f"Converting to Petri net (include_cofactors={filter_cofactors})...")
+                document_model = self.converter.convert(processed_pathway, include_cofactors=filter_cofactors)
                 
                 # 4. Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed_pathway:
@@ -2236,6 +2241,49 @@ class SBMLCategory(BasePathwayCategory):
         """
         self.controller = controller
         self.logger.debug(f"Controller set for thermodynamic validation")
+    
+    def on_tab_switched(self):
+        """Called when the user switches to a different model tab.
+        
+        Updates the SBML panel to reflect the currently active model:
+        - Refreshes button states
+        - Updates status labels
+        - Clears old pathway info if model changed
+        """
+        self.logger.debug("Tab switched, updating SBML panel state")
+        
+        # Get current document
+        document = None
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                if canvas_manager and hasattr(canvas_manager, 'document'):
+                    document = canvas_manager.document
+            except Exception as e:
+                self.logger.warning(f"Could not get document on tab switch: {e}")
+        
+        # Update buttons based on new active model
+        if document:
+            # Check if SBML model
+            is_sbml = False
+            if hasattr(document, 'metadata') and document.metadata:
+                is_sbml = document.metadata.get('data_source') == 'sbml_import'
+            
+            if is_sbml:
+                self.status_label.set_text("SBML model loaded")
+            else:
+                self.status_label.set_markup(
+                    '<span size="small">Not an SBML model</span>'
+                )
+        else:
+            # No document - disable buttons
+            self.status_label.set_markup(
+                '<span size="small">No model loaded</span>'
+            )
     
     def _show_stochastic_warning_dialog(self, warnings):
         """Show dialog warning about stochastic incompatibility with user choices.

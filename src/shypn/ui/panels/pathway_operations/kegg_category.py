@@ -103,6 +103,158 @@ class KEGGCategory(BasePathwayCategory):
         """
         self.file_panel_loader = file_panel_loader
     
+    def on_model_loaded(self):
+        """Called when a model is loaded into the canvas.
+        
+        Updates enrichment button states based on the loaded model.
+        This should be called by the canvas loader after any model is opened.
+        """
+        # Check if it's a KEGG model by checking transitions for KEGG metadata
+        document = None
+        
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                if canvas_manager and hasattr(canvas_manager, 'document'):
+                    document = canvas_manager.document
+            except Exception as e:
+                self.logger.warning(f"Could not get document: {e}")
+        
+        if not document:
+            # No document loaded, disable buttons
+            self.enrich_button.set_sensitive(False)
+            self.stoich_enrich_button.set_sensitive(False)
+            return
+        
+        # Check if it's a KEGG import by looking for KEGG metadata
+        is_kegg = False
+        if hasattr(document, 'metadata') and document.metadata:
+            is_kegg = document.metadata.get('data_source') == 'kegg_import'
+        
+        # Also check transitions for KEGG reaction IDs
+        if not is_kegg and document.transitions:
+            for t in document.transitions[:5]:  # Check first few
+                if hasattr(t, 'metadata') and t.metadata:
+                    if t.metadata.get('kegg_reaction_id') or t.metadata.get('data_source') == 'kegg_import':
+                        is_kegg = True
+                        break
+        
+        if is_kegg:
+            self.logger.info("KEGG model detected, enabling enrichment buttons")
+            self.stoich_enrich_button.set_sensitive(True)
+            self._check_stoich_enrichment_candidates()
+        else:
+            self.logger.info("Non-KEGG model loaded, disabling KEGG enrichment buttons")
+            self.stoich_enrich_button.set_sensitive(False)
+    
+    def on_tab_switched(self):
+        """Called when the user switches to a different model tab.
+        
+        Updates the KEGG panel to reflect the currently active model:
+        - Refreshes enrichment button states
+        - Updates status labels
+        - Clears old pathway info if model changed
+        """
+        self.logger.debug("Tab switched, updating KEGG panel state")
+        
+        # Get current document
+        document = None
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                if canvas_manager and hasattr(canvas_manager, 'document'):
+                    document = canvas_manager.document
+            except Exception as e:
+                self.logger.warning(f"Could not get document on tab switch: {e}")
+        
+        # Update enrichment buttons based on new active model
+        if document:
+            # Check if KEGG model
+            is_kegg = False
+            if hasattr(document, 'metadata') and document.metadata:
+                is_kegg = document.metadata.get('data_source') == 'kegg_import'
+            
+            if is_kegg:
+                self.stoich_enrich_button.set_sensitive(True)
+                self._check_stoich_enrichment_candidates()
+            else:
+                self.stoich_enrich_button.set_sensitive(False)
+                self.stoich_status_label.set_markup(
+                    '<span size="small">Not a KEGG model</span>'
+                )
+        else:
+            # No document - disable buttons
+            self.stoich_enrich_button.set_sensitive(False)
+            self.stoich_status_label.set_markup(
+                '<span size="small">No model loaded</span>'
+            )
+    
+    def on_model_closed(self):
+        """Called when the active model/tab is closed.
+        
+        Clears all KEGG panel state to prevent stale data.
+        """
+        self.logger.debug("Model closed, clearing KEGG panel")
+        self.clear_panel()
+    
+    def clear_panel(self):
+        """Clear all KEGG panel state.
+        
+        This should be called when:
+        - A model is closed
+        - User switches to a different model tab
+        - Panel needs to be reset
+        """
+        self.logger.debug("Clearing KEGG panel state")
+        
+        # Clear current pathway data
+        self.current_pathway = None
+        self.current_kgml = None
+        self.current_pathway_id = None
+        self.current_pathway_doc = None
+        
+        # Clear input
+        self.accession_entry.set_text("")
+        
+        # Clear preview
+        self.preview_label.set_text("No pathway loaded")
+        
+        # Clear status
+        self.status_label.set_text("")
+        
+        # Disable and clear enrichment states
+        self.stoich_enrich_button.set_sensitive(False)
+        self.stoich_status_label.set_markup(
+            '<span size="small">No model loaded</span>'
+        )
+        
+        # Reset import button
+        self.import_button.set_sensitive(True)
+        self.import_button.set_label("Import")
+    
+    def set_model_canvas(self, model_canvas):
+        """Override to handle tab switching.
+        
+        Called when the active model canvas changes (tab switch).
+        Updates panel state to reflect the current model.
+        
+        Args:
+            model_canvas: ModelCanvasLoader or ModelCanvasManager instance
+        """
+        # Call parent implementation to update model_canvas reference
+        super().set_model_canvas(model_canvas)
+        
+        # Trigger tab switch handling
+        self.on_tab_switched()
+    
     def _is_signaling_pathway(self, pathway_id: str) -> bool:
         """Detect if a pathway is a signaling pathway based on KEGG classification.
         
@@ -272,53 +424,42 @@ class KEGGCategory(BasePathwayCategory):
         label.set_xalign(0)
         box.pack_start(label, False, False, 0)
         
-        # Include cofactors checkbox (metadata only, not in reaction chain)
-        self.filter_cofactors_check = Gtk.CheckButton(label="Include cofactors (metadata only)")
-        self.filter_cofactors_check.set_active(False)
-        self.filter_cofactors_check.set_tooltip_text(
-            "Include common cofactors (ATP, NADH, etc.) for reference.\n"
-            "They are not part of the main reaction chain."
-        )
-        box.pack_start(self.filter_cofactors_check, False, False, 0)
-        
-        # Show catalysts checkbox (Biological Petri Net mode)
-        self.show_catalysts_check = Gtk.CheckButton(label="Show catalysts (Biological Petri Net)")
-        self.show_catalysts_check.set_active(True)  # Default: Show enzyme places
-        self.show_catalysts_check.set_tooltip_text(
-            "Create enzyme/catalyst places with test arcs (dashed lines).\n"
-            "Enables Biological Petri Net analysis but increases visual complexity.\n\n"
-            "When disabled: Clean layout matching KEGG visualization (default)\n"
-            "When enabled: Explicit enzyme places with non-consuming test arcs"
-        )
-        box.pack_start(self.show_catalysts_check, False, False, 0)
+        # NOTE: Cofactor inclusion removed - now handled by Stoichiometry Enrichment
+        # NOTE: Catalyst places removed - always shown (Biological Petri Net mode)
+        # Both options deprecated as of 2026-01-01
         
         # Separator before enrichment section
         separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         box.pack_start(separator, False, False, 6)
         
-        # Enrichment button for post-import name fetching
-        enrich_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        # NOTE: "Enrich Names from KEGG API" button removed - deprecated as of 2026-01-01
+        # Name enrichment now handled automatically via cross-reference database
+        # See: thermodynamics/database/xref/
         
-        self.enrich_button = Gtk.Button(label="Enrich Names from KEGG API")
-        self.enrich_button.set_sensitive(False)  # Enabled after import
-        self.enrich_button.set_tooltip_text(
-            "Fetch biological names from KEGG API to replace codes (C#####, R#####).\n\n"
-            "This is a SLOW operation (~1.5s per item) that queries KEGG database\n"
-            "to get actual compound and enzyme names.\n\n"
-            "Only run this when you need biological names for publication/presentation.\n"
-            "Import remains fast because this is opt-in post-processing."
+        # Stoichiometry enrichment button (add cofactors)
+        stoich_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        self.stoich_enrich_button = Gtk.Button(label="Enrich Stoichiometry (Add Cofactors)")
+        self.stoich_enrich_button.set_sensitive(False)  # Enabled after import
+        self.stoich_enrich_button.set_tooltip_text(
+            "Add missing cofactors (ATP, NADH, CoA, etc.) to reactions.\n\n"
+            "KEGG KGML files omit cofactors to keep visualizations clean,\n"
+            "but this makes models incomplete for signal hierarchy and thermodynamic analysis.\n\n"
+            "This operation queries KEGG REACTION database (~1-2s per reaction)\n"
+            "to get complete stoichiometry and adds missing compounds to the model.\n\n"
+            "⚠️ IMPORTANT: Run this BEFORE signal hierarchy analysis!"
         )
-        self.enrich_button.connect('clicked', self._on_enrich_names_clicked)
-        enrich_box.pack_start(self.enrich_button, False, False, 0)
+        self.stoich_enrich_button.connect('clicked', self._on_enrich_stoichiometry_clicked)
+        stoich_box.pack_start(self.stoich_enrich_button, False, False, 0)
         
-        # Enrich status label
-        self.enrich_status_label = Gtk.Label()
-        self.enrich_status_label.set_xalign(0)
-        self.enrich_status_label.set_line_wrap(True)
-        self.enrich_status_label.get_style_context().add_class("dim-label")
-        enrich_box.pack_start(self.enrich_status_label, True, True, 0)
+        # Stoichiometry enrichment status label
+        self.stoich_status_label = Gtk.Label()
+        self.stoich_status_label.set_xalign(0)
+        self.stoich_status_label.set_line_wrap(True)
+        self.stoich_status_label.get_style_context().add_class("dim-label")
+        stoich_box.pack_start(self.stoich_status_label, True, True, 0)
         
-        box.pack_start(enrich_box, False, False, 0)
+        box.pack_start(stoich_box, False, False, 0)
         
         return box
     
@@ -681,8 +822,8 @@ class KEGGCategory(BasePathwayCategory):
                         )
                 
                 # 3. Convert to Petri net
-                filter_cofactors = self.filter_cofactors_check.get_active()
-                show_catalysts = self.show_catalysts_check.get_active()
+                filter_cofactors = True  # Always include cofactors (mandatory)
+                show_catalysts = True  # Always show enzyme places (mandatory)
                 coordinate_scale = 2.5  # Optimal default scale for KEGG coordinates
                 
                 enhancement_options = EnhancementOptions(
@@ -812,8 +953,8 @@ class KEGGCategory(BasePathwayCategory):
                         )
                 
                 # 3. Convert to Petri net
-                filter_cofactors = self.filter_cofactors_check.get_active()
-                show_catalysts = self.show_catalysts_check.get_active()
+                filter_cofactors = True  # Always include cofactors (mandatory)
+                show_catalysts = True  # Always show enzyme places (mandatory)
                 coordinate_scale = 2.5  # Optimal default scale for KEGG coordinates
                 
                 enhancement_options = EnhancementOptions(
@@ -1065,9 +1206,12 @@ class KEGGCategory(BasePathwayCategory):
             self.import_button.set_sensitive(True)
             self.import_in_progress = False
             
-            # Enable enrichment button now that we have a model
-            self.enrich_button.set_sensitive(True)
-            self._check_enrichment_candidates()
+            # Store reference to imported document for enrichment
+            self.current_pathway_doc = document_model
+            
+            # Enable stoichiometry enrichment button
+            self.stoich_enrich_button.set_sensitive(True)
+            self._check_stoich_enrichment_candidates()
             
             # Notify parent panel (for BRENDA integration)
             imported_data = {
@@ -1216,9 +1360,17 @@ class KEGGCategory(BasePathwayCategory):
             self._show_status(f"❌ Failed to save files: {save_error}", error=True)
     
     def _check_enrichment_candidates(self):
-        """Check how many items can be enriched and update status label."""
+        """[DEPRECATED] Check how many items can be enriched and update status label.
+        
+        DEPRECATED as of 2026-01-01: This method is no longer used.
+        The "Enrich Names" button has been removed because name enrichment
+        is now handled automatically via the cross-reference database.
+        """
+        self.logger.warning("_check_enrichment_candidates called but is deprecated")
+        return  # Early return
+        
+        # [DEPRECATED CODE BELOW - KEPT FOR REFERENCE ONLY]
         if not self.current_pathway_doc:
-            self.enrich_status_label.set_text("")
             return
         
         import re
@@ -1254,11 +1406,84 @@ class KEGGCategory(BasePathwayCategory):
                 '<span size="small">No KEGG codes to enrich</span>'
             )
     
+    def _check_stoich_enrichment_candidates(self):
+        """Check how many reactions can be enriched with stoichiometry."""
+        # Get document from canvas (where loaded models are)
+        document = None
+        
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                if canvas_manager and hasattr(canvas_manager, 'document'):
+                    document = canvas_manager.document
+                elif canvas_manager and hasattr(canvas_manager, 'get_document'):
+                    document = canvas_manager.get_document()
+            except Exception as e:
+                self.logger.warning(f"Could not get document from canvas: {e}")
+        
+        # Fallback to stored reference from recent import
+        if not document:
+            document = self.current_pathway_doc
+        
+        if not document:
+            self.stoich_status_label.set_text("")
+            return
+        
+        # Count transitions with KEGG reaction IDs
+        reactions_to_enrich = [
+            t for t in document.transitions
+            if hasattr(t, 'metadata') and t.metadata and
+               t.metadata.get('kegg_reaction_id') and
+               t.metadata.get('data_source') == 'kegg_import'
+        ]
+        
+        total = len(reactions_to_enrich)
+        
+        # Check if already enriched
+        already_enriched = (
+            hasattr(document, 'metadata') and
+            document.metadata and
+            document.metadata.get('stoichiometry_enriched', False)
+        )
+        
+        if already_enriched:
+            self.stoich_status_label.set_markup(
+                '<span size="small">✅ Already enriched</span>'
+            )
+        elif total > 0:
+            est_time = total * 1.5  # ~1.5s per reaction
+            self.stoich_status_label.set_markup(
+                f'<span size="small">{total} reactions can be enriched '
+                f'(~{est_time:.0f}s)</span>'
+            )
+        else:
+            self.stoich_status_label.set_markup(
+                '<span size="small">No reactions to enrich</span>'
+            )
+    
     def _on_enrich_names_clicked(self, button):
-        """Handle enrichment button click.
+        """[DEPRECATED] Handle enrichment button click.
+        
+        DEPRECATED as of 2026-01-01: This method is no longer used.
+        Name enrichment is now handled automatically via the cross-reference
+        database (thermodynamics/database/xref/) which provides instant lookups
+        without slow KEGG API calls.
+        
+        Historical implementation kept for reference but should not be called.
         
         Fetches biological names from KEGG API to replace codes (C#####, R#####).
         """
+        self.logger.warning(
+            "_on_enrich_names_clicked called but is deprecated. "
+            "Use cross-reference database for name resolution."
+        )
+        return  # Early return - do not execute deprecated functionality
+        
+        # [DEPRECATED CODE BELOW - KEPT FOR REFERENCE ONLY]
         if not self.current_pathway_doc:
             self._show_error("No imported model available. Import a pathway first.")
             return
@@ -1351,6 +1576,9 @@ class KEGGCategory(BasePathwayCategory):
                         canvas_manager.mark_needs_redraw()
                         canvas_manager.mark_dirty()  # Mark as needing save
                         self.logger.info("Canvas redrawn after enrichment")
+                        
+                        # Update metadata inspector with enrichment info
+                        self._update_metadata_after_enrichment(canvas_manager, result)
                 except Exception as e:
                     self.logger.warning(f"Could not redraw canvas: {e}")
         else:
@@ -1380,6 +1608,353 @@ class KEGGCategory(BasePathwayCategory):
         self._show_error(f"Enrichment failed: {error}")
         
         return False  # Don't repeat
+    
+    def _on_enrich_stoichiometry_clicked(self, button):
+        """Handle stoichiometry enrichment button click.
+        
+        Adds missing cofactors (ATP, NADH, etc.) to transitions by querying
+        KEGG REACTION database for complete stoichiometry.
+        """
+        # Get document from canvas (where loaded models are)
+        document = None
+        canvas_manager = None
+        
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                # CRITICAL: Use the canvas manager itself as the document
+                # The enricher expects an object with .places, .transitions, .arcs
+                # The ModelCanvasManager has these via properties delegating to DocumentController
+                if canvas_manager:
+                    # Check if it has the required attributes
+                    if (hasattr(canvas_manager, 'places') and 
+                        hasattr(canvas_manager, 'transitions') and 
+                        hasattr(canvas_manager, 'arcs')):
+                        document = canvas_manager
+                        self.logger.info(
+                            f"Using canvas manager as document: {len(document.places)} places, "
+                            f"{len(document.transitions)} transitions"
+                        )
+                    elif hasattr(canvas_manager, 'document'):
+                        document = canvas_manager.document
+                    elif hasattr(canvas_manager, 'get_document'):
+                        document = canvas_manager.get_document()
+                        
+                if document:
+                    self.logger.info(
+                        f"Retrieved document: {len(document.places)} places, "
+                        f"{len(document.transitions)} transitions"
+                    )
+            except Exception as e:
+                self.logger.warning(f"Could not get document from canvas: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Fallback: use stored reference from recent import
+        if not document:
+            document = self.current_pathway_doc
+            if document:
+                self.logger.info("Using stored pathway document from import")
+        
+        if not document:
+            self._show_error("No model loaded. Open a KEGG model from the file browser or import one.")
+            return
+        
+        # Import enrichment service
+        try:
+            from shypn.services.enrichment import KEGGStoichiometryEnricher
+        except ImportError as e:
+            self._show_error(f"Stoichiometry enrichment service not available: {e}")
+            return
+        
+        # Check if already enriched
+        if hasattr(document, 'metadata') and \
+           document.metadata and \
+           document.metadata.get('stoichiometry_enriched'):
+            dialog = Gtk.MessageDialog(
+                transient_for=self.parent_window,
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text="Model already enriched"
+            )
+            dialog.format_secondary_text(
+                "This model has already been enriched with stoichiometry.\n"
+                "Running again may create duplicate cofactors.\n\n"
+                "Continue anyway?"
+            )
+            response = dialog.run()
+            dialog.destroy()
+            if response != Gtk.ResponseType.YES:
+                return
+        
+        # Disable button during enrichment
+        self.stoich_enrich_button.set_sensitive(False)
+        self.stoich_status_label.set_text("Enriching...")
+        
+        def enrich_in_thread():
+            """Run enrichment in background thread."""
+            try:
+                # Progress callback to update UI
+                def progress(current, total, message):
+                    GLib.idle_add(
+                        self.stoich_status_label.set_text,
+                        f"[{current}/{total}] {message[:40]}..."
+                    )
+                
+                # Create enricher
+                enricher = KEGGStoichiometryEnricher(
+                    progress_callback=progress,
+                    position_strategy='cluster'  # Position cofactors near transitions
+                )
+                
+                # Run enrichment
+                result = enricher.enrich_document(document)
+                
+                return result
+                
+            except Exception as e:
+                self.logger.error(f"Stoichiometry enrichment failed: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        # Run in background with callbacks
+        self._run_in_thread(
+            enrich_in_thread,
+            on_complete=self._on_stoich_enrichment_complete,
+            on_error=self._on_stoich_enrichment_error
+        )
+    
+    def _on_stoich_enrichment_complete(self, result):
+        """Called when stoichiometry enrichment completes successfully.
+        
+        Args:
+            result: EnrichmentResult object
+        """
+        self.logger.info(
+            f"Stoichiometry enrichment complete: "
+            f"{result.statistics.get('places_added', 0)} places, "
+            f"{result.statistics.get('arcs_added', 0)} arcs in "
+            f"{result.duration_seconds:.1f}s"
+        )
+        
+        # Re-enable button
+        self.stoich_enrich_button.set_sensitive(True)
+        
+        # Update status
+        places_added = result.statistics.get('places_added', 0)
+        arcs_added = result.statistics.get('arcs_added', 0)
+        reactions_enriched = result.statistics.get('reactions_enriched', 0)
+        
+        if result.success and places_added > 0:
+            self.stoich_status_label.set_markup(
+                f'<span size="small">✅ Added {places_added} cofactors '
+                f'({arcs_added} arcs) in {result.duration_seconds:.0f}s</span>'
+            )
+            
+            # Update main status with detailed statistics
+            status_msg = f"✅ Stoichiometry enrichment complete!\n"
+            status_msg += f"Reactions enriched: {reactions_enriched}\n"
+            status_msg += f"Places added: {places_added}\n"
+            status_msg += f"Arcs added: {arcs_added}\n"
+            status_msg += f"Duration: {result.duration_seconds:.1f}s\n"
+            
+            # Show cofactor breakdown
+            if 'cofactor_counts' in result.statistics:
+                cofactor_counts = result.statistics['cofactor_counts']
+                top_cofactors = sorted(
+                    cofactor_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )[:5]
+                if top_cofactors:
+                    status_msg += "\nTop cofactors:\n"
+                    for compound_id, count in top_cofactors:
+                        status_msg += f"  • {compound_id}: {count} reactions\n"
+            
+            status_msg += "\n💡 Model updated in memory. Save to persist changes."
+            
+            if result.warnings:
+                status_msg += f"\n\n⚠️ {len(result.warnings)} warnings:\n"
+                for warning in result.warnings[:3]:  # Show first 3
+                    status_msg += f"  • {warning}\n"
+            
+            self._show_status(status_msg)
+            
+            # Trigger canvas redraw if model is loaded
+            # Use GLib.idle_add to schedule on main thread (enrichment runs in background)
+            def refresh_canvas():
+                """Refresh canvas on main thread."""
+                if not self.model_canvas:
+                    return False
+                
+                try:
+                    canvas_manager = None
+                    if hasattr(self.model_canvas, 'get_current_model'):
+                        canvas_manager = self.model_canvas.get_current_model()
+                    else:
+                        canvas_manager = self.model_canvas
+                    
+                    if canvas_manager:
+                        # Mark canvas as needing redraw (will call queue_draw via callback)
+                        if hasattr(canvas_manager, 'mark_needs_redraw'):
+                            canvas_manager.mark_needs_redraw()
+                            self.logger.info("Marked canvas for redraw after enrichment")
+                        
+                        # Mark model as dirty (needs save)
+                        if hasattr(canvas_manager, 'mark_dirty'):
+                            canvas_manager.mark_dirty()
+                            self.logger.info("Marked model as dirty after enrichment")
+                        
+                        # CRITICAL: Force simulation reset to recognize new objects
+                        # New places/arcs won't be in enablement calculations until reset
+                        if hasattr(canvas_manager, '_request_simulation_reset'):
+                            canvas_manager._request_simulation_reset()
+                            self.logger.info("Requested simulation reset after enrichment")
+                        
+                        self.logger.info("Canvas refresh complete after stoichiometry enrichment")
+                except Exception as e:
+                    self.logger.warning(f"Could not redraw canvas: {e}")
+                    import traceback
+                    traceback.print_exc()
+                
+                return False  # Don't repeat
+            
+            # Schedule on main GTK thread
+            GLib.idle_add(refresh_canvas)
+        else:
+            self.stoich_status_label.set_markup(
+                '<span size="small">No cofactors were added</span>'
+            )
+            self._show_status(f"Enrichment completed but no cofactors were added.\n{result.message}")
+        
+        return False  # Don't repeat
+    
+    def _on_stoich_enrichment_error(self, error):
+        """Called when stoichiometry enrichment encounters an error.
+        
+        Args:
+            error: Exception object
+        """
+        self.logger.error(f"Stoichiometry enrichment error: {error}")
+        
+        # Re-enable button
+        self.stoich_enrich_button.set_sensitive(True)
+        
+        # Update status
+        self.stoich_status_label.set_markup(
+            '<span size="small">❌ Enrichment failed</span>'
+        )
+        
+        self._show_error(f"Stoichiometry enrichment failed: {error}")
+        
+        return False  # Don't repeat
+    
+    def _update_metadata_after_enrichment(self, canvas_manager, result):
+        """Update metadata inspector with enrichment statistics.
+        
+        Adds enrichment info to the existing metadata tree without
+        losing the original import data.
+        
+        Args:
+            canvas_manager: Canvas manager with document
+            result: EnrichmentResult object
+        """
+        try:
+            # Find or create enrichment section in metadata tree
+            model = self.metadata_store
+            enrichment_root = None
+            
+            # Look for existing enrichment section
+            iter = model.get_iter_first()
+            while iter:
+                name = model.get_value(iter, 1)
+                if name == "Enrichment History":
+                    enrichment_root = iter
+                    break
+                iter = model.iter_next(iter)
+            
+            # If not found, create new section at the top
+            if not enrichment_root:
+                enrichment_root = model.insert(0, None, [
+                    "✨", "Enrichment History", "Recent enrichments",
+                    "section", "", "Stoichiometry enrichment history"
+                ])
+            
+            # Add this enrichment as a timestamped entry
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            
+            enrich_iter = model.append(enrichment_root, [
+                "🔬", f"Stoichiometry @ {timestamp}",
+                f"{result.places_enriched + result.transitions_enriched} objects",
+                "enrichment", "", 
+                f"Added {result.places_enriched} places, {result.arcs_added} arcs in {result.duration_seconds:.1f}s"
+            ])
+            
+            model.append(enrich_iter, [
+                "⏱️", "Duration",
+                f"{result.duration_seconds:.1f}s",
+                "stat", "", "Time taken to enrich"
+            ])
+            
+            model.append(enrich_iter, [
+                "🔷", "Places Added",
+                str(result.places_enriched),
+                "stat", "", "New metabolite places created"
+            ])
+            
+            model.append(enrich_iter, [
+                "🔗", "Arcs Added",
+                str(result.arcs_added),
+                "stat", "", "New stoichiometry connections"
+            ])
+            
+            model.append(enrich_iter, [
+                "🔶", "Reactions Enriched",
+                str(result.transitions_enriched),
+                "stat", "", "Reactions with stoichiometry added"
+            ])
+            
+            if result.warnings:
+                warn_iter = model.append(enrich_iter, [
+                    "⚠️", "Warnings",
+                    f"{len(result.warnings)} issues",
+                    "warnings", "", "Non-fatal warnings during enrichment"
+                ])
+                for warning in result.warnings[:10]:  # First 10 warnings
+                    model.append(warn_iter, [
+                        "⚠️", warning[:50],
+                        "...",
+                        "warning", "", warning
+                    ])
+            
+            if result.errors:
+                err_iter = model.append(enrich_iter, [
+                    "❌", "Errors",
+                    f"{len(result.errors)} errors",
+                    "errors", "", "Errors encountered during enrichment"
+                ])
+                for error in result.errors[:10]:  # First 10 errors
+                    model.append(err_iter, [
+                        "❌", error[:50],
+                        "...",
+                        "error", "", error
+                    ])
+            
+            # Expand the enrichment section
+            path = model.get_path(enrichment_root)
+            self.metadata_tree.expand_row(path, False)
+            
+            self.logger.info("Metadata inspector updated with enrichment info")
+            
+        except Exception as e:
+            self.logger.warning(f"Could not update metadata tree: {e}")
     
     def _populate_metadata_tree(self, pathway):
         """Populate metadata tree with KEGG pathway information.

@@ -776,20 +776,21 @@ class TransitionRatePanel(AnalysisPlotPanel):
             locality_data = self._locality_places[obj.id]
             logger.debug(f"[ARC_COLOR] Resetting locality arc colors for transition {obj.id}")
             
+            from shypn.netobjs.arc import Arc
+            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+            
             # Reset colors of arcs from input places to transition
             for place in locality_data['input_places']:
                 for arc in self._model_manager.arcs:
                     if arc.source.id == place.id and arc.target.id == obj.id:
-                        from shypn.netobjs.arc import Arc
-                        arc.color = Arc.DEFAULT_COLOR
+                        arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                         logger.debug(f"[ARC_COLOR] Reset input arc {arc.id} to default")
             
             # Reset colors of arcs from transition to output places
             for place in locality_data['output_places']:
                 for arc in self._model_manager.arcs:
                     if arc.source.id == obj.id and arc.target.id == place.id:
-                        from shypn.netobjs.arc import Arc
-                        arc.color = Arc.DEFAULT_COLOR
+                        arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                         logger.debug(f"[ARC_COLOR] Reset output arc {arc.id} to default")
             
             # Reset colors of catalyst arcs (test arcs from catalyst places to transition)
@@ -797,8 +798,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 for place in locality_data['catalyst_places']:
                     for arc in self._model_manager.arcs:
                         if arc.source.id == place.id and arc.target.id == obj.id:
-                            from shypn.netobjs.arc import Arc
-                            arc.color = Arc.DEFAULT_COLOR
+                            arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                             logger.debug(f"[ARC_COLOR] Reset catalyst arc {arc.id} to default")
             
             # Remove locality data

@@ -932,8 +932,18 @@ class Arc(PetriNetObject):
         )
         
         # Restore optional properties
-        if "color" in data:
+        # Color handling: Always enforce color schema for semantic arc types
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        if ColorSchemaManager.is_semantic_arc_color(arc):
+            # Semantic arcs (TestArc, SignalFlowArc) always get schema color
+            ColorSchemaManager.reset_arc_color(arc)
+        elif "color" in data:
+            # Non-semantic arcs use saved color (may be analysis color)
             arc.color = tuple(data["color"])
+        else:
+            # Fallback to type-appropriate default
+            ColorSchemaManager.reset_arc_color(arc)
+        
         if "width" in data:
             arc.width = data["width"]
         if "control_points" in data:

@@ -103,6 +103,7 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 📚 **[User Documentation](doc/README.md)** - Comprehensive guides and tutorials
 
 **Key Documentation:**
+- **[Object Identity Architecture](doc/OBJECT_IDENTITY_RECONNAISSANCE.md)** - ID/Name/Label system and rate formula rules
 - **[Assignment Rules Options 2 & 3](doc/ASSIGNMENT_RULES_OPTIONS_2_3_IMPLEMENTATION.md)** - Smart SBML import handling (v0.5.0)
 - **[Thermodynamic Validation](doc/thermodynamics_simulation_integration.md)** - Gibbs free energy integration (v0.4.0)
 - **[Skellam Distribution](doc/SKELLAM_IMPLEMENTATION.md)** - Reversible reaction handling (v0.3.0)

@@ -175,9 +175,12 @@ class SpeciesConverter(BaseConverter):
             # They have arcs (infinite sources/sinks) unlike true signal places (no arcs)
             if species.compartment and species.compartment != self.default_compartment:
                 place.is_compartment_place = True
+                # Apply color schema immediately after setting semantic flag
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                ColorSchemaManager.reset_place_color(place)
                 self.logger.debug(
                     f"Marking place '{place.name}' as non-default compartment place "
-                    f"(compartment: {species.compartment}, green border)"
+                    f"(compartment: {species.compartment}, violet border)"
                 )
             
             # Keep default black border for visibility
@@ -557,7 +560,7 @@ class ReactionConverter(BaseConverter):
             return
         
         # Build rate function based on number of substrates with NAMED PARAMETERS
-        # Use place.name for rate function string (this is acceptable - it's a formula string, not object reference)
+        # Use place.name for rate function string (user-editable alias like ATP, Glucose)
         if len(substrate_places) == 1:
             # Single substrate - standard Michaelis-Menten
             rate_func = f"michaelis_menten({substrate_places[0].name}, vmax={vmax}, km={km})"
@@ -1115,6 +1118,9 @@ class PathwayConverter:
             place.set_tokens(param_value)  # Parameter value as tokens
             place.set_initial_marking(param_value)
             place.is_signal_place = True  # Hexagon shape - shows it's a parameter, not pathway element
+            # Apply color schema immediately after setting semantic flag
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(place)
             
             # Mark as a parameter place
             if not hasattr(place, 'metadata'):
@@ -1203,10 +1209,11 @@ class PathwayConverter:
         
         # Color ONLY SignalFlowArcs connected to signal places (light gray)
         # TestArcs remain blue, regular Arcs remain black per normalized color schema
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         for arc in document.arcs:
             if isinstance(arc, SignalFlowArc):
                 if arc.source in signal_places or arc.target in signal_places:
-                    arc.color = SIGNAL_COLOR
+                    ColorSchemaManager.reset_arc_color(arc)
                     signal_arc_count += 1
         
         if signal_arc_count > 0:
@@ -1492,6 +1499,13 @@ class PathwayConverter:
         # Signal places (Ψ) represent information flow, not mass transfer
         # Their arcs get orange color to distinguish from metabolic transport
         self._color_signal_arcs(document)
+        
+        # Apply color schema to all SignalFlowArcs to ensure correct light gray color
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        for arc in document.arcs:
+            if isinstance(arc, SignalFlowArc):
+                ColorSchemaManager.reset_arc_color(arc)
         
         # ==============================================================================
         # BOUNDARY SPECIES: Color arcs but DO NOT create source/sink transitions

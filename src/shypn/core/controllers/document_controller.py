@@ -128,6 +128,21 @@ class DocumentController:
         # Extract arc_type to determine which class to instantiate
         arc_type = kwargs.pop('arc_type', 'normal')
         
+        # AUTO-DETECT signal_flow arc: if connecting to/from signal place and arc_type is 'normal'
+        if arc_type == 'normal':
+            from shypn.netobjs.place import Place
+            source_is_place = isinstance(source, Place)
+            target_is_place = isinstance(target, Place)
+            
+            source_is_signal = (source_is_place and 
+                               getattr(source, 'is_signal_place', False))
+            target_is_signal = (target_is_place and 
+                               getattr(target, 'is_signal_place', False))
+            
+            if source_is_signal or target_is_signal:
+                # Automatically create signal_flow arc when connecting to signal places
+                arc_type = 'signal_flow'
+        
         # Instantiate the appropriate arc subclass
         if arc_type == 'test':
             from shypn.netobjs.test_arc import TestArc
@@ -146,6 +161,11 @@ class DocumentController:
             arc = CurvedInhibitorArc(source, target, arc_id, arc_name, **kwargs)
         else:  # 'normal' or default
             arc = Arc(source, target, arc_id, arc_name, **kwargs)
+        
+        # Apply color schema to semantic arcs (TestArc, SignalFlowArc, InhibitorArc)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        if ColorSchemaManager.is_semantic_arc_color(arc):
+            ColorSchemaManager.reset_arc_color(arc)
         
         if self._on_change_callback:
             arc.on_changed = self._on_change_callback

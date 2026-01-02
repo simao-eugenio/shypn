@@ -2085,6 +2085,45 @@ class BRENDACategory(BasePathwayCategory):
         self.parent_window = parent_window
         self.logger.debug(f"Parent window set: {parent_window}")
     
+    def on_tab_switched(self):
+        """Called when the user switches to a different model tab.
+        
+        Updates the BRENDA panel to reflect the currently active model:
+        - Refreshes button states based on model availability
+        - Updates status labels
+        - Ensures the correct model canvas manager is used
+        """
+        self.logger.debug("Tab switched, updating BRENDA panel state")
+        
+        # Refresh the model canvas manager to point to the new tab
+        self._ensure_manager_current()
+        
+        # Get current document
+        document = None
+        if self.model_canvas_manager:
+            try:
+                if hasattr(self.model_canvas_manager, 'document'):
+                    document = self.model_canvas_manager.document
+            except Exception as e:
+                self.logger.warning(f"Could not get document on tab switch: {e}")
+        
+        # Update buttons based on new active model
+        if document:
+            # Enable query buttons if authenticated
+            if self.brenda_api and self.brenda_api.authenticated:
+                self.search_button.set_sensitive(True)
+                self.query_all_button.set_sensitive(True)
+                self.status_label.set_text(f"Ready - Model has {len(getattr(self.model_canvas_manager, 'transitions', []))} transitions")
+            else:
+                self.search_button.set_sensitive(False)
+                self.query_all_button.set_sensitive(False)
+                self.status_label.set_markup('<span size="small">Authenticate to query BRENDA</span>')
+        else:
+            # No document - disable buttons
+            self.search_button.set_sensitive(False)
+            self.query_all_button.set_sensitive(False)
+            self.status_label.set_markup('<span size="small">No model loaded</span>')
+    
     def set_query_from_transition(self, ec_number: str = "", reaction_name: str = "", 
                                    enzyme_name: str = "", transition_id: str = "",
                                    organism: str = "", substrates: list = None,

@@ -10,6 +10,7 @@ from typing import Dict, Optional
 
 from .base import ThermodynamicCalculatorBase, CompoundDataProviderBase
 from .models import ReactionThermodynamics
+from .thermodynamic_corrector import ThermodynamicCorrector
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         """
         self.compound_provider = compound_provider
         self._compound_cache: Dict[str, float] = {}
+        self.corrector = ThermodynamicCorrector()
     
     def calculate_delta_g_reaction(
         self,
@@ -51,7 +53,8 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         products: Dict[str, float],
         concentrations: Optional[Dict[str, float]] = None,
         temperature: float = ThermodynamicCalculatorBase.STANDARD_TEMPERATURE,
-        ph: float = ThermodynamicCalculatorBase.STANDARD_PH
+        ph: float = ThermodynamicCalculatorBase.STANDARD_PH,
+        n_protons: int = 0
     ) -> ReactionThermodynamics:
         """Calculate ΔG for a biochemical reaction.
         
@@ -68,6 +71,7 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
             concentrations: Optional {compound_id: concentration_M}
             temperature: Temperature in Kelvin
             ph: pH value
+            n_protons: Net protons consumed (negative if produced)
             
         Returns:
             ReactionThermodynamics with all calculated properties
@@ -78,12 +82,24 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         # Calculate ΔG°_r from compound formation energies
         delta_g_standard = self._calculate_delta_g_standard(reactants, products, ph, temperature)
         
-        # For now, assume ΔG'° ≈ ΔG° (pH correction requires proton stoichiometry)
-        # TODO: Implement full pH correction in separate corrector class
-        delta_g_prime = delta_g_standard
+        # Apply pH correction if n_protons specified
+        if n_protons != 0:
+            delta_g_prime = self.corrector.correct_ph(
+                delta_g_standard,
+                n_protons=n_protons,
+                ph_actual=ph,
+                ph_standard=self.STANDARD_PH,
+                temperature=temperature
+            )
+            logger.debug(
+                f"Applied pH correction: ΔG° = {delta_g_standard:.2f} kJ/mol, "
+                f"ΔG'° = {delta_g_prime:.2f} kJ/mol (n_H+ = {n_protons}, pH = {ph})"
+            )
+        else:
+            delta_g_prime = delta_g_standard
         
-        # Calculate equilibrium constant
-        k_eq = self.calculate_k_eq(delta_g_standard, temperature)
+        # Calculate equilibrium constant (use corrected value)
+        k_eq = self.calculate_k_eq(delta_g_prime, temperature)
         
         # Calculate actual ΔG and Q if concentrations provided
         delta_g_actual = None
@@ -93,7 +109,7 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
                 reactants, products, concentrations
             )
             delta_g_actual = self.calculate_delta_g_with_concentrations(
-                delta_g_standard, reaction_quotient, temperature
+                delta_g_prime, reaction_quotient, temperature
             )
         
         return ReactionThermodynamics(
