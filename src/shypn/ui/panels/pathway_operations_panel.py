@@ -285,6 +285,30 @@ class PathwayOperationsPanel(Gtk.Box):
         else:
             self.logger.warning(f"Unknown category: {category_name}")
     
+    def on_tab_switched(self, drawing_area):
+        """Called when user switches between model tabs.
+        
+        Notifies all categories to update their state for the new active model.
+        This ensures KEGG/SBML/BRENDA panels show data for the currently focused model.
+        
+        Pattern: Like Report Panel, simply notify categories without complex logic.
+        Each category is responsible for safely updating its own state.
+        
+        Args:
+            drawing_area: The newly active drawing area
+        """
+        self.logger.debug("Tab switched, updating all categories")
+        
+        # Notify all categories that support tab switching
+        for category in [self.kegg_category, self.sbml_category, self.brenda_category, 
+                        self.sabio_rk_category, self.enrichment_history_category]:
+            if hasattr(category, 'on_tab_switched'):
+                try:
+                    category.on_tab_switched()
+                except Exception as e:
+                    # Log but don't let one category's failure affect others
+                    self.logger.debug(f"{type(category).__name__} tab-switch update skipped: {e}")
+    
     def cleanup(self):
         """Clean up resources when panel is destroyed."""
         self.logger.info("Cleaning up Pathway Operations panel")
