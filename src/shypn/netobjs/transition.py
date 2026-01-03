@@ -541,6 +541,8 @@ class Transition(PetriNetObject):
             data["guard"] = self.guard
         if self.rate is not None:
             data["rate"] = self.rate
+        if hasattr(self, 'rate_function') and self.rate_function:
+            data["rate_function"] = self.rate_function
         if hasattr(self, 'formula') and self.formula:
             data["formula"] = self.formula
         
@@ -705,6 +707,8 @@ class Transition(PetriNetObject):
             transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
+        if "rate_function" in data:
+            transition.rate_function = data["rate_function"]
         if "formula" in data:
             transition.formula = data["formula"]
         

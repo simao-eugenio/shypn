@@ -306,6 +306,37 @@ class TransitionBehavior(ABC):
                 f"Model.places must be dict or list, got {type(places_collection)}"
             )
     
+    def _get_arc(self, arc_id):
+        """Get arc object by ID.
+        
+        Args:
+            arc_id: ID of the arc (string like "A101")
+            
+        Returns:
+            Arc object or None if not found
+            
+        Raises:
+            AttributeError: If model doesn't have arcs attribute
+        """
+        if not hasattr(self.model, 'arcs'):
+            raise AttributeError(
+                f"Model {self.model} does not have 'arcs' attribute. "
+                f"Cannot look up arc {arc_id}"
+            )
+        
+        # Handle both dict and list representations
+        arcs_collection = self.model.arcs
+        if isinstance(arcs_collection, dict):
+            # Direct lookup
+            return arcs_collection.get(arc_id)
+        elif isinstance(arcs_collection, list):
+            # Linear search
+            return next((a for a in arcs_collection if a.id == arc_id), None)
+        else:
+            raise TypeError(
+                f"Model.arcs must be dict or list, got {type(arcs_collection)}"
+            )
+    
     def _get_current_time(self) -> float:
         """Get current simulation time from model.
         

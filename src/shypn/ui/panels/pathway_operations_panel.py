@@ -24,6 +24,7 @@ except Exception as e:
 
 from .pathway_operations.kegg_category import KEGGCategory
 from .pathway_operations.sbml_category import SBMLCategory
+from .pathway_operations.bigg_category import BiGGCategory
 from .pathway_operations.brenda_category import BRENDACategory
 from .pathway_operations.sabio_rk_category import SabioRKCategory
 from .pathway_operations.heuristic_parameters_category import HeuristicParametersCategory
@@ -33,22 +34,25 @@ from .pathway_operations.enrichment_history_category import EnrichmentHistoryCat
 class PathwayOperationsPanel(Gtk.Box):
     """Main Pathway Operations panel container.
     
-    Assembles six categories:
+    Assembles seven categories:
     1. KEGG - Import pathways from KEGG database
     2. SBML - Import models from SBML files or BioModels
-    3. BRENDA - Enrich models with kinetic parameters from BRENDA
-    4. SABIO-RK - Enrich models with kinetic parameters from SABIO-RK
-    5. Heuristic Parameters - Type-aware parameter inference from multiple sources
-    6. Enrichment History - View, rate, and undo parameter enrichments (Phase 2)
+    3. BiGG Models - Import curated genome-scale models from BiGG database
+    4. BRENDA - Enrich models with kinetic parameters from BRENDA
+    5. SABIO-RK - Enrich models with kinetic parameters from SABIO-RK
+    6. Heuristic Parameters - Type-aware parameter inference from multiple sources
+    7. Enrichment History - View, rate, and undo parameter enrichments (Phase 2)
     
     Data flow:
       KEGG import → BRENDA/SABIO-RK/Heuristic (EC numbers)
       SBML import → BRENDA/SABIO-RK/Heuristic (reaction IDs)
+      BiGG import → BRENDA/SABIO-RK/Heuristic (reaction IDs)
       All enrichments → History tracking (KB)
     
     Attributes:
         kegg_category: KEGGCategory instance
         sbml_category: SBMLCategory instance
+        bigg_category: BiGGCategory instance
         brenda_category: BRENDACategory instance
         sabio_rk_category: SabioRKCategory instance
         heuristic_params_category: HeuristicParametersCategory instance
@@ -88,6 +92,8 @@ class PathwayOperationsPanel(Gtk.Box):
             workspace_settings=workspace_settings,
             parent_window=parent_window
         )
+        
+        self.bigg_category = BiGGCategory()
         
         self.brenda_category = BRENDACategory(
             workspace_settings=workspace_settings,
@@ -163,6 +169,7 @@ class PathwayOperationsPanel(Gtk.Box):
         # Add categories in order
         categories_box.pack_start(self.kegg_category, False, False, 0)
         categories_box.pack_start(self.sbml_category, False, False, 0)
+        categories_box.pack_start(self.bigg_category, False, False, 0)
         categories_box.pack_start(self.brenda_category, False, False, 0)
         categories_box.pack_start(self.sabio_rk_category, False, False, 0)
         categories_box.pack_start(self.heuristic_params_category, False, False, 0)
@@ -197,9 +204,19 @@ class PathwayOperationsPanel(Gtk.Box):
             if self.report_refresh_callback:
                 self.report_refresh_callback()
         
+        # BiGG → BRENDA data flow
+        def on_bigg_import_complete(data):
+            self.logger.info("BiGG import completed, notifying BRENDA category")
+            data['source'] = 'bigg'
+            self.brenda_category.receive_import_data(data)
+            # Notify Report panel if callback is set
+            if self.report_refresh_callback:
+                self.report_refresh_callback()
+        
         # Connect the signals (categories emit these via _trigger_import_complete)
         self.kegg_category.import_complete_callback = on_kegg_import_complete
         self.sbml_category.import_complete_callback = on_sbml_import_complete
+        self.bigg_category.import_complete_callback = on_bigg_import_complete
     
     def set_project(self, project):
         """Set the current project for all categories.
@@ -212,6 +229,7 @@ class PathwayOperationsPanel(Gtk.Box):
         # Propagate to all categories
         self.kegg_category.set_project(project)
         self.sbml_category.set_project(project)
+        self.bigg_category.set_project(project)
         self.brenda_category.set_project(project)
         self.sabio_rk_category.set_project(project)
         self.enrichment_history_category.set_project(project)  # Phase 2
@@ -229,6 +247,7 @@ class PathwayOperationsPanel(Gtk.Box):
         # Propagate to all categories
         self.kegg_category.set_model_canvas(model_canvas)
         self.sbml_category.set_model_canvas(model_canvas)
+        self.bigg_category.set_model_canvas(model_canvas)
         self.brenda_category.set_model_canvas(model_canvas)
         self.sabio_rk_category.set_model_canvas(model_canvas)
         self.enrichment_history_category.set_model_canvas(model_canvas)  # Phase 2
@@ -273,6 +292,7 @@ class PathwayOperationsPanel(Gtk.Box):
         category_map = {
             'KEGG': self.kegg_category,
             'SBML': self.sbml_category,
+            'BiGG': self.bigg_category,
             'BRENDA': self.brenda_category,
             'SABIO-RK': self.sabio_rk_category
         }
@@ -300,8 +320,9 @@ class PathwayOperationsPanel(Gtk.Box):
         self.logger.debug("Tab switched, updating all categories")
         
         # Notify all categories that support tab switching
-        for category in [self.kegg_category, self.sbml_category, self.brenda_category, 
-                        self.sabio_rk_category, self.enrichment_history_category]:
+        for category in [self.kegg_category, self.sbml_category, self.bigg_category,
+                        self.brenda_category, self.sabio_rk_category, 
+                        self.enrichment_history_category]:
             if hasattr(category, 'on_tab_switched'):
                 try:
                     category.on_tab_switched()

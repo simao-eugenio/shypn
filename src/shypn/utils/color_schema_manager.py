@@ -11,7 +11,7 @@ Color Schema (Minimalist Black-and-Blue):
 - Test arcs: Blue (0.0, 0.0, 1.0) - Read-only catalytic
 - SignalFlowArcs: Light gray (0.7, 0.7, 0.7) - Information with consumption
 - Inhibitor arcs: Black (0.0, 0.0, 0.0)
-- Transitions: Black border + white fill
+- Transitions: Black border + black fill (0.0, 0.0, 0.0)
 - Source/Sink transitions: Green (0.0, 0.8, 0.0)
 - Compartment places: Violet border (0.5, 0.0, 0.5)
 - Recording color: Orange (1.0, 0.5, 0.0)
@@ -50,7 +50,7 @@ class ColorSchemaManager:
     # TRANSITION COLORS
     # ========================================================================
     TRANSITION_DEFAULT_BORDER = (0.0, 0.0, 0.0)  # Black border
-    TRANSITION_DEFAULT_FILL = (1.0, 1.0, 1.0)    # White fill
+    TRANSITION_DEFAULT_FILL = (0.0, 0.0, 0.0)    # Black fill
     TRANSITION_SOURCE_SINK = (0.0, 0.8, 0.0)     # Green - source/sink transitions
     
     # ========================================================================
@@ -128,7 +128,7 @@ class ColorSchemaManager:
             color = ColorSchemaManager.TRANSITION_SOURCE_SINK
             return (color, color)
         
-        # Default: black border, white fill
+        # Default: black border, black fill
         return (
             ColorSchemaManager.TRANSITION_DEFAULT_BORDER,
             ColorSchemaManager.TRANSITION_DEFAULT_FILL

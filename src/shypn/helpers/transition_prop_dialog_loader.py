@@ -211,7 +211,8 @@ class TransitionPropDialogLoader(GObject.GObject):
                 buffer.set_text(str(guard_value))
         
         # Check for directional rates first (reversible reactions)
-        rate_textview = self.builder.get_object('rate_textview')
+        # Backward compatible: try new name first, fall back to old name
+        rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
         rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
         reversible_check = self.builder.get_object('reversible_check')
         
@@ -242,12 +243,16 @@ class TransitionPropDialogLoader(GObject.GObject):
                 elif hasattr(self.transition_obj, 'properties') and 'rate_function' in self.transition_obj.properties:
                     rate_func = self.transition_obj.properties['rate_function']
                 
-                # Priority 3: Check kinetic_metadata.formula (backup for SBML)
+                # Priority 3: Check top-level rate_function attribute (direct attribute)
+                elif hasattr(self.transition_obj, 'rate_function') and self.transition_obj.rate_function:
+                    rate_func = self.transition_obj.rate_function
+                
+                # Priority 4: Check kinetic_metadata.formula (backup for SBML)
                 elif hasattr(self.transition_obj, 'kinetic_metadata') and self.transition_obj.kinetic_metadata:
                     if hasattr(self.transition_obj.kinetic_metadata, 'formula'):
                         rate_func = self.transition_obj.kinetic_metadata.formula
                 
-                # Priority 4: Fall back to simple rate value
+                # Priority 5: Fall back to simple rate value
                 elif hasattr(self.transition_obj, 'rate') and self.transition_obj.rate is not None:
                     rate_func = str(self.transition_obj.rate)
                 
@@ -300,7 +305,8 @@ class TransitionPropDialogLoader(GObject.GObject):
             rate_entry.set_visible(editable_fields.get('rate', True))
         
         # Show/hide rate function (multi-line)
-        rate_textview = self.builder.get_object('rate_textview')
+        # Backward compatible: try new name first, fall back to old name
+        rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
         if rate_textview:
             parent = rate_textview.get_parent()
             if parent:
@@ -423,7 +429,8 @@ class TransitionPropDialogLoader(GObject.GObject):
     
     def _setup_rate_sync(self):
         """Setup synchronization between rate function TextView and rate entry."""
-        rate_textview = self.builder.get_object('rate_textview')
+        # Backward compatible: try new name first, fall back to old name
+        rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
         rate_entry = self.builder.get_object('rate_entry')
         
         if rate_textview and rate_entry:
@@ -607,13 +614,15 @@ class TransitionPropDialogLoader(GObject.GObject):
                 self.transition_obj.is_sink = is_sink_check.get_active()
             
             # Rate function - validate and save to both rate and properties['rate_function']
-            rate_textview = self.builder.get_object('rate_textview')
+            # Backward compatible: try new name first, fall back to old name
+            rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
             reversible_check = self.builder.get_object('reversible_check')
             
             # Check if using directional rates
             if reversible_check and reversible_check.get_active():
-                # Save directional rates: rate_textview is forward, rate_reverse_textview is reverse
-                rate_textview = self.builder.get_object('rate_textview')
+                # Save directional rates: rate_function is forward, rate_reverse is reverse
+                # Backward compatible: try new name first, fall back to old name
+                rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
                 rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
                 
                 # Forward rate from main rate field
@@ -690,8 +699,18 @@ class TransitionPropDialogLoader(GObject.GObject):
                     # Note: For manual edits, user must use P1, P2, P3 notation for simulation
                     # or keep biological names if they want display-only
                     
-                    # Also try to set rate (for simple numeric values)
-                    self.transition_obj.set_rate(rate_text)
+                    # Clear the simple rate field - rate_function supersedes rate
+                    # Only set rate if it's a simple numeric value (for lambda)
+                    try:
+                        numeric_rate = float(rate_text)
+                        self.transition_obj.set_rate(numeric_rate)
+                        # If successful, this is just a simple lambda - clear rate_function
+                        del self.transition_obj.properties['rate_function']
+                        del self.transition_obj.properties['rate_function_display']
+                    except (ValueError, TypeError):
+                        # Not a simple number - it's a function expression
+                        # Clear rate field so rate_function takes precedence
+                        self.transition_obj.rate = None
                 else:
                     # Clear rate_function if empty
                     if hasattr(self.transition_obj, 'properties'):

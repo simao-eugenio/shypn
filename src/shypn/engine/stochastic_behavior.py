@@ -20,6 +20,7 @@ import math
 import logging
 from .transition_behavior import TransitionBehavior
 from shypn.netobjs.inhibitor_arc import InhibitorArc
+from shypn.utils.threshold_evaluator import ThresholdEvaluator
 
 
 class StochasticBehavior(TransitionBehavior):
@@ -469,14 +470,84 @@ class StochasticBehavior(TransitionBehavior):
         
         self._scheduled_fire_time = time + delay
         
-        # Sample burst size (will be used at firing time)
-        self._sampled_burst = random.randint(1, self.max_burst)
+        # Sample burst size with intelligent constraint awareness
+        # If inhibitor arcs exist, limit burst to respect thresholds
+        max_allowed_burst = self._calculate_max_burst_for_inhibitors()
+        effective_max_burst = min(self.max_burst, max_allowed_burst)
+        
+        if effective_max_burst >= 1:
+            self._sampled_burst = random.randint(1, effective_max_burst)
+        else:
+            # No burst allowed - inhibitor threshold would be exceeded
+            self._sampled_burst = 0
         
         self.logger.debug(
             f"Stochastic {self.transition.name} enabled at t={time:.3f}, "
             f"rate={lambda_rate:.3f}, delay={delay:.3f}, "
             f"scheduled={self._scheduled_fire_time:.3f}, burst={self._sampled_burst}"
         )
+    
+    def _calculate_max_burst_for_inhibitors(self) -> int:
+        """Calculate maximum burst size that respects inhibitor arc thresholds.
+        
+        For each inhibitor arc (Product → Transition), calculates how many
+        firings can occur before the product place exceeds its threshold.
+        Returns the minimum across all inhibitors (most restrictive).
+        
+        Returns:
+            int: Maximum allowed burst size (can be very large if no constraints)
+        """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator
+        
+        max_allowed = float('inf')  # Start with no limit
+        
+        # Get input and output arcs
+        input_arcs = self.get_input_arcs()
+        output_arcs = self.get_output_arcs()
+        
+        # Find inhibitor arcs (Product → Transition)
+        inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+        
+        for inh_arc in inhibitor_arcs:
+            # The source of inhibitor arc is the product place
+            product_place = self._get_place(inh_arc.source_id)
+            if not product_place:
+                continue
+            
+            # Evaluate threshold dynamically
+            evaluator = ThresholdEvaluator(self.model)
+            current_time = self._get_current_time()
+            context = {'time': current_time}
+            
+            try:
+                threshold_value = evaluator.evaluate(inh_arc, context)
+            except Exception as e:
+                self.logger.warning(f"Failed to evaluate inhibitor threshold for {inh_arc.id}: {e}")
+                continue
+            
+            # Find how many tokens this transition produces to the inhibited place
+            tokens_per_firing = 0
+            for out_arc in output_arcs:
+                if out_arc.target_id == inh_arc.source_id:
+                    tokens_per_firing += out_arc.weight
+            
+            if tokens_per_firing > 0:
+                current_tokens = product_place.tokens
+                
+                # Calculate remaining capacity before exceeding threshold
+                remaining = threshold_value - current_tokens
+                
+                if remaining > 0:
+                    # How many firings before exceeding?
+                    max_firings = int(remaining / tokens_per_firing)
+                    max_allowed = min(max_allowed, max_firings)
+                else:
+                    # Already at or above threshold
+                    max_allowed = 0
+        
+        # Return finite value (if inf, no inhibitor constraints exist)
+        return int(max_allowed) if max_allowed != float('inf') else self.max_burst
     
     def get_scheduled_fire_time(self) -> Optional[float]:
         """Get the scheduled firing time.
@@ -540,6 +611,18 @@ class StochasticBehavior(TransitionBehavior):
             input_arcs = self.get_input_arcs()
             burst = self._sampled_burst if self._sampled_burst else self.max_burst
             
+            # VERBOSE DEBUG: Print ALL input arcs for T7, T8, T15
+            if self._transition.id in ['T7', 'T8', 'T15']:
+                print(f"\n{'='*60}")
+                print(f"VERBOSE: Checking enablement for {self._transition.id} ({self._transition.name})")
+                print(f"Input arcs: {len(input_arcs)}")
+                for i, arc in enumerate(input_arcs):
+                    arc_type_name = type(arc).__name__
+                    arc_type_attr = getattr(arc, 'arc_type', 'unknown')
+                    print(f"  Arc {i+1}: {arc.id}, type={arc_type_name}, arc_type={arc_type_attr}, "
+                          f"isinstance(InhibitorArc)={isinstance(arc, InhibitorArc)}")
+                print(f"{'='*60}\n")
+            
             for arc in input_arcs:
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
@@ -549,27 +632,31 @@ class StochasticBehavior(TransitionBehavior):
                 # This implements negative feedback / product inhibition
                 if isinstance(arc, InhibitorArc):
                     # Inhibitor arcs use INVERTED logic: disable when tokens >= threshold
-                    threshold = getattr(arc, 'threshold', None)
-                    if threshold is None:
-                        threshold = arc.weight
+                    # Evaluate threshold dynamically (supports formulas like "2.0 * (1 + ATP_pool/5000)**0.5")
+                    evaluator = ThresholdEvaluator(self.model)
+                    context = {'time': self.model.time if hasattr(self.model, 'time') else 0.0}
+                    threshold_value = evaluator.evaluate(arc, context)
                     
-                    if source_place.tokens >= threshold:
-                        return False, f"inhibited-by-P{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold})"
+                    # VERBOSE DEBUG for specific transitions
+                    if self._transition.id in ['T7', 'T8', 'T15']:
+                        print(f"  INHIBITOR CHECK: {arc.id} ({arc.source_id} → {self._transition.id})")
+                        print(f"    Source tokens: {source_place.tokens:.2f}")
+                        print(f"    Threshold: {threshold_value:.2f}")
+                        print(f"    Will inhibit: {source_place.tokens >= threshold_value}")
+                    
+                    if source_place.tokens >= threshold_value:
+                        logging.info(f"Transition {self._transition.id} INHIBITED by {arc.source_id}: "
+                                   f"{source_place.tokens:.2f} >= {threshold_value:.2f}")
+                        return False, f"inhibited-by-{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold_value:.2f})"
                     # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
                     continue
-                
-                # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
-                # They broadcast information without token consumption
-                # Skip token requirement checks for signal places
-                if self._is_signal_place(source_place):
-                    continue  # Signal places don't require tokens for burst
                 
                 # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                     required = arc.weight  # Just check presence for catalysts
                 else:
-                    required = arc.weight * burst  # Normal arcs need burst tokens
+                    required = arc.weight * burst  # Normal arcs (including SignalFlowArcs) need burst tokens
                 
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
