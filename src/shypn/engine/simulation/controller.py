@@ -917,6 +917,9 @@ class SimulationController:
         # Debug output (can be enabled for troubleshooting)
         # print(f"\n▶️  [SIMULATION_STEP] t={self.time:.3f}, dt={time_step:.3f}")
         
+        # Track whether tau-leaping advanced time (to avoid double advancement)
+        tau_leaping_advanced_time = False
+        
         self._update_enablement_states()
         
         immediate_fired_total = 0
@@ -1063,6 +1066,15 @@ class SimulationController:
         # Group continuous transitions by locality conflicts and apply firing policies
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
         
+        # DIAGNOSTIC: Log continuous phase
+        if continuous_transitions:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"[PHASE3_DEBUG] Found {len(continuous_transitions)} continuous transitions: "
+                f"{[t.name for t in continuous_transitions]}"
+            )
+        
         continuous_enabled = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)
@@ -1103,16 +1115,10 @@ class SimulationController:
                         if hasattr(listener_obj, 'on_transition_fired'):
                             listener_obj.on_transition_fired(transition, self.time, details)
         
-        # Advance time BEFORE checking discrete transitions
-        # This ensures timed transitions are evaluated at the correct time
-        self.time += time_step
+        # NOTE: Time advancement moved to AFTER stochastic phase (see below)
+        # to prevent double advancement when tau-leaping is used
         
-        # Record state after time advancement
-        if self.data_collector:
-            self.data_collector.record_state(self.time)
-        
-        # Now check discrete transitions at the NEW time
-        # This allows timed transitions to fire when entering their window mid-step
+        # Update enablement states at current time
         self._update_enablement_states()
         
         # Handle timed and stochastic transitions with PRIORITY RULE:
@@ -1208,18 +1214,44 @@ class SimulationController:
                         if hasattr(t, 'transition_type')
                     )
                     
+                    # DIAGNOSTIC: Log hybrid detection
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    transition_types = [t.transition_type for t in self.model.transitions if hasattr(t, 'transition_type')]
+                    logger.warning(
+                        f"[HYBRID_DEBUG] Pure stochastic: {is_pure_stochastic}\n"
+                        f"               Transition types: {transition_types}\n"
+                        f"               Time: {self.time:.4f}, time_step: {time_step:.4f}"
+                    )
+                    
                     if is_pure_stochastic:
                         # Pure stochastic: tau-leaping controls time stepping
+                        logger.warning("[HYBRID_DEBUG] Using PURE STOCHASTIC path")
+                        # Temporarily disable time advancement in tau-leaping (we'll handle it)
+                        # No wait - for pure stochastic, tau-leaping SHOULD advance time
                         self._tau_leaping_engine.execute_step(self)
+                        # Flag that time was already advanced by tau-leaping
+                        tau_leaping_advanced_time = True
                     else:
                         # Hybrid model: clamp tau to dt to stay synchronized
+                        logger.warning("[HYBRID_DEBUG] Using HYBRID MODEL path (clamped tau)")
                         original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                        self._tau_leaping_engine.leap_selector.max_tau = min(time_step, original_max_tau)
+                        # CRITICAL: Force tau = time_step for hybrid models to ensure
+                        # continuous and stochastic operate over same time interval
+                        self._tau_leaping_engine.leap_selector.max_tau = time_step
+                        self._tau_leaping_engine.leap_selector.min_tau = time_step
                         
+                        # CRITICAL: Temporarily prevent tau-leaping from advancing time
+                        # For hybrid models, controller must be single source of time advancement
+                        self._tau_leaping_engine._advance_time = False
                         self._tau_leaping_engine.execute_step(self)
+                        self._tau_leaping_engine._advance_time = True
                         
-                        # Restore original max_tau
+                        # Restore original tau bounds
                         self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
+                        self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                        # Hybrid models: controller will advance time by time_step
+                        tau_leaping_advanced_time = False
                     
                     discrete_fired = True
                 else:
@@ -1242,6 +1274,15 @@ class SimulationController:
                         # Fire the transition
                         self._fire_transition(next_transition)
                         discrete_fired = True
+        
+        # CRITICAL: Advance time AFTER stochastic phase
+        # Skip if tau-leaping already advanced time (pure stochastic models)
+        if not tau_leaping_advanced_time:
+            self.time += time_step
+        
+        # Record state after time advancement
+        if self.data_collector:
+            self.data_collector.record_state(self.time)
         
         self._notify_step_listeners()
         

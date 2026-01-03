@@ -9,7 +9,8 @@ Date: 2025-10-29
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, Pango
 
 from .base_dynamic_category import BaseDynamicCategory
 from shypn.analyses.diagnostics_panel import DiagnosticsPanel
@@ -87,7 +88,7 @@ class DiagnosticsCategory(BaseDynamicCategory):
         textview = Gtk.TextView()
         textview.set_editable(False)
         textview.set_cursor_visible(False)
-        textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        textview.set_wrap_mode(Pango.WrapMode.WORD)
         textview.set_left_margin(6)
         textview.set_right_margin(6)
         textview.set_top_margin(6)

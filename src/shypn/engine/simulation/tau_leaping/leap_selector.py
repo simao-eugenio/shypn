@@ -134,10 +134,10 @@ class LeapSelector:
         tau = max(self.min_tau, min(tau_unbounded, self.max_tau))
         
         # Log tau calculation details
-        self.logger.info(
-            f"Leap selector: propensities={[f'{p:.3f}' for p in propensities]}, "
+        self.logger.warning(
+            f"[TAU_SELECTOR_DEBUG] propensities={[f'{p:.3f}' for p in propensities]}, "
             f"tau_unbounded={tau_unbounded:.6f}, tau_bounded={tau:.6f}, "
-            f"epsilon={self.epsilon}, max_tau={self.max_tau}"
+            f"epsilon={self.epsilon}, max_tau={self.max_tau}, min_tau={self.min_tau}"
         )
         
         return tau, {
@@ -196,10 +196,10 @@ class LeapSelector:
                 # Get minimum tokens available in input places
                 min_tokens = self._get_min_input_tokens(transition, model)
                 if min_tokens > 0:
-                    # Limit tau so expected firings <= min_tokens / 2 (conservative)
-                    # Poisson(λ) has mean λ and std √λ, so limit to mean = min_tokens/2
-                    # gives ~95% probability of staying under min_tokens
-                    max_tau_for_tokens = (min_tokens / 2.0) / propensities[i]
+                    # Limit tau so expected firings <= min_tokens
+                    # The _calculate_max_firings method will cap actual firings if needed
+                    # No need to be overly conservative here (was causing 50% token loss bug)
+                    max_tau_for_tokens = min_tokens / propensities[i]
                     tau = min(tau, max_tau_for_tokens)
         
         return tau

@@ -10,7 +10,8 @@ Date: 2025-11-16
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Pango
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, Pango, Pango
 from typing import Optional, Dict, Any
 
 
@@ -138,7 +139,7 @@ class ParameterRatingDialog(Gtk.Dialog):
             params_textview = Gtk.TextView()
             params_textview.set_editable(False)
             params_textview.set_cursor_visible(False)
-            params_textview.set_wrap_mode(Gtk.WrapMode.WORD)
+            params_textview.set_wrap_mode(Pango.WrapMode.WORD)
             params_textview.set_left_margin(8)
             params_textview.set_right_margin(8)
             params_textview.set_top_margin(4)
@@ -218,7 +219,7 @@ class ParameterRatingDialog(Gtk.Dialog):
         comment_scroll.set_min_content_height(60)
         
         self.comment_textview = Gtk.TextView()
-        self.comment_textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.comment_textview.set_wrap_mode(Pango.WrapMode.WORD)
         self.comment_textview.set_left_margin(8)
         self.comment_textview.set_right_margin(8)
         self.comment_textview.set_top_margin(4)

@@ -72,6 +72,9 @@ class TauLeapingEngine:
         # Parallel scheduler (initialized lazily)
         self._parallel_scheduler = None
         
+        # Control flag for time advancement (can be disabled for hybrid models)
+        self._advance_time = True
+        
         self.logger = logging.getLogger(__name__)
         
         # Suppress warnings if not verbose
@@ -143,6 +146,9 @@ class TauLeapingEngine:
         )
         
         # Log sampled firings for debugging
+        self.logger.warning(
+            f"[TAU_DEBUG] τ={tau:.6f}, sampled firings={dict((t.name, f) for t, f in firings_map.items() if f > 0)}"
+        )
         self.logger.debug(
             f"τ-leaping: sampled firings={dict((t.name, f) for t, f in firings_map.items() if f > 0)}"
         )
@@ -153,17 +159,16 @@ class TauLeapingEngine:
             controller
         )
         
-        # Step 4: Advance time
-        controller.time += tau
+        # Step 4: Advance time (only if enabled - disabled for hybrid models)
+        if self._advance_time:
+            controller.time += tau
         
         # Step 4.5: Update assignment rule-defined species (Option 3)
         if hasattr(controller, 'enable_assignment_rule_reevaluation') and controller.enable_assignment_rule_reevaluation:
             self._update_assignment_rules(controller)
         
-        # CRITICAL: Record state after time advancement
-        # This captures updated firing counts and place tokens for automation experiments
-        if controller.data_collector:
-            controller.data_collector.record_state(controller.time)
+        # NOTE: State recording moved to controller.step() to avoid duplicate recording
+        # Controller records state once per step after all phases complete
         
         # Step 5: Update statistics
         self.stats['total_leaps'] += 1
@@ -376,7 +381,138 @@ class TauLeapingEngine:
                 firings_map[transition] = firings
                 self.stats['irreversible_reactions'] += 1
         
+        # Apply inhibitor arc constraints to limit firings
+        firings_map = self._apply_inhibitor_constraints(firings_map, transitions)
+        
         return firings_map
+    
+    def _apply_inhibitor_constraints(
+        self,
+        firings_map: Dict[Any, int],
+        transitions: List[Any]
+    ) -> Dict[Any, int]:
+        """Apply inhibitor arc constraints to limit firings.
+        
+        For each transition with inhibitor arcs, check if the products
+        would exceed their thresholds and reduce firings accordingly.
+        
+        Args:
+            firings_map: Dictionary mapping transition -> sampled firings
+            transitions: List of transitions
+        
+        Returns:
+            Modified firings_map with inhibitor constraints applied
+        """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator
+        import sys
+        
+        constrained_map = {}
+        
+        for transition in transitions:
+            original_firings = firings_map.get(transition, 0)
+            if original_firings <= 0:
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Get behavior to access arcs
+            behavior = self._get_behavior(transition)
+            if behavior is None:
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Get arcs
+            try:
+                input_arcs = behavior.get_input_arcs()
+                output_arcs = behavior.get_output_arcs()
+            except Exception as e:
+                print(f"❌ Could not get arcs for {getattr(transition, 'name', 'unknown')}: {e}", file=sys.stderr)
+                self.logger.debug(f"Could not get arcs for {transition.name}: {e}")
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Find inhibitor arcs (Product → Transition)
+            inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+            
+            if not inhibitor_arcs:
+                # No inhibitors, use original firings
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Found inhibitors - evaluate constraints
+            trans_name = getattr(transition, 'name', getattr(transition, 'label', 'unknown'))
+            
+            # Calculate maximum allowed firings based on inhibitors
+            max_allowed_firings = original_firings
+            
+            for inh_arc in inhibitor_arcs:
+                try:
+                    # The source of inhibitor arc is the product place
+                    product_place = behavior._get_place(inh_arc.source_id)
+                    if not product_place:
+                        continue
+                    
+                    # Evaluate threshold dynamically
+                    evaluator = ThresholdEvaluator(behavior.model)
+                    context = {'time': behavior.model.time if hasattr(behavior.model, 'time') else 0.0}
+                    threshold = evaluator.evaluate(inh_arc, context)
+                    
+                    # Current tokens in product place
+                    current_tokens = product_place.tokens
+                    
+                    # Find how much this transition produces to that place
+                    # Note: output_arcs should be arc objects, but handle strings just in case
+                    tokens_per_firing = 0.0
+                    
+                    for out_arc_ref in output_arcs:
+                        # Get actual arc object if we have an ID string
+                        if isinstance(out_arc_ref, str):
+                            # It's an arc ID, need to get the arc object from model
+                            out_arc = behavior._get_arc(out_arc_ref)
+                            if not out_arc:
+                                continue
+                        else:
+                            out_arc = out_arc_ref
+                        
+                        if out_arc.target_id == product_place.id:
+                            tokens_per_firing = out_arc.weight
+                            break
+                    
+                    if tokens_per_firing > 0:
+                        # Calculate remaining capacity
+                        remaining = threshold - current_tokens
+                        
+                        if remaining <= 0:
+                            # Already at or above threshold, no firings allowed
+                            max_allowed_firings = 0
+                            break
+                        
+                        # Calculate max firings before exceeding threshold
+                        max_firings_for_this_inhibitor = int(remaining / tokens_per_firing)
+                        
+                        # Keep the most restrictive constraint
+                        max_allowed_firings = min(max_allowed_firings, max_firings_for_this_inhibitor)
+                
+                except Exception as e:
+                    import traceback
+                    self.logger.error(
+                        f"❌ Error evaluating inhibitor for {trans_name}: {e}\n"
+                        f"Traceback: {traceback.format_exc()}"
+                    )
+                    print(f"❌ Error evaluating inhibitor for {trans_name}: {e}", file=sys.stderr)
+                    continue
+            
+            # Apply the constraint
+            if max_allowed_firings < original_firings:
+                trans_name = getattr(transition, 'name', getattr(transition, 'label', 'unknown'))
+                self.logger.info(
+                    f"🔒 Inhibitor constraint: {trans_name} firings reduced "
+                    f"{original_firings} → {max_allowed_firings}"
+                )
+            
+            constrained_map[transition] = max_allowed_firings
+        
+        return constrained_map
     
     def _apply_firings(
         self,
@@ -415,6 +551,18 @@ class TauLeapingEngine:
             )
             
             actual_firings = min(num_firings, max_possible_firings)
+            
+            # DIAGNOSTIC: Track sampled vs actual firings
+            is_multi_firing = actual_firings >= 2
+            log_level = "WARNING" if is_multi_firing else "INFO"
+            self.logger.warning(
+                f"[FIRING_DEBUG {'***MULTI***' if is_multi_firing else ''}] {transition.name}:\n"
+                f"               Sampled: {num_firings}\n"
+                f"               Max possible: {max_possible_firings}\n"
+                f"               Actual applied: {actual_firings}\n"
+                f"               is_source: {getattr(transition, 'is_source', False)}\n"
+                f"               is_sink: {getattr(transition, 'is_sink', False)}"
+            )
             
             # Log if we had to cap firings due to insufficient tokens (debug level only)
             if actual_firings < num_firings:
@@ -533,20 +681,50 @@ class TauLeapingEngine:
         is_source = getattr(transition, 'is_source', False)
         is_sink = getattr(transition, 'is_sink', False)
         
+        # DIAGNOSTIC: Log token state before firing
+        self.logger.warning(
+            f"[TOKEN_DEBUG] BEFORE {transition.name} × {num_firings} firings:\n"
+            f"  is_source={is_source}, is_sink={is_sink}\n"
+            f"  Input arcs: {len(input_arcs)}, Output arcs: {len(output_arcs)}"
+        )
+        
         # Phase 1: Consume tokens (skip if source)
         if not is_source:
             for arc in input_arcs:
                 # Skip test arcs
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    self.logger.warning(f"[TOKEN_DEBUG]   Skipping arc (test/signal arc): {arc.id}")
                     continue
                 
                 source_place = arc.source
                 if source_place is None:
                     continue
                 
+                tokens_before = source_place.tokens
                 amount = arc.weight * num_firings
-                source_place.set_tokens(source_place.tokens - amount)
+                self.logger.warning(
+                    f"[TOKEN_DEBUG]   CONSUME CALCULATION:\n"
+                    f"               arc.weight={arc.weight}, num_firings={num_firings}\n"
+                    f"               amount = {arc.weight} × {num_firings} = {amount}\n"
+                    f"               READING source_place.tokens AGAIN before calculation: {source_place.tokens}"
+                )
+                tokens_after_calc = source_place.tokens - amount
+                self.logger.warning(f"[TOKEN_DEBUG]   CALLING set_tokens({tokens_after_calc}) on {source_place.name}")
+                source_place.set_tokens(tokens_after_calc)
+                tokens_actual = source_place.tokens
+                self.logger.warning(f"[TOKEN_DEBUG]   AFTER set_tokens, reading tokens again: {tokens_actual}")
                 consumed_map[source_place.id] = float(amount)
+                
+                self.logger.warning(
+                    f"[TOKEN_DEBUG]   CONSUME: {source_place.name} via arc {arc.id} (weight={arc.weight})\n"
+                    f"               Before: {tokens_before:.2f}\n"
+                    f"               Amount: {amount:.2f} (arc_weight={arc.weight} × num_firings={num_firings})\n"
+                    f"               Expected after: {tokens_after_calc:.2f}\n"
+                    f"               Actual after: {tokens_actual:.2f}\n"
+                    f"               Match: {tokens_after_calc == tokens_actual}"
+                )
+        else:
+            self.logger.warning(f"[TOKEN_DEBUG]   Source transition - skipping consumption")
         
         # Phase 2: Produce tokens (skip if sink)
         if not is_sink:
@@ -555,15 +733,27 @@ class TauLeapingEngine:
                 if target_place is None:
                     continue
                 
+                tokens_before = target_place.tokens
                 amount = arc.weight * num_firings
-                target_place.set_tokens(target_place.tokens + amount)
+                tokens_after_calc = target_place.tokens + amount
+                target_place.set_tokens(tokens_after_calc)
+                tokens_actual = target_place.tokens
                 produced_map[target_place.id] = float(amount)
+                
+                self.logger.warning(
+                    f"[TOKEN_DEBUG]   PRODUCE: {target_place.name} via arc {arc.id} (weight={arc.weight})\n"
+                    f"                Before: {tokens_before:.2f}\n"
+                    f"                Amount: {amount:.2f} (arc_weight={arc.weight} × num_firings={num_firings})\n"
+                    f"                Expected after: {tokens_after_calc:.2f}\n"
+                    f"                Actual after: {tokens_actual:.2f}\n"
+                    f"                Match: {tokens_after_calc == tokens_actual}"
+                )
+        else:
+            self.logger.warning(f"[TOKEN_DEBUG]   Sink transition - skipping production")
         
-        # CRITICAL: Increment firing count for statistics/plotting
-        # This is needed for automation experiments and data collection
-        if not hasattr(transition, 'firing_count'):
-            transition.firing_count = 0
-        transition.firing_count += num_firings
+        # NOTE: firing_count is incremented by data_collector.record_firing() 
+        # in _apply_firings(), not here. Removed duplicate increment that was
+        # causing 2× firing counts and 50% token loss bug.
         
         return consumed_map, produced_map
     

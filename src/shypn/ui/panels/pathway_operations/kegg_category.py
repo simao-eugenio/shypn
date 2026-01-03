@@ -20,7 +20,8 @@ from typing import Optional, Dict, Any
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, GLib, Pango
 
 from .base_pathway_category import BasePathwayCategory
 
@@ -308,14 +309,7 @@ class KEGGCategory(BasePathwayCategory):
         
         # Preview section
         preview_box = self._build_preview()
-        main_box.pack_start(preview_box, True, True, 0)
-        
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_xalign(0)
-        self.status_label.set_line_wrap(True)
-        self.status_label.get_style_context().add_class("dim-label")
-        main_box.pack_start(self.status_label, False, False, 0)
+        main_box.pack_start(preview_box, False, False, 0)
         
         # Save to Project button
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -327,6 +321,13 @@ class KEGGCategory(BasePathwayCategory):
         button_box.pack_start(self.import_button, False, False, 0)
         
         main_box.pack_start(button_box, False, False, 0)
+        
+        # Status label (at the end)
+        self.status_label = Gtk.Label()
+        self.status_label.set_xalign(0)
+        self.status_label.set_line_wrap(True)
+        self.status_label.get_style_context().add_class("dim-label")
+        main_box.pack_start(self.status_label, False, False, 0)
         
         # Show all widgets (required for content to be visible)
         main_box.show_all()
@@ -467,10 +468,10 @@ class KEGGCategory(BasePathwayCategory):
         """Build preview section with metadata tree view.
         
         Returns:
-            Gtk.Frame: Preview widgets (Notebook with tabs)
+            Gtk.Expander: Preview widgets under expander
         """
-        frame = Gtk.Frame()
-        frame.set_label("KEGG Metadata Inspector")
+        expander = Gtk.Expander(label="KEGG Metadata Inspector")
+        expander.set_expanded(False)
         
         # Main container with notebook for tabs
         notebook = Gtk.Notebook()
@@ -521,7 +522,7 @@ class KEGGCategory(BasePathwayCategory):
         
         self.preview_text = Gtk.TextView()
         self.preview_text.set_editable(False)
-        self.preview_text.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.preview_text.set_wrap_mode(Pango.WrapMode.WORD)
         self.preview_text.set_left_margin(6)
         self.preview_text.set_right_margin(6)
         self.preview_text.set_top_margin(6)
@@ -538,8 +539,8 @@ class KEGGCategory(BasePathwayCategory):
         
         self.preview_widget = self.preview_text
         
-        frame.add(notebook)
-        return frame
+        expander.add(notebook)
+        return expander
     
     def _get_status_widget(self):
         """Get the status label widget.

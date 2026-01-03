@@ -305,7 +305,7 @@ class ViabilityPanel(Gtk.Box):
         
         self.diagnostics_textview = Gtk.TextView()
         self.diagnostics_textview.set_editable(False)
-        self.diagnostics_textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.diagnostics_textview.set_wrap_mode(Pango.WrapMode.WORD)
         self.diagnostics_textview.set_monospace(True)
         self.diagnostics_textbuffer = self.diagnostics_textview.get_buffer()
         log_scroll.add(self.diagnostics_textview)

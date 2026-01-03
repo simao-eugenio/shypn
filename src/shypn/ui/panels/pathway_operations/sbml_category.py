@@ -22,7 +22,8 @@ from typing import Optional
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    gi.require_version('Pango', '1.0')
+    from gi.repository import Gtk, GLib, Pango
 except Exception as e:
     print(f'ERROR: GTK3 not available in sbml_category: {e}', file=sys.stderr)
     sys.exit(1)
@@ -124,20 +125,13 @@ class SBMLCategory(BasePathwayCategory):
         options_box = self._build_options()
         main_box.pack_start(options_box, False, False, 0)
         
-        # Preview section
+        # Preview section (metadata inspector under expander)
         preview_box = self._build_preview_section()
-        main_box.pack_start(preview_box, True, True, 0)
+        main_box.pack_start(preview_box, False, False, 0)
         
-        # Thermodynamic validation section
+        # Thermodynamic validation section (under expander)
         thermodynamic_box = self._build_thermodynamic_section()
         main_box.pack_start(thermodynamic_box, False, False, 0)
-        
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_xalign(0)
-        self.status_label.set_line_wrap(True)
-        self.status_label.get_style_context().add_class("dim-label")
-        main_box.pack_start(self.status_label, False, False, 0)
         
         # Save to Project button
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -149,6 +143,13 @@ class SBMLCategory(BasePathwayCategory):
         button_box.pack_start(self.import_button, False, False, 0)
         
         main_box.pack_start(button_box, False, False, 0)
+        
+        # Status label (at the end)
+        self.status_label = Gtk.Label()
+        self.status_label.set_xalign(0)
+        self.status_label.set_line_wrap(True)
+        self.status_label.get_style_context().add_class("dim-label")
+        main_box.pack_start(self.status_label, False, False, 0)
         
         main_box.show_all()
         
@@ -259,8 +260,8 @@ class SBMLCategory(BasePathwayCategory):
     
     def _build_preview_section(self) -> Gtk.Widget:
         """Build preview section with metadata tree view."""
-        frame = Gtk.Frame()
-        frame.set_label("SBML Metadata Inspector")
+        expander = Gtk.Expander(label="SBML Metadata Inspector")
+        expander.set_expanded(False)
         
         # Main container with notebook for tabs
         notebook = Gtk.Notebook()
@@ -291,7 +292,7 @@ class SBMLCategory(BasePathwayCategory):
         name_col.set_expand(True)
         self.metadata_tree.append_column(name_col)
         
-        # Value column
+        # Value column (editable)
         value_renderer = Gtk.CellRendererText()
         value_renderer.set_property("family", "monospace")
         value_renderer.set_property("editable", True)
@@ -300,6 +301,13 @@ class SBMLCategory(BasePathwayCategory):
         value_col.set_resizable(True)
         value_col.set_expand(True)
         self.metadata_tree.append_column(value_col)
+        
+        # Type column
+        type_renderer = Gtk.CellRendererText()
+        type_col = Gtk.TreeViewColumn("Type", type_renderer, text=3)
+        type_col.set_resizable(True)
+        type_col.set_min_width(80)
+        self.metadata_tree.append_column(type_col)
         
         # Connect click handler
         self.metadata_tree.connect("row-activated", self._on_metadata_row_clicked)
@@ -313,7 +321,7 @@ class SBMLCategory(BasePathwayCategory):
         
         self.preview_text = Gtk.TextView()
         self.preview_text.set_editable(False)
-        self.preview_text.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.preview_text.set_wrap_mode(Pango.WrapMode.WORD)
         self.preview_text.set_left_margin(6)
         self.preview_text.set_right_margin(6)
         self.preview_text.set_top_margin(6)
@@ -328,8 +336,8 @@ class SBMLCategory(BasePathwayCategory):
         text_scroll.add(self.preview_text)
         notebook.append_page(text_scroll, Gtk.Label(label="📄 Summary"))
         
-        frame.add(notebook)
-        return frame
+        expander.add(notebook)
+        return expander
     
     def _build_thermodynamic_section(self) -> Gtk.Widget:
         """Build thermodynamic validation results section.
@@ -337,10 +345,10 @@ class SBMLCategory(BasePathwayCategory):
         Shows validation status for reversible reactions imported from SBML.
         Initially hidden, shown after import completes.
         """
-        self.thermodynamic_frame = Gtk.Frame()
-        self.thermodynamic_frame.set_label("Thermodynamic Validation")
-        self.thermodynamic_frame.set_no_show_all(True)  # Hidden until data available
-        self.thermodynamic_frame.set_visible(False)
+        self.thermodynamic_expander = Gtk.Expander(label="Thermodynamic Validation")
+        self.thermodynamic_expander.set_expanded(False)
+        self.thermodynamic_expander.set_no_show_all(True)  # Hidden until data available
+        self.thermodynamic_expander.set_visible(False)
         
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_start(12)
@@ -456,7 +464,7 @@ class SBMLCategory(BasePathwayCategory):
         
         # Column 10: Message (hidden by default, shown on selection)
         renderer_msg = Gtk.CellRendererText()
-        renderer_msg.set_property("wrap-mode", Gtk.WrapMode.WORD)
+        renderer_msg.set_property("wrap-mode", Pango.WrapMode.WORD)
         renderer_msg.set_property("wrap-width", 400)
         column_msg = Gtk.TreeViewColumn("Details", renderer_msg, text=10)
         column_msg.set_visible(False)  # Hidden by default
@@ -473,8 +481,8 @@ class SBMLCategory(BasePathwayCategory):
         btn_box.pack_start(self.show_details_btn, False, False, 0)
         box.pack_start(btn_box, False, False, 0)
         
-        self.thermodynamic_frame.add(box)
-        return self.thermodynamic_frame
+        self.thermodynamic_expander.add(box)
+        return self.thermodynamic_expander
     
     def _update_thermodynamic_display(self, results: dict):
         """Update thermodynamic validation display with results.
@@ -483,8 +491,8 @@ class SBMLCategory(BasePathwayCategory):
             results: Dictionary with keys 'valid', 'warnings', 'violations', 'insufficient_data'
         """
         if not results:
-            # No results - hide frame
-            self.thermodynamic_frame.set_visible(False)
+            # No results - hide expander
+            self.thermodynamic_expander.set_visible(False)
             return
         
         # Count results by category
@@ -496,7 +504,7 @@ class SBMLCategory(BasePathwayCategory):
         
         if total_count == 0:
             # No reversible transitions to validate
-            self.thermodynamic_frame.set_visible(False)
+            self.thermodynamic_expander.set_visible(False)
             return
         
         # Determine status emoji and text
@@ -646,9 +654,9 @@ class SBMLCategory(BasePathwayCategory):
             ])
         
         # Show the frame (need both set_visible and show_all for no_show_all widgets)
-        self.thermodynamic_frame.set_no_show_all(False)
-        self.thermodynamic_frame.show_all()
-        self.thermodynamic_frame.set_visible(True)
+        self.thermodynamic_expander.set_no_show_all(False)
+        self.thermodynamic_expander.show_all()
+        self.thermodynamic_expander.set_visible(True)
     
     def _on_toggle_details(self, button):
         """Toggle visibility of details column."""
@@ -1010,13 +1018,88 @@ class SBMLCategory(BasePathwayCategory):
                 processed_pathway = postprocessor.process(parsed_pathway)
                 
                 # 3. Convert to Petri net → DocumentModel
-                # Get user options
-                filter_cofactors = False
-                if hasattr(self, 'filter_cofactors_check') and self.filter_cofactors_check:
-                    filter_cofactors = self.filter_cofactors_check.get_active()
+                self.logger.info("Converting to Petri net...")
+                document_model = self.converter.convert(processed_pathway)
                 
-                self.logger.info(f"Converting to Petri net (include_cofactors={filter_cofactors})...")
-                document_model = self.converter.convert(processed_pathway, include_cofactors=filter_cofactors)
+                # 3.5: Detect and classify signal places (energy metabolites)
+                if SBMLCompartmentModuleService:
+                    self.logger.info("Detecting signal places...")
+                    from shypn.netobjs.signal_type import SignalType
+                    
+                    # Auto-detect energy signals (ATP, NAD, CoA, etc.)
+                    signal_count = 0
+                    for place in document_model.places:
+                        if hasattr(place, 'metadata') and place.metadata:
+                            species_id = place.metadata.get('original_species_id', '').lower()
+                            # Common energy metabolites
+                            energy_markers = ['atp', 'adp', 'amp', 'nad', 'nadh', 'nadp', 'nadph', 
+                                            'fad', 'fadh', 'coa', 'accoa', 'gtp', 'gdp', 'ctp', 'utp']
+                            if any(marker in species_id for marker in energy_markers):
+                                place.is_signal_place = True
+                                place.signal_type = SignalType.ENERGY
+                                signal_count += 1
+                    
+                    if signal_count > 0:
+                        self.logger.info(f"  Detected {signal_count} energy signal places")
+                
+                # 3.6: Convert arcs to/from signal places to SignalFlowArcs
+                signal_places = [p for p in document_model.places if getattr(p, 'is_signal_place', False)]
+                if signal_places:
+                    self.logger.info("Converting arcs to signal places to SignalFlowArcs...")
+                    from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                    from shypn.netobjs.arc import Arc
+                    
+                    signal_place_set = set(signal_places)
+                    converted_count = 0
+                    new_arcs = []
+                    
+                    for arc in document_model.arcs:
+                        # Check if arc connects to/from a signal place
+                        if isinstance(arc, Arc) and not isinstance(arc, SignalFlowArc):
+                            if arc.source in signal_place_set or arc.target in signal_place_set:
+                                # Convert to SignalFlowArc
+                                arc_id = getattr(arc, 'id', f'arc_{id(arc)}')
+                                arc_name = getattr(arc, 'name', '')
+                                signal_arc = SignalFlowArc(
+                                    source=arc.source,
+                                    target=arc.target,
+                                    id=arc_id,
+                                    name=arc_name,
+                                    weight=arc.weight
+                                )
+                                # Copy metadata
+                                if hasattr(arc, 'metadata'):
+                                    signal_arc.metadata = arc.metadata
+                                new_arcs.append(signal_arc)
+                                converted_count += 1
+                            else:
+                                new_arcs.append(arc)
+                        else:
+                            new_arcs.append(arc)
+                    
+                    document_model.arcs = new_arcs
+                    self.logger.info(f"  Converted {converted_count} arcs to SignalFlowArcs")
+                
+                # 3.7: Enforce color schema on all entities
+                self.logger.info("Enforcing color schema on all entities...")
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                
+                # Apply colors to all places (signal, compartment, regulatory)
+                for place in document_model.places:
+                    ColorSchemaManager.reset_place_color(place)
+                
+                # Apply colors to all arcs (regular, test, signal flow, inhibitor)
+                for arc in document_model.arcs:
+                    ColorSchemaManager.reset_arc_color(arc)
+                
+                # Apply colors to all transitions (regular, source/sink)
+                for transition in document_model.transitions:
+                    border_color, fill_color = ColorSchemaManager.get_transition_colors(transition)
+                    transition.border_color = border_color
+                    transition.fill_color = fill_color
+                
+                self.logger.info(f"  Applied color schema to {len(document_model.places)} places, "
+                               f"{len(document_model.transitions)} transitions, {len(document_model.arcs)} arcs")
                 
                 # 4. Convert SBML compartments to modules (if service available)
                 if SBMLCompartmentModuleService and document_model and processed_pathway:
@@ -1913,16 +1996,57 @@ class SBMLCategory(BasePathwayCategory):
                     ])
                     return False
                 
-                # Parameters section
-                params_root = self.metadata_store.append(None, [
-                    "📊", "Parameters", f"{len(getattr(pathway, 'parameters', {}))} items",
-                    "section", "", "Global and local kinetic parameters"
-                ])
-                for param_id, param_value in getattr(pathway, 'parameters', {}).items():
-                    self.metadata_store.append(params_root, [
-                        "🌐", param_id, str(param_value), "parameter",
-                        param_id, f"Global parameter: {param_id} = {param_value}"
+                # Parameters section - split into constants and variables
+                all_params = getattr(pathway, 'parameters', {})
+                constants_dict = {}
+                variables_dict = {}
+                
+                # Check if pathway has explicit constant marking
+                if hasattr(pathway, 'constants') and pathway.constants:
+                    for param_id, param_value in all_params.items():
+                        if param_id in pathway.constants:
+                            constants_dict[param_id] = param_value
+                        else:
+                            variables_dict[param_id] = param_value
+                else:
+                    # Treat all as variables if not explicitly marked
+                    variables_dict = all_params
+                
+                # Global Constants section
+                if constants_dict:
+                    constants_root = self.metadata_store.append(None, [
+                        "🔒", "Global Constants", f"{len(constants_dict)} items",
+                        "section", "", "Read-only global parameters"
                     ])
+                    for param_id, param_value in constants_dict.items():
+                        self.metadata_store.append(constants_root, [
+                            "🔒", param_id, str(param_value), "constant",
+                            param_id, f"Constant: {param_id} = {param_value} (read-only)"
+                        ])
+                
+                # Global Variables section
+                if variables_dict:
+                    variables_root = self.metadata_store.append(None, [
+                        "📊", "Global Variables", f"{len(variables_dict)} items",
+                        "section", "", "Editable global parameters"
+                    ])
+                    for param_id, param_value in variables_dict.items():
+                        self.metadata_store.append(variables_root, [
+                            "🌐", param_id, str(param_value), "parameter",
+                            param_id, f"Variable: {param_id} = {param_value}"
+                        ])
+                
+                # All Parameters section (legacy, keep for compatibility)
+                if not constants_dict and not variables_dict:
+                    params_root = self.metadata_store.append(None, [
+                        "📊", "Parameters", f"{len(all_params)} items",
+                        "section", "", "Global and local kinetic parameters"
+                    ])
+                    for param_id, param_value in all_params.items():
+                        self.metadata_store.append(params_root, [
+                            "🌐", param_id, str(param_value), "parameter",
+                            param_id, f"Global parameter: {param_id} = {param_value}"
+                        ])
                 
                 # Compartments section
                 comps = getattr(pathway, 'compartments_enhanced', {})
@@ -2096,6 +2220,20 @@ class SBMLCategory(BasePathwayCategory):
             obj_type = model.get_value(iter_node, 3)  # type column
             obj_id = model.get_value(iter_node, 4)    # object_id column
             old_value = model.get_value(iter_node, 2) # current value
+            
+            # Check if this is a constant (read-only)
+            if obj_type == 'constant':
+                dialog = Gtk.MessageDialog(
+                    transient_for=self.parent_window,
+                    flags=0,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Cannot Edit Constant"
+                )
+                dialog.format_secondary_text(f"{obj_id} is marked as a constant and cannot be edited.")
+                dialog.run()
+                dialog.destroy()
+                return
             
             # Validate and parse new value
             try:

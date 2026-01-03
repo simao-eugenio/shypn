@@ -97,7 +97,7 @@ class DocumentModel:
             source: Source object (Place or Transition)
             target: Target object (must be different type from source)
             weight: Arc weight (default 1)
-            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'signal_flow', 'curved', 'curved_inhibitor_arc')
+            arc_type: Type of arc ('normal', 'test', 'inhibitor', 'signal_flow', 'curved', 'curved_inhibitor_arc', 'curved_opposite_signal_flow')
             
         Returns:
             The created Arc object (proper subclass), or None if connection is invalid
@@ -141,6 +141,9 @@ class DocumentModel:
             elif arc_type == 'curved_inhibitor_arc':
                 from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
                 arc = CurvedInhibitorArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
+            elif arc_type == 'curved_opposite_signal_flow':
+                from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+                arc = CurvedSignalFlowArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
             else:  # 'normal' or default
                 arc = Arc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
             

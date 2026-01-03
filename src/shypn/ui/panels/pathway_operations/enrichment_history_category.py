@@ -18,7 +18,8 @@ from datetime import datetime, timedelta
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, GLib, Pango
 
 from .base_pathway_category import BasePathwayCategory
 from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
@@ -238,7 +239,7 @@ class EnrichmentHistoryCategory(BasePathwayCategory):
         
         self.detail_text = Gtk.TextView()
         self.detail_text.set_editable(False)
-        self.detail_text.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.detail_text.set_wrap_mode(Pango.WrapMode.WORD)
         self.detail_text.set_left_margin(6)
         self.detail_text.set_right_margin(6)
         self.detail_text.get_buffer().set_text("Select an enrichment to view details")
