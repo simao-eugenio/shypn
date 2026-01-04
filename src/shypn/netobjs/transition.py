@@ -674,8 +674,8 @@ class Transition(PetriNetObject):
         
         # Extract required properties with type conversion
         transition = cls(
-            x=float(data["x"]),
-            y=float(data["y"]),
+            x=float(data.get("x", 0.0)),  # Default to 0.0 if missing (legacy file support)
+            y=float(data.get("y", 0.0)),  # Default to 0.0 if missing (legacy file support)
             id=transition_id,  # String ID
             name=name,
             width=float(data.get("width", cls.DEFAULT_WIDTH)),
