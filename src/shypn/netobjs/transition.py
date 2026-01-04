@@ -464,12 +464,15 @@ class Transition(PetriNetObject):
         # Store the value
         self.rate = rate_value
         
-        # For continuous transitions, also store in properties for engine
+        # DEPRECATED: Legacy sync to properties dict
+        # NOTE: As of 2026-01-04, continuous_behavior.py now prefers top-level
+        # rate_function field over properties['rate_function']. This sync is
+        # maintained for backwards compatibility only and will be removed in future.
         if self.transition_type == 'continuous':
             if not hasattr(self, 'properties') or self.properties is None:
                 self.properties = {}
             
-            # Store expression for evaluation
+            # Store expression for evaluation (legacy)
             if isinstance(rate_value, str):
                 self.properties['rate_function'] = rate_value
             else:
