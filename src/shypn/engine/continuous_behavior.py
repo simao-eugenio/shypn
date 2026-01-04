@@ -67,12 +67,12 @@ class ContinuousBehavior(TransitionBehavior):
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
         
-        # Support multiple formats:
-        # 1. properties['rate_function'] = string expression
-        # 2. properties['rate_function'] = callable
-        # 3. properties = {'rate': lambda places, t: ...}  (dict format)
-        # 4. transition.rate attribute (UI stores simple value)
-        # 5. DIRECTIONAL: rate_forward + rate_reverse (new format)
+        # Support multiple formats (priority order):
+        # 1. transition.rate_function (top-level JSON field - AUTHORITATIVE)
+        # 2. transition.rate_forward/rate_reverse (directional reactions)
+        # 3. properties['rate_function'] (legacy/fallback only)
+        # 4. properties['rate'] (callable format)
+        # 5. transition.rate attribute (simple numeric value)
         
         rate_expr = None
         rate_forward_expr = None
@@ -88,13 +88,13 @@ class ContinuousBehavior(TransitionBehavior):
         else:
             self.use_directional_rates = False
             
-            if 'rate_function' in props:
-                # Explicit rate function in properties dict
-                rate_expr = props.get('rate_function')
-            elif getattr(transition, 'rate_function', None):
-                # Check transition.rate_function attribute (from JSON top-level field)
-                # This takes precedence over simple rate value
+            # PRIORITY 1: Check top-level rate_function attribute (from JSON "rate_function" field)
+            # This is the authoritative source set by the UI
+            if getattr(transition, 'rate_function', None):
                 rate_expr = transition.rate_function
+            # PRIORITY 2: Legacy fallback - properties dict (only if no top-level field)
+            elif 'rate_function' in props:
+                rate_expr = props.get('rate_function')
             elif 'rate' in props and callable(props['rate']):
                 # Dict format with callable: {'rate': lambda ...}
                 rate_expr = props['rate']
