@@ -2120,7 +2120,7 @@
       "source_type": "transition",
       "target_id": "P1",
       "target_type": "place",
-      "weight": 20.0,
+      "weight": 24.0,
       "threshold": null,
       "color": [
         0.7,
