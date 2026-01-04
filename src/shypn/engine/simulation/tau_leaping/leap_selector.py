@@ -133,13 +133,6 @@ class LeapSelector:
         # Apply bounds
         tau = max(self.min_tau, min(tau_unbounded, self.max_tau))
         
-        # Log tau calculation details
-        self.logger.warning(
-            f"[TAU_SELECTOR_DEBUG] propensities={[f'{p:.3f}' for p in propensities]}, "
-            f"tau_unbounded={tau_unbounded:.6f}, tau_bounded={tau:.6f}, "
-            f"epsilon={self.epsilon}, max_tau={self.max_tau}, min_tau={self.min_tau}"
-        )
-        
         return tau, {
             'propensities': propensities,
             'critical_count': len(critical_transitions),

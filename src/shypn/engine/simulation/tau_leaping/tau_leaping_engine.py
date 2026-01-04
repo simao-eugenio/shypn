@@ -146,9 +146,6 @@ class TauLeapingEngine:
         )
         
         # Log sampled firings for debugging
-        self.logger.warning(
-            f"[TAU_DEBUG] τ={tau:.6f}, sampled firings={dict((t.name, f) for t, f in firings_map.items() if f > 0)}"
-        )
         self.logger.debug(
             f"τ-leaping: sampled firings={dict((t.name, f) for t, f in firings_map.items() if f > 0)}"
         )
@@ -552,18 +549,6 @@ class TauLeapingEngine:
             
             actual_firings = min(num_firings, max_possible_firings)
             
-            # DIAGNOSTIC: Track sampled vs actual firings
-            is_multi_firing = actual_firings >= 2
-            log_level = "WARNING" if is_multi_firing else "INFO"
-            self.logger.warning(
-                f"[FIRING_DEBUG {'***MULTI***' if is_multi_firing else ''}] {transition.name}:\n"
-                f"               Sampled: {num_firings}\n"
-                f"               Max possible: {max_possible_firings}\n"
-                f"               Actual applied: {actual_firings}\n"
-                f"               is_source: {getattr(transition, 'is_source', False)}\n"
-                f"               is_sink: {getattr(transition, 'is_sink', False)}"
-            )
-            
             # Log if we had to cap firings due to insufficient tokens (debug level only)
             if actual_firings < num_firings:
                 self.logger.debug(
@@ -681,50 +666,20 @@ class TauLeapingEngine:
         is_source = getattr(transition, 'is_source', False)
         is_sink = getattr(transition, 'is_sink', False)
         
-        # DIAGNOSTIC: Log token state before firing
-        self.logger.warning(
-            f"[TOKEN_DEBUG] BEFORE {transition.name} × {num_firings} firings:\n"
-            f"  is_source={is_source}, is_sink={is_sink}\n"
-            f"  Input arcs: {len(input_arcs)}, Output arcs: {len(output_arcs)}"
-        )
-        
         # Phase 1: Consume tokens (skip if source)
         if not is_source:
             for arc in input_arcs:
                 # Skip test arcs
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
-                    self.logger.warning(f"[TOKEN_DEBUG]   Skipping arc (test/signal arc): {arc.id}")
                     continue
                 
                 source_place = arc.source
                 if source_place is None:
                     continue
                 
-                tokens_before = source_place.tokens
                 amount = arc.weight * num_firings
-                self.logger.warning(
-                    f"[TOKEN_DEBUG]   CONSUME CALCULATION:\n"
-                    f"               arc.weight={arc.weight}, num_firings={num_firings}\n"
-                    f"               amount = {arc.weight} × {num_firings} = {amount}\n"
-                    f"               READING source_place.tokens AGAIN before calculation: {source_place.tokens}"
-                )
-                tokens_after_calc = source_place.tokens - amount
-                self.logger.warning(f"[TOKEN_DEBUG]   CALLING set_tokens({tokens_after_calc}) on {source_place.name}")
-                source_place.set_tokens(tokens_after_calc)
-                tokens_actual = source_place.tokens
-                self.logger.warning(f"[TOKEN_DEBUG]   AFTER set_tokens, reading tokens again: {tokens_actual}")
+                source_place.set_tokens(source_place.tokens - amount)
                 consumed_map[source_place.id] = float(amount)
-                
-                self.logger.warning(
-                    f"[TOKEN_DEBUG]   CONSUME: {source_place.name} via arc {arc.id} (weight={arc.weight})\n"
-                    f"               Before: {tokens_before:.2f}\n"
-                    f"               Amount: {amount:.2f} (arc_weight={arc.weight} × num_firings={num_firings})\n"
-                    f"               Expected after: {tokens_after_calc:.2f}\n"
-                    f"               Actual after: {tokens_actual:.2f}\n"
-                    f"               Match: {tokens_after_calc == tokens_actual}"
-                )
-        else:
-            self.logger.warning(f"[TOKEN_DEBUG]   Source transition - skipping consumption")
         
         # Phase 2: Produce tokens (skip if sink)
         if not is_sink:
@@ -733,23 +688,9 @@ class TauLeapingEngine:
                 if target_place is None:
                     continue
                 
-                tokens_before = target_place.tokens
                 amount = arc.weight * num_firings
-                tokens_after_calc = target_place.tokens + amount
-                target_place.set_tokens(tokens_after_calc)
-                tokens_actual = target_place.tokens
+                target_place.set_tokens(target_place.tokens + amount)
                 produced_map[target_place.id] = float(amount)
-                
-                self.logger.warning(
-                    f"[TOKEN_DEBUG]   PRODUCE: {target_place.name} via arc {arc.id} (weight={arc.weight})\n"
-                    f"                Before: {tokens_before:.2f}\n"
-                    f"                Amount: {amount:.2f} (arc_weight={arc.weight} × num_firings={num_firings})\n"
-                    f"                Expected after: {tokens_after_calc:.2f}\n"
-                    f"                Actual after: {tokens_actual:.2f}\n"
-                    f"                Match: {tokens_after_calc == tokens_actual}"
-                )
-        else:
-            self.logger.warning(f"[TOKEN_DEBUG]   Sink transition - skipping production")
         
         # NOTE: firing_count is incremented by data_collector.record_firing() 
         # in _apply_firings(), not here. Removed duplicate increment that was

@@ -1068,12 +1068,7 @@ class SimulationController:
         
         # DIAGNOSTIC: Log continuous phase
         if continuous_transitions:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                f"[PHASE3_DEBUG] Found {len(continuous_transitions)} continuous transitions: "
-                f"{[t.name for t in continuous_transitions]}"
-            )
+            pass
         
         continuous_enabled = []
         for transition in continuous_transitions:
@@ -1095,7 +1090,14 @@ class SimulationController:
                 continuous_active += 1
                 
                 # Increment firing count for continuous transitions (for statistics/tables)
-                transition.firing_count += 1
+                # For continuous transitions, firing count should reflect actual flow amount
+                # Extract delta from integration details if available
+                if details and 'delta' in details:
+                    transition.firing_count += abs(details['delta'])
+                else:
+                    # Fallback: use rate × dt as approximation
+                    rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
+                    transition.firing_count += rate * time_step
                 
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
@@ -1215,18 +1217,8 @@ class SimulationController:
                     )
                     
                     # DIAGNOSTIC: Log hybrid detection
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    transition_types = [t.transition_type for t in self.model.transitions if hasattr(t, 'transition_type')]
-                    logger.warning(
-                        f"[HYBRID_DEBUG] Pure stochastic: {is_pure_stochastic}\n"
-                        f"               Transition types: {transition_types}\n"
-                        f"               Time: {self.time:.4f}, time_step: {time_step:.4f}"
-                    )
-                    
                     if is_pure_stochastic:
                         # Pure stochastic: tau-leaping controls time stepping
-                        logger.warning("[HYBRID_DEBUG] Using PURE STOCHASTIC path")
                         # Temporarily disable time advancement in tau-leaping (we'll handle it)
                         # No wait - for pure stochastic, tau-leaping SHOULD advance time
                         self._tau_leaping_engine.execute_step(self)
@@ -1234,7 +1226,6 @@ class SimulationController:
                         tau_leaping_advanced_time = True
                     else:
                         # Hybrid model: clamp tau to dt to stay synchronized
-                        logger.warning("[HYBRID_DEBUG] Using HYBRID MODEL path (clamped tau)")
                         original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
                         # CRITICAL: Force tau = time_step for hybrid models to ensure
                         # continuous and stochastic operate over same time interval
