@@ -730,7 +730,8 @@ class ContinuousBehavior(TransitionBehavior):
             actual_flow = flow_magnitude
             if not is_source:
                 for arc in consume_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens
+                    # Skip test arcs - they check enablement but don't consume tokens OR limit flow
+                    # Test arcs are read-only (catalyst behavior) and should not affect rate
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
@@ -742,6 +743,7 @@ class ContinuousBehavior(TransitionBehavior):
                     
                     # Calculate max flow possible from this arc
                     # All consuming arcs (including SignalFlowArcs) limit the flow rate
+                    # CRITICAL: Test arcs should NOT reach here due to continue above
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
                     actual_flow = min(actual_flow, max_flow_from_arc)
             

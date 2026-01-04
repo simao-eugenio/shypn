@@ -408,8 +408,8 @@ class Place(PetriNetObject):
         name = str(data.get("name", place_id))
         
         place = cls(
-            x=float(data["x"]),
-            y=float(data["y"]),
+            x=float(data.get("x", 0.0)),  # Default to 0.0 if missing (legacy file support)
+            y=float(data.get("y", 0.0)),  # Default to 0.0 if missing (legacy file support)
             id=place_id,  # String ID
             name=name,
             radius=float(data.get("radius", cls.DEFAULT_RADIUS)),

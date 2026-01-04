@@ -1090,14 +1090,16 @@ class SimulationController:
                 continuous_active += 1
                 
                 # Increment firing count for continuous transitions (for statistics/tables)
-                # For continuous transitions, firing count should reflect actual flow amount
-                # Extract delta from integration details if available
-                if details and 'delta' in details:
-                    transition.firing_count += abs(details['delta'])
+                # Firing count represents the amount of "reaction" that occurred
+                # Use the rate from the integration step
+                if details and 'rate' in details:
+                    # Rate is the propensity/speed of the transition
+                    # Firing count increment = rate × dt
+                    transition.firing_count += abs(details['rate']) * time_step
                 else:
-                    # Fallback: use rate × dt as approximation
+                    # Fallback: evaluate rate directly
                     rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
-                    transition.firing_count += rate * time_step
+                    transition.firing_count += abs(rate) * time_step
                 
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
@@ -2211,22 +2213,30 @@ class SimulationController:
             return random.choice(enabled_transitions)
 
     def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
-        """Apply conflict resolution for continuous transitions.
+        """Apply conflict resolution for continuous transitions using weak independence theory.
         
-        Continuous transitions that share input places are in conflict.
-        Unlike discrete transitions, multiple continuous transitions can fire
-        simultaneously if they don't share resources (parallel flows).
+        Implements the refined locality theory from dependency_coupling.py:
+        - **Competitive (True Conflict)**: Shared places via CONSUMING arcs → Sequential execution
+        - **Regulatory (Valid Coupling)**: Shared places via TEST ARCS (read-only) → Parallel execution OK
+        
+        Test arcs (catalysts/enzymes) don't consume tokens, so multiple transitions can
+        share the same catalyst without conflict. This is correct biological behavior:
+        "Same enzyme catalyzes multiple reactions."
         
         Strategy:
-        1. Identify conflict groups (transitions sharing input places)
+        1. Identify conflict groups (transitions sharing input places via CONSUMING arcs)
         2. For each conflict group, apply firing policy to select winner(s)
-        3. Non-conflicting transitions always fire (parallel execution)
+        3. Non-conflicting and regulatory-coupled transitions fire in parallel
         
         Args:
             continuous_enabled: List of (transition, behavior, input_arcs, output_arcs) tuples
             
         Returns:
             List of (transition, behavior, input_arcs, output_arcs) tuples to integrate
+        
+        See also:
+            - topology/biological/dependency_coupling.py: Weak independence theory
+            - doc/foundation/BIOLOGICAL_PETRI_NET_FORMALIZATION.md: Section 3.1
         """
         if len(continuous_enabled) <= 1:
             return continuous_enabled
@@ -2239,11 +2249,17 @@ class SimulationController:
             transition, behavior, input_arcs, output_arcs = trans_tuple
             transition_data[transition.id] = trans_tuple
             
-            # Get input places for this transition
+            # Get input places for this transition (only consuming arcs)
+            # Test arcs (catalysts) don't create conflicts → weak independence theory
             input_places = set()
             for arc in input_arcs:
                 if hasattr(arc, 'source_id'):
-                    input_places.add(arc.source_id)
+                    # Check if this is a test arc (read-only, non-consuming)
+                    is_test_arc = hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens()
+                    if not is_test_arc:
+                        # Only consuming arcs create true conflicts (competitive coupling)
+                        input_places.add(arc.source_id)
+                    # Test arcs are regulatory coupling → transitions can fire in parallel
             
             # Map places to transitions
             for place_id in input_places:
