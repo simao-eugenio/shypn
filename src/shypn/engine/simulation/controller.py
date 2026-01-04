@@ -2335,10 +2335,20 @@ class SimulationController:
             time_step = self.get_effective_dt()
         
         # Calculate max_steps from duration if not specified
+        # For stochastic simulations using τ-leaping: Use much higher step limit
+        # because τ-leaping takes adaptive (often large) steps but still counts
+        # each step() call. We use 100× the normal estimate as a safety limit
+        # while relying primarily on time-based termination.
         if max_steps is None:
             estimated_steps = self.settings.estimate_step_count()
             if estimated_steps is not None:
-                max_steps = estimated_steps
+                has_stochastic = any(t.transition_type == 'stochastic' for t in self.model.transitions)
+                if has_stochastic:
+                    # Stochastic: 100× safety limit (relies on time-based termination)
+                    max_steps = estimated_steps * 100
+                else:
+                    # Deterministic: Use normal step count
+                    max_steps = estimated_steps
         
         self._running = True
         self._stop_requested = False
