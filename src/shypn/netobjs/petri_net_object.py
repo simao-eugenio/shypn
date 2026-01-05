@@ -128,11 +128,17 @@ class PetriNetObject:
         Returns:
             dict: Dictionary containing object properties
         """
-        return {
+        data = {
             "id": self.id,
             "name": self.name,
             "label": self.label if self.label else ""
         }
+        
+        # Include metadata if present (added dynamically by importers/enrichers)
+        if hasattr(self, 'metadata') and self.metadata:
+            data["metadata"] = self.metadata
+        
+        return data
     
     def __repr__(self):
         """String representation for debugging.

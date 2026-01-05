@@ -2,6 +2,13 @@
 
 Professional command-line tools for stochastic Petri net simulation, validation, and analysis.
 
+## Recent Updates (v0.5.0)
+
+- ✅ **Enhanced SBML Import** - Smart handling of assignment rules and reversible reactions
+- ✅ **Thermodynamic Validation** - Gibbs free energy validation (v0.4.0)
+- ✅ **τ-Leaping Support** - Approximate stochastic simulation with Skellam distribution (v0.3.0)
+- ✅ **Assignment Rule Options** - Three modes for handling algebraic constraints
+
 ## Installation
 
 ```bash

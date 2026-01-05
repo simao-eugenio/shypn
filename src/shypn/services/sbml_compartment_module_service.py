@@ -560,8 +560,8 @@ class SBMLCompartmentModuleService:
             signal_places: List of newly detected signal places
         """
         from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         
-        SIGNAL_COLOR = (0.7, 0.7, 0.7)  # Light gray for signal_flow arcs only
         recolored_count = 0
         
         # Color ONLY SignalFlowArcs (light gray)
@@ -570,7 +570,7 @@ class SBMLCompartmentModuleService:
             if isinstance(arc, SignalFlowArc):
                 # Color if connected to a signal place
                 if arc.source in signal_places or arc.target in signal_places:
-                    arc.color = SIGNAL_COLOR
+                    ColorSchemaManager.reset_arc_color(arc)
                     recolored_count += 1
         
         if recolored_count > 0:

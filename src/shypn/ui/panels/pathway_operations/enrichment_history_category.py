@@ -18,7 +18,8 @@ from datetime import datetime, timedelta
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, GLib, Pango
 
 from .base_pathway_category import BasePathwayCategory
 from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
@@ -238,7 +239,7 @@ class EnrichmentHistoryCategory(BasePathwayCategory):
         
         self.detail_text = Gtk.TextView()
         self.detail_text.set_editable(False)
-        self.detail_text.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.detail_text.set_wrap_mode(Pango.WrapMode.WORD)
         self.detail_text.set_left_margin(6)
         self.detail_text.set_right_margin(6)
         self.detail_text.get_buffer().set_text("Select an enrichment to view details")
@@ -569,4 +570,45 @@ class EnrichmentHistoryCategory(BasePathwayCategory):
                 
         except Exception as e:
             self.logger.error(f"Undo failed: {e}")
-            self._show_error(f"Undo failed: {e}")
+            self._show_error(f"Undo failed: {e}")    
+    def on_tab_switched(self):
+        """Called when the user switches to a different model tab.
+        
+        Updates the enrichment history to reflect the currently active model:
+        - Refreshes history list for the new model
+        - Updates button states
+        - Clears any selection from previous model
+        """
+        self.logger.debug("Tab switched, refreshing enrichment history")
+        
+        # Clear current selection
+        self.selected_param_id = None
+        self.selected_record = None
+        self.undo_button.set_sensitive(False)
+        self.rate_button.set_sensitive(False)
+        self.detail_text.get_buffer().set_text("No selection")
+        
+        # Get current document
+        document = None
+        if self.model_canvas:
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    canvas_manager = self.model_canvas.get_current_model()
+                else:
+                    canvas_manager = self.model_canvas
+                
+                if canvas_manager and hasattr(canvas_manager, 'document'):
+                    document = canvas_manager.document
+            except Exception as e:
+                self.logger.warning(f"Could not get document on tab switch: {e}")
+        
+        # Refresh history for new model
+        if document and self.kb_available:
+            self._refresh_history()
+        else:
+            # No document or KB not available - clear history
+            self.history_store.clear()
+            if not self.kb_available:
+                self.status_label.set_markup('<span size="small">Knowledge base not available</span>')
+            else:
+                self.status_label.set_markup('<span size="small">No model loaded</span>')

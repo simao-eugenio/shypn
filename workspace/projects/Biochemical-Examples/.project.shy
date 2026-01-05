@@ -6,7 +6,7 @@
     "name": "Biochemical-Examples",
     "description": "",
     "created_date": "2025-11-18T11:03:29.589087",
-    "modified_date": "2025-12-23T20:22:46.004350"
+    "modified_date": "2026-01-02T14:00:01.032470"
   },
   "location": {
     "base_path": "/home/simao/projetos/shypn/workspace/projects/Biochemical-Examples"
@@ -28,6 +28,42 @@
         "model_id": null,
         "tags": [],
         "notes": "SBML model: BIOMD0000000064\nSpecies: 26, Reactions: 17"
+      },
+      "4d18f502-9498-4687-a25f-f5afd5c25604": {
+        "id": "4d18f502-9498-4687-a25f-f5afd5c25604",
+        "name": "e_coli_core",
+        "source_type": "kegg",
+        "source_id": "e_coli_core",
+        "source_organism": "Unknown",
+        "raw_file": "e_coli_core.xml",
+        "metadata_file": "",
+        "imported_date": "2026-01-02T14:00:00.907747",
+        "last_modified": "2026-01-02T14:00:00.907747",
+        "enrichments": [],
+        "model_id": null,
+        "tags": [
+          "auto-discovered",
+          "external"
+        ],
+        "notes": "Auto-discovered from file system: /home/simao/projetos/shypn/workspace/projects/Biochemical-Examples/pathways/e_coli_core.xml"
+      },
+      "3a072ddd-1f50-45ac-8a30-8efe1b16ac85": {
+        "id": "3a072ddd-1f50-45ac-8a30-8efe1b16ac85",
+        "name": "iAB_RBC_283",
+        "source_type": "kegg",
+        "source_id": "iAB_RBC_283",
+        "source_organism": "Unknown",
+        "raw_file": "iAB_RBC_283.xml",
+        "metadata_file": "",
+        "imported_date": "2026-01-02T14:00:01.032414",
+        "last_modified": "2026-01-02T14:00:01.032414",
+        "enrichments": [],
+        "model_id": null,
+        "tags": [
+          "auto-discovered",
+          "external"
+        ],
+        "notes": "Auto-discovered from file system: /home/simao/projetos/shypn/workspace/projects/Biochemical-Examples/pathways/iAB_RBC_283.xml"
       }
     },
     "simulations": []

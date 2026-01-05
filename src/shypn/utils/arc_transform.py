@@ -11,6 +11,7 @@ and maintain the arc's identity (ID, name) in the model.
 from shypn.netobjs import Arc, InhibitorArc, CurvedArc, CurvedInhibitorArc
 from shypn.netobjs.test_arc import TestArc
 from shypn.netobjs.signal_flow_arc import SignalFlowArc
+from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
 
 
 def transform_arc(arc, make_curved=None, make_inhibitor=None):
@@ -48,8 +49,9 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
     from shypn.netobjs.transition import Transition
     
     # Determine current state
-    is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc))
+    is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc))
     is_inhibitor = isinstance(arc, (InhibitorArc, CurvedInhibitorArc))
+    is_signal = isinstance(arc, (SignalFlowArc, CurvedSignalFlowArc))
     
     # Apply transformations (if specified)
     if make_curved is not None:
@@ -66,12 +68,17 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
             )
     
     # Select appropriate target class
+    # Priority: inhibitor > signal > normal (test arcs not handled here)
     if is_curved and is_inhibitor:
         target_class = CurvedInhibitorArc
+    elif is_curved and is_signal:
+        target_class = CurvedSignalFlowArc
     elif is_curved:
         target_class = CurvedArc
     elif is_inhibitor:
         target_class = InhibitorArc
+    elif is_signal:
+        target_class = SignalFlowArc
     else:
         target_class = Arc
     
@@ -170,7 +177,7 @@ def is_straight(arc):
         bool: True if arc is straight (not curved)
     """
     # Check if it's a CurvedArc class (legacy system)
-    if isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
+    if isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc)):
         return False
     
     # Check if regular Arc has is_curved flag set (new system)
@@ -193,7 +200,7 @@ def is_curved(arc):
         bool: True if arc is curved
     """
     # Check if it's a CurvedArc class (legacy system)
-    if isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
+    if isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc)):
         return True
     
     # Check if regular Arc has is_curved flag set (new system)

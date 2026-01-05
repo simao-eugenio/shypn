@@ -437,18 +437,28 @@ class HeuristicParametersController:
                     
                     if substrate_places:
                         # Build substrate expression: P1*P2*P3 for multi-substrate reactions
-                        # Sanitize names to be eval-safe (remove spaces, special chars)
+                        # Get substrate names (user-editable aliases like ATP, Glucose)
                         substrate_names = []
                         for place in substrate_places:
-                            raw_name = place.name if hasattr(place, 'name') else f"P{place.id}"
-                            sanitized_name = self._sanitize_place_name(raw_name)
-                            substrate_names.append(sanitized_name)
+                            # Use place.name (alias) in rate expressions, not place.id (system ID)
+                            # place.name is user-editable and represents the biochemical entity
+                            substrate_names.append(place.name)
                         
-                        # Join with multiplication for multi-substrate
-                        substrate_expr = '*'.join(substrate_names)
-                        rate_function = f"michaelis_menten({substrate_expr}, vmax={params['vmax']}, km={params['km']})"
+                        # Use EXPANDED formula instead of catalog function
+                        vmax = params['vmax']
+                        km = params['km']
+                        
+                        if len(substrate_names) == 1:
+                            # Single substrate: (Vmax * S) / (Km + S)
+                            s_name = substrate_names[0]
+                            rate_function = f"({vmax} * {s_name}) / ({km} + {s_name})"
+                        else:
+                            # Multi-substrate: (Vmax * S1 * S2 * ...) / (Km + S1 * S2 * ...)
+                            substrate_expr = ' * '.join(substrate_names)
+                            rate_function = f"({vmax} * {substrate_expr}) / ({km} + {substrate_expr})"
+                        
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"✅ Generated rate_function: {rate_function} ({len(substrate_names)} substrates)")
+                        self.logger.info(f"✅ Generated rate_function: {rate_function} ({len(substrate_ids)} substrates)")
                     else:
                         self.logger.warning(f"No substrate place found for {transition_id}, using constant rate")
                         transition.rate = params['vmax']

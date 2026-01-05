@@ -497,17 +497,19 @@ class ModelCanvasLoader:
                                 break
                         
                         if transition_obj:
+                            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                            
                             # Reset colors of arcs from input places to transition
                             for place in locality_data.get('input_places', []):
                                 for arc in check_manager.arcs:
                                     if arc.source.id == place.id and arc.target.id == transition_id:
-                                        arc.color = Arc.DEFAULT_COLOR
+                                        arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                             
                             # Reset colors of arcs from transition to output places
                             for place in locality_data.get('output_places', []):
                                 for arc in check_manager.arcs:
                                     if arc.source.id == transition_id and arc.target.id == place.id:
-                                        arc.color = Arc.DEFAULT_COLOR
+                                        arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                             
                             # Trigger redraw for this canvas
                             check_manager.mark_needs_redraw()
@@ -579,6 +581,9 @@ class ModelCanvasLoader:
         if hasattr(self, 'pathway_panel_loader') and self.pathway_panel_loader:
             try:
                 self.pathway_panel_loader.set_model_canvas(self)
+                # Notify Pathway Operations panel about tab switch (for KEGG/SBML/BRENDA panels)
+                if hasattr(self.pathway_panel_loader, 'on_tab_switched'):
+                    self.pathway_panel_loader.on_tab_switched(drawing_area)
             except Exception:
                 pass
         
@@ -4908,26 +4913,25 @@ class ModelCanvasLoader:
         
         # Import default colors
         from shypn.netobjs import Place, Transition
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         
         if settings.is_object_recorded(obj_id):
             settings.remove_recorded_object(obj_id)
             
-            # Restore default colors based on object type
+            # Restore type-appropriate default colors
             if isinstance(obj, Place):
-                # All places use black border (normalized color scheme)
-                obj.border_color = Place.DEFAULT_BORDER_COLOR  # Black for all places
+                ColorSchemaManager.reset_place_color(obj)
             elif isinstance(obj, Transition):
-                obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                obj.fill_color = Transition.DEFAULT_COLOR
+                ColorSchemaManager.reset_transition_colors(obj)
         else:
             settings.add_recorded_object(obj_id)
             
             # Apply recording color (orange for all types)
             if isinstance(obj, Place):
-                obj.border_color = RECORDING_COLOR
+                obj.border_color = ColorSchemaManager.RECORDING_COLOR
             elif isinstance(obj, Transition):
-                obj.border_color = RECORDING_COLOR
-                obj.fill_color = RECORDING_COLOR
+                obj.border_color = ColorSchemaManager.RECORDING_COLOR
+                obj.fill_color = ColorSchemaManager.RECORDING_COLOR
         
         # Trigger on_changed callback if available
         if hasattr(obj, 'on_changed') and obj.on_changed:
@@ -5239,10 +5243,10 @@ class ModelCanvasLoader:
         place.is_signal_place = True
         place.signal_type = signal_type
         
-        # Apply normalized color schema (2025-12-31):
-        # Signal places have hexagonal shape with BLUE border
+        # Apply normalized color schema using ColorSchemaManager
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         place.shape = 'hexagon'
-        place.border_color = (0.0, 0.4, 0.8)  # Blue border
+        ColorSchemaManager.reset_place_color(place)  # Blue border for signal places
         
         # Mark document dirty
         if self.persistency:
@@ -5273,10 +5277,10 @@ class ModelCanvasLoader:
         place.is_signal_place = False
         place.signal_type = None
         
-        # Restore default appearance (normalized color schema):
-        # Regular places have circular shape with black border
+        # Restore default appearance using ColorSchemaManager
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         place.shape = 'circle'
-        place.border_color = (0.0, 0.0, 0.0)  # Black border (default)
+        ColorSchemaManager.reset_place_color(place)
         
         # Mark document dirty
         if self.persistency:

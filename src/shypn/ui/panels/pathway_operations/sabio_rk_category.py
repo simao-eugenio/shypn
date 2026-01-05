@@ -848,67 +848,45 @@ class SabioRKCategory(BasePathwayCategory):
         self.status_label.set_markup("<i>Ready to query</i>")
         
         # Store transition ID and object for use in search results
-        self._context_transition_id = transition_id if transition_id else None
-        self._context_transition = transition  # Store actual transition object
-        
-        # Pre-fill EC number (use reaction_id if it looks like EC format)
-        if ec_number:
-            self.ec_entry.set_text(ec_number)
-            self.logger.info(f"[SABIO-RK] Set EC number: {ec_number}")
-        elif reaction_id:
-            # If reaction_id is EC format, use it as EC number
-            import re
-            if re.match(r'^\d+\.\d+\.\d+\.\d+$', reaction_id):
-                self.ec_entry.set_text(reaction_id)
-                self.logger.info(f"[SABIO-RK] Set EC number from reaction_id: {reaction_id}")
-            else:
-                self.logger.warning(f"[SABIO-RK] Reaction ID '{reaction_id}' not in EC format")
-                # Clear EC field if we can't use it
-                self.ec_entry.set_text("")
-        else:
-            self.ec_entry.set_text("")
-            self.logger.warning(f"[SABIO-RK] No EC number or reaction_id for transition {transition_id}")
-        
-        # Keep current organism selection - DON'T change it
-        # User may have selected a specific organism they want to use for all queries
-        # Only set organism if explicitly provided AND it's different from current
-        current_organism = self.organism_combo.get_active_text()
-        if organism and organism != current_organism and hasattr(self, 'organism_combo'):
-            # Try to find matching organism in combo box
-            model = self.organism_combo.get_model()
-            found = False
-            
-            if model:
-                for i, row in enumerate(model):
-                    if organism.lower() in row[0].lower() or row[0].lower() in organism.lower():
-                        self.organism_combo.set_active(i)
-                        found = True
-                        self.logger.info(f"[SABIO-RK] Set organism: {row[0]}")
-                        break
-            
-            if not found:
-                # Set to "All organisms" if not found
-                self.organism_combo.set_active(0)
-                self.logger.warning(f"[SABIO-RK] Organism '{organism}' not found in list, using 'All organisms'")
-        else:
-            # No organism specified, recommend adding one
-            if hasattr(self, 'organism_combo'):
-                self.organism_combo.set_active(0)  # "All organisms"
-            self.logger.info(f"[SABIO-RK] No organism specified for transition {transition_id}")
-        
-        # Update status to guide user
-        if hasattr(self, 'status_label'):
-            if ec_number or reaction_id:
-                self.status_label.set_markup(
-                    f"<i>Query pre-filled from transition {transition_id}. "
-                    f"Recommend selecting organism filter before searching.</i>"
-                )
-            else:
-                self.status_label.set_markup(
-                    f"<span foreground='red'>No EC number found for transition {transition_id}. "
-                    f"Please enter EC number manually.</span>"
-                )
     
+    def on_tab_switched(self):
+        """Called when the user switches to a different model tab.
+        
+        Updates the SABIO-RK panel to reflect the currently active model:
+        - Refreshes button states
+        - Updates status labels
+        - Ensures correct model is targeted for queries
+        """
+        self.logger.debug("Tab switched, updating SABIO-RK panel state")
+        
+        # Get current model/document
+        canvas_manager = self._get_current_model()
+        document = None
+        if canvas_manager and hasattr(canvas_manager, 'document'):
+            document = canvas_manager.document
+        
+        # Update buttons based on new active model
+        if document:
+            # Enable buttons if model is loaded
+            self.search_button.set_sensitive(True)
+            self.query_all_button.set_sensitive(True)
+            
+            # Count transitions in new model
+            transition_count = 0
+            if canvas_manager and hasattr(canvas_manager, 'transitions'):
+                transition_count = len(canvas_manager.transitions)
+            
+            self.status_label.set_markup(
+                f'<span size="small">Model loaded - {transition_count} transitions</span>'
+            )
+        else:
+            # No document - disable buttons
+            self.search_button.set_sensitive(False)
+            self.query_all_button.set_sensitive(False)
+            self.status_label.set_markup(
+                '<span size="small">No model loaded</span>'
+            )
+
     def _reset_simulation_after_parameter_changes(self):
         """Reset simulation to initial state after applying parameter changes.
         

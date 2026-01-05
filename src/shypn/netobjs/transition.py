@@ -464,12 +464,15 @@ class Transition(PetriNetObject):
         # Store the value
         self.rate = rate_value
         
-        # For continuous transitions, also store in properties for engine
+        # DEPRECATED: Legacy sync to properties dict
+        # NOTE: As of 2026-01-04, continuous_behavior.py now prefers top-level
+        # rate_function field over properties['rate_function']. This sync is
+        # maintained for backwards compatibility only and will be removed in future.
         if self.transition_type == 'continuous':
             if not hasattr(self, 'properties') or self.properties is None:
                 self.properties = {}
             
-            # Store expression for evaluation
+            # Store expression for evaluation (legacy)
             if isinstance(rate_value, str):
                 self.properties['rate_function'] = rate_value
             else:
@@ -541,6 +544,8 @@ class Transition(PetriNetObject):
             data["guard"] = self.guard
         if self.rate is not None:
             data["rate"] = self.rate
+        if hasattr(self, 'rate_function') and self.rate_function:
+            data["rate_function"] = self.rate_function
         if hasattr(self, 'formula') and self.formula:
             data["formula"] = self.formula
         
@@ -672,8 +677,8 @@ class Transition(PetriNetObject):
         
         # Extract required properties with type conversion
         transition = cls(
-            x=float(data["x"]),
-            y=float(data["y"]),
+            x=float(data.get("x", 0.0)),  # Default to 0.0 if missing (legacy file support)
+            y=float(data.get("y", 0.0)),  # Default to 0.0 if missing (legacy file support)
             id=transition_id,  # String ID
             name=name,
             width=float(data.get("width", cls.DEFAULT_WIDTH)),
@@ -705,6 +710,8 @@ class Transition(PetriNetObject):
             transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
+        if "rate_function" in data:
+            transition.rate_function = data["rate_function"]
         if "formula" in data:
             transition.formula = data["formula"]
         
@@ -726,6 +733,10 @@ class Transition(PetriNetObject):
         # Restore kinetic metadata (new structured metadata)
         if "kinetic_metadata" in data and create_metadata_from_dict is not None:
             transition.kinetic_metadata = create_metadata_from_dict(data["kinetic_metadata"])
+        
+        # Restore generic metadata (added by importers/enrichers)
+        if "metadata" in data:
+            transition.metadata = data["metadata"]
         
         # Restore signal places (quorum sensing)
         if "signal_places" in data:

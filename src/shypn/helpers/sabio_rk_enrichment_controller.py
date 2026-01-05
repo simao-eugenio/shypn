@@ -678,20 +678,20 @@ class SabioRKEnrichmentController:
                     tokens = getattr(place, 'tokens', 0)
                     if tokens > max_tokens:
                         max_tokens = tokens
-                        substrate_place = place.id
+                        substrate_place = place.name  # Use name (alias), not id
                 
                 # Use second place for inhibitor if Ki available
                 if ki and len(input_places) > 1:
                     for place in input_places:
-                        if place.id != substrate_place:
-                            inhibitor_place = place.id
+                        if place.name != substrate_place:
+                            inhibitor_place = place.name  # Use name (alias), not id
                             break
         
         # If no input places or substrate not found, try output places
         # (for reverse reactions where Km might be for product)
         if not substrate_place and output_places:
             self.logger.info(f"[SABIO-RK] No input places found, using first output place for substrate")
-            substrate_place = output_places[0].id
+            substrate_place = output_places[0].name  # Use name (alias), not id
         
         # Fallback: use generic names
         if not substrate_place:

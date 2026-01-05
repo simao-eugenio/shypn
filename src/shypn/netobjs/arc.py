@@ -898,14 +898,35 @@ class Arc(PetriNetObject):
                 raise ValueError(f"{obj_type_name} not found with ID: {raw_id}")
             return obj
         
+        # Infer source_type and target_type if not present (for backward compatibility)
+        source_type = data.get("source_type")
+        if source_type is None:
+            # Infer from ID - check if it exists in places or transitions
+            if raw_source_id in places:
+                source_type = "place"
+            elif raw_source_id in transitions:
+                source_type = "transition"
+            else:
+                raise ValueError(f"Cannot determine source type for ID: {raw_source_id}")
+        
+        target_type = data.get("target_type")
+        if target_type is None:
+            # Infer from ID - check if it exists in places or transitions
+            if raw_target_id in places:
+                target_type = "place"
+            elif raw_target_id in transitions:
+                target_type = "transition"
+            else:
+                raise ValueError(f"Cannot determine target type for ID: {raw_target_id}")
+        
         # Find source object
-        if data["source_type"] == "place":
+        if source_type == "place":
             source = find_object(raw_source_id, places, "Source place")
         else:
             source = find_object(raw_source_id, transitions, "Source transition")
         
         # Find target object
-        if data["target_type"] == "place":
+        if target_type == "place":
             target = find_object(raw_target_id, places, "Target place")
         else:
             target = find_object(raw_target_id, transitions, "Target transition")
@@ -932,8 +953,18 @@ class Arc(PetriNetObject):
         )
         
         # Restore optional properties
-        if "color" in data:
+        # Color handling: Always enforce color schema for semantic arc types
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        if ColorSchemaManager.is_semantic_arc_color(arc):
+            # Semantic arcs (TestArc, SignalFlowArc) always get schema color
+            ColorSchemaManager.reset_arc_color(arc)
+        elif "color" in data:
+            # Non-semantic arcs use saved color (may be analysis color)
             arc.color = tuple(data["color"])
+        else:
+            # Fallback to type-appropriate default
+            ColorSchemaManager.reset_arc_color(arc)
+        
         if "width" in data:
             arc.width = data["width"]
         if "control_points" in data:
@@ -947,8 +978,9 @@ class Arc(PetriNetObject):
     def create_from_dict(data: dict, places: dict, transitions: dict) -> 'Arc':
         """Factory method to create appropriate arc subclass from dictionary.
         
-        This method examines the 'type' field in the data and creates the
-        appropriate Arc subclass (Arc, InhibitorArc, CurvedArc, or CurvedInhibitorArc).
+        This method examines the 'arc_type' or 'type' field in the data and creates the
+        appropriate Arc subclass (Arc, InhibitorArc, CurvedArc, CurvedInhibitorArc, 
+        SignalFlowArc, CurvedSignalFlowArc, TestArc).
         
         Args:
             data: Dictionary containing arc properties
@@ -961,19 +993,28 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source or target objects not found
         """
-        # Support both old "type" and new "object_type" for backward compatibility
-        arc_type = data.get("object_type", data.get("type", "arc"))
+        # Check arc_type first (new format), then object_type/type (old format)
+        arc_type = data.get("arc_type", data.get("object_type", data.get("type", "arc")))
         
         # Import subclasses here to avoid circular imports
-        if arc_type == "inhibitor_arc":
+        if arc_type == "inhibitor" or arc_type == "inhibitor_arc":
             from shypn.netobjs.inhibitor_arc import InhibitorArc
             return InhibitorArc.from_dict(data, places, transitions)
-        elif arc_type == "curved_arc":
+        elif arc_type == "curved" or arc_type == "curved_arc":
             from shypn.netobjs.curved_arc import CurvedArc
             return CurvedArc.from_dict(data, places, transitions)
         elif arc_type == "curved_inhibitor_arc":
             from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
             return CurvedInhibitorArc.from_dict(data, places, transitions)
+        elif arc_type == "signal_flow":
+            from shypn.netobjs.signal_flow_arc import SignalFlowArc
+            return SignalFlowArc.from_dict(data, places, transitions)
+        elif arc_type == "curved_opposite_signal_flow":
+            from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+            return CurvedSignalFlowArc.from_dict(data, places, transitions)
+        elif arc_type == "test":
+            from shypn.netobjs.test_arc import TestArc
+            return TestArc.from_dict(data, places, transitions)
         else:
             # Default to Arc for backward compatibility
             return Arc.from_dict(data, places, transitions)

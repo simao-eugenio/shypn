@@ -6,7 +6,8 @@ the _build_content() method to populate their specific views.
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, Pango
 
 from shypn.ui.category_frame import CategoryFrame
 
@@ -169,7 +170,7 @@ class BaseReportCategory:
         textview = Gtk.TextView()
         textview.set_editable(False)
         textview.set_cursor_visible(False)
-        textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        textview.set_wrap_mode(Pango.WrapMode.WORD)
         textview.set_left_margin(6)
         textview.set_right_margin(6)
         

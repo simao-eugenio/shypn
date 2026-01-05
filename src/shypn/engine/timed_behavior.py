@@ -175,13 +175,14 @@ class TimedBehavior(TransitionBehavior):
                 if source_place is None:
                     return (False, f'missing-source-place-{arc.source_id}')
                 
-                # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
-                # They broadcast information without token consumption
-                # Skip token requirement checks for signal places
-                if self._is_signal_place(source_place):
-                    continue  # Signal places don't block enablement
+                # TEST ARC: Non-consuming arcs only check presence (weight)
+                # Consuming arcs (including SignalFlowArcs) must have sufficient tokens
+                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    required = arc.weight  # Just check presence for test arcs
+                else:
+                    required = arc.weight  # Normal and SignalFlowArcs need full weight
                 
-                if source_place.tokens < arc.weight:
+                if source_place.tokens < required:
                     return (False, f'insufficient-tokens-P{arc.source_id}')
         
         if self._enablement_time is None:

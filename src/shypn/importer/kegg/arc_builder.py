@@ -99,7 +99,13 @@ class StandardArcBuilder(ArcBuilder):
             
             # Use stoichiometry from substrate as arc weight
             weight = substrate.stoichiometry
-            arc = Arc(place, transition, arc_id, "", weight=weight)
+            
+            # Auto-detect signal places and create SignalFlowArc if needed
+            if getattr(place, 'is_signal_place', False):
+                from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                arc = SignalFlowArc(place, transition, arc_id, "", weight=weight)
+            else:
+                arc = Arc(place, transition, arc_id, "", weight=weight)
             
             # Store KEGG metadata including stoichiometry
             if not hasattr(arc, 'metadata'):
@@ -154,7 +160,13 @@ class StandardArcBuilder(ArcBuilder):
             
             # Use stoichiometry from product as arc weight
             weight = product.stoichiometry
-            arc = Arc(transition, place, arc_id, "", weight=weight)
+            
+            # Auto-detect signal places and create SignalFlowArc if needed
+            if getattr(place, 'is_signal_place', False):
+                from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                arc = SignalFlowArc(transition, place, arc_id, "", weight=weight)
+            else:
+                arc = Arc(transition, place, arc_id, "", weight=weight)
             
             # Store KEGG metadata including stoichiometry
             if not hasattr(arc, 'metadata'):

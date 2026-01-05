@@ -16,6 +16,11 @@ import sys
 import logging
 import warnings
 
+# Configure logging to suppress all messages except CRITICAL errors
+logging.basicConfig(level=logging.CRITICAL)
+# Disable logging for all shypn modules
+logging.getLogger('shypn').setLevel(logging.CRITICAL)
+
 # Suppress matplotlib Axes3D import warning (harmless - system matplotlib visible in path)
 warnings.filterwarnings('ignore', message='Unable to import Axes3D')
 
@@ -476,6 +481,7 @@ def main(argv=None):
 				# 	sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
 				
 		except Exception as e:
+			import logging
 			logging.getLogger(__name__).warning('Failed to load pathway panel: %s', e)
 			pathway_panel_loader = None
 			topology_panel_loader = None

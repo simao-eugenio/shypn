@@ -84,20 +84,24 @@ class StandardReactionMapper(ReactionMapper):
         if hasattr(reaction, 'graphics') and reaction.graphics and hasattr(reaction.graphics, 'name'):
             enzyme_name = str(reaction.graphics.name).strip()
             if enzyme_name and enzyme_name.lower() not in ('undefined', 'unknown', ''):
-                # Take first word if multi-word name
+                # Extract SHORT name (first word only, not entire EC family)
+                # Example: "Hexokinase type 1" → "Hexokinase"
+                # Example: "Pyruvate kinase" → "Pyruvate"
                 first_word = enzyme_name.split()[0] if ' ' in enzyme_name else enzyme_name
-                # Remove common characters
-                first_word = first_word.rstrip(',;:')
+                # Remove trailing punctuation
+                first_word = first_word.rstrip(',;:()')
                 # Must be actual name, not a reaction code
                 if first_word and len(first_word) > 1 and not (first_word.startswith('R') and len(first_word) == 6):
                     return first_word
         
         # 3. Use EC number directly if no abbreviation found (still biological)
+        # Format as short EC number without family details
         if ec_numbers and len(ec_numbers) > 0:
-            # Format as EC_2.7.1.1 for first EC number
+            # Use first EC number, formatted simply (e.g., "2.7.1.1")
             ec_clean = ec_numbers[0].replace('EC:', '').replace('EC ', '').strip()
             if ec_clean:
-                return f"EC_{ec_clean}"
+                # Return just the EC number for brevity
+                return ec_clean
         
         # 4. Try to extract enzyme name from reaction definition/equation
         if hasattr(reaction, 'equation') and reaction.equation:

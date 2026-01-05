@@ -13,7 +13,8 @@ Example:
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Pango
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, Pango, Pango
 
 from .locality_detector import Locality, LocalityDetector
 from .locality_analyzer import LocalityAnalyzer
@@ -100,7 +101,7 @@ class LocalityInfoWidget(Gtk.Box):
         self.textview = Gtk.TextView()
         self.textview.set_editable(False)
         self.textview.set_cursor_visible(False)
-        self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.textview.set_wrap_mode(Pango.WrapMode.WORD)
         self.textview.set_left_margin(10)
         self.textview.set_right_margin(10)
         self.textview.set_top_margin(5)
