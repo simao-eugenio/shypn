@@ -1494,6 +1494,22 @@ class SBMLCategory(BasePathwayCategory):
             }
             self._trigger_import_complete(imported_data)
             
+            # PHASE 3: Auto-map compounds for thermodynamic validation
+            if document_model:
+                try:
+                    from shypn.thermodynamics.mappers import CompoundMapperService
+                    
+                    mapper_service = CompoundMapperService()
+                    mappings, confidences = mapper_service.map_all_places(document_model)
+                    
+                    summary = mapper_service.get_mapping_summary(mappings, confidences)
+                    self.logger.info(
+                        f"Thermodynamic mapping: {summary['total_mapped']}/{len(document_model.places)} places mapped "
+                        f"(avg confidence: {summary['average_confidence']:.0%})"
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Compound mapping failed (non-critical): {e}")
+            
             # Re-enable button
             self.import_button.set_sensitive(True)
             

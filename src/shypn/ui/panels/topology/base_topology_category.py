@@ -753,7 +753,15 @@ class BaseTopologyCategory:
         # Run analysis in background thread
         def analyze_thread():
             try:
-                analyzer = analyzer_class(model)
+                # PHASE 3: Pass document to ThermodynamicAnalyzerAdapter for settings
+                # The adapter reads pH, temperature, and ionic_strength from document
+                from shypn.topology.biological.thermodynamic_analyzer_adapter import ThermodynamicAnalyzerAdapter
+                
+                if analyzer_class == ThermodynamicAnalyzerAdapter:
+                    analyzer = analyzer_class(model, document=model)
+                else:
+                    analyzer = analyzer_class(model)
+                
                 result = analyzer.analyze()
                 
                 # Cache result
@@ -1173,7 +1181,14 @@ class BaseTopologyCategory:
                 # COMPUTATION HAPPENS HERE (in background thread, UI-decoupled)
                 # Model was extracted on main thread, so this is safe
                 # ===================================================================
-                analyzer = analyzer_class(model)
+                # PHASE 3: Pass document to ThermodynamicAnalyzerAdapter for settings
+                from shypn.topology.biological.thermodynamic_analyzer_adapter import ThermodynamicAnalyzerAdapter
+                
+                if analyzer_class == ThermodynamicAnalyzerAdapter:
+                    analyzer = analyzer_class(model, document=model)
+                else:
+                    analyzer = analyzer_class(model)
+                
                 result = analyzer.analyze()  # This can take seconds - UI stays responsive!
                 # ===================================================================
                 

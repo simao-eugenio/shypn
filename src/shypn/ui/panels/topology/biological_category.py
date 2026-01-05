@@ -26,8 +26,7 @@ from shypn.topology.biological.regulatory_structure import RegulatoryStructureAn
 from shypn.topology.biological.mass_balance import MassBalanceAnalyzer
 from shypn.topology.biological.stoichiometry import StoichiometryAnalyzer
 from shypn.topology.biological.flux_balance import FluxBalanceAnalyzer
-from shypn.topology.biological.thermodynamics import ThermodynamicAnalyzer
-from shypn.topology.biological.thermodynamics import ThermodynamicAnalyzer
+from shypn.topology.biological.thermodynamic_analyzer_adapter import ThermodynamicAnalyzerAdapter
 
 
 class BiologicalCategory(BaseTopologyCategory):
@@ -71,7 +70,7 @@ class BiologicalCategory(BaseTopologyCategory):
             'flux_balance': FluxBalanceAnalyzer,
             'dependency_coupling': DependencyAndCouplingAnalyzer,
             'regulatory_structure': RegulatoryStructureAnalyzer,
-            'thermodynamics': ThermodynamicAnalyzer,
+            'thermodynamics': ThermodynamicAnalyzerAdapter,
         }
     
     def _build_content(self):
