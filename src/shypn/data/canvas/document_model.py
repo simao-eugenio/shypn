@@ -681,9 +681,6 @@ class DocumentModel:
         for i, signal_arc in arcs_to_convert:
             document.arcs[i] = signal_arc
         
-        if arcs_to_convert:
-            print(f"[INFO] Post-load fix: Converted {len(arcs_to_convert)} regular Arc(s) to SignalFlowArc(s) for signal place connections")
-        
         return document
     
     def save_to_file(self, filepath: str) -> None:
