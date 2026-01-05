@@ -55,17 +55,41 @@ class ThermodynamicSimulationValidator:
     
     def __init__(
         self,
-        tolerance: float = 0.5,
+        tolerance: float = None,
         enable_web: bool = False,
-        emit_warnings: bool = True
+        emit_warnings: bool = True,
+        document = None
     ):
         """Initialize thermodynamic validator.
         
         Args:
-            tolerance: Validation tolerance (0.0 to 1.0, default 0.5)
+            tolerance: Validation tolerance (0.0 to 1.0, default 0.5). 
+                      If None and document provided, reads from document.thermodynamic_settings
             enable_web: Enable eQuilibrator API access (default False for offline)
             emit_warnings: Emit Python warnings for violations (default True)
+            document: DocumentModel to read settings from (optional)
         """
+        # Store document reference
+        self.document = document
+        
+        # Determine settings from document or use defaults
+        if document is not None:
+            # Read from document settings
+            self.ph = document.get_thermodynamic_setting('ph', 7.0)
+            self.temperature = document.get_thermodynamic_setting('temperature', 298.15)
+            self.ionic_strength = document.get_thermodynamic_setting('ionic_strength', 0.1)
+            if tolerance is None:
+                tolerance = document.get_thermodynamic_setting('tolerance', 0.5)
+            if not document.get_thermodynamic_setting('enable_validation', True):
+                logger.info("Thermodynamic validation disabled in document settings")
+        else:
+            # Use defaults
+            self.ph = 7.0
+            self.temperature = 298.15
+            self.ionic_strength = 0.1
+            if tolerance is None:
+                tolerance = 0.5
+        
         # Initialize thermodynamics engine
         self.provider = MultiSourceProvider(enable_web=enable_web)
         self.calculator = GibbsCalculator(self.provider)
@@ -77,7 +101,7 @@ class ThermodynamicSimulationValidator:
         
         logger.info(
             f"ThermodynamicSimulationValidator initialized "
-            f"(tolerance={tolerance:.1%}, web={enable_web})"
+            f"(tolerance={tolerance:.1%}, pH={self.ph:.1f}, T={self.temperature:.1f}K, web={enable_web})"
         )
     
     def validate_reversible_reaction(
@@ -87,8 +111,8 @@ class ThermodynamicSimulationValidator:
         k_reverse: float,
         reactants: Dict[str, int],
         products: Dict[str, int],
-        ph: float = 7.0,
-        temperature: float = 298.15,
+        ph: float = None,
+        temperature: float = None,
         suppress_warnings: bool = False
     ) -> ThermodynamicValidation:
         """Validate a single reversible reaction.
@@ -99,13 +123,19 @@ class ThermodynamicSimulationValidator:
             k_reverse: Reverse rate constant
             reactants: {compound_id: stoichiometry}
             products: {compound_id: stoichiometry}
-            ph: pH value (default 7.0)
-            temperature: Temperature in K (default 298.15)
+            ph: pH value (default None = use document or 7.0)
+            temperature: Temperature in K (default None = use document or 298.15)
             suppress_warnings: Skip warning emission for this call
             
         Returns:
             ThermodynamicValidation with validation results
         """
+        # Use document settings if not provided
+        if ph is None:
+            ph = self.ph
+        if temperature is None:
+            temperature = self.temperature
+        
         # Validate the reaction - catch errors for missing data
         try:
             validation = self.validator.validate_reversible_reaction(
