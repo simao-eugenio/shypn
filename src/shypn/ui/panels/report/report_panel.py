@@ -24,6 +24,7 @@ from .model_structure_category import ModelsCategory
 from .provenance_category import ProvenanceCategory
 from .parameters_category import DynamicAnalysesCategory
 from .topology_analyses_category import TopologyAnalysesCategory
+from .thermodynamic_validation_category import ThermodynamicValidationCategory
 from .export_toolbar import ExportToolbar
 
 
@@ -204,6 +205,20 @@ class ReportPanel(Gtk.Box):
         widget.show_all()
         container.pack_start(widget, False, False, 0)
         # print("[REPORT_PANEL] TopologyAnalysesCategory added to container")
+        
+        # THERMODYNAMIC VALIDATION (Phase 4: from THERMODYNAMICS category)
+        # print("[REPORT_PANEL] Creating ThermodynamicValidationCategory...")
+        thermodynamics = ThermodynamicValidationCategory(
+            project=self.project,
+            model_canvas=current_manager,
+            pathway_operations_panel=self.pathway_operations_panel
+        )
+        self.categories.append(thermodynamics)
+        widget = thermodynamics.get_widget()
+        # print(f"[REPORT_PANEL] ThermodynamicValidationCategory widget: {widget}, visible={widget.get_visible()}")
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
+        # print("[REPORT_PANEL] ThermodynamicValidationCategory added to container")
         
         # PROVENANCE & LINEAGE (from all panels)
         # print("[REPORT_PANEL] Creating ProvenanceCategory...")
