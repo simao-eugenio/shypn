@@ -304,12 +304,12 @@ class AnalysisPlotPanel(Gtk.Box):
         obj.on_changed = None
         
         from shypn.netobjs import Transition, Place
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        
         if isinstance(obj, Transition):
-            obj.border_color = Transition.DEFAULT_BORDER_COLOR
-            obj.fill_color = Transition.DEFAULT_COLOR
+            ColorSchemaManager.reset_transition_colors(obj)
         elif isinstance(obj, Place):
-            obj.border_color = Place.DEFAULT_BORDER_COLOR
-            # Places don't have fill_color attribute
+            ColorSchemaManager.reset_place_color(obj)
         
         obj.on_changed = old_callback
         
@@ -463,6 +463,7 @@ class AnalysisPlotPanel(Gtk.Box):
         """Handle clear button click - clear selection and blank canvas."""
         # Reset both border and fill colors for all selected objects
         from shypn.netobjs import Transition, Place, Arc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
         
         # For transition panels, also reset arc colors for locality
         if self.object_type == 'transition' and hasattr(self, '_locality_places') and self._model_manager:
@@ -471,19 +472,19 @@ class AnalysisPlotPanel(Gtk.Box):
                 for place in locality_data.get('input_places', []):
                     for arc in self._model_manager.arcs:
                         if arc.source.id == place.id and arc.target.id == transition_id:
-                            arc.color = Arc.DEFAULT_COLOR
+                            arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                 
                 # Reset colors of arcs from transition to output places
                 for place in locality_data.get('output_places', []):
                     for arc in self._model_manager.arcs:
                         if arc.source.id == transition_id and arc.target.id == place.id:
-                            arc.color = Arc.DEFAULT_COLOR
+                            arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
                 
                 # Reset colors of catalyst arcs (test arcs from catalyst places to transition)
                 for place in locality_data.get('catalyst_places', []):
                     for arc in self._model_manager.arcs:
                         if arc.source.id == place.id and arc.target.id == transition_id:
-                            arc.color = Arc.DEFAULT_COLOR
+                            arc.color = SignalFlowArc.DEFAULT_COLOR if isinstance(arc, SignalFlowArc) else Arc.DEFAULT_COLOR
             
             # Clear locality data
             self._locality_places.clear()
@@ -493,12 +494,12 @@ class AnalysisPlotPanel(Gtk.Box):
             old_callback = obj.on_changed if hasattr(obj, 'on_changed') else None
             obj.on_changed = None
             
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            
             if isinstance(obj, Transition):
-                obj.border_color = Transition.DEFAULT_BORDER_COLOR
-                obj.fill_color = Transition.DEFAULT_COLOR
+                ColorSchemaManager.reset_transition_colors(obj)
             elif isinstance(obj, Place):
-                obj.border_color = Place.DEFAULT_BORDER_COLOR
-                # Places don't have fill_color attribute
+                ColorSchemaManager.reset_place_color(obj)
             
             obj.on_changed = old_callback
         

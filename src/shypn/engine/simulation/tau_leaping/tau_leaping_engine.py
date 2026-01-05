@@ -1,10 +1,12 @@
 """τ-Leaping Simulation Engine.
 
 Main engine for approximate stochastic simulation using τ-leaping method.
-Coordinates leap selection, Poisson sampling, and state updates.
+Coordinates leap selection, Poisson sampling (for irreversible reactions),
+Skellam sampling (for reversible reactions), and state updates.
 
-Phase 2: Sequential implementation (no parallelization)
-Phase 3: Will add parallel execution for weakly independent transitions
+Supports:
+- Irreversible reactions: Poisson(λ) for non-negative rates
+- Reversible reactions: Skellam(λ_forward, λ_reverse) for net flux
 """
 
 import logging
@@ -13,6 +15,7 @@ from typing import List, Dict, Any, Tuple, Optional
 
 from .leap_selector import LeapSelector
 from .poisson_sampler import PoissonSampler
+from .skellam_sampler import SkellamSampler
 from .parallel_scheduler import ParallelStochasticScheduler
 
 
@@ -21,7 +24,9 @@ class TauLeapingEngine:
     
     Implements approximate stochastic simulation:
     1. Select time leap τ (adaptive based on propensities)
-    2. Sample firings for each transition: Kⱼ ~ Poisson(aⱼ·τ)
+    2. Sample firings for each transition:
+       - Irreversible: Kⱼ ~ Poisson(aⱼ·τ)
+       - Reversible: ΔKⱼ ~ Skellam(a_forward·τ, a_reverse·τ)
     3. Apply all firings simultaneously
     4. Advance time by τ
     
@@ -60,11 +65,15 @@ class TauLeapingEngine:
             max_tau=max_tau
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
+        self.skellam_sampler = SkellamSampler(seed=seed)  # For reversible reactions
         self.use_parallel = use_parallel
         self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
         self._parallel_scheduler = None
+        
+        # Control flag for time advancement (can be disabled for hybrid models)
+        self._advance_time = True
         
         self.logger = logging.getLogger(__name__)
         
@@ -77,7 +86,9 @@ class TauLeapingEngine:
             'total_leaps': 0,
             'total_firings': 0,
             'mean_tau': 0.0,
-            'exact_ssa_fallbacks': 0
+            'exact_ssa_fallbacks': 0,
+            'reversible_reactions': 0,  # Count of Skellam samples
+            'irreversible_reactions': 0  # Count of Poisson samples
         }
     
     def execute_step(
@@ -145,13 +156,16 @@ class TauLeapingEngine:
             controller
         )
         
-        # Step 4: Advance time
-        controller.time += tau
+        # Step 4: Advance time (only if enabled - disabled for hybrid models)
+        if self._advance_time:
+            controller.time += tau
         
-        # CRITICAL: Record state after time advancement
-        # This captures updated firing counts and place tokens for automation experiments
-        if controller.data_collector:
-            controller.data_collector.record_state(controller.time)
+        # Step 4.5: Update assignment rule-defined species (Option 3)
+        if hasattr(controller, 'enable_assignment_rule_reevaluation') and controller.enable_assignment_rule_reevaluation:
+            self._update_assignment_rules(controller)
+        
+        # NOTE: State recording moved to controller.step() to avoid duplicate recording
+        # Controller records state once per step after all phases complete
         
         # Step 5: Update statistics
         self.stats['total_leaps'] += 1
@@ -188,13 +202,16 @@ class TauLeapingEngine:
     ) -> Dict[Any, int]:
         """Sample number of firings for each transition.
         
+        Detects reversible reactions (formulas with subtraction) and uses
+        Skellam distribution. Otherwise uses Poisson distribution.
+        
         Args:
             transitions: List of stochastic transitions
             tau: Time leap size
             current_time: Current simulation time
         
         Returns:
-            Dictionary mapping transition -> number of firings
+            Dictionary mapping transition -> number of firings (can be negative for reversible)
         """
         propensities = []
         
@@ -207,11 +224,29 @@ class TauLeapingEngine:
             # Calculate propensity
             try:
                 propensity = behavior._evaluate_rate_at_enablement(current_time)
+                
+                # Check if this is a reversible reaction
+                if hasattr(behavior, 'rate_function_expr') and behavior.rate_function_expr:
+                    is_reversible, forward_expr, reverse_expr = (
+                        SkellamSampler.detect_reversible_formula(behavior.rate_function_expr)
+                    )
+                    
+                    if is_reversible:
+                        # Mark for Skellam sampling
+                        transition._skellam_reversible = True
+                        transition._forward_expr = forward_expr
+                        transition._reverse_expr = reverse_expr
+                    else:
+                        transition._skellam_reversible = False
+                else:
+                    transition._skellam_reversible = False
+                    
             except Exception as e:
                 self.logger.warning(
                     f"Could not evaluate propensity for {transition.name}: {e}. Using default rate."
                 )
                 propensity = getattr(behavior, 'rate', 1.0)
+                transition._skellam_reversible = False
             
             propensities.append(propensity)
         
@@ -240,7 +275,7 @@ class TauLeapingEngine:
                     transitions, propensities, tau
                 )
         
-        # Sequential sampling (original implementation)
+        # Sequential sampling with Skellam support for reversible reactions
         firings_map = {}
         
         # Diagnostic: Check for extreme propensities before sampling
@@ -298,12 +333,183 @@ class TauLeapingEngine:
                 f"  Kinetic law: {formula_str[:200]}{'...' if len(formula_str) > 200 else ''}"
             )
         
-        firings_array = self.poisson_sampler.sample_batch(propensities, tau)
+        # Sample firings - use Skellam for reversible, Poisson for irreversible
+        for transition, propensity in zip(transitions, propensities):
+            if getattr(transition, '_skellam_reversible', False):
+                # Reversible reaction: use Skellam distribution
+                try:
+                    behavior = self._get_behavior(transition)
+                    
+                    # Evaluate forward and reverse propensities separately
+                    # For now, use the net propensity and split based on sign
+                    # TODO: Improve by parsing formula to extract forward/reverse components
+                    if propensity >= 0:
+                        # Net forward
+                        forward_prop = propensity
+                        reverse_prop = 0.0
+                    else:
+                        # Net reverse
+                        forward_prop = 0.0
+                        reverse_prop = abs(propensity)
+                    
+                    firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
+                    firings_map[transition] = firings
+                    self.stats['reversible_reactions'] += 1
+                    
+                except Exception as e:
+                    self.logger.warning(
+                        f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
+                    )
+                    # Fallback to Poisson with clamped propensity
+                    firings = self.poisson_sampler.sample(max(0, propensity), tau)
+                    firings_map[transition] = firings
+                    self.stats['irreversible_reactions'] += 1
+            else:
+                # Irreversible reaction: use Poisson distribution
+                # Clamp negative propensities to zero (shouldn't happen for irreversible)
+                if propensity < 0:
+                    self.logger.warning(
+                        f"Negative propensity for irreversible transition {transition.name}: {propensity}. "
+                        f"Clamping to 0."
+                    )
+                    propensity = 0.0
+                
+                firings = self.poisson_sampler.sample(propensity, tau)
+                firings_map[transition] = firings
+                self.stats['irreversible_reactions'] += 1
         
-        for transition, firings in zip(transitions, firings_array):
-            firings_map[transition] = int(firings)
+        # Apply inhibitor arc constraints to limit firings
+        firings_map = self._apply_inhibitor_constraints(firings_map, transitions)
         
         return firings_map
+    
+    def _apply_inhibitor_constraints(
+        self,
+        firings_map: Dict[Any, int],
+        transitions: List[Any]
+    ) -> Dict[Any, int]:
+        """Apply inhibitor arc constraints to limit firings.
+        
+        For each transition with inhibitor arcs, check if the products
+        would exceed their thresholds and reduce firings accordingly.
+        
+        Args:
+            firings_map: Dictionary mapping transition -> sampled firings
+            transitions: List of transitions
+        
+        Returns:
+            Modified firings_map with inhibitor constraints applied
+        """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator
+        import sys
+        
+        constrained_map = {}
+        
+        for transition in transitions:
+            original_firings = firings_map.get(transition, 0)
+            if original_firings <= 0:
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Get behavior to access arcs
+            behavior = self._get_behavior(transition)
+            if behavior is None:
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Get arcs
+            try:
+                input_arcs = behavior.get_input_arcs()
+                output_arcs = behavior.get_output_arcs()
+            except Exception as e:
+                print(f"❌ Could not get arcs for {getattr(transition, 'name', 'unknown')}: {e}", file=sys.stderr)
+                self.logger.debug(f"Could not get arcs for {transition.name}: {e}")
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Find inhibitor arcs (Product → Transition)
+            inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+            
+            if not inhibitor_arcs:
+                # No inhibitors, use original firings
+                constrained_map[transition] = original_firings
+                continue
+            
+            # Found inhibitors - evaluate constraints
+            trans_name = getattr(transition, 'name', getattr(transition, 'label', 'unknown'))
+            
+            # Calculate maximum allowed firings based on inhibitors
+            max_allowed_firings = original_firings
+            
+            for inh_arc in inhibitor_arcs:
+                try:
+                    # The source of inhibitor arc is the product place
+                    product_place = behavior._get_place(inh_arc.source_id)
+                    if not product_place:
+                        continue
+                    
+                    # Evaluate threshold dynamically
+                    evaluator = ThresholdEvaluator(behavior.model)
+                    context = {'time': behavior.model.time if hasattr(behavior.model, 'time') else 0.0}
+                    threshold = evaluator.evaluate(inh_arc, context)
+                    
+                    # Current tokens in product place
+                    current_tokens = product_place.tokens
+                    
+                    # Find how much this transition produces to that place
+                    # Note: output_arcs should be arc objects, but handle strings just in case
+                    tokens_per_firing = 0.0
+                    
+                    for out_arc_ref in output_arcs:
+                        # Get actual arc object if we have an ID string
+                        if isinstance(out_arc_ref, str):
+                            # It's an arc ID, need to get the arc object from model
+                            out_arc = behavior._get_arc(out_arc_ref)
+                            if not out_arc:
+                                continue
+                        else:
+                            out_arc = out_arc_ref
+                        
+                        if out_arc.target_id == product_place.id:
+                            tokens_per_firing = out_arc.weight
+                            break
+                    
+                    if tokens_per_firing > 0:
+                        # Calculate remaining capacity
+                        remaining = threshold - current_tokens
+                        
+                        if remaining <= 0:
+                            # Already at or above threshold, no firings allowed
+                            max_allowed_firings = 0
+                            break
+                        
+                        # Calculate max firings before exceeding threshold
+                        max_firings_for_this_inhibitor = int(remaining / tokens_per_firing)
+                        
+                        # Keep the most restrictive constraint
+                        max_allowed_firings = min(max_allowed_firings, max_firings_for_this_inhibitor)
+                
+                except Exception as e:
+                    import traceback
+                    self.logger.error(
+                        f"❌ Error evaluating inhibitor for {trans_name}: {e}\n"
+                        f"Traceback: {traceback.format_exc()}"
+                    )
+                    print(f"❌ Error evaluating inhibitor for {trans_name}: {e}", file=sys.stderr)
+                    continue
+            
+            # Apply the constraint
+            if max_allowed_firings < original_firings:
+                trans_name = getattr(transition, 'name', getattr(transition, 'label', 'unknown'))
+                self.logger.info(
+                    f"🔒 Inhibitor constraint: {trans_name} firings reduced "
+                    f"{original_firings} → {max_allowed_firings}"
+                )
+            
+            constrained_map[transition] = max_allowed_firings
+        
+        return constrained_map
     
     def _apply_firings(
         self,
@@ -486,11 +692,9 @@ class TauLeapingEngine:
                 target_place.set_tokens(target_place.tokens + amount)
                 produced_map[target_place.id] = float(amount)
         
-        # CRITICAL: Increment firing count for statistics/plotting
-        # This is needed for automation experiments and data collection
-        if not hasattr(transition, 'firing_count'):
-            transition.firing_count = 0
-        transition.firing_count += num_firings
+        # NOTE: firing_count is incremented by data_collector.record_firing() 
+        # in _apply_firings(), not here. Removed duplicate increment that was
+        # causing 2× firing counts and 50% token loss bug.
         
         return consumed_map, produced_map
     
@@ -569,5 +773,38 @@ class TauLeapingEngine:
             'total_leaps': 0,
             'total_firings': 0,
             'mean_tau': 0.0,
-            'exact_ssa_fallbacks': 0
+            'exact_ssa_fallbacks': 0,
+            'reversible_reactions': 0,
+            'irreversible_reactions': 0
         }
+    
+    def _update_assignment_rules(self, controller: Any) -> None:
+        """Update all assignment rule-defined species.
+        
+        Re-evaluates assignment rule formulas and updates place tokens.
+        Called after each τ-leap to maintain algebraic constraints.
+        
+        Args:
+            controller: Simulation controller with model and time
+        """
+        # Get any stochastic behavior (they all share the same assignment rules)
+        stochastic_transitions = [
+            t for t in controller.model.transitions
+            if t.transition_type == 'stochastic'
+        ]
+        
+        if not stochastic_transitions:
+            return
+        
+        # Get behavior of first stochastic transition
+        behavior = self._get_behavior(stochastic_transitions[0])
+        if behavior is None or not hasattr(behavior, 'update_rule_defined_species'):
+            return
+        
+        # Update all rule-defined species
+        updated = behavior.update_rule_defined_species(controller.time)
+        
+        if updated > 0:
+            self.logger.debug(
+                f"Updated {updated} assignment rule-defined species at time {controller.time:.4f}"
+            )

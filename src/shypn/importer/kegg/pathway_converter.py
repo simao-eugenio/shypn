@@ -239,6 +239,9 @@ class KEGGRelationConverter:
             
             # Mark source place as signal place (Ψ_regulatory)
             source_place.is_signal_place = True
+            # Apply color schema immediately after setting semantic flag
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(source_place)
             if not hasattr(source_place, 'metadata'):
                 source_place.metadata = {}
             source_place.metadata['signal_type'] = 'Ψ_regulatory'
@@ -289,23 +292,47 @@ class KEGGRelationConverter:
                 # Create arcs: target_place → transition → target_place (protein cycle)
                 # This represents protein being active/inactive
                 arc_id_in = self.document.id_manager.generate_arc_id()
-                arc_in = Arc(
-                    source=target_place,
-                    target=target_transition,
-                    id=arc_id_in,
-                    name=f"A{arc_id_in[1:]}",
-                    weight=1
-                )
+                
+                # Auto-detect signal places and create SignalFlowArc if needed
+                if getattr(target_place, 'is_signal_place', False):
+                    from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                    arc_in = SignalFlowArc(
+                        source=target_place,
+                        target=target_transition,
+                        id=arc_id_in,
+                        name=f"A{arc_id_in[1:]}",
+                        weight=1
+                    )
+                else:
+                    arc_in = Arc(
+                        source=target_place,
+                        target=target_transition,
+                        id=arc_id_in,
+                        name=f"A{arc_id_in[1:]}",
+                        weight=1
+                    )
                 self.document.arcs.append(arc_in)
                 
                 arc_id_out = self.document.id_manager.generate_arc_id()
-                arc_out = Arc(
-                    source=target_transition,
-                    target=target_place,
-                    id=arc_id_out,
-                    name=f"A{arc_id_out[1:]}",
-                    weight=1
-                )
+                
+                # Auto-detect signal places and create SignalFlowArc if needed
+                if getattr(target_place, 'is_signal_place', False):
+                    from shypn.netobjs.signal_flow_arc import SignalFlowArc
+                    arc_out = SignalFlowArc(
+                        source=target_transition,
+                        target=target_place,
+                        id=arc_id_out,
+                        name=f"A{arc_id_out[1:]}",
+                        weight=1
+                    )
+                else:
+                    arc_out = Arc(
+                        source=target_transition,
+                        target=target_place,
+                        id=arc_id_out,
+                        name=f"A{arc_id_out[1:]}",
+                        weight=1
+                    )
                 self.document.arcs.append(arc_out)
             
             # CASE 3: Target is compound (less common, skip for now)
@@ -426,6 +453,12 @@ class StandardConversionStrategy(ConversionStrategy):
         """
         document = DocumentModel()
         
+        # Initialize document metadata for KEGG import
+        if not hasattr(document, 'metadata') or document.metadata is None:
+            document.metadata = {}
+        document.metadata['data_source'] = 'kegg_import'
+        document.metadata['source'] = 'kegg'
+        
         # Phase 1: Create places from compounds AND enzyme entries
         # Strategy: Only create places for compounds used in reactions + enzyme entries with reactions
         place_map: Dict[str, Place] = {}
@@ -500,7 +533,8 @@ class StandardConversionStrategy(ConversionStrategy):
                         # Mark as enzyme and signal place (Ψ_regulatory) for signal partition theory
                         place.is_signal_place = True  # Information flow, not mass transfer
                         place.shape = 'hexagon'  # Hexagonal shape for visual distinction
-                        place.border_color = (0.0, 0.4, 0.8)  # Blue border for signal places
+                        from shypn.utils.color_schema_manager import ColorSchemaManager
+                        ColorSchemaManager.reset_place_color(place)  # Apply blue border for signal places
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -556,7 +590,8 @@ class StandardConversionStrategy(ConversionStrategy):
                         # Mark as signal place (Ψ_regulatory) for signal partition theory
                         place.is_signal_place = True  # Information flow, not mass transfer
                         place.shape = 'hexagon'  # Hexagonal shape for visual distinction
-                        place.border_color = (0.0, 0.4, 0.8)  # Blue border for signal places
+                        from shypn.utils.color_schema_manager import ColorSchemaManager
+                        ColorSchemaManager.reset_place_color(place)  # Apply blue border for signal places
                         if not hasattr(place, 'metadata'):
                             place.metadata = {}
                         place.metadata['kegg_id'] = entry.name
@@ -673,6 +708,7 @@ class StandardConversionStrategy(ConversionStrategy):
                 if not hasattr(document, 'metadata') or document.metadata is None:
                     document.metadata = {}
                 document.metadata['source'] = 'kegg'
+                document.metadata['data_source'] = 'kegg_import'  # For stoichiometry enrichment
                 document.metadata['has_test_arcs'] = True
                 document.metadata['model_type'] = 'Biological Petri Net'
                 document.metadata['test_arc_count'] = len(test_arcs)
@@ -718,6 +754,13 @@ class StandardConversionStrategy(ConversionStrategy):
         # Signal places (Ψ) represent information flow, distinct from mass transfer
         # Orange arcs = information/regulatory, Violet = compartment transport, Blue = boundary
         self._color_signal_arcs(document)
+        
+        # Apply color schema to all SignalFlowArcs to ensure correct light gray color
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        for arc in document.arcs:
+            if isinstance(arc, SignalFlowArc):
+                ColorSchemaManager.reset_arc_color(arc)
         
         # Phase 3: Enhance transitions with kinetic properties
         if options.enhance_kinetics:
@@ -779,13 +822,13 @@ class StandardConversionStrategy(ConversionStrategy):
                     is_signal_arc = True
             
             if is_signal_arc:
-                # Test arcs (catalytic/enabling) get blue color for visibility
+                # Use ColorSchemaManager to assign type-appropriate colors
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                ColorSchemaManager.reset_arc_color(arc)
+                
                 if isinstance(arc, TestArc):
-                    arc.color = BLUE_COLOR
                     test_arc_count += 1
                 else:
-                    # Other signal arcs remain black (normalized schema)
-                    arc.color = BLACK_COLOR
                     other_arc_count += 1
         
         logger.info(
@@ -1610,4 +1653,96 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
             import traceback
             traceback.print_exc()
     
+    # === SIGNAL HIERARCHY LAYER INFERENCE ===
+    # Assign hierarchical layers to signal places based on signal type
+    # This enables preemption mechanism and layer-aware analysis
+    try:
+        _infer_signal_hierarchy_layers(document)
+    except Exception as e:
+        logger.warning(f"Signal hierarchy layer inference failed: {e}")
+    
     return document
+
+
+def _infer_signal_hierarchy_layers(document: DocumentModel) -> Dict[str, int]:
+    """Infer and assign hierarchical layers to signal places.
+    
+    Signal Hierarchy Theory (Simão, 2025):
+    - Layer 0: ENERGY signals (ATP, NADH) - Universal metabolic orchestrators
+    - Layer 1: SPATIAL signals (compartments, membranes) - Structural constraints
+    - Layer 2: QUORUM signals (AHL, autoinducers) - Population context
+    - Layer 3: REGULATORY signals (transcription factors) - Decision variables
+    
+    Higher layers can preempt lower layers through signal flow arcs.
+    
+    Args:
+        document: Document model with signal places
+        
+    Returns:
+        Dict mapping place_id to layer number
+    """
+    from shypn.netobjs.signal_type import SignalType
+    
+    logger = logging.getLogger("KEGGConverter")
+    layers = {}
+    layer_counts = {0: 0, 1: 0, 2: 0, 3: 0}
+    
+    # Get all signal places
+    signal_places = [p for p in document.places if getattr(p, 'is_signal_place', False)]
+    
+    if not signal_places:
+        logger.debug("No signal places found for layer inference")
+        return layers
+    
+    # Assign layers based on signal type
+    for place in signal_places:
+        signal_type = getattr(place, 'signal_type', None)
+        
+        if not signal_type:
+            continue
+        
+        # Determine layer from signal type
+        layer = None
+        if signal_type == SignalType.ENERGY:
+            layer = 0
+        elif signal_type == SignalType.SPATIAL:
+            layer = 1
+        elif signal_type == SignalType.QUORUM:
+            layer = 2
+        elif signal_type == SignalType.REGULATORY:
+            layer = 3
+        
+        if layer is not None:
+            # Store layer in place metadata
+            if not hasattr(place, 'metadata') or place.metadata is None:
+                place.metadata = {}
+            place.metadata['hierarchy_layer'] = layer
+            place.metadata['layer_name'] = f"Layer {layer}"
+            
+            layers[place.id] = layer
+            layer_counts[layer] += 1
+            
+            logger.debug(f"Assigned {place.name} to Layer {layer} ({signal_type.name})")
+    
+    # Store hierarchy summary in document metadata
+    if not hasattr(document, 'metadata') or document.metadata is None:
+        document.metadata = {}
+    
+    document.metadata['signal_hierarchy'] = {
+        'has_hierarchy': len(layers) > 0,
+        'layer_count': sum(1 for count in layer_counts.values() if count > 0),
+        'layer_distribution': layer_counts,
+        'total_signal_places': len(signal_places),
+        'layered_signal_places': len(layers),
+    }
+    
+    # Log summary
+    if layers:
+        logger.info(
+            f"Signal hierarchy: {len(layers)} places assigned to "
+            f"{document.metadata['signal_hierarchy']['layer_count']} layers "
+            f"(L0:{layer_counts[0]}, L1:{layer_counts[1]}, L2:{layer_counts[2]}, L3:{layer_counts[3]})"
+        )
+    
+    return layers
+

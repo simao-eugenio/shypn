@@ -123,8 +123,16 @@ class DeleteOperation:
 				elif arc_type == 'curved_inhibitor_arc':
 					from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
 					arc = CurvedInhibitorArc(source, target, arc_id, arc_snap.get('label'))
+				elif arc_type == 'curved_opposite_signal_flow':
+					from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+					arc = CurvedSignalFlowArc(source, target, arc_id, arc_snap.get('label'))
 				else:
 					arc = Arc(source, target, arc_id, arc_snap.get('label'))
+				
+				# Apply type-appropriate default color
+				from shypn.utils.color_schema_manager import ColorSchemaManager
+				ColorSchemaManager.reset_arc_color(arc)
+				
 				dc.arcs.append(arc)
 				created_arcs.append(arc)
 				if arc_id and 'A' in arc_id:

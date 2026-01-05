@@ -305,7 +305,7 @@ class ViabilityPanel(Gtk.Box):
         
         self.diagnostics_textview = Gtk.TextView()
         self.diagnostics_textview.set_editable(False)
-        self.diagnostics_textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.diagnostics_textview.set_wrap_mode(Pango.WrapMode.WORD)
         self.diagnostics_textview.set_monospace(True)
         self.diagnostics_textbuffer = self.diagnostics_textview.get_buffer()
         log_scroll.add(self.diagnostics_textview)
@@ -1033,21 +1033,22 @@ class ViabilityPanel(Gtk.Box):
         
         locality_obj = self._locality_objects.get(transition_id)
         if locality_obj:
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            
             # Reset transition color
-            locality_obj.transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            locality_obj.transition.fill_color = Transition.DEFAULT_COLOR
+            ColorSchemaManager.reset_transition_colors(locality_obj.transition)
             
             # Reset input place colors
             for p_obj in locality_obj.input_places:
-                p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                ColorSchemaManager.reset_place_color(p_obj)
             
             # Reset output place colors
             for p_obj in locality_obj.output_places:
-                p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                ColorSchemaManager.reset_place_color(p_obj)
             
             # Reset input arc colors
             for a_obj in locality_obj.input_arcs:
-                a_obj.color = Arc.DEFAULT_COLOR
+                ColorSchemaManager.reset_arc_color(a_obj)
             
             # Reset output arc colors
             for a_obj in locality_obj.output_arcs:
@@ -1999,29 +2000,30 @@ class ViabilityPanel(Gtk.Box):
                 if not locality_ids:
                     continue
                 
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                
                 # Reset transition color
-                locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
-                locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
+                ColorSchemaManager.reset_transition_colors(locality_ids.transition)
                 
                 # Reset input place colors
                 for p_obj in locality_ids.input_places:
-                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    ColorSchemaManager.reset_place_color(p_obj)
                 
                 # Reset output place colors
                 for p_obj in locality_ids.output_places:
-                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    ColorSchemaManager.reset_place_color(p_obj)
                 
                 # Reset catalyst place colors
                 for p_obj in locality_ids.catalyst_places:
-                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    ColorSchemaManager.reset_place_color(p_obj)
                 
                 # Reset input arc colors
                 for arc_obj in locality_ids.input_arcs:
-                    arc_obj.color = Arc.DEFAULT_COLOR
+                    ColorSchemaManager.reset_arc_color(arc_obj)
                 
                 # Reset output arc colors
                 for arc_obj in locality_ids.output_arcs:
-                    arc_obj.color = Arc.DEFAULT_COLOR
+                    ColorSchemaManager.reset_arc_color(arc_obj)
                 
                 # Reset catalyst arc colors
                 for arc_obj in locality_ids.catalyst_arcs:
@@ -2197,11 +2199,12 @@ class ViabilityPanel(Gtk.Box):
                     continue
                 
                 # Reset all locality colors
-                locality_ids.transition.border_color = Transition.DEFAULT_BORDER_COLOR
-                locality_ids.transition.fill_color = Transition.DEFAULT_COLOR
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                
+                ColorSchemaManager.reset_transition_colors(locality_ids.transition)
                 
                 for p_obj in locality_ids.input_places:
-                    p_obj.border_color = Place.DEFAULT_BORDER_COLOR
+                    ColorSchemaManager.reset_place_color(p_obj)
                 for p_obj in locality_ids.output_places:
                     p_obj.border_color = Place.DEFAULT_BORDER_COLOR
                 for p_obj in locality_ids.catalyst_places:

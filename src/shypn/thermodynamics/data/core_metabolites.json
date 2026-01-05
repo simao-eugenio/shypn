@@ -1,0 +1,234 @@
+{
+  "version": "1.0",
+  "description": "Core biochemical metabolite thermodynamic data",
+  "source": "Alberty, R.A. (2003). Thermodynamics of Biochemical Reactions. Wiley.",
+  "conditions": {
+    "standard_pH": 7.0,
+    "standard_temperature": 298.15,
+    "standard_ionic_strength": 0.1,
+    "note": "All values are for biochemical standard state (pH 7, 25°C, 0.1 M ionic strength)"
+  },
+  "compounds": {
+    "C00002": {
+      "compound_id": "C00002",
+      "name": "ATP",
+      "full_name": "Adenosine triphosphate",
+      "delta_g_formation": -2292.2,
+      "uncertainty": 1.5,
+      "source": "Alberty 2003, Table 3.1",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00008": {
+      "compound_id": "C00008",
+      "name": "ADP",
+      "full_name": "Adenosine diphosphate",
+      "delta_g_formation": -1906.2,
+      "uncertainty": 1.2,
+      "source": "Alberty 2003, Table 3.1",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00020": {
+      "compound_id": "C00020",
+      "name": "AMP",
+      "full_name": "Adenosine monophosphate",
+      "delta_g_formation": -556.3,
+      "uncertainty": 1.0,
+      "source": "Alberty 2003, Table 3.1",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00009": {
+      "compound_id": "C00009",
+      "name": "Phosphate",
+      "full_name": "Orthophosphate (Pi)",
+      "delta_g_formation": -1059.2,
+      "uncertainty": 0.5,
+      "source": "Alberty 2003, Table 3.1",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00001": {
+      "compound_id": "C00001",
+      "name": "H2O",
+      "full_name": "Water",
+      "delta_g_formation": -237.2,
+      "uncertainty": 0.1,
+      "source": "NIST Chemistry WebBook",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00003": {
+      "compound_id": "C00003",
+      "name": "NAD+",
+      "full_name": "Nicotinamide adenine dinucleotide (oxidized)",
+      "delta_g_formation": -10.9,
+      "uncertainty": 2.0,
+      "source": "Alberty 2003, Table 3.2",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00004": {
+      "compound_id": "C00004",
+      "name": "NADH",
+      "full_name": "Nicotinamide adenine dinucleotide (reduced)",
+      "delta_g_formation": 22.6,
+      "uncertainty": 2.0,
+      "source": "Alberty 2003, Table 3.2",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00006": {
+      "compound_id": "C00006",
+      "name": "NADP+",
+      "full_name": "Nicotinamide adenine dinucleotide phosphate (oxidized)",
+      "delta_g_formation": -13.5,
+      "uncertainty": 2.5,
+      "source": "Estimated from NAD+",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00005": {
+      "compound_id": "C00005",
+      "name": "NADPH",
+      "full_name": "Nicotinamide adenine dinucleotide phosphate (reduced)",
+      "delta_g_formation": 20.0,
+      "uncertainty": 2.5,
+      "source": "Estimated from NADH",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00031": {
+      "compound_id": "C00031",
+      "name": "Glucose",
+      "full_name": "D-Glucose",
+      "delta_g_formation": -915.9,
+      "uncertainty": 1.5,
+      "source": "Alberty 2003, Table 3.3",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00092": {
+      "compound_id": "C00092",
+      "name": "Glucose-6-phosphate",
+      "full_name": "D-Glucose 6-phosphate (G6P)",
+      "delta_g_formation": -1763.9,
+      "uncertainty": 2.0,
+      "source": "Alberty 2003, Table 3.3",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00085": {
+      "compound_id": "C00085",
+      "name": "Fructose-6-phosphate",
+      "full_name": "D-Fructose 6-phosphate (F6P)",
+      "delta_g_formation": -1758.3,
+      "uncertainty": 2.0,
+      "source": "Alberty 2003, Table 3.3",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00022": {
+      "compound_id": "C00022",
+      "name": "Pyruvate",
+      "full_name": "Pyruvic acid",
+      "delta_g_formation": -472.3,
+      "uncertainty": 1.0,
+      "source": "Alberty 2003, Table 3.4",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00024": {
+      "compound_id": "C00024",
+      "name": "Acetyl-CoA",
+      "full_name": "Acetyl coenzyme A",
+      "delta_g_formation": -178.7,
+      "uncertainty": 3.0,
+      "source": "Alberty 2003, Table 3.4",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00010": {
+      "compound_id": "C00010",
+      "name": "CoA",
+      "full_name": "Coenzyme A",
+      "delta_g_formation": -7.7,
+      "uncertainty": 2.5,
+      "source": "Alberty 2003, Table 3.4",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00011": {
+      "compound_id": "C00011",
+      "name": "CO2",
+      "full_name": "Carbon dioxide",
+      "delta_g_formation": -547.1,
+      "uncertainty": 0.3,
+      "source": "NIST Chemistry WebBook",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    },
+    "C00007": {
+      "compound_id": "C00007",
+      "name": "Oxygen",
+      "full_name": "O2 (dioxygen)",
+      "delta_g_formation": 16.4,
+      "uncertainty": 0.2,
+      "source": "NIST Chemistry WebBook",
+      "conditions": {
+        "pH": 7.0,
+        "temperature": 298.15,
+        "ionic_strength": 0.1
+      }
+    }
+  }
+}

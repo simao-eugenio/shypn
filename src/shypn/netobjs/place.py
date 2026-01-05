@@ -20,6 +20,7 @@ class Place(PetriNetObject):
     # Default styling (proportional metrics at 1:1 scale)
     DEFAULT_RADIUS = 40.0  # 40px radius = 80px diameter at 100% zoom
     DEFAULT_BORDER_COLOR = (0.0, 0.0, 0.0)  # Black border
+    SIGNAL_BORDER_COLOR = (0.0, 0.4, 0.8)  # Blue border for signal places
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
     def __init__(self, x: float, y: float, id: str, name: str, 
@@ -369,6 +370,7 @@ class Place(PetriNetObject):
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
             "is_signal_place": getattr(self, 'is_signal_place', False),  # Save signal place flag (13-tuple Ψ)
+            "is_compartment_place": getattr(self, 'is_compartment_place', False),  # Save compartment place flag
             "is_regulatory_place": getattr(self, 'is_regulatory_place', False)  # Save regulatory place flag
         })
         
@@ -406,8 +408,8 @@ class Place(PetriNetObject):
         name = str(data.get("name", place_id))
         
         place = cls(
-            x=float(data["x"]),
-            y=float(data["y"]),
+            x=float(data.get("x", 0.0)),  # Default to 0.0 if missing (legacy file support)
+            y=float(data.get("y", 0.0)),  # Default to 0.0 if missing (legacy file support)
             id=place_id,  # String ID
             name=name,
             radius=float(data.get("radius", cls.DEFAULT_RADIUS)),
@@ -427,6 +429,8 @@ class Place(PetriNetObject):
         place.is_catalyst = data.get("is_catalyst", False)
         # Restore signal place flag (13-tuple formalism: Ψ)
         place.is_signal_place = data.get("is_signal_place", False)
+        # Restore compartment place flag (non-default compartments)
+        place.is_compartment_place = data.get("is_compartment_place", False)
         # Restore regulatory place flag (genes/resources)
         place.is_regulatory_place = data.get("is_regulatory_place", False)
         if "capacity" in data:
@@ -436,8 +440,19 @@ class Place(PetriNetObject):
                 place.capacity = float('inf')
             else:
                 place.capacity = capacity_value
-        if "border_color" in data:
+        
+        # Color handling: Always enforce color schema for semantic types
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        if ColorSchemaManager.is_semantic_place_color(place):
+            # Semantic places (signal, compartment, regulatory) always get schema color
+            ColorSchemaManager.reset_place_color(place)
+        elif "border_color" in data:
+            # Non-semantic places use saved color (may be analysis/recording color)
             place.border_color = tuple(data["border_color"])
+        else:
+            # Fallback to default black for regular places
+            place.border_color = Place.DEFAULT_BORDER_COLOR
+        
         if "border_width" in data:
             place.border_width = data["border_width"]
         

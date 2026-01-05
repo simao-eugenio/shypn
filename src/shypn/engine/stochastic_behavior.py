@@ -20,6 +20,7 @@ import math
 import logging
 from .transition_behavior import TransitionBehavior
 from shypn.netobjs.inhibitor_arc import InhibitorArc
+from shypn.utils.threshold_evaluator import ThresholdEvaluator
 
 
 class StochasticBehavior(TransitionBehavior):
@@ -86,12 +87,12 @@ class StochasticBehavior(TransitionBehavior):
         if self.has_rate_function and self.rate_function_expr:
             self._detect_signal_places()
             
-            # Warn if stochastic transition has complex formula (likely should be continuous)
+            # Detect reversible reactions (formulas with subtraction)
             formula_lower = str(self.rate_function_expr).lower()
             if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
-                self.logger.warning(
-                    f"Stochastic transition '{transition.name}' has formula with subtraction, "
-                    f"which may produce negative rates. Consider converting to continuous transition. "
+                self.logger.info(
+                    f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
+                    f"τ-leaping will use Skellam distribution for net flux sampling. "
                     f"Formula: {self.rate_function_expr[:80]}..."
                 )
         
@@ -142,6 +143,11 @@ class StochasticBehavior(TransitionBehavior):
         self._enablement_time = None
         self._scheduled_fire_time = None
         self._sampled_burst = None
+        
+        # Assignment rule support (Option 3: Runtime Re-evaluation)
+        self.assignment_rules: Dict[int, str] = {}  # place_id -> formula
+        self._compiled_rules: Dict[int, Any] = {}  # place_id -> compiled code
+        self._rules_initialized = False
     
     def _detect_signal_places(self):
         r"""Detect signal places (Ψ) for this transition's rate formula.
@@ -464,14 +470,84 @@ class StochasticBehavior(TransitionBehavior):
         
         self._scheduled_fire_time = time + delay
         
-        # Sample burst size (will be used at firing time)
-        self._sampled_burst = random.randint(1, self.max_burst)
+        # Sample burst size with intelligent constraint awareness
+        # If inhibitor arcs exist, limit burst to respect thresholds
+        max_allowed_burst = self._calculate_max_burst_for_inhibitors()
+        effective_max_burst = min(self.max_burst, max_allowed_burst)
+        
+        if effective_max_burst >= 1:
+            self._sampled_burst = random.randint(1, effective_max_burst)
+        else:
+            # No burst allowed - inhibitor threshold would be exceeded
+            self._sampled_burst = 0
         
         self.logger.debug(
             f"Stochastic {self.transition.name} enabled at t={time:.3f}, "
             f"rate={lambda_rate:.3f}, delay={delay:.3f}, "
             f"scheduled={self._scheduled_fire_time:.3f}, burst={self._sampled_burst}"
         )
+    
+    def _calculate_max_burst_for_inhibitors(self) -> int:
+        """Calculate maximum burst size that respects inhibitor arc thresholds.
+        
+        For each inhibitor arc (Product → Transition), calculates how many
+        firings can occur before the product place exceeds its threshold.
+        Returns the minimum across all inhibitors (most restrictive).
+        
+        Returns:
+            int: Maximum allowed burst size (can be very large if no constraints)
+        """
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.utils.threshold_evaluator import ThresholdEvaluator
+        
+        max_allowed = float('inf')  # Start with no limit
+        
+        # Get input and output arcs
+        input_arcs = self.get_input_arcs()
+        output_arcs = self.get_output_arcs()
+        
+        # Find inhibitor arcs (Product → Transition)
+        inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+        
+        for inh_arc in inhibitor_arcs:
+            # The source of inhibitor arc is the product place
+            product_place = self._get_place(inh_arc.source_id)
+            if not product_place:
+                continue
+            
+            # Evaluate threshold dynamically
+            evaluator = ThresholdEvaluator(self.model)
+            current_time = self._get_current_time()
+            context = {'time': current_time}
+            
+            try:
+                threshold_value = evaluator.evaluate(inh_arc, context)
+            except Exception as e:
+                self.logger.warning(f"Failed to evaluate inhibitor threshold for {inh_arc.id}: {e}")
+                continue
+            
+            # Find how many tokens this transition produces to the inhibited place
+            tokens_per_firing = 0
+            for out_arc in output_arcs:
+                if out_arc.target_id == inh_arc.source_id:
+                    tokens_per_firing += out_arc.weight
+            
+            if tokens_per_firing > 0:
+                current_tokens = product_place.tokens
+                
+                # Calculate remaining capacity before exceeding threshold
+                remaining = threshold_value - current_tokens
+                
+                if remaining > 0:
+                    # How many firings before exceeding?
+                    max_firings = int(remaining / tokens_per_firing)
+                    max_allowed = min(max_allowed, max_firings)
+                else:
+                    # Already at or above threshold
+                    max_allowed = 0
+        
+        # Return finite value (if inf, no inhibitor constraints exist)
+        return int(max_allowed) if max_allowed != float('inf') else self.max_burst
     
     def get_scheduled_fire_time(self) -> Optional[float]:
         """Get the scheduled firing time.
@@ -535,6 +611,18 @@ class StochasticBehavior(TransitionBehavior):
             input_arcs = self.get_input_arcs()
             burst = self._sampled_burst if self._sampled_burst else self.max_burst
             
+            # VERBOSE DEBUG: Print ALL input arcs for T7, T8, T15
+            if self._transition.id in ['T7', 'T8', 'T15']:
+                print(f"\n{'='*60}")
+                print(f"VERBOSE: Checking enablement for {self._transition.id} ({self._transition.name})")
+                print(f"Input arcs: {len(input_arcs)}")
+                for i, arc in enumerate(input_arcs):
+                    arc_type_name = type(arc).__name__
+                    arc_type_attr = getattr(arc, 'arc_type', 'unknown')
+                    print(f"  Arc {i+1}: {arc.id}, type={arc_type_name}, arc_type={arc_type_attr}, "
+                          f"isinstance(InhibitorArc)={isinstance(arc, InhibitorArc)}")
+                print(f"{'='*60}\n")
+            
             for arc in input_arcs:
                 source_place = self._get_place(arc.source_id)
                 if source_place is None:
@@ -544,27 +632,31 @@ class StochasticBehavior(TransitionBehavior):
                 # This implements negative feedback / product inhibition
                 if isinstance(arc, InhibitorArc):
                     # Inhibitor arcs use INVERTED logic: disable when tokens >= threshold
-                    threshold = getattr(arc, 'threshold', None)
-                    if threshold is None:
-                        threshold = arc.weight
+                    # Evaluate threshold dynamically (supports formulas like "2.0 * (1 + ATP_pool/5000)**0.5")
+                    evaluator = ThresholdEvaluator(self.model)
+                    context = {'time': self.model.time if hasattr(self.model, 'time') else 0.0}
+                    threshold_value = evaluator.evaluate(arc, context)
                     
-                    if source_place.tokens >= threshold:
-                        return False, f"inhibited-by-P{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold})"
+                    # VERBOSE DEBUG for specific transitions
+                    if self._transition.id in ['T7', 'T8', 'T15']:
+                        print(f"  INHIBITOR CHECK: {arc.id} ({arc.source_id} → {self._transition.id})")
+                        print(f"    Source tokens: {source_place.tokens:.2f}")
+                        print(f"    Threshold: {threshold_value:.2f}")
+                        print(f"    Will inhibit: {source_place.tokens >= threshold_value}")
+                    
+                    if source_place.tokens >= threshold_value:
+                        logging.info(f"Transition {self._transition.id} INHIBITED by {arc.source_id}: "
+                                   f"{source_place.tokens:.2f} >= {threshold_value:.2f}")
+                        return False, f"inhibited-by-{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold_value:.2f})"
                     # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
                     continue
-                
-                # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
-                # They broadcast information without token consumption
-                # Skip token requirement checks for signal places
-                if self._is_signal_place(source_place):
-                    continue  # Signal places don't require tokens for burst
                 
                 # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
                 if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                     required = arc.weight  # Just check presence for catalysts
                 else:
-                    required = arc.weight * burst  # Normal arcs need burst tokens
+                    required = arc.weight * burst  # Normal arcs (including SignalFlowArcs) need burst tokens
                 
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
@@ -767,3 +859,178 @@ class StochasticBehavior(TransitionBehavior):
                 required[arc.source_id] = arc.weight * burst
         
         return required
+    
+    # ============================================================================
+    # Assignment Rule Re-evaluation (Option 3: Temporal Evaluation)
+    # ============================================================================
+    
+    def initialize_assignment_rules(self, pathway_data: Any = None) -> None:
+        """Initialize assignment rules from pathway data.
+        
+        Extract assignment rules from species and prepare for runtime evaluation.
+        Called once during simulation initialization.
+        
+        Args:
+            pathway_data: PathwayData object with species containing assignment_rule field
+        """
+        if self._rules_initialized:
+            return
+            
+        if pathway_data is None:
+            self._rules_initialized = True
+            return
+        
+        # Extract assignment rules from species
+        for species in pathway_data.species:
+            if hasattr(species, 'assignment_rule') and species.assignment_rule:
+                # Find corresponding place in model
+                place = None
+                for p in self.model.places:
+                    if p.name == species.id or p.name == species.name:
+                        place = p
+                        break
+                
+                if place:
+                    self.assignment_rules[place.id] = species.assignment_rule
+                    self.logger.info(
+                        f"Registered assignment rule for place '{place.name}' (ID={place.id}): "
+                        f"{species.assignment_rule[:60]}..."
+                    )
+        
+        # Precompile formulas for performance
+        self._compile_assignment_rules()
+        self._rules_initialized = True
+        
+        if self.assignment_rules:
+            self.logger.info(
+                f"Initialized {len(self.assignment_rules)} assignment rule(s) for "
+                f"runtime re-evaluation in stochastic mode"
+            )
+    
+    def _compile_assignment_rules(self) -> None:
+        """Precompile assignment rule formulas for performance.
+        
+        Uses compile() to avoid repeated parsing overhead during simulation.
+        Caches compiled code objects in _compiled_rules.
+        """
+        for place_id, formula in self.assignment_rules.items():
+            try:
+                # Compile formula to bytecode
+                compiled_code = compile(formula, f'<assignment_rule_{place_id}>', 'eval')
+                self._compiled_rules[place_id] = compiled_code
+                self.logger.debug(f"Compiled assignment rule for place ID={place_id}")
+            except SyntaxError as e:
+                self.logger.error(
+                    f"Failed to compile assignment rule for place ID={place_id}: {e}. "
+                    f"Formula: {formula}"
+                )
+    
+    def _build_evaluation_context(self, time: float) -> Dict[str, Any]:
+        """Build evaluation context for assignment rule formulas.
+        
+        Creates dictionary with:
+        - All place tokens (by name)
+        - Common math functions
+        - Time variable
+        - Function catalog
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Dictionary for eval() context
+        """
+        from .function_catalog import FUNCTION_CATALOG
+        import numpy as np
+        
+        context = {
+            'time': time,
+            't': time,
+            'min': min,
+            'max': max,
+            'abs': abs,
+            'math': math,
+            'np': np,
+            'numpy': np,
+            'log': math.log,
+            'log10': math.log10,
+            'exp': math.exp,
+            'sqrt': math.sqrt,
+            'pow': pow,
+            'sin': math.sin,
+            'cos': math.cos,
+            'tan': math.tan
+        }
+        
+        # Add function catalog
+        for func_name, func_impl in FUNCTION_CATALOG.items():
+            context[func_name] = func_impl
+        
+        # Add all place tokens (by name)
+        for place in self.model.places:
+            context[place.name] = place.tokens
+        
+        return context
+    
+    def _safe_eval(self, formula: str, context: Dict[str, Any], place_id: int) -> float:
+        """Safely evaluate formula with error handling.
+        
+        Args:
+            formula: Formula string to evaluate
+            context: Evaluation context dictionary
+            place_id: Place ID for logging
+            
+        Returns:
+            Evaluated value (float)
+        """
+        try:
+            # Use precompiled code if available
+            if place_id in self._compiled_rules:
+                result = eval(self._compiled_rules[place_id], {"__builtins__": {}}, context)
+            else:
+                result = eval(formula, {"__builtins__": {}}, context)
+            
+            return float(result)
+        except Exception as e:
+            place = self.model.get_object_by_id(place_id)
+            place_name = place.name if place else f"ID={place_id}"
+            self.logger.error(
+                f"Failed to evaluate assignment rule for place '{place_name}': {e}. "
+                f"Formula: {formula[:60]}... Keeping current value."
+            )
+            # Return current value as fallback
+            return place.tokens if place else 0.0
+    
+    def update_rule_defined_species(self, time: float) -> int:
+        """Update all species with assignment rules.
+        
+        Re-evaluates assignment rule formulas and updates place tokens.
+        Called after each τ-leap or SSA step.
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Number of species updated
+        """
+        if not self.assignment_rules:
+            return 0
+        
+        # Build evaluation context once
+        context = self._build_evaluation_context(time)
+        
+        # Update each rule-defined species
+        updated = 0
+        for place_id, formula in self.assignment_rules.items():
+            place = self.model.get_object_by_id(place_id)
+            if not place:
+                continue
+            
+            # Evaluate formula
+            new_value = self._safe_eval(formula, context, place_id)
+            
+            # Update tokens (ensure non-negative)
+            place.tokens = max(0.0, new_value)
+            updated += 1
+        
+        return updated

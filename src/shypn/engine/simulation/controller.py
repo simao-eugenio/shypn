@@ -171,6 +171,13 @@ class SimulationController:
         from shypn.ui.interaction import InteractionGuard
         self.interaction_guard = InteractionGuard(self.state_detector)
         
+        # Thermodynamic validation results (populated on demand)
+        self.thermodynamic_results = None
+        
+        # Option 3: Assignment rule re-evaluation support
+        self.enable_assignment_rule_reevaluation = False
+        self.pathway_data = None  # Store for assignment rule initialization
+        
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
@@ -213,6 +220,9 @@ class SimulationController:
         self.behavior_cache.clear()
         self.transition_states.clear()
         self._round_robin_index = 0
+        
+        # Clear thermodynamic validation results
+        self.thermodynamic_results = None
         
         # Reset τ-leaping engine (if it exists)
         if hasattr(self, '_tau_leaping_engine'):
@@ -261,6 +271,217 @@ class SimulationController:
                 # print(f"[CALLBACK_TRACE]   {line.strip()}")
         
         self._on_simulation_complete = value
+    
+    def validate_thermodynamics(self) -> Dict[str, Any]:
+        """
+        Validate thermodynamic consistency of reversible transitions.
+        
+        Checks all reversible transitions in the model to ensure their rate
+        constants are consistent with thermodynamic equilibrium constants
+        derived from Gibbs free energy.
+        
+        Results are cached in self.thermodynamic_results for GUI display.
+        
+        Returns:
+            Dict with validation results:
+            - 'summary': Overall summary statistics
+            - 'violations': List of transitions with violations
+            - 'warnings': List of transitions with warnings
+            - 'valid': List of valid transitions
+            - 'insufficient_data': List with missing data
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
+            
+            # Initialize validator
+            validator = ThermodynamicSimulationValidator()
+            
+            # Get reversible transitions from model
+            reversible_transitions = [
+                t for t in self.model.transitions
+                if t.properties.get('is_reversible', False)
+            ]
+            
+            if not reversible_transitions:
+                logger.info("No reversible transitions found for thermodynamic validation")
+                self.thermodynamic_results = {
+                    'summary': {
+                        'total': 0,
+                        'valid': 0,
+                        'warnings': 0,
+                        'violations': 0,
+                        'insufficient_data': 0,
+                    },
+                    'violations': [],
+                    'warnings': [],
+                    'valid': [],
+                    'insufficient_data': [],
+                }
+                return self.thermodynamic_results
+            
+            logger.info(f"Validating {len(reversible_transitions)} reversible transitions")
+            
+            # Collect results from transition properties
+            violations = []
+            warnings = []
+            valid = []
+            insufficient_data = []
+            
+            for transition in reversible_transitions:
+                # Get validation result from properties (stored during SBML import)
+                validation = transition.properties.get('thermodynamic_validation')
+                
+                if validation is None:
+                    # No validation stored - mark as insufficient data
+                    insufficient_data.append({
+                        'transition': transition.name,
+                        'message': 'Validation not performed during import'
+                    })
+                    continue
+                
+                status = validation.get('status', 'unknown')
+                
+                if status == 'valid':
+                    valid.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                    })
+                elif status == 'warning':
+                    warnings.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                        'message': validation.get('message', 'Exceeded warning threshold'),
+                    })
+                elif status == 'violation':
+                    violations.append({
+                        'transition': transition.name,
+                        'k_ratio': validation.get('k_ratio'),
+                        'k_eq': validation.get('k_eq'),
+                        'deviation': validation.get('deviation'),
+                        'message': validation.get('message', 'Exceeded violation threshold'),
+                    })
+                else:
+                    # insufficient_data, no_rate_constants, error
+                    insufficient_data.append({
+                        'transition': transition.name,
+                        'status': status,
+                        'message': validation.get('message', 'Unknown issue'),
+                    })
+            
+            # Build summary
+            summary = {
+                'total': len(reversible_transitions),
+                'valid': len(valid),
+                'warnings': len(warnings),
+                'violations': len(violations),
+                'insufficient_data': len(insufficient_data),
+            }
+            
+            # Store results
+            self.thermodynamic_results = {
+                'summary': summary,
+                'violations': violations,
+                'warnings': warnings,
+                'valid': valid,
+                'insufficient_data': insufficient_data,
+            }
+            
+            logger.info(
+                f"Thermodynamic validation complete: "
+                f"{summary['valid']} valid, "
+                f"{summary['warnings']} warnings, "
+                f"{summary['violations']} violations, "
+                f"{summary['insufficient_data']} insufficient data"
+            )
+            
+            return self.thermodynamic_results
+            
+        except ImportError as e:
+            logger.warning(f"Thermodynamic validation not available: {e}")
+            self.thermodynamic_results = None
+            return None
+        except Exception as e:
+            logger.error(f"Thermodynamic validation failed: {e}")
+            self.thermodynamic_results = None
+            return None
+    
+    def initialize_assignment_rules(self, pathway_data: Any = None) -> None:
+        """Initialize assignment rules for runtime re-evaluation (Option 3).
+        
+        Extracts assignment rules from pathway species and passes them to
+        stochastic behaviors for runtime evaluation during τ-leaping.
+        
+        Called after SBML/KEGG import with enable_assignment_rule_reevaluation=True.
+        
+        Args:
+            pathway_data: PathwayData object with species containing assignment_rule field
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if pathway_data is None:
+            logger.warning("No pathway_data provided for assignment rule initialization")
+            return
+        
+        self.pathway_data = pathway_data
+        
+        # Initialize assignment rules on stochastic behaviors
+        stochastic_transitions = [
+            t for t in self.model.transitions
+            if t.transition_type == 'stochastic'
+        ]
+        
+        if not stochastic_transitions:
+            logger.info("No stochastic transitions found - assignment rule re-evaluation not applicable")
+            return
+        
+        # Get behavior of first stochastic transition and initialize
+        behavior = self._get_behavior(stochastic_transitions[0])
+        if behavior and hasattr(behavior, 'initialize_assignment_rules'):
+            behavior.initialize_assignment_rules(pathway_data)
+            
+            if behavior.assignment_rules:
+                logger.info(
+                    f"✅ Option 3 enabled: Runtime re-evaluation initialized for "
+                    f"{len(behavior.assignment_rules)} assignment rule(s)"
+                )
+            else:
+                logger.info("No assignment rules found in pathway data")
+        else:
+            logger.warning(
+                "StochasticBehavior does not support assignment rule re-evaluation. "
+                "Update StochasticBehavior class to add initialize_assignment_rules() method."
+            )
+    
+    def get_thermodynamic_summary(self) -> Optional[Dict[str, int]]:
+        """
+        Get summary of thermodynamic validation results.
+        
+        Returns cached results from last validation, or performs validation
+        if not yet cached.
+        
+        Returns:
+            Dict with summary statistics or None if validation unavailable:
+            - 'total': Total reversible transitions
+            - 'valid': Number passing validation
+            - 'warnings': Number with warnings
+            - 'violations': Number with violations
+            - 'insufficient_data': Number with missing data
+        """
+        if self.thermodynamic_results is None:
+            self.validate_thermodynamics()
+        
+        if self.thermodynamic_results is None:
+            return None
+        
+        return self.thermodynamic_results.get('summary')
 
     def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
         """Handle model change notifications.
@@ -696,6 +917,9 @@ class SimulationController:
         # Debug output (can be enabled for troubleshooting)
         # print(f"\n▶️  [SIMULATION_STEP] t={self.time:.3f}, dt={time_step:.3f}")
         
+        # Track whether tau-leaping advanced time (to avoid double advancement)
+        tau_leaping_advanced_time = False
+        
         self._update_enablement_states()
         
         immediate_fired_total = 0
@@ -842,6 +1066,10 @@ class SimulationController:
         # Group continuous transitions by locality conflicts and apply firing policies
         continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
         
+        # DIAGNOSTIC: Log continuous phase
+        if continuous_transitions:
+            pass
+        
         continuous_enabled = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)
@@ -862,7 +1090,16 @@ class SimulationController:
                 continuous_active += 1
                 
                 # Increment firing count for continuous transitions (for statistics/tables)
-                transition.firing_count += 1
+                # Firing count represents the amount of "reaction" that occurred
+                # Use the rate from the integration step
+                if details and 'rate' in details:
+                    # Rate is the propensity/speed of the transition
+                    # Firing count increment = rate × dt
+                    transition.firing_count += abs(details['rate']) * time_step
+                else:
+                    # Fallback: evaluate rate directly
+                    rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
+                    transition.firing_count += abs(rate) * time_step
                 
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
@@ -882,16 +1119,10 @@ class SimulationController:
                         if hasattr(listener_obj, 'on_transition_fired'):
                             listener_obj.on_transition_fired(transition, self.time, details)
         
-        # Advance time BEFORE checking discrete transitions
-        # This ensures timed transitions are evaluated at the correct time
-        self.time += time_step
+        # NOTE: Time advancement moved to AFTER stochastic phase (see below)
+        # to prevent double advancement when tau-leaping is used
         
-        # Record state after time advancement
-        if self.data_collector:
-            self.data_collector.record_state(self.time)
-        
-        # Now check discrete transitions at the NEW time
-        # This allows timed transitions to fire when entering their window mid-step
+        # Update enablement states at current time
         self._update_enablement_states()
         
         # Handle timed and stochastic transitions with PRIORITY RULE:
@@ -987,18 +1218,33 @@ class SimulationController:
                         if hasattr(t, 'transition_type')
                     )
                     
+                    # DIAGNOSTIC: Log hybrid detection
                     if is_pure_stochastic:
                         # Pure stochastic: tau-leaping controls time stepping
+                        # Temporarily disable time advancement in tau-leaping (we'll handle it)
+                        # No wait - for pure stochastic, tau-leaping SHOULD advance time
                         self._tau_leaping_engine.execute_step(self)
+                        # Flag that time was already advanced by tau-leaping
+                        tau_leaping_advanced_time = True
                     else:
                         # Hybrid model: clamp tau to dt to stay synchronized
                         original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                        self._tau_leaping_engine.leap_selector.max_tau = min(time_step, original_max_tau)
+                        # CRITICAL: Force tau = time_step for hybrid models to ensure
+                        # continuous and stochastic operate over same time interval
+                        self._tau_leaping_engine.leap_selector.max_tau = time_step
+                        self._tau_leaping_engine.leap_selector.min_tau = time_step
                         
+                        # CRITICAL: Temporarily prevent tau-leaping from advancing time
+                        # For hybrid models, controller must be single source of time advancement
+                        self._tau_leaping_engine._advance_time = False
                         self._tau_leaping_engine.execute_step(self)
+                        self._tau_leaping_engine._advance_time = True
                         
-                        # Restore original max_tau
+                        # Restore original tau bounds
                         self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
+                        self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                        # Hybrid models: controller will advance time by time_step
+                        tau_leaping_advanced_time = False
                     
                     discrete_fired = True
                 else:
@@ -1021,6 +1267,15 @@ class SimulationController:
                         # Fire the transition
                         self._fire_transition(next_transition)
                         discrete_fired = True
+        
+        # CRITICAL: Advance time AFTER stochastic phase
+        # Skip if tau-leaping already advanced time (pure stochastic models)
+        if not tau_leaping_advanced_time:
+            self.time += time_step
+        
+        # Record state after time advancement
+        if self.data_collector:
+            self.data_collector.record_state(self.time)
         
         self._notify_step_listeners()
         
@@ -1958,22 +2213,30 @@ class SimulationController:
             return random.choice(enabled_transitions)
 
     def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
-        """Apply conflict resolution for continuous transitions.
+        """Apply conflict resolution for continuous transitions using weak independence theory.
         
-        Continuous transitions that share input places are in conflict.
-        Unlike discrete transitions, multiple continuous transitions can fire
-        simultaneously if they don't share resources (parallel flows).
+        Implements the refined locality theory from dependency_coupling.py:
+        - **Competitive (True Conflict)**: Shared places via CONSUMING arcs → Sequential execution
+        - **Regulatory (Valid Coupling)**: Shared places via TEST ARCS (read-only) → Parallel execution OK
+        
+        Test arcs (catalysts/enzymes) don't consume tokens, so multiple transitions can
+        share the same catalyst without conflict. This is correct biological behavior:
+        "Same enzyme catalyzes multiple reactions."
         
         Strategy:
-        1. Identify conflict groups (transitions sharing input places)
+        1. Identify conflict groups (transitions sharing input places via CONSUMING arcs)
         2. For each conflict group, apply firing policy to select winner(s)
-        3. Non-conflicting transitions always fire (parallel execution)
+        3. Non-conflicting and regulatory-coupled transitions fire in parallel
         
         Args:
             continuous_enabled: List of (transition, behavior, input_arcs, output_arcs) tuples
             
         Returns:
             List of (transition, behavior, input_arcs, output_arcs) tuples to integrate
+        
+        See also:
+            - topology/biological/dependency_coupling.py: Weak independence theory
+            - doc/foundation/BIOLOGICAL_PETRI_NET_FORMALIZATION.md: Section 3.1
         """
         if len(continuous_enabled) <= 1:
             return continuous_enabled
@@ -1986,11 +2249,17 @@ class SimulationController:
             transition, behavior, input_arcs, output_arcs = trans_tuple
             transition_data[transition.id] = trans_tuple
             
-            # Get input places for this transition
+            # Get input places for this transition (only consuming arcs)
+            # Test arcs (catalysts) don't create conflicts → weak independence theory
             input_places = set()
             for arc in input_arcs:
                 if hasattr(arc, 'source_id'):
-                    input_places.add(arc.source_id)
+                    # Check if this is a test arc (read-only, non-consuming)
+                    is_test_arc = hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens()
+                    if not is_test_arc:
+                        # Only consuming arcs create true conflicts (competitive coupling)
+                        input_places.add(arc.source_id)
+                    # Test arcs are regulatory coupling → transitions can fire in parallel
             
             # Map places to transitions
             for place_id in input_places:
@@ -2073,10 +2342,20 @@ class SimulationController:
             time_step = self.get_effective_dt()
         
         # Calculate max_steps from duration if not specified
+        # For stochastic simulations using τ-leaping: Use much higher step limit
+        # because τ-leaping takes adaptive (often large) steps but still counts
+        # each step() call. We use 100× the normal estimate as a safety limit
+        # while relying primarily on time-based termination.
         if max_steps is None:
             estimated_steps = self.settings.estimate_step_count()
             if estimated_steps is not None:
-                max_steps = estimated_steps
+                has_stochastic = any(t.transition_type == 'stochastic' for t in self.model.transitions)
+                if has_stochastic:
+                    # Stochastic: 100× safety limit (relies on time-based termination)
+                    max_steps = estimated_steps * 100
+                else:
+                    # Deterministic: Use normal step count
+                    max_steps = estimated_steps
         
         self._running = True
         self._stop_requested = False
@@ -2284,6 +2563,9 @@ class SimulationController:
         if self.data_collector is not None:
             self.data_collector.clear()
         self.transition_states.clear()
+        
+        # Clear thermodynamic validation results
+        self.thermodynamic_results = None
         
         # Reset firing counts for all transitions
         for transition in self.model.transitions:

@@ -175,9 +175,12 @@ class SpeciesConverter(BaseConverter):
             # They have arcs (infinite sources/sinks) unlike true signal places (no arcs)
             if species.compartment and species.compartment != self.default_compartment:
                 place.is_compartment_place = True
+                # Apply color schema immediately after setting semantic flag
+                from shypn.utils.color_schema_manager import ColorSchemaManager
+                ColorSchemaManager.reset_place_color(place)
                 self.logger.debug(
                     f"Marking place '{place.name}' as non-default compartment place "
-                    f"(compartment: {species.compartment}, green border)"
+                    f"(compartment: {species.compartment}, violet border)"
                 )
             
             # Keep default black border for visibility
@@ -557,7 +560,7 @@ class ReactionConverter(BaseConverter):
             return
         
         # Build rate function based on number of substrates with NAMED PARAMETERS
-        # Use place.name for rate function string (this is acceptable - it's a formula string, not object reference)
+        # Use place.name for rate function string (user-editable alias like ATP, Glucose)
         if len(substrate_places) == 1:
             # Single substrate - standard Michaelis-Menten
             rate_func = f"michaelis_menten({substrate_places[0].name}, vmax={vmax}, km={km})"
@@ -1115,6 +1118,9 @@ class PathwayConverter:
             place.set_tokens(param_value)  # Parameter value as tokens
             place.set_initial_marking(param_value)
             place.is_signal_place = True  # Hexagon shape - shows it's a parameter, not pathway element
+            # Apply color schema immediately after setting semantic flag
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(place)
             
             # Mark as a parameter place
             if not hasattr(place, 'metadata'):
@@ -1203,10 +1209,11 @@ class PathwayConverter:
         
         # Color ONLY SignalFlowArcs connected to signal places (light gray)
         # TestArcs remain blue, regular Arcs remain black per normalized color schema
+        from shypn.utils.color_schema_manager import ColorSchemaManager
         for arc in document.arcs:
             if isinstance(arc, SignalFlowArc):
                 if arc.source in signal_places or arc.target in signal_places:
-                    arc.color = SIGNAL_COLOR
+                    ColorSchemaManager.reset_arc_color(arc)
                     signal_arc_count += 1
         
         if signal_arc_count > 0:
@@ -1259,8 +1266,9 @@ class PathwayConverter:
         (assignment rules, reversible formulas) and chose how to proceed.
         
         Choices:
-        - 'continuous': Convert ALL transitions to continuous mode
-        - 'hybrid': Convert only problematic transitions to continuous
+        - 'continuous': Convert ALL transitions to continuous mode (Option 1)
+        - 'hybrid': Convert only problematic transitions to continuous (Option 2)
+        - 'stochastic_with_reevaluation': Keep stochastic, enable runtime re-eval (Option 3)
         - 'stochastic': Keep as is (no changes)
         
         Args:
@@ -1268,9 +1276,12 @@ class PathwayConverter:
             user_choice: User's choice from validation dialog
             pathway: PathwayData with metadata about which transitions are problematic
         """
-        if user_choice == 'stochastic':
-            # User chose to proceed with stochastic, no changes needed
-            self.logger.info("User chose stochastic mode - no transition type changes")
+        if user_choice == 'stochastic' or user_choice == 'stochastic_with_reevaluation':
+            # User chose to proceed with stochastic, no transition type changes needed
+            # For Option 3, controller will handle runtime re-evaluation
+            self.logger.info(
+                f"User chose {user_choice} mode - no transition type changes"
+            )
             return
         
         validation_issues = pathway.metadata.get('validation_issues', [])
@@ -1310,6 +1321,29 @@ class PathwayConverter:
                 if issue.get('category') == 'reversible_formulas'
             ]
             
+            # Option 2: Build dependency map for assignment rules
+            # Identify which species have assignment rules
+            rule_defined_species = set()
+            if has_assignment_rules:
+                assignment_rule_info = pathway.metadata.get('assignment_rules', {})
+                species_rules = assignment_rule_info.get('species_rules', [])
+                for rule in species_rules:
+                    rule_defined_species.add(rule.get('variable'))
+                
+                self.logger.info(
+                    f"Option 2 - Enhanced Hybrid Mode: Found {len(rule_defined_species)} "
+                    f"species with assignment rules: {list(rule_defined_species)}"
+                )
+            
+            # Build species-to-place mapping for dependency analysis
+            species_to_place = {}
+            for place in document.places:
+                species_id = place.metadata.get('species_id') if hasattr(place, 'metadata') else None
+                if species_id:
+                    species_to_place[species_id] = place
+                # Also map by name for fallback
+                species_to_place[place.name] = place
+            
             converted_count = 0
             for transition in document.transitions:
                 should_convert = False
@@ -1332,27 +1366,59 @@ class PathwayConverter:
                     if has_subtraction or has_reverse_keywords or is_reversible:
                         should_convert = True
                         problematic_reactions.add(transition.name)
+                        self.logger.debug(
+                            f"Transition '{transition.name}' marked for conversion: reversible formula"
+                        )
                 
-                # If assignment rules present, convert all transitions to be safe
-                # (hard to determine which transitions use rule-defined species)
-                if has_assignment_rules:
-                    should_convert = True
+                # Option 2: Check if transition uses rule-defined species
+                if has_assignment_rules and not should_convert:
+                    # Check input arcs (reactants)
+                    for arc in document.arcs:
+                        if arc.kind == 'normal' and arc.target_id == transition.id:
+                            # Input arc - check if source place is rule-defined
+                            source_place = document.get_object_by_id(arc.source_id)
+                            if source_place:
+                                species_id = source_place.metadata.get('species_id') if hasattr(source_place, 'metadata') else None
+                                if species_id in rule_defined_species or source_place.name in rule_defined_species:
+                                    should_convert = True
+                                    problematic_reactions.add(transition.name)
+                                    self.logger.debug(
+                                        f"Transition '{transition.name}' marked for conversion: "
+                                        f"uses rule-defined species '{source_place.name}' (input)"
+                                    )
+                                    break
+                    
+                    # Check rate formula for species references
+                    if not should_convert and hasattr(transition, 'properties'):
+                        rate_function = transition.properties.get('rate_function', '')
+                        if rate_function:
+                            for species_id in rule_defined_species:
+                                if species_id in rate_function:
+                                    should_convert = True
+                                    problematic_reactions.add(transition.name)
+                                    self.logger.debug(
+                                        f"Transition '{transition.name}' marked for conversion: "
+                                        f"rate formula references rule-defined species '{species_id}'"
+                                    )
+                                    break
                 
                 if should_convert and transition.transition_type == 'stochastic':
                     transition.transition_type = 'continuous'
                     converted_count += 1
                     self.logger.debug(
                         f"Converted {transition.name} from stochastic to continuous "
-                        f"(hybrid mode - problematic formula)"
+                        f"(hybrid mode - uses problematic species or reversible)"
                     )
             
             self.logger.info(
-                f"User chose hybrid mode: Converted {converted_count} problematic "
-                f"stochastic transitions to continuous, kept others as stochastic"
+                f"Option 2 - Enhanced Hybrid Mode: Converted {converted_count} transitions "
+                f"that use rule-defined species or reversible formulas. "
+                f"Kept {len([t for t in document.transitions if t.transition_type == 'stochastic'])} as stochastic."
             )
-            document.metadata['conversion_mode'] = 'hybrid'
-            document.metadata['conversion_reason'] = 'User choice after validation warnings'
+            document.metadata['conversion_mode'] = 'hybrid_enhanced'
+            document.metadata['conversion_reason'] = 'Option 2: Dependency tracking for assignment rules'
             document.metadata['problematic_reactions'] = list(problematic_reactions)
+            document.metadata['rule_defined_species'] = list(rule_defined_species)
     
     def convert(self, pathway: ProcessedPathwayData) -> DocumentModel:
         """
@@ -1433,6 +1499,13 @@ class PathwayConverter:
         # Signal places (Ψ) represent information flow, not mass transfer
         # Their arcs get orange color to distinguish from metabolic transport
         self._color_signal_arcs(document)
+        
+        # Apply color schema to all SignalFlowArcs to ensure correct light gray color
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        for arc in document.arcs:
+            if isinstance(arc, SignalFlowArc):
+                ColorSchemaManager.reset_arc_color(arc)
         
         # ==============================================================================
         # BOUNDARY SPECIES: Color arcs but DO NOT create source/sink transitions

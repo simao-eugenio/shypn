@@ -40,7 +40,7 @@ class SimulationSettings:
     # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
     DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance (controls accuracy)
     DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (lowered for biochemical models)
-    DEFAULT_MAX_TAU = 0.01  # Maximum leap size (seconds) - conservative default to prevent huge time jumps
+    DEFAULT_MAX_TAU = 0.1  # Maximum leap size (seconds) - allows reasonable simulation speed
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting

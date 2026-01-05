@@ -127,6 +127,18 @@ class SignalFlowArc(Arc):
         """
         return "information_transfer"
     
+    def to_dict(self) -> dict:
+        """Serialize signal flow arc to dictionary for persistence.
+        
+        Returns:
+            dict: Dictionary containing all arc properties with arc_type='signal_flow'
+        """
+        data = super().to_dict()
+        # Ensure color is always the correct light gray for signal flow arcs
+        # This prevents black color from being saved and restored
+        data['color'] = list(self.DEFAULT_COLOR)
+        return data
+    
     def __repr__(self) -> str:
         """String representation for debugging."""
         return (f"SignalFlowArc(id={self.id}, {self.source.name} → {self.target.name}, "

@@ -67,12 +67,12 @@ class ContinuousBehavior(TransitionBehavior):
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
         
-        # Support multiple formats:
-        # 1. properties['rate_function'] = string expression
-        # 2. properties['rate_function'] = callable
-        # 3. properties = {'rate': lambda places, t: ...}  (dict format)
-        # 4. transition.rate attribute (UI stores simple value)
-        # 5. DIRECTIONAL: rate_forward + rate_reverse (new format)
+        # Support multiple formats (priority order):
+        # 1. transition.rate_function (top-level JSON field - AUTHORITATIVE)
+        # 2. transition.rate_forward/rate_reverse (directional reactions)
+        # 3. properties['rate_function'] (legacy/fallback only)
+        # 4. properties['rate'] (callable format)
+        # 5. transition.rate attribute (simple numeric value)
         
         rate_expr = None
         rate_forward_expr = None
@@ -88,8 +88,12 @@ class ContinuousBehavior(TransitionBehavior):
         else:
             self.use_directional_rates = False
             
-            if 'rate_function' in props:
-                # Explicit rate function in properties
+            # PRIORITY 1: Check top-level rate_function attribute (from JSON "rate_function" field)
+            # This is the authoritative source set by the UI
+            if getattr(transition, 'rate_function', None):
+                rate_expr = transition.rate_function
+            # PRIORITY 2: Legacy fallback - properties dict (only if no top-level field)
+            elif 'rate_function' in props:
                 rate_expr = props.get('rate_function')
             elif 'rate' in props and callable(props['rate']):
                 # Dict format with callable: {'rate': lambda ...}
@@ -505,13 +509,12 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place is None:
                 return False, f"missing-place-{place_id}"
             
-            # SIGNAL PLACE SEMANTICS: Signal places are read-only (Ψ in Bio-PN)
-            # They broadcast information without token consumption
-            # Skip token threshold check for signal places
-            if self._is_signal_place(source_place):
-                continue  # Signal places don't block enablement
+            # TEST ARC: Non-consuming arcs don't block on token threshold
+            # Consuming arcs (including SignalFlowArcs) must have tokens above threshold
+            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                continue  # Test arcs don't block enablement
             
-            # Normal/Test arcs: Require positive tokens for continuous enablement
+            # Normal/SignalFlow arcs: Require positive tokens for continuous enablement
             # Continuous requires tokens above threshold
             if source_place.tokens <= self.min_token_threshold:
                 return False, f"place-below-threshold-{place_id}"
@@ -727,7 +730,8 @@ class ContinuousBehavior(TransitionBehavior):
             actual_flow = flow_magnitude
             if not is_source:
                 for arc in consume_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens
+                    # Skip test arcs - they check enablement but don't consume tokens OR limit flow
+                    # Test arcs are read-only (catalyst behavior) and should not affect rate
                     if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
                         continue
                     
@@ -737,12 +741,9 @@ class ContinuousBehavior(TransitionBehavior):
                     if source_place is None:
                         continue
                     
-                    # SIGNAL PLACE SEMANTICS: Skip signal places in flow clamping
-                    # Signal places are read-only and don't limit available flow
-                    if self._is_signal_place(source_place):
-                        continue  # Signal places have unlimited "read" capacity
-                    
                     # Calculate max flow possible from this arc
+                    # All consuming arcs (including SignalFlowArcs) limit the flow rate
+                    # CRITICAL: Test arcs should NOT reach here due to continue above
                     max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
                     actual_flow = min(actual_flow, max_flow_from_arc)
             
