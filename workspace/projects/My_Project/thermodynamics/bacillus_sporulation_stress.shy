@@ -1580,7 +1580,7 @@
       "source_type": "place",
       "target_id": "T7",
       "target_type": "transition",
-      "weight": 40.0,
+      "weight": 32.0,
       "threshold": null,
       "color": [
         0.7,
@@ -1640,7 +1640,7 @@
       "source_type": "place",
       "target_id": "T8",
       "target_type": "transition",
-      "weight": 15.0,
+      "weight": 12.0,
       "threshold": null,
       "color": [
         0.7,
@@ -1760,7 +1760,7 @@
       "source_type": "place",
       "target_id": "T11",
       "target_type": "transition",
-      "weight": 20.0,
+      "weight": 16.0,
       "threshold": null,
       "color": [
         0.7,
@@ -1800,7 +1800,7 @@
       "source_type": "place",
       "target_id": "T12",
       "target_type": "transition",
-      "weight": 20.0,
+      "weight": 16.0,
       "threshold": null,
       "color": [
         0.7,
@@ -1840,7 +1840,7 @@
       "source_type": "place",
       "target_id": "T13",
       "target_type": "transition",
-      "weight": 24.0,
+      "weight": 20.0,
       "threshold": null,
       "color": [
         0.7,
@@ -1880,7 +1880,7 @@
       "source_type": "place",
       "target_id": "T14",
       "target_type": "transition",
-      "weight": 24.0,
+      "weight": 20.0,
       "threshold": null,
       "color": [
         0.7,
@@ -2060,7 +2060,7 @@
       "source_type": "place",
       "target_id": "T18",
       "target_type": "transition",
-      "weight": 20.0,
+      "weight": 16.0,
       "threshold": null,
       "color": [
         0.7,
@@ -2120,7 +2120,7 @@
       "source_type": "transition",
       "target_id": "P1",
       "target_type": "place",
-      "weight": 24.0,
+      "weight": 40.0,
       "threshold": null,
       "color": [
         0.7,

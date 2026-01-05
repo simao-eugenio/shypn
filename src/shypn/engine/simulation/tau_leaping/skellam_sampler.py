@@ -54,7 +54,6 @@ class SkellamSampler:
             seed: Random seed for reproducibility. If None, uses system entropy.
         """
         self.rng = np.random.default_rng(seed)
-        self.logger = logging.getLogger(__name__)
     
     def sample(
         self, 
