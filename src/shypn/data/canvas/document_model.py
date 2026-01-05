@@ -45,6 +45,29 @@ class DocumentModel:
         # Simulation settings (for batch mode and recording configuration)
         from shypn.engine.simulation.settings import SimulationSettings
         self.simulation_settings = SimulationSettings()
+        
+        # Thermodynamic settings (pH, temperature, validation parameters)
+        self.thermodynamic_settings = self._get_default_thermodynamic_settings()
+        
+        # Compound mappings (place_id → compound_id for thermodynamic validation)
+        # Format: {"P001": "C00002", "P002": "CHEBI:15422", ...}
+        self.compound_mappings: Dict[str, str] = {}
+    
+    @staticmethod
+    def _get_default_thermodynamic_settings() -> dict:
+        """Get default thermodynamic settings (biochemical standard state).
+        
+        Returns:
+            Dictionary with pH, temperature, ionic_strength, tolerance, enable_validation
+        """
+        return {
+            "ph": 7.0,                      # Biochemical standard pH
+            "temperature": 298.15,          # 25°C in Kelvin
+            "ionic_strength": 0.1,          # 0.1 M (physiological)
+            "tolerance": 0.5,               # ±50% (≈±1 order of magnitude)
+            "enable_validation": True,      # Validate by default
+            "preset": "biochemical_standard"  # Track which preset is active
+        }
     
     # ============================================================================
     # Object Creation
@@ -556,6 +579,8 @@ class DocumentModel:
             "version": "2.0",
             "metadata": metadata,
             "view_state": self.view_state,
+            "thermodynamic_settings": self.thermodynamic_settings,
+            "compound_mappings": self.compound_mappings,
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
             "arcs": [arc.to_dict() for arc in self.arcs],
@@ -632,6 +657,20 @@ class DocumentModel:
         if "view_state" in data:
             document.view_state = data["view_state"]
         
+        # Restore thermodynamic settings if present, else use defaults
+        if "thermodynamic_settings" in data:
+            document.thermodynamic_settings = data["thermodynamic_settings"]
+        else:
+            # Legacy models get defaults
+            document.thermodynamic_settings = cls._get_default_thermodynamic_settings()
+        
+        # Restore compound mappings if present, else use empty dict
+        if "compound_mappings" in data:
+            document.compound_mappings = data["compound_mappings"]
+        else:
+            # Legacy models get empty mappings
+            document.compound_mappings = {}
+        
         # Restore metadata if present (source, has_test_arcs, model_type, etc.)
         if "metadata" in data:
             # Filter out serialization-only metadata (created, object_counts)
@@ -682,6 +721,119 @@ class DocumentModel:
             document.arcs[i] = signal_arc
         
         return document
+    
+    # ============================================================================
+    # Thermodynamic Settings Management
+    # ============================================================================
+    
+    @staticmethod
+    def get_thermodynamic_presets() -> Dict[str, dict]:
+        """Get available thermodynamic condition presets.
+        
+        Returns:
+            Dictionary mapping preset_name → settings dict
+        """
+        return {
+            "biochemical_standard": {
+                "ph": 7.0,
+                "temperature": 298.15,  # 25°C
+                "ionic_strength": 0.1,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "biochemical_standard",
+                "description": "Biochemical standard state (pH 7.0, 25°C)"
+            },
+            "e_coli_cytoplasm": {
+                "ph": 7.4,
+                "temperature": 310.15,  # 37°C
+                "ionic_strength": 0.15,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "e_coli_cytoplasm",
+                "description": "E. coli cytoplasm (pH 7.4, 37°C)"
+            },
+            "human_blood": {
+                "ph": 7.4,
+                "temperature": 310.15,  # 37°C
+                "ionic_strength": 0.15,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "human_blood",
+                "description": "Human blood plasma (pH 7.4, 37°C)"
+            },
+            "thermophile": {
+                "ph": 7.0,
+                "temperature": 353.15,  # 80°C
+                "ionic_strength": 0.1,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "thermophile",
+                "description": "Thermophilic organism (pH 7.0, 80°C)"
+            },
+            "acidophile": {
+                "ph": 3.0,
+                "temperature": 298.15,  # 25°C
+                "ionic_strength": 0.1,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "acidophile",
+                "description": "Acidophilic organism (pH 3.0, 25°C)"
+            },
+            "alkaliphile": {
+                "ph": 10.0,
+                "temperature": 298.15,  # 25°C
+                "ionic_strength": 0.1,
+                "tolerance": 0.5,
+                "enable_validation": True,
+                "preset": "alkaliphile",
+                "description": "Alkaliphilic organism (pH 10.0, 25°C)"
+            }
+        }
+    
+    def set_thermodynamic_preset(self, preset_name: str) -> None:
+        """Apply a thermodynamic preset to this model.
+        
+        Args:
+            preset_name: Name of preset from get_thermodynamic_presets()
+            
+        Raises:
+            ValueError: If preset_name is not recognized
+        """
+        presets = self.get_thermodynamic_presets()
+        if preset_name not in presets:
+            raise ValueError(f"Unknown preset: {preset_name}. Available: {list(presets.keys())}")
+        
+        self.thermodynamic_settings = presets[preset_name].copy()
+    
+    def update_thermodynamic_settings(self, **kwargs) -> None:
+        """Update specific thermodynamic settings.
+        
+        Args:
+            **kwargs: Settings to update (ph, temperature, ionic_strength, tolerance, enable_validation)
+            
+        Example:
+            >>> doc.update_thermodynamic_settings(ph=7.4, temperature=310.15)
+        """
+        # Update provided settings
+        for key, value in kwargs.items():
+            if key in self.thermodynamic_settings:
+                self.thermodynamic_settings[key] = value
+        
+        # Mark as custom if not using a standard preset
+        if any(kwargs):
+            self.thermodynamic_settings["preset"] = "custom"
+    
+    def get_thermodynamic_setting(self, key: str, default=None):
+        """Get a specific thermodynamic setting value.
+        
+        Args:
+            key: Setting name (ph, temperature, ionic_strength, tolerance, enable_validation)
+            default: Value to return if key not found
+            
+        Returns:
+            Setting value or default
+        """
+        return self.thermodynamic_settings.get(key, default)
     
     def save_to_file(self, filepath: str) -> None:
         """Save document to JSON file.
