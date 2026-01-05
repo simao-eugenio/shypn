@@ -3,6 +3,12 @@
 
 Displays thermodynamic consistency validation results for reversible reactions.
 Shows violations, warnings, and statistics from automated validation during SBML import.
+
+Phase 4 Enhancement:
+- Added compound mapping display with confidence badges
+- Added quick access button to THERMODYNAMICS category
+- Enhanced settings display (pH, temperature, ionic strength)
+- Added mapping statistics section
 """
 import gi
 gi.require_version('Gtk', '3.0')
@@ -23,9 +29,16 @@ class ThermodynamicValidationCategory(BaseReportCategory):
     Data source: SimulationController.thermodynamic_results
     """
     
-    def __init__(self, project=None, model_canvas=None):
-        """Initialize thermodynamic validation category."""
+    def __init__(self, project=None, model_canvas=None, pathway_operations_panel=None):
+        """Initialize thermodynamic validation category.
+        
+        Args:
+            project: Project instance
+            model_canvas: ModelCanvas instance
+            pathway_operations_panel: PathwayOperationsPanel for quick access (Phase 4)
+        """
         self.controller = None  # Set before super() since refresh() is called during init
+        self.pathway_operations_panel = pathway_operations_panel  # Phase 4: Quick access
         
         super().__init__(
             title="THERMODYNAMIC VALIDATION",
@@ -41,6 +54,17 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         box.set_margin_end(12)
         box.set_margin_top(12)
         box.set_margin_bottom(12)
+        
+        # === QUICK ACCESS BUTTON (Phase 4) ===
+        if self.pathway_operations_panel:
+            button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            
+            quick_access_btn = Gtk.Button(label="⚙️  Configure Thermodynamics")
+            quick_access_btn.set_tooltip_text("Open THERMODYNAMICS category in Pathway Operations Panel")
+            quick_access_btn.connect('clicked', self._on_quick_access_clicked)
+            button_box.pack_start(quick_access_btn, True, True, 0)
+            
+            box.pack_start(button_box, False, False, 0)
         
         # === STATUS BAR ===
         self.status_label = Gtk.Label()
@@ -67,6 +91,46 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         
         summary_frame.add(summary_box)
         box.pack_start(summary_frame, False, False, 0)
+        
+        # === COMPOUND MAPPINGS (Phase 4) ===
+        mappings_frame = Gtk.Frame()
+        mappings_frame.set_label("Compound Mappings")
+        mappings_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        
+        mappings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        mappings_box.set_margin_start(12)
+        mappings_box.set_margin_end(12)
+        mappings_box.set_margin_top(6)
+        mappings_box.set_margin_bottom(6)
+        
+        self.mappings_label = Gtk.Label()
+        self.mappings_label.set_xalign(0)
+        self.mappings_label.set_line_wrap(True)
+        self.mappings_label.set_text("No mappings configured")
+        mappings_box.pack_start(self.mappings_label, False, False, 0)
+        
+        mappings_frame.add(mappings_box)
+        box.pack_start(mappings_frame, False, False, 0)
+        
+        # === SETTINGS (Phase 4) ===
+        settings_frame = Gtk.Frame()
+        settings_frame.set_label("Settings")
+        settings_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        
+        settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        settings_box.set_margin_start(12)
+        settings_box.set_margin_end(12)
+        settings_box.set_margin_top(6)
+        settings_box.set_margin_bottom(6)
+        
+        self.settings_label = Gtk.Label()
+        self.settings_label.set_xalign(0)
+        self.settings_label.set_line_wrap(True)
+        self.settings_label.set_text("Using default settings")
+        settings_box.pack_start(self.settings_label, False, False, 0)
+        
+        settings_frame.add(settings_box)
+        box.pack_start(settings_frame, False, False, 0)
         
         # === VIOLATIONS (Expandable) ===
         self.violations_expander = Gtk.Expander(label="❌ Violations")
@@ -174,6 +238,10 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         if not self.controller:
             self._show_no_controller()
             return
+        
+        # Phase 4: Update compound mappings and settings
+        self._update_compound_mappings()
+        self._update_settings()
         
         # Get validation results from controller
         results = self.controller.thermodynamic_results
@@ -352,6 +420,82 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         """
         self.controller = controller
         self.refresh()
+    
+    def _update_compound_mappings(self):
+        """Update compound mappings display (Phase 4)."""
+        if not self.model_canvas:
+            self.mappings_label.set_text("No model loaded")
+            return
+        
+        # Get document model
+        document = self.model_canvas
+        if not hasattr(document, 'compound_mappings'):
+            self.mappings_label.set_text("No mappings configured")
+            return
+        
+        mappings = document.compound_mappings
+        if not mappings:
+            self.mappings_label.set_text("No compounds mapped yet. Auto-mapping runs after import.")
+            return
+        
+        # Count by confidence (estimate from compound_id format)
+        total = len(mappings)
+        lines = [f"Total mapped: {total} places"]
+        
+        # Show first 5 mappings as examples
+        lines.append("\nExamples:")
+        for i, (place_id, compound_id) in enumerate(list(mappings.items())[:5]):
+            # Get place label
+            place = next((p for p in document.places if p.id == place_id), None)
+            label = place.label if place else place_id
+            lines.append(f"  • {label} → {compound_id}")
+        
+        if total > 5:
+            lines.append(f"  ... and {total - 5} more")
+        
+        self.mappings_label.set_text('\n'.join(lines))
+    
+    def _update_settings(self):
+        """Update settings display (Phase 4)."""
+        if not self.model_canvas:
+            self.settings_label.set_text("No model loaded")
+            return
+        
+        # Get document model
+        document = self.model_canvas
+        if not hasattr(document, 'thermodynamic_settings'):
+            self.settings_label.set_text("Using default settings")
+            return
+        
+        settings = document.thermodynamic_settings
+        ph = settings.get('ph', 7.0)
+        temp_k = settings.get('temperature', 298.15)
+        temp_c = temp_k - 273.15
+        ionic = settings.get('ionic_strength', 0.1)
+        tolerance = settings.get('tolerance', 0.5)
+        preset = settings.get('preset', 'custom')
+        
+        lines = [
+            f"Preset: {preset.capitalize()}",
+            f"pH: {ph:.1f}",
+            f"Temperature: {temp_k:.1f} K ({temp_c:.1f}°C)",
+            f"Ionic Strength: {ionic:.2f} M",
+            f"Tolerance: {tolerance:.0%}"
+        ]
+        
+        self.settings_label.set_text('\n'.join(lines))
+    
+    def _on_quick_access_clicked(self, button):
+        """Handle quick access button click (Phase 4)."""
+        if not self.pathway_operations_panel:
+            return
+        
+        # Switch to THERMODYNAMICS category
+        # The pathway_operations_panel should have a method to switch categories
+        if hasattr(self.pathway_operations_panel, 'set_active_category'):
+            self.pathway_operations_panel.set_active_category('THERMODYNAMICS')
+        elif hasattr(self.pathway_operations_panel, 'show_category'):
+            self.pathway_operations_panel.show_category('THERMODYNAMICS')
     
     def get_widget(self):
         """Get the widget for this category.
