@@ -29,12 +29,13 @@ from .pathway_operations.brenda_category import BRENDACategory
 from .pathway_operations.sabio_rk_category import SabioRKCategory
 from .pathway_operations.heuristic_parameters_category import HeuristicParametersCategory
 from .pathway_operations.enrichment_history_category import EnrichmentHistoryCategory
+from .pathway_operations.thermodynamics import ThermodynamicsCategory
 
 
 class PathwayOperationsPanel(Gtk.Box):
     """Main Pathway Operations panel container.
     
-    Assembles seven categories:
+    Assembles eight categories:
     1. KEGG - Import pathways from KEGG database
     2. SBML - Import models from SBML files or BioModels
     3. BiGG Models - Import curated genome-scale models from BiGG database
@@ -42,6 +43,7 @@ class PathwayOperationsPanel(Gtk.Box):
     5. SABIO-RK - Enrich models with kinetic parameters from SABIO-RK
     6. Heuristic Parameters - Type-aware parameter inference from multiple sources
     7. Enrichment History - View, rate, and undo parameter enrichments (Phase 2)
+    8. THERMODYNAMICS - Universal thermodynamic validation settings and mapping
     
     Data flow:
       KEGG import → BRENDA/SABIO-RK/Heuristic (EC numbers)
@@ -57,6 +59,7 @@ class PathwayOperationsPanel(Gtk.Box):
         sabio_rk_category: SabioRKCategory instance
         heuristic_params_category: HeuristicParametersCategory instance
         enrichment_history_category: EnrichmentHistoryCategory instance (Phase 2)
+        thermodynamics_category: ThermodynamicsCategory instance
         project: Current project
         model_canvas: Current model canvas
     """
@@ -117,6 +120,13 @@ class PathwayOperationsPanel(Gtk.Box):
             expanded=False
         )
         
+        # THERMODYNAMICS category - Universal thermodynamic validation
+        self.thermodynamics_category = ThermodynamicsCategory(
+            expanded=False,
+            model_canvas=model_canvas,
+            parent_window=parent_window
+        )
+        
         # Set initial project and canvas if provided
         if project:
             self.set_project(project)
@@ -174,6 +184,7 @@ class PathwayOperationsPanel(Gtk.Box):
         categories_box.pack_start(self.sabio_rk_category, False, False, 0)
         categories_box.pack_start(self.heuristic_params_category, False, False, 0)
         categories_box.pack_start(self.enrichment_history_category, False, False, 0)  # Phase 2
+        categories_box.pack_start(self.thermodynamics_category, False, False, 0)
         
         scrolled.add(categories_box)
         self.pack_start(scrolled, True, True, 0)
@@ -233,6 +244,7 @@ class PathwayOperationsPanel(Gtk.Box):
         self.brenda_category.set_project(project)
         self.sabio_rk_category.set_project(project)
         self.enrichment_history_category.set_project(project)  # Phase 2
+        # thermodynamics_category doesn't need project reference
         
         self.logger.info(f"Project set: {project.name if project else None}")
     
@@ -251,6 +263,7 @@ class PathwayOperationsPanel(Gtk.Box):
         self.brenda_category.set_model_canvas(model_canvas)
         self.sabio_rk_category.set_model_canvas(model_canvas)
         self.enrichment_history_category.set_model_canvas(model_canvas)  # Phase 2
+        self.thermodynamics_category.set_model_canvas(model_canvas)
         
         self.logger.info("Model canvas updated for all categories")
     
