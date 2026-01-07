@@ -6225,12 +6225,27 @@ class ModelCanvasLoader:
                         arc = manager.add_arc(source, target)
                         arc.weight = item['weight']
                         
-                        # Set arc type
-                        if item.get('arc_type') == 'inhibitor':
+                        # Set arc type and apply proper ColorSchemaManager colors
+                        arc_type = item.get('arc_type', 'normal')
+                        if arc_type == 'inhibitor':
                             from shypn.utils.arc_transform import convert_to_inhibitor
                             new_arc = convert_to_inhibitor(arc)
                             manager.replace_arc(arc, new_arc)
                             arc = new_arc
+                        elif arc_type == 'test':
+                            from shypn.utils.arc_transform import convert_to_test
+                            new_arc = convert_to_test(arc)
+                            manager.replace_arc(arc, new_arc)
+                            arc = new_arc
+                        elif arc_type == 'signal_flow':
+                            from shypn.utils.arc_transform import convert_to_signal_flow
+                            try:
+                                new_arc = convert_to_signal_flow(arc)
+                                manager.replace_arc(arc, new_arc)
+                                arc = new_arc
+                            except ValueError:
+                                # Signal place constraint not met, keep as normal arc
+                                pass
                         
                         # Handle curved arcs
                         if item.get('is_curved'):

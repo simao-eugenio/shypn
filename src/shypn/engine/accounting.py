@@ -339,6 +339,35 @@ class TokenAccountingAuditor:
         conserved = abs(leak) < tolerance
         
         return conserved, leak
+    
+    def validate_firing_counts(self):
+        """Validate that transition.firing_count matches accounting records.
+        
+        Compares the actual transition.firing_count with the number of
+        firing records in the accounting system to detect discrepancies.
+        """
+        self.firing_discrepancies.clear()
+        
+        # Get transitions that have a firing_count attribute
+        transitions_dict = self.model.transitions if isinstance(self.model.transitions, dict) else {t.id: t for t in self.model.transitions}
+        
+        for trans_id, stats in self.transition_stats.items():
+            if trans_id in transitions_dict:
+                transition = transitions_dict[trans_id]
+                actual_firings = getattr(transition, 'firing_count', 0)
+                expected_firings = stats['firings']
+                
+                if actual_firings != expected_firings:
+                    discrepancy = FiringCountDiscrepancy(
+                        transition_id=trans_id,
+                        expected_firings=expected_firings,
+                        actual_firings=actual_firings,
+                        discrepancy=actual_firings - expected_firings,
+                        tokens_per_firing=stats['consumed'] / expected_firings if expected_firings > 0 else 0.0
+                    )
+                    self.firing_discrepancies.append(discrepancy)
+        
+        return len(self.firing_discrepancies) == 0
         
     def generate_report(self) -> Dict[str, Any]:
         """Generate comprehensive accounting report.
