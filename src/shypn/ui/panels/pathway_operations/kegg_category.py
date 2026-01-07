@@ -1419,6 +1419,13 @@ class KEGGCategory(BasePathwayCategory):
             self.stoich_status_label.set_markup(
                 '<span size="small">No reactions to enrich</span>'
             )
+    
+    @deprecated(
+        deprecated_in="2.5.0",
+        removed_in="3.0.0",
+        replacement="thermodynamics cross-reference database",
+        reason="Name enrichment now handled automatically via xref database with instant lookups"
+    )
     def _on_enrich_names_clicked(self, button):
         """[DEPRECATED] Handle enrichment button click.
         DEPRECATED as of 2026-01-01: This method is no longer used.
