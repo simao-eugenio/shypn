@@ -91,6 +91,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.time_units_combo = None
         self.progress_bar = None
         self.time_display_label = None
+        self.token_accounting_check = None
         self._load_ui()
         
         # Initialize simulation controller AFTER UI is loaded
@@ -222,6 +223,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.dt_auto_radio = settings_builder.get_object('dt_auto_radio')
             self.dt_manual_radio = settings_builder.get_object('dt_manual_radio')
             self.dt_manual_entry = settings_builder.get_object('dt_manual_entry')
+            self.token_accounting_check = settings_builder.get_object('token_accounting_check')
             
             # τ-Leaping controls
             self.tau_leaping_check = settings_builder.get_object('tau_leaping_check')
@@ -351,6 +353,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.batch_replicates_spin.connect('value-changed', self._on_batch_replicates_changed)
         if self.batch_output_chooser:
             self.batch_output_chooser.connect('file-set', self._on_batch_output_changed)
+        
+        # Wire token accounting checkbox
+        if self.token_accounting_check:
+            self.token_accounting_check.connect('toggled', self._on_token_accounting_toggled)
     
     def _on_batch_mode_toggled(self, check_button):
         """Handle batch mode enable/disable toggle with atomic persistence.
@@ -1096,18 +1102,23 @@ class SimulateToolsPaletteLoader(GObject.GObject):
     def _on_run_clicked(self, button):
         """Handle Run button click - start continuous simulation."""
         if self.simulation is None:
+            print("⚠️ No simulation controller available")
             return
         
         # Hide settings panel if open
         self._hide_settings_panel()
         
-        # Enable/disable token accounting based on settings
-        if self.simulation.settings.token_accounting_enabled:
+        # Enable/disable token accounting based on checkbox
+        checkbox_active = self.token_accounting_check and self.token_accounting_check.get_active()
+        print(f"🔍 Test checkbox state: {checkbox_active}")
+        
+        if checkbox_active:
             # Use relaxed mode (collect violations, don't crash)
             self.simulation.enable_token_accounting(strict_mode=False)
             print("🧮 Token accounting enabled - data will be included in CSV export")
         else:
             self.simulation.disable_token_accounting()
+            print("➡️ Token accounting disabled")
         
         # Check if batch mode is enabled in document model
         model = self.simulation.model
@@ -1673,6 +1684,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Revalidate duration with new units
         if self.duration_entry:
             self._on_duration_changed(self.duration_entry)
+    
+    def _on_token_accounting_toggled(self, checkbox):
+        """Handle token accounting checkbox toggle."""
+        # Checkbox state is checked when simulation runs
+        # Just emit settings-changed signal to notify any listeners
+        self.emit('settings-changed')
     
     def _populate_time_units_combo(self):
         """Populate the time units combo box with available units."""

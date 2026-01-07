@@ -614,14 +614,22 @@ class SimulationController:
         Args:
             strict_mode: If True, raise RuntimeError on violations. If False, collect violations.
         """
-        from shypn.engine.accounting import TokenAccountingAuditor
-        self.auditor = TokenAccountingAuditor(self.model_adapter, strict_mode=strict_mode)
-        self.auditor.enable()
-        
-        # Enable accounting in all transition behaviors
-        for transition in self.model.transitions:
-            behavior = self._get_behavior(transition)
-            behavior.enable_accounting()
+        try:
+            from shypn.engine.accounting import TokenAccountingAuditor
+            self.auditor = TokenAccountingAuditor(self.model_adapter, strict_mode=strict_mode)
+            self.auditor.enable()
+            
+            # Enable accounting in all transition behaviors
+            for transition in self.model.transitions:
+                behavior = self._get_behavior(transition)
+                behavior.enable_accounting()
+            
+            print(f"✓ Token accounting enabled (transitions: {len(self.model.transitions)})")
+        except Exception as e:
+            print(f"✗ Failed to enable token accounting: {e}")
+            import traceback
+            traceback.print_exc()
+            self.auditor = None
     
     def disable_token_accounting(self):
         """Disable token conservation accounting."""
@@ -1379,7 +1387,10 @@ class SimulationController:
         """
         # Token accounting: snapshot before firing
         if self.auditor is not None:
-            self.auditor.snapshot_before_fire(transition, self.time)
+            try:
+                self.auditor.snapshot_before_fire(transition, self.time)
+            except Exception as e:
+                print(f"⚠️ Accounting error (before fire): {e}")
         
         behavior = self._get_behavior(transition)
         input_arcs = behavior.get_input_arcs()
@@ -1388,9 +1399,14 @@ class SimulationController:
         
         # Token accounting: snapshot after firing and validate
         if self.auditor is not None and success:
-            consumed = behavior.get_last_consumed()
-            produced = behavior.get_last_produced()
-            self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
+            try:
+                consumed = behavior.get_last_consumed()
+                produced = behavior.get_last_produced()
+                self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
+            except Exception as e:
+                print(f"⚠️ Accounting error (after fire): {e}")
+                import traceback
+                traceback.print_exc()
         
         if success:
             # Increment firing count for statistics
