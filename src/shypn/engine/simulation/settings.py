@@ -76,8 +76,30 @@ class SimulationSettings:
         self._ic_noise_enabled = False  # Enable random perturbations to initial conditions
         self._ic_noise_percent = 20.0  # Percentage of noise (±20% = uniform in [0.8, 1.2] range)
         self._ic_noise_places = set()  # Specific places to randomize (empty = all non-catalyst places)
+        
+        # Token accounting (conservation validation)
+        self._token_accounting_enabled = False  # Enable token conservation tracking
     
     # ========== Properties with Validation ==========
+    
+    @property
+    def token_accounting_enabled(self) -> bool:
+        """Get token accounting enabled status."""
+        return self._token_accounting_enabled
+    
+    @token_accounting_enabled.setter
+    def token_accounting_enabled(self, value: bool):
+        """Set token accounting enabled with validation.
+        
+        Args:
+            value: Whether to enable token accounting
+        
+        Raises:
+            TypeError: If value is not bool
+        """
+        if not isinstance(value, bool):
+            raise TypeError(f"Expected bool, got {type(value)}")
+        self._token_accounting_enabled = value
     
     @property
     def time_units(self) -> TimeUnits:

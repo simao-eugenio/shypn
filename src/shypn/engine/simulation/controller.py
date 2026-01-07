@@ -178,6 +178,9 @@ class SimulationController:
         self.enable_assignment_rule_reevaluation = False
         self.pathway_data = None  # Store for assignment rule initialization
         
+        # Token accounting auditor (conservation validation)
+        self.auditor = None  # Initialized when enabled via settings
+        
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
@@ -602,6 +605,47 @@ class SimulationController:
                             behavior.set_enablement_time(self.time)
                         import logging
                         logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
+    
+    # ========== Token Accounting Methods ==========
+    
+    def enable_token_accounting(self, strict_mode=False):
+        """Enable token conservation accounting.
+        
+        Args:
+            strict_mode: If True, raise RuntimeError on violations. If False, collect violations.
+        """
+        from shypn.engine.accounting import TokenAccountingAuditor
+        self.auditor = TokenAccountingAuditor(self.model_adapter, strict_mode=strict_mode)
+        self.auditor.enable()
+        
+        # Enable accounting in all transition behaviors
+        for transition in self.model.transitions:
+            behavior = self._get_behavior(transition)
+            behavior.enable_accounting()
+    
+    def disable_token_accounting(self):
+        """Disable token conservation accounting."""
+        self.auditor = None
+        
+        # Disable accounting in all transition behaviors
+        for transition in self.model.transitions:
+            behavior = self._get_behavior(transition)
+            behavior.disable_accounting()
+    
+    def get_accounting_report(self):
+        """Get token accounting report.
+        
+        Returns:
+            dict: Accounting report with statistics and violations, or None if disabled
+        """
+        if self.auditor is None:
+            return None
+        return self.auditor.generate_report()
+    
+    def print_accounting_report(self):
+        """Print token accounting report to console."""
+        if self.auditor is not None:
+            self.auditor.print_report()
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -1333,10 +1377,21 @@ class SimulationController:
         Args:
             transition: Transition object to fire
         """
+        # Token accounting: snapshot before firing
+        if self.auditor is not None:
+            self.auditor.snapshot_before_fire(transition, self.time)
+        
         behavior = self._get_behavior(transition)
         input_arcs = behavior.get_input_arcs()
         output_arcs = behavior.get_output_arcs()
         success, details = behavior.fire(input_arcs, output_arcs)
+        
+        # Token accounting: snapshot after firing and validate
+        if self.auditor is not None and success:
+            consumed = behavior.get_last_consumed()
+            produced = behavior.get_last_produced()
+            self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
+        
         if success:
             # Increment firing count for statistics
             transition.firing_count += 1
@@ -2485,6 +2540,14 @@ class SimulationController:
                 # Stop data collection
                 if self.data_collector:
                     self.data_collector.stop_collection()
+                
+                # Print token accounting report if enabled
+                if self.auditor is not None:
+                    print("\n" + "="*80)
+                    print("TOKEN ACCOUNTING REPORT")
+                    print("="*80)
+                    self.print_accounting_report()
+                    print("="*80 + "\n")
                 
                 # Notify completion callback (deferred to avoid blocking UI)
                 if self.on_simulation_complete:

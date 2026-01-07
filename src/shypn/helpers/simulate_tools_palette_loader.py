@@ -1101,6 +1101,14 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Hide settings panel if open
         self._hide_settings_panel()
         
+        # Enable/disable token accounting based on settings
+        if self.simulation.settings.token_accounting_enabled:
+            # Use relaxed mode (collect violations, don't crash)
+            self.simulation.enable_token_accounting(strict_mode=False)
+            print("🧮 Token accounting enabled (relaxed mode)")
+        else:
+            self.simulation.disable_token_accounting()
+        
         # Check if batch mode is enabled in document model
         model = self.simulation.model
         batch_enabled = False
