@@ -208,32 +208,36 @@ class ModelsCategory(BaseReportCategory):
     def _populate_species_if_needed(self):
         """Populate species table if it needs refresh and expander is open."""
         if self.species_expander.get_expanded():
-            if self.model_canvas:
+            # Get current active model dynamically
+            model = self.get_current_model()
+            if model:
                 # Do KB update first if needed
                 if self._kb_needs_update:
-                    self._update_knowledge_base_structural(self.model_canvas)
-                    self._update_knowledge_base_pathway(self.model_canvas)
-                    self._update_knowledge_base_kinetics(self.model_canvas)
+                    self._update_knowledge_base_structural(model)
+                    self._update_knowledge_base_pathway(model)
+                    self._update_knowledge_base_kinetics(model)
                     self._kb_needs_update = False
                 
                 if self._species_table_needs_refresh:
-                    self._populate_species_table(self.model_canvas)
+                    self._populate_species_table(model)
                     self._species_table_needs_refresh = False
         return False  # Don't repeat
     
     def _populate_reactions_if_needed(self):
         """Populate reactions table if it needs refresh and expander is open."""
         if self.reactions_expander.get_expanded():
-            if self.model_canvas:
+            # Get current active model dynamically
+            model = self.get_current_model()
+            if model:
                 # Do KB update first if needed
                 if self._kb_needs_update:
-                    self._update_knowledge_base_structural(self.model_canvas)
-                    self._update_knowledge_base_pathway(self.model_canvas)
-                    self._update_knowledge_base_kinetics(self.model_canvas)
+                    self._update_knowledge_base_structural(model)
+                    self._update_knowledge_base_pathway(model)
+                    self._update_knowledge_base_kinetics(model)
                     self._kb_needs_update = False
                 
                 if self._reactions_table_needs_refresh:
-                    self._populate_reactions_table(self.model_canvas)
+                    self._populate_reactions_table(model)
                     self._reactions_table_needs_refresh = False
         return False  # Don't repeat
     
@@ -861,25 +865,10 @@ class ModelsCategory(BaseReportCategory):
     def refresh(self):
         """Refresh tables when model changes or tab switches.
         
-        OPTIMIZATION: Throttles redundant refreshes during file loading.
-        During a file open, refresh() can be called 8+ times from various events
-        (tab creation, tab switch, object notifications, explicit calls).
-        We defer all refreshes and execute only one after a short delay.
+        Calls _do_refresh directly - deferral mechanism was causing callbacks
+        to be cancelled before execution.
         """
-        # Cancel any pending timeout to prevent stale refreshes
-        if self._refresh_timeout_id is not None:
-            GLib.source_remove(self._refresh_timeout_id)
-            self._refresh_timeout_id = None
-        
-        # If refresh already scheduled, mark as pending and skip
-        if self._refresh_scheduled:
-            self._refresh_pending = True
-            return
-        
-        # Schedule deferred refresh with minimal delay (just enough to coalesce multiple calls)
-        # Expensive work (KB updates, table population) is deferred until user opens tables
-        self._refresh_scheduled = True
-        self._refresh_timeout_id = GLib.timeout_add(100, self._do_refresh)
+        self._do_refresh()
     
     def _do_refresh(self):
         """Actual refresh implementation - only updates lightweight UI elements.
@@ -887,186 +876,276 @@ class ModelsCategory(BaseReportCategory):
         Expensive operations (KB updates, table population) are deferred until
         user actually opens the corresponding expanders.
         """
-        self._refresh_scheduled = False
-        self._refresh_timeout_id = None
-        
-        # If no model, show empty state
-        if not self.model_canvas:
-            self.overview_label.set_text("No model loaded")
-            self.structure_label.set_text("No data")
-            self.provenance_label.set_text("No import data")
-            # Hide provenance frame when no data
-            self.provenance_frame.hide()
-            return False  # Don't repeat this timeout callback
-        
-        # The model_canvas IS the model (ModelCanvasManager with places/transitions/arcs)
-        model = self.model_canvas
-        
-        # DEFER EXPENSIVE KB UPDATES - only do them when tables are actually opened
-        # These iterate through all objects (268 for rn00071) and are very slow
-        # Mark for lazy execution instead of blocking here
-        self._kb_needs_update = True
-        
-        # === BUILD MODEL OVERVIEW (quick - just metadata) ===
-        overview_lines = []
-        
-        # Model name
-        if hasattr(model, 'name') and model.name:
-            overview_lines.append(f"Model Name: {model.name}")
-        else:
-            overview_lines.append("Model Name: Untitled")
-        
-        # Project name
-        if self.project and hasattr(self.project, 'name'):
-            overview_lines.append(f"Project: {self.project.name}")
-        
-        # File path (if available)
-        if hasattr(model, 'file_path') and model.file_path:
-            overview_lines.append(f"File: {model.file_path}")
-        elif hasattr(self.model_canvas, 'file_path') and self.model_canvas.file_path:
-            overview_lines.append(f"File: {self.model_canvas.file_path}")
-        
-        # Creation date (if available)
-        if hasattr(model, 'created_date') and model.created_date:
-            try:
-                # Parse ISO format date
-                dt = datetime.fromisoformat(model.created_date.replace('Z', '+00:00'))
-                date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                overview_lines.append(f"Created: {date_str}")
-            except:
-                overview_lines.append(f"Created: {model.created_date}")
-        
-        # Last modified (if available)
-        if hasattr(model, 'modified_date') and model.modified_date:
-            try:
-                dt = datetime.fromisoformat(model.modified_date.replace('Z', '+00:00'))
-                date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                overview_lines.append(f"Modified: {date_str}")
-            except:
-                overview_lines.append(f"Modified: {model.modified_date}")
-        
-        # Description (if available)
-        if hasattr(model, 'description') and model.description:
-            overview_lines.append(f"\nDescription: {model.description}")
-        
-        self.overview_label.set_text("\n".join(overview_lines) if overview_lines else "No model information available")
-        
-        # === BUILD PETRI NET STRUCTURE ===
-        places_count = len(model.places) if hasattr(model, 'places') else 0
-        transitions_count = len(model.transitions) if hasattr(model, 'transitions') else 0
-        arcs_count = len(model.arcs) if hasattr(model, 'arcs') else 0
-        
-        structure_lines = [
-            f"Places: {places_count}",
-            f"Transitions: {transitions_count}",
-            f"Arcs: {arcs_count}",
-        ]
-        
-        # Determine model type (if metadata available)
-        model_types = []
-        if hasattr(model, 'transitions') and model.transitions:
-            # Check for different transition types
-            # Note: transitions is a list, not a dict
-            has_stochastic = any(
-                hasattr(t, 'transition_type') and t.transition_type == 'stochastic'
-                for t in model.transitions if t
-            )
-            has_continuous = any(
-                hasattr(t, 'transition_type') and t.transition_type == 'continuous'
-                for t in model.transitions if t
-            )
-            has_timed = any(
-                hasattr(t, 'transition_type') and t.transition_type == 'timed'
-                for t in model.transitions if t
-            )
+        try:
+            # Get current active model dynamically instead of using stale reference
+            model = self.get_current_model()
             
-            if has_stochastic:
-                model_types.append("Stochastic")
-            if has_continuous:
-                model_types.append("Continuous")
-            if has_timed:
-                model_types.append("Timed")
+            # If no model, show empty state
+            if not model:
+                self.overview_label.set_text("No model loaded")
+                self.overview_label.show_all()
+                self.structure_label.set_text("No data")
+                self.structure_label.show_all()
+                self.provenance_label.set_text("No import data")
+                self.provenance_label.show_all()
+                self.provenance_frame.hide()
+                return
             
-            # Check for test arcs (biological petri nets)
-            # Note: arcs is a list, not a dict
-            has_test_arcs = any(
-                hasattr(arc, 'arc_type') and arc.arc_type == 'test'
-                for arc in model.arcs if hasattr(model, 'arcs') and arc
-            )
-            if has_test_arcs:
-                model_types.append("Bio-PN")
-        
-        if model_types:
-            structure_lines.append(f"Type: {', '.join(model_types)}")
-        
-        self.structure_label.set_text("\n".join(structure_lines))
-        
-        # === BUILD IMPORT PROVENANCE (if available) ===
-        pathway_doc = self._find_linked_pathway_document(model)
-        
-        if pathway_doc:
+            places_count = len(model.places) if hasattr(model, 'places') else 0
+            transitions_count = len(model.transitions) if hasattr(model, 'transitions') else 0
+            
+            # DEFER EXPENSIVE KB UPDATES
+            self._kb_needs_update = True
+            
+            # === BUILD MODEL OVERVIEW (quick - just metadata) ===
+            overview_lines = []
+            
+            # Get metadata dictionary (contains name, source info, etc.)
+            # Now using public property instead of private _document_model
+            metadata = getattr(model, 'metadata', {}) or {}
+            
+            model_name = metadata.get('name') or metadata.get('model_name')
+            if not model_name and hasattr(model, 'name') and model.name:
+                model_name = model.name
+            
+            if model_name:
+                overview_lines.append(f"Model Name: {model_name}")
+            elif places_count > 0 or transitions_count > 0:
+                # Has objects but no name - user hasn't named it yet
+                overview_lines.append("Model Name: Untitled (not saved)")
+            else:
+                # Empty model with no name
+                overview_lines.append("Model Name: Untitled (empty model)")
+            
+            # Project name
+            if self.project and hasattr(self.project, 'name'):
+                overview_lines.append(f"Project: {self.project.name}")
+            
+            # File path (if available)
+            if hasattr(model, 'file_path') and model.file_path:
+                overview_lines.append(f"File: {model.file_path}")
+            
+            # Creation date (if available)
+            if hasattr(model, 'created_date') and model.created_date:
+                try:
+                    # Parse ISO format date
+                    dt = datetime.fromisoformat(model.created_date.replace('Z', '+00:00'))
+                    date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    overview_lines.append(f"Created: {date_str}")
+                except:
+                    overview_lines.append(f"Created: {model.created_date}")
+            
+            # Last modified (if available)
+            if hasattr(model, 'modified_date') and model.modified_date:
+                try:
+                    dt = datetime.fromisoformat(model.modified_date.replace('Z', '+00:00'))
+                    date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    overview_lines.append(f"Modified: {date_str}")
+                except:
+                    overview_lines.append(f"Modified: {model.modified_date}")
+            
+            # Description (if available)
+            if hasattr(model, 'description') and model.description:
+                overview_lines.append(f"\nDescription: {model.description}")
+            
+            overview_text = "\n".join(overview_lines) if overview_lines else "No model information available"
+            self.overview_label.set_text(overview_text)
+            self.overview_label.show_all()
+            # === BUILD PETRI NET STRUCTURE ===
+            places_count = len(model.places) if hasattr(model, 'places') else 0
+            transitions_count = len(model.transitions) if hasattr(model, 'transitions') else 0
+            arcs_count = len(model.arcs) if hasattr(model, 'arcs') else 0
+            
+            # Check if we successfully retrieved data
+            has_places_attr = hasattr(model, 'places')
+            has_transitions_attr = hasattr(model, 'transitions')
+            has_arcs_attr = hasattr(model, 'arcs')
+            
+            if not (has_places_attr and has_transitions_attr and has_arcs_attr):
+                # Failed to retrieve data structure
+                structure_lines = [
+                    "⚠️ Error: Failed to retrieve model data",
+                    f"Places attribute: {'✓' if has_places_attr else '✗'}",
+                    f"Transitions attribute: {'✓' if has_transitions_attr else '✗'}",
+                    f"Arcs attribute: {'✓' if has_arcs_attr else '✗'}"
+                ]
+            elif places_count == 0 and transitions_count == 0:
+                # Empty model - valid state for new models
+                structure_lines = [
+                    "Empty Model (no objects yet)",
+                    "Places: 0",
+                    "Transitions: 0",
+                    "Arcs: 0"
+                ]
+            else:
+                # Normal case - has objects
+                structure_lines = [
+                    f"Places: {places_count}",
+                    f"Transitions: {transitions_count}",
+                    f"Arcs: {arcs_count}",
+                ]
+            
+            # Determine model type (if metadata available)
+            model_types = []
+            if hasattr(model, 'transitions') and model.transitions and transitions_count > 0:
+                # Check for different transition types
+                # Note: transitions is a list, not a dict
+                has_stochastic = any(
+                    hasattr(t, 'transition_type') and t.transition_type == 'stochastic'
+                    for t in model.transitions if t
+                )
+                has_continuous = any(
+                    hasattr(t, 'transition_type') and t.transition_type == 'continuous'
+                    for t in model.transitions if t
+                )
+                has_timed = any(
+                    hasattr(t, 'transition_type') and t.transition_type == 'timed'
+                    for t in model.transitions if t
+                )
+                
+                if has_stochastic:
+                    model_types.append("Stochastic")
+                if has_continuous:
+                    model_types.append("Continuous")
+                if has_timed:
+                    model_types.append("Timed")
+                
+                # Check for test arcs (biological petri nets)
+                # Note: arcs is a list, not a dict
+                has_test_arcs = any(
+                    hasattr(arc, 'arc_type') and arc.arc_type == 'test'
+                    for arc in model.arcs if hasattr(model, 'arcs') and arc
+                )
+                if has_test_arcs:
+                    model_types.append("Bio-PN")
+            
+            if model_types and places_count > 0:
+                structure_lines.append(f"Type: {', '.join(model_types)}")
+            
+            structure_text = "\n".join(structure_lines)
+            self.structure_label.set_text(structure_text)
+            self.structure_label.show_all()
+            
+            # === BUILD IMPORT PROVENANCE (if available) ===
+            # Check both pathway_doc and metadata for provenance info
+            pathway_doc = self._find_linked_pathway_document(model)
+            
+            # Get metadata dictionary (now using public property)
+            metadata = getattr(model, 'metadata', {}) or {}
+            
             provenance_lines = []
             
-            # Source type
-            if hasattr(pathway_doc, 'source_type'):
-                source_type = pathway_doc.source_type.upper()
-                provenance_lines.append(f"Source: {source_type}")
+            # Try pathway_doc first (for active imports)
+            if pathway_doc:
+                # Source type
+                if hasattr(pathway_doc, 'source_type'):
+                    source_type = pathway_doc.source_type.upper()
+                    provenance_lines.append(f"Source: {source_type}")
+                
+                # Source ID
+                if hasattr(pathway_doc, 'source_id') and pathway_doc.source_id:
+                    provenance_lines.append(f"Source ID: {pathway_doc.source_id}")
+                
+                # Organism
+                if hasattr(pathway_doc, 'source_organism') and pathway_doc.source_organism:
+                    provenance_lines.append(f"Organism: {pathway_doc.source_organism}")
+                
+                # Import date
+                if hasattr(pathway_doc, 'imported_date') and pathway_doc.imported_date:
+                    try:
+                        dt = datetime.fromisoformat(pathway_doc.imported_date.replace('Z', '+00:00'))
+                        date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        provenance_lines.append(f"Imported: {date_str}")
+                    except:
+                        provenance_lines.append(f"Imported: {pathway_doc.imported_date}")
+                
+                # Original file
+                if hasattr(pathway_doc, 'raw_file') and pathway_doc.raw_file:
+                    provenance_lines.append(f"Original File: {pathway_doc.raw_file}")
+                
+                # Additional metadata (species/reactions count from import)
+                if hasattr(pathway_doc, 'metadata') and pathway_doc.metadata:
+                    pmeta = pathway_doc.metadata
+                    if 'species_count' in pmeta:
+                        provenance_lines.append(f"Imported Species: {pmeta['species_count']}")
+                    if 'reactions_count' in pmeta:
+                        provenance_lines.append(f"Imported Reactions: {pmeta['reactions_count']}")
             
-            # Source ID
-            if hasattr(pathway_doc, 'source_id') and pathway_doc.source_id:
-                provenance_lines.append(f"Source ID: {pathway_doc.source_id}")
+            # Fallback to metadata dictionary (persists after save/load)
+            elif metadata:
+                # Source type from metadata
+                source = metadata.get('source') or metadata.get('source_type')
+                if source:
+                    provenance_lines.append(f"Source: {source.upper()}")
+                
+                # Source ID
+                source_id = metadata.get('source_id') or metadata.get('pathway_id')
+                if source_id:
+                    provenance_lines.append(f"Source ID: {source_id}")
+                
+                # Organism
+                organism = metadata.get('organism') or metadata.get('source_organism')
+                if organism:
+                    provenance_lines.append(f"Organism: {organism}")
+                
+                # Import/Creation date
+                imported = metadata.get('imported_date') or metadata.get('created')
+                if imported:
+                    try:
+                        dt = datetime.fromisoformat(imported.replace('Z', '+00:00'))
+                        date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        provenance_lines.append(f"Imported: {date_str}")
+                    except:
+                        provenance_lines.append(f"Imported: {imported}")
+                
+                # Original file
+                raw_file = metadata.get('raw_file') or metadata.get('original_file')
+                if raw_file:
+                    provenance_lines.append(f"Original File: {raw_file}")
             
-            # Organism
-            if hasattr(pathway_doc, 'source_organism') and pathway_doc.source_organism:
-                provenance_lines.append(f"Organism: {pathway_doc.source_organism}")
+            # Display provenance if we have any data
+            if provenance_lines:
+                self.provenance_label.set_text("\n".join(provenance_lines))
+                self.provenance_label.show_all()
+                self.provenance_frame.set_visible(True)
+                self.provenance_frame.show_all()
+            else:
+                # Check if this is an imported model or manually created
+                if metadata:
+                    # Has metadata but no provenance - might be incomplete data
+                    self.provenance_label.set_text("⚠️ Import information not available\n(Model may have been created manually)")
+                else:
+                    # No metadata at all - clearly manual
+                    self.provenance_label.set_text("✓ Manually created model\n(No import provenance)")
+                self.provenance_label.show_all()
+                self.provenance_frame.set_visible(True)
+                self.provenance_frame.show_all()
             
-            # Import date
-            if hasattr(pathway_doc, 'imported_date') and pathway_doc.imported_date:
-                try:
-                    dt = datetime.fromisoformat(pathway_doc.imported_date.replace('Z', '+00:00'))
-                    date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    provenance_lines.append(f"Imported: {date_str}")
-                except:
-                    provenance_lines.append(f"Imported: {pathway_doc.imported_date}")
+            # === DEFER DETAILED TABLES POPULATION ===
+            # Instead of populating tables immediately (expensive for large models),
+            # mark them as needing refresh and populate lazily when user expands them
+            # This makes refresh instant for large models (rn00071 with 268 objects)
+            self._species_table_needs_refresh = True
+            self._reactions_table_needs_refresh = True
             
-            # Original file
-            if hasattr(pathway_doc, 'raw_file') and pathway_doc.raw_file:
-                provenance_lines.append(f"Original File: {pathway_doc.raw_file}")
+            # Clear tables immediately to show they're ready for data
+            self.species_store.clear()
+            self.reactions_store.clear()
             
-            # Additional metadata (species/reactions count from import)
-            if hasattr(pathway_doc, 'metadata') and pathway_doc.metadata:
-                metadata = pathway_doc.metadata
-                if 'species_count' in metadata:
-                    provenance_lines.append(f"Imported Species: {metadata['species_count']}")
-                if 'reactions_count' in metadata:
-                    provenance_lines.append(f"Imported Reactions: {metadata['reactions_count']}")
+            # === REFRESH LOCALITY TABLE IF SELECTION EXISTS ===
+            if self.selected_transition and self.selected_locality:
+                self._populate_locality_table()
             
-            self.provenance_label.set_text("\n".join(provenance_lines))
-            self.provenance_frame.set_visible(True)
-        else:
-            self.provenance_label.set_text("No import data available (manually created model)")
-            self.provenance_frame.set_visible(False)
-        
-        # === DEFER DETAILED TABLES POPULATION ===
-        # Instead of populating tables immediately (expensive for large models),
-        # mark them as needing refresh and populate lazily when user expands them
-        # This makes refresh instant for large models (rn00071 with 268 objects)
-        self._species_table_needs_refresh = True
-        self._reactions_table_needs_refresh = True
-        
-        # Clear tables immediately to show they're ready for data
-        self.species_store.clear()
-        self.reactions_store.clear()
-        
-        # === REFRESH LOCALITY TABLE IF SELECTION EXISTS ===
-        if self.selected_transition and self.selected_locality:
-            self._populate_locality_table()
-        
-        # Clear pending flag - no need to reschedule since expensive work is deferred
-        self._refresh_pending = False
-        
-        return False  # Don't repeat this timeout callback
-    
+            # Force the entire category to redraw
+            if hasattr(self, 'category_frame') and self.category_frame:
+                self.category_frame.show_all()
+                self.category_frame.queue_draw()
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.overview_label.set_text(f"Error: {e}")
+            
     def _find_linked_pathway_document(self, model):
         """Find the PathwayDocument linked to this model.
         
@@ -1074,7 +1153,7 @@ class ModelsCategory(BaseReportCategory):
             model: Current model instance
             
         Returns:
-            PathwayDocument instance or None
+            PathwayDocument or None if not found
         """
         if not self.project:
             return None
@@ -1837,14 +1916,14 @@ class ModelsCategory(BaseReportCategory):
                 - species: list of dicts with species data
                 - reactions: list of dicts with reaction data
         """
-        if not self.model_canvas:
+        # Get current active model dynamically
+        model = self.get_current_model()
+        if not model:
             return {
                 'title': 'Model Structure',
                 'has_data': False,
                 'summary': 'No model loaded'
             }
-        
-        model = self.model_canvas
         
         # Extract overview data
         overview = {

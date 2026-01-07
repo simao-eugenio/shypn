@@ -38,7 +38,7 @@ class SimulationDataCollector:
         
         # After simulation runs, access data:
         place_history = collector.place_data[place_id]  # [(time, tokens), ...]
-        firing_events = collector.transition_data[trans_id]  # [(time, 'fired', None), ...]
+        firing_events = collector.transition_data[trans_id]  # [(time, count), ...]
     """
 
     def __init__(self, max_data_points: int=10000, downsample_threshold: int=8000):
@@ -170,3 +170,90 @@ class SimulationDataCollector:
             Dictionary with statistics about the collected data
         """
         return {'step_count': self.step_count, 'total_firings': self.total_firings, 'places_tracked': len(self.place_data), 'transitions_tracked': len(self.transition_data), 'total_place_points': sum((len(data) for data in self.place_data.values())), 'total_transition_events': sum((len(data) for data in self.transition_data.values()))}
+    
+    def has_data(self) -> bool:
+        """Check if any data has been collected.
+        
+        Returns:
+            True if there is any place or transition data collected
+        """
+        return bool(self.place_data or self.transition_data or self.step_count > 0)
+    
+    def get_total_firings(self, transition_id: Any) -> int:
+        """Get total number of firings for a transition.
+        
+        Args:
+            transition_id: ID of the transition
+            
+        Returns:
+            Number of times the transition fired
+        """
+        events = self.transition_data.get(transition_id, [])
+        return len([e for e in events if e[1] == 'fired'])
+    
+    def get_transition_rate_series(self, transition_id: Any) -> Tuple[List[float], List[float]]:
+        """Get instantaneous rate time-series for a transition.
+        
+        This returns the rate values recorded at each simulation step,
+        useful for transitions with time-varying rate functions.
+        
+        Args:
+            transition_id: ID of the transition
+            
+        Returns:
+            Tuple of (times, rates) lists
+        """
+        events = self.transition_data.get(transition_id, [])
+        if not events:
+            return ([], [])
+        
+        # Extract rate from event details if available
+        times = []
+        rates = []
+        for time, event_type, details in events:
+            if details and isinstance(details, dict) and 'rate' in details:
+                times.append(time)
+                rates.append(details['rate'])
+        
+        return (times, rates)
+    
+    def get_place_series(self, place_id: Any) -> Tuple[List[float], List[int]]:
+        """Get token count time-series for a place.
+        
+        Args:
+            place_id: ID of the place
+            
+        Returns:
+            Tuple of (times, tokens) lists
+        """
+        data = self.place_data.get(place_id, [])
+        if not data:
+            return ([], [])
+        
+        times, tokens = zip(*data)
+        return (list(times), list(tokens))
+    
+    def get_transition_series(self, transition_id: Any) -> Tuple[List[float], List[int]]:
+        """Get cumulative firing count time-series for a transition.
+        
+        Args:
+            transition_id: ID of the transition
+            
+        Returns:
+            Tuple of (times, cumulative_firings) lists
+        """
+        events = self.transition_data.get(transition_id, [])
+        if not events:
+            return ([], [])
+        
+        times = []
+        cumulative = []
+        count = 0
+        
+        for time, event_type, details in events:
+            if event_type == 'fired':
+                count += 1
+                times.append(time)
+                cumulative.append(count)
+        
+        return (times, cumulative)

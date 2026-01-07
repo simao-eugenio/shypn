@@ -104,7 +104,7 @@ class PlaceRatePanel(AnalysisPlotPanel):
             return []
         
         # Get raw token count data from collector
-        raw_data = self.data_collector.get_place_data(place_id)
+        raw_data = self.data_collector.place_data.get(place_id, [])
         
         if DEBUG_PLOT_DATA:
             if len(raw_data) > 0:

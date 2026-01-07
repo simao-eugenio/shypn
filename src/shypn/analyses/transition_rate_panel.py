@@ -181,51 +181,15 @@ class TransitionRatePanel(AnalysisPlotPanel):
                 rate_series = list(zip(times, rates))
                 return rate_series
         
-        # PRIORITY 2: Fall back to checking event details (continuous transitions)
-        # Get raw firing event data from collector
-        raw_events = self.data_collector.get_transition_data(transition_id)
+        # PRIORITY 2: Fall back to transition_data (cumulative firing counts)
+        # Get raw firing count data from collector - now stored as (time, count) tuples
+        firing_data = self.data_collector.transition_data.get(transition_id, [])
         
-        if not raw_events:
+        if not firing_data:
             return []
         
-        # Determine transition type by checking if details contain 'rate' field
-        # Continuous transitions store their rate in details
-        has_rate_data = False
-        if len(raw_events) > 0 and raw_events[0][2] is not None:
-            details = raw_events[0][2]
-            if isinstance(details, dict) and 'rate' in details:
-                has_rate_data = True
-        
-        if has_rate_data:
-            # CONTINUOUS TRANSITION: Always use time on X-axis
-            rate_series = []
-            for time, event_type, details in raw_events:
-                if event_type == 'fired' and details and isinstance(details, dict):
-                    rate = details.get('rate', 0.0)
-                    rate_series.append((time, rate))
-            
-            return rate_series
-        else:
-            # DISCRETE TRANSITION: Plot cumulative firing count (fallback)
-            firing_times = [t for t, event_type, _ in raw_events 
-                           if event_type == 'fired']
-            
-            if len(firing_times) < 1:
-                return []
-            
-            # Convert to cumulative count series
-            cumulative_series = []
-            
-            # Start at time 0 with count 0
-            if firing_times[0] > 0:
-                cumulative_series.append((0.0, 0))
-            
-            # Add each firing event with its cumulative count
-            for i, time in enumerate(firing_times):
-                count = i + 1  # Cumulative count (1-indexed)
-                cumulative_series.append((time, count))
-            
-            return cumulative_series
+        # Return the firing count time series directly - already in (time, count) format
+        return firing_data
     
     def _get_ylabel(self) -> str:
         """Get Y-axis label for transition plot.
@@ -243,28 +207,20 @@ class TransitionRatePanel(AnalysisPlotPanel):
         if not self.selected_objects:
             return 'Value'
         
-        # Check if we have any continuous transitions with specific rate functions
-        has_continuous = False
-        has_discrete = False
-        func_type = None
-        
+        # Check if we're plotting instantaneous rates or cumulative counts
+        # If we have transition_rates data, we're plotting rates
+        has_rate_data = False
         for obj in self.selected_objects:
-            raw_events = self.data_collector.get_transition_data(obj.id)
-            if raw_events and len(raw_events) > 0:
-                details = raw_events[0][2]
-                if isinstance(details, dict) and 'rate' in details:
-                    has_continuous = True
-                else:
-                    has_discrete = True
+            if hasattr(self.data_collector, 'transition_rates'):
+                rates = self.data_collector.transition_rates.get(obj.id, [])
+                if rates:
+                    has_rate_data = True
+                    break
         
-        if has_continuous and not has_discrete:
-            pass
-            # Simple, consistent label for all rate functions
-            return 'Rate'
-        elif has_discrete and not has_continuous:
-            return 'Cumulative Firings'
+        if has_rate_data:
+            return 'Rate (tokens/time)'
         else:
-            return 'Value'  # Mixed types
+            return 'Cumulative Firings'
     
     def _get_title(self) -> str:
         """Get plot title for transition plot.
@@ -1123,7 +1079,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         for i, place in enumerate(locality_data['input_places']):
             pass
             # Get place token data from data collector
-            place_data = self.data_collector.get_place_data(place.id)
+            place_data = self.data_collector.place_data.get(place.id, [])
             
             if place_data:
                 pass
@@ -1151,7 +1107,7 @@ class TransitionRatePanel(AnalysisPlotPanel):
         for i, place in enumerate(locality_data['output_places']):
             pass
             # Get place token data from data collector
-            place_data = self.data_collector.get_place_data(place.id)
+            place_data = self.data_collector.place_data.get(place.id, [])
             
             if place_data:
                 pass

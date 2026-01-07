@@ -130,7 +130,7 @@ class SubnetSimulator:
                 result = []
                 for i, t in enumerate(times):
                     marking = {
-                        pid: self.controller.data_collector.place_data[pid][i]
+                        pid: self.controller.data_collector.place_data[pid][i][1]  # Extract tokens from (time, tokens) tuple
                         for pid in place_ids
                     }
                     result.append((t, marking))
@@ -541,7 +541,7 @@ class SubnetSimulator:
             place_ids = list(self.controller.data_collector.place_data.keys())
             for i, t in enumerate(times):
                 marking = {
-                    pid: self.controller.data_collector.place_data[pid][i]
+                    pid: self.controller.data_collector.place_data[pid][i][1]  # Extract tokens from (time, tokens) tuple
                     for pid in place_ids
                 }
                 results.trajectory.append((t, marking))

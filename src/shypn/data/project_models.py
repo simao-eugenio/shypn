@@ -396,6 +396,14 @@ class Project:
         with open(project_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
+        # CRITICAL: Ensure base_path is set from project file location
+        # If base_path not in saved data, derive it from .project.shy location
+        if 'location' not in data or not data['location'].get('base_path'):
+            project_dir = os.path.dirname(os.path.abspath(project_file))
+            if 'location' not in data:
+                data['location'] = {}
+            data['location']['base_path'] = project_dir
+        
         project = cls.from_dict(data)
         
         # Sync with file system (discover new files, remove deleted ones)

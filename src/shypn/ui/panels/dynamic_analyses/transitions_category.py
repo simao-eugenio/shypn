@@ -161,5 +161,11 @@ class TransitionsCategory(BaseDynamicCategory):
     
     def clear_transitions(self):
         """Clear all transitions from plot."""
+        # Reset colors for all transitions before clearing
+        if self.panel and hasattr(self.panel, 'selected_objects'):
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            for transition in self.panel.selected_objects:
+                ColorSchemaManager.reset_transition_colors(transition)
+        
         if self.panel:
             self.panel.clear_objects()

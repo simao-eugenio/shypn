@@ -66,7 +66,9 @@ class PlotExporter:
                 if place_id not in self.place_data:
                     continue
                 
-                values = self.place_data[place_id]
+                # Extract values from (time, tokens) tuples
+                raw_data = self.place_data[place_id]
+                values = [tokens for _, tokens in raw_data] if raw_data else []
                 place_name = self._get_place_name(place_id)
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
@@ -128,7 +130,9 @@ class PlotExporter:
                 if trans_id not in self.transition_data:
                     continue
                 
-                values = self.transition_data[trans_id]
+                # Extract values from (time, count) tuples
+                raw_data = self.transition_data[trans_id]
+                values = [count for _, count in raw_data] if raw_data else []
                 trans_name = self._get_transition_name(trans_id)
                 color = self.colors[i % len(self.colors)]
                 
@@ -189,7 +193,9 @@ class PlotExporter:
             
             # Top panel: Concentrations
             for i, place_id in enumerate(sorted(self.place_data.keys())):
-                values = self.place_data[place_id]
+                # Extract values from (time, tokens) tuples
+                raw_data = self.place_data[place_id]
+                values = [tokens for _, tokens in raw_data] if raw_data else []
                 place_name = self._get_place_name(place_id)
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
@@ -211,7 +217,9 @@ class PlotExporter:
             
             # Bottom panel: Firing rates
             for i, trans_id in enumerate(sorted(self.transition_data.keys())):
-                values = self.transition_data[trans_id]
+                # Extract values from (time, count) tuples
+                raw_data = self.transition_data[trans_id]
+                values = [count for _, count in raw_data] if raw_data else []
                 trans_name = self._get_transition_name(trans_id)
                 color = self.colors[i % len(self.colors)]
                 

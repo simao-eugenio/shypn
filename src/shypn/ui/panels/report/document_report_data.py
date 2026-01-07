@@ -60,6 +60,7 @@ class DocumentReportData:
             return
         
         data_collector = controller.data_collector
+        
         if not data_collector or not data_collector.has_data():
             return
         

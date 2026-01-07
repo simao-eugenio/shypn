@@ -24,6 +24,7 @@ from .model_structure_category import ModelsCategory
 from .provenance_category import ProvenanceCategory
 from .parameters_category import DynamicAnalysesCategory
 from .topology_analyses_category import TopologyAnalysesCategory
+from .thermodynamic_validation_category import ThermodynamicValidationCategory
 from .export_toolbar import ExportToolbar
 
 
@@ -205,6 +206,20 @@ class ReportPanel(Gtk.Box):
         container.pack_start(widget, False, False, 0)
         # print("[REPORT_PANEL] TopologyAnalysesCategory added to container")
         
+        # THERMODYNAMIC VALIDATION (Phase 4: from THERMODYNAMICS category)
+        # print("[REPORT_PANEL] Creating ThermodynamicValidationCategory...")
+        thermodynamics = ThermodynamicValidationCategory(
+            project=self.project,
+            model_canvas=current_manager,
+            pathway_operations_panel=self.pathway_operations_panel
+        )
+        self.categories.append(thermodynamics)
+        widget = thermodynamics.get_widget()
+        # print(f"[REPORT_PANEL] ThermodynamicValidationCategory widget: {widget}, visible={widget.get_visible()}")
+        widget.show_all()
+        container.pack_start(widget, False, False, 0)
+        # print("[REPORT_PANEL] ThermodynamicValidationCategory added to container")
+        
         # PROVENANCE & LINEAGE (from all panels)
         # print("[REPORT_PANEL] Creating ProvenanceCategory...")
         provenance = ProvenanceCategory(
@@ -316,14 +331,14 @@ class ReportPanel(Gtk.Box):
         
         Called when significant events occur (e.g., model loaded, analysis completed).
         """
-        import logging
-        logging.getLogger(__name__).info(f"[REPORT_PANEL] refresh_all() called, {len(self.categories)} categories")
         for category in self.categories:
-            import logging
-            logging.getLogger(__name__).info(f"[REPORT_PANEL] Refreshing category: {type(category).__name__}")
             category.refresh()
-        import logging
-        logging.getLogger(__name__).info("[REPORT_PANEL] refresh_all() completed")
+    
+    def clear_all(self):
+        """Clear all report data when document is closed."""
+        for category in self.categories:
+            if hasattr(category, 'clear_all'):
+                category.clear_all()
     
     def set_project(self, project):
         """Set project for all categories.
@@ -341,33 +356,18 @@ class ReportPanel(Gtk.Box):
     def set_model_canvas(self, model_manager):
         """Set model manager for all categories.
         
-        This is called with the actual ModelCanvasManager (has places, transitions, arcs).
-        Auto-refreshes to immediately show model data.
+        DEPRECATED: Categories now use get_current_model() to dynamically access
+        the active document's model. This method is kept for compatibility.
         
         Args:
-            model_manager: ModelCanvasManager instance with model data
+            model_manager: ModelCanvasManager instance (ignored)
         """
-        # print(f"[REPORT] set_model_canvas called with: {model_manager}")
-        
         # Update export toolbar with parent window
         if self.export_toolbar:
             self.export_toolbar.set_parent_window(self.get_toplevel())
         
-        if model_manager:
-            pass
-            # print(f"[REPORT] Model manager has {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
-        
-        # Pass the manager directly to all categories
-        for category in self.categories:
-            if hasattr(category, 'set_model_canvas'):
-                category.set_model_canvas(model_manager)
-                # print(f"[REPORT] Set model_manager for {category.__class__.__name__}")
-        
-        # Wire up observer for property changes (real-time refresh)
-        self._setup_model_observer(model_manager)
-        
-        # Always refresh to show current model state (even if empty)
-        # This ensures "No model loaded" or actual model data is displayed
+        # No need to pass manager to categories - they get it dynamically
+        # Just trigger a refresh to show current data
         self.refresh_all()
     
     def _setup_model_observer(self, model_manager):
@@ -475,6 +475,12 @@ class ReportPanel(Gtk.Box):
         # Set callback so pathway operations panel can notify us when pathways are imported
         if hasattr(pathway_operations_panel, 'set_report_refresh_callback'):
             pathway_operations_panel.set_report_refresh_callback(self._on_pathway_imported)
+        
+        # Set callback so thermodynamics validation can notify us when validation completes
+        if hasattr(pathway_operations_panel, 'thermodynamics_category'):
+            pathway_operations_panel.thermodynamics_category.set_report_panel_refresh_callback(
+                self._on_thermodynamics_validated
+            )
     
     def _on_pathway_imported(self):
         """Called by pathway operations panel when new pathway is imported."""
@@ -512,6 +518,14 @@ class ReportPanel(Gtk.Box):
             pass
             # print("[REPORT] ERROR: model_canvas_loader has no get_current_model() method!")
     
+    def _on_thermodynamics_validated(self):
+        """Called by thermodynamics validation section when validation completes."""
+        # Refresh only the ThermodynamicValidationCategory
+        for category in self.categories:
+            if isinstance(category, ThermodynamicValidationCategory):
+                category.refresh()
+                break
+    
     def set_controller(self, controller):
         """Set simulation controller reference for dynamic analyses.
         
@@ -523,6 +537,8 @@ class ReportPanel(Gtk.Box):
         # Update categories with controller reference
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
+                category.set_controller(controller)
+            elif isinstance(category, ThermodynamicValidationCategory):
                 category.set_controller(controller)
     
     def on_file_opened(self, filepath):

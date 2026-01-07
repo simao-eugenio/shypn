@@ -246,11 +246,16 @@ class TopologyPanel(Gtk.Box):
     
     def notify_report_panel(self):
         """Notify report panel that topology analyses have been updated."""
+        print(f"[TOPOLOGY_PANEL] notify_report_panel called, callback={self._report_refresh_callback is not None}")
         if self._report_refresh_callback:
             try:
+                print(f"[TOPOLOGY_PANEL] Calling report refresh callback...")
                 self._report_refresh_callback()
+                print(f"[TOPOLOGY_PANEL] Callback completed")
             except Exception as e:
+                print(f"[TOPOLOGY_PANEL] Callback failed: {e}")
                 pass  # Silently ignore report panel refresh failures
+
     
     def get_all_results(self):
         """Get all analyzer results from all categories.

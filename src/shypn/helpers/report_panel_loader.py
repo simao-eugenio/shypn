@@ -10,7 +10,7 @@ import logging
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
+    from gi.repository import Gtk, Gdk
 except Exception as e:
     print('ERROR: GTK3 not available in report_panel loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -63,6 +63,7 @@ class ReportPanelLoader:
         self.widget = self.panel
         
         # Set up window for floating
+        self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         self.window.set_title("Report")
         self.window.set_default_size(500, 700)
         
@@ -145,8 +146,9 @@ class ReportPanelLoader:
             self.panel.float_button.set_active(True)
             self._updating_button = False
         
-        # Show window (use show_all for Wayland compatibility)
+        # Show window and bring to front (Wayland compatibility)
         self.window.show_all()
+        self.window.present()
         self.logger.info("Report panel detached")
     
     def float(self, parent_window=None):
