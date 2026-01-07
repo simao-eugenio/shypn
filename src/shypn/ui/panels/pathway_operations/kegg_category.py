@@ -20,6 +20,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, GLib, Pango
 from .base_pathway_category import BasePathwayCategory
+from shypn.deprecation import deprecated
 # Import KEGG backend modules
 try:
     from shypn.importer.kegg import KEGGAPIClient, KGMLParser, PathwayConverter

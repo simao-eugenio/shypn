@@ -97,6 +97,16 @@ class CSVSimulationExporter:
                     status_row.append(f'{status} (leak: {leak:+.6f})')
                     status_row.extend([''] * 2)
                     writer.writerow(status_row)
+                    
+                    # Add firing count validation row
+                    firing_status_row = ['# Firing Count Validation']
+                    firing_status_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                    firing_valid = self.accounting_data.get('firing_counts_valid', True)
+                    num_discrepancies = stats.get('num_firing_discrepancies', 0)
+                    firing_status = 'PASS' if firing_valid else f'FAIL ({num_discrepancies} discrepancies)'
+                    firing_status_row.append(firing_status)
+                    firing_status_row.extend([''] * 2)
+                    writer.writerow(firing_status_row)
                 
                 # Write data rows
                 for i, time in enumerate(self.time_points):

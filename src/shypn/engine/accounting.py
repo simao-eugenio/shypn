@@ -69,6 +69,16 @@ class ConservationViolation:
     actual_net_change: float
     places_affected: List[str]
     leak_amount: float
+    
+
+@dataclass
+class FiringCountDiscrepancy:
+    """Record of firing count mismatch."""
+    transition_id: str
+    expected_firings: int  # From token flow analysis
+    actual_firings: int    # From transition.firing_count
+    discrepancy: int
+    tokens_per_firing: float
 
 
 class TokenAccountingAuditor:
@@ -89,6 +99,7 @@ class TokenAccountingAuditor:
         self.snapshots: List[TokenSnapshot] = []
         self.firing_records: List[FiringRecord] = []
         self.violations: List[ConservationViolation] = []
+        self.firing_discrepancies: List[FiringCountDiscrepancy] = []
         
         # Statistics
         self.total_firings = 0
@@ -138,8 +149,11 @@ class TokenAccountingAuditor:
         """Record initial token counts."""
         if not hasattr(self.model, 'places'):
             return
+        
+        # Handle both list and dict for model.places
+        places = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             
-        for place in self.model.places:
+        for place in places:
             self.initial_tokens[place.id] = float(place.tokens)
             self.current_tokens[place.id] = float(place.tokens)
             
@@ -152,8 +166,11 @@ class TokenAccountingAuditor:
         """
         if not self.enabled:
             return
+        
+        # Handle both list and dict for model.places
+        places = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             
-        for place in self.model.places:
+        for place in places:
             snapshot = TokenSnapshot(
                 time=time,
                 place_id=place.id,
@@ -180,10 +197,13 @@ class TokenAccountingAuditor:
         """
         if not self.enabled:
             return
+        
+        # Handle both list and dict for model.places
+        places = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             
         # Take post-fire snapshot
         post_tokens = {}
-        for place in self.model.places:
+        for place in places:
             tokens = float(place.tokens)
             post_tokens[place.id] = tokens
             snapshot = TokenSnapshot(
@@ -329,22 +349,27 @@ class TokenAccountingAuditor:
                 - global_conservation: bool
                 - total_leak: float
                 - violations: List[ConservationViolation]
+                - firing_discrepancies: List[FiringCountDiscrepancy]
                 - statistics: Dict
                 - transition_summary: Dict
         """
         conserved, total_leak = self.check_global_conservation()
+        firing_counts_valid = self.validate_firing_counts()
         
         report = {
-            'leaks_detected': len(self.violations) > 0 or not conserved,
+            'leaks_detected': len(self.violations) > 0 or not conserved or not firing_counts_valid,
             'global_conservation': conserved,
+            'firing_counts_valid': firing_counts_valid,
             'total_leak': total_leak,
             'violations': self.violations,
+            'firing_discrepancies': self.firing_discrepancies,
             'statistics': {
                 'total_firings': self.total_firings,
                 'total_consumed': self.total_consumed,
                 'total_produced': self.total_produced,
                 'net_change': self.total_produced - self.total_consumed,
-                'num_violations': len(self.violations)
+                'num_violations': len(self.violations),
+                'num_firing_discrepancies': len(self.firing_discrepancies)
             },
             'initial_tokens': self.initial_tokens.copy(),
             'current_tokens': self.current_tokens.copy(),
@@ -373,11 +398,12 @@ class TokenAccountingAuditor:
         
         # Global status
         if report['leaks_detected']:
-            print("❌ STATUS: TOKEN LEAKS DETECTED")
+            print("❌ STATUS: TOKEN LEAKS OR FIRING DISCREPANCIES DETECTED")
         else:
             print("✅ STATUS: NO LEAKS - CONSERVATION MAINTAINED")
             
         print(f"\nGlobal Conservation: {'✅ PASS' if report['global_conservation'] else '❌ FAIL'}")
+        print(f"Firing Counts Valid: {'✅ PASS' if report['firing_counts_valid'] else '❌ FAIL'}")
         print(f"Total Leak: {report['total_leak']:+.6f} tokens")
         
         # Statistics
@@ -405,9 +431,15 @@ class TokenAccountingAuditor:
             
         # Violations
         if report['violations']:
-            print(f"\nViolations ({len(report['violations'])}):")
+            print(f"\nToken Violations ({len(report['violations'])}):")
             for i, v in enumerate(report['violations'][:10], 1):  # Show first 10
                 print(f"  {i}. t={v.time:.6f}: {v.transition_id} leaked {v.leak_amount:+.6f} tokens")
+        
+        # Firing count discrepancies
+        if report['firing_discrepancies']:
+            print(f"\nFiring Count Discrepancies ({len(report['firing_discrepancies'])}):")
+            for i, d in enumerate(report['firing_discrepancies'], 1):
+                print(f"  {i}. {d.transition_id}: Expected {d.expected_firings}, Actual {d.actual_firings} ({d.discrepancy:+d} discrepancy)")
                 
         # Transition summary
         if report['transition_summary']:
