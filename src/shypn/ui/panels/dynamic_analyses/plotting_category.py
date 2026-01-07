@@ -197,7 +197,14 @@ class PlottingCategory(BaseDynamicCategory):
         Args:
             obj: Place or Transition to remove
         """
-        from shypn.netobjs import Transition
+        from shypn.netobjs import Transition, Place
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        
+        # Reset color to schema default when removing
+        if isinstance(obj, Place):
+            ColorSchemaManager.reset_place_color(obj)
+        elif isinstance(obj, Transition):
+            ColorSchemaManager.reset_transition_colors(obj)
         
         # If it's a transition with tracked locality, remove locality places first
         if isinstance(obj, Transition) and obj.id in self._locality_places:
@@ -205,14 +212,17 @@ class PlottingCategory(BaseDynamicCategory):
             
             # Remove all locality places
             for place in locality_data['input_places']:
+                ColorSchemaManager.reset_place_color(place)
                 for plot in self.plots:
                     plot.remove_object(place)
             
             for place in locality_data['output_places']:
+                ColorSchemaManager.reset_place_color(place)
                 for plot in self.plots:
                     plot.remove_object(place)
             
             for place in locality_data.get('catalyst_places', []):
+                ColorSchemaManager.reset_place_color(place)
                 for plot in self.plots:
                     plot.remove_object(place)
             
@@ -225,6 +235,23 @@ class PlottingCategory(BaseDynamicCategory):
     
     def clear_objects(self):
         """Clear all objects from all plots."""
+        # Reset all object colors to schema defaults before clearing
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        from shypn.netobjs import Place, Transition
+        
+        # Collect all objects from all plots
+        all_objects = set()
+        for plot in self.plots:
+            if hasattr(plot, 'selected_objects'):
+                all_objects.update(plot.selected_objects)
+        
+        # Reset colors for all objects
+        for obj in all_objects:
+            if isinstance(obj, Place):
+                ColorSchemaManager.reset_place_color(obj)
+            elif isinstance(obj, Transition):
+                ColorSchemaManager.reset_transition_colors(obj)
+        
         # Clear locality tracking
         self._locality_places.clear()
         

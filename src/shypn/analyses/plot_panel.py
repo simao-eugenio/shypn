@@ -90,6 +90,28 @@ class AnalysisPlotPanel(Gtk.Box):
                 GLib.source_remove(timeout_id)
         self._timeout_ids.clear()
         
+        # Cleanup matplotlib resources to prevent memory leaks
+        try:
+            # Clear plot lines cache
+            self._plot_lines.clear()
+            
+            # Clear and close the figure to release resources
+            if hasattr(self, 'axes') and self.axes:
+                self.axes.clear()
+            
+            if hasattr(self, 'figure') and self.figure:
+                import matplotlib.pyplot as plt
+                plt.close(self.figure)
+                self.figure = None
+            
+            # Destroy the canvas widget
+            if hasattr(self, 'canvas') and self.canvas:
+                self.canvas.destroy()
+                self.canvas = None
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Error during matplotlib cleanup: {e}")
+        
         # Unregister from model manager
         if self._model_manager is not None:
             self._model_manager.unregister_observer(self._on_model_changed)
@@ -546,29 +568,44 @@ class AnalysisPlotPanel(Gtk.Box):
         Returns:
             bool: True to continue periodic calls
         """
-        # Skip update if no data collector available yet
-        if not self.data_collector:
-            return True
-            
+        # If no objects selected, nothing to update
         if not self.selected_objects:
             return True
         
+        # CRITICAL FIX: Always update plot when needs_update is set,
+        # even if there's no data yet. This ensures the plot axes appear
+        # when you add objects before running simulation.
+        if self.needs_update:
+            self.update_plot(force_full_redraw=True)
+            self.needs_update = False
+            return True
+        
+        # Skip data checks if no data collector available yet
+        if not self.data_collector:
+            return True
+        
+        # Check if data changed since last update
         data_changed = False
         for obj in self.selected_objects:
             if self.object_type == 'place':
-                current_length = len(self.data_collector.get_place_data(obj.id))
+                current_length = len(self.data_collector.place_data.get(obj.id, []))
             else:
-                current_length = len(self.data_collector.get_transition_data(obj.id))
+                # For transitions, check transition_rates (instantaneous rates) for real-time plotting
+                # This ensures we detect data changes for transitions with rate formulas
+                if hasattr(self.data_collector, 'transition_rates'):
+                    current_length = len(self.data_collector.transition_rates.get(obj.id, []))
+                else:
+                    current_length = len(self.data_collector.transition_data.get(obj.id, []))
             last_length = self.last_data_length.get(obj.id, 0)
+            
             if current_length != last_length:
                 data_changed = True
                 self.last_data_length[obj.id] = current_length
         
-        if data_changed or self.needs_update:
+        if data_changed:
             # Only update plot, UI list is updated immediately in add_object()
-            # Force full redraw when needs_update (properties changed) to re-apply adjustments
-            self.update_plot(force_full_redraw=self.needs_update)
-            self.needs_update = False
+            self.update_plot(force_full_redraw=False)
+        
         return True
 
     def update_plot(self, force_full_redraw=False):

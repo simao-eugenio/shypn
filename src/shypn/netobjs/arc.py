@@ -54,8 +54,9 @@ class Arc(PetriNetObject):
         self.target = target
         self.weight = float(weight)  # Float for precise thresholds (e.g., 2.5 mM)
         
-        # Styling
-        self.color = self.DEFAULT_COLOR
+        # Styling - color determined by arc type via ColorSchemaManager
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        self.color = ColorSchemaManager.get_arc_color(self)
         self.width = self.DEFAULT_WIDTH
         
         # Behavioral properties (formula support)

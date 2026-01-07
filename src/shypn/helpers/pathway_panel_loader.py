@@ -1,369 +1,243 @@
 #!/usr/bin/env python3
-"""Pathway Panel Loader - Simplified for CategoryFrame Architecture.
+"""Pathway Panel Loader - Per-Document Instance Architecture.
 
-This module provides a simple loader for the Pathway Operations panel.
-The panel now uses the CategoryFrame architecture (KEGG, SBML, BRENDA categories).
+This module provides a per-document panel loader for the Pathway Operations panel.
+Each document gets its own PathwayOperationsPanel instance, ensuring complete
+state isolation between documents.
 
-The panel can exist in two states:
-  - Detached: standalone floating window
-  - Attached: content embedded in main window container
+Architecture:
+  - Inherits from PerDocumentPanelLoader base class
+  - Creates PathwayOperationsPanel with 8 categories (KEGG, SBML, BiGG, BRENDA, etc.)
+  - Each panel instance tied to one document (ModelCanvasManager)
+  - State preserved per document (form fields, selections, expanded categories)
+
+Author: SHYPN Development Team
+Date: 2026-01-06
 """
-import os
 import sys
 import logging
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
-    print('ERROR: GTK3 not available in pathway_panel loader:', e, file=sys.stderr)
+    print(f'ERROR: GTK3 not available in pathway_panel_loader: {e}', file=sys.stderr)
     sys.exit(1)
 
 from shypn.ui.panels.pathway_operations_panel import PathwayOperationsPanel
+from .base_panel_loader import PerDocumentPanelLoader
 
 
-class PathwayPanelLoader:
-    """Simplified loader for the Pathway Operations panel.
+class PathwayPanelLoader(PerDocumentPanelLoader):
+    """Per-document loader for Pathway Operations panel.
     
-    Uses CategoryFrame architecture - all logic is in PathwayOperationsPanel
-    and its category subclasses (KEGG, SBML, BRENDA).
+    Creates a PathwayOperationsPanel instance tied to a specific document.
+    Each document maintains its own pathway operations state:
+    - KEGG import: pathway ID, organism, form fields
+    - SBML import: file path, BioModels ID
+    - BiGG import: model search query, selected model
+    - BRENDA: EC numbers list, enrichment history
+    - SABIO-RK: query state
+    - Heuristic Parameters: configuration
+    - Enrichment History: parameter enrichments
+    - THERMODYNAMICS: compound mappings, validation settings
+    
+    Attributes:
+        workspace_settings: Optional workspace settings for preferences
+        project: Optional project reference
+        
+    Inherited Attributes:
+        model: ModelCanvasManager for this document
+        parent_window: Parent window for dialogs (Wayland-safe)
+        panel: PathwayOperationsPanel instance
+        widget: Root widget for packing into containers
     """
     
-    def __init__(self, ui_path=None, model_canvas=None, workspace_settings=None):
-        """Initialize the pathway panel loader.
+    def __init__(self, model, parent_window=None, workspace_settings=None, project=None, canvas_loader=None):
+        """Initialize pathway panel loader for a document.
         
         Args:
-            ui_path: Deprecated - CategoryFrame doesn't use .ui files
-            model_canvas: Optional ModelCanvasManager for loading imported pathways
-            workspace_settings: Optional WorkspaceSettings for remembering user preferences
+            model: ModelCanvasManager for this document
+            parent_window: Optional parent window for dialogs (Wayland-safe)
+            workspace_settings: Optional workspace settings
+            project: Optional project reference
+            canvas_loader: Optional ModelCanvasLoader for creating new tabs
         """
-        self.model_canvas = model_canvas
         self.workspace_settings = workspace_settings
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.project = project
+        self.canvas_loader = canvas_loader
         
-        # State management
-        self.window = None
-        self.content = None
-        self.panel = None
-        self.is_hanged = False
-        self.parent_container = None
-        self.parent_window = None
-        self._updating_button = False
-        self.on_float_callback = None
-        self.on_attach_callback = None
-        self.project = None
+        # Initialize base class (calls _create_panel)
+        super().__init__(model, parent_window)
         
-        # Legacy compatibility
-        self.kegg_import_controller = None
-        self.sbml_import_controller = None
-        self.brenda_enrichment_controller = None
+        # Set up legacy compatibility references for backward compatibility
+        self._setup_legacy_compatibility()
     
-    def load(self):
-        """Load the panel and create the window.
+    # =========================================================================
+    # Abstract Method Implementations (required by PerDocumentPanelLoader)
+    # =========================================================================
+    
+    def _create_panel(self) -> Gtk.Widget:
+        """Create PathwayOperationsPanel instance for this document.
+        
+        Creates a panel with 8 categories:
+        1. KEGG - Import from KEGG database
+        2. SBML - Import from SBML files/BioModels
+        3. BiGG - Import from BiGG database
+        4. BRENDA - Enrich with BRENDA kinetic parameters
+        5. SABIO-RK - Enrich with SABIO-RK parameters
+        6. Heuristic Parameters - Type-aware parameter inference
+        7. Enrichment History - View/rate/undo enrichments
+        8. THERMODYNAMICS - Universal thermodynamic validation
         
         Returns:
-            Gtk.Window: The pathway panel window containing the panel.
+            PathwayOperationsPanel: The created panel widget
         """
-        # Create the panel (CategoryFrame architecture)
-        self.panel = PathwayOperationsPanel(
+        self.logger.debug(f"Creating PathwayOperationsPanel for document (model id={id(self.model)})")
+        
+        panel = PathwayOperationsPanel(
             workspace_settings=self.workspace_settings,
             parent_window=self.parent_window,
             project=self.project,
-            model_canvas=self.model_canvas
+            model_canvas=self.canvas_loader if self.canvas_loader else self.model  # Pass canvas_loader for auto-load imports
         )
         
-        # Content is the panel itself (no wrapper needed, matches Topology pattern)
-        self.content = self.panel
-        
-        # Create a window to contain the panel
-        self.window = Gtk.Window()
-        self.window.set_title("Pathway Operations")
-        self.window.set_default_size(400, 600)
-        
-        # Wire float button (part of the panel)
-        if hasattr(self.panel, 'float_button') and self.panel.float_button:
-            self.panel.float_button.connect('toggled', self._on_float_toggled)
-        
-        # Add panel to window (will be used when floating)
-        self.window.add(self.content)
-        
-        # Connect delete-event to handle window close
-        self.window.connect('delete-event', self._on_delete_event)
-        
-        # Hide window by default (will be shown when toggled)
-        self.window.set_visible(False)
-        
-        # Set up legacy compatibility references
-        self._setup_legacy_compatibility()
-        
-        self.logger.info("Pathway Operations panel loaded with CategoryFrame architecture")
-        
-        return self.window
+        return panel
     
-    def _setup_legacy_compatibility(self):
-        """Set up legacy compatibility references for old code."""
-        # Expose category controllers as legacy attributes
-        if self.panel:
-            self.kegg_import_controller = self.panel.kegg_category
-            self.sbml_import_controller = self.panel.sbml_category
-            self.brenda_enrichment_controller = self.panel.brenda_category
-
-    
-    def set_model_canvas(self, model_canvas):
-        """Set or update the model canvas.
-        
-        Args:
-            model_canvas: ModelCanvasManager instance
-        """
-        self.model_canvas = model_canvas
-        
-        if self.panel:
-            self.panel.set_model_canvas(model_canvas)
-        
-        self.logger.info("Model canvas updated")
-    
-    def on_tab_switched(self, drawing_area):
-        """Called when user switches between model tabs.
-        
-        Forwards the notification to the PathwayOperationsPanel.
-        
-        Args:
-            drawing_area: The newly active drawing area
-        """
-        if self.panel and hasattr(self.panel, 'on_tab_switched'):
-            self.panel.on_tab_switched(drawing_area)
-    
-    def set_project(self, project):
-        """Set or update the current project.
-        
-        Args:
-            project: Project instance
-        """
-        self.project = project
-        
-        if self.panel:
-            self.panel.set_project(project)
-        
-        self.logger.info(f"Project set: {project.name if project else None}")
-    
-    def set_file_panel_loader(self, file_panel_loader):
-        """Set file panel loader for file tree refresh.
-        
-        Args:
-            file_panel_loader: FilePanelLoader instance
-        """
-        if self.panel:
-            self.panel.set_file_panel_loader(file_panel_loader)
-        
-        self.logger.info("File panel loader set")
-    
-    def get_sbml_controller(self):
-        """Get the SBML category instance.
+    def get_panel_name(self) -> str:
+        """Get human-readable panel name.
         
         Returns:
-            SBMLCategory instance or None
+            str: "Pathway Operations"
         """
-        return self.sbml_import_controller
+        return "Pathway Operations"
     
-    def _on_float_toggled(self, button):
-        """Handle float toggle button click."""
-        if self._updating_button:
-            return
-        
-        is_active = button.get_active()
-        if is_active:
-            self.detach()
-        else:
-            if self.parent_container:
-                self.hang_on(self.parent_container)
+    # =========================================================================
+    # Template Method Overrides (optional customization)
+    # =========================================================================
     
-    def _on_delete_event(self, window, event):
-        """Handle window close button - hide instead of destroy."""
-        self.hide()
+    def refresh(self) -> None:
+        """Refresh panel to reflect current model state.
         
-        if self.panel and hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
-            self._updating_button = True
-            self.panel.float_button.set_active(False)
-            self._updating_button = False
-        
-        if self.parent_container:
-            self.attach_to(self.parent_container, self.parent_window)
-        
-        return True
-    
-    def detach(self):
-        """Detach from container and show as floating window."""
-        if not self.is_hanged:
-            return
-        
-        # Remove content from container
-        if self.parent_container:
-            self.parent_container.remove(self.content)
-            self.parent_container.set_visible(False)
-        
-        # Hide stack if applicable
-        if hasattr(self, '_stack') and self._stack:
-            self._stack.set_visible(False)
-        
-        # Add content to window
-        self.window.add(self.content)
-        
-        if self.parent_window:
-            self.window.set_transient_for(self.parent_window)
-        
-        self.is_hanged = False
-        
-        if self.panel and hasattr(self.panel, 'float_button') and not self.panel.float_button.get_active():
-            self._updating_button = True
-            self.panel.float_button.set_active(True)
-            self._updating_button = False
-        
-        if self.on_float_callback:
-            self.on_float_callback()
-        
-        self.window.show_all()
-        self.logger.info("Pathway panel detached")
-    
-    def float(self, parent_window=None):
-        """Float panel as a separate window."""
-        if parent_window:
-            self.parent_window = parent_window
-            if self.panel:
-                self.panel.parent_window = parent_window
-        self.detach()
-    
-    def hang_on(self, container):
-        """Attach panel to a container."""
-        if self.is_hanged:
-            if not self.content.get_visible():
-                self.content.show_all()
-            if not container.get_visible():
-                container.set_visible(True)
-            return
-        
-        # Hide window
-        self.window.hide()
-        
-        # Remove content from window
-        self.window.remove(self.content)
-        
-        # Add content to container
-        container.pack_start(self.content, True, True, 0)
-        self.content.show_all()
-        container.set_visible(True)
-        
-        self.is_hanged = True
-        self.parent_container = container
-        
-        if self.panel and hasattr(self.panel, 'float_button') and self.panel.float_button.get_active():
-            self._updating_button = True
-            self.panel.float_button.set_active(False)
-            self._updating_button = False
-        
-        if self.on_attach_callback:
-            self.on_attach_callback()
-        
-        self.logger.info("Pathway panel attached")
-    
-    def attach_to(self, container, parent_window=None):
-        """Attach panel to container."""
-        if parent_window:
-            self.parent_window = parent_window
-            if self.panel:
-                self.panel.parent_window = parent_window
-        
-        self.hang_on(container)
-    
-    def unattach(self):
-        """Unattach panel from container."""
-        self.detach()
-    
-    def hide(self):
-        """Hide the panel."""
-        if self.is_hanged and self.parent_container:
-            self.content.set_no_show_all(True)
-            self.content.hide()
-        else:
-            self.window.hide()
-    
-    def show(self):
-        """Show the panel."""
-        if self.is_hanged and self.parent_container:
-            self.content.set_no_show_all(False)
-            self.content.show()
-        else:
-            self.window.show()
-    
-    def add_to_stack(self, stack, container, panel_name='pathways'):
-        """Add panel to a GtkStack container."""
-        if self.panel is None:
-            self.panel = PathwayOperationsPanel(
-                workspace_settings=self.workspace_settings,
-                parent_window=self.parent_window,
-                project=self.project,
-                model_canvas=self.model_canvas
-            )
-            self._setup_legacy_compatibility()
-        
-        if self.panel.get_parent() != container:
-            current_parent = self.panel.get_parent()
-            if current_parent:
-                current_parent.remove(self.panel)
-            container.add(self.panel)
-        
-        self.is_hanged = True
-        self.parent_container = container
-        self._stack = stack
-        self._stack_panel_name = panel_name
-    
-    def show_in_stack(self):
-        """Show this panel in the GtkStack."""
-        if not hasattr(self, '_stack') or not self._stack:
-            return
-        
-        if not self._stack.get_visible():
-            self._stack.set_visible(True)
-        
-        self._stack.set_visible_child_name(self._stack_panel_name)
-        
+        Updates all 8 categories to ensure they display data for the current model.
+        """
         if self.panel:
-            self.panel.set_no_show_all(False)
-            self.panel.show()
-        
-        if self.parent_container:
-            self.parent_container.set_visible(True)
+            self.logger.debug(f"Refreshing {self.get_panel_name()}")
+            
+            # Note: DO NOT call set_model_canvas(self.model) here!
+            # The panel already has the canvas_loader reference from initialization,
+            # and calling set_model_canvas(self.model) would replace it with the
+            # manager, breaking auto-load for subsequent imports.
+            # The categories automatically get the current manager via _get_canvas_manager().
     
-    def hide_in_stack(self):
-        """Hide this panel in the GtkStack."""
-        if self.panel:
-            self.panel.set_no_show_all(True)
-            self.panel.hide()
-        
-        if self.parent_container:
-            self.parent_container.set_visible(False)
+    # =========================================================================
+    # Legacy Compatibility Methods
+    # =========================================================================
     
-    def cleanup(self):
-        """Clean up resources."""
-        self.logger.info("Cleaning up Pathway Panel loader")
+    def _setup_legacy_compatibility(self) -> None:
+        """Set up legacy compatibility references.
         
+        Maintains backward compatibility with code that expects specific
+        controller references (kegg_import_controller, etc.).
+        """
         if self.panel:
-            self.panel.cleanup()
+            # KEGG category controller
+            if hasattr(self.panel, 'kegg_category'):
+                self.kegg_import_controller = getattr(
+                    self.panel.kegg_category, 'controller', None
+                )
+            
+            # SBML category controller
+            if hasattr(self.panel, 'sbml_category'):
+                self.sbml_import_controller = getattr(
+                    self.panel.sbml_category, 'controller', None
+                )
+            
+            # BRENDA category controller
+            if hasattr(self.panel, 'brenda_category'):
+                self.brenda_enrichment_controller = getattr(
+                    self.panel.brenda_category, 'controller', None
+                )
+    
+    def set_model_canvas(self, model_canvas):
+        """Set model canvas reference (legacy compatibility).
+        
+        This method exists for backward compatibility. The base class
+        provides set_model() which should be used instead.
+        
+        Args:
+            model_canvas: ModelCanvasManager or ModelCanvasLoader instance
+        """
+        # If it's a loader, extract the current manager
+        if hasattr(model_canvas, 'get_current_manager'):
+            manager = model_canvas.get_current_manager()
+            if manager:
+                self.set_model(manager)
+        else:
+            # Direct manager reference
+            self.set_model(model_canvas)
+        
+        # Also update panel's reference
+        if self.panel and hasattr(self.panel, 'set_model_canvas'):
+            self.panel.set_model_canvas(model_canvas)
+    
+    def on_tab_switched(self, drawing_area):
+        """Handle tab switch event (legacy compatibility).
+        
+        With per-document instances, tab switching is handled by the
+        model_canvas_loader swapping panel instances. This method is
+        kept for backward compatibility but does nothing.
+        
+        Args:
+            drawing_area: The newly active DrawingArea
+        """
+        # No-op: Tab switching handled by instance swapping
+        pass
+    
+    def add_to_stack(self, stack, container, name):
+        """Add panel to GTK stack (legacy compatibility).
+        
+        With per-document instances, panels are added to containers
+        dynamically during tab switching. This method is kept for
+        backward compatibility but does nothing.
+        
+        Args:
+            stack: GTK stack
+            container: Container widget
+            name: Stack page name
+        """
+        # No-op: Panel packing handled by tab switch logic
+        pass
 
 
-def create_pathway_panel(ui_path=None, model_canvas=None, workspace_settings=None, parent_window=None):
-    """Convenience function to create and load the pathway panel.
+def create_pathway_panel(model_canvas=None, workspace_settings=None, 
+                        parent_window=None, project=None):
+    """Legacy factory function for creating pathway panel loaders.
+    
+    This function is kept for backward compatibility with existing code.
+    New code should use PanelLoaderFactory.create_pathway_panel() instead.
     
     Args:
-        ui_path: Deprecated - not used in CategoryFrame architecture
-        model_canvas: Optional ModelCanvasManager
-        workspace_settings: Optional WorkspaceSettings
-        parent_window: Optional parent window for dialogs (Wayland compatibility)
+        model_canvas: ModelCanvasManager for the document
+        workspace_settings: Optional workspace settings
+        parent_window: Optional parent window for dialogs
+        project: Optional project reference
         
     Returns:
-        PathwayPanelLoader: The loaded pathway panel loader instance.
+        PathwayPanelLoader: The created panel loader
+        
+    Note:
+        This creates a loader for a single document. With per-document
+        instances, you should create one loader per document via the
+        factory pattern in base_panel_loader.py.
     """
-    loader = PathwayPanelLoader(ui_path, model_canvas, workspace_settings)
-    loader.parent_window = parent_window  # Set before load() so panel gets it
-    loader.load()
-    return loader
+    return PathwayPanelLoader(
+        model=model_canvas,
+        parent_window=parent_window,
+        workspace_settings=workspace_settings,
+        project=project
+    )
+
+
+__all__ = ['PathwayPanelLoader', 'create_pathway_panel']

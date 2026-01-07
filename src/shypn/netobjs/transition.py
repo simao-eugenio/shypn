@@ -56,7 +56,7 @@ class Transition(PetriNetObject):
         self.height = float(height) if height is not None else self.DEFAULT_HEIGHT
         self.horizontal = bool(horizontal)
         
-        # Styling
+        # Styling - temporary defaults, updated after properties initialized
         self.fill_color = self.DEFAULT_COLOR
         self.border_color = self.DEFAULT_BORDER_COLOR
         self.border_width = self.DEFAULT_BORDER_WIDTH
@@ -78,6 +78,12 @@ class Transition(PetriNetObject):
         
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
+        
+        # Apply color schema based on transition type (after all properties initialized)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        border_color, fill_color = ColorSchemaManager.get_transition_colors(self)
+        self.border_color = border_color
+        self.fill_color = fill_color
         
         # Quorum sensing / signal dependencies (13-tuple formalism: Ψ: T → 2^P)
         # Places that this transition senses as environmental signals without arc connection

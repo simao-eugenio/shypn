@@ -74,7 +74,10 @@ class BiologicalCategory(BaseViabilityCategory):
             for place_id in kb.places.keys():
                 try:
                     # Get token history
-                    times, tokens = data_collector.get_place_data(place_id)
+                    place_history = data_collector.place_data.get(place_id, [])
+                    if not place_history:
+                        continue
+                    times, tokens = zip(*place_history) if place_history else ([], [])
                     if len(tokens) > 0:
                         # Check if tokens changed
                         initial = tokens[0]

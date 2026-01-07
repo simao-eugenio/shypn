@@ -2,11 +2,12 @@
 """Topology Analyses category for Report Panel.
 
 Displays network structure and connectivity analysis results.
+Refactored to use table-based layout for better data presentation and organization.
 """
 import sys
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, Pango
 
 from .base_category import BaseReportCategory
 
@@ -41,7 +42,7 @@ class TopologyAnalysesCategory(BaseReportCategory):
         )
     
     def _build_content(self):
-        """Build topology analyses content: Status + Key Findings + Brief Summaries."""
+        """Build topology analyses content with table-based layout."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_start(12)
         box.set_margin_end(12)
@@ -76,60 +77,199 @@ class TopologyAnalysesCategory(BaseReportCategory):
         
         # === ANALYSIS CATEGORIES (Brief Summaries) ===
         
-        # Structural Analysis
+        # === STRUCTURAL ANALYSIS TABLE ===
         self.structural_expander = Gtk.Expander(label="Structural Analysis")
         self.structural_expander.set_expanded(False)
-        self.structural_summary_label = Gtk.Label()
-        self.structural_summary_label.set_xalign(0)
-        self.structural_summary_label.set_line_wrap(True)
-        self.structural_summary_label.set_margin_start(12)
-        self.structural_summary_label.set_margin_end(12)
-        self.structural_summary_label.set_margin_top(6)
-        self.structural_summary_label.set_margin_bottom(6)
-        self.structural_summary_label.set_text("No structural analysis performed")
-        self.structural_expander.add(self.structural_summary_label)
+        
+        # Create TreeView for structural analysis
+        self.structural_store = Gtk.ListStore(str, int, str, str)  # Type, Count, Coverage, Status
+        self.structural_tree = Gtk.TreeView(model=self.structural_store)
+        self.structural_tree.set_enable_search(True)
+        self.structural_tree.set_search_column(0)
+        
+        # Configure columns
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Analysis Type", renderer, text=0)
+        column.set_sort_column_id(0)
+        column.set_resizable(True)
+        column.set_min_width(120)
+        self.structural_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 1.0)  # Right-align numbers
+        column = Gtk.TreeViewColumn("Count", renderer, text=1)
+        column.set_sort_column_id(1)
+        column.set_resizable(True)
+        column.set_min_width(60)
+        self.structural_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 1.0)  # Right-align
+        column = Gtk.TreeViewColumn("Coverage", renderer, text=2)
+        column.set_sort_column_id(2)
+        column.set_resizable(True)
+        column.set_min_width(80)
+        self.structural_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 0.5)  # Center-align status
+        column = Gtk.TreeViewColumn("Status", renderer, text=3)
+        column.set_sort_column_id(3)
+        column.set_min_width(60)
+        self.structural_tree.append_column(column)
+        
+        structural_scroll = Gtk.ScrolledWindow()
+        structural_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        structural_scroll.set_min_content_height(120)
+        structural_scroll.set_max_content_height(250)
+        structural_scroll.add(self.structural_tree)
+        self.structural_expander.add(structural_scroll)
         box.pack_start(self.structural_expander, False, False, 0)
         
-        # Graph & Network Analysis
+        # === GRAPH & NETWORK ANALYSIS TABLE ===
         self.graph_expander = Gtk.Expander(label="Graph & Network Analysis")
         self.graph_expander.set_expanded(False)
-        self.graph_summary_label = Gtk.Label()
-        self.graph_summary_label.set_xalign(0)
-        self.graph_summary_label.set_line_wrap(True)
-        self.graph_summary_label.set_margin_start(12)
-        self.graph_summary_label.set_margin_end(12)
-        self.graph_summary_label.set_margin_top(6)
-        self.graph_summary_label.set_margin_bottom(6)
-        self.graph_summary_label.set_text("No graph analysis performed")
-        self.graph_expander.add(self.graph_summary_label)
+        
+        # Create TreeView for graph analysis
+        self.graph_store = Gtk.ListStore(str, int, str, str)  # Feature, Count, Details, Status
+        self.graph_tree = Gtk.TreeView(model=self.graph_store)
+        self.graph_tree.set_enable_search(True)
+        self.graph_tree.set_search_column(0)
+        
+        # Configure columns
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Feature", renderer, text=0)
+        column.set_sort_column_id(0)
+        column.set_resizable(True)
+        column.set_min_width(120)
+        self.graph_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 1.0)
+        column = Gtk.TreeViewColumn("Count", renderer, text=1)
+        column.set_sort_column_id(1)
+        column.set_resizable(True)
+        column.set_min_width(60)
+        self.graph_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Details", renderer, text=2)
+        column.set_sort_column_id(2)
+        column.set_resizable(True)
+        column.set_expand(True)
+        self.graph_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 0.5)
+        column = Gtk.TreeViewColumn("Status", renderer, text=3)
+        column.set_sort_column_id(3)
+        column.set_min_width(60)
+        self.graph_tree.append_column(column)
+        
+        graph_scroll = Gtk.ScrolledWindow()
+        graph_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        graph_scroll.set_min_content_height(120)
+        graph_scroll.set_max_content_height(250)
+        graph_scroll.add(self.graph_tree)
+        self.graph_expander.add(graph_scroll)
         box.pack_start(self.graph_expander, False, False, 0)
         
-        # Behavioral Analysis
+        # === BEHAVIORAL ANALYSIS TABLE ===
         self.behavioral_expander = Gtk.Expander(label="Behavioral Analysis")
         self.behavioral_expander.set_expanded(False)
-        self.behavioral_summary_label = Gtk.Label()
-        self.behavioral_summary_label.set_xalign(0)
-        self.behavioral_summary_label.set_line_wrap(True)
-        self.behavioral_summary_label.set_margin_start(12)
-        self.behavioral_summary_label.set_margin_end(12)
-        self.behavioral_summary_label.set_margin_top(6)
-        self.behavioral_summary_label.set_margin_bottom(6)
-        self.behavioral_summary_label.set_text("No behavioral analysis performed")
-        self.behavioral_expander.add(self.behavioral_summary_label)
+        
+        # Create TreeView for behavioral analysis
+        self.behavioral_store = Gtk.ListStore(str, str, str, str)  # Property, Result, Status, Details
+        self.behavioral_tree = Gtk.TreeView(model=self.behavioral_store)
+        self.behavioral_tree.set_enable_search(True)
+        self.behavioral_tree.set_search_column(0)
+        
+        # Configure columns
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Property", renderer, text=0)
+        column.set_sort_column_id(0)
+        column.set_resizable(True)
+        column.set_min_width(120)
+        self.behavioral_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Result", renderer, text=1)
+        column.set_sort_column_id(1)
+        column.set_resizable(True)
+        column.set_min_width(100)
+        self.behavioral_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 0.5)
+        column = Gtk.TreeViewColumn("Status", renderer, text=2)
+        column.set_sort_column_id(2)
+        column.set_min_width(60)
+        self.behavioral_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("wrap-mode", Pango.WrapMode.WORD)
+        renderer.set_property("wrap-width", 250)
+        column = Gtk.TreeViewColumn("Details", renderer, text=3)
+        column.set_sort_column_id(3)
+        column.set_resizable(True)
+        column.set_expand(True)
+        self.behavioral_tree.append_column(column)
+        
+        behavioral_scroll = Gtk.ScrolledWindow()
+        behavioral_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        behavioral_scroll.set_min_content_height(150)
+        behavioral_scroll.set_max_content_height(300)
+        behavioral_scroll.add(self.behavioral_tree)
+        self.behavioral_expander.add(behavioral_scroll)
         box.pack_start(self.behavioral_expander, False, False, 0)
         
-        # Biological Analysis
+        # === BIOLOGICAL ANALYSIS TABLE ===
         self.biological_expander = Gtk.Expander(label="Biological Analysis")
         self.biological_expander.set_expanded(False)
-        self.biological_summary_label = Gtk.Label()
-        self.biological_summary_label.set_xalign(0)
-        self.biological_summary_label.set_line_wrap(True)
-        self.biological_summary_label.set_margin_start(12)
-        self.biological_summary_label.set_margin_end(12)
-        self.biological_summary_label.set_margin_top(6)
-        self.biological_summary_label.set_margin_bottom(6)
-        self.biological_summary_label.set_text("No biological analysis performed")
-        self.biological_expander.add(self.biological_summary_label)
+        
+        # Create TreeView for biological analysis
+        self.biological_store = Gtk.ListStore(str, str, str, str)  # Analysis, Result, Status, Interpretation
+        self.biological_tree = Gtk.TreeView(model=self.biological_store)
+        self.biological_tree.set_enable_search(True)
+        self.biological_tree.set_search_column(0)
+        
+        # Configure columns
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Analysis", renderer, text=0)
+        column.set_sort_column_id(0)
+        column.set_resizable(True)
+        column.set_min_width(130)
+        self.biological_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Result", renderer, text=1)
+        column.set_sort_column_id(1)
+        column.set_resizable(True)
+        column.set_min_width(100)
+        self.biological_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("xalign", 0.5)
+        column = Gtk.TreeViewColumn("Status", renderer, text=2)
+        column.set_sort_column_id(2)
+        column.set_min_width(60)
+        self.biological_tree.append_column(column)
+        
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("wrap-mode", Pango.WrapMode.WORD)
+        renderer.set_property("wrap-width", 250)
+        column = Gtk.TreeViewColumn("Interpretation", renderer, text=3)
+        column.set_sort_column_id(3)
+        column.set_resizable(True)
+        column.set_expand(True)
+        self.biological_tree.append_column(column)
+        
+        biological_scroll = Gtk.ScrolledWindow()
+        biological_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        biological_scroll.set_min_content_height(150)
+        biological_scroll.set_max_content_height(300)
+        biological_scroll.add(self.biological_tree)
+        self.biological_expander.add(biological_scroll)
         box.pack_start(self.biological_expander, False, False, 0)
         
         # Initial populate
@@ -154,14 +294,28 @@ class TopologyAnalysesCategory(BaseReportCategory):
         if self.topology_panel:
             try:
                 summary = self.topology_panel.generate_summary_for_report_panel()
-                self._update_display(summary)
+                
+                # Check if we got valid data
+                if summary and 'status' in summary:
+                    self._update_display(summary)
+                else:
+                    # Got response but no valid data structure
+                    self.status_label.set_markup("<b>⚠️ Status:</b> Invalid topology data structure")
+                    self.findings_label.set_text("Topology panel returned incomplete data")
+                    self._show_placeholder()
                 return
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).exception(f"[TOPOLOGY_CATEGORY] Could not fetch topology summary: {e}")
-                # Fall through to placeholder display
+                import traceback
+                traceback.print_exc()
+                # Show error state with details
+                self.status_label.set_markup("<b>❌ Status:</b> Failed to retrieve topology data")
+                self.findings_label.set_text(f"Error: {str(e)}\n\nPlease check the Topology Panel connection")
+                self._show_placeholder()
+                return
         
         # Otherwise show placeholder (topology panel not yet connected)
+        self.status_label.set_markup("<b>ℹ️ Status:</b> Topology panel not connected")
+        self.findings_label.set_text("Waiting for topology panel connection...\nAnalyses will appear after connection is established")
         self._show_placeholder()
     
     def _update_display(self, summary):
@@ -174,7 +328,6 @@ class TopologyAnalysesCategory(BaseReportCategory):
         stats = summary.get('statistics', {})
         warnings = summary.get('warnings', [])
         
-        # === UPDATE STATUS BAR ===
         status_icons = {
             'complete': '✓',
             'partial': '⚠️',
@@ -205,11 +358,11 @@ class TopologyAnalysesCategory(BaseReportCategory):
         else:
             self.findings_label.set_text("No significant findings")
         
-        # === UPDATE SECTION SUMMARIES ===
-        self._update_structural_preview(stats)
-        self._update_graph_preview(stats)
-        self._update_behavioral_preview(stats)
-        self._update_biological_preview(stats)
+        # === UPDATE SECTION TABLES ===
+        self._update_structural_table(stats)
+        self._update_graph_table(stats)
+        self._update_behavioral_table(stats)
+        self._update_biological_table(stats)
     
     def _extract_key_findings(self, summary):
         """Extract 3-5 key findings for bullet list.
@@ -260,178 +413,195 @@ class TopologyAnalysesCategory(BaseReportCategory):
         # Return max 5 findings
         return findings[:5]
     
-    def _update_structural_preview(self, stats):
-        """Update structural analysis preview (brief summary).
+    def _update_structural_table(self, stats):
+        """Populate structural analysis table.
         
         Args:
             stats: statistics dict from summary
         """
-        p_inv = stats.get('p_invariants', 0) or 0
-        t_inv = stats.get('t_invariants', 0) or 0
-        siphons = stats.get('siphons', 0) or 0
-        traps = stats.get('traps', 0) or 0
+        self.structural_store.clear()
         
-        if p_inv > 0 or t_inv > 0 or siphons > 0 or traps > 0:
-            lines = []
-            
-            if p_inv > 0:
-                p_cov = stats.get('p_invariant_coverage', 0)
-                lines.append(f"✓ {p_inv} P-invariants ({p_cov:.0%} coverage)")
-            
-            if t_inv > 0:
-                t_cov = stats.get('t_invariant_coverage', 0)
-                lines.append(f"✓ {t_inv} T-invariants ({t_cov:.0%} coverage)")
-            
-            if siphons > 0:
-                lines.append(f"✓ {siphons} siphon(s)")
-            
-            if traps > 0:
-                lines.append(f"✓ {traps} trap(s)")
-            
-            self.structural_summary_label.set_text("\n".join(lines))
+        # P-Invariants
+        p_inv = stats.get('p_invariants')
+        p_cov = stats.get('p_invariant_coverage')
+        if p_inv is not None and p_inv > 0:
+            coverage_str = f"{p_cov:.0%}" if p_cov is not None else "N/A"
+            self.structural_store.append(["P-Invariants", p_inv, coverage_str, "✓"])
+        elif p_inv == 0:
+            self.structural_store.append(["P-Invariants", 0, "0%", "○"])
         else:
-            self.structural_summary_label.set_text("○ No structural analysis performed")
-    
-    def _update_graph_preview(self, stats):
-        """Update graph & network analysis preview (brief summary).
+            self.structural_store.append(["P-Invariants", 0, "N/A", "○"])
         
-        Args:
-            stats: statistics dict from summary
-        """
-        cycles = stats.get('cycles', 0) or 0
-        hubs = stats.get('hubs', 0)
-        paths = stats.get('paths', 0)
-        
-        if cycles > 0 or hubs > 0 or paths > 0:
-            lines = []
-            
-            if isinstance(cycles, (int, float)) and cycles > 0:
-                lines.append(f"✓ {cycles} feedback cycle(s)")
-            
-            if hubs > 0:
-                lines.append(f"✓ {hubs} hub node(s)")
-            
-            if paths > 0:
-                lines.append(f"✓ {paths} critical path(s)")
-            
-            self.graph_summary_label.set_text("\n".join(lines))
+        # T-Invariants
+        t_inv = stats.get('t_invariants')
+        t_cov = stats.get('t_invariant_coverage')
+        if t_inv is not None and t_inv > 0:
+            coverage_str = f"{t_cov:.0%}" if t_cov is not None else "N/A"
+            self.structural_store.append(["T-Invariants", t_inv, coverage_str, "✓"])
+        elif t_inv == 0:
+            self.structural_store.append(["T-Invariants", 0, "0%", "○"])
         else:
-            self.graph_summary_label.set_text("○ No graph analysis performed")
+            self.structural_store.append(["T-Invariants", 0, "N/A", "○"])
+        
+        # Siphons (can be 'blocked')
+        siphons = stats.get('siphons')
+        if siphons == 'blocked':
+            self.structural_store.append(["Siphons", 0, "Blocked", "⏱️"])
+        elif siphons is not None and siphons > 0:
+            self.structural_store.append(["Siphons", siphons, "N/A", "✓"])
+        elif siphons == 0:
+            self.structural_store.append(["Siphons", 0, "N/A", "○"])
+        else:
+            self.structural_store.append(["Siphons", 0, "N/A", "○"])
+        
+        # Traps (can be 'blocked')
+        traps = stats.get('traps')
+        if traps == 'blocked':
+            self.structural_store.append(["Traps", 0, "Blocked", "⏱️"])
+        elif traps is not None and traps > 0:
+            self.structural_store.append(["Traps", traps, "N/A", "✓"])
+        elif traps == 0:
+            self.structural_store.append(["Traps", 0, "N/A", "○"])
+        else:
+            self.structural_store.append(["Traps", 0, "N/A", "○"])
     
-    def _update_behavioral_preview(self, stats):
-        """Update behavioral analysis preview (brief summary).
+    def _update_graph_table(self, stats):
+        """Populate graph & network analysis table.
         
         Args:
             stats: statistics dict from summary
         """
-        properties = []
+        self.graph_store.clear()
         
-        # Check each behavioral property
+        # Feedback Cycles
+        cycles = stats.get('cycles')
+        if cycles is not None and cycles > 0:
+            self.graph_store.append(["Feedback Cycles", int(cycles), "Detected", "✓"])
+        elif cycles == 0:
+            self.graph_store.append(["Feedback Cycles", 0, "None found", "○"])
+        else:
+            self.graph_store.append(["Feedback Cycles", 0, "Not computed", "○"])
+        
+        # Hub Nodes
+        hubs = stats.get('hubs')
+        if hubs is not None and hubs > 0:
+            self.graph_store.append(["Hub Nodes", int(hubs), "High connectivity", "✓"])
+        elif hubs == 0:
+            self.graph_store.append(["Hub Nodes", 0, "No hubs found", "○"])
+        else:
+            self.graph_store.append(["Hub Nodes", 0, "Not computed", "○"])
+    
+    def _update_behavioral_table(self, stats):
+        """Populate behavioral analysis table.
+        
+        Args:
+            stats: statistics dict from summary
+        """
+        self.behavioral_store.clear()
+        
+        # Boundedness
         is_bounded = stats.get('is_bounded')
         if is_bounded is True:
-            properties.append("✓ Bounded")
+            self.behavioral_store.append(["Boundedness", "Bounded", "✓", "System tokens limited"])
         elif is_bounded is False:
-            properties.append("✗ Unbounded")
-        elif is_bounded == 'timeout':
-            properties.append("⏱️ Boundedness (timeout)")
+            self.behavioral_store.append(["Boundedness", "Unbounded", "✗", "Tokens can grow infinitely"])
+        else:
+            self.behavioral_store.append(["Boundedness", "Not computed", "○", "Analysis not performed"])
         
+        # Liveness
         is_live = stats.get('is_live')
         if is_live is True:
-            properties.append("✓ Live")
+            self.behavioral_store.append(["Liveness", "Live", "✓", "All transitions can eventually fire"])
         elif is_live is False:
-            properties.append("✗ Not live")
-        elif is_live == 'timeout':
-            properties.append("⏱️ Liveness (timeout)")
-        
-        is_deadlock_free = stats.get('is_deadlock_free')
-        if is_deadlock_free is True:
-            properties.append("✓ Deadlock-free")
-        elif is_deadlock_free is False:
-            properties.append("✗ Has deadlocks")
-        elif is_deadlock_free == 'timeout':
-            properties.append("⏱️ Deadlocks (timeout)")
-        
-        is_fair = stats.get('is_fair')
-        if is_fair is True:
-            properties.append("✓ Fair")
-        elif is_fair is False:
-            properties.append("✗ Not fair")
-        elif is_fair == 'timeout':
-            properties.append("⏱️ Fairness (timeout)")
-        
-        is_reachable = stats.get('is_reachable')
-        if is_reachable is True:
-            properties.append("✓ Reachable")
-        elif is_reachable is False:
-            properties.append("✗ Not reachable")
-        elif is_reachable == 'timeout':
-            properties.append("⏱️ Reachability (timeout)")
-        
-        if properties:
-            self.behavioral_summary_label.set_text("\n".join(properties))
+            self.behavioral_store.append(["Liveness", "Not Live", "✗", "Some transitions cannot fire"])
         else:
-            self.behavioral_summary_label.set_text("○ No behavioral analysis performed")
+            self.behavioral_store.append(["Liveness", "Not computed", "○", "Analysis not performed"])
+        
+        # Deadlock-Free (use has_deadlock from stats)
+        has_deadlock = stats.get('has_deadlock')
+        is_deadlock_free = stats.get('is_deadlock_free')
+        if is_deadlock_free is True or has_deadlock is False:
+            self.behavioral_store.append(["Deadlock-Free", "Yes", "✓", "No deadlock states"])
+        elif is_deadlock_free is False or has_deadlock is True:
+            self.behavioral_store.append(["Deadlock-Free", "No", "✗", "Deadlock states exist"])
+        else:
+            self.behavioral_store.append(["Deadlock-Free", "Not computed", "○", "Analysis not performed"])
+        
+        # Reachability (use reachable_states from stats)
+        reachable_states = stats.get('reachable_states')
+        if reachable_states is not None and reachable_states > 0:
+            self.behavioral_store.append(["Reachability", f"{reachable_states} states", "✓", "State space explored"])
+        elif reachable_states == 0:
+            self.behavioral_store.append(["Reachability", "0 states", "⚠️", "Empty state space"])
+        elif stats.get('siphons') == 'blocked' or stats.get('traps') == 'blocked':
+            self.behavioral_store.append(["Reachability", "Blocked", "⏱️", "Model too large"])
+        else:
+            self.behavioral_store.append(["Reachability", "Not computed", "○", "Analysis not performed"])
     
-    def _update_biological_preview(self, stats):
-        """Update biological analysis preview (brief summary).
+    def _update_biological_table(self, stats):
+        """Populate biological analysis table.
         
         Args:
             stats: statistics dict from summary
         """
-        # Get all biological analysis results
-        mass_balance = stats.get('mass_balance')
-        stoichiometry = stats.get('stoichiometry')
-        flux_balance = stats.get('flux_balance')
-        dep_score = stats.get('dependency_score')
-        reg_patterns = stats.get('regulatory_patterns', 0)
-        thermo_warnings = stats.get('thermodynamics_warnings', 0)
-        
-        lines = []
+        self.biological_store.clear()
         
         # Mass Balance
+        mass_balance = stats.get('mass_balance')
         if mass_balance is True:
-            lines.append("✓ Mass Balance: Passed (all reactions balanced)")
+            self.biological_store.append(["Mass Balance", "Passed", "✓", "All reactions balanced"])
         elif mass_balance is False:
-            lines.append("✗ Mass Balance: Failed (unbalanced reactions)")
+            self.biological_store.append(["Mass Balance", "Failed", "✗", "Some reactions unbalanced"])
+        else:
+            self.biological_store.append(["Mass Balance", "Not computed", "○", "Analysis not performed"])
         
         # Stoichiometry
+        stoichiometry = stats.get('stoichiometry')
         if stoichiometry is True:
-            lines.append("✓ Stoichiometry: Valid")
+            self.biological_store.append(["Stoichiometry", "Valid", "✓", "Stoichiometry is valid"])
         elif stoichiometry is False:
-            lines.append("✗ Stoichiometry: Invalid")
+            self.biological_store.append(["Stoichiometry", "Invalid", "✗", "Stoichiometry issues detected"])
+        else:
+            self.biological_store.append(["Stoichiometry", "Not computed", "○", "Analysis not performed"])
         
         # Flux Balance Analysis
+        flux_balance = stats.get('flux_balance')
         if flux_balance is True:
-            lines.append("✓ Flux Balance: Feasible")
+            self.biological_store.append(["Flux Balance", "Feasible", "✓", "FBA solution exists"])
         elif flux_balance is False:
-            lines.append("✗ Flux Balance: Infeasible")
+            self.biological_store.append(["Flux Balance", "Infeasible", "✗", "No FBA solution"])
+        else:
+            self.biological_store.append(["Flux Balance", "Not computed", "○", "Analysis not performed"])
         
-        # Dependency & Coupling
+        # Dependency Score
+        dep_score = stats.get('dependency_score')
         if dep_score is not None:
-            # Interpret dependency score
             if dep_score < 0.3:
-                interp = "low coupling"
+                interp = "Low coupling"
             elif dep_score < 0.6:
-                interp = "moderate coupling"
+                interp = "Moderate coupling"
             else:
-                interp = "high coupling"
-            lines.append(f"✓ Dependency score: {dep_score:.2f} ({interp})")
+                interp = "High coupling"
+            self.biological_store.append(["Dependency Score", f"{dep_score:.2f}", "✓", interp])
+        else:
+            self.biological_store.append(["Dependency Score", "N/A", "○", "Not computed"])
         
-        # Regulatory Structure
-        if reg_patterns and reg_patterns > 0:
-            lines.append(f"✓ Regulatory patterns: {reg_patterns}")
+        # Regulatory Patterns
+        reg_patterns = stats.get('regulatory_patterns', 0) or 0
+        if reg_patterns > 0:
+            self.biological_store.append(["Regulatory Patterns", f"{reg_patterns} found", "✓", "Patterns identified"])
+        else:
+            self.biological_store.append(["Regulatory Patterns", "None", "○", "No patterns detected"])
         
         # Thermodynamics
+        thermo_warnings = stats.get('thermodynamics_warnings', 0)
         if thermo_warnings is not None:
             if thermo_warnings == 0:
-                lines.append("✓ Thermodynamics: No warnings")
+                self.biological_store.append(["Thermodynamics", "No warnings", "✓", "All checks passed"])
             else:
-                lines.append(f"⚠️ Thermodynamics: {thermo_warnings} warning(s)")
-        
-        if lines:
-            self.biological_summary_label.set_text("\n".join(lines))
+                self.biological_store.append(["Thermodynamics", f"{thermo_warnings} warnings", "⚠️", "See Thermodynamic Validation"])
         else:
-            self.biological_summary_label.set_text("○ No biological analysis performed")
+            self.biological_store.append(["Thermodynamics", "Not computed", "○", "Analysis not performed"])
     
     def get_structured_data(self):
         """Get structured topology analysis data for document generation.
@@ -518,25 +688,46 @@ class TopologyAnalysesCategory(BaseReportCategory):
         self.status_label.set_markup("<b>ℹ️ Status:</b> No analyses performed yet")
         self.findings_label.set_text("Perform analyses in Topology Panel to see results here")
         
-        self.structural_summary_label.set_text(
-            "○ P-Invariants, T-Invariants, Siphons, Traps\n"
-            "(Not computed)"
-        )
+        # Clear all tables and show placeholder rows
+        self.structural_store.clear()
+        self.structural_store.append(["P-Invariants", 0, "N/A", "○"])
+        self.structural_store.append(["T-Invariants", 0, "N/A", "○"])
+        self.structural_store.append(["Siphons", 0, "N/A", "○"])
+        self.structural_store.append(["Traps", 0, "N/A", "○"])
         
-        self.graph_summary_label.set_text(
-            "○ Cycles, Paths, Hubs\n"
-            "(Not computed)"
-        )
+        self.graph_store.clear()
+        self.graph_store.append(["Feedback Cycles", 0, "Not computed", "○"])
+        self.graph_store.append(["Hub Nodes", 0, "Not computed", "○"])
+        self.graph_store.append(["Critical Paths", 0, "Not computed", "○"])
         
-        self.behavioral_summary_label.set_text(
-            "○ Boundedness, Liveness, Deadlocks, Fairness, Reachability\n"
-            "(Not computed)"
-        )
+        self.behavioral_store.clear()
+        self.behavioral_store.append(["Boundedness", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Liveness", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Deadlock-Free", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Fairness", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Reachability", "Not computed", "○", "Analysis not performed"])
         
-        self.biological_summary_label.set_text(
-            "○ Dependency & Coupling, Regulatory Structure\n"
-            "(Not computed)"
-        )
+        self.biological_store.clear()
+        self.biological_store.append(["Mass Balance", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Stoichiometry", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Flux Balance", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Dependency Score", "N/A", "○", "Not computed"])
+        self.biological_store.append(["Regulatory Patterns", "None", "○", "No patterns detected"])
+        self.biological_store.append(["Thermodynamics", "Not computed", "○", "Analysis not performed"])
+    
+        self.behavioral_store.clear()
+        self.behavioral_store.append(["Boundedness", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Liveness", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Deadlock-Free", "Not computed", "○", "Analysis not performed"])
+        self.behavioral_store.append(["Reachability", "Not computed", "○", "Analysis not performed"])
+        
+        self.biological_store.clear()
+        self.biological_store.append(["Mass Balance", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Stoichiometry", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Flux Balance", "Not computed", "○", "Analysis not performed"])
+        self.biological_store.append(["Dependency Score", "N/A", "○", "Not computed"])
+        self.biological_store.append(["Regulatory Patterns", "None", "○", "No patterns detected"])
+        self.biological_store.append(["Thermodynamics", "Not computed", "○", "Analysis not performed"])
     
     def get_export_data(self):
         """Provide structured data for export functions (PDF/Excel/SVG).

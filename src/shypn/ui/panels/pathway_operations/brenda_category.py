@@ -163,10 +163,6 @@ class BRENDACategory(BasePathwayCategory):
                 self.model_canvas_manager = current
                 if self.brenda_controller:
                     self.brenda_controller.set_model_canvas(self.model_canvas_manager)
-                self.logger.info(
-                    f"[BRENDA_CANVAS] Refreshed manager: "
-                    f"{len(getattr(self.model_canvas_manager, 'transitions', []))} transitions"
-                )
         except Exception:
             pass
 
@@ -183,8 +179,6 @@ class BRENDACategory(BasePathwayCategory):
         Args:
             model_canvas: Typically a ModelCanvasLoader for the document
         """
-        self.logger.info(f"[BRENDA_CANVAS] set_model_canvas called with: {type(model_canvas)}")
-
         # Store loader reference (if that's what we received)
         self.model_canvas_loader = model_canvas
 
@@ -202,10 +196,6 @@ class BRENDACategory(BasePathwayCategory):
         # Also update controller so scan/apply paths use the same canvas
         if self.brenda_controller and self.model_canvas_manager is not None:
             self.brenda_controller.set_model_canvas(self.model_canvas_manager)
-            self.logger.info(
-                f"[BRENDA_CANVAS] Manager set with "
-                f"{len(getattr(self.model_canvas_manager, 'transitions', []))} transitions"
-            )
     
     def _build_content(self) -> Gtk.Widget:
         """Build the BRENDA category content.

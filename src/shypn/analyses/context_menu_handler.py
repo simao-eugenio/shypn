@@ -168,6 +168,7 @@ class ContextMenuHandler:
         
         # Only add if panel is available
         if panel is None:
+            logger.debug(f"[CTX_MENU] Panel for {obj_type_name} is None, skipping menu items")
             return
         
         # Add separator
@@ -532,9 +533,25 @@ class ContextMenuHandler:
         """
         from shypn.netobjs import Place, Transition
         
+        # Defensive check for None panel
+        if panel is None:
+            logger.error(f"[CTX_MENU] Cannot add {obj.id} to analysis: panel is None")
+            return
+        
+        # Check if panel has add_object method
+        if not hasattr(panel, 'add_object'):
+            logger.error(f"[CTX_MENU] Panel {type(panel).__name__} missing add_object method")
+            return
+        
         # Add object to the appropriate panel
         # (border color will be set automatically in panel.add_object)
-        panel.add_object(obj)
+        try:
+            panel.add_object(obj)
+        except Exception as e:
+            logger.error(f"[CTX_MENU] Error adding {obj.id} to panel: {e}")
+            import traceback
+            traceback.print_exc()
+            return
         
         # Request canvas redraw to show new border color
         if self.model:

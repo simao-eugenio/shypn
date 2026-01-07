@@ -76,8 +76,10 @@ try:
 		from shypn.helpers.file_panel_v3_loader import create_file_panel_v3 as create_left_panel
 	else:
 		from shypn.helpers.left_panel_loader import create_left_panel
-	from shypn.helpers.right_panel_loader import create_right_panel
-	from shypn.helpers.pathway_panel_loader import create_pathway_panel
+	# NOTE: Pathway panel now created per-document in model_canvas_loader.py
+	# No global pathway_panel_loader - matches Report/Viability panel architecture
+	# NOTE: Analyses panel now created per-document in model_canvas_loader.py
+	# No global right_panel_loader - matches Report/Viability/Pathway panel architecture
 	from shypn.helpers.topology_panel_loader import TopologyPanelLoader
 	from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
 	from shypn.helpers.model_canvas_loader import create_model_canvas
@@ -274,6 +276,8 @@ def main(argv=None):
 			model_canvas_loader = create_model_canvas(create_initial_document=False)
 			# Set parent window for zoom palette window
 			model_canvas_loader.parent_window = window
+			# Set workspace settings for panel loaders
+			model_canvas_loader.workspace_settings = workspace_settings
 		except Exception as e:
 			logging.getLogger(__name__).error('Failed to load model canvas: %s', e)
 			sys.exit(8)
@@ -353,191 +357,84 @@ def main(argv=None):
 			
 			file_explorer.on_file_open_requested = on_file_open_requested
 
-		# Load right panel via its loader
-		try:
-			right_panel_loader = create_right_panel()
-		except Exception as e:
-			print(f'ERROR: Failed to load right panel: {e}', file=sys.stderr)
-			sys.exit(5)
+		# ===================================================================
+		# PER-DOCUMENT ANALYSES PANEL ARCHITECTURE (Phase 2)
+		# ===================================================================
+		# NOTE: Analyses panel is now created per-document in model_canvas_loader.py
+		# Each document gets its own AnalysesPanelLoader instance with independent state:
+		# - Transitions: selected transitions, plot data, locality tracking
+		# - Places: selected places, trajectories, marking evolution
+		# - Plotting: real-time plots, zoom configuration
+		# - Context: selected objects for right-click analysis
+		#
+		# CRITICAL BENEFIT: No more global state clearing on tab switch!
+		# Old code cleared all selected_objects on tab switch, losing analysis data.
+		# Now each document preserves its independent analysis state.
+		#
+		# Per-document instances are created in model_canvas_loader._setup_edit_palettes()
+		# and stored in overlay_managers[drawing_area].analyses_panel_loader
+		#
+		# Tab switching automatically swaps panel instances via _on_notebook_page_changed()
+		# ===================================================================
 		
-		# Load topology panel FIRST (needed by pathway panel wiring)
-		try:
-			# Topology panel doesn't need model at init - will get it at analysis time
-			topology_panel_loader = TopologyPanelLoader(model=None)
-			
-			# Store topology_panel_loader reference for Report Panel to access
-			# Do this BEFORE the controller check so it's always available
-			model_canvas_loader.topology_panel_loader = topology_panel_loader
-			
-			# Wire model_canvas_loader so topology can access current model
-			if hasattr(topology_panel_loader, 'controller') and topology_panel_loader.controller:
-				# Use the proper method to set model_canvas_loader
-				topology_panel_loader.set_model_canvas_loader(model_canvas_loader)
-				
-				# ===================================================================
-				# WIRE TOPOLOGY PANEL TO MODEL LIFECYCLE EVENTS
-				# This ensures cache is invalidated when models change/switch
-				# ===================================================================
-				
-				# Event 1: Tab Switching (user creates multiple models and switches)
-				# Connect to notebook's page-changed signal
-				def on_canvas_tab_switched(notebook, page, page_num):
-					"""Called when user switches to different model tab."""
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area and topology_panel_loader.controller:
-						topology_panel_loader.controller.on_tab_switched(drawing_area)
-				
-				if model_canvas_loader.notebook:
-					model_canvas_loader.notebook.connect('switch-page', on_canvas_tab_switched)
-				
-			# Event 2: File Operations (user opens .shy file)
-			# Wire to file explorer's open callback
-			# Store the original handler before any wrapping
-			topology_original_on_file_open = getattr(file_explorer, 'on_file_open_requested', None) if file_explorer else None
-			
-			if file_explorer and topology_original_on_file_open:
-				def on_file_open_with_topology_notify(filepath):
-					"""Wrapper that notifies topology panel after file opens."""
-					# Call original file open handler
-					topology_original_on_file_open(filepath)
-					
-					# Notify topology panel that model changed
-					drawing_area = model_canvas_loader.get_current_document()
-					if drawing_area and topology_panel_loader.controller:
-						topology_panel_loader.controller.on_file_opened(drawing_area)
-				
-				file_explorer.on_file_open_requested = on_file_open_with_topology_notify				# Event 3: Pathway Import (KEGG/SBML import)
-				# Will be wired after pathway_panel_loader is created (see below)
-				
-		except Exception as e:
-			logging.getLogger(__name__).warning('Failed to load topology panel: %s', e)
-			topology_panel_loader = None
+		# ===================================================================
+		# PER-DOCUMENT TOPOLOGY PANEL ARCHITECTURE (Phase 3 Complete)
+		# ===================================================================
+		# NOTE: Topology panel is now created per-document in model_canvas_loader.py
+		# Each document gets its own TopologyPanelLoader instance with independent state:
+		#   - P-Invariants, T-Invariants analysis per document
+		#   - Siphons, Traps analysis per document
+		#   - Reachability graph per document
+		#   - Behavioral properties per document
+		#
+		# Per-document instances created in model_canvas_loader._setup_edit_palettes()
+		# and stored in overlay_managers[drawing_area].topology_panel_loader
+		#
+		# Tab switching automatically swaps panel instances via _on_notebook_page_changed()
+		# ===================================================================
 		
-		# Load pathway panel via its loader
-		try:
-			pathway_panel_loader = create_pathway_panel(
-				model_canvas=model_canvas_loader,
-				workspace_settings=workspace_settings,
-				parent_window=window  # WAYLAND FIX: Pass main window for dialog parent
-			)
-
-			# Store on canvas loader so it can keep it in sync on tab switches
-			try:
-				model_canvas_loader.pathway_panel_loader = pathway_panel_loader
-			except Exception:
-				pass
-			
-			# Wire topology panel to pathway import events (if both panels loaded)
-			if topology_panel_loader and topology_panel_loader.controller and pathway_panel_loader:
-				# KEGG Import: Wrap import completion callback to notify topology
-				# DISABLED: Topology notification can trigger expensive calculations
-				pass
-				# if hasattr(pathway_panel_loader, 'kegg_import_controller') and pathway_panel_loader.kegg_import_controller:
-				# 	kegg_ctrl = pathway_panel_loader.kegg_import_controller
-				# 	original_kegg_complete = kegg_ctrl._on_import_complete
-				# 	
-				# 	def kegg_import_with_topology_notify(document_model):
-				# 		"""Wrapper for KEGG import completion that notifies topology panel."""
-				# 		# Run original completion handler
-				# 		result = original_kegg_complete(document_model)
-				# 		
-				# 		# Notify topology that model was imported (with error handling)
-				# 		try:
-				# 			drawing_area = model_canvas_loader.get_current_document()
-				# 			if drawing_area and topology_panel_loader and topology_panel_loader.controller:
-				# 				topology_panel_loader.controller.on_pathway_imported(drawing_area)
-				# 		except Exception as e:
-				# 			print(f"[KEGG] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
-				# 			import traceback
-				# 			traceback.print_exc()
-				# 		
-				# 		return result
-				# 	
-				# 	kegg_ctrl._on_import_complete = kegg_import_with_topology_notify
-				
-				# SBML Import: Wrap load completion callback to notify topology
-				# DISABLED: Topology notification can trigger expensive calculations
-				# if hasattr(pathway_panel_loader, 'sbml_import_controller') and pathway_panel_loader.sbml_import_controller:
-				# 	sbml_ctrl = pathway_panel_loader.sbml_import_controller
-				# 	original_sbml_complete = sbml_ctrl._on_load_complete
-				# 	
-				# 	def sbml_load_with_topology_notify(document_model, pathway_name):
-				# 		"""Wrapper for SBML load completion that notifies topology panel."""
-				# 		# Run original completion handler
-				# 		result = original_sbml_complete(document_model, pathway_name)
-				# 		
-				# 		# Notify topology that model was imported (with error handling)
-				# 		try:
-				# 			drawing_area = model_canvas_loader.get_current_document()
-				# 			if drawing_area and topology_panel_loader and topology_panel_loader.controller:
-				# 				topology_panel_loader.controller.on_pathway_imported(drawing_area)
-				# 		except Exception as e:
-				# 			print(f"[SBML] Warning: Failed to notify topology panel: {e}", file=sys.stderr)
-				# 			import traceback
-				# 			traceback.print_exc()
-				# 		
-				# 		return result
-				# 	
-				# 	sbml_ctrl._on_load_complete = sbml_load_with_topology_notify
-				
-		except Exception as e:
-			import logging
-			logging.getLogger(__name__).warning('Failed to load pathway panel: %s', e)
-			pathway_panel_loader = None
-			topology_panel_loader = None
+		# Topology container will be exposed after it's loaded from builder (see line ~485)
+		
+		# ===================================================================
+		# PER-DOCUMENT PATHWAY PANEL ARCHITECTURE (Phase 1 Complete)
+		# ===================================================================
+		# NOTE: Pathway panel is now created per-document in model_canvas_loader.py
+		# Each document gets its own PathwayPanelLoader instance with independent state:
+		# - KEGG: pathway ID, organism, search state
+		# - SBML: file path, BioModels ID
+		# - BiGG: search query, selected reactions
+		# - BRENDA: EC numbers, parameter settings
+		# - SABIO-RK: query state, kinetics data
+		# - Heuristic: configuration
+		# - Enrichment History: import history
+		# - THERMODYNAMICS: compound mappings, dG data
+		#
+		# This matches Report/Viability panel architecture (no global instance).
+		# Per-document instances are created in model_canvas_loader._setup_edit_palettes()
+		# and stored in overlay_managers[drawing_area].pathway_panel_loader
+		#
+		# Tab switching automatically swaps panel instances via _on_notebook_page_changed()
+		# ===================================================================
 		
 		# NOTE: Viability panel is now ONLY created per-document in model_canvas_loader.py
 		# No global viability panel loader - this matches Report panel architecture
 		# Each document gets its own ViabilityPanel instance with independent state
 		
-		# Wire pathway panel loader to file panel for project synchronization
-		# This ensures pathway import controllers get updated when project is opened
-		if pathway_panel_loader and left_panel_loader:
-			left_panel_loader.set_pathway_panel_loader(pathway_panel_loader)
+		# NOTE: Pathway panel is now ONLY created per-document in model_canvas_loader.py
+		# No global pathway panel loader - matches Report/Viability architecture
+		# Each document gets its own PathwayPanelLoader instance with independent state
 		
 		# Wire model canvas loader to file panel for project synchronization
 		# This ensures all canvas managers save to correct project directories
 		if model_canvas_loader and left_panel_loader:
 			left_panel_loader.set_model_canvas_loader(model_canvas_loader)
 		
-		# Wire right panel loader to canvas loader
-		# This allows tab switching to update the right panel's data collector
-		model_canvas_loader.set_right_panel_loader(right_panel_loader)
-		
-		# Wire canvas loader to right panel loader (reverse direction)
-		# This allows context menu handler to access per-document viability panels
-		right_panel_loader.model_canvas_loader = model_canvas_loader
-		
-		# Recreate context menu handler now that model_canvas_loader is set
-		# This enables "Add to Viability Analysis" context menu option
-		right_panel_loader.recreate_context_menu_handler()
-		
-		# IMPORTANT: Wire data_collector for any EXISTING canvases (e.g., startup default canvas)
-		# The startup canvas is created before right_panel_loader exists, so we need to
-		# wire it retroactively here after both components are initialized
-		try:
-			model_canvas_loader.wire_existing_canvases_to_right_panel()
-		except Exception as e:
-			import logging
-			logging.getLogger(__name__).exception("[SHYPN ERROR] Exception in wire_existing_canvases_to_right_panel(): %s", e)
-		
-		# Wire context menu handler to canvas loader
-		# This allows right-click context menus to include "Add to Analysis" options
-		# MUST happen AFTER recreate_context_menu_handler() so we use the updated handler
-		if hasattr(right_panel_loader, 'context_menu_handler') and right_panel_loader.context_menu_handler:
-			model_canvas_loader.set_context_menu_handler(right_panel_loader.context_menu_handler)
-			
-			# Wire pathway operations panel to context menu handler for BRENDA enrichment
-			if pathway_panel_loader and hasattr(pathway_panel_loader, 'panel'):
-				right_panel_loader.context_menu_handler.set_pathway_operations_panel(pathway_panel_loader.panel)
+		# NOTE: Context menu handler is now created per-document in model_canvas_loader
+		# Each document's analyses_panel_loader gets its own ContextMenuHandler instance
+		# with proper model_canvas_loader reference for viability panel integration
 
-		# Ensure Pathway Operations panel re-resolves the current manager
-		# after all canvas wiring is complete (startup default tab)
-		try:
-			if pathway_panel_loader:
-				pathway_panel_loader.set_model_canvas(model_canvas_loader)
-		except Exception:
-			pass
+# NOTE: Pathway Operations panel now resolves model_canvas per-document
+	# Each document's PathwayPanelLoader is created with correct model reference
 		
 		# Wire file explorer panel to canvas loader
 		# This allows keyboard shortcuts (Ctrl+S, Ctrl+Shift+S) to trigger save operations
@@ -556,29 +453,36 @@ def main(argv=None):
 		# This ensures per-document panel loaders (Viability, Report) can access it during initialization
 		model_canvas_loader.left_dock_stack = left_dock_stack
 		
-		# Now create the initial document (deferred from load() to ensure dependencies are set)
-		page_index, drawing_area = model_canvas_loader.add_document(filename='default')
-
-		# Get individual panel containers from the stack
+		# Get individual panel containers from the stack BEFORE creating documents
+		# Per-document panels need these containers during initialization
 		files_panel_container = main_builder.get_object('files_panel_container')
 		analyses_panel_container = main_builder.get_object('analyses_panel_container')
 		pathways_panel_container = main_builder.get_object('pathways_panel_container')
 		topology_panel_container = main_builder.get_object('topology_panel_container')
 		report_panel_container = main_builder.get_object('report_panel_container')
 		
+		# Expose containers to model_canvas_loader for per-document panel swapping
+		model_canvas_loader.pathways_panel_container = pathways_panel_container
+		model_canvas_loader.analyses_panel_container = analyses_panel_container
+		model_canvas_loader.topology_panel_container = topology_panel_container
+		
 		# Viability panel container (not in UI file - create programmatically)
 		viability_panel_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 		viability_panel_container.set_name('viability_panel_container')
-
+		model_canvas_loader.viability_panel_container = viability_panel_container
+		
+		# Now create the initial document (deferred from load() to ensure dependencies are set)
+		page_index, drawing_area = model_canvas_loader.add_document(filename='default')
+		
 		# Get paned widget for curtain resize control
 		# Note: UI file has 'main_paned', but code refers to it as 'left_paned' for historical reasons
 		left_paned = main_builder.get_object('main_paned')
-
+		
 		# ====================================================================
 		# WAYLAND FIX: Show main window FIRST, then add panels
 		# Following skeleton test pattern: window.show_all() before panel operations
 		# ====================================================================
-		
+	
 		# CRITICAL: Hide panel containers BEFORE window.show_all()
 		# This prevents them from being shown when show_all() is called
 		if files_panel_container:
@@ -674,28 +578,30 @@ def main(argv=None):
 		if left_panel_loader:
 			left_panel_loader.add_to_stack(left_dock_stack, files_panel_container, 'files')
 		
-		# Add Pathways panel to stack
-		if pathway_panel_loader:
-			pathway_panel_loader.add_to_stack(left_dock_stack, pathways_panel_container, 'pathways')
+		# NOTE: files_panel_container is already added by add_to_stack() above
+		# No need to call left_dock_stack.add_named() again - it would cause GTK warnings
 		
-		# Add Analyses panel to stack
-		if right_panel_loader:
-			right_panel_loader.add_to_stack(left_dock_stack, analyses_panel_container, 'analyses')
+		# NOTE: Pathways/Analyses/Topology containers are already children of left_dock_stack
+		# in main_window.ui with their names set via <packing> tags.
+		# Do NOT call add_named() on them - they are already in the stack!
 		
-		# Add Topology panel to stack
-		if topology_panel_loader:
-			topology_panel_loader.add_to_stack(left_dock_stack, topology_panel_container, 'topology')
+		# Pathways panel container - already in stack from UI file
+		# NOTE: Per-document PathwayPanelLoader instances will be swapped in/out of this container
+		# This matches Report/Viability panel architecture - no global panel instance
+		
+		# Analyses panel container - already in stack from UI file
+		# NOTE: Per-document AnalysesPanelLoader instances will be swapped in/out of this container
+		# This matches Pathway/Viability/Report panel architecture - no global panel instance
+		
+		# Topology panel container - already in stack from UI file
+		# NOTE: Per-document TopologyPanelLoader instances will be swapped in/out of this container
 		
 		# Add Viability panel container to stack
-		# NOTE: Per-document ViabilityPanel instances will be swapped in/out of this container
-		# This matches Report panel architecture - no global panel instance
 		if viability_panel_container:
 			# Add empty container to stack - per-document panels added dynamically
 			left_dock_stack.add_named(viability_panel_container, 'viability')
 
-			# Expose container to model_canvas_loader so tab-switch logic can swap panels
-			# This mirrors the Report panel wiring just above
-			model_canvas_loader.viability_panel_container = viability_panel_container
+			# Expose left_dock_stack reference for viability panel tab-switch logic
 			model_canvas_loader.left_dock_stack = left_dock_stack
 		
 		# ====================================================================
@@ -711,12 +617,19 @@ def main(argv=None):
 				any_docked = False
 				if left_panel_loader and left_panel_loader.is_hanged:
 					any_docked = True
-				elif right_panel_loader and right_panel_loader.is_hanged:
-					any_docked = True
-				elif pathway_panel_loader and pathway_panel_loader.is_hanged:
-					any_docked = True
-				elif topology_panel_loader and topology_panel_loader.is_hanged:
-					any_docked = True
+				# NOTE: Per-document panels (pathway, analyses) checked via current document
+				drawing_area = model_canvas_loader.get_current_document()
+				if drawing_area and drawing_area in model_canvas_loader.overlay_managers:
+					overlay_manager = model_canvas_loader.overlay_managers[drawing_area]
+					if hasattr(overlay_manager, 'pathway_panel_loader') and overlay_manager.pathway_panel_loader:
+						if overlay_manager.pathway_panel_loader.is_hanged:
+							any_docked = True
+					if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+						if overlay_manager.analyses_panel_loader.is_hanged:
+							any_docked = True
+					if hasattr(overlay_manager, 'topology_panel_loader') and overlay_manager.topology_panel_loader:
+						if overlay_manager.topology_panel_loader.is_hanged:
+							any_docked = True
 				# Only collapse if NO panels remain docked
 				if not any_docked and left_paned:
 					try:
@@ -861,21 +774,16 @@ def main(argv=None):
 							model_canvas_loader.report_panel_container.remove(child)
 						
 						# Pack into container
-					model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
-					report_loader.parent_container = model_canvas_loader.report_panel_container
-					# Note: Don't show_all() yet - let user click Report button to show it
+						model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
+						report_loader.parent_container = model_canvas_loader.report_panel_container
+						# Prepare widget content (doesn't affect container visibility)
+						report_loader.panel.show_all()
 		
 		except Exception as e:
-   # print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
+			# print(f"[REPORT_INIT] ❌ Error wiring report panel: {e}")
 			import traceback
-			traceback.print_exc()		# Note: report_panel_container is already in the UI stack, no need to add it again
+			traceback.print_exc()
 		
-		# ====================================================================
-		# Show initial document's Report Panel on demand
-		# ====================================================================
-		# NOTE: Don't show Report panel automatically on startup
-		# Let user click Master Palette button to show it when needed
-		# This avoids issues with panel initialization timing
 			
 		# ===================================================================
 		# Legacy event handlers (kept for compatibility, may need updating)
@@ -888,7 +796,7 @@ def main(argv=None):
 			# Note: New models will get their Report Panel created automatically in model_canvas_loader
 			
 		except Exception as e:
-   # print(f"[REPORT_INIT] ❌ Error in legacy handlers: {e}")
+			# print(f"[REPORT_INIT] ❌ Error in legacy handlers: {e}")
 			import traceback
 			traceback.print_exc()
 
@@ -916,14 +824,11 @@ def main(argv=None):
 				if hasattr(left_panel_loader.file_explorer, 'persistency') and left_panel_loader.file_explorer.persistency:
 					left_panel_loader.file_explorer.persistency.parent_window = window
 		
-		if right_panel_loader:
-			right_panel_loader.parent_window = window
+		# NOTE: Analyses and Topology panel parent_window set per-document in model_canvas_loader
+		# Each document's panel loader gets parent_window from factory
 		
-		if pathway_panel_loader:
-			pathway_panel_loader.parent_window = window
+		# NOTE: All panel loaders get parent_window from factory
 		
-		if topology_panel_loader:
-			topology_panel_loader.parent_window = window
 		
 		# Store main window reference in model_canvas_loader for per-document Report panels
 		if model_canvas_loader:
@@ -982,33 +887,47 @@ def main(argv=None):
 					except Exception:
 						pass
 
-		def on_right_toggle(is_active):
-			"""Handle Analyses panel toggle from Master Palette.
+
+		def on_pathway_toggle(is_active):
+			"""Handle Pathways panel toggle from Master Palette.
 			
 			EXCLUSIVE MODE: Only one panel active at a time.
 			When button is activated, deactivate others.
+			
+			PER-DOCUMENT ARCHITECTURE: Each model has its own PathwayPanelLoader instance.
+			Must handle both docked and floating states.
 			"""
-			if not right_panel_loader:
+			# Get current document's pathway loader
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'pathway_panel_loader'):
+				return
+			
+			pathway_loader = overlay_manager.pathway_panel_loader
+			if not pathway_loader:
 				return
 			
 			if is_active:
 				# Deactivate other panels (exclusive mode)
 				master_palette.set_active('files', False)
-				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
-				right_panel_loader.show_in_stack()
+				pathway_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
-				if right_panel_loader.is_hanged and left_paned:
+				if pathway_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(280)
+						left_paned.set_position(250)
 					except Exception:
 						pass
 			else:
-				right_panel_loader.hide_in_stack()
+				pathway_loader.hide_in_stack()
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -1018,33 +937,46 @@ def main(argv=None):
 					except Exception:
 						pass
 
-		def on_pathway_toggle(is_active):
-			"""Handle Pathways panel toggle from Master Palette.
+		def on_right_toggle(is_active):
+			"""Handle Analyses panel toggle from Master Palette.
 			
 			EXCLUSIVE MODE: Only one panel active at a time.
 			When button is activated, deactivate others.
+			
+			PER-DOCUMENT ARCHITECTURE: Each model has its own AnalysesPanelLoader instance.
+			Must handle both docked and floating states.
 			"""
-			if not pathway_panel_loader:
+			# Get current document's analyses loader
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'analyses_panel_loader'):
+				return
+			
+			analyses_loader = overlay_manager.analyses_panel_loader
+			if not analyses_loader:
 				return
 			
 			if is_active:
 				# Deactivate other panels (exclusive mode)
 				master_palette.set_active('files', False)
-				master_palette.set_active('analyses', False)
+				master_palette.set_active('pathways', False)
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
-				pathway_panel_loader.show_in_stack()
+				analyses_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
-				if pathway_panel_loader.is_hanged and left_paned:
+				if analyses_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(270)
+						left_paned.set_position(280)
 					except Exception:
 						pass
 			else:
-				pathway_panel_loader.hide_in_stack()
+				analyses_loader.hide_in_stack()
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -1053,14 +985,24 @@ def main(argv=None):
 						left_paned.set_position(0)
 					except Exception:
 						pass
-		
+
 		def on_topology_toggle(is_active):
-			"""Handle Topology panel toggle from Master Palette.
+			"""Handle Topology panel toggle from Master Palette (per-document).
 			
 			EXCLUSIVE MODE: Only one panel active at a time.
-			When button is activated, deactivate others.
+			Per-document: Gets current document's topology loader.
 			"""
-			if not topology_panel_loader:
+			# Get current document's topology loader
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'topology_panel_loader'):
+				return
+			
+			topology_loader = overlay_manager.topology_panel_loader
+			if not topology_loader:
 				return
 			
 			if is_active:
@@ -1072,15 +1014,15 @@ def main(argv=None):
 				master_palette.set_active('report', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
-				topology_panel_loader.show_in_stack()
+				topology_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
-				if topology_panel_loader.is_hanged and left_paned:
+				if topology_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(320)  # Match Report panel width
 					except Exception:
 						pass
 			else:
-				topology_panel_loader.hide_in_stack()
+				topology_loader.hide_in_stack()
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -1120,56 +1062,24 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				
-				# If panel is floating, just show the window and ENSURE dock is collapsed
-				if not report_loader.is_hanged:
-					if report_loader.window:
-						report_loader.window.show_all()
-					# CRITICAL: Always collapse dock when panel is floating
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if report_panel_container:
-						report_panel_container.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
-					return
-				
-				# Panel is docked - show in stack
-				if left_dock_stack:
-					left_dock_stack.set_visible_child_name('report')
-					left_dock_stack.set_visible(True)
-				
-				# Expand left paned to show stack
-				if left_paned:
+				# Show this panel (in stack if hanged, or floating if detached)
+				report_loader.show_in_stack()
+				# Expand left paned to show stack only if panel is hanged
+				if report_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(320)
 					except Exception:
 						pass
-				
-				# Show container and panel content
-				if report_panel_container:
-					report_panel_container.set_visible(True)
-					if report_loader.panel:
-						report_loader.panel.show_all()
 			else:
-				# Hide panel
-				if report_loader.is_hanged:
-					# Panel is docked - hide container and collapse dock
-					if report_panel_container:
-						report_panel_container.set_visible(False)
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
-				else:
-					# Panel is floating - just hide the window
-					if report_loader.window:
-						report_loader.window.hide()
+				report_loader.hide_in_stack()
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		def on_viability_toggle(is_active):
 			"""Handle Viability panel toggle from Master Palette.
@@ -1201,69 +1111,24 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('report', False)
 				
-				# If panel is floating, just show the window and ENSURE dock is collapsed
-				if not viability_loader.is_hanged:
-					if viability_loader.window:
-						viability_loader.window.show_all()
-					# CRITICAL: Always collapse dock and hide containers when panel is floating
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if viability_panel_container:
-						viability_panel_container.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
-					return
-				
-				# Panel is docked - show in stack
-				if left_dock_stack:
-					left_dock_stack.set_visible_child_name('viability')
-					left_dock_stack.set_visible(True)
-				
-				# Expand left paned to show stack
-				if left_paned:
+				# Show this panel (in stack if hanged, or floating if detached)
+				viability_loader.show_in_stack()
+				# Expand left paned to show stack only if panel is hanged
+				if viability_loader.is_hanged and left_paned:
 					try:
 						left_paned.set_position(320)
 					except Exception:
 						pass
-				
-				# Swap this document's panel into the shared container
-				if viability_panel_container:
-					viability_panel_container.set_visible(True)
-					
-					# Clear container first
-					for child in viability_panel_container.get_children():
-						viability_panel_container.remove(child)
-					
-					# Remove panel from its current parent (if any)
-					current_parent = viability_loader.widget.get_parent()
-					if current_parent and current_parent != viability_panel_container:
-						current_parent.remove(viability_loader.widget)
-					
-					# Pack this document's panel
-					viability_panel_container.pack_start(viability_loader.widget, True, True, 0)
-					viability_loader.parent_container = viability_panel_container
-					viability_loader.widget.show_all()
 			else:
-				# Hide panel
-				if viability_loader.is_hanged:
-					# Panel is docked - hide container
-					if viability_panel_container:
-						viability_panel_container.set_visible(False)
-					# Hide stack when last panel is hidden
-					if left_dock_stack:
-						left_dock_stack.set_visible(False)
-					if left_paned:
-						try:
-							left_paned.set_position(0)
-						except Exception:
-							pass
-				else:
-					# Panel is floating - hide the window
-					if viability_loader.window:
-						viability_loader.window.hide()
+				viability_loader.hide_in_stack()
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
 
 		# Set up callbacks to manage paned position when panels float/attach (detach button)
 		def on_left_float():
@@ -1347,12 +1212,19 @@ def main(argv=None):
 			any_docked = False
 			if left_panel_loader and left_panel_loader.is_hanged:
 				any_docked = True
-			elif right_panel_loader and right_panel_loader.is_hanged:
-				any_docked = True
-			elif pathway_panel_loader and pathway_panel_loader.is_hanged:
-				any_docked = True
-			elif topology_panel_loader and topology_panel_loader.is_hanged:
-				any_docked = True
+			# NOTE: Per-document panels (pathway, analyses) checked via current document
+			drawing_area = model_canvas_loader.get_current_document()
+			if drawing_area and drawing_area in model_canvas_loader.overlay_managers:
+				overlay_manager = model_canvas_loader.overlay_managers[drawing_area]
+				if hasattr(overlay_manager, 'pathway_panel_loader') and overlay_manager.pathway_panel_loader:
+					if overlay_manager.pathway_panel_loader.is_hanged:
+						any_docked = True
+				if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+					if overlay_manager.analyses_panel_loader.is_hanged:
+						any_docked = True
+				if hasattr(overlay_manager, 'topology_panel_loader') and overlay_manager.topology_panel_loader:
+					if overlay_manager.topology_panel_loader.is_attached:
+						any_docked = True
 			# Only collapse if NO panels remain docked
 			if not any_docked and left_paned:
 				try:
@@ -1373,18 +1245,16 @@ def main(argv=None):
 		# Wire up callbacks
 		left_panel_loader.on_float_callback = on_left_float
 		left_panel_loader.on_attach_callback = on_left_attach
-		right_panel_loader.on_float_callback = on_right_float
-		right_panel_loader.on_attach_callback = on_right_attach
-		if pathway_panel_loader:
-			pathway_panel_loader.on_float_callback = on_pathway_float
-			pathway_panel_loader.on_attach_callback = on_pathway_attach
-		if topology_panel_loader:
-			topology_panel_loader.on_float_callback = on_topology_float
-			topology_panel_loader.on_attach_callback = on_topology_attach
-
-		# Expose viability callbacks to model_canvas_loader so per-document
-		# ViabilityPanelLoader instances can wire them on creation
-		model_canvas_loader.on_viability_float = on_viability_float
+		# NOTE: Analyses and Topology panel float/attach callbacks set per-document
+		# Each panel loader in overlay_manager has its own callbacks wired in model_canvas_loader
+		
+		# Expose topology callbacks to model_canvas_loader for per-document wiring
+		model_canvas_loader.topology_float_callback = on_topology_float
+		model_canvas_loader.topology_attach_callback = on_topology_attach
+		
+	# Expose pathway callbacks to model_canvas_loader for per-document wiring
+		model_canvas_loader.pathway_float_callback = on_pathway_float
+		model_canvas_loader.pathway_attach_callback = on_pathway_attach
 		model_canvas_loader.on_viability_attach = on_viability_attach
 
 		# ====================================================================
@@ -1398,12 +1268,12 @@ def main(argv=None):
 		master_palette.connect('viability', on_viability_toggle)
 		master_palette.connect('report', on_report_toggle)
 		
-		# Enable topology button if panel loaded successfully
-		if topology_panel_loader:
-			master_palette.set_sensitive('topology', True)
-			# Update tooltip to remove "Coming Soon"
-			if 'topology' in master_palette.buttons:
-				master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
+		
+		# Topology button always available (per-document topology panels)
+		master_palette.set_sensitive('topology', True)
+		if 'topology' in master_palette.buttons:
+			master_palette.buttons['topology'].widget.set_tooltip_text('Topology Analysis')
+		
 		
 		# Enable viability button (per-document panels created automatically)
 		master_palette.set_sensitive('viability', True)

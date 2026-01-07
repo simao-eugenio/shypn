@@ -163,7 +163,7 @@ class LocalityRuntimeAnalyzer:
         # Try to get transition-specific data from collector
         try:
             # Get transition firing data (time, event_type, details format)
-            transition_data = self.data_collector.get_transition_data(transition_id)
+            transition_data = self.data_collector.transition_data.get(transition_id, [])
             
             if transition_data:
             
@@ -172,19 +172,17 @@ class LocalityRuntimeAnalyzer:
                 return []
             
             # Convert to event format and take last N
-            # transition_data format: [(time, event_type, details), ...]
+            # transition_data format: [(time, cumulative_count), ...]
             events = []
             for entry in transition_data[-window:]:
                 try:
-                    time, event_type, details = entry  # Unpack all 3 elements
+                    time, count = entry  # Unpack 2 elements: time and cumulative count
                     event = {
                         'time': time,
-                        'type': event_type,
+                        'type': 'fired',
                         'transition_id': transition_id,
+                        'count': count
                     }
-                    # Add details if available
-                    if details:
-                        event['details'] = details
                     events.append(event)
                 except Exception as e:
                     continue
@@ -220,7 +218,7 @@ class LocalityRuntimeAnalyzer:
         
         try:
             # Get all transition data
-            transition_data = self.data_collector.get_transition_data(transition_id)
+            transition_data = self.data_collector.transition_data.get(transition_id, [])
             
             if not transition_data:
                 return 0.0
@@ -229,12 +227,20 @@ class LocalityRuntimeAnalyzer:
             window_start = max(0.0, logical_time - window)
             fire_count = 0
             
-            for entry in transition_data:
-                time, event_type, details = entry  # Unpack all 3 elements
-                if time >= window_start and time <= logical_time:
-                    # Count firing events (not just enable/disable)
-                    if 'fire' in str(event_type).lower() or event_type == 'transition':
-                        fire_count += 1
+            # transition_data format: [(time, cumulative_count), ...]
+            # To count firings in window, we need to find the difference in counts
+            count_at_start = 0
+            count_at_end = 0
+            
+            for time, count in transition_data:
+                if time <= window_start:
+                    count_at_start = count
+                if time <= logical_time:
+                    count_at_end = count
+                else:
+                    break
+            
+            fire_count = count_at_end - count_at_start
             
             # Calculate rate
             actual_window = logical_time - window_start

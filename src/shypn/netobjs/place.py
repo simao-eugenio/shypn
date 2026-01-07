@@ -43,8 +43,8 @@ class Place(PetriNetObject):
         self.y = float(y)
         self.radius = float(radius) if radius is not None else self.DEFAULT_RADIUS
         
-        # Styling
-        self.border_color = self.DEFAULT_BORDER_COLOR
+        # Styling - will be set properly after properties are initialized
+        self.border_color = self.DEFAULT_BORDER_COLOR  # Temporary, updated below
         self.border_width = self.DEFAULT_BORDER_WIDTH
         
         # State
@@ -70,6 +70,10 @@ class Place(PetriNetObject):
         # is_compartment_place: True if in non-default compartment (e.g., extracellular)
         #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
+        
+        # Apply color schema based on place type (after all properties initialized)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        self.border_color = ColorSchemaManager.get_place_border_color(self)
     
     def get_bounding_box(self):
         """Calculate bounding box for the place.

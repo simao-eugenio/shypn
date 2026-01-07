@@ -236,6 +236,14 @@ class SimulationController:
         from shypn.engine.simulation.data_collector import DataCollector
         self.data_collector = DataCollector(self.model, controller=self)
         
+        # CRITICAL: Notify any observers that data_collector changed
+        # This ensures analyses panels get the new data_collector reference
+        if hasattr(self, '_on_data_collector_changed'):
+            try:
+                self._on_data_collector_changed(self.data_collector)
+            except Exception as e:
+                logger.warning(f"Error notifying data_collector change: {e}")
+        
         # Reset buffered settings (discard any uncommitted changes from previous model)
         if hasattr(self, 'buffered_settings'):
             self.buffered_settings.rollback()
@@ -842,15 +850,6 @@ class SimulationController:
 
     def _notify_step_listeners(self):
         """Notify all registered step listeners."""
-        # Debug: Log listener count once
-        if not hasattr(self, '_logged_listeners'):
-            self._logged_listeners = True
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"[STEP_LISTENERS] Controller has {len(self.step_listeners)} step listeners registered")
-            for i, callback in enumerate(self.step_listeners):
-                logger.info(f"  [{i}] {callback}")
-        
         for callback in self.step_listeners:
             try:
                 callback(self, self.time)
@@ -2533,9 +2532,7 @@ class SimulationController:
                     self.on_simulation_complete()
                 except Exception as e:
                     import logging
-                    logging.getLogger(__name__).exception(f"[ERROR] Exception in on_simulation_complete callback: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    logging.getLogger(__name__).exception(f"Exception in on_simulation_complete callback: {e}")
                 return False  # Don't repeat
             GLib.idle_add(deferred_callback)
         
@@ -2637,6 +2634,15 @@ class SimulationController:
         # Recreate data collector with new model
         from shypn.engine.simulation.data_collector import DataCollector
         self.data_collector = DataCollector(new_model, controller=self)
+        
+        # CRITICAL: Notify any observers that data_collector changed
+        # This ensures analyses panels get the new data_collector reference
+        if hasattr(self, '_on_data_collector_changed'):
+            try:
+                self._on_data_collector_changed(self.data_collector)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Error notifying data_collector change: {e}")
         
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback

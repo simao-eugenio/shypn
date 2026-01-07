@@ -3,10 +3,12 @@
 
 Displays thermodynamic consistency validation results for reversible reactions.
 Shows violations, warnings, and statistics from automated validation during SBML import.
+
+Refactored to use table-based layout for better data presentation and organization.
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, Pango
 
 from .base_category import BaseReportCategory
 
@@ -23,9 +25,16 @@ class ThermodynamicValidationCategory(BaseReportCategory):
     Data source: SimulationController.thermodynamic_results
     """
     
-    def __init__(self, project=None, model_canvas=None):
-        """Initialize thermodynamic validation category."""
+    def __init__(self, project=None, model_canvas=None, pathway_operations_panel=None):
+        """Initialize thermodynamic validation category.
+        
+        Args:
+            project: Project instance
+            model_canvas: ModelCanvas instance
+            pathway_operations_panel: PathwayOperationsPanel for quick access (Phase 4)
+        """
         self.controller = None  # Set before super() since refresh() is called during init
+        self.pathway_operations_panel = pathway_operations_panel  # Phase 4: Quick access
         
         super().__init__(
             title="THERMODYNAMIC VALIDATION",
@@ -35,12 +44,23 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         )
     
     def _build_content(self):
-        """Build thermodynamic validation content."""
+        """Build thermodynamic validation content with table-based layout."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_start(12)
         box.set_margin_end(12)
         box.set_margin_top(12)
         box.set_margin_bottom(12)
+        
+        # === QUICK ACCESS BUTTON ===
+        if self.pathway_operations_panel:
+            button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            
+            quick_access_btn = Gtk.Button(label="⚙️  Configure Thermodynamics")
+            quick_access_btn.set_tooltip_text("Open THERMODYNAMICS category in Pathway Operations Panel")
+            quick_access_btn.connect('clicked', self._on_quick_access_clicked)
+            button_box.pack_start(quick_access_btn, True, True, 0)
+            
+            box.pack_start(button_box, False, False, 0)
         
         # === STATUS BAR ===
         self.status_label = Gtk.Label()
@@ -48,7 +68,7 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         self.status_label.set_markup("<b>ℹ️ Status:</b> No validation performed yet")
         box.pack_start(self.status_label, False, False, 0)
         
-        # === SUMMARY STATISTICS ===
+        # === SUMMARY STATISTICS (Compact header style) ===
         summary_frame = Gtk.Frame()
         summary_frame.set_label("Summary")
         summary_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
@@ -62,107 +82,123 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         self.summary_label = Gtk.Label()
         self.summary_label.set_xalign(0)
         self.summary_label.set_line_wrap(True)
-        self.summary_label.set_text("No reversible reactions found")
+        self.summary_label.set_markup("<i>No reversible reactions found</i>")
         summary_box.pack_start(self.summary_label, False, False, 0)
         
         summary_frame.add(summary_box)
         box.pack_start(summary_frame, False, False, 0)
         
-        # === VIOLATIONS (Expandable) ===
-        self.violations_expander = Gtk.Expander(label="❌ Violations")
-        self.violations_expander.set_expanded(True)  # Show violations by default
+        # === VALIDATION RESULTS TABLE ===
+        results_expander = Gtk.Expander(label="Validation Results")
+        results_expander.set_expanded(True)
         
-        violations_scroll = Gtk.ScrolledWindow()
-        violations_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        violations_scroll.set_max_content_height(200)
-        violations_scroll.set_propagate_natural_height(True)
+        # Create TreeView for results
+        self.results_store = Gtk.ListStore(str, str, str)  # Status icon, Transition ID, Message
+        self.results_tree = Gtk.TreeView(model=self.results_store)
+        self.results_tree.set_enable_search(True)
+        self.results_tree.set_search_column(1)  # Search by transition ID
         
-        self.violations_label = Gtk.Label()
-        self.violations_label.set_xalign(0)
-        self.violations_label.set_yalign(0)
-        self.violations_label.set_line_wrap(True)
-        self.violations_label.set_selectable(True)
-        self.violations_label.set_margin_start(12)
-        self.violations_label.set_margin_end(12)
-        self.violations_label.set_margin_top(6)
-        self.violations_label.set_margin_bottom(6)
-        self.violations_label.set_text("No violations")
+        # Status column (icon)
+        status_renderer = Gtk.CellRendererText()
+        status_column = Gtk.TreeViewColumn("", status_renderer, text=0)
+        status_column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+        status_column.set_fixed_width(30)
+        self.results_tree.append_column(status_column)
         
-        violations_scroll.add(self.violations_label)
-        self.violations_expander.add(violations_scroll)
-        box.pack_start(self.violations_expander, False, False, 0)
+        # Transition ID column
+        id_renderer = Gtk.CellRendererText()
+        id_renderer.set_property("weight", Pango.Weight.BOLD)
+        id_column = Gtk.TreeViewColumn("Transition", id_renderer, text=1)
+        id_column.set_sort_column_id(1)
+        id_column.set_resizable(True)
+        id_column.set_min_width(80)
+        self.results_tree.append_column(id_column)
         
-        # === WARNINGS (Expandable) ===
-        self.warnings_expander = Gtk.Expander(label="⚠️  Warnings")
-        self.warnings_expander.set_expanded(False)
+        # Message column
+        msg_renderer = Gtk.CellRendererText()
+        msg_renderer.set_property("wrap-mode", Pango.WrapMode.WORD)
+        msg_renderer.set_property("wrap-width", 400)
+        msg_column = Gtk.TreeViewColumn("Details", msg_renderer, text=2)
+        msg_column.set_sort_column_id(2)
+        msg_column.set_resizable(True)
+        msg_column.set_expand(True)
+        self.results_tree.append_column(msg_column)
         
-        warnings_scroll = Gtk.ScrolledWindow()
-        warnings_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        warnings_scroll.set_max_content_height(200)
-        warnings_scroll.set_propagate_natural_height(True)
+        # Add scrolled window
+        results_scroll = Gtk.ScrolledWindow()
+        results_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        results_scroll.set_min_content_height(200)
+        results_scroll.set_max_content_height(400)
+        results_scroll.set_propagate_natural_height(True)
+        results_scroll.add(self.results_tree)
         
-        self.warnings_label = Gtk.Label()
-        self.warnings_label.set_xalign(0)
-        self.warnings_label.set_yalign(0)
-        self.warnings_label.set_line_wrap(True)
-        self.warnings_label.set_selectable(True)
-        self.warnings_label.set_margin_start(12)
-        self.warnings_label.set_margin_end(12)
-        self.warnings_label.set_margin_top(6)
-        self.warnings_label.set_margin_bottom(6)
-        self.warnings_label.set_text("No warnings")
+        results_expander.add(results_scroll)
+        box.pack_start(results_expander, True, True, 0)
         
-        warnings_scroll.add(self.warnings_label)
-        self.warnings_expander.add(warnings_scroll)
-        box.pack_start(self.warnings_expander, False, False, 0)
+        # === COMPOUND MAPPINGS TABLE ===
+        mappings_expander = Gtk.Expander(label="Compound Mappings")
+        mappings_expander.set_expanded(False)
         
-        # === VALID TRANSITIONS (Expandable, collapsed by default) ===
-        self.valid_expander = Gtk.Expander(label="✓ Valid Transitions")
-        self.valid_expander.set_expanded(False)
+        # Create TreeView for mappings (matching Pathway Operations columns)
+        self.mappings_store = Gtk.ListStore(str, str, str)  # Place Label, Compound ID, Confidence
+        self.mappings_tree = Gtk.TreeView(model=self.mappings_store)
+        self.mappings_tree.set_enable_search(True)
+        self.mappings_tree.set_search_column(0)  # Search by place label
         
-        valid_scroll = Gtk.ScrolledWindow()
-        valid_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        valid_scroll.set_max_content_height(200)
-        valid_scroll.set_propagate_natural_height(True)
+        # Place column (label only, matching Pathway Operations)
+        place_renderer = Gtk.CellRendererText()
+        place_column = Gtk.TreeViewColumn("Place", place_renderer, text=0)
+        place_column.set_sort_column_id(0)
+        place_column.set_resizable(True)
+        place_column.set_min_width(120)
+        self.mappings_tree.append_column(place_column)
         
-        self.valid_label = Gtk.Label()
-        self.valid_label.set_xalign(0)
-        self.valid_label.set_yalign(0)
-        self.valid_label.set_line_wrap(True)
-        self.valid_label.set_selectable(True)
-        self.valid_label.set_margin_start(12)
-        self.valid_label.set_margin_end(12)
-        self.valid_label.set_margin_top(6)
-        self.valid_label.set_margin_bottom(6)
-        self.valid_label.set_text("No valid transitions")
+        # Compound ID column
+        compound_renderer = Gtk.CellRendererText()
+        compound_column = Gtk.TreeViewColumn("Compound ID", compound_renderer, text=1)
+        compound_column.set_sort_column_id(1)
+        compound_column.set_resizable(True)
+        compound_column.set_expand(True)
+        self.mappings_tree.append_column(compound_column)
         
-        valid_scroll.add(self.valid_label)
-        self.valid_expander.add(valid_scroll)
-        box.pack_start(self.valid_expander, False, False, 0)
+        # Confidence column
+        confidence_renderer = Gtk.CellRendererText()
+        confidence_column = Gtk.TreeViewColumn("Confidence", confidence_renderer, text=2)
+        confidence_column.set_sort_column_id(2)
+        confidence_column.set_resizable(True)
+        confidence_column.set_min_width(100)
+        self.mappings_tree.append_column(confidence_column)
         
-        # === INSUFFICIENT DATA (Expandable, collapsed by default) ===
-        self.insufficient_expander = Gtk.Expander(label="ℹ️  Insufficient Data")
-        self.insufficient_expander.set_expanded(False)
+        # Add scrolled window
+        mappings_scroll = Gtk.ScrolledWindow()
+        mappings_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        mappings_scroll.set_min_content_height(150)
+        mappings_scroll.set_max_content_height(300)
+        mappings_scroll.set_propagate_natural_height(True)
+        mappings_scroll.add(self.mappings_tree)
         
-        insufficient_scroll = Gtk.ScrolledWindow()
-        insufficient_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        insufficient_scroll.set_max_content_height(200)
-        insufficient_scroll.set_propagate_natural_height(True)
+        mappings_expander.add(mappings_scroll)
+        box.pack_start(mappings_expander, True, True, 0)
         
-        self.insufficient_label = Gtk.Label()
-        self.insufficient_label.set_xalign(0)
-        self.insufficient_label.set_yalign(0)
-        self.insufficient_label.set_line_wrap(True)
-        self.insufficient_label.set_selectable(True)
-        self.insufficient_label.set_margin_start(12)
-        self.insufficient_label.set_margin_end(12)
-        self.insufficient_label.set_margin_top(6)
-        self.insufficient_label.set_margin_bottom(6)
-        self.insufficient_label.set_text("No transitions with missing data")
+        # === SETTINGS SECTION ===
+        settings_frame = Gtk.Frame()
+        settings_frame.set_label("Settings")
+        settings_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
         
-        insufficient_scroll.add(self.insufficient_label)
-        self.insufficient_expander.add(insufficient_scroll)
-        box.pack_start(self.insufficient_expander, False, False, 0)
+        settings_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        settings_box.set_margin_start(12)
+        settings_box.set_margin_end(12)
+        settings_box.set_margin_top(6)
+        settings_box.set_margin_bottom(6)
+        
+        self.settings_label = Gtk.Label()
+        self.settings_label.set_xalign(0)
+        self.settings_label.set_line_wrap(True)
+        self.settings_label.set_text("Using default settings")
+        settings_box.pack_start(self.settings_label, False, False, 0)
+        
+        settings_frame.add(settings_box)
+        box.pack_start(settings_frame, False, False, 0)
         
         # Initial refresh
         self.refresh()
@@ -171,6 +207,7 @@ class ThermodynamicValidationCategory(BaseReportCategory):
     
     def refresh(self):
         """Refresh thermodynamic validation data from controller."""
+        
         if not self.controller:
             self._show_no_controller()
             return
@@ -184,33 +221,36 @@ class ThermodynamicValidationCategory(BaseReportCategory):
             return
         
         # Update content from results
-        self._update_status(results)
+        violations_count = len(results.get('violations', []))
+        warnings_count = len(results.get('warnings', []))
+        valid_count = len(results.get('valid', []))
+        
         self._update_summary(results)
-        self._update_violations(results.get('violations', []))
-        self._update_warnings(results.get('warnings', []))
-        self._update_valid(results.get('valid', []))
-        self._update_insufficient(results.get('insufficient_data', []))
+        self._update_results_table(results)
+        self._update_compound_mappings()
+        self._update_settings()
     
     def _show_no_controller(self):
         """Show placeholder when no controller available."""
-        self.status_label.set_markup("<b>ℹ️ Status:</b> No simulation controller available")
-        self.summary_label.set_text("Controller not initialized")
-        self.violations_label.set_text("No data")
-        self.warnings_label.set_text("No data")
-        self.valid_label.set_text("No data")
-        self.insufficient_label.set_text("No data")
+        self.status_label.set_markup("<b>⚠️ Status:</b> Simulation controller not available")
+        self.summary_label.set_markup(
+            "<i>Cannot retrieve thermodynamic validation data:\n"
+            "Simulation controller not initialized for this model.</i>"
+        )
+        self.results_store.clear()
+        self.mappings_store.clear()
     
     def _show_no_validation(self):
         """Show placeholder when validation not yet performed."""
         self.status_label.set_markup("<b>ℹ️ Status:</b> No validation performed yet")
-        self.summary_label.set_text(
-            "Thermodynamic validation runs automatically during SBML import.\n"
-            "Import an SBML file with reversible reactions to see results."
+        self.summary_label.set_markup(
+            "<i>Thermodynamic validation runs automatically during SBML import.\n\n"
+            "• Import an SBML file with reversible reactions, or\n"
+            "• Run validation manually from Pathway Operations panel</i>"
         )
-        self.violations_label.set_text("No validation performed")
-        self.warnings_label.set_text("No validation performed")
-        self.valid_label.set_text("No validation performed")
-        self.insufficient_label.set_text("No validation performed")
+        self.results_store.clear()
+        self._update_compound_mappings()
+        self._update_settings()
     
     def _update_status(self, results):
         """Update status bar based on results."""
@@ -242,107 +282,38 @@ class ThermodynamicValidationCategory(BaseReportCategory):
             f"  ✓ Valid: {summary.get('valid', 0)}",
             f"  ⚠️  Warnings: {summary.get('warnings', 0)}",
             f"  ❌ Violations: {summary.get('violations', 0)}",
-            f"  ℹ️  Insufficient data: {summary.get('insufficient_data', 0)}",
         ]
         
-        self.summary_label.set_text('\n'.join(lines))
+        self.summary_label.set_markup('\n'.join(lines))
     
-    def _update_violations(self, violations):
-        """Update violations list."""
-        if not violations:
-            self.violations_label.set_text("No violations detected")
-            self.violations_expander.set_label("❌ Violations (0)")
-            return
+    def _update_results_table(self, results):
+        """Update results table with all validation data."""
+        self.results_store.clear()
         
-        self.violations_expander.set_label(f"❌ Violations ({len(violations)})")
-        
-        lines = []
-        for v in violations:
+        # Add violations (red icon)
+        for v in results.get('violations', []):
             transition = v.get('transition', 'Unknown')
-            k_ratio = v.get('k_ratio', 'N/A')
-            k_eq = v.get('k_eq', 'N/A')
-            deviation = v.get('deviation', 'N/A')
             message = v.get('message', '')
-            
-            lines.append(f"• {transition}")
-            lines.append(f"  k_f/k_r = {k_ratio:.2e}, K_eq = {k_eq:.2e}")
-            lines.append(f"  Deviation: {deviation:.2f}")
-            if message:
-                lines.append(f"  {message}")
-            lines.append("")  # Blank line between entries
+            self.results_store.append(["❌", transition, message])
         
-        self.violations_label.set_text('\n'.join(lines))
-    
-    def _update_warnings(self, warnings):
-        """Update warnings list."""
-        if not warnings:
-            self.warnings_label.set_text("No warnings")
-            self.warnings_expander.set_label("⚠️  Warnings (0)")
-            return
-        
-        self.warnings_expander.set_label(f"⚠️  Warnings ({len(warnings)})")
-        
-        lines = []
-        for w in warnings:
+        # Add warnings (orange icon)
+        for w in results.get('warnings', []):
             transition = w.get('transition', 'Unknown')
-            k_ratio = w.get('k_ratio', 'N/A')
-            k_eq = w.get('k_eq', 'N/A')
-            deviation = w.get('deviation', 'N/A')
             message = w.get('message', '')
-            
-            lines.append(f"• {transition}")
-            lines.append(f"  k_f/k_r = {k_ratio:.2e}, K_eq = {k_eq:.2e}")
-            lines.append(f"  Deviation: {deviation:.2f}")
-            if message:
-                lines.append(f"  {message}")
-            lines.append("")
+            self.results_store.append(["⚠️", transition, message])
         
-        self.warnings_label.set_text('\n'.join(lines))
-    
-    def _update_valid(self, valid):
-        """Update valid transitions list."""
-        if not valid:
-            self.valid_label.set_text("No valid transitions")
-            self.valid_expander.set_label("✓ Valid Transitions (0)")
-            return
-        
-        self.valid_expander.set_label(f"✓ Valid Transitions ({len(valid)})")
-        
-        lines = []
-        for v in valid:
+        # Add valid (green icon)
+        for v in results.get('valid', []):
             transition = v.get('transition', 'Unknown')
-            k_ratio = v.get('k_ratio', 'N/A')
-            k_eq = v.get('k_eq', 'N/A')
-            deviation = v.get('deviation', 'N/A')
-            
-            lines.append(f"• {transition}")
-            if k_ratio != 'N/A' and k_eq != 'N/A':
-                lines.append(f"  k_f/k_r = {k_ratio:.2e}, K_eq = {k_eq:.2e}, deviation = {deviation:.2f}")
-            lines.append("")
+            message = v.get('message', 'Valid thermodynamic consistency')
+            self.results_store.append(["✓", transition, message])
         
-        self.valid_label.set_text('\n'.join(lines))
+        # Add insufficient data (info icon)
+        for i in results.get('insufficient_data', []):
+            transition = i.get('transition', 'Unknown')
+            message = i.get('message', 'Insufficient data for validation')
+            self.results_store.append(["ℹ️", transition, message])
     
-    def _update_insufficient(self, insufficient):
-        """Update insufficient data list."""
-        if not insufficient:
-            self.insufficient_label.set_text("No transitions with missing data")
-            self.insufficient_expander.set_label("ℹ️  Insufficient Data (0)")
-            return
-        
-        self.insufficient_expander.set_label(f"ℹ️  Insufficient Data ({len(insufficient)})")
-        
-        lines = []
-        for item in insufficient:
-            transition = item.get('transition', 'Unknown')
-            status = item.get('status', 'unknown')
-            message = item.get('message', 'No details')
-            
-            lines.append(f"• {transition}")
-            lines.append(f"  Status: {status}")
-            lines.append(f"  {message}")
-            lines.append("")
-        
-        self.insufficient_label.set_text('\n'.join(lines))
     
     def set_controller(self, controller):
         """Set simulation controller reference.
@@ -352,6 +323,77 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         """
         self.controller = controller
         self.refresh()
+    
+    def _update_compound_mappings(self):
+        """Update compound mappings table (matching Pathway Operations format)."""
+        self.mappings_store.clear()
+        
+        # Get compound mappings from controller results
+        if not self.controller or not self.controller.thermodynamic_results:
+            return
+        
+        mappings = self.controller.thermodynamic_results.get('compound_mappings', {})
+        
+        if not mappings:
+            return
+        
+        # Get current active model to look up place labels
+        document = self.get_current_model()
+        
+        # Populate table with all mappings (columns: Place, Compound ID, Confidence)
+        for place_id, compound_id in mappings.items():
+            # Get place label if document is available
+            label = place_id  # Default to place_id
+            if document:
+                place = next((p for p in document.places if p.id == place_id), None)
+                if place:
+                    label = place.label if place.label else place_id
+            
+            # Show "Manual" confidence since these are pre-existing mappings from validation
+            confidence = "Manual"
+            
+            self.mappings_store.append([label, compound_id, confidence])
+    
+    def _update_settings(self):
+        """Update settings display (Phase 4)."""
+        # Get current active model dynamically
+        document = self.get_current_model()
+        if not document:
+            self.settings_label.set_text("No model loaded")
+            return
+        if not hasattr(document, 'thermodynamic_settings'):
+            self.settings_label.set_text("Using default settings")
+            return
+        
+        settings = document.thermodynamic_settings
+        ph = settings.get('ph', 7.0)
+        temp_k = settings.get('temperature', 298.15)
+        temp_c = temp_k - 273.15
+        ionic = settings.get('ionic_strength', 0.1)
+        tolerance = settings.get('tolerance', 0.5)
+        preset = settings.get('preset', 'custom')
+        
+        lines = [
+            f"Preset: {preset.capitalize()}",
+            f"pH: {ph:.1f}",
+            f"Temperature: {temp_k:.1f} K ({temp_c:.1f}°C)",
+            f"Ionic Strength: {ionic:.2f} M",
+            f"Tolerance: {tolerance:.0%}"
+        ]
+        
+        self.settings_label.set_text('\n'.join(lines))
+    
+    def _on_quick_access_clicked(self, button):
+        """Handle quick access button click (Phase 4)."""
+        if not self.pathway_operations_panel:
+            return
+        
+        # Switch to THERMODYNAMICS category
+        # The pathway_operations_panel should have a method to switch categories
+        if hasattr(self.pathway_operations_panel, 'set_active_category'):
+            self.pathway_operations_panel.set_active_category('THERMODYNAMICS')
+        elif hasattr(self.pathway_operations_panel, 'show_category'):
+            self.pathway_operations_panel.show_category('THERMODYNAMICS')
     
     def get_widget(self):
         """Get the widget for this category.

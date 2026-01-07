@@ -147,5 +147,11 @@ class PlacesCategory(BaseDynamicCategory):
     
     def clear_places(self):
         """Clear all places from plot."""
+        # Reset colors for all places before clearing
+        if self.panel and hasattr(self.panel, 'selected_objects'):
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            for place in self.panel.selected_objects:
+                ColorSchemaManager.reset_place_color(place)
+        
         if self.panel:
             self.panel.clear_objects()

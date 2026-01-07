@@ -7,11 +7,16 @@ control and export configuration.
 Author: Simão Eugénio
 Date: 2025-12-30
 """
+import warnings
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 import matplotlib
 matplotlib.use('GTK3Agg')
+
+# Suppress matplotlib deprecation warnings (we use keyword args for compatibility)
+warnings.filterwarnings('ignore', category=matplotlib._api.deprecation.MatplotlibDeprecationWarning)
+
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
@@ -205,8 +210,8 @@ class BasePlot(Gtk.Box):
         self.canvas = FigureCanvas(self.figure)
         self.canvas.set_size_request(400, 300)
         
-        # Navigation toolbar
-        self.toolbar = NavigationToolbar2GTK3(self.canvas, None)
+        # Navigation toolbar (matplotlib 3.6+ compatible)
+        self.toolbar = NavigationToolbar2GTK3(self.canvas)
         
         vbox.pack_start(self.toolbar, False, False, 0)
         vbox.pack_start(self.canvas, True, True, 0)
@@ -429,8 +434,8 @@ class BasePlot(Gtk.Box):
             obj_id = obj.id
             
             if isinstance(obj, Place):
-                # Get place data using proper getter method
-                place_data = self.data_collector.get_place_data(obj_id)
+                # Get place data using direct property access
+                place_data = self.data_collector.place_data.get(obj_id, [])
                 if place_data:
                     # Apply time range filter
                     if self.start_time is not None or self.end_time is not None:
@@ -468,55 +473,21 @@ class BasePlot(Gtk.Box):
                             }
                             continue
                 
-                # PRIORITY 2: Check event details for rate data (continuous transitions)
-                trans_data = self.data_collector.get_transition_data(obj_id)
+                # PRIORITY 2: Fall back to cumulative firing count from transition_data
+                trans_data = self.data_collector.transition_data.get(obj_id, [])
                 if trans_data:
-                    # Check if this is a continuous transition with rate data in details
-                    has_rate_data = False
-                    if len(trans_data) > 0 and trans_data[0][2] is not None:
-                        details = trans_data[0][2]
-                        if isinstance(details, dict) and 'rate' in details:
-                            has_rate_data = True
-                    
-                    if has_rate_data:
-                        # CONTINUOUS TRANSITION: Extract rate from event details
-                        rate_series = []
-                        for time, event_type, details in trans_data:
-                            if event_type == 'fired' and details and isinstance(details, dict):
-                                rate = details.get('rate', 0.0)
-                                rate_series.append((time, rate))
-                        
-                        # Apply time range filter
-                        if self.start_time is not None or self.end_time is not None:
-                            if rate_series:
-                                start = self.start_time if self.start_time is not None else rate_series[0][0]
-                                end = self.end_time if self.end_time is not None else rate_series[-1][0]
-                                rate_series = [(t, r) for t, r in rate_series if start <= t <= end]
-                        
-                        if rate_series:
-                            times, rates = zip(*rate_series)
-                            data[obj_id] = {
-                                'time': list(times),
-                                'values': list(rates)
-                            }
-                            continue
-                    
-                    # PRIORITY 3: Fall back to cumulative firing count for discrete transitions
-                    firing_events = [(t, e, d) for t, e, d in trans_data if e == 'fired']
-                    
+                    # transition_data now stores (time, count) tuples
                     # Apply time range filter
                     if self.start_time is not None or self.end_time is not None:
-                        if firing_events:
-                            start = self.start_time if self.start_time is not None else firing_events[0][0]
-                            end = self.end_time if self.end_time is not None else firing_events[-1][0]
-                            firing_events = [(t, e, d) for t, e, d in firing_events if start <= t <= end]
+                        start = self.start_time if self.start_time is not None else trans_data[0][0]
+                        end = self.end_time if self.end_time is not None else trans_data[-1][0]
+                        trans_data = [(t, c) for t, c in trans_data if start <= t <= end]
                     
-                    if firing_events:
-                        times = [t for t, _, _ in firing_events]
-                        cumulative = list(range(1, len(times) + 1))
+                    if trans_data:
+                        times, counts = zip(*trans_data)
                         data[obj_id] = {
-                            'time': times,
-                            'values': cumulative
+                            'time': list(times),
+                            'values': list(counts)
                         }
         
         return {'data': data}
