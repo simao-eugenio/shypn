@@ -1,0 +1,89 @@
+name: Version Synchronization Check
+
+on:
+  push:
+    branches: [ main, "Usability-and-Manuscripts", "develop" ]
+  pull_request:
+    branches: [ main, "Usability-and-Manuscripts", "develop" ]
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Check version synchronization
+        run: |
+          echo "🔍 Checking version synchronization..."
+          
+          # Extract version from version.py
+          VERSION=$(grep -E '^__version__\s*=\s*"[^"]*"' src/shypn/version.py | sed -E 's/^__version__\s*=\s*"([^"]*)".*/\1/')
+          
+          if [ -z "$VERSION" ]; then
+            echo "❌ Error: Could not extract version from version.py"
+            exit 1
+          fi
+          
+          echo "✓ Version source: $VERSION"
+          
+          # Check pyproject.toml
+          PYPROJECT_VER=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "$PYPROJECT_VER" != "$VERSION" ]; then
+            echo "❌ VERSION DRIFT in pyproject.toml!"
+            echo "   Expected: $VERSION"
+            echo "   Found:    $PYPROJECT_VER"
+            exit 1
+          fi
+          echo "✓ pyproject.toml: $PYPROJECT_VER"
+          
+          # Check CITATION.cff
+          CITATION_VER=$(grep '^version: ' CITATION.cff | awk '{print $2}')
+          if [ "$CITATION_VER" != "$VERSION" ]; then
+            echo "❌ VERSION DRIFT in CITATION.cff!"
+            echo "   Expected: $VERSION"
+            echo "   Found:    $CITATION_VER"
+            exit 1
+          fi
+          echo "✓ CITATION.cff: $CITATION_VER"
+          
+          # Check imports
+          if ! grep -q "from .version import" src/shypn/__init__.py; then
+            echo "⚠ Warning: __init__.py doesn't import from version.py"
+          else
+            echo "✓ __init__.py imports from version.py"
+          fi
+          
+          echo "✅ All version checks passed!"
+      
+      - name: Test Python imports
+        run: |
+          echo "🔍 Testing Python imports..."
+          python -c "import sys; sys.path.insert(0, 'src'); from shypn import __version__; print(f'✓ Import successful: {__version__}')"
+          python -c "import sys; sys.path.insert(0, 'src'); from shypn.version import __api_version__; print(f'✓ API version: {__api_version__}')"
+      
+      - name: Check API compatibility
+        run: |
+          echo "🔍 Checking API compatibility..."
+          python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from shypn.compatibility import verify_submodule_compatibility
+          result = verify_submodule_compatibility(strict=False)
+          if result:
+              print('✅ All submodules compatible')
+          else:
+              print('⚠ Some compatibility warnings (non-critical)')
+          "
+      
+      - name: Run sync script check
+        run: |
+          echo "🔍 Running sync script validation..."
+          chmod +x ./tools/sync_versions.sh
+          ./tools/sync_versions.sh --check
