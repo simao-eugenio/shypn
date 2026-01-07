@@ -2541,13 +2541,8 @@ class SimulationController:
                 if self.data_collector:
                     self.data_collector.stop_collection()
                 
-                # Print token accounting report if enabled
-                if self.auditor is not None:
-                    print("\n" + "="*80)
-                    print("TOKEN ACCOUNTING REPORT")
-                    print("="*80)
-                    self.print_accounting_report()
-                    print("="*80 + "\n")
+                # Token accounting report will be exported via Report Panel if user exports CSV
+                # No terminal output needed - keeps terminal clean
                 
                 # Notify completion callback (deferred to avoid blocking UI)
                 if self.on_simulation_complete:
