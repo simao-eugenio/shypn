@@ -93,6 +93,7 @@ class SBMLCategory(BasePathwayCategory):
         self.processed_pathway = None
         self.current_pathway_doc = None
         self.controller = None  # Set via set_controller()
+        self.model_canvas = None  # Set via set_model_canvas()
         
         # Workflow flags
         self._import_button_flow = False
@@ -260,8 +261,11 @@ class SBMLCategory(BasePathwayCategory):
     
     def _build_preview_section(self) -> Gtk.Widget:
         """Build preview section with metadata tree view."""
-        expander = Gtk.Expander(label="SBML Metadata Inspector")
-        expander.set_expanded(False)
+        self.metadata_expander = Gtk.Expander(label="SBML Metadata Inspector")
+        self.metadata_expander.set_expanded(False)
+        
+        # Connect to expansion event - populate metadata when user expands
+        self.metadata_expander.connect("notify::expanded", self._on_metadata_expander_toggled)
         
         # Main container with notebook for tabs
         notebook = Gtk.Notebook()
@@ -336,8 +340,8 @@ class SBMLCategory(BasePathwayCategory):
         text_scroll.add(self.preview_text)
         notebook.append_page(text_scroll, Gtk.Label(label="📄 Summary"))
         
-        expander.add(notebook)
-        return expander
+        self.metadata_expander.add(notebook)
+        return self.metadata_expander
     
     def _build_thermodynamic_section(self) -> Gtk.Widget:
         """Build thermodynamic validation results section.
@@ -841,7 +845,12 @@ class SBMLCategory(BasePathwayCategory):
         
         if self.local_radio.get_active():
             # Local mode - check if file exists
-            self.import_button.set_sensitive(bool(text and os.path.exists(text)))
+            file_exists = bool(text and os.path.exists(text))
+            self.import_button.set_sensitive(file_exists)
+            
+            # Auto-parse and preview SBML file when valid file is selected
+            if file_exists:
+                self._parse_and_preview_sbml(text)
         else:
             # BioModels mode - check if ID is not empty
             self.import_button.set_sensitive(len(text) > 0)
@@ -891,6 +900,65 @@ class SBMLCategory(BasePathwayCategory):
         if filepath:
             self.file_entry.set_text(filepath)
     
+    def _parse_and_preview_sbml(self, filepath):
+        """Parse SBML file and show preview in metadata inspector.
+        
+        This provides immediate feedback when browsing files before import.
+        Populates BOTH the text preview AND the metadata table.
+        
+        Args:
+            filepath: Path to SBML file to parse
+        """
+        if not self.parser:
+            self.logger.warning("SBML parser not available for preview")
+            return
+        
+        def parse_in_thread():
+            try:
+                self.logger.info(f"Parsing SBML for preview: {filepath}")
+                
+                # Parse SBML file using parse_file (not parse)
+                parsed_pathway = self.parser.parse_file(filepath)
+                
+                if parsed_pathway:
+                    # Store for later use in import
+                    self.current_filepath = filepath
+                    self.parsed_pathway = parsed_pathway
+                    
+                    # Update BOTH preview text AND metadata table on main thread
+                    from gi.repository import GLib
+                    GLib.idle_add(self._update_preview, parsed_pathway)
+                    GLib.idle_add(self._update_metadata_tree, parsed_pathway)
+                    
+                    # Metadata will be visible when user expands the inspector
+                    
+                    self.logger.info("✅ SBML preview and metadata table updated")
+                else:
+                    GLib.idle_add(self._show_parse_error, "Failed to parse SBML file")
+                    
+            except Exception as e:
+                self.logger.error(f"Error parsing SBML for preview: {e}")
+                import traceback
+                traceback.print_exc()
+                from gi.repository import GLib
+                GLib.idle_add(self._show_parse_error, str(e))
+        
+        # Parse in background thread to avoid UI freeze
+        import threading
+        thread = threading.Thread(target=parse_in_thread, daemon=True)
+        thread.start()
+    
+    def _show_parse_error(self, error_msg):
+        """Show parse error in metadata inspector.
+        
+        Args:
+            error_msg: Error message to display
+        """
+        self.metadata_store.clear()
+        buffer = self.preview_text.get_buffer()
+        buffer.set_text(f"⚠️ Error parsing SBML file:\\n\\n{error_msg}")
+        return False  # Don't repeat
+    
     def _update_ui_for_project_state(self):
         """Update UI based on project availability.
         
@@ -928,7 +996,7 @@ class SBMLCategory(BasePathwayCategory):
         """
         if not self.project:
             self._show_error(
-                "No project available. Please open or create a project first:\n"
+                "No project open. Please open or create a project first:\n"
                 "File → New Project or File → Open Project"
             )
             return
@@ -959,15 +1027,30 @@ class SBMLCategory(BasePathwayCategory):
     def _process_sbml_file(self, filepath: str):
         """Process a local SBML file in background thread.
         
+        Workflow:
+        1. Reuse cached parse if available (from preview)
+        2. Otherwise parse SBML → PathwayData
+        3. Post-process (layout, colors)
+        4. Convert to Petri net
+        5. Save to project
+        6. Load to canvas
+        
         Args:
             filepath: Path to SBML file
         """
         def parse_and_convert():
             try:
-                self.logger.info(f"Parsing SBML file: {filepath}")
-                
-                # 1. Parse SBML → PathwayData
-                parsed_pathway = self.parser.parse_file(filepath)
+                # 1. Parse SBML → PathwayData (reuse cached if available)
+                if (self.parsed_pathway and 
+                    self.current_filepath == filepath and
+                    not getattr(self.parsed_pathway, 'metadata', {}).get('modified', False)):
+                    # Reuse cached parse from preview
+                    self.logger.info(f"Reusing cached parse for: {filepath}")
+                    parsed_pathway = self.parsed_pathway
+                else:
+                    # Parse fresh (file changed or was edited)
+                    self.logger.info(f"Parsing SBML file: {filepath}")
+                    parsed_pathway = self.parser.parse_file(filepath)
                 
                 # 1.5. Check for stochastic compatibility warnings and show dialog
                 # Must be done on main thread (GTK requirement), so queue it
@@ -1271,28 +1354,16 @@ class SBMLCategory(BasePathwayCategory):
             # Load the saved model into canvas automatically (same as KEGG import)
             self.logger.info("=== Starting SBML canvas auto-load ===")
             
-            # Detect if we have a loader or direct manager
-            canvas_loader = None
-            canvas_manager = None
+            # Use normalized method to get canvas loader
+            canvas_loader = self._get_canvas_loader()
+            canvas_manager = self._get_canvas_manager()
             
-            # DEFENSIVE: Check model_canvas exists and is valid
-            if self.model_canvas is None:
-                self.logger.warning("model_canvas is None, cannot auto-load to canvas")
-            elif hasattr(self.model_canvas, 'get_current_model'):
-                # It's a loader - get reference and current manager
-                canvas_loader = self.model_canvas
-                try:
-                    canvas_manager = canvas_loader.get_current_model()
-                    self.logger.info(f"Detected canvas loader, current manager={canvas_manager is not None}")
-                except Exception as e:
-                    self.logger.error(f"Error getting current model: {e}")
-                    canvas_manager = None
-            elif hasattr(self.model_canvas, 'places'):
-                # It's already a manager
-                canvas_manager = self.model_canvas
-                self.logger.info("Direct canvas manager provided")
+            if self.model_canvas:
+                self.logger.info(f"model_canvas type: {type(self.model_canvas).__name__}")
+                self.logger.info(f"canvas_loader available: {canvas_loader is not None}")
+                self.logger.info(f"canvas_manager available: {canvas_manager is not None}")
             else:
-                self.logger.warning(f"model_canvas has unexpected type: {type(self.model_canvas)}")
+                self.logger.error("model_canvas is None! Cannot auto-load to canvas")
             
             self.logger.info(f"Auto-load check: model_canvas={self.model_canvas is not None}, "
                            f"canvas_loader={canvas_loader is not None}, "
@@ -1302,48 +1373,46 @@ class SBMLCategory(BasePathwayCategory):
             
             # For auto-load, we need the canvas_loader to create a new tab
             if canvas_loader and document_model and saved_filepath:
-                # PERFORMANCE FIX: Defer canvas loading to prevent UI freeze
-                # Canvas operations (creating tab, loading objects, fitting) are heavy
-                # and block the UI if done synchronously. By using GLib.idle_add,
-                # we allow the GTK event loop to process other events between steps.
-                
-                def do_canvas_load():
-                    """Deferred canvas loading to keep UI responsive."""
+                # Auto-load synchronously (like KEGG) for reliability
+                try:
+                    self.logger.info("✓ Auto-loading imported model into new canvas tab...")
+                    
+                    # Get base name for tab
+                    base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                    self.logger.info(f"Loading model: {base_name}")
+                    
+                    # UNIFIED APPROACH: Always create fresh canvas via add_document()
+                    # This ensures IDENTICAL initialization to File→New and File→Open:
+                    # - Fresh ModelCanvasManager
+                    # - Proper controller wiring
+                    # - Report Panel creation and registration
+                    # - Callback setup
+                    # Benefits: No reuse logic complexity, consistent behavior, no stale state
+                    self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
+                    
                     try:
-                        self.logger.info("✓ Auto-loading imported model into new canvas tab...")
-                        
-                        # Get base name for tab
-                        base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
-                        self.logger.info(f"Loading model: {base_name}")
-                        
-                        # UNIFIED APPROACH: Always create fresh canvas via add_document()
-                        # This ensures IDENTICAL initialization to File→New and File→Open:
-                        # - Fresh ModelCanvasManager
-                        # - Proper controller wiring
-                        # - Report Panel creation and registration
-                        # - Callback setup
-                        # Benefits: No reuse logic complexity, consistent behavior, no stale state
-                        self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
-                        
-                        # DEFENSIVE: Wrap canvas operations in try-except to catch errors
-                        try:
-                            page_index, drawing_area = canvas_loader.add_document(filename=base_name)
-                        except Exception as e:
-                            raise ValueError(f"Failed to create new canvas tab: {e}")
+                        # CRITICAL: Create canvas with temporary filename to avoid loading
+                        # stale view state from previous imports of same model
+                        page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
+                        self.logger.info(f"[SBML AUTO-LOAD] Step 1: add_document() returned page_index={page_index}, drawing_area={id(drawing_area) if drawing_area else 'None'}")
                         
                         if drawing_area is None:
                             raise ValueError("add_document() returned None for drawing_area")
                         
-                        try:
-                            canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
-                        except Exception as e:
-                            raise ValueError(f"Failed to get canvas manager: {e}")
+                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                        self.logger.info(f"[SBML AUTO-LOAD] Step 2: get_canvas_manager() returned canvas_manager={canvas_manager is not None} (type={type(canvas_manager).__name__ if canvas_manager else 'None'})")
                         
                         if not canvas_manager:
                             raise ValueError("get_canvas_manager() returned None")
                     
+                        # CRITICAL: Set filepath FIRST before load_objects
+                        # This ensures the correct filename is used for any auto-save operations
+                        self.logger.info(f"[SBML AUTO-LOAD] Step 3: Setting filepath to {saved_filepath}")
+                        canvas_manager.set_filepath(saved_filepath)
+                        
                         # ===== UNIFIED OBJECT LOADING =====
                         # Use load_objects() for consistent initialization (same as File → Open)
+                        self.logger.info(f"[SBML AUTO-LOAD] Step 4: Loading objects (places={len(document_model.places)}, transitions={len(document_model.transitions)}, arcs={len(document_model.arcs)})")
                         try:
                             canvas_manager.load_objects(
                                 places=document_model.places,
@@ -1351,8 +1420,17 @@ class SBMLCategory(BasePathwayCategory):
                                 arcs=document_model.arcs,
                                 modules=document_model.modules
                             )
+                            self.logger.info(f"[SBML AUTO-LOAD] Step 5: load_objects() completed successfully")
                         except Exception as e:
                             raise ValueError(f"Failed to load objects to canvas: {e}")
+                        
+                        # CRITICAL: Copy metadata to canvas manager's document
+                        # This ensures metadata is available for tab-switch and metadata inspector
+                        if hasattr(canvas_manager, 'document') and hasattr(document_model, 'metadata'):
+                            # Copy metadata keys individually (document.metadata is a property)
+                            for key, value in document_model.metadata.items():
+                                canvas_manager.document.metadata[key] = value
+                            self.logger.info(f"Copied metadata to canvas document ({len(document_model.metadata)} keys)")
                         
                         # CRITICAL: Set change callback for proper state management
                         if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
@@ -1365,12 +1443,17 @@ class SBMLCategory(BasePathwayCategory):
                         else:
                             self.logger.warning("document_controller not available for change callback")
                         
-                        # Set filepath and mark as clean (just imported/saved)
-                        canvas_manager.set_filepath(saved_filepath)
+                        # Mark as clean (just imported/saved)
                         canvas_manager.mark_clean()
                         
                         # Mark as imported
                         canvas_manager.mark_as_imported(base_name)
+                        
+                        # CRITICAL: Ensure callbacks are enabled before display
+                        # (Should already be False from setup, but verify)
+                        if hasattr(canvas_manager, '_suppress_callbacks'):
+                            canvas_manager._suppress_callbacks = False
+                            self.logger.info(f"Callbacks enabled: _suppress_callbacks={canvas_manager._suppress_callbacks}")
                         
                         # Fit to page to show entire model (with padding)
                         canvas_manager.fit_to_page(
@@ -1409,6 +1492,31 @@ class SBMLCategory(BasePathwayCategory):
                                                 if hasattr(report_panel_loader.panel, 'set_controller'):
                                                     report_panel_loader.panel.set_controller(simulation_controller)
                                                     self.logger.info("✅ Report Panel controller set")
+                                                
+                                                # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
+                                                # Determine metadata path based on project structure
+                                                if self.project and hasattr(self.project, 'get_metadata_dir'):
+                                                    metadata_dir = self.project.get_metadata_dir()
+                                                    if metadata_dir:
+                                                        # Look for metadata in project/metadata/ directory
+                                                        import os
+                                                        model_filename = f"{base_name}.shypn"
+                                                        shypn_path = os.path.join(metadata_dir, model_filename)
+                                                    else:
+                                                        # Fallback: look alongside model file
+                                                        shypn_path = saved_filepath.replace('.shy', '.shypn')
+                                                else:
+                                                    # No project context: look alongside model file
+                                                    shypn_path = saved_filepath.replace('.shy', '.shypn')
+                                                
+                                                if hasattr(report_panel_loader.panel, 'on_file_opened'):
+                                                    report_panel_loader.panel.on_file_opened(shypn_path)
+                                                    self.logger.info(f"✅ Metadata loaded from: {shypn_path}")
+                                                
+                                                # CRITICAL: Refresh SBML metadata inspector for imported model
+                                                # This ensures the metadata tree is populated after import
+                                                self.refresh_metadata_inspector()
+                                                self.logger.info("✅ SBML Metadata Inspector refreshed after import")
                                                 
                                                 # Set controller on SBML category for thermodynamic validation
                                                 self.set_controller(simulation_controller)
@@ -1457,7 +1565,7 @@ class SBMLCategory(BasePathwayCategory):
                             f"✅ Model loaded to canvas: {base_name}\n"
                             f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
                         )
-                        
+                    
                     except Exception as load_error:
                         self.logger.error(f"=== SBML canvas auto-load FAILED ===")
                         self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
@@ -1465,22 +1573,21 @@ class SBMLCategory(BasePathwayCategory):
                         traceback.print_exc()
                         # Show fallback message
                         self._show_status(
-                            f"✅ Model saved to {saved_filepath}\n"
-                            f"⚠️ Auto-load failed, use File → Open to load manually\n"
-                            f"💡 Use View → Fit to Page (Ctrl+0) to see the entire model"
+                            f"✅ Model saved successfully:\n{saved_filepath}\n\n"
+                            f"💡 Open from the file browser on the left to view the model"
                         )
-                    
-                    return False  # Don't repeat GLib.idle_add
                 
-                # Schedule canvas loading on idle to prevent UI freeze
-                GLib.idle_add(do_canvas_load)
+                except Exception as outer_error:
+                    self.logger.error(f"Outer error during SBML import auto-load: {outer_error}")
+                    import traceback
+                    traceback.print_exc()
             else:
                 # No canvas loader available - this is expected if panel not connected to canvas
                 reason = "model_canvas is None" if not self.model_canvas else "canvas_loader not detected"
                 self.logger.info(f"Canvas auto-load skipped: {reason}")
                 self._show_status(
                     f"✅ Model saved successfully:\n{saved_filepath}\n\n"
-                    f"💡 Open the model: File → Open or double-click in file explorer",
+                    f"💡 Open from the file browser on the left to view the model",
                     error=False
                 )
             
@@ -1709,6 +1816,34 @@ class SBMLCategory(BasePathwayCategory):
             doc_model.metadata['source'] = 'sbml_import'
             doc_model.metadata['original_file'] = filename
             doc_model.metadata['requires_fit_to_page'] = True  # Signal to auto-fit on load
+            
+            # CRITICAL: Save PathwayData for metadata inspector
+            # Store serialized pathway data in metadata so it can be loaded later
+            if parsed_pathway:
+                try:
+                    # Serialize the essential pathway data for the metadata inspector
+                    pathway_dict = {
+                        'name': getattr(parsed_pathway, 'name', base_name),
+                        'organism': getattr(parsed_pathway, 'organism', 'Unknown'),
+                        'species_count': len(getattr(parsed_pathway, 'species', [])),
+                        'reactions_count': len(getattr(parsed_pathway, 'reactions', [])),
+                        'parameters': getattr(parsed_pathway, 'parameters', {}),
+                        'constants': list(getattr(parsed_pathway, 'constants', set())),
+                        'compartments_enhanced': {
+                            comp_id: {
+                                'id': comp.id,
+                                'name': comp.name,
+                                'size': comp.size
+                            }
+                            for comp_id, comp in getattr(parsed_pathway, 'compartments_enhanced', {}).items()
+                        } if hasattr(parsed_pathway, 'compartments_enhanced') else {},
+                        'events_count': len(getattr(parsed_pathway, 'events', [])),
+                        'metadata': getattr(parsed_pathway, 'metadata', {})
+                    }
+                    doc_model.metadata['sbml_pathway_data'] = pathway_dict
+                    self.logger.info(f"Saved PathwayData to metadata: {len(pathway_dict)} keys")
+                except Exception as e:
+                    self.logger.warning(f"Could not serialize PathwayData: {e}")
             
             doc_model.save_to_file(model_filepath)
             self.logger.info(f"Model saved successfully to: {model_filepath}")
@@ -2187,8 +2322,8 @@ class SBMLCategory(BasePathwayCategory):
                         "", "No function definitions", "", "", "", ""
                     ])
                 
-                # Expand top level
-                self.metadata_tree.expand_row(Gtk.TreePath.new_first(), False)
+                # Expand all tree rows to show the metadata
+                self.metadata_tree.expand_all()
                 
             except Exception as e:
                 self.logger.error(f"Error updating metadata tree: {e}", exc_info=True)
@@ -2396,48 +2531,272 @@ class SBMLCategory(BasePathwayCategory):
         self.controller = controller
         self.logger.debug(f"Controller set for thermodynamic validation")
     
+    def set_model_canvas(self, model_canvas):
+        """Set model canvas (called by PathwayOperationsPanel).
+        
+        Note: Metadata inspector refresh is deferred until user expands it.
+        
+        Args:
+            model_canvas: ModelCanvas instance (should be ModelCanvasLoader)
+        """
+        self.model_canvas = model_canvas
+        self.logger.debug(f"Model canvas set: {model_canvas}")
+    
+    def _on_metadata_expander_toggled(self, expander, param):
+        """Called when user expands/collapses the metadata inspector.
+        Populates metadata only when expanded to avoid cascade issues.
+        
+        Args:
+            expander: The Gtk.Expander widget
+            param: The parameter (notify signal)
+        """
+        if expander.get_expanded():
+            self.refresh_metadata_inspector()
+    
     def on_tab_switched(self):
         """Called when the user switches to a different model tab.
+        
+        Note: Metadata inspector refresh is deferred until user expands it.
         
         Updates the SBML panel to reflect the currently active model:
         - Refreshes button states
         - Updates status labels
-        - Clears old pathway info if model changed
         """
         self.logger.debug("Tab switched, updating SBML panel state")
-        
-        # Get current document
+    
+    def refresh_metadata_inspector(self):
+        """Refresh SBML Metadata Inspector for the currently active document.
+        This method is called when the user expands the metadata inspector.
+        It populates the metadata tree and summary from the current document.
+        """
+        # Get current document using normalized method
         document = None
-        if self.model_canvas:
-            try:
-                if hasattr(self.model_canvas, 'get_current_model'):
-                    canvas_manager = self.model_canvas.get_current_model()
-                else:
-                    canvas_manager = self.model_canvas
-                
-                if canvas_manager and hasattr(canvas_manager, 'document'):
-                    document = canvas_manager.document
-            except Exception as e:
-                self.logger.warning(f"Could not get document on tab switch: {e}")
+        canvas_manager = self._get_canvas_manager()
         
-        # Update buttons based on new active model
+        if canvas_manager:
+            try:
+                # Always use _document_model (document property returns self)
+                if hasattr(canvas_manager, '_document_model'):
+                    document = canvas_manager._document_model
+            except Exception as e:
+                self.logger.warning(f"Could not get document for metadata refresh: {e}")
+        
+        # Update buttons and metadata based on active document
         if document:
             # Check if SBML model
             is_sbml = False
             if hasattr(document, 'metadata') and document.metadata:
-                is_sbml = document.metadata.get('data_source') == 'sbml_import'
+                is_sbml = (document.metadata.get('source') == 'sbml_import' or 
+                          document.metadata.get('data_source') == 'sbml_import')
             
             if is_sbml:
                 self.status_label.set_text("SBML model loaded")
+                
+                # CRITICAL: Load PathwayData from metadata if available
+                self._load_pathway_data_from_metadata(document)
+                self.logger.debug(f"Metadata inspector refreshed for SBML document: {document.metadata.get('original_file', 'unknown')}")
             else:
                 self.status_label.set_markup(
                     '<span size="small">Not an SBML model</span>'
                 )
+                # Clear metadata tree for non-SBML models
+                self.metadata_store.clear()
+                buffer = self.preview_text.get_buffer()
+                buffer.set_text("No SBML model loaded.\n\nImport an SBML model to see metadata.")
         else:
             # No document - disable buttons
             self.status_label.set_markup(
                 '<span size="small">No model loaded</span>'
             )
+            # Clear metadata tree
+            self.metadata_store.clear()
+            buffer = self.preview_text.get_buffer()
+            buffer.set_text("No model loaded.")
+    
+    def _load_pathway_data_from_metadata(self, document):
+        """Load and display PathwayData from document metadata.
+        
+        When an SBML model is loaded from disk, restore the pathway data
+        that was saved during import to populate the metadata inspector.
+        
+        Args:
+            document: DocumentModel with metadata containing sbml_pathway_data
+        """
+        if not hasattr(document, 'metadata') or not document.metadata:
+            return
+        
+        pathway_dict = document.metadata.get('sbml_pathway_data')
+        if not pathway_dict:
+            return
+        
+        self.logger.info("Loading PathwayData from metadata for SBML Metadata Inspector")
+        
+        try:
+            # Reconstruct a minimal PathwayData-like object for the inspector
+            # We don't need full species/reactions lists, just summary info
+            class PathwayDataStub:
+                def __init__(self, data_dict):
+                    self.name = data_dict.get('name', 'Unnamed')
+                    self.organism = data_dict.get('organism', 'Unknown')
+                    self.parameters = data_dict.get('parameters', {})
+                    self.constants = set(data_dict.get('constants', []))
+                    self.metadata = data_dict.get('metadata', {})
+                    
+                    # Reconstruct compartments
+                    self.compartments_enhanced = {}
+                    comps_dict = data_dict.get('compartments_enhanced', {})
+                    for comp_id, comp_data in comps_dict.items():
+                        comp_stub = type('Compartment', (), {})()
+                        comp_stub.id = comp_data.get('id', comp_id)
+                        comp_stub.name = comp_data.get('name', comp_id)
+                        comp_stub.size = comp_data.get('size', 1.0)
+                        self.compartments_enhanced[comp_id] = comp_stub
+                    
+                    # Empty lists for species/reactions/events (we only have counts)
+                    self.species = []
+                    self.reactions = []
+                    self.events = []
+                    
+                    # Add counts to metadata
+                    self.species_count = data_dict.get('species_count', 0)
+                    self.reactions_count = data_dict.get('reactions_count', 0)
+                    self.events_count = data_dict.get('events_count', 0)
+            
+            pathway_stub = PathwayDataStub(pathway_dict)
+            
+            # Update the metadata tree view
+            self._update_metadata_tree_from_stub(pathway_stub)
+            
+            # Update preview text
+            preview_lines = [
+                f"=== MODEL INFO ===",
+                f"Name: {pathway_stub.name}",
+                f"Organism: {pathway_stub.organism}",
+                f"",
+                f"=== STATISTICS ===",
+                f"Species: {pathway_stub.species_count}",
+                f"Reactions: {pathway_stub.reactions_count}",
+                f"Parameters: {len(pathway_stub.parameters)}",
+                f"Compartments: {len(pathway_stub.compartments_enhanced)}",
+                f"Events: {pathway_stub.events_count}",
+                f"",
+                f"=== SOURCE ===",
+                f"Type: SBML Import",
+                f"Original File: {document.metadata.get('original_file', 'Unknown')}",
+            ]
+            
+            def update_preview():
+                buffer = self.preview_text.get_buffer()
+                buffer.set_text("\n".join(preview_lines))
+                return False
+            
+            from gi.repository import GLib
+            GLib.idle_add(update_preview)
+            
+            self.logger.info(f"✅ SBML Metadata Inspector populated from saved data")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load PathwayData from metadata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _update_metadata_tree_from_stub(self, pathway_stub):
+        """Update metadata tree with limited PathwayData from disk.
+        
+        Similar to _update_metadata_tree but works with stub data from metadata.
+        
+        Args:
+            pathway_stub: PathwayDataStub with limited data
+        """
+        def do_update():
+            try:
+                self.metadata_store.clear()
+                
+                # Global Constants section
+                constants_dict = {k: v for k, v in pathway_stub.parameters.items() 
+                                 if k in pathway_stub.constants}
+                if constants_dict:
+                    constants_root = self.metadata_store.append(None, [
+                        "🔒", "Global Constants", f"{len(constants_dict)} items",
+                        "section", "", "Read-only global parameters"
+                    ])
+                    for param_id, param_value in constants_dict.items():
+                        self.metadata_store.append(constants_root, [
+                            "🔒", param_id, str(param_value), "constant",
+                            param_id, f"Constant: {param_id} = {param_value} (read-only)"
+                        ])
+                
+                # Global Variables section
+                variables_dict = {k: v for k, v in pathway_stub.parameters.items() 
+                                 if k not in pathway_stub.constants}
+                if variables_dict:
+                    variables_root = self.metadata_store.append(None, [
+                        "📊", "Global Variables", f"{len(variables_dict)} items",
+                        "section", "", "Editable global parameters"
+                    ])
+                    for param_id, param_value in variables_dict.items():
+                        self.metadata_store.append(variables_root, [
+                            "🌐", param_id, str(param_value), "parameter",
+                            param_id, f"Variable: {param_id} = {param_value}"
+                        ])
+                
+                # Compartments section
+                comps = pathway_stub.compartments_enhanced
+                comps_root = self.metadata_store.append(None, [
+                    "🔷", "Compartments", f"{len(comps)} items",
+                    "section", "", "Cellular compartments with volumes"
+                ])
+                for comp_id, comp in comps.items():
+                    self.metadata_store.append(comps_root, [
+                        "🔷", comp.name, f"{comp.size} L",
+                        "compartment", comp_id,
+                        f"Compartment: {comp.name}, Volume: {comp.size} L"
+                    ])
+                
+                # Species section (counts only, no detail)
+                species_root = self.metadata_store.append(None, [
+                    "🔵", "Species", f"{pathway_stub.species_count} items",
+                    "section", "", "Metabolites and compounds (summary only - see Report Panel for details)"
+                ])
+                self.metadata_store.append(species_root, [
+                    "", "(Data not available - file was loaded from disk)", "", "", "", 
+                    "Full species details only available during import. See Report Panel → Models category."
+                ])
+                
+                # Reactions section (counts only, no detail)
+                reactions_root = self.metadata_store.append(None, [
+                    "🔶", "Reactions", f"{pathway_stub.reactions_count} items",
+                    "section", "", "Biochemical reactions (summary only - see Report Panel for details)"
+                ])
+                self.metadata_store.append(reactions_root, [
+                    "", "(Data not available - file was loaded from disk)", "", "", "",
+                    "Full reaction details only available during import. See Report Panel → Models category."
+                ])
+                
+                # Events section (counts only, no detail)
+                events_root = self.metadata_store.append(None, [
+                    "⚡", "Events", f"{pathway_stub.events_count} items",
+                    "section", "", "Time/state-triggered perturbations"
+                ])
+                if pathway_stub.events_count == 0:
+                    self.metadata_store.append(events_root, [
+                        "", "No events", "", "", "", ""
+                    ])
+                else:
+                    self.metadata_store.append(events_root, [
+                        "", "(Data not available - file was loaded from disk)", "", "", "",
+                        "Event details only available during import."
+                    ])
+                
+            except Exception as e:
+                self.logger.error(f"Error updating metadata tree from stub: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            return False  # Don't repeat
+        
+        from gi.repository import GLib
+        GLib.idle_add(do_update)
     
     def _show_stochastic_warning_dialog(self, warnings):
         """Show dialog warning about stochastic incompatibility with user choices.

@@ -1458,7 +1458,10 @@ class BaseTopologyCategory:
         
         # Notify report panel that analyses have been updated
         if self.parent_panel:
+            print(f"[BASE_TOPOLOGY] Calling notify_report_panel(), analyzed={len(analyzed_set)}/{total_analyzers}")
             self.parent_panel.notify_report_panel()
+        else:
+            print(f"[BASE_TOPOLOGY] No parent_panel to notify!")
     
     def auto_run_all_analyzers(self):
         """Auto-run SAFE analyzers in background without requiring user expansion.

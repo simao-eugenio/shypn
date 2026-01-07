@@ -20,7 +20,7 @@ from pathlib import Path
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk, Gdk, GLib
 except Exception as e:
     print('ERROR: GTK3 not available in file_panel loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -680,6 +680,7 @@ class FilePanelLoader:
         if self.window is None:
             pass
             self.window = Gtk.Window()
+            self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
             self.window.set_title('Files')
             self.window.set_default_size(300, 600)
             self.window.connect('delete-event', self._on_delete_event)
@@ -707,8 +708,9 @@ class FilePanelLoader:
         if callable(self.on_float_callback):
             self.on_float_callback()
         
-        # Show window
+        # Show window and bring to front
         self.window.show_all()
+        self.window.present()
     
     def hang_on(self, container):
         """Attach panel back to container."""
@@ -1037,14 +1039,17 @@ class FilePanelLoader:
             self.file_explorer.set_project(project)
         
         # Update canvas loader so all managers save to correct project paths
+        # This also propagates to the active pathway panel
         if self.model_canvas:
             pass
             self.model_canvas.set_project(project)
         
-        # Notify pathway panel about project (so import controllers can save to it)
-        if self.pathway_panel_loader:
-            pass
-            self.pathway_panel_loader.set_project(project)
+        # DEPRECATED: Direct pathway panel propagation removed
+        # Pathway panel is now per-document, so model_canvas.set_project()
+        # handles propagation to the active document's pathway panel
+        # if self.pathway_panel_loader:
+        #     pass
+        #     self.pathway_panel_loader.set_project(project)
     
     def _on_project_created_from_file_panel(self, project):
         """Handle project creation from file panel inline edit.

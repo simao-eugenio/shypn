@@ -114,3 +114,21 @@ class ThermodynamicsCategory(BasePathwayCategory):
             self.mapping_section.save_to_document()
             self.validation_section.save_to_document()
             self.logger.info("Thermodynamic settings saved to document")
+    
+    def set_simulation_controller(self, controller):
+        """Set simulation controller for validation section.
+        
+        Args:
+            controller: SimulationController instance
+        """
+        self.validation_section.set_simulation_controller(controller)
+        self.logger.info(f"Simulation controller set on THERMODYNAMICS category: {controller}")
+    
+    def set_report_panel_refresh_callback(self, callback):
+        """Set callback to refresh Report Panel after validation.
+        
+        Args:
+            callback: Function to call when validation completes
+        """
+        self.validation_section.set_report_panel_refresh_callback(callback)
+        self.logger.info("Report panel refresh callback set on THERMODYNAMICS category")

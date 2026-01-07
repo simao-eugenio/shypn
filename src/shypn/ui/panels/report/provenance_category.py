@@ -118,13 +118,24 @@ class ProvenanceCategory(BaseReportCategory):
         """Refresh provenance data with summary."""
         self.pathways_store.clear()
         
-        if not self.project or not hasattr(self.project, 'pathways'):
-            self.summary_label.set_text("No project loaded")
-            self.pipeline_buffer.set_text("No project loaded")
+        if not self.project:
+            self.summary_label.set_text("⚠️ No project loaded\n\nCannot retrieve provenance data without an active project.")
+            self.pipeline_buffer.set_text("No project loaded - provenance data unavailable")
+            return
+        
+        if not hasattr(self.project, 'pathways'):
+            self.summary_label.set_text("⚠️ Project has no pathway manager\n\nProject structure may be incomplete.")
+            self.pipeline_buffer.set_text("Project pathway manager not available")
             return
         
         # Get pathways
         pathways = self.project.pathways.list_pathways()
+        
+        if not pathways:
+            # No pathways imported yet - valid state for manual models
+            self.summary_label.set_text("✓ No imported pathways\n\nThis is normal for manually created models.")
+            self.pipeline_buffer.set_text("No pathway imports recorded.\n\nModels can be created manually without importing from KEGG/SBML.")
+            return
         
         # Build summary
         kegg_count = len([p for p in pathways if p.source_type == 'kegg'])
@@ -132,8 +143,10 @@ class ProvenanceCategory(BaseReportCategory):
         converted_count = len([p for p in pathways if p.model_id])
         enriched_count = len([p for p in pathways if p.enrichments])
         
-        summary = f"Total Pathways: {len(pathways)}\n"
-        summary += f"  KEGG: {kegg_count}, SBML: {sbml_count}\n"
+        summary = f"✓ Data Retrieved Successfully\n\n"
+        summary += f"Total Pathways: {len(pathways)}\n"
+        summary += f"  • KEGG: {kegg_count}\n"
+        summary += f"  • SBML: {sbml_count}\n"
         summary += f"Converted to Models: {converted_count}\n"
         summary += f"Enriched: {enriched_count}"
         

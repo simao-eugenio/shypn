@@ -1180,6 +1180,47 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.data_collector:
             self.data_collector.clear()
         
+        # CRITICAL: Clear all six Dynamic Analysis plot canvases on reset
+        # This ensures plots are blanked when simulation is reset
+        if hasattr(self, 'model_canvas_loader') and self.model_canvas_loader:
+            # Get the current document's analyses panel loader
+            drawing_area = self.model_canvas_loader.get_current_drawing_area()
+            if drawing_area and drawing_area in self.model_canvas_loader.overlay_managers:
+                overlay_manager = self.model_canvas_loader.overlay_managers[drawing_area]
+                if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+                    analyses_panel = overlay_manager.analyses_panel_loader.panel
+                    if analyses_panel:
+                        # Clear Transitions panel
+                        if hasattr(analyses_panel, 'transitions_category') and analyses_panel.transitions_category:
+                            trans_panel = analyses_panel.transitions_category.panel
+                            if trans_panel and hasattr(trans_panel, '_show_empty_state'):
+                                trans_panel.selected_objects.clear()
+                                trans_panel.last_data_length.clear()
+                                trans_panel._plot_lines.clear()
+                                trans_panel._show_empty_state()
+                        
+                        # Clear Places panel
+                        if hasattr(analyses_panel, 'places_category') and analyses_panel.places_category:
+                            places_panel = analyses_panel.places_category.panel
+                            if places_panel and hasattr(places_panel, '_show_empty_state'):
+                                places_panel.selected_objects.clear()
+                                places_panel.last_data_length.clear()
+                                places_panel._plot_lines.clear()
+                                places_panel._show_empty_state()
+                        
+                        # Clear Plotting category (Time Series, Histogram, Scatter, Phase)
+                        if hasattr(analyses_panel, 'plotting_category') and analyses_panel.plotting_category:
+                            plotting_cat = analyses_panel.plotting_category
+                            # Clear all 4 plot types
+                            if hasattr(plotting_cat, 'timeseries_plot') and plotting_cat.timeseries_plot:
+                                plotting_cat.timeseries_plot.clear_plot()
+                            if hasattr(plotting_cat, 'histogram_plot') and plotting_cat.histogram_plot:
+                                plotting_cat.histogram_plot.clear_plot()
+                            if hasattr(plotting_cat, 'scatter_plot') and plotting_cat.scatter_plot:
+                                plotting_cat.scatter_plot.clear_plot()
+                            if hasattr(plotting_cat, 'phase_plot') and plotting_cat.phase_plot:
+                                plotting_cat.phase_plot.clear_plot()
+        
         self.emit('reset-executed')
         self._update_progress_display()  # Reset progress bar
         
@@ -1423,12 +1464,20 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Data rows
                 for i, t in enumerate(time_points):
                     row = [t]
-                    # Add place values
+                    # Add place values - extract value from (time, tokens) tuples
                     for obj_id in sorted(place_data.keys()):
-                        row.append(place_data[obj_id][i] if i < len(place_data[obj_id]) else '')
-                    # Add transition values
+                        if i < len(place_data[obj_id]):
+                            _, tokens = place_data[obj_id][i]  # Extract tokens from tuple
+                            row.append(tokens)
+                        else:
+                            row.append('')
+                    # Add transition values - extract value from (time, count) tuples
                     for obj_id in sorted(transition_data.keys()):
-                        row.append(transition_data[obj_id][i] if i < len(transition_data[obj_id]) else '')
+                        if i < len(transition_data[obj_id]):
+                            _, count = transition_data[obj_id][i]  # Extract count from tuple
+                            row.append(count)
+                        else:
+                            row.append('')
                     writer.writerow(row)
             csv_count += 1
         
@@ -1449,9 +1498,15 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Collect trajectories from all replicates
                 for result in successful_results:
                     if obj_id in result.get('place_data', {}):
-                        obj_trajectories.append(result['place_data'][obj_id])
+                        # Extract just the values from (time, tokens) tuples
+                        traj_tuples = result['place_data'][obj_id]
+                        traj_values = [tokens for time, tokens in traj_tuples]
+                        obj_trajectories.append(traj_values)
                     elif obj_id in result.get('transition_data', {}):
-                        obj_trajectories.append(result['transition_data'][obj_id])
+                        # Extract just the values from (time, count) tuples
+                        traj_tuples = result['transition_data'][obj_id]
+                        traj_values = [count for time, count in traj_tuples]
+                        obj_trajectories.append(traj_values)
                 
                 if obj_trajectories:
                     # Filter out empty trajectories

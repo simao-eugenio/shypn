@@ -52,7 +52,33 @@ class DynamicAnalysesPanel(Gtk.Box):
         self._build_ui()
     
     def _build_ui(self):
-        """Build panel UI with scrolled window and categories."""
+        """Build panel UI with header and scrolled categories."""
+        # Header with title and float button
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        header_box.set_margin_top(8)
+        header_box.set_margin_bottom(8)
+        header_box.set_margin_start(12)
+        header_box.set_margin_end(12)
+        
+        title_label = Gtk.Label()
+        title_label.set_markup('<b>DYNAMIC ANALYSES</b>')
+        title_label.set_halign(Gtk.Align.START)
+        header_box.pack_start(title_label, True, True, 0)
+        
+        # Float button on the right (icon only)
+        self.float_button = Gtk.ToggleButton()
+        self.float_button.set_label("⬈")
+        self.float_button.set_tooltip_text("Detach panel to floating window")
+        self.float_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
+        self.float_button.set_valign(Gtk.Align.CENTER)
+        header_box.pack_end(self.float_button, False, False, 0)
+        
+        self.pack_start(header_box, False, False, 0)
+        
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        self.pack_start(separator, False, False, 0)
+        
         # Scrolled window for categories
         self.scrolled_window = Gtk.ScrolledWindow()
         self.scrolled_window.set_policy(

@@ -354,7 +354,12 @@ class DynamicAnalysesCategory(BaseReportCategory):
             total_firings = 0
             for firing_series in sim_data.get('transition_data', {}).values():
                 if firing_series:
-                    total_firings += firing_series[-1]
+                    # firing_series is list of (time, count) tuples
+                    last_entry = firing_series[-1]
+                    if isinstance(last_entry, tuple):
+                        total_firings += last_entry[1]  # Extract count from (time, count)
+                    else:
+                        total_firings += last_entry  # Fallback for raw values
             
             duration = metadata.get('duration', 0)
             avg_rate = total_firings / duration if duration > 0 else 0
@@ -596,7 +601,15 @@ class DynamicAnalysesCategory(BaseReportCategory):
                         break
         
         # Check if we have stored simulation data for this document
-        if not report_data or not report_data.has_simulation_data():
+        if not report_data:
+            self.simulation_status_label.set_markup(
+                "<i>No simulation data available. Run a simulation to see results.</i>"
+            )
+            self.species_table.clear()
+            self.reaction_table.clear()
+            return
+        
+        if not report_data.has_simulation_data():
             self.simulation_status_label.set_markup(
                 "<i>No simulation data available. Run a simulation to see results.</i>"
             )
@@ -606,6 +619,40 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Get the stored simulation data (snapshot, not live)
         sim_data = report_data.last_simulation_data
+        
+        # CRITICAL: Convert tuple format to raw values for analyzers
+        # The stored data has (time, value) tuples, but analyzers expect raw values
+        # Create temporary data structures with just the values
+        place_data_raw = {}
+        for place_id, series in sim_data['place_data'].items():
+            # Extract values from (time, tokens) tuples
+            place_data_raw[place_id] = [entry[1] if isinstance(entry, tuple) else entry for entry in series]
+        
+        transition_data_raw = {}
+        for trans_id, series in sim_data['transition_data'].items():
+            # Extract values from (time, count) tuples
+            transition_data_raw[trans_id] = [entry[1] if isinstance(entry, tuple) else entry for entry in series]
+        
+        # Create a temporary data structure that mimics data_collector format
+        class TempDataCollector:
+            def __init__(self, time_points, place_data, transition_data, model):
+                self.time_points = time_points
+                self.place_data = place_data
+                self.transition_data = transition_data
+                self.model = model  # Access to model for places/transitions
+            
+            def get_place_series(self, place_id):
+                return self.time_points, self.place_data.get(place_id, [])
+            
+            def get_transition_series(self, transition_id):
+                return self.time_points, self.transition_data.get(transition_id, [])
+        
+        temp_collector = TempDataCollector(
+            sim_data['time_points'],
+            place_data_raw,
+            transition_data_raw,
+            self.controller.model  # Pass model for analyzer access
+        )
         # print(f"[DEBUG_TABLES] Retrieved stored simulation data")
         # print(f"[DEBUG_TABLES] time_points length: {len(sim_data['time_points'])}")
         # print(f"[DEBUG_TABLES] place_data keys: {list(sim_data['place_data'].keys())}")
@@ -685,28 +732,8 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # print("[DEBUG_TABLES] Analyzing species...")
         try:
-            pass
-            # Create a temporary data collector wrapper that provides stored data
-            # but still has access to the model for analyzers
-            class DataCollectorSnapshot:
-                """Wrapper that provides stored simulation data with model access."""
-                def __init__(self, sim_data, controller):
-                    self.time_points = sim_data['time_points']
-                    self.place_data = sim_data['place_data']
-                    self.transition_data = sim_data['transition_data']
-                    self.model = controller.model  # Access to model for places/transitions
-                
-                def get_place_series(self, place_id):
-                    """Get time series for a place."""
-                    return self.time_points, self.place_data.get(place_id, [])
-                
-                def get_transition_series(self, transition_id):
-                    """Get time series for a transition."""
-                    return self.time_points, self.transition_data.get(transition_id, [])
-            
-            data_snapshot = DataCollectorSnapshot(sim_data, self.controller)
-            
-            species_analyzer = SpeciesAnalyzer(data_snapshot)
+            # Use the temp_collector that has raw values (tuples already unpacked)
+            species_analyzer = SpeciesAnalyzer(temp_collector)
             species_metrics = species_analyzer.analyze_all_species(duration)
             # print(f"[DEBUG_TABLES] Got {len(species_metrics)} species metrics")
             
@@ -733,7 +760,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # Analyze reactions
         # print("[DEBUG_TABLES] Analyzing reactions...")
         try:
-            reaction_analyzer = ReactionAnalyzer(data_snapshot)
+            reaction_analyzer = ReactionAnalyzer(temp_collector)
             reaction_metrics = reaction_analyzer.analyze_all_reactions(duration)
             # print(f"[DEBUG_TABLES] Got {len(reaction_metrics)} reaction metrics")
             
@@ -788,7 +815,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # CRITICAL: Always refresh Reaction Selected table after simulation completes
         # This table queries TransitionRatePanel.selected_objects directly, so we don't 
         # need to check _selected_transition/_selected_locality (which are deprecated)
-        self._populate_reaction_selected_table()
+        try:
+            self._populate_reaction_selected_table()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
         
         # Force a redraw of the parent widget to ensure visibility
         if hasattr(self, 'category_frame') and self.category_frame:
@@ -844,7 +875,13 @@ class DynamicAnalysesCategory(BaseReportCategory):
             total_firings = 0
             for firing_series in sim_data['transition_data'].values():
                 if firing_series:
-                    total_firings += firing_series[-1]
+                    # firing_series is list of (time, count) tuples
+                    # Extract the count value from the last tuple
+                    last_entry = firing_series[-1]
+                    if isinstance(last_entry, tuple):
+                        total_firings += last_entry[1]  # Extract count from (time, count)
+                    else:
+                        total_firings += last_entry  # Fallback for raw values
             
             # Format time_step (handle None case)
             if time_step is None or time_step == 0.0:
@@ -916,12 +953,35 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self.project = project
     
     def set_model_canvas(self, model_canvas):
-        """Set model canvas reference.
+        """Set model canvas reference and update controller.
+        
+        This is called during tab switching to update the category with the
+        current document's model manager. We also need to update the controller
+        to match the current document.
         
         Args:
-            model_canvas: ModelCanvas instance
+            model_canvas: ModelCanvas instance (ModelCanvasManager)
         """
         self.model_canvas = model_canvas
+        
+        # CRITICAL: Also update controller when model_canvas changes (e.g., tab switching)
+        # The controller must match the current document to show correct simulation data
+        if hasattr(self, 'parent_panel') and self.parent_panel:
+            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers'):
+                # Find the overlay_manager for the current document
+                current_da = model_canvas_loader.get_current_document() if hasattr(model_canvas_loader, 'get_current_document') else None
+                if current_da:
+                    overlay_manager = model_canvas_loader.overlay_managers.get(current_da)
+                    if overlay_manager and hasattr(overlay_manager, 'simulation_controller'):
+                        # Update controller to match the current document
+                        new_controller = overlay_manager.simulation_controller
+                        if new_controller != self.controller:
+                            # Controller changed - update it but DON'T register callback
+                            # (callback is already registered during initial set_controller call)
+                            self.controller = new_controller
+                            # NOTE: Don't call _refresh_simulation_data() here
+                            # refresh_all() will be called by ReportPanel right after this
     
     def set_selected_reaction(self, transition, locality):
         """Set the selected reaction and populate the locality simulation data table.
@@ -972,15 +1032,25 @@ class DynamicAnalysesCategory(BaseReportCategory):
         2. When simulation completes (via _refresh_simulation_data)
         3. When switching tabs (via refresh) - will check Analyses panel state
         """
-        
-        # Get the TransitionRatePanel from the right panel (Analyses panel)
+        # Get the PER-DOCUMENT TransitionRatePanel from analyses_panel_loader
+        # NOT from right_panel_loader (which is global)
         transition_panel = None
         if hasattr(self, 'parent_panel') and self.parent_panel:
             model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
-            if model_canvas_loader and hasattr(model_canvas_loader, 'right_panel_loader'):
-                right_panel = model_canvas_loader.right_panel_loader
-                if right_panel and hasattr(right_panel, 'transition_panel'):
-                    transition_panel = right_panel.transition_panel
+            
+            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers') and self.controller:
+                # Find the drawing_area for the current controller
+                for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
+                    if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is self.controller:
+                        # Get the per-document analyses panel
+                        if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+                            analyses_panel_loader = overlay_manager.analyses_panel_loader
+                            if hasattr(analyses_panel_loader, 'panel') and analyses_panel_loader.panel:
+                                analyses_panel = analyses_panel_loader.panel
+                                # Get the transitions category panel
+                                if hasattr(analyses_panel, 'transitions_category') and analyses_panel.transitions_category:
+                                    transition_panel = analyses_panel.transitions_category.panel
+                        break
         
         if not transition_panel:
             # DON'T clear the table! Just show message
@@ -1070,8 +1140,21 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # Get stored simulation data
         sim_data = report_data.last_simulation_data
         time_points = sim_data['time_points']
-        place_data = sim_data['place_data']
-        transition_data = sim_data['transition_data']
+        
+        # CRITICAL: Extract values from (time, value) tuples
+        # The stored data has tuples, but we need raw values for calculations
+        place_data_raw = {}
+        for place_id, series in sim_data['place_data'].items():
+            # Extract token values from (time, tokens) tuples
+            place_data_raw[place_id] = [entry[1] if isinstance(entry, tuple) else entry for entry in series]
+        
+        transition_data_raw = {}
+        for trans_id, series in sim_data['transition_data'].items():
+            # Extract count values from (time, count) tuples
+            transition_data_raw[trans_id] = [entry[1] if isinstance(entry, tuple) else entry for entry in series]
+        
+        place_data = place_data_raw
+        transition_data = transition_data_raw
         
         
         # Clear and populate table with SUMMARY statistics for ALL selected reactions
@@ -1232,5 +1315,29 @@ class DynamicAnalysesCategory(BaseReportCategory):
                 f"<span foreground='green'>✓ Experiment '{name}' added to report</span>\n"
                 f"<i>Showing {n_reps} replicates with {duration:.2f}s duration</i>"
             )
-
+    
+    def clear_all(self):
+        """Clear all tables, textviews, and labels when document is closed."""
+        # Clear summary label
+        if hasattr(self, 'summary_label'):
+            self.summary_label.set_markup("<i>No simulation or experimental data available</i>")
         
+        # Clear simulation status
+        if hasattr(self, 'simulation_status_label'):
+            self.simulation_status_label.set_markup("<i>No simulation data available. Run a simulation to see results.</i>")
+        
+        # Clear species table
+        if hasattr(self, 'species_table') and hasattr(self.species_table, 'clear'):
+            self.species_table.clear()
+        
+        # Clear reaction table
+        if hasattr(self, 'reaction_table') and hasattr(self.reaction_table, 'clear'):
+            self.reaction_table.clear()
+        
+        # Clear reaction selected table
+        if hasattr(self, 'reaction_selected_store'):
+            self.reaction_selected_store.clear()
+        
+        # Clear reaction selected status
+        if hasattr(self, 'reaction_selected_status'):
+            self.reaction_selected_status.set_markup("<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>")
