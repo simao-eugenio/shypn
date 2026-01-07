@@ -52,6 +52,15 @@ class DocumentModel:
         # Compound mappings (place_id → compound_id for thermodynamic validation)
         # Format: {"P001": "C00002", "P002": "CHEBI:15422", ...}
         self.compound_mappings: Dict[str, str] = {}
+        
+        # Model metadata (source, creation date, model type, etc.)
+        # Always initialized to ensure metadata is available for all models
+        from datetime import datetime
+        self.metadata: Dict[str, Any] = {
+            "created": datetime.now().isoformat(),
+            "source": "manual",  # Can be overwritten by import/load operations
+            "model_type": "Petri Net"  # Can be updated based on object types
+        }
     
     @staticmethod
     def _get_default_thermodynamic_settings() -> dict:
@@ -846,6 +855,16 @@ class DocumentModel:
         """
         import json
         import os
+        
+        # Reset all objects to color schema defaults before saving
+        # This ensures recording colors (orange) don't get persisted
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        for place in self.places:
+            ColorSchemaManager.reset_place_color(place)
+        for transition in self.transitions:
+            ColorSchemaManager.reset_transition_colors(transition)
+        for arc in self.arcs:
+            ColorSchemaManager.reset_arc_color(arc)
         
         # Don't modify filepath - it should already have the correct extension (.shy)
         # The .shy extension is used for SHYpn Petri net files (which are JSON internally)

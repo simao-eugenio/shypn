@@ -1,6 +1,6 @@
 # shypn package
 
-__version__ = "2.2.0"
+__version__ = "2.5.4"
 __version_name__ = "Pulsating Singularity Dynamics"
 __version_date__ = "2025-10-17"
 

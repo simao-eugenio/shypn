@@ -41,6 +41,12 @@ class ValidationSection(ThermodynamicsSectionBase):
         # Validation state
         self.validation_running = False
         self.last_results = None
+        
+        # Simulation controller (for storing results)
+        self.simulation_controller = None
+        
+        # Report panel callback (for refreshing after validation)
+        self.report_panel_refresh_callback = None
     
     def build_widget(self) -> Gtk.Widget:
         """Build validation section widget.
@@ -106,14 +112,25 @@ class ValidationSection(ThermodynamicsSectionBase):
     
     def refresh_data(self):
         """Refresh validation status from document."""
-        if not self.document:
-            self.status_label.set_text("No document loaded")
-            self.results_label.set_markup("<small>No validation results yet</small>")
+        # Get current document from canvas manager
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document'):
+            self.status_label.set_text("")
+            self.results_label.set_markup("")
             return
         
+        document = manager.document
+        if not document:
+            self.status_label.set_text("")
+            self.results_label.set_markup("")
+            return
+        
+        # Update cached document reference
+        self.document = document
+        
         # Check if validation is enabled
-        if hasattr(self.document, 'thermodynamic_settings'):
-            enabled = self.document.thermodynamic_settings.get('enable_validation', True)
+        if hasattr(document, 'thermodynamic_settings'):
+            enabled = document.thermodynamic_settings.get('enable_validation', True)
             if not enabled:
                 self.status_label.set_text("Validation disabled in settings")
                 self.validate_button.set_sensitive(False)
@@ -139,11 +156,32 @@ class ValidationSection(ThermodynamicsSectionBase):
         # by the validator, so nothing to save here
         pass
     
+    def set_simulation_controller(self, controller):
+        """Set simulation controller for storing validation results.
+        
+        Args:
+            controller: SimulationController instance
+        """
+        self.simulation_controller = controller
+    
+    def set_report_panel_refresh_callback(self, callback):
+        """Set callback to refresh Report Panel after validation.
+        
+        Args:
+            callback: Function to call when validation completes
+        """
+        self.report_panel_refresh_callback = callback
+    
     def _on_validate_clicked(self, button):
         """Handle validate button click."""
-        if not self.document:
+        # Get current document from canvas manager
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
             self._show_error("No document loaded")
             return
+        
+        document = manager.document
+        self.document = document  # Update cached reference
         
         if self.validation_running:
             return
@@ -268,6 +306,60 @@ class ValidationSection(ThermodynamicsSectionBase):
         self.validation_running = False
         self.last_results = results
         
+        # Store results in simulation controller for Report Panel access
+        if self.simulation_controller:
+            # Parse details to categorize by validation status
+            violations_list = []
+            warnings_list = []
+            valid_list = []
+            
+            logger.info(f"Processing {len(results.get('details', []))} validation details")
+            
+            for detail in results.get('details', []):
+                transition_id = detail.get('transition_id')
+                is_valid = detail.get('is_valid', False)
+                message = detail.get('message', '')
+                
+                logger.info(f"  {transition_id}: valid={is_valid}, message={message[:50]}...")
+                
+                if is_valid:
+                    valid_list.append({
+                        'transition': transition_id,
+                        'message': message
+                    })
+                else:
+                    # Invalid reactions are violations (regardless of whether they "exceed" tolerance)
+                    # Check if it's a soft warning vs hard violation based on message severity
+                    if 'warning' in message.lower() and 'invalid' not in message.lower():
+                        warnings_list.append({
+                            'transition': transition_id,
+                            'message': message
+                        })
+                    else:
+                        violations_list.append({
+                            'transition': transition_id,
+                            'message': message
+                        })
+            
+            logger.info(f"Categorized: {len(valid_list)} valid, {len(warnings_list)} warnings, {len(violations_list)} violations")
+            
+            # Include compound_mappings in results for Report Panel access
+            compound_mappings = getattr(self.document, 'compound_mappings', {})
+            
+            self.simulation_controller.thermodynamic_results = {
+                'summary': {
+                    'total': results['total'],
+                    'valid': results['valid'],
+                    'warnings': results['warnings'],
+                    'violations': results['violations'],
+                },
+                'violations': violations_list,
+                'warnings': warnings_list,
+                'valid': valid_list,
+                'insufficient_data': [],
+                'compound_mappings': compound_mappings,
+            }
+        
         # Hide progress bar
         self.progress_bar.hide()
         
@@ -302,6 +394,13 @@ class ValidationSection(ThermodynamicsSectionBase):
             # Log results
             logger.info(f"Thermodynamic validation: {valid}/{total} valid, {warnings} warnings, {violations} violations")
         
+        # Notify Report Panel to refresh (if callback is set)
+        if self.report_panel_refresh_callback:
+            try:
+                self.report_panel_refresh_callback()
+            except Exception as e:
+                logger.warning(f"Failed to refresh report panel: {e}")
+        
         return False  # Remove from idle
     
     def _on_validation_error(self, error_msg: str):
@@ -325,4 +424,4 @@ class ValidationSection(ThermodynamicsSectionBase):
     def _on_view_report_clicked(self, button):
         """Handle view report button click."""
         # TODO: Switch to Report Panel and show thermodynamics category
-        self._show_info("Report Panel integration pending (Phase 4)")
+        pass

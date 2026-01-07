@@ -68,16 +68,16 @@ class DataCollector:
             
         self.time_points.append(current_time)
         
-        # Record place tokens
+        # Record place tokens as (time, tokens) tuples
         for place in self.model.places:
             tokens = place.tokens
-            self.place_data[place.id].append(tokens)
+            self.place_data[place.id].append((current_time, tokens))
             
-        # Record transition firing counts (cumulative) AND instantaneous rates
+        # Record transition firing counts (cumulative) AND instantaneous rates as tuples
         for transition in self.model.transitions:
-            # Cumulative firing count
+            # Cumulative firing count stored as (time, count) tuple
             count = getattr(transition, 'firing_count', 0)
-            self.transition_data[transition.id].append(count)
+            self.transition_data[transition.id].append((current_time, count))
             
             # Instantaneous rate/propensity - evaluate with CURRENT token state
             rate = 0.0

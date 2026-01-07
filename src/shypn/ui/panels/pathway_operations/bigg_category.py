@@ -114,6 +114,9 @@ class BiGGCategory(BasePathwayCategory):
         self.sbml_metadata_expander = Gtk.Expander(label="SBML Metadata Inspector")
         self.sbml_metadata_expander.set_expanded(False)
         
+        # Connect to expansion event - populate metadata when user expands
+        self.sbml_metadata_expander.connect("notify::expanded", self._on_metadata_expander_toggled)
+        
         # Create tree store for metadata
         self.sbml_metadata_store = Gtk.TreeStore(str, str, str, str, str, bool, str)
         
@@ -321,6 +324,9 @@ class BiGGCategory(BasePathwayCategory):
         if self.local_radio.get_active():
             # Local mode: check if file exists
             if value and os.path.exists(value):
+                # Trigger preview parse
+                self._parse_and_preview_sbml(value)
+                
                 self.import_button.set_sensitive(True)
                 self.status_label.set_text(f"Ready to import {os.path.basename(value)}")
             else:
@@ -378,6 +384,41 @@ class BiGGCategory(BasePathwayCategory):
         filepath = result_container[0]
         if filepath:
             self.accession_entry.set_text(filepath)
+    
+    def _parse_and_preview_sbml(self, filepath):
+        """Parse a local SBML file in background and populate metadata preview.
+        
+        This method is called when browsing local files to show a preview
+        before importing.
+        
+        Args:
+            filepath: Path to SBML file
+        """
+        def parse_in_background():
+            try:
+                self.logger.info(f"Parsing SBML file for preview: {filepath}")
+                
+                # Parse SBML file
+                parsed_pathway = self.sbml_parser.parse_file(filepath)
+                
+                # Cache for later import
+                self.parsed_pathway = parsed_pathway
+                self.current_filepath = filepath
+                
+                # Update metadata tree on main thread
+                GLib.idle_add(self._update_sbml_metadata_view, parsed_pathway)
+                # Metadata will be visible when user expands the inspector
+                
+                self.logger.info("SBML preview completed successfully")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to parse SBML for preview: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Run parse in background thread to avoid UI freeze
+        thread = threading.Thread(target=parse_in_background, daemon=True)
+        thread.start()
     
     def _update_sbml_metadata_view(self, parsed_pathway):
         """Update SBML metadata inspector with parsed data in table format.
@@ -494,8 +535,10 @@ class BiGGCategory(BasePathwayCategory):
                             ])
                     self.logger.info(f"  Added {count} function definitions")
             
-            # Auto-expand the inspector when data is loaded
-            self.sbml_metadata_expander.set_expanded(True)
+            # Expand all tree rows to show the metadata
+            self.sbml_metadata_tree.expand_all()
+            
+            # Metadata will be visible when user expands the inspector
             self.logger.info("✓ SBML metadata inspector updated successfully")
             
         except Exception as e:
@@ -605,7 +648,7 @@ class BiGGCategory(BasePathwayCategory):
         
         if not self.project:
             self._show_status(
-                "❌ No project available. Please open or create a project first: "
+                "No project open. Please open or create a project first: "
                 "File → New Project or File → Open Project",
                 error=True
             )
@@ -651,10 +694,16 @@ class BiGGCategory(BasePathwayCategory):
                 self.logger.info(f"  Using: {sbml_path} ({sbml_size} bytes)")
                 
                 # Step 2: Parse SBML → PathwayData
-                self.logger.info(f"Step 2: Parsing SBML")
-                parsed_pathway = self.sbml_parser.parse_file(sbml_path)
-                self.logger.info(f"  Parsed: {len(parsed_pathway.species)} species, "
-                               f"{len(parsed_pathway.reactions)} reactions")
+                # Check if we already parsed this file in preview
+                if (hasattr(self, 'parsed_pathway') and self.parsed_pathway and 
+                    hasattr(self, 'current_filepath') and self.current_filepath == sbml_path):
+                    self.logger.info("  Reusing cached parsed pathway from preview")
+                    parsed_pathway = self.parsed_pathway
+                else:
+                    self.logger.info(f"Step 2: Parsing SBML")
+                    parsed_pathway = self.sbml_parser.parse_file(sbml_path)
+                    self.logger.info(f"  Parsed: {len(parsed_pathway.species)} species, "
+                                   f"{len(parsed_pathway.reactions)} reactions")
                 
                 # Update SBML metadata inspector (on main thread)
                 GLib.idle_add(self._update_sbml_metadata_view, parsed_pathway)
@@ -668,6 +717,27 @@ class BiGGCategory(BasePathwayCategory):
                 document_model = self.converter.convert(processed_pathway)
                 self.logger.info(f"  Converted: {len(document_model.places)} places, "
                                f"{len(document_model.transitions)} transitions")
+                
+                # Add metadata to document model for later identification
+                if not hasattr(document_model, 'metadata'):
+                    document_model.metadata = {}
+                document_model.metadata['source'] = 'bigg_import'
+                document_model.metadata['data_source'] = 'bigg_import'
+                document_model.metadata['model_id'] = model_id
+                
+                # Save minimal SBML data for metadata inspector
+                try:
+                    bigg_sbml_data = {
+                        'model_id': model_id,
+                        'compartments_count': len(getattr(parsed_pathway, 'compartments', {})),
+                        'species_count': len(getattr(parsed_pathway, 'species', [])),
+                        'reactions_count': len(getattr(parsed_pathway, 'reactions', [])),
+                        'parameters_count': len(getattr(parsed_pathway, 'parameters', {}))
+                    }
+                    document_model.metadata['bigg_sbml_data'] = bigg_sbml_data
+                    self.logger.info(f"Saved BiGG SBML data to metadata: {len(bigg_sbml_data)} keys")
+                except Exception as e:
+                    self.logger.warning(f"Could not serialize BiGG SBML data: {e}")
                 
                 # Step 5: Apply BiGG signal classification (if enabled)
                 if classify_energy:
@@ -952,13 +1022,17 @@ class BiGGCategory(BasePathwayCategory):
         """
         self.logger.info("=== Starting BiGG canvas auto-load ===")
         
-        # Detect canvas loader
-        canvas_loader = None
-        if self.model_canvas and hasattr(self.model_canvas, 'add_document'):
-            canvas_loader = self.model_canvas
+        # Use normalized method to get canvas loader
+        canvas_loader = self._get_canvas_loader()
+        
+        if self.model_canvas:
+            self.logger.info(f"model_canvas type: {type(self.model_canvas).__name__}")
+            self.logger.info(f"canvas_loader available: {canvas_loader is not None}")
+        else:
+            self.logger.error("model_canvas is None! Cannot auto-load to canvas.")
         
         if not canvas_loader:
-            self.logger.info("Canvas auto-load skipped: model_canvas not available")
+            self.logger.warning("Canvas auto-load skipped: model_canvas not available or doesn't have add_document")
             self._show_status(
                 f"✅ Model saved successfully:\n{saved_filepath}\n\n"
                 f"💡 Open the model: File → Open or double-click in file explorer"
@@ -971,23 +1045,42 @@ class BiGGCategory(BasePathwayCategory):
             try:
                 self.logger.info(f"✓ Auto-loading {model_id} into new canvas tab...")
                 
-                # Create fresh canvas tab
-                page_index, drawing_area = canvas_loader.add_document(filename=model_id)
+                # CRITICAL: Create canvas with temporary filename to avoid loading
+                # stale view state from previous imports of same model
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 1: Calling add_document()...")
+                page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 2: add_document() returned page_index={page_index}, drawing_area={id(drawing_area) if drawing_area else 'None'}")
                 
                 if drawing_area is None:
                     raise ValueError("add_document() returned None for drawing_area")
                 
                 canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 3: get_canvas_manager() returned canvas_manager={canvas_manager is not None} (type={type(canvas_manager).__name__ if canvas_manager else 'None'})")
                 if not canvas_manager:
                     raise ValueError("get_canvas_manager() returned None")
                 
+                # CRITICAL: Set filepath FIRST before load_objects
+                # This ensures the correct filename is used for any auto-save operations
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 4: Setting filepath to {saved_filepath}")
+                canvas_manager.set_filepath(saved_filepath)
+                
                 # Load objects to canvas
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 5: Loading objects (places={len(document_model.places)}, transitions={len(document_model.transitions)}, arcs={len(document_model.arcs)})")
                 canvas_manager.load_objects(
                     places=document_model.places,
                     transitions=document_model.transitions,
                     arcs=document_model.arcs,
                     modules=document_model.modules
                 )
+                self.logger.info(f"[BIGG AUTO-LOAD] Step 6: load_objects() completed successfully")
+                
+                # CRITICAL: Copy metadata to canvas manager's document
+                # This ensures metadata is available for tab-switch and metadata inspector
+                if hasattr(canvas_manager, 'document') and hasattr(document_model, 'metadata'):
+                    # Copy metadata keys individually (document.metadata is a property)
+                    for key, value in document_model.metadata.items():
+                        canvas_manager.document.metadata[key] = value
+                    self.logger.info(f"Copied metadata to canvas document ({len(document_model.metadata)} keys)")
                 
                 # Set change callback
                 if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
@@ -995,10 +1088,15 @@ class BiGGCategory(BasePathwayCategory):
                         canvas_manager._on_object_changed
                     )
                 
-                # Set filepath and mark clean
-                canvas_manager.set_filepath(saved_filepath)
+                # Mark clean and as imported
                 canvas_manager.mark_clean()
                 canvas_manager.mark_as_imported(model_id)
+                
+                # CRITICAL: Ensure callbacks are enabled before display
+                # (Should already be False from setup, but verify)
+                if hasattr(canvas_manager, '_suppress_callbacks'):
+                    canvas_manager._suppress_callbacks = False
+                    self.logger.info(f"Callbacks enabled: _suppress_callbacks={canvas_manager._suppress_callbacks}")
                 
                 # Fit to page
                 canvas_manager.fit_to_page(
@@ -1014,6 +1112,47 @@ class BiGGCategory(BasePathwayCategory):
                 # Ensure simulation reset
                 if hasattr(canvas_loader, '_ensure_simulation_reset'):
                     canvas_loader._ensure_simulation_reset(drawing_area)
+                
+                # REPORT PANEL: Trigger refresh after BiGG import (deferred)
+                # Use GLib.idle_add to ensure this happens AFTER tab switch completes
+                if drawing_area in canvas_loader.overlay_managers:
+                    from gi.repository import GLib
+                    
+                    def refresh_report_panel():
+                        """Deferred refresh to ensure tab switch completes first."""
+                        overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
+                        if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
+                            report_panel_loader = overlay_manager.report_panel_loader
+                            if report_panel_loader and hasattr(report_panel_loader, 'panel'):
+                                self.logger.info("Triggering Report Panel refresh after BiGG import (deferred)")
+                                simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                                if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                    report_panel_loader.panel.set_controller(simulation_controller)
+                                    self.logger.info("✅ Report Panel refreshed")
+                                
+                                # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
+                                # Determine metadata path based on project structure
+                                if self.project and hasattr(self.project, 'get_metadata_dir'):
+                                    metadata_dir = self.project.get_metadata_dir()
+                                    if metadata_dir:
+                                        # Look for metadata in project/metadata/ directory
+                                        import os
+                                        model_filename = f"{model_id}.shypn"
+                                        shypn_path = os.path.join(metadata_dir, model_filename)
+                                    else:
+                                        # Fallback: look alongside model file
+                                        shypn_path = saved_filepath.replace('.shy', '.shypn')
+                                else:
+                                    # No project context: look alongside model file
+                                    shypn_path = saved_filepath.replace('.shy', '.shypn')
+                                
+                                if hasattr(report_panel_loader.panel, 'on_file_opened'):
+                                    report_panel_loader.panel.on_file_opened(shypn_path)
+                                    self.logger.info(f"✅ Metadata loaded from: {shypn_path}")
+                            return False  # Don't repeat
+                        
+                        GLib.idle_add(refresh_report_panel)
+                        self.logger.info("Report Panel refresh scheduled (idle)")
                 
                 self.logger.info("=== BiGG canvas auto-load COMPLETED ===")
                 self._show_status(
@@ -1036,7 +1175,9 @@ class BiGGCategory(BasePathwayCategory):
             return False  # Don't repeat GLib.idle_add
         
         # Schedule canvas loading on idle
+        self.logger.info(f"[BIGG] Scheduling do_canvas_load() via GLib.idle_add (canvas_loader={canvas_loader is not None}, document_model={document_model is not None}, saved_filepath={saved_filepath})")
         GLib.idle_add(do_canvas_load)
+        self.logger.info(f"[BIGG] GLib.idle_add(do_canvas_load) called successfully")
     
     # ========================================================================
     # Category Interface (from BasePathwayCategory)
@@ -1060,12 +1201,152 @@ class BiGGCategory(BasePathwayCategory):
         self.model_canvas = model_canvas
         self.logger.debug(f"Model canvas set: {model_canvas}")
     
+    def _on_metadata_expander_toggled(self, expander, param):
+        """Called when user expands/collapses the metadata inspector.
+        Populates metadata only when expanded to avoid cascade issues.
+        
+        Args:
+            expander: The Gtk.Expander widget
+            param: The parameter (notify signal)
+        """
+        if expander.get_expanded():
+            self.refresh_metadata_inspector()
+    
     def on_tab_switched(self):
         """Handle tab switch event (called by PathwayOperationsPanel).
         
-        Opportunity to refresh state when user switches back to this tab.
+        Note: Metadata inspector refresh is deferred until user expands it.
+        
+        Updates the BiGG panel to reflect the currently active model:
+        - Updates status labels
         """
-        self.logger.debug("Tab switched to BiGG category")
+        self.logger.debug("Tab switched, updating BiGG panel state")
+    
+    def refresh_metadata_inspector(self):
+        """Refresh BiGG Metadata Inspector for the currently active document.
+        This method is called when the user expands the metadata inspector.
+        It populates the metadata tree and summary from the current document.
+        """
+        # Get current document using normalized method
+        document = None
+        canvas_manager = self._get_canvas_manager()
+        
+        if canvas_manager:
+            try:
+                # Always use _document_model (document property returns self)
+                if hasattr(canvas_manager, '_document_model'):
+                    document = canvas_manager._document_model
+            except Exception as e:
+                self.logger.warning(f"Could not get document for metadata refresh: {e}")
+        
+        # Update metadata based on active document
+        if document:
+            # Check if BiGG model
+            is_bigg = False
+            if hasattr(document, 'metadata') and document.metadata:
+                source = document.metadata.get('source')
+                data_source = document.metadata.get('data_source')
+                is_bigg = (source == 'bigg_import' or data_source == 'bigg_import')
+            
+            if is_bigg:
+                self.status_label.set_text("BiGG model loaded")
+                
+                # Load SBML metadata from document metadata if available
+                sbml_data = document.metadata.get('bigg_sbml_data')
+                if sbml_data:
+                    self._load_sbml_metadata_from_dict(sbml_data)
+                    self.logger.debug(f"Metadata inspector refreshed for BiGG model: {document.metadata.get('model_id', 'unknown')}")
+                else:
+                    # Clear for old BiGG models without saved metadata
+                    self.sbml_metadata_store.clear()
+                    self.status_label.set_text("BiGG model (legacy import - metadata not saved)")
+            else:
+                self.status_label.set_markup(
+                    '<span size="small">Not a BiGG model</span>'
+                )
+                # Clear metadata tree for non-BiGG models
+                self.sbml_metadata_store.clear()
+        else:
+            # No document - clear metadata
+            self.status_label.set_markup(
+                '<span size="small">No model loaded</span>'
+            )
+            self.sbml_metadata_store.clear()
+    
+    def _load_sbml_metadata_from_dict(self, sbml_data):
+        """Load and display SBML metadata from saved dictionary.
+        
+        Args:
+            sbml_data: Dictionary with saved BiGG/SBML pathway data
+        """
+        def do_update():
+            try:
+                self.sbml_metadata_store.clear()
+                
+                # Model Info section
+                if 'model_id' in sbml_data or 'model_name' in sbml_data:
+                    info_root = self.sbml_metadata_store.append(None, [
+                        "🆔", "Model Info", "",
+                        "", "Section", False, "model_info"
+                    ])
+                    if 'model_id' in sbml_data:
+                        self.sbml_metadata_store.append(info_root, [
+                            "🆔", "Model ID", sbml_data['model_id'],
+                            "", "Text", False, "model_id"
+                        ])
+                    if 'model_name' in sbml_data:
+                        self.sbml_metadata_store.append(info_root, [
+                            "📝", "Name", sbml_data['model_name'],
+                            "", "Text", False, "model_name"
+                        ])
+                
+                # Statistics section
+                stats_root = self.sbml_metadata_store.append(None, [
+                    "📊", "Statistics", "",
+                    "", "Section", False, "statistics"
+                ])
+                
+                # Compartments
+                if 'compartments_count' in sbml_data:
+                    self.sbml_metadata_store.append(stats_root, [
+                        "📦", "Compartments", str(sbml_data['compartments_count']),
+                        "", "Number", False, "compartments_count"
+                    ])
+                
+                # Species
+                if 'species_count' in sbml_data:
+                    self.sbml_metadata_store.append(stats_root, [
+                        "🧬", "Species", str(sbml_data['species_count']),
+                        "", "Number", False, "species_count"
+                    ])
+                
+                # Reactions
+                if 'reactions_count' in sbml_data:
+                    self.sbml_metadata_store.append(stats_root, [
+                        "⚡", "Reactions", str(sbml_data['reactions_count']),
+                        "", "Number", False, "reactions_count"
+                    ])
+                
+                # Parameters
+                if 'parameters_count' in sbml_data:
+                    self.sbml_metadata_store.append(stats_root, [
+                        "⚙️", "Parameters", str(sbml_data['parameters_count']),
+                        "", "Number", False, "parameters_count"
+                    ])
+                
+                # Expand all tree rows
+                self.sbml_metadata_tree.expand_all()
+                
+                self.logger.info("BiGG metadata inspector updated from saved data")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to load BiGG metadata from dict: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Use idle_add to ensure GTK updates on main thread
+        from gi.repository import GLib
+        GLib.idle_add(do_update)
     
     # ========================================================================
     # Wayland-Safe Cleanup

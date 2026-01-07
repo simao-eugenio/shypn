@@ -144,13 +144,24 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def refresh_data(self):
         """Refresh mappings from document."""
-        if not self.document:
+        # Get current document from canvas manager
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document'):
             self.list_store.clear()
-            self.stats_label.set_text("No document loaded")
+            self.stats_label.set_text("")
             return
         
+        document = manager.document
+        if not document:
+            self.list_store.clear()
+            self.stats_label.set_text("")
+            return
+        
+        # Update cached document reference
+        self.document = document
+        
         # Get current mappings from document
-        mappings = self.document.compound_mappings if hasattr(self.document, 'compound_mappings') else {}
+        mappings = document.compound_mappings if hasattr(document, 'compound_mappings') else {}
         
         # Re-run mapper to get confidence scores
         try:
@@ -192,9 +203,14 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def _on_auto_map_clicked(self, button):
         """Handle auto-map button click."""
-        if not self.document:
+        # Get current document from canvas manager
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
             self._show_error("No document loaded")
             return
+        
+        document = manager.document
+        self.document = document  # Update cached reference
         
         button.set_sensitive(False)
         self.auto_map_button.set_label("Mapping...")
@@ -230,7 +246,6 @@ class MappingSection(ThermodynamicsSectionBase):
         self.auto_map_button.set_label("Auto-Map Compounds")
         
         summary = self.mapper_service.get_mapping_summary(mappings, confidences)
-        self._show_info(f"Mapped {summary['total_mapped']} places (avg confidence: {summary['average_confidence']:.0%})")
         
         return False  # Remove from idle
     
@@ -243,8 +258,11 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def _on_compound_edited(self, renderer, path, new_text):
         """Handle compound ID edit in tree view."""
-        if not self.document:
+        # Ensure document is available
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
             return
+        self.document = manager.document
         
         # Get place ID from row
         iterator = self.list_store.get_iter(path)
@@ -275,6 +293,13 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def _on_edit_clicked(self, button):
         """Handle edit button click."""
+        # Ensure document is available
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
+            self._show_error("No document loaded")
+            return
+        self.document = manager.document
+        
         selection = self.tree_view.get_selection()
         model, iterator = selection.get_selected()
         
@@ -329,6 +354,13 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def _on_remove_clicked(self, button):
         """Handle remove button click."""
+        # Ensure document is available
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
+            self._show_error("No document loaded")
+            return
+        self.document = manager.document
+        
         selection = self.tree_view.get_selection()
         model, iterator = selection.get_selected()
         
@@ -342,6 +374,13 @@ class MappingSection(ThermodynamicsSectionBase):
     
     def _on_clear_clicked(self, button):
         """Handle clear all button click."""
+        # Ensure document is available
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
+            self._show_error("No document loaded")
+            return
+        self.document = manager.document
+        
         dialog = Gtk.MessageDialog(
             parent=None,
             flags=0,

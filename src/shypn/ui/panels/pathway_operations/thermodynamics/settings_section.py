@@ -176,13 +176,22 @@ class SettingsSection(ThermodynamicsSectionBase):
     
     def refresh_data(self):
         """Refresh settings from document."""
-        if not self.document:
+        # Get current document from canvas manager
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document'):
             return
+        
+        document = manager.document
+        if not document:
+            return
+        
+        # Update cached document reference
+        self.document = document
         
         self._refreshing = True
         
         try:
-            settings = self.document.thermodynamic_settings
+            settings = document.thermodynamic_settings
             
             # Update preset
             preset = settings.get('preset', 'custom')
@@ -331,6 +340,13 @@ class SettingsSection(ThermodynamicsSectionBase):
     
     def _on_apply_clicked(self, button):
         """Handle apply button click."""
+        # Ensure document is available
+        manager = self._get_canvas_manager()
+        if not manager or not hasattr(manager, 'document') or not manager.document:
+            self._show_error("No document loaded")
+            return
+        
+        self.document = manager.document
         self.save_to_document()
         self._show_info("Thermodynamic settings applied")
     

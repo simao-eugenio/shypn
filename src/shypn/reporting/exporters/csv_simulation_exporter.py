@@ -78,18 +78,24 @@ class CSVSimulationExporter:
                     
                     # Add place values
                     for place_id, _ in place_headers:
-                        value = self.place_data[place_id][i] if i < len(self.place_data[place_id]) else ''
-                        # Convert tokens to concentration if scale factor exists
-                        if self.model:
-                            place = self._get_place_obj(place_id)
-                            if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                                value = value / place.scale_factor
-                        row.append(f"{value:.6f}" if value != '' else '')
+                        if i < len(self.place_data[place_id]):
+                            _, value = self.place_data[place_id][i]  # Extract value from (time, tokens) tuple
+                            # Convert tokens to concentration if scale factor exists
+                            if self.model:
+                                place = self._get_place_obj(place_id)
+                                if place and hasattr(place, 'scale_factor') and place.scale_factor:
+                                    value = value / place.scale_factor
+                            row.append(f"{value:.6f}")
+                        else:
+                            row.append('')
                     
                     # Add transition values
                     for trans_id, _ in transition_headers:
-                        value = self.transition_data[trans_id][i] if i < len(self.transition_data[trans_id]) else ''
-                        row.append(str(value))
+                        if i < len(self.transition_data[trans_id]):
+                            _, value = self.transition_data[trans_id][i]  # Extract value from (time, count) tuple
+                            row.append(str(value))
+                        else:
+                            row.append('')
                     
                     writer.writerow(row)
             

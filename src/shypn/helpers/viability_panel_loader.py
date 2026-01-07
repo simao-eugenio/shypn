@@ -45,10 +45,17 @@ class ViabilityPanelLoader:
         self.on_attach_callback = None
         
         # Create floating window
+        from gi.repository import Gdk
         self.window = Gtk.Window()
         self.window.set_title('Viability')
         self.window.set_default_size(350, 700)
         self.window.connect('delete-event', self._on_delete_event)
+        
+        # Set window type hint to keep it visible
+        try:
+            self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+        except Exception:
+            pass  # Wayland may not support this
         
         # Create the viability panel
         self.panel = ViabilityPanel(
@@ -281,8 +288,14 @@ class ViabilityPanelLoader:
             self.panel.float_button.set_active(True)
             self._updating_button = False
         
-        # Show window
+        # Show window and bring to front
         self.window.show_all()
+        
+        # Raise window to ensure visibility
+        try:
+            self.window.present()
+        except Exception:
+            pass  # Some window managers may not support this
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""

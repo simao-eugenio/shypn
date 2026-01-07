@@ -187,25 +187,66 @@ class BasePathwayCategory(CategoryFrame):
         Args:
             model_canvas: Either a ModelCanvasLoader (multi-document) or a
                 ModelCanvasManager. Subclasses that need direct access to the
-                manager should use ``self.model_canvas_manager`` after this
-                method runs.
+                manager should use ``self._get_canvas_manager()`` method.
         """
-        # Store reference (loader or manager) for subclasses that expect it
         self.model_canvas = model_canvas
-
-        # Prefer modern helper: ModelCanvasLoader.get_current_model_manager()
-        manager = None
-        if model_canvas is not None:
-            if hasattr(model_canvas, 'get_current_model_manager') and callable(getattr(model_canvas, 'get_current_model_manager')):
-                manager = model_canvas.get_current_model_manager()
-            elif hasattr(model_canvas, 'get_current_model') and callable(getattr(model_canvas, 'get_current_model')):
-                # Backward-compatibility: some loaders still expose get_current_model()
-                manager = model_canvas.get_current_model()
-            elif hasattr(model_canvas, 'transitions'):
-                # A ModelCanvasManager (or similar) was passed directly
-                manager = model_canvas
-
-        self.model_canvas_manager = manager
+    
+    def _get_canvas_loader(self):
+        """Get the canvas loader instance (for creating new tabs).
+        
+        Returns:
+            ModelCanvasLoader instance if available, None otherwise
+        """
+        if self.model_canvas is None:
+            import logging
+            logger = logging.getLogger(self.__class__.__name__)
+            logger.warning("_get_canvas_loader: self.model_canvas is None")
+            return None
+        
+        # Check if it's a loader (has add_document method)
+        if hasattr(self.model_canvas, 'add_document'):
+            import logging
+            logger = logging.getLogger(self.__class__.__name__)
+            logger.info(f"_get_canvas_loader: Found loader (type={type(self.model_canvas).__name__})")
+            return self.model_canvas
+        
+        import logging
+        logger = logging.getLogger(self.__class__.__name__)
+        logger.warning(f"_get_canvas_loader: model_canvas has no add_document method (type={type(self.model_canvas).__name__})")
+        return None
+    
+    def _get_canvas_manager(self):
+        """Get the current canvas manager instance consistently.
+        
+        This method normalizes access to the canvas manager across all
+        per-document panel instances, handling both loader and direct
+        manager references.
+        
+        Returns:
+            ModelCanvasManager instance if available, None otherwise
+        """
+        if self.model_canvas is None:
+            return None
+        
+        # If it has add_document, it's a loader - get current manager
+        if hasattr(self.model_canvas, 'add_document'):
+            # It's a ModelCanvasLoader
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    return self.model_canvas.get_current_model()
+                elif hasattr(self.model_canvas, 'get_current_model_manager'):
+                    return self.model_canvas.get_current_model_manager()
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(self.__class__.__name__)
+                logger.warning(f"Failed to get manager from loader: {e}")
+                return None
+        
+        # Check if it's already a manager (has places/transitions)
+        if hasattr(self.model_canvas, 'places') and hasattr(self.model_canvas, 'transitions'):
+            return self.model_canvas
+        
+        return None
     
     # ========================================================================
     # Import Lifecycle (Override in subclasses)

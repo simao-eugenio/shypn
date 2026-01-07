@@ -358,3 +358,42 @@ class PathwayOperationsPanel(Gtk.Box):
             self.sabio_rk_category.cleanup()
 
 
+
+    def _show_pending_actions_notification(self, count: int):
+        """Show notification that pending actions were executed.
+        
+        Args:
+            count: Number of actions that were executed
+        """
+        try:
+            import gi
+            gi.require_version('Gtk', '3.0')
+            from gi.repository import Gtk, GLib
+            
+            # Show a non-intrusive info bar
+            info_bar = Gtk.InfoBar()
+            info_bar.set_message_type(Gtk.MessageType.INFO)
+            info_bar.set_show_close_button(True)
+            
+            content = info_bar.get_content_area()
+            message = Gtk.Label()
+            if count == 1:
+                message.set_markup(f"<b>✓ Executed 1 pending action</b>")
+            else:
+                message.set_markup(f"<b>✓ Executed {count} pending actions</b>")
+            content.add(message)
+            
+            info_bar.connect('response', lambda bar, response: bar.destroy())
+            
+            # Auto-dismiss after 5 seconds
+            GLib.timeout_add_seconds(5, lambda: info_bar.destroy() if info_bar.get_parent() else False)
+            
+            # Add to top of the panel
+            if hasattr(self, 'content_box') and self.content_box:
+                self.content_box.pack_start(info_bar, False, False, 0)
+                self.content_box.reorder_child(info_bar, 0)
+                info_bar.show_all()
+                
+                self.logger.info(f"Showed notification for {count} executed pending actions")
+        except Exception as e:
+            self.logger.error(f"Failed to show pending actions notification: {e}")

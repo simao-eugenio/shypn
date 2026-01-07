@@ -70,12 +70,47 @@ class ThermodynamicsSectionBase(ABC):
         """Set the model canvas and refresh data.
         
         Args:
-            model_canvas: ModelCanvasManager instance
+            model_canvas: ModelCanvasLoader or ModelCanvasManager instance
         """
         self.model_canvas = model_canvas
-        if model_canvas and hasattr(model_canvas, 'document'):
-            self.document = model_canvas.document
+        
+        # Get the actual manager from the loader
+        manager = self._get_canvas_manager()
+        if manager and hasattr(manager, 'document'):
+            self.document = manager.document
             self.refresh_data()
+    
+    def _get_canvas_manager(self):
+        """Get the current canvas manager instance consistently.
+        
+        This method normalizes access to the canvas manager, handling both
+        loader and direct manager references.
+        
+        Returns:
+            ModelCanvasManager instance if available, None otherwise
+        """
+        if self.model_canvas is None:
+            return None
+        
+        # If it has add_document, it's a loader - get current manager
+        if hasattr(self.model_canvas, 'add_document'):
+            # It's a ModelCanvasLoader
+            try:
+                if hasattr(self.model_canvas, 'get_current_model'):
+                    return self.model_canvas.get_current_model()
+                elif hasattr(self.model_canvas, 'get_current_model_manager'):
+                    return self.model_canvas.get_current_model_manager()
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(self.__class__.__name__)
+                logger.warning(f"Failed to get manager from loader: {e}")
+                return None
+        
+        # Check if it's already a manager (has places/transitions)
+        if hasattr(self.model_canvas, 'places') and hasattr(self.model_canvas, 'transitions'):
+            return self.model_canvas
+        
+        return None
     
     def set_document(self, document):
         """Set the document and refresh data.

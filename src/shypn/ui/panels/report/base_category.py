@@ -84,13 +84,41 @@ class BaseReportCategory:
     def set_model_canvas(self, model_canvas):
         """Set model canvas reference.
         
+        DEPRECATED: This method is kept for compatibility but categories should
+        use get_current_model() to dynamically access the active document's model.
+        
         Does NOT auto-refresh. Report categories are static summaries
         that are manually refreshed via the refresh button.
         
         Args:
-            model_canvas: ModelCanvas instance
+            model_canvas: ModelCanvas instance (ignored - use get_current_model() instead)
         """
-        self.model_canvas = model_canvas
+        # Don't store the reference - it gets stale when model changes
+        # Categories should use get_current_model() to get the active model
+        pass
+    
+    def get_current_model(self):
+        """Get the current active document's model dynamically.
+        
+        This ensures categories always work with the current document in focus,
+        not a stale reference from initialization.
+        
+        Returns:
+            ModelCanvasManager: Current active document's model, or None
+        """
+        if not hasattr(self, 'parent_panel') or not self.parent_panel:
+            return None
+        
+        # Get the model_canvas_loader from parent panel
+        model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
+        if not model_canvas_loader:
+            return None
+        
+        # Get the current active document
+        if hasattr(model_canvas_loader, 'get_current_model_manager'):
+            return model_canvas_loader.get_current_model_manager()
+        
+        return None
     
     def get_widget(self):
         """Get the category frame widget.

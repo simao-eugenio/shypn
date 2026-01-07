@@ -132,6 +132,11 @@ class ModelCanvasManager:
         from shypn.engine.simulation.settings import SimulationSettings
         self.simulation_settings = SimulationSettings()
         
+        # Document model for storing metadata and settings
+        # This provides a persistent model for thermodynamic settings, compound mappings, etc.
+        from shypn.data.canvas import DocumentModel
+        self._document_model = DocumentModel()
+        
         # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
         # Each manager now owns its filepath and dirty state
         # This fixes critical data loss issues from single global persistency
@@ -165,6 +170,23 @@ class ModelCanvasManager:
     
     # ==================== Property Proxies (Backward Compatibility) ====================
     # These properties delegate to controllers for backward compatibility
+    
+    @property
+    def document(self):
+        """Get the document model for this canvas.
+        
+        This provides access to document-level settings and metadata including:
+        - Thermodynamic settings (pH, temperature, presets)
+        - Compound mappings (place ID → compound ID)
+        - Petri net objects (places, transitions, arcs)
+        - Document-level properties and metadata
+        
+        ModelCanvasManager serves as its own document model via property delegation.
+        
+        Returns:
+            ModelCanvasManager: Self (provides unified access to all document components)
+        """
+        return self
     
     @property
     def zoom(self):
@@ -315,6 +337,44 @@ class ModelCanvasManager:
     def _next_arc_id(self, value):
         """Set next arc ID counter (delegates to IDManager)."""
         self.document_controller.id_manager._next_arc_id = value
+    
+    @property
+    def thermodynamic_settings(self):
+        """Get thermodynamic settings dictionary (delegates to DocumentModel)."""
+        return self._document_model.thermodynamic_settings
+    
+    @property
+    def compound_mappings(self):
+        """Get compound mappings dictionary (delegates to DocumentModel)."""
+        return self._document_model.compound_mappings
+    
+    @property
+    def metadata(self):
+        """Get metadata dictionary (delegates to DocumentModel).
+        
+        Metadata contains model provenance and import information:
+        - name: Model name
+        - source/source_type: Import source (KEGG, SBML)
+        - source_id/pathway_id: Source identifier
+        - organism/source_organism: Organism name
+        - imported_date/created: Import/creation timestamp
+        - raw_file/original_file: Original file path
+        """
+        if hasattr(self._document_model, 'metadata'):
+            return self._document_model.metadata
+        return {}
+    
+    def update_thermodynamic_settings(self, **kwargs):
+        """Update thermodynamic settings (delegates to DocumentModel)."""
+        return self._document_model.update_thermodynamic_settings(**kwargs)
+    
+    def set_thermodynamic_preset(self, preset_id):
+        """Apply thermodynamic preset (delegates to DocumentModel)."""
+        return self._document_model.set_thermodynamic_preset(preset_id)
+    
+    def get_thermodynamic_setting(self, key: str, default=None):
+        """Get a specific thermodynamic setting value (delegates to DocumentModel)."""
+        return self._document_model.get_thermodynamic_setting(key, default)
     
     # ==================== DPI and Physical Units ====================
     
