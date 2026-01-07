@@ -1105,7 +1105,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.simulation.settings.token_accounting_enabled:
             # Use relaxed mode (collect violations, don't crash)
             self.simulation.enable_token_accounting(strict_mode=False)
-            print("🧮 Token accounting enabled (relaxed mode)")
+            print("🧮 Token accounting enabled - data will be included in CSV export")
         else:
             self.simulation.disable_token_accounting()
         

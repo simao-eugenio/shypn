@@ -869,12 +869,18 @@ class ExportToolbar(Gtk.Box):
                             if hasattr(da, 'report_data') and da.report_data:
                                 stored_data = da.report_data.last_simulation_data
                         
+                        # Get accounting report if enabled
+                        accounting_report = None
+                        if hasattr(category.controller, 'get_accounting_report'):
+                            accounting_report = category.controller.get_accounting_report()
+                        
                         return {
                             'time_points': stored_data['time_points'] if stored_data else dc.time_points,
                             'place_data': stored_data['place_data'] if stored_data else dc.place_data,
                             'transition_data': stored_data['transition_data'] if stored_data else dc.transition_data,
                             'model': category.controller.model,
-                            'metadata': stored_data.get('metadata', {}) if stored_data else {}
+                            'metadata': stored_data.get('metadata', {}) if stored_data else {},
+                            'accounting_report': accounting_report
                         }
         return None
     
@@ -947,17 +953,20 @@ class ExportToolbar(Gtk.Box):
             
             if format_type == 'csv_timeseries_wide':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_timeseries_wide(filepath)
             
             elif format_type == 'csv_timeseries_long':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_timeseries_long(filepath)
             
             elif format_type == 'csv_summary':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_summary_statistics(filepath)
             
             elif format_type == 'json':
