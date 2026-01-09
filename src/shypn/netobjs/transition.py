@@ -560,6 +560,12 @@ class Transition(PetriNetObject):
             data["rate_forward"] = self.rate_forward
         if hasattr(self, 'rate_reverse') and self.rate_reverse is not None:
             data["rate_reverse"] = self.rate_reverse
+        
+        # Serialize timed transition parameters (TPN window)
+        if hasattr(self, 'earliest_time') and self.earliest_time is not None:
+            data["earliest_time"] = self.earliest_time
+        if hasattr(self, 'latest_time') and self.latest_time is not None:
+            data["latest_time"] = self.latest_time
             
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
@@ -735,6 +741,12 @@ class Transition(PetriNetObject):
             transition.is_source = data["is_source"]
         if "is_sink" in data:
             transition.is_sink = data["is_sink"]
+        
+        # Restore timed transition parameters (TPN window)
+        if "earliest_time" in data:
+            transition.earliest_time = data["earliest_time"]
+        if "latest_time" in data:
+            transition.latest_time = data["latest_time"]
         
         # Restore kinetic metadata (new structured metadata)
         if "kinetic_metadata" in data and create_metadata_from_dict is not None:

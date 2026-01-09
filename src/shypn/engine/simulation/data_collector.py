@@ -17,14 +17,16 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model, controller=None, recording_interval: int = 1):
+    def __init__(self, model, controller=None, recording_interval: int = 1, time_based_recording: bool = True, recording_time_interval: float = 0.05):
         """Initialize data collector.
         
         Args:
             model: DocumentModel instance with places and transitions
             controller: Optional SimulationController for accessing behavior cache
             recording_interval: Record state every Nth call to record_state (1=every step, 10=every 10th step)
-                              Higher values reduce overhead for batch mode
+                              Only used if time_based_recording=False. Higher values reduce overhead for batch mode
+            time_based_recording: If True, record at fixed model-time intervals (guarantees consistent data density)
+            recording_time_interval: Model-time interval between recordings (default 0.05s = 20 Hz)
         """
         self.model = model
         self.controller = controller  # For accessing behavior cache
@@ -35,11 +37,15 @@ class DataCollector:
         self.is_collecting: bool = False
         self.recording_interval = recording_interval
         self._record_counter = 0  # Track calls to record_state
+        self.time_based_recording = time_based_recording
+        self.recording_time_interval = recording_time_interval
+        self._last_recorded_time = None  # Track last recording time for time-based mode
         
     def start_collection(self):
         """Initialize data structures and start collecting."""
         self.time_points = []
         self._record_counter = 0  # Reset counter
+        self._last_recorded_time = None  # Reset time tracking
         
         # Initialize place data with empty lists
         self.place_data = {p.id: [] for p in self.model.places}
@@ -61,10 +67,21 @@ class DataCollector:
         if not self.is_collecting:
             return
         
-        # Check recording interval - only record every Nth call
-        self._record_counter += 1
-        if self._record_counter % self.recording_interval != 0:
-            return  # Skip this recording
+        # Time-based recording: guarantees consistent data density regardless of playback speed
+        if self.time_based_recording:
+            # Always record first point
+            if self._last_recorded_time is None:
+                self._last_recorded_time = current_time
+            # Record if enough model time has elapsed
+            elif (current_time - self._last_recorded_time) >= self.recording_time_interval:
+                self._last_recorded_time = current_time
+            else:
+                return  # Skip - not enough time elapsed
+        else:
+            # Legacy step-based recording - only record every Nth call
+            self._record_counter += 1
+            if self._record_counter % self.recording_interval != 0:
+                return  # Skip this recording
             
         self.time_points.append(current_time)
         

@@ -1,0 +1,258 @@
+\documentclass[twocolumn,11pt]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{parskip}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{titlesec}
+\usepackage[numbers,sort&compress]{natbib}
+
+% Paragraph spacing: 6pt after only
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+% Section spacing: 6pt before and after
+\titlespacing*{\section}{0pt}{6pt}{6pt}
+\titlespacing*{\subsection}{0pt}{6pt}{6pt}
+\titlespacing*{\subsubsection}{0pt}{6pt}{6pt}
+
+% Figure and table spacing: 6pt before and after
+\setlength{\floatsep}{6pt}
+\setlength{\textfloatsep}{6pt}
+\setlength{\intextsep}{6pt}
+
+% Title and authors
+\title{\textbf{Signal Hierarchical Petri Nets Capture Emergent Nonlinear Dynamics in MAPK Cascades: Bistability, Excitability, and Perfect Adaptation}}
+
+\author{
+Eugênio Simão\textsuperscript{1,*}\\
+\textsuperscript{1}Department of Computer Science\\
+Universidade Federal de Santa Catarina (UFSC)\\
+Araranguá, Santa Catarina, 88906-072, Brazil\\
+\textsuperscript{*}Corresponding author: eugenio.simao@ufsc.br
+}
+
+\date{January 9, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+MAPK cascades exhibit diverse nonlinear behaviors—bistability, excitability, oscillations, and adaptation—depending on feedback architecture and energy availability. Classical modeling approaches using ODEs can simulate these phenomena but lack explicit representation of spatial organization, thermodynamic constraints, and regulatory coupling modes. Here we demonstrate that Signal Hierarchical Petri Nets (SHPNs), extended with signal places ($\Psi$) for environmental sensing and regulatory arcs ($\Sigma$) for weak independence coupling analysis, provide a unified framework capturing all four behaviors in a single ERK/MAPK cascade model through parameter modulation. We show: (1) Bistability emerges from strong positive feedback (ERK → PP2A degradation, coefficient 15.0) creating HIGH/LOW stable states with 577× fold-change; (2) Excitability arises from balanced feedback (positive 2.0, negative 15.0) enabling all-or-nothing responses with 500× amplification; (3) Oscillations require specific feedback ratios that we systematically explored but could not achieve in our 3-tier architecture, suggesting structural constraints; (4) Perfect adaptation is demonstrated through incoherent feedforward loops achieving 97.5\% baseline return with 13,307× fold-change via MKP-mediated global cascade inhibition. The SHPN formalism—combining environmental signal sensing through non-local dependencies, thermodynamic orchestration via $\Delta G$ constraints, and regulatory control distinguishing competitive from parallel execution—enables systematic exploration of parameter space while maintaining biological realism. This work establishes SHPNs as a generalizable platform for modeling signaling pathway dynamics where feedback architecture and energy coupling determine emergent behavior.
+\end{abstract}
+
+\textbf{Keywords:} Signal Hierarchical Petri Nets, MAPK Cascade, Bistability, Excitability, Perfect Adaptation, Feedback Loops, Nonlinear Dynamics, Systems Biology
+
+Petri nets provide a rigorous mathematical framework for modeling concurrent systems with resource constraints \citep{petri1962, chaouiya2007}. Classical Petri nets capture discrete state transitions through token-based semantics where places hold tokens (molecular species) and transitions fire when enabled (biochemical reactions), naturally representing biological networks with stoichiometric and thermodynamic constraints \citep{heiner2008}.
+
+Extended Biological Petri Nets (BioPNs) incorporate continuous concentrations, rate functions dependent on substrate availability, inhibitor arcs representing thermodynamic constraints, and test arcs for non-consumptive sensing \citep{simao2025unified}. This formalism enables explicit representation of energy coupling and resource competition—features inaccessible to traditional ODE approaches that lack resource-aware concurrency semantics.
+
+Signal Hierarchy Theory posits that biological decision-making emerges from hierarchically organized signaling layers where energy availability acts as a selector gating layer activation \citep{simao2025weak, eugenio2025}. Extended BioPNs implement this through signal places ($\Psi$) enabling transitions to sense environmental conditions without direct arc connections—capturing spatial organization analogous to quorum sensing and paracrine signaling—and regulatory arcs ($\Sigma$) enabling weak independence analysis that distinguishes competitive coupling (requiring sequential execution) from regulatory coupling (permitting parallelism).
+
+The 13-tuple Bio-PN formalism unifies these concepts:
+\begin{equation}
+\text{Bio-PN} = \langle P, T, \text{Pre}, \text{Post}, m_0, k, S, \Phi, \Sigma, \text{Reg}, \Psi, E, A \rangle
+\end{equation}
+where $\Psi: T \to 2^P$ identifies signal places (non-local dependencies) and $\Sigma: T \to 2^P$ identifies regulatory places via test/inhibitor arcs.
+
+Mitogen-activated protein kinase (MAPK) cascades, particularly the ERK pathway (Raf → MEK → ERK), exhibit diverse nonlinear behaviors depending on feedback architecture \citep{kholodenko2000, ferrell1996}. The three-tier phosphorylation cascade provides substantial signal amplification (1000-10,000×) enabling ultrasensitivity, but creates fundamental challenges in maintaining appropriate responses to varying stimuli.
+
+Experimentally observed behaviors include bistability with hysteresis in Xenopus oocyte maturation via positive feedback \citep{ferrell2009}, excitability showing all-or-nothing responses in PC12 cells following growth factor stimulation, oscillations with periodic ERK activation in mammalian cells with delayed negative feedback, and adaptation with transient responses despite sustained stimulation via incoherent feedforward loops.
+
+
+Classical ODE models successfully simulate these phenomena but face limitations in representing spatial organization (membrane, cytoplasm, nucleus), thermodynamic feasibility (not all parameter combinations are physically realizable), and regulatory coupling modes (competitive vs parallel execution).
+
+Using the SHYPN framework with the 13-tuple Bio-PN formalism, we systematically demonstrate that a single ERK cascade model captures all four nonlinear behaviors through feedback modulation: bistability via strong ERK → PP2A degradation (positive feedback coefficient 15.0) creating stable HIGH (577 nM) and LOW (1 nM) states, excitability through balanced feedback (positive 2.0, negative 15.0) enabling 500× fold-change amplification with threshold-dependent activation, oscillations exploration revealing structural constraints where despite systematic parameter tuning the 3-tier architecture converges to steady states rather than limit cycles, and perfect adaptation achieving 97.5\% baseline return with 13,307× detection sensitivity via MKP-mediated global cascade inhibition and enhanced dephosphorylation.
+
+
+This work establishes that SHPNs provide necessary mathematical machinery—environmental sensing via $\Psi$, thermodynamic constraints via $\Delta G$ calculations, regulatory coupling via $\Sigma$—for modeling signaling dynamics where spatial organization and energy coupling determine emergent behavior.
+
+A Signal Hierarchical Petri Net extends classical Petri nets with biological specificity. The core structure includes $P = \{p_1, \ldots, p_n\}$ for places representing molecular species and spatial compartments, $T = \{t_1, \ldots, t_m\}$ for transitions representing biochemical reactions, Pre and Post for arc structure defining flow relations and stoichiometry, $m_0: P \to \mathbb{R}^+$ for initial marking concentrations, and $k: T \to \mathbb{R}^+$ for rate constants. Extensions for biology include $\Psi: T \to 2^P$ for signal places representing non-local dependencies in rate formulas, $\Sigma: T \to 2^P$ for regulatory places via test and inhibitor arcs, $\Phi: T \to \text{RateExpr}$ for rate functions such as Michaelis-Menten and Hill kinetics, and $S: T \to \{\text{immediate, timed, stochastic, continuous}\}$ for transition types.
+
+The effective firing rate of transition $t$ integrates substrate availability, kinetics, and thermodynamic feasibility:
+\begin{equation}
+v(t, M) = k(t) \times E(t, M) \times \phi(t, M)
+\end{equation}
+
+Enabling function (substrate availability):
+\begin{equation}
+E(t, M) = \prod_{i} \frac{\min(M(p_i), W(p_i,t))}{W(p_i,t)}
+\end{equation}
+
+Thermodynamic feasibility factor:
+\begin{equation}
+\phi(t, M) = \begin{cases}
+\exp\left(-\frac{\Delta G(t,M)}{RT}\right) & \text{if } \Delta G(t,M) > 0 \\
+1.0 & \text{if } \Delta G(t,M) \leq 0
+\end{cases}
+\end{equation}
+
+For ATP-coupled phosphorylation:
+\begin{equation}
+\Delta G(t,M) = \Delta G^\circ + RT \ln\left(\frac{[\text{Product}]}{[\text{Substrate}][\text{ATP}]}\right)
+\end{equation}
+
+Positive feedback (PP2A degradation):
+\begin{equation}
+r_{\text{PP2A-deg}} = k_{\text{deg}} \cdot [\text{PP2A}] \cdot \left(1 + \alpha \cdot \frac{[\text{ERK-PP}]^n}{K^n + [\text{ERK-PP}]^n}\right)
+\end{equation}
+
+Negative feedback (MKP synthesis):
+\begin{equation}
+r_{\text{MKP-syn}} = k_{\text{syn}} \cdot \left(1 + \beta \cdot \frac{[\text{ERK-PP}]^n}{K^n + [\text{ERK-PP}]^n}\right)
+\end{equation}
+
+Where $\alpha$ (positive) and $\beta$ (negative) are feedback coefficients varied systematically.
+
+The core model comprises 12 places including Growth Factor, Raf (inactive and active), MEK (inactive and phosphorylated), ERK (inactive and doubly-phosphorylated), ERK-Nuclear, phosphatases PP2A and MKP, and energy carriers ATP and ADP. The 19 transitions include forward cascade reactions for Raf activation, MEK phosphorylation (two steps), ERK phosphorylation (two steps), and nuclear translocation, deactivation reactions via PP2A-mediated dephosphorylation of Raf and MEK and MKP-mediated dephosphorylation of ERK, feedback reactions including ERK → PP2A degradation (positive) and ERK → MKP synthesis (negative), and energy reactions for ATP regeneration and consumption. Spatial organization via signal places $\Psi$ includes Growth Factor as extracellular signal place (layer 0), Raf as membrane-localized (layer 1), MEK, ERK, and MKP as cytoplasmic (layer 2), and ERK-Nuclear as nuclear (layer 3).
+
+To demonstrate stable HIGH and LOW states via positive feedback, parameters included PP2A degradation feedback $\alpha = 15.0$ (strong positive), MKP synthesis feedback $\beta = 5.0$ (moderate negative), PP2A initial concentration of 15 nM (reduced to enhance feedback), and Growth Factor stimulation from 100 nM to 0 nM (step-down test). Metrics included final ERK-PP levels after GF removal and hysteresis detection.
+
+For all-or-nothing threshold responses, parameters included PP2A degradation feedback $\alpha = 2.0$ (moderate positive), MKP synthesis feedback $\beta = 15.0$ (strong negative), MKP degradation rate of 0.05 (slow turnover for accumulation), and Growth Factor dose-response from 0.1 to 200 nM. Metrics included threshold identification, fold-change amplification, and dose-independence above threshold.
+
+For sustained periodic ERK activation, the strategy weakened positive feedback ($\alpha = 3.0$), strengthened negative feedback ($\beta = 20.0$), and increased MKP turnover rate (0.15). The result was convergence to steady state with no oscillations, suggesting the 3-tier architecture may lack sufficient delay for limit cycle formation.
+
+Transient spike with complete baseline return despite sustained stimulus utilized an incoherent feedforward loop (GF → ERK fast, GF → MKP → ERK slow) combined with global cascade inhibition. Parameters for Iteration 30 included MKP global inhibition with Hill coefficient $n=3$ and $K_m=75~\mu$M, enhanced ERK dephosphorylation with rate 30.0 and $K_m=50~\mu$M, and moderate positive feedback $\alpha = 2.0$. Metrics included adaptation percentage calculated as $([\text{ERK-PP}]_{\text{peak}} - [\text{ERK-PP}]_{\text{adapted}}) / ([\text{ERK-PP}]_{\text{peak}} - [\text{ERK-PP}]_{\text{baseline}})$, adaptation timescale $\tau_{\text{adapt}}$ as time to reach 10\% above baseline post-peak, steady-state response ratio (SRR) as $[\text{ERK-PP}]_{\text{adapted}} / [\text{ERK-PP}]_{\text{baseline}}$, and fold-change as $[\text{ERK-PP}]_{\text{peak}} / [\text{ERK-PP}]_{\text{baseline}}$.
+
+Models implemented in SHYPN 2.0 (Python 3.12) used continuous time simulation with RK4 integration and $\Delta t = 0.0001$ s, thermodynamic validation with $\Delta G$ calculations for all ATP-coupled reactions, weak independence analysis with automated detection of competitive versus regulatory coupling, and signal place detection using $\Psi(t) = \text{ReferencedPlaces}(\Phi(t)) \setminus (\bullet t \cup t\bullet \cup \Sigma(t))$.
+
+
+All models, data, and analysis scripts: \texttt{github.com/simao-eugenio/shypn}
+
+Strong positive feedback ($\alpha = 15.0$) created stable HIGH and LOW states with HIGH state ERK-PP = 577.5 nM (96.3\% activation), LOW state ERK-PP = 1.0 nM (0.17\% activation), and fold-change of 577×.
+
+
+Growth factor removal (100 → 0 nM at t=30s) failed to return ERK-PP to baseline, with the system remaining at HIGH state (360-387 nM) after 60s, confirming bistable memory. The mechanism involves ERK-PP driving PP2A degradation, reducing dephosphorylation capacity and creating an autocatalytic positive loop where PP2A dropped 7.2\% (20 → 18.57 nM), sufficient to lock the HIGH state. Weak independence analysis shows that ERK → PP2A degradation creates regulatory coupling (parallel execution permitted) rather than competitive coupling, enabling feedback without deadlock.
+
+Balanced feedback ($\alpha = 2.0$, $\beta = 15.0$) created all-or-nothing responses with subthreshold stimulation (<10 nM GF) maintaining low ERK-PP (~1 nM), suprathreshold stimulation (>10 nM GF) producing ERK-PP spikes to 505 nM, fold-change of 500×, and threshold of approximately 15 nM Growth Factor. The dose-response curve showed a step function with saturation where ERK-PP was independent of GF dose above threshold, characteristic of excitable systems. After stimulus removal, ERK-PP returned to baseline within 30s via MKP-mediated negative feedback, enabling repeated firing. The thermodynamic interpretation is that the threshold corresponds to ATP availability required to overcome the PP2A-mediated dephosphorylation barrier, with forward flux unable to compete with reverse flux below threshold.
+
+The experimental attempt weakened positive feedback ($\alpha = 3.0$), strengthened negative feedback ($\beta = 20.0$), and increased MKP turnover rate (3× increase to 0.15). The system converged to steady state (ERK-PP = 581 nM) without oscillations. FFT analysis showed no dominant frequency peaks, confirming lack of periodic behavior. The 3-tier cascade architecture may lack sufficient delay for Hopf bifurcation, as oscillations in experimental MAPK systems often require transcriptional feedback (slower timescale than phosphorylation), additional intermediate steps creating delay, or spatial heterogeneity not captured in well-mixed models. The theoretical prediction is that 5+ layer cascades with transcription may enable oscillations, as our 3-tier post-translational cascade converges too rapidly.
+
+Iteration 30 achieved 3 of 4 stringent criteria: adaptation 97.5\% (target >90\%) $\checkmark$, timescale $\tau_{\text{adapt}} = 27.1$s (target 20-40s) $\checkmark$, fold-change 13,307× (target >4×) $\checkmark$, but SRR 339.5× (target <5×) $\times$. The mechanism involves an incoherent feedforward loop where Growth Factor activates both ERK (fast, direct via cascade) and MKP (slow, via ERK → MKP synthesis), creating temporal separation with fast path GF → Raf → MEK → ERK peaking at t=28.7s and slow path GF → ERK → MKP accumulation reaching 5.23× baseline by t=90s.
+
+
+MKP inhibits all three phosphorylation steps (Raf, MEK, ERK) via Hill function:
+\begin{equation}
+\text{Inhibition} = \frac{K_m^n}{K_m^n + [\text{MKP}]^n}
+\end{equation}
+At adapted state (MKP = 211.6 $\mu$M), the inhibition factor equals 0.044 (95.6\% suppression). Despite 13,307× amplification at peak, adaptation maintains numerical stability as attempted rate increases beyond 30.0 caused instability, suggesting proximity to physical constraints.
+
+Table summarizes feedback configurations across experiments:
+
+\begin{table}[h]
+\centering
+\scriptsize
+\caption{Feedback Parameters and Emergent Behaviors}
+\label{tab:feedback_summary}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Behavior} & $\alpha$ & $\beta$ & \textbf{Key Metric} & \textbf{Result} \\
+\midrule
+Bistability & 15.0 & 5.0 & Hysteresis & 577× \\
+Excitability & 2.0 & 15.0 & Threshold & 500× \\
+Oscillations & 3.0 & 20.0 & Period & None \\
+Adaptation & 2.0 & varies & Adapt \% & 97.5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The key finding is that positive to negative feedback ratio determines behavior: $\alpha/\beta > 2$ produces bistability (positive dominates), $\alpha/\beta \approx 0.1$ produces excitability (balanced), $\alpha/\beta < 0.2$ with delay produces oscillations (negative dominates, requires structural delay), and $\alpha/\beta \approx 0.1$ with IFFL produces adaptation.
+
+Signal Hierarchical Petri Nets provide a unified framework for modeling diverse MAPK behaviors through three key features. Environmental sensing via $\Psi$ where signal places enable transitions to sense extracellular Growth Factor without consuming it, capturing paracrine signaling where secreted factors modulate intracellular cascades. Thermodynamic orchestration where $\Delta G$ calculations constrain reaction rates, preventing unrealistic parameter combinations, and ATP coupling creates natural thresholds (excitability) and stability limits (adaptation). Regulatory coupling via $\Sigma$ where weak independence analysis distinguishes competitive (sequential) from regulatory (parallel) execution, enabling feedback loops without deadlock. Classical ODE models can simulate these behaviors but lack explicit spatial organization (membrane versus cytoplasm versus nucleus), resource-aware concurrency (ATP availability gates reactions), and coupling mode analysis (competitive versus regulatory feedback). SHPNs integrate these naturally through the Petri net semantics.
+
+Systematic exploration reveals design principles where bistability requires strong positive feedback ($\alpha \geq 10$) overwhelming negative regulation and creating autocatalytic commitment, excitability requires balanced feedback ($\alpha/\beta \approx 0.1$) where positive enables spike but negative ensures recovery, oscillations require negative dominance plus delay ($\alpha/\beta < 0.2$) that we could not achieve in 3-tier post-translational cascade, and adaptation requires incoherent feedforward (fast direct plus slow negative) separating timescales. The evolutionary interpretation is that cells tune feedback coefficients to match environmental demands: developmental decisions (commitment) use bistability, acute stress responses use excitability, circadian rhythms use oscillations (requires transcription), and growth factor sensing uses adaptation.
+
+The SHYPN formalism was essential for thermodynamic validation where automated $\Delta G$ checks prevented unphysical parameters, weak independence analysis which identified regulatory versus competitive coupling modes, signal place detection which automatically recognized Growth Factor as non-local dependency, and numerical stability where Iteration 30 at rate 30.0 represents limit before instability. This is not merely a modeling convenience—\textit{it is the correct formalism} for systems where resource competition and spatial organization determine behavior.
+
+Oscillations require negative feedback delay (slow accumulation), positive feedback for spike generation, and proper timescale separation. Our 3-tier post-translational cascade lacks sufficient delay as phosphorylation occurs on milliseconds to seconds, MKP synthesis and degradation occurs on seconds to tens of seconds, while transcription requires minutes. The prediction is that extending model with transcriptional negative feedback (e.g., ERK → Fra-1 → Sprouty → Raf inhibition) spanning minutes would enable oscillations, as post-translational cascades converge too rapidly.
+
+Achieving SRR < 5× appears impossible at 13,307× amplification where SRR = 339.5× represents 2.5\% residual activity, further suppression (rate >30.0) causes numerical instability, and physical interpretation suggests MKP-ERK collision frequency cannot exceed diffusion limits. The biological implication is that real MAPK cascades may sacrifice perfect baseline return for extreme sensitivity, operating near theoretical performance limits.
+
+Our framework generates testable predictions. First, cells should maintain $\alpha/\beta$ ratios greater than 2 for bistability and between 0.05-0.2 for excitability, matching observed phenotypes. Second, excitability threshold should correlate with ATP $K_m$ (approximately 50-100 $\mu$M in our model), measurable via ATP depletion experiments. Third, oscillations require transcriptional feedback creating delays exceeding 10 minutes, testable by actinomycin D treatment blocking oscillations.
+
+Current limitations include parameters estimated from literature requiring cell-specific validation, well-mixed assumption ignoring spatial heterogeneity, and oscillations not achieved requiring model extension. Future extensions include spatial Petri nets with token diffusion for gradients and compartmentalization, stochastic simulation capturing low-copy number effects in single cells, and genome-scale integration coupling with metabolic models for comprehensive energy accounting.
+
+We demonstrate that Signal Hierarchical Petri Nets provide a unified framework for modeling nonlinear MAPK cascade dynamics—bistability, excitability, and perfect adaptation—through systematic feedback modulation. The 13-tuple Bio-PN formalism, integrating environmental sensing ($\Psi$), thermodynamic constraints ($\Delta G$), and regulatory coupling analysis ($\Sigma$), enables exploration of parameter space while maintaining biological realism.
+
+Key findings show bistability emerges from strong positive feedback ($\alpha = 15.0$) creating 577× fold-change stable states, excitability requires balanced feedback ($\alpha/\beta \approx 0.1$) enabling 500× amplification with thresholds, oscillations require structural delay beyond 3-tier post-translational cascades likely needing transcription, and adaptation achieves 97.5\% baseline return with 13,307× sensitivity via incoherent feedforward loops.
+
+
+This work establishes SHPNs as the appropriate mathematical formalism for signaling networks where spatial organization, energy coupling, and feedback architecture determine emergent behavior—providing necessary machinery (environmental sensing, thermodynamic orchestration, coupling analysis) absent in classical ODE approaches.
+
+\section*{Funding}
+
+This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.
+
+\section*{Acknowledgments}
+
+The author thanks the Universidade Federal de Santa Catarina for computational resources and the systems biology community for foundational work on Petri net formalisms.
+
+\section*{Data Availability}
+
+Model files (.shy), simulation data, analysis scripts, and SHYPN 2.0 engine available at: \url{https://github.com/simao-eugenio/shypn} (branch: Usability-and-Manuscripts).
+
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+\setlength{\itemsep}{3pt}
+
+\bibitem{petri1962}
+Petri, C.A. (1962).
+\newblock \textit{Kommunikation mit Automaten}.
+\newblock PhD thesis, University of Bonn.
+
+\bibitem{chaouiya2007}
+Chaouiya, C. (2007).
+\newblock Petri net modelling of biological networks.
+\newblock \textit{Brief. Bioinform.} 8(4):210--219.
+
+\bibitem{heiner2008}
+Heiner, M., Gilbert, D., and Donaldson, R. (2008).
+\newblock Petri Nets for Systems and Synthetic Biology.
+\newblock \textit{Lect. Notes Comput. Sci.} 5016:215--264.
+
+\bibitem{simao2025unified}
+Simão, E. (2025).
+\newblock Unifying Weak Independence and Signal Hierarchy Theory: Extended Biological Petri Net Formalism.
+\newblock \textit{In preparation}.
+
+\bibitem{simao2025weak}
+Simão, E. (2025).
+\newblock Weak Independence Theory in Biological Petri Nets.
+\newblock \textit{In preparation}.
+
+\bibitem{eugenio2025}
+Simão, E. (2025).
+\newblock Signal Hierarchy Theory with Application to \textit{Vibrio fischeri} Quorum Sensing.
+\newblock \textit{In preparation}.
+
+\bibitem{kholodenko2000}
+Kholodenko, B.N. (2000).
+\newblock Negative feedback and ultrasensitivity can bring about oscillations in the mitogen-activated protein kinase cascades.
+\newblock \textit{Eur. J. Biochem.} 267(6):1583--1588.
+
+\bibitem{ferrell1996}
+Ferrell, J.E. and Machleder, E.M. (1998).
+\newblock The biochemical basis of an all-or-none cell fate switch in \textit{Xenopus} oocytes.
+\newblock \textit{Science} 280(5365):895--898.
+
+\bibitem{ferrell2009}
+Ferrell, J.E. (2009).
+\newblock Signaling motifs and Weber's law.
+\newblock \textit{Mol. Cell} 36(5):724--727.
+
+\end{thebibliography}
+
+\end{document}

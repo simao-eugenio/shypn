@@ -125,13 +125,16 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, verbose: bool = True, recording_interval: int = 1):
+    def __init__(self, model, verbose: bool = True, recording_interval: int = 1, time_based_recording: bool = True):
         """Initialize the simulation controller.
         
         Args:
             model: ModelCanvasManager instance (has places, transitions, arcs lists)
             verbose: If True, print debug output (disable for batch mode performance)
             recording_interval: Record data every Nth step (higher = less overhead for batch mode)
+                              Only used if time_based_recording=False
+            time_based_recording: If True, record at fixed model-time intervals (default: True)
+                                 Guarantees consistent data point density regardless of playback speed
         """
         self.model = model
         self.time = 0.0
@@ -147,8 +150,16 @@ class SimulationController:
         self.verbose = verbose  # Control debug output
         
         # Data collection for simulation results
+        # Time-based recording (default): ensures consistent data density at all playback speeds
+        # recording_time_interval=0.05s means 20 data points per second of model time
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(model, controller=self, recording_interval=recording_interval)
+        self.data_collector = DataCollector(
+            model, 
+            controller=self, 
+            recording_interval=recording_interval,
+            time_based_recording=time_based_recording,
+            recording_time_interval=0.05  # 20 Hz sampling rate
+        )
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -1083,6 +1094,9 @@ class SimulationController:
                         state = self._get_or_create_state(transition)
                         state.enablement_time = None
                         state.scheduled_time = None
+                        
+                        # Increment firing count for statistics
+                        transition.firing_count += 1
                         
                         # Notify data collector (if it has this method - old SimulationDataCollector)
                         if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):

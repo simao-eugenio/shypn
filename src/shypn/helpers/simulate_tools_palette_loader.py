@@ -1110,15 +1110,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Enable/disable token accounting based on checkbox
         checkbox_active = self.token_accounting_check and self.token_accounting_check.get_active()
-        print(f"🔍 Test checkbox state: {checkbox_active}")
         
         if checkbox_active:
             # Use relaxed mode (collect violations, don't crash)
             self.simulation.enable_token_accounting(strict_mode=False)
-            print("🧮 Token accounting enabled - data will be included in CSV export")
         else:
             self.simulation.disable_token_accounting()
-            print("➡️ Token accounting disabled")
         
         # Check if batch mode is enabled in document model
         model = self.simulation.model
@@ -1209,36 +1206,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
                     analyses_panel = overlay_manager.analyses_panel_loader.panel
                     if analyses_panel:
-                        # Clear Transitions panel
+                        # Clear Transitions category (2 panels)
                         if hasattr(analyses_panel, 'transitions_category') and analyses_panel.transitions_category:
-                            trans_panel = analyses_panel.transitions_category.panel
-                            if trans_panel and hasattr(trans_panel, '_show_empty_state'):
-                                trans_panel.selected_objects.clear()
-                                trans_panel.last_data_length.clear()
-                                trans_panel._plot_lines.clear()
-                                trans_panel._show_empty_state()
+                            analyses_panel.transitions_category.clear_plot()
                         
-                        # Clear Places panel
+                        # Clear Places category (2 panels)
                         if hasattr(analyses_panel, 'places_category') and analyses_panel.places_category:
-                            places_panel = analyses_panel.places_category.panel
-                            if places_panel and hasattr(places_panel, '_show_empty_state'):
-                                places_panel.selected_objects.clear()
-                                places_panel.last_data_length.clear()
-                                places_panel._plot_lines.clear()
-                                places_panel._show_empty_state()
+                            analyses_panel.places_category.clear_plot()
                         
-                        # Clear Plotting category (Time Series, Histogram, Scatter, Phase)
+                        # Clear Plotting category (4 plots: Time Series, Histogram, Scatter, Phase)
                         if hasattr(analyses_panel, 'plotting_category') and analyses_panel.plotting_category:
-                            plotting_cat = analyses_panel.plotting_category
-                            # Clear all 4 plot types
-                            if hasattr(plotting_cat, 'timeseries_plot') and plotting_cat.timeseries_plot:
-                                plotting_cat.timeseries_plot.clear_plot()
-                            if hasattr(plotting_cat, 'histogram_plot') and plotting_cat.histogram_plot:
-                                plotting_cat.histogram_plot.clear_plot()
-                            if hasattr(plotting_cat, 'scatter_plot') and plotting_cat.scatter_plot:
-                                plotting_cat.scatter_plot.clear_plot()
-                            if hasattr(plotting_cat, 'phase_plot') and plotting_cat.phase_plot:
-                                plotting_cat.phase_plot.clear_plot()
+                            analyses_panel.plotting_category.clear_plot()
         
         self.emit('reset-executed')
         self._update_progress_display()  # Reset progress bar
