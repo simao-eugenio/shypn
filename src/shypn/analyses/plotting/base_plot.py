@@ -253,6 +253,19 @@ class BasePlot(Gtk.Box):
         """Handle Reset button click - blank the canvas with proper axes/grid/legend."""
         self._show_reset_state()
     
+    def clear_plot(self):
+        """Clear plot data and show reset state.
+        
+        Called when simulation is reset to blank the canvas.
+        """
+        # Reset tracking counters
+        self._last_data_count = 0
+        self._last_selected_count = 0
+        self.needs_update = False
+        
+        # Show blank reset state
+        self._show_reset_state()
+    
     def _on_update_toggled(self, check):
         """Handle Auto-update toggle."""
         self.update_enabled = check.get_active()

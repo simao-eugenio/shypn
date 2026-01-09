@@ -3125,6 +3125,15 @@ class ModelCanvasLoader:
                     self.right_panel_loader.dynamic_analyses_panel.reset()
                 except Exception as e:
                     print(f"Warning: Could not reset dynamic analyses panel: {e}")
+        
+        # Also check overlay-based dynamic analyses panel (per-document)
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+                try:
+                    overlay_manager.analyses_panel_loader.panel.reset()
+                except Exception as e:
+                    pass
 
     def _on_simulation_settings_changed(self, palette, drawing_area):
         """Handle simulation settings change.

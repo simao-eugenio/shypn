@@ -30,20 +30,20 @@ warnings.filterwarnings('ignore', message="'parseString' deprecated")
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
 
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+
+# Import gi.repository.cairo to register foreign struct converters
+# This fixes "Couldn't find foreign struct converter for 'cairo.Context'" error
+# which occurs in conda environments with pygobject
 try:
-	import gi
-	gi.require_version('Gtk', '3.0')
-	gi.require_version('Gdk', '3.0')
-	
-	# Import gi.repository.cairo to register foreign struct converters
-	# This fixes "Couldn't find foreign struct converter for 'cairo.Context'" error
-	# which occurs in conda environments with pygobject
-	try:
-		gi.require_version('cairo', '1.0')
-		from gi.repository import cairo as _gi_cairo  # noqa: F401
-	except (ImportError, ValueError):
-		pass  # Cairo integration may not be available
-	
+	gi.require_version('cairo', '1.0')
+	from gi.repository import cairo as _gi_cairo  # noqa: F401
+except (ImportError, ValueError):
+	pass  # Cairo integration may not be available
+
+try:
 	from gi.repository import Gtk, Gdk, GLib
 	
 	# Initialize Gdk early to avoid initialization issues in imports

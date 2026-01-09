@@ -196,14 +196,14 @@ class CurvedSignalFlowArc(CurvedArc):
         end_world_x = arrowhead_x - dx_end * pullback
         end_world_y = arrowhead_y - dy_end * pullback
         
-        # Add glow effect for colored arcs
+        # Add glow effect for colored arcs (with same dash pattern as main line)
         if self.color != self.DEFAULT_COLOR:
             cr.move_to(start_world_x, start_world_y)
             cr.curve_to(cp_x, cp_y, cp_x, cp_y, end_world_x, end_world_y)
             r, g, b = self.color
             cr.set_source_rgba(r, g, b, 0.3)
             cr.set_line_width((self.width + 2) / max(zoom, 1e-6))
-            cr.set_dash([])  # Glow is solid
+            cr.set_dash([8.0 / zoom, 4.0 / zoom])  # Match dashed pattern for glow
             cr.stroke()
         
         # Draw curved arc with DASHED pattern (signal flow style)

@@ -202,6 +202,38 @@ class TransitionPropDialogLoader(GObject.GObject):
             if rate_value is not None:
                 rate_entry.set_text(str(rate_value))
         
+        # Earliest time (for Timed transitions)
+        earliest_time_spin = self.builder.get_object('earliest_time_spin')
+        if earliest_time_spin:
+            earliest_value = None
+            # Check top-level attribute first (JSON schema)
+            if hasattr(self.transition_obj, 'earliest_time'):
+                earliest_value = self.transition_obj.earliest_time
+            # Fall back to properties dict
+            elif hasattr(self.transition_obj, 'properties'):
+                earliest_value = self.transition_obj.properties.get('earliest_time')
+            # Set value or default for timed transitions
+            if earliest_value is not None:
+                earliest_time_spin.set_value(float(earliest_value))
+            elif hasattr(self.transition_obj, 'transition_type') and self.transition_obj.transition_type == 'timed':
+                earliest_time_spin.set_value(1.0)  # Default 1 second
+        
+        # Latest time (for Timed transitions)
+        latest_time_spin = self.builder.get_object('latest_time_spin')
+        if latest_time_spin:
+            latest_value = None
+            # Check top-level attribute first (JSON schema)
+            if hasattr(self.transition_obj, 'latest_time'):
+                latest_value = self.transition_obj.latest_time
+            # Fall back to properties dict
+            elif hasattr(self.transition_obj, 'properties'):
+                latest_value = self.transition_obj.properties.get('latest_time')
+            # Set value or default for timed transitions
+            if latest_value is not None:
+                latest_time_spin.set_value(float(latest_value))
+            elif hasattr(self.transition_obj, 'transition_type') and self.transition_obj.transition_type == 'timed':
+                latest_time_spin.set_value(1.0)  # Default 1 second
+        
         # Guard function (TextView)
         guard_textview = self.builder.get_object('guard_textview')
         if guard_textview and hasattr(self.transition_obj, 'guard'):
@@ -318,6 +350,15 @@ class TransitionPropDialogLoader(GObject.GObject):
             parent = firing_policy_combo.get_parent()
             if parent:
                 parent.set_visible(editable_fields.get('firing_policy', True))
+        
+        # Show/hide timing fields (only for timed transitions)
+        is_timed = hasattr(self.transition_obj, 'transition_type') and self.transition_obj.transition_type == 'timed'
+        earliest_time_box = self.builder.get_object('earliest_time_box')
+        if earliest_time_box:
+            earliest_time_box.set_visible(is_timed)
+        latest_time_box = self.builder.get_object('latest_time_box')
+        if latest_time_box:
+            latest_time_box.set_visible(is_timed)
     
     def _update_priority_field_visibility(self):
         """Show/hide priority value field based on selected firing policy."""
@@ -749,6 +790,25 @@ class TransitionPropDialogLoader(GObject.GObject):
                         return False  # Validation failed, don't apply changes
                 
                 self.transition_obj.set_guard(guard_text if guard_text else None)
+            
+            # Timing parameters (for Timed transitions)
+            earliest_time_spin = self.builder.get_object('earliest_time_spin')
+            if earliest_time_spin:
+                earliest_value = earliest_time_spin.get_value()
+                self.transition_obj.earliest_time = earliest_value
+                # Also save to properties for backward compatibility
+                if not hasattr(self.transition_obj, 'properties'):
+                    self.transition_obj.properties = {}
+                self.transition_obj.properties['earliest_time'] = earliest_value
+            
+            latest_time_spin = self.builder.get_object('latest_time_spin')
+            if latest_time_spin:
+                latest_value = latest_time_spin.get_value()
+                self.transition_obj.latest_time = latest_value
+                # Also save to properties for backward compatibility
+                if not hasattr(self.transition_obj, 'properties'):
+                    self.transition_obj.properties = {}
+                self.transition_obj.properties['latest_time'] = latest_value
             
             # Color from picker
             if self.color_picker:
