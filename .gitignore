@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Debug and cleanup logs at root
+debug.log
+CLEANUP_SUMMARY.md
+
 # Distribution / packaging
 .Python
 build/
