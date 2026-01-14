@@ -55,27 +55,44 @@ class TimedBehavior(TransitionBehavior):
             model: Model instance for context access
         """
         super().__init__(transition, model)
-        props = getattr(transition, 'properties', {})
-        if 'earliest' in props or 'latest' in props:
-            self.earliest = float(props.get('earliest', 0.0))
-            self.latest = float(props.get('latest', float('inf')))
+        
+        # Read timing parameters (TPN firing window: [earliest, latest])
+        # Priority order:
+        #   1. Direct attributes: transition.earliest_time / transition.latest_time (JSON schema)
+        #   2. Properties dict: transition.properties['earliest_time'] or ['earliest'] (legacy)
+        #   3. Fallback to rate as delay (backward compatibility)
+        
+        # Try direct attributes first (JSON loads these at top level)
+        if hasattr(transition, 'earliest_time') or hasattr(transition, 'latest_time'):
+            self.earliest = float(getattr(transition, 'earliest_time', 0.0))
+            self.latest = float(getattr(transition, 'latest_time', float('inf')))
         else:
-            rate = getattr(transition, 'rate', None)
-            if rate is not None:
-                try:
-                    delay = float(rate) if isinstance(rate, (int, float)) else 1.0
-                    if delay > 0:
-                        self.earliest = delay
-                        self.latest = delay
-                    else:
+            # Try properties dictionary (legacy or programmatically created)
+            props = getattr(transition, 'properties', {})
+            if 'earliest_time' in props or 'latest_time' in props:
+                self.earliest = float(props.get('earliest_time', 0.0))
+                self.latest = float(props.get('latest_time', float('inf')))
+            elif 'earliest' in props or 'latest' in props:
+                self.earliest = float(props.get('earliest', 0.0))
+                self.latest = float(props.get('latest', float('inf')))
+            else:
+                # Fallback: use rate as delay (backward compatibility)
+                rate = getattr(transition, 'rate', None)
+                if rate is not None:
+                    try:
+                        delay = float(rate) if isinstance(rate, (int, float)) else 1.0
+                        if delay > 0:
+                            self.earliest = delay
+                            self.latest = delay
+                        else:
+                            self.earliest = 1.0
+                            self.latest = 1.0
+                    except (ValueError, TypeError) as e:
                         self.earliest = 1.0
                         self.latest = 1.0
-                except (ValueError, TypeError) as e:
+                else:
                     self.earliest = 1.0
                     self.latest = 1.0
-            else:
-                self.earliest = 1.0
-                self.latest = 1.0
         if self.earliest < 0:
             raise ValueError(f'Earliest time cannot be negative: {self.earliest}')
         if self.latest < self.earliest:

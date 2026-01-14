@@ -125,13 +125,16 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, verbose: bool = True, recording_interval: int = 1):
+    def __init__(self, model, verbose: bool = True, recording_interval: int = 1, time_based_recording: bool = True):
         """Initialize the simulation controller.
         
         Args:
             model: ModelCanvasManager instance (has places, transitions, arcs lists)
             verbose: If True, print debug output (disable for batch mode performance)
             recording_interval: Record data every Nth step (higher = less overhead for batch mode)
+                              Only used if time_based_recording=False
+            time_based_recording: If True, record at fixed model-time intervals (default: True)
+                                 Guarantees consistent data point density regardless of playback speed
         """
         self.model = model
         self.time = 0.0
@@ -147,8 +150,16 @@ class SimulationController:
         self.verbose = verbose  # Control debug output
         
         # Data collection for simulation results
+        # Time-based recording (default): ensures consistent data density at all playback speeds
+        # recording_time_interval=0.05s means 20 data points per second of model time
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(model, controller=self, recording_interval=recording_interval)
+        self.data_collector = DataCollector(
+            model, 
+            controller=self, 
+            recording_interval=recording_interval,
+            time_based_recording=time_based_recording,
+            recording_time_interval=0.05  # 20 Hz sampling rate
+        )
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -177,6 +188,9 @@ class SimulationController:
         # Option 3: Assignment rule re-evaluation support
         self.enable_assignment_rule_reevaluation = False
         self.pathway_data = None  # Store for assignment rule initialization
+        
+        # Token accounting auditor (conservation validation)
+        self.auditor = None  # Initialized when enabled via settings
         
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
@@ -602,6 +616,55 @@ class SimulationController:
                             behavior.set_enablement_time(self.time)
                         import logging
                         logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
+    
+    # ========== Token Accounting Methods ==========
+    
+    def enable_token_accounting(self, strict_mode=False):
+        """Enable token conservation accounting.
+        
+        Args:
+            strict_mode: If True, raise RuntimeError on violations. If False, collect violations.
+        """
+        try:
+            from shypn.engine.accounting import TokenAccountingAuditor
+            self.auditor = TokenAccountingAuditor(self.model_adapter, strict_mode=strict_mode)
+            self.auditor.enable()
+            
+            # Enable accounting in all transition behaviors
+            for transition in self.model.transitions:
+                behavior = self._get_behavior(transition)
+                behavior.enable_accounting()
+            
+            print(f"✓ Token accounting enabled (transitions: {len(self.model.transitions)})")
+        except Exception as e:
+            print(f"✗ Failed to enable token accounting: {e}")
+            import traceback
+            traceback.print_exc()
+            self.auditor = None
+    
+    def disable_token_accounting(self):
+        """Disable token conservation accounting."""
+        self.auditor = None
+        
+        # Disable accounting in all transition behaviors
+        for transition in self.model.transitions:
+            behavior = self._get_behavior(transition)
+            behavior.disable_accounting()
+    
+    def get_accounting_report(self):
+        """Get token accounting report.
+        
+        Returns:
+            dict: Accounting report with statistics and violations, or None if disabled
+        """
+        if self.auditor is None:
+            return None
+        return self.auditor.generate_report()
+    
+    def print_accounting_report(self):
+        """Print token accounting report to console."""
+        if self.auditor is not None:
+            self.auditor.print_report()
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -1032,6 +1095,9 @@ class SimulationController:
                         state.enablement_time = None
                         state.scheduled_time = None
                         
+                        # Increment firing count for statistics
+                        transition.firing_count += 1
+                        
                         # Notify data collector (if it has this method - old SimulationDataCollector)
                         if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                             details = {
@@ -1333,10 +1399,29 @@ class SimulationController:
         Args:
             transition: Transition object to fire
         """
+        # Token accounting: snapshot before firing
+        if self.auditor is not None:
+            try:
+                self.auditor.snapshot_before_fire(transition, self.time)
+            except Exception as e:
+                print(f"⚠️ Accounting error (before fire): {e}")
+        
         behavior = self._get_behavior(transition)
         input_arcs = behavior.get_input_arcs()
         output_arcs = behavior.get_output_arcs()
         success, details = behavior.fire(input_arcs, output_arcs)
+        
+        # Token accounting: snapshot after firing and validate
+        if self.auditor is not None and success:
+            try:
+                consumed = behavior.get_last_consumed()
+                produced = behavior.get_last_produced()
+                self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
+            except Exception as e:
+                print(f"⚠️ Accounting error (after fire): {e}")
+                import traceback
+                traceback.print_exc()
+        
         if success:
             # Increment firing count for statistics
             transition.firing_count += 1
@@ -2485,6 +2570,9 @@ class SimulationController:
                 # Stop data collection
                 if self.data_collector:
                     self.data_collector.stop_collection()
+                
+                # Token accounting report will be exported via Report Panel if user exports CSV
+                # No terminal output needed - keeps terminal clean
                 
                 # Notify completion callback (deferred to avoid blocking UI)
                 if self.on_simulation_complete:

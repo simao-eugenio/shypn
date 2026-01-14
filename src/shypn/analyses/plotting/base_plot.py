@@ -74,6 +74,9 @@ class BasePlot(Gtk.Box):
         # Object filter (None = all, 'places' = places only, 'transitions' = transitions only)
         self.object_filter = None
         
+        # Legend visibility control
+        self.show_legend = True
+        
         # Track last data state to avoid redundant updates
         self._last_data_count = 0
         self._last_selected_count = 0
@@ -180,6 +183,14 @@ class BasePlot(Gtk.Box):
         action_box.pack_start(filter_combo, False, False, 0)
         self.filter_combo = filter_combo
         
+        # Legend toggle
+        legend_check = Gtk.CheckButton(label="Legend")
+        legend_check.set_active(True)
+        legend_check.connect('toggled', self._on_legend_toggled)
+        legend_check.set_tooltip_text("Show/hide plot legend")
+        action_box.pack_start(legend_check, False, False, 0)
+        self.legend_check = legend_check
+        
         vbox.pack_start(action_box, False, False, 0)
         
         # Object selection info
@@ -253,6 +264,19 @@ class BasePlot(Gtk.Box):
         """Handle Reset button click - blank the canvas with proper axes/grid/legend."""
         self._show_reset_state()
     
+    def clear_plot(self):
+        """Clear plot data and show reset state.
+        
+        Called when simulation is reset to blank the canvas.
+        """
+        # Reset tracking counters
+        self._last_data_count = 0
+        self._last_selected_count = 0
+        self.needs_update = False
+        
+        # Show blank reset state
+        self._show_reset_state()
+    
     def _on_update_toggled(self, check):
         """Handle Auto-update toggle."""
         self.update_enabled = check.get_active()
@@ -270,7 +294,31 @@ class BasePlot(Gtk.Box):
         elif active == 2:
             self.object_filter = 'transitions'  # Transitions only
         
+        self._update_selection_label()
         self.needs_update = True
+    
+    def _on_legend_toggled(self, check):
+        """Handle legend visibility toggle."""
+        self.show_legend = check.get_active()
+        self.needs_update = True
+    
+    def _get_filtered_objects(self):
+        """Get selected objects filtered by object_filter setting.
+        
+        Returns:
+            list: Filtered list of selected objects based on current filter
+        """
+        if self.object_filter is None:
+            return self.selected_objects
+        
+        from shypn.netobjs import Place, Transition
+        
+        if self.object_filter == 'places':
+            return [obj for obj in self.selected_objects if isinstance(obj, Place)]
+        elif self.object_filter == 'transitions':
+            return [obj for obj in self.selected_objects if isinstance(obj, Transition)]
+        
+        return self.selected_objects
     
     def _on_destroy(self, widget):
         """Cleanup resources when widget is destroyed.
@@ -388,19 +436,13 @@ class BasePlot(Gtk.Box):
         if not self.data_collector:
             return {'data': {}}
         
-        # Apply object type filter
-        from shypn.netobjs import Place, Transition
-        
-        filtered_objects = self.selected_objects
-        if self.object_filter == 'places':
-            filtered_objects = [obj for obj in self.selected_objects if isinstance(obj, Place)]
-        elif self.object_filter == 'transitions':
-            filtered_objects = [obj for obj in self.selected_objects if isinstance(obj, Transition)]
+        # Apply object type filter to selected objects
+        filtered_objects = self._get_filtered_objects()
         
         if not filtered_objects:
             return {'data': {}}
         
-        # Temporarily swap selected_objects for filtering
+        # Temporarily replace selected_objects with filtered version for data collection
         original_objects = self.selected_objects
         self.selected_objects = filtered_objects
         
@@ -610,8 +652,9 @@ class BasePlot(Gtk.Box):
             self.axes.set_xlim(0, 10)
             self.axes.set_ylim(0, 10)
         
-        # Add empty legend
-        self.axes.legend([], [], loc='best', fontsize=9, framealpha=0.9)
+        # Add empty legend (if enabled)
+        if self.show_legend:
+            self.axes.legend([], [], loc='best', fontsize=9, framealpha=0.9)
         
         self.canvas.draw_idle()
     

@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Debug and cleanup logs at root
+debug.log
+CLEANUP_SUMMARY.md
+
 # Distribution / packaging
 .Python
 build/
@@ -100,6 +104,12 @@ test_output/
 # Utility scripts (development tools)
 scripts/
 
+# CLI tools (experimental/research validation tools)
+cli/
+
+# Development utilities (pre-commit, sync scripts)
+tools/
+
 # Development and archived code
 archive/
 dev/
@@ -110,13 +120,16 @@ dev/
 workspace/projects/My_Project/
 workspace/projects/thesis/
 workspace/projects/*.json
+!workspace/projects/Biochemical-Examples/
 
 # Signal hierarchy paper (private development)
 workspace/projects/My_Project/signal_hierarchy/
 
-# Biochemical-Examples artifacts (metadata, simulation results)
-workspace/projects/*/metadata/
-workspace/projects/*/results/
+# Biochemical-Examples: exclude generated artifacts
+workspace/projects/Biochemical-Examples/metadata/
+workspace/projects/Biochemical-Examples/results/
+workspace/projects/Biochemical-Examples/*/metadata/
+workspace/projects/Biochemical-Examples/*/results/
 
 # LaTeX auxiliary files
 *.aux

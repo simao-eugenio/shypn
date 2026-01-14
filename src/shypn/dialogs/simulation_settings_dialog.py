@@ -146,6 +146,8 @@ class SimulationSettingsDialog(Gtk.Dialog):
             'dt_manual_entry': builder.get_object('dt_manual_entry'),
             'time_scale_entry': builder.get_object('time_scale_entry'),
             'conflict_policy_combo': builder.get_object('conflict_policy_combo'),
+            # Token accounting
+            'token_accounting_check': builder.get_object('token_accounting_check'),
             # τ-leaping settings
             'tau_leaping_enabled_check': builder.get_object('tau_leaping_enabled_check'),
             'tau_epsilon_entry': builder.get_object('tau_epsilon_entry'),
@@ -277,6 +279,9 @@ class SimulationSettingsDialog(Gtk.Dialog):
         index = 0  # Default to Random
         self._widgets['conflict_policy_combo'].set_active(index)
         
+        # Token accounting
+        self._widgets['token_accounting_check'].set_active(self.settings.token_accounting_enabled)
+        
         # τ-Leaping settings
         self._widgets['tau_leaping_enabled_check'].set_active(self.settings.use_tau_leaping)
         self._widgets['tau_epsilon_entry'].set_text(str(self.settings.tau_epsilon))
@@ -353,6 +358,10 @@ class SimulationSettingsDialog(Gtk.Dialog):
                                f"Time scale must be a positive number. Got: {scale_text}")
                 self.buffered_settings.rollback()
                 return False
+            
+            # Token accounting
+            token_accounting = self._widgets['token_accounting_check'].get_active()
+            self.buffered_settings.buffer.token_accounting_enabled = token_accounting
             
             # τ-Leaping settings
             use_tau_leaping = self._widgets['tau_leaping_enabled_check'].get_active()

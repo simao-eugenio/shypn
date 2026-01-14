@@ -3125,6 +3125,15 @@ class ModelCanvasLoader:
                     self.right_panel_loader.dynamic_analyses_panel.reset()
                 except Exception as e:
                     print(f"Warning: Could not reset dynamic analyses panel: {e}")
+        
+        # Also check overlay-based dynamic analyses panel (per-document)
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+                try:
+                    overlay_manager.analyses_panel_loader.panel.reset()
+                except Exception as e:
+                    pass
 
     def _on_simulation_settings_changed(self, palette, drawing_area):
         """Handle simulation settings change.
@@ -6225,12 +6234,27 @@ class ModelCanvasLoader:
                         arc = manager.add_arc(source, target)
                         arc.weight = item['weight']
                         
-                        # Set arc type
-                        if item.get('arc_type') == 'inhibitor':
+                        # Set arc type and apply proper ColorSchemaManager colors
+                        arc_type = item.get('arc_type', 'normal')
+                        if arc_type == 'inhibitor':
                             from shypn.utils.arc_transform import convert_to_inhibitor
                             new_arc = convert_to_inhibitor(arc)
                             manager.replace_arc(arc, new_arc)
                             arc = new_arc
+                        elif arc_type == 'test':
+                            from shypn.utils.arc_transform import convert_to_test
+                            new_arc = convert_to_test(arc)
+                            manager.replace_arc(arc, new_arc)
+                            arc = new_arc
+                        elif arc_type == 'signal_flow':
+                            from shypn.utils.arc_transform import convert_to_signal_flow
+                            try:
+                                new_arc = convert_to_signal_flow(arc)
+                                manager.replace_arc(arc, new_arc)
+                                arc = new_arc
+                            except ValueError:
+                                # Signal place constraint not met, keep as normal arc
+                                pass
                         
                         # Handle curved arcs
                         if item.get('is_curved'):

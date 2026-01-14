@@ -63,12 +63,10 @@ class SBMLAnnotationMapper(CompoundMapperBase):
             # No SBML species annotations
             return mappings
         
-        # Build place label → place_id lookup
-        place_lookup = {place.label: place.id for place in places if hasattr(place, 'label')}
-        
-        # Also try place name → place_id
+        # Build place name → place_id lookup (name is the reliable identifier)
+        place_lookup = {}
         for place in places:
-            if hasattr(place, 'name'):
+            if hasattr(place, 'name') and place.name:
                 place_lookup[place.name] = place.id
         
         # Extract compound IDs from species annotations

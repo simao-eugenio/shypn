@@ -198,18 +198,23 @@ class SBMLCompartmentModuleService:
         
         Returns:
             Dict mapping compartment_id to compartment data
+            Note: Compartments with spatial_dimensions == 0 are marked as 'is_spatial_marker'
         """
         compartments = {}
         
         # Try enhanced compartments first (Phase 1 parser)
         if hasattr(pathway, 'compartments_enhanced') and pathway.compartments_enhanced:
             for comp_id, comp in pathway.compartments_enhanced.items():
+                # Check if this is a spatial marker (point compartment)
+                is_spatial_marker = comp.spatial_dimensions == 0
+                
                 compartments[comp_id] = {
                     'id': comp_id,
                     'name': comp.name,
                     'size': comp.size,
                     'spatial_dimensions': comp.spatial_dimensions,
-                    'units': comp.units
+                    'units': comp.units,
+                    'is_spatial_marker': is_spatial_marker
                 }
         # Fallback to legacy compartments dict
         elif hasattr(pathway, 'compartments') and pathway.compartments:
@@ -219,7 +224,8 @@ class SBMLCompartmentModuleService:
                     'name': comp_name,
                     'size': 1.0,
                     'spatial_dimensions': 3,
-                    'units': None
+                    'units': None,
+                    'is_spatial_marker': False
                 }
         
         return compartments
@@ -232,6 +238,9 @@ class SBMLCompartmentModuleService:
     ) -> Dict[str, Module]:
         """Create Module objects from compartment data.
         
+        Skips spatial marker compartments (spatial_dimensions == 0),
+        as these represent positional information rather than physical modules.
+        
         Args:
             document: DocumentModel to add modules to
             compartments: Dict of compartment data
@@ -243,6 +252,14 @@ class SBMLCompartmentModuleService:
         modules = {}
         
         for comp_id, comp_data in compartments.items():
+            # Skip spatial marker compartments (e.g., spatial_dimensions == 0)
+            if comp_data.get('is_spatial_marker', False):
+                self.logger.info(
+                    f"Skipping spatial marker compartment '{comp_id}' "
+                    f"({comp_data['name']}, spatial_dimensions={comp_data['spatial_dimensions']})"
+                )
+                continue
+            
             # Create module via DocumentModel
             module = document.create_module(
                 name=comp_data['name'],
@@ -268,6 +285,9 @@ class SBMLCompartmentModuleService:
     ) -> None:
         """Assign places to modules based on species compartment.
         
+        Species in spatial marker compartments (spatial_dimensions == 0)
+        are marked as SPATIAL signal places instead of being assigned to modules.
+        
         Args:
             modules: Dict mapping compartment_id to Module
             pathway: ProcessedPathwayData with species info
@@ -275,6 +295,12 @@ class SBMLCompartmentModuleService:
             warnings: List to append warnings to
         """
         unassigned_places = []
+        spatial_signal_places = []
+        
+        # Get compartment metadata
+        compartments = {}
+        if hasattr(pathway, 'compartments_enhanced') and pathway.compartments_enhanced:
+            compartments = pathway.compartments_enhanced
         
         for species in pathway.species:
             place = species_to_place.get(species.id)
@@ -294,6 +320,31 @@ class SBMLCompartmentModuleService:
                 )
                 continue
             
+            # Check if compartment is a spatial marker (spatial_dimensions == 0)
+            compartment_obj = compartments.get(compartment_id)
+            is_spatial_marker = (compartment_obj and 
+                               compartment_obj.spatial_dimensions == 0)
+            
+            if is_spatial_marker:
+                # Mark as SPATIAL signal place
+                place.is_signal_place = True
+                place.signal_type = SignalType.SPATIAL
+                spatial_signal_places.append(place.name)
+                
+                # Store compartment metadata on place
+                if not hasattr(place, 'metadata'):
+                    place.metadata = {}
+                place.metadata['compartment_id'] = compartment_id
+                place.metadata['compartment_name'] = compartment_obj.name
+                place.metadata['spatial_dimensions'] = compartment_obj.spatial_dimensions
+                
+                self.logger.info(
+                    f"Marked place '{place.name}' as SPATIAL signal "
+                    f"(spatial marker compartment '{compartment_id}', "
+                    f"spatial_dimensions={compartment_obj.spatial_dimensions})"
+                )
+                continue
+            
             # Find corresponding module
             module = modules.get(compartment_id)
             if not module:
@@ -310,6 +361,12 @@ class SBMLCompartmentModuleService:
             self.logger.debug(
                 f"Assigned place '{place.name}' to module {module.name} "
                 f"(compartment: {compartment_id})"
+            )
+        
+        if spatial_signal_places:
+            self.logger.info(
+                f"Detected {len(spatial_signal_places)} SPATIAL signal places from "
+                f"spatial marker compartments: {', '.join(spatial_signal_places)}"
             )
         
         if unassigned_places:

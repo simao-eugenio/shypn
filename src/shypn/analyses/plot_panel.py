@@ -352,20 +352,14 @@ class AnalysisPlotPanel(Gtk.Box):
         # Clear plot lines cache
         self._plot_lines.clear()
         
-        # Clear the axes
-        if hasattr(self, 'axes') and self.axes:
-            self.axes.clear()
-            self.axes.set_xlabel('Time (s)')
-            self.axes.set_ylabel(self._get_ylabel())
-            self.axes.set_title(self._get_title())
-            self.axes.grid(True, alpha=0.3)
-            self.canvas.draw_idle()
-        
         # Clear data length tracking
         self.last_data_length.clear()
         
         # Reset needs_update flag
         self.needs_update = False
+        
+        # Show blank reset state
+        self._show_reset_state()
 
     def _add_object_row(self, obj: Any, index: int):
         """Add a single object row to the UI list (optimized for incremental adds).
@@ -695,6 +689,35 @@ class AnalysisPlotPanel(Gtk.Box):
         self.axes.set_xticks([])
         self.axes.set_yticks([])
         self.canvas.draw()
+    
+    def _show_reset_state(self):
+        """Show reset state with proper axes, grid, and legend.
+        
+        Called when simulation is reset to blank the canvas while
+        maintaining proper plot structure (axes, grid, legend).
+        Preserves selected objects (user doesn't lose their selection).
+        """
+        # Clear the axes
+        self.axes.clear()
+        
+        # Set up basic plot structure
+        self.axes.set_xlabel('Time (s)', fontsize=11)
+        self.axes.set_ylabel(self._get_ylabel(), fontsize=11)
+        self.axes.set_title(self._get_title(), fontsize=12, fontweight='bold')
+        
+        # Add grid
+        if self.show_grid:
+            self.axes.grid(True, alpha=0.3, linestyle='--')
+        
+        # Set reasonable default limits
+        self.axes.set_xlim(0, 10)
+        self.axes.set_ylim(0, 10)
+        
+        # Add empty legend (shows structure is ready for data)
+        if self.show_legend:
+            self.axes.legend([], [], loc='best', fontsize=9, framealpha=0.9)
+        
+        self.canvas.draw_idle()
 
     def _format_plot(self):
         """Format the plot with labels, grid, and legend."""

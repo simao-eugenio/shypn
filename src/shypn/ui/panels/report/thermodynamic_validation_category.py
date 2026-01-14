@@ -337,22 +337,22 @@ class ThermodynamicValidationCategory(BaseReportCategory):
         if not mappings:
             return
         
-        # Get current active model to look up place labels
+        # Get current active model to look up place names
         document = self.get_current_model()
         
         # Populate table with all mappings (columns: Place, Compound ID, Confidence)
         for place_id, compound_id in mappings.items():
-            # Get place label if document is available
-            label = place_id  # Default to place_id
+            # Get place name if document is available
+            name = place_id  # Default to place_id
             if document:
                 place = next((p for p in document.places if p.id == place_id), None)
                 if place:
-                    label = place.label if place.label else place_id
+                    name = place.name if hasattr(place, 'name') and place.name else place_id
             
             # Show "Manual" confidence since these are pre-existing mappings from validation
             confidence = "Manual"
             
-            self.mappings_store.append([label, compound_id, confidence])
+            self.mappings_store.append([name, compound_id, confidence])
     
     def _update_settings(self):
         """Update settings display (Phase 4)."""

@@ -20,15 +20,17 @@ class CSVSimulationExporter:
     - Summary statistics only
     """
     
-    def __init__(self, simulation_data: dict, metadata: Optional[dict] = None):
+    def __init__(self, simulation_data: dict, metadata: Optional[dict] = None, accounting_data: Optional[dict] = None):
         """Initialize CSV exporter.
         
         Args:
             simulation_data: Dict with 'time_points', 'place_data', 'transition_data', 'model'
             metadata: Optional metadata dict
+            accounting_data: Optional token accounting report dict
         """
         self.simulation_data = simulation_data
         self.metadata = metadata or {}
+        self.accounting_data = accounting_data
         self.time_points = simulation_data.get('time_points', [])
         self.place_data = simulation_data.get('place_data', {})
         self.transition_data = simulation_data.get('transition_data', {})
@@ -70,7 +72,41 @@ class CSVSimulationExporter:
                     transition_headers.append((trans_id, header))
                     headers.append(header)
                 
+                # Add accounting columns if available
+                if self.accounting_data:
+                    headers.append('Accounting: Total Consumed')
+                    headers.append('Accounting: Total Produced')
+                    headers.append('Accounting: Net Change')
+                
                 writer.writerow(headers)
+                
+                # Write accounting summary row if available
+                if self.accounting_data:
+                    stats = self.accounting_data.get('statistics', {})
+                    summary_row = ['# Token Accounting Summary']
+                    summary_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                    summary_row.append(f"{stats.get('total_consumed', 0):.6f}")
+                    summary_row.append(f"{stats.get('total_produced', 0):.6f}")
+                    summary_row.append(f"{stats.get('net_change', 0):+.6f}")
+                    writer.writerow(summary_row)
+                    
+                    status_row = ['# Conservation Status']
+                    status_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                    status = 'PASS' if self.accounting_data.get('global_conservation') else 'FAIL'
+                    leak = self.accounting_data.get('total_leak', 0)
+                    status_row.append(f'{status} (leak: {leak:+.6f})')
+                    status_row.extend([''] * 2)
+                    writer.writerow(status_row)
+                    
+                    # Add firing count validation row
+                    firing_status_row = ['# Firing Count Validation']
+                    firing_status_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                    firing_valid = self.accounting_data.get('firing_counts_valid', True)
+                    num_discrepancies = stats.get('num_firing_discrepancies', 0)
+                    firing_status = 'PASS' if firing_valid else f'FAIL ({num_discrepancies} discrepancies)'
+                    firing_status_row.append(firing_status)
+                    firing_status_row.extend([''] * 2)
+                    writer.writerow(firing_status_row)
                 
                 # Write data rows
                 for i, time in enumerate(self.time_points):

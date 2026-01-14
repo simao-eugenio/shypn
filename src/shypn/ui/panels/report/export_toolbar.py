@@ -823,30 +823,36 @@ class ExportToolbar(Gtk.Box):
     
     def _on_export_simulation_data(self, button):
         """Handle simulation data export button click."""
-        # Get simulation data from parent panel
-        if not self.parent_panel:
-            self._show_error("No Data", "No simulation data available.")
-            return
-        
-        sim_data = self._get_simulation_data()
-        if not sim_data:
-            self._show_error("No Data", 
-                           "No simulation data available. Run a simulation first.")
-            return
-        
-        # Get the actual top-level window
-        toplevel = self.get_toplevel()
-        if not isinstance(toplevel, Gtk.Window):
-            toplevel = None
-        
-        # Open export dialog
-        from .simulation_export_dialog import SimulationExportDialog
-        dialog = SimulationExportDialog(toplevel, sim_data, self.metadata or {})
-        response, export_config = dialog.run()
-        dialog.destroy()
-        
-        if response == Gtk.ResponseType.OK:
-            self._execute_simulation_export(export_config, sim_data)
+        try:
+            # Get simulation data from parent panel
+            if not self.parent_panel:
+                self._show_error("No Data", "No simulation data available.")
+                return
+            
+            sim_data = self._get_simulation_data()
+            if not sim_data:
+                self._show_error("No Data", 
+                               "No simulation data available. Run a simulation first.")
+                return
+            
+            # Get the actual top-level window
+            toplevel = self.get_toplevel()
+            if not isinstance(toplevel, Gtk.Window):
+                toplevel = None
+            
+            # Open export dialog
+            from .simulation_export_dialog import SimulationExportDialog
+            dialog = SimulationExportDialog(toplevel, sim_data, self.metadata or {})
+            response, export_config = dialog.run()
+            dialog.destroy()
+            
+            if response == Gtk.ResponseType.OK:
+                self._execute_simulation_export(export_config, sim_data)
+        except Exception as e:
+            print(f"Error in simulation export: {e}")
+            import traceback
+            traceback.print_exc()
+            self._show_error("Export Error", f"Failed to open export dialog: {e}")
     
     def _get_simulation_data(self) -> dict:
         """Get simulation data from Dynamic Analyses category.
@@ -869,12 +875,18 @@ class ExportToolbar(Gtk.Box):
                             if hasattr(da, 'report_data') and da.report_data:
                                 stored_data = da.report_data.last_simulation_data
                         
+                        # Get accounting report if enabled
+                        accounting_report = None
+                        if hasattr(category.controller, 'get_accounting_report'):
+                            accounting_report = category.controller.get_accounting_report()
+                        
                         return {
                             'time_points': stored_data['time_points'] if stored_data else dc.time_points,
                             'place_data': stored_data['place_data'] if stored_data else dc.place_data,
                             'transition_data': stored_data['transition_data'] if stored_data else dc.transition_data,
                             'model': category.controller.model,
-                            'metadata': stored_data.get('metadata', {}) if stored_data else {}
+                            'metadata': stored_data.get('metadata', {}) if stored_data else {},
+                            'accounting_report': accounting_report
                         }
         return None
     
@@ -947,17 +959,20 @@ class ExportToolbar(Gtk.Box):
             
             if format_type == 'csv_timeseries_wide':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_timeseries_wide(filepath)
             
             elif format_type == 'csv_timeseries_long':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_timeseries_long(filepath)
             
             elif format_type == 'csv_summary':
                 from shypn.reporting.exporters import CSVSimulationExporter
-                exporter = CSVSimulationExporter(sim_data, self.metadata)
+                accounting_data = sim_data.get('accounting_report')
+                exporter = CSVSimulationExporter(sim_data, self.metadata, accounting_data)
                 success = exporter.export_summary_statistics(filepath)
             
             elif format_type == 'json':

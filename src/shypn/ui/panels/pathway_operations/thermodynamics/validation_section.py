@@ -10,7 +10,6 @@ import logging
 
 from .base_section import ThermodynamicsSectionBase
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -138,11 +137,15 @@ class ValidationSection(ThermodynamicsSectionBase):
         
         self.validate_button.set_sensitive(True)
         
-        # Check for reversible transitions
-        reversible_count = sum(
-            1 for t in self.document.transitions
-            if t.properties.get('is_reversible', False)
-        ) if hasattr(self.document, 'transitions') else 0
+        # Check for reversible transitions using parser
+        from shypn.thermodynamics.rate_function_parser import RateFunctionParser
+        parser = RateFunctionParser()
+        
+        reversible_count = 0
+        if hasattr(self.document, 'transitions'):
+            for t in self.document.transitions:
+                if parser.is_reversible(t):
+                    reversible_count += 1
         
         if reversible_count == 0:
             self.status_label.set_text("No reversible transitions to validate")
@@ -174,16 +177,25 @@ class ValidationSection(ThermodynamicsSectionBase):
     
     def _on_validate_clicked(self, button):
         """Handle validate button click."""
+
+
+
         # Get current document from canvas manager
         manager = self._get_canvas_manager()
+
         if not manager or not hasattr(manager, 'document') or not manager.document:
+
             self._show_error("No document loaded")
             return
         
         document = manager.document
+
+        print(f"Document transitions: {len(document.transitions) if hasattr(document, 'transitions') else 'NO TRANSITIONS'}")
+        
         self.document = document  # Update cached reference
         
         if self.validation_running:
+
             return
         
         # Disable button and show progress
@@ -193,19 +205,33 @@ class ValidationSection(ThermodynamicsSectionBase):
         self.progress_bar.show()
         self.status_label.set_text("Validation in progress...")
         
+
+
+        print(f"Document has {len(document.transitions)} transitions")
+
         def run_validation():
             try:
-                # Import validator
+                # Import validator and parser
                 from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
+                from shypn.thermodynamics.rate_function_parser import RateFunctionParser
                 
-                # Create validator with document settings
+                # Create validator and parser with document settings
                 validator = ThermodynamicSimulationValidator(document=self.document)
+                parser = RateFunctionParser()
                 
-                # Get reversible transitions
-                reversible_transitions = [
-                    t for t in self.document.transitions
-                    if t.properties.get('is_reversible', False)
-                ]
+
+                print(f"Checking {len(self.document.transitions)} transitions for reversibility...")
+                
+                # Get reversible transitions using parser
+                reversible_transitions = []
+                for t in self.document.transitions:
+
+                    is_rev = parser.is_reversible(t)
+
+                    if is_rev:
+                        reversible_transitions.append(t)
+                
+                print(f"Found {len(reversible_transitions)} reversible transitions")
                 
                 if not reversible_transitions:
                     GLib.idle_add(self._on_validation_complete, {
@@ -227,24 +253,24 @@ class ValidationSection(ThermodynamicsSectionBase):
                 }
                 
                 for i, transition in enumerate(reversible_transitions):
+                    print(f"\nValidating transition {transition.id} ({i+1}/{len(reversible_transitions)})")
+                    
                     # Update progress on main thread
                     progress = (i + 1) / len(reversible_transitions)
                     GLib.idle_add(self._update_progress, progress, f"Validating {i+1}/{len(reversible_transitions)}")
                     
-                    # Get rate constants
-                    k_forward = transition.properties.get('k_forward', 1.0)
-                    k_reverse = transition.properties.get('k_reverse', 1.0)
-                    
-                    # Get reactants/products from compound mappings
+                    # Get reactants and products for this transition
                     reactants = {}
                     products = {}
                     
+
                     # Input places (reactants)
                     for arc in self.document.arcs:
                         if arc.target == transition and arc.source.id in self.document.compound_mappings:
                             compound_id = self.document.compound_mappings[arc.source.id]
                             stoich = arc.weight if hasattr(arc, 'weight') else 1
                             reactants[compound_id] = reactants.get(compound_id, 0) + stoich
+                            print(f"    Reactant: {arc.source.id} -> {compound_id} (stoich={stoich})")
                     
                     # Output places (products)
                     for arc in self.document.arcs:
@@ -252,12 +278,30 @@ class ValidationSection(ThermodynamicsSectionBase):
                             compound_id = self.document.compound_mappings[arc.target.id]
                             stoich = arc.weight if hasattr(arc, 'weight') else 1
                             products[compound_id] = products.get(compound_id, 0) + stoich
+                            print(f"    Product: {arc.target.id} -> {compound_id} (stoich={stoich})")
                     
+
+
                     if not reactants or not products:
-                        # Skip transitions without mapped compounds
+
+                        continue
+                    
+
+                    # Extract rate constants using parser (handles multiple formats)
+                    k_forward, k_reverse = parser.extract_rate_constants(transition, reactants, products)
+                    
+
+                    if k_forward is None or k_reverse is None:
+
+                        logger.warning(f"Could not extract rate constants from {transition.id}")
                         continue
                     
                     # Validate
+
+
+
+
+
                     try:
                         validation = validator.validate_reversible_reaction(
                             reaction_id=transition.id,
@@ -267,6 +311,9 @@ class ValidationSection(ThermodynamicsSectionBase):
                             products=products
                         )
                         
+
+
+
                         if validation.is_valid:
                             results['valid'] += 1
                         else:
@@ -423,5 +470,12 @@ class ValidationSection(ThermodynamicsSectionBase):
     
     def _on_view_report_clicked(self, button):
         """Handle view report button click."""
-        # TODO: Switch to Report Panel and show thermodynamics category
-        pass
+        # Trigger report panel refresh first
+        if self.report_panel_refresh_callback:
+            try:
+                self.report_panel_refresh_callback()
+                logger.info("Report panel refreshed from validation section")
+            except Exception as e:
+                logger.error(f"Failed to refresh report panel: {e}")
+        else:
+            logger.warning("No report panel refresh callback set")
