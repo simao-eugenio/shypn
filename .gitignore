@@ -110,13 +110,16 @@ dev/
 workspace/projects/My_Project/
 workspace/projects/thesis/
 workspace/projects/*.json
+!workspace/projects/Biochemical-Examples/
 
 # Signal hierarchy paper (private development)
 workspace/projects/My_Project/signal_hierarchy/
 
-# Biochemical-Examples artifacts (metadata, simulation results)
-workspace/projects/*/metadata/
-workspace/projects/*/results/
+# Biochemical-Examples: exclude generated artifacts
+workspace/projects/Biochemical-Examples/metadata/
+workspace/projects/Biochemical-Examples/results/
+workspace/projects/Biochemical-Examples/*/metadata/
+workspace/projects/Biochemical-Examples/*/results/
 
 # LaTeX auxiliary files
 *.aux
