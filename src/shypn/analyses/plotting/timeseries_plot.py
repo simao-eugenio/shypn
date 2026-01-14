@@ -71,9 +71,9 @@ class TimeSeriesPlot(BasePlot):
                 values,
                 label=label,
                 color=color,
-                linewidth=2,
+                linewidth=2.0,
                 alpha=0.9,
-                linestyle='-',
+                linestyle='-',  # Solid for transitions
                 marker=None
             )
         
@@ -92,9 +92,9 @@ class TimeSeriesPlot(BasePlot):
                 values,
                 label=label,
                 color=color,
-                linewidth=2,
+                linewidth=1.5,
                 alpha=0.9,
-                linestyle='-',
+                linestyle='--',  # Dashed for places
                 marker=None
             )
         
@@ -118,12 +118,14 @@ class TimeSeriesPlot(BasePlot):
                 ax_places.set_ylim(ylim2[0] - y_range2 * 0.1, ylim2[1] + y_range2 * 0.1)
             
             # Combine legends from both axes
-            lines1, labels1 = self.axes.get_legend_handles_labels()
-            lines2, labels2 = ax_places.get_legend_handles_labels()
-            if lines1 or lines2:
-                self.axes.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=9, framealpha=0.9)
+            if self.show_legend:
+                lines1, labels1 = self.axes.get_legend_handles_labels()
+                lines2, labels2 = ax_places.get_legend_handles_labels()
+                if lines1 or lines2:
+                    self.axes.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=9, framealpha=0.9)
         else:
-            self.axes.legend(loc='best', fontsize=9, framealpha=0.9)
+            if self.show_legend:
+                self.axes.legend(loc='best', fontsize=9, framealpha=0.9)
         
         # Tight layout
         try:

@@ -37,6 +37,8 @@ class HistogramPlot(BasePlot):
         colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12',
                  '#9b59b6', '#1abc9c', '#e67e22', '#34495e']
         
+        from shypn.netobjs import Place, Transition
+        
         # Plot each object
         for i, obj in enumerate(self.selected_objects):
             obj_id = obj.id
@@ -48,15 +50,20 @@ class HistogramPlot(BasePlot):
                 if not values:
                     continue
                 
+                # Different hatching for places vs transitions
+                is_place = isinstance(obj, Place)
+                hatch = '//' if is_place else None  # Diagonal hatch for places
+                
                 # Plot histogram
                 self.axes.hist(
                     values,
                     bins=self.bins,
                     label=obj.name,
                     color=color,
-                    alpha=0.6,
+                    alpha=0.6 if not is_place else 0.5,  # Slightly more transparent for hatched places
                     edgecolor='black',
-                    linewidth=0.5
+                    linewidth=0.5,
+                    hatch=hatch
                 )
         
         # Configure axes
@@ -64,7 +71,8 @@ class HistogramPlot(BasePlot):
         self.axes.set_ylabel('Frequency', fontsize=12)
         self.axes.set_title(self._get_plot_title(), fontsize=14, fontweight='bold')
         self.axes.grid(True, alpha=0.3)
-        self.axes.legend(loc='best', framealpha=0.9)
+        if self.show_legend:
+            self.axes.legend(loc='best', framealpha=0.9)
         
         # Tight layout
         self.figure.tight_layout()

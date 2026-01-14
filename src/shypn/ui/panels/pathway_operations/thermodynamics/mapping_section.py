@@ -181,12 +181,12 @@ class MappingSection(ThermodynamicsSectionBase):
         # Add rows for each place
         for place in self.document.places:
             place_id = place.id
-            place_label = place.label if hasattr(place, 'label') else place.name
+            place_name = place.name if hasattr(place, 'name') else place_id
             compound_id = mappings.get(place_id, "")
             confidence = self.current_confidences.get(place_id, 0.0)
             confidence_badge = self._get_confidence_badge(confidence)
             
-            self.list_store.append([place_id, place_label, compound_id, confidence, confidence_badge])
+            self.list_store.append([place_id, place_name, compound_id, confidence, confidence_badge])
         
         # Update statistics
         self._update_statistics()
