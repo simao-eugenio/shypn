@@ -12,6 +12,7 @@ from shypn.netobjs import Arc, InhibitorArc, CurvedArc, CurvedInhibitorArc
 from shypn.netobjs.test_arc import TestArc
 from shypn.netobjs.signal_flow_arc import SignalFlowArc
 from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+from shypn.utils.color_schema_manager import ColorSchemaManager
 
 
 def transform_arc(arc, make_curved=None, make_inhibitor=None):
@@ -96,7 +97,13 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
     )
     
     # Copy all properties
-    new_arc.color = arc.color
+    # For semantic arc types (TestArc, SignalFlowArc), apply color schema
+    # For normal arcs, preserve the original color
+    if ColorSchemaManager.is_semantic_arc_color(new_arc):
+        ColorSchemaManager.reset_arc_color(new_arc)
+    else:
+        new_arc.color = arc.color
+    
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points
@@ -153,7 +160,7 @@ def convert_to_inhibitor(arc):
 
 
 def convert_to_normal(arc):
-    """Convert inhibitor arc to normal arc.
+    """Convert arc to normal arc (non-inhibitor, non-test, non-signal).
     
     Args:
         arc: Arc instance to convert
@@ -161,7 +168,49 @@ def convert_to_normal(arc):
     Returns:
         Arc or CurvedArc: Normal version of the arc
     """
-    return transform_arc(arc, make_inhibitor=False)
+    from shypn.netobjs.place import Place
+    from shypn.netobjs.transition import Transition
+    
+    # Check if it's curved
+    is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc))
+    
+    # Select target class (Arc or CurvedArc)
+    target_class = CurvedArc if is_curved else Arc
+    
+    # If already the correct type, return it
+    if type(arc) == target_class:
+        return arc
+    
+    # Create new normal arc
+    new_arc = target_class(
+        source=arc.source,
+        target=arc.target,
+        id=arc.id,
+        name=arc.name,
+        weight=arc.weight
+    )
+    
+    # Apply ColorSchemaManager for normal arc (black)
+    ColorSchemaManager.reset_arc_color(new_arc)
+    
+    # Copy all properties (except color - now managed by ColorSchemaManager)
+    new_arc.width = arc.width
+    new_arc.threshold = arc.threshold
+    new_arc.control_points = arc.control_points
+    
+    # Copy optional properties if they exist
+    if hasattr(arc, 'label'):
+        new_arc.label = arc.label
+    if hasattr(arc, 'description'):
+        new_arc.description = arc.description
+    
+    # Copy internal references
+    if hasattr(arc, '_manager'):
+        new_arc._manager = arc._manager
+    if hasattr(arc, 'on_changed'):
+        new_arc.on_changed = arc.on_changed
+    
+    return new_arc
 
 
 def is_straight(arc):
@@ -293,8 +342,10 @@ def convert_to_test(arc):
         weight=arc.weight
     )
     
-    # Copy all properties (except color - use TestArc's blue DEFAULT_COLOR)
-    # new_arc.color is already set to (0.0, 0.0, 1.0) by TestArc.__init__
+    # Apply ColorSchemaManager semantic color for TestArc (blue)
+    ColorSchemaManager.reset_arc_color(new_arc)
+    
+    # Copy all properties (except color - now managed by ColorSchemaManager)
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points
@@ -382,8 +433,10 @@ def convert_to_signal_flow(arc):
         weight=arc.weight
     )
     
-    # Copy all properties (except color - use SignalFlowArc's light gray DEFAULT_COLOR)
-    # new_arc.color is already set to (0.7, 0.7, 0.7) by SignalFlowArc.__init__
+    # Apply ColorSchemaManager semantic color for SignalFlowArc (light gray)
+    ColorSchemaManager.reset_arc_color(new_arc)
+    
+    # Copy all properties (except color - now managed by ColorSchemaManager)
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points

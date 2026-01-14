@@ -360,6 +360,7 @@ class Arc(PetriNetObject):
             cr.set_dash([])
         
         # Add glow effect for colored arcs (CSS-like styling)
+        # IMPORTANT: Glow must use same dash pattern as main line to avoid solid underlayer
         if self.color != self.DEFAULT_COLOR:
             # Draw outer glow (subtle shadow effect)
             if render_as_curved:
@@ -371,7 +372,14 @@ class Arc(PetriNetObject):
             r, g, b = self.color
             cr.set_source_rgba(r, g, b, 0.3)  # Semi-transparent color
             cr.set_line_width((self.width + 2) / max(zoom, 1e-6))
+            # Glow inherits dash pattern (already set above) - do NOT reset to solid
             cr.stroke()
+            
+            # Re-establish dash pattern for main line draw (stroke() clears state)
+            if is_signal_arc:
+                cr.set_dash([8.0 / zoom, 4.0 / zoom])
+            else:
+                cr.set_dash([])
         
         # Draw line in world coordinates (straight or curved)
         if render_as_curved:

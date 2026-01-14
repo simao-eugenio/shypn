@@ -38,6 +38,20 @@
     <property name="step-increment">1</property>
     <property name="page-increment">5</property>
   </object>
+  <object class="GtkAdjustment" id="earliest_time_adjustment">
+    <property name="lower">0</property>
+    <property name="upper">1000000</property>
+    <property name="value">1</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="latest_time_adjustment">
+    <property name="lower">0</property>
+    <property name="upper">1000000</property>
+    <property name="value">1</property>
+    <property name="step-increment">0.1</property>
+    <property name="page-increment">1</property>
+  </object>
 
   <!-- Main Dialog -->
   <object class="GtkDialog" id="transition_properties_dialog">
@@ -525,6 +539,96 @@
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">1</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Earliest Time Field (for Timed transitions) -->
+                        <child>
+                          <object class="GtkBox" id="earliest_time_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <property name="no-show-all">True</property>
+                            <child>
+                              <object class="GtkLabel" id="earliest_time_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Earliest (α):</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Minimum delay (seconds) after enablement before transition can fire</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="earliest_time_spin">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="adjustment">earliest_time_adjustment</property>
+                                <property name="digits">3</property>
+                                <property name="tooltip-text">Minimum time (seconds) that must elapse after enablement before firing</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        
+                        <!-- Latest Time Field (for Timed transitions) -->
+                        <child>
+                          <object class="GtkBox" id="latest_time_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <property name="no-show-all">True</property>
+                            <child>
+                              <object class="GtkLabel" id="latest_time_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Latest (β):</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Maximum delay (seconds) after enablement before transition must fire (urgency)</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="latest_time_spin">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="adjustment">latest_time_adjustment</property>
+                                <property name="digits">3</property>
+                                <property name="tooltip-text">Maximum time (seconds) before transition must fire if still enabled</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">3</property>
                           </packing>
                         </child>
                         

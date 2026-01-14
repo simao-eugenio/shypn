@@ -112,7 +112,8 @@ class PhasePlot(BasePlot):
         self.axes.set_ylabel(self.selected_objects[1].name, fontsize=12)
         self.axes.set_title('Phase Space Trajectory (2D)', fontsize=14, fontweight='bold')
         self.axes.grid(True, alpha=0.3, linestyle='-')
-        self.axes.legend(loc='best', framealpha=0.9)
+        if self.show_legend:
+            self.axes.legend(loc='best', framealpha=0.9)
         
         # Tight layout
         try:
@@ -182,7 +183,8 @@ class PhasePlot(BasePlot):
         self.axes.set_ylabel(self.selected_objects[1].name, fontsize=10)
         self.axes.set_zlabel(self.selected_objects[2].name, fontsize=10)
         self.axes.set_title('Phase Space Trajectory (3D)', fontsize=14, fontweight='bold')
-        self.axes.legend(loc='best', framealpha=0.9)
+        if self.show_legend:
+            self.axes.legend(loc='best', framealpha=0.9)
         
         # Tight layout
         try:

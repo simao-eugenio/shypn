@@ -114,6 +114,16 @@
                                 <property name="label">s</property>
                               </object>
                             </child>
+                            
+                            <child>
+                              <object class="GtkCheckButton" id="token_accounting_check">
+                                <property name="visible">True</property>
+                                <property name="label">Test</property>
+                                <property name="active">False</property>
+                                <property name="margin-start">12</property>
+                                <property name="tooltip-text">Enable token accounting to detect conservation violations during simulation</property>
+                              </object>
+                            </child>
                           </object>
                         </child>
                       </object>

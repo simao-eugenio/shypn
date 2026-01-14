@@ -210,6 +210,10 @@ class CompoundMapperService:
         
         document.compound_mappings[place_id] = compound_id
         
+        # Mark document as modified so changes are saved
+        if hasattr(document, 'mark_modified'):
+            document.mark_modified()
+        
         logger.info(f"Manual mapping updated: {place_id} → {compound_id}")
     
     def remove_mapping(self, document, place_id: str) -> None:
@@ -221,6 +225,11 @@ class CompoundMapperService:
         """
         if hasattr(document, 'compound_mappings') and place_id in document.compound_mappings:
             del document.compound_mappings[place_id]
+            
+            # Mark document as modified so changes are saved
+            if hasattr(document, 'mark_modified'):
+                document.mark_modified()
+            
             logger.info(f"Removed mapping for {place_id}")
     
     def get_unmapped_places(self, document) -> List:

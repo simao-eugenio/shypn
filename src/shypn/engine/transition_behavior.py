@@ -58,6 +58,11 @@ class TransitionBehavior(ABC):
         """
         self.transition = transition
         self.model = model
+        
+        # Token accounting tracking
+        self._last_consumed = {}
+        self._last_produced = {}
+        self._accounting_enabled = False
     
     # ============================================================================
     # Abstract Methods (Must be implemented by subclasses)
@@ -437,6 +442,10 @@ class TransitionBehavior(ABC):
             mode: Event mode ('logical', 'timed', etc.)
             **kwargs: Additional event data
         """
+        # Store for accounting
+        self._last_consumed = consumed.copy()
+        self._last_produced = produced.copy()
+        
         if hasattr(self.model, 'record_transition_event'):
             try:
                 self.model.record_transition_event(
@@ -449,6 +458,30 @@ class TransitionBehavior(ABC):
             except Exception:
                 # Event recording is not critical for firing success
                 pass
+    
+    def get_last_consumed(self) -> Dict[int, float]:
+        """Get tokens consumed in last firing.
+        
+        Returns:
+            Dictionary of {place_id: amount} consumed
+        """
+        return self._last_consumed.copy()
+    
+    def get_last_produced(self) -> Dict[int, float]:
+        """Get tokens produced in last firing.
+        
+        Returns:
+            Dictionary of {place_id: amount} produced
+        """
+        return self._last_produced.copy()
+    
+    def enable_accounting(self):
+        """Enable token accounting tracking."""
+        self._accounting_enabled = True
+        
+    def disable_accounting(self):
+        """Disable token accounting tracking."""
+        self._accounting_enabled = False
     
     # ============================================================================
     # String Representation

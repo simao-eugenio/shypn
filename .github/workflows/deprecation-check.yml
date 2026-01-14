@@ -1,0 +1,61 @@
+name: Deprecation Warnings Check
+
+on:
+  push:
+    branches: [ main, "Usability-and-Manuscripts", "develop" ]
+  pull_request:
+    branches: [ main, "Usability-and-Manuscripts", "develop" ]
+
+jobs:
+  deprecation-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Check for deprecated APIs usage
+        run: |
+          echo "🔍 Scanning for deprecated API usage..."
+          
+          # Look for calls to deprecated methods (basic pattern matching)
+          if grep -r "_on_enrich_names_clicked" src/ --include="*.py" | grep -v "def _on_enrich_names_clicked" | grep -v "# " | grep -v "@deprecated"; then
+            echo "⚠ Found calls to deprecated _on_enrich_names_clicked method"
+            echo "   Consider updating to use cross-reference database instead"
+          fi
+          
+          echo "✅ Deprecation scan complete"
+      
+      - name: Test deprecation system
+        run: |
+          echo "🔍 Testing deprecation system..."
+          python -c "
+          import sys
+          import warnings
+          sys.path.insert(0, 'src')
+          warnings.filterwarnings('always', category=DeprecationWarning)
+          
+          from shypn.deprecation import deprecated, get_deprecated_apis
+          
+          # Test decorator
+          @deprecated(
+              deprecated_in='2.5.0',
+              removed_in='3.0.0',
+              replacement='test()',
+              reason='Testing'
+          )
+          def old_func():
+              return True
+          
+          # This should emit a warning
+          result = old_func()
+          
+          apis = get_deprecated_apis()
+          print(f'✓ Deprecation system functional')
+          print(f'✓ Registered APIs: {len(apis)}')
+          "

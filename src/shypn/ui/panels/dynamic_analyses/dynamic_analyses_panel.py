@@ -340,5 +340,4 @@ class DynamicAnalysesPanel(Gtk.Box):
                     category_panel.clear_plot()
                 except Exception as e:
                     pass
-                    # print(f"Warning: Could not clear plot in {category_panel.__class__.__name__}: {e}")
 
