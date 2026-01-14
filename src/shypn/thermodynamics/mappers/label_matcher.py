@@ -11,12 +11,16 @@ from .base_mapper import CompoundMapperBase
 
 
 class LabelBasedMapper(CompoundMapperBase):
-    """Maps compounds by parsing place labels.
+    """Maps compounds by parsing place names.
     
     Strategy:
-    1. Try direct ID extraction (C00002, CHEBI:12345)
-    2. Fall back to fuzzy name matching (ATP → C00002)
-    3. Return confidence based on match type
+    1. Use place.name (object identifier, not display label)
+    2. Try direct ID extraction (C00002, CHEBI:12345)
+    3. Fall back to fuzzy name matching (ATP → C00002)
+    4. Return confidence based on match type
+    
+    Note: place.label is NOT used because it's inconsistent display text,
+    not a reliable identifier for compound mapping.
     
     Confidence Levels:
         0.95: Direct ID extraction
@@ -147,32 +151,33 @@ class LabelBasedMapper(CompoundMapperBase):
         """Map single place, return (compound_id, confidence).
         
         Args:
-            place: Place object with .label attribute
+            place: Place object with .name attribute
             
         Returns:
             Tuple of (compound_id or None, confidence score)
         """
-        if not hasattr(place, 'label') or not place.label:
+        # Use place.name only (NOT place.label)
+        if not hasattr(place, 'name') or not place.name:
             return None, 0.0
         
-        label = place.label.strip()
-        if not label:
+        name_text = place.name.strip()
+        if not name_text:
             return None, 0.0
         
         # Strategy 1: Try direct ID extraction
-        compound_id = self._extract_id(label)
+        compound_id = self._extract_id(name_text)
         if compound_id:
             return compound_id, 0.95  # High confidence
         
         # Strategy 2: Try fuzzy matching
-        compound_id = self._fuzzy_match(label)
+        compound_id = self._fuzzy_match(name_text)
         if compound_id:
             return compound_id, 0.60  # Medium confidence
         
         return None, 0.0
     
-    def _extract_id(self, label: str) -> Optional[str]:
-        """Extract compound ID from label.
+    def _extract_id(self, name_text: str) -> Optional[str]:
+        """Extract compound ID from place name.
         
         Patterns:
             - C##### (KEGG)
@@ -181,52 +186,52 @@ class LabelBasedMapper(CompoundMapperBase):
             - Brackets: "ATP [C00002]"
         
         Args:
-            label: Place label text
+            name_text: Place name text
             
         Returns:
             Extracted compound ID or None
         """
         # Try KEGG C-number
-        kegg_match = re.search(r'\b(C\d{5})\b', label, re.IGNORECASE)
+        kegg_match = re.search(r'\b(C\d{5})\b', name_text, re.IGNORECASE)
         if kegg_match:
             return kegg_match.group(1).upper()
         
         # Try ChEBI identifier
-        chebi_match = re.search(r'\b(CHEBI:\d+)\b', label, re.IGNORECASE)
+        chebi_match = re.search(r'\b(CHEBI:\d+)\b', name_text, re.IGNORECASE)
         if chebi_match:
             return self.normalize_compound_id(chebi_match.group(1))
         
         return None
     
-    def _fuzzy_match(self, label: str) -> Optional[str]:
-        """Match label against common compound names.
+    def _fuzzy_match(self, name_text: str) -> Optional[str]:
+        """Match place name against common compound names.
         
         Args:
-            label: Place label text
+            name_text: Place name text
             
         Returns:
             Matched KEGG compound ID or None
         """
-        # Clean label for matching
-        clean_label = label.upper().strip()
+        # Clean name for matching
+        clean_name = name_text.upper().strip()
         
         # Remove common prefixes/suffixes
-        clean_label = re.sub(r'^(D-|L-)', '', clean_label)
-        clean_label = re.sub(r'\s*\(.*\)\s*$', '', clean_label)  # Remove parentheses
-        clean_label = re.sub(r'\s*\[.*\]\s*$', '', clean_label)  # Remove brackets
-        clean_label = clean_label.strip()
+        clean_name = re.sub(r'^(D-|L-)', '', clean_name)
+        clean_name = re.sub(r'\s*\(.*\)\s*$', '', clean_name)  # Remove parentheses
+        clean_name = re.sub(r'\s*\[.*\]\s*$', '', clean_name)  # Remove brackets
+        clean_name = clean_name.strip()
         
         # Exact match (case-insensitive)
-        if clean_label in self.common_mappings:
-            return self.common_mappings[clean_label]
+        if clean_name in self.common_mappings:
+            return self.common_mappings[clean_name]
         
         # Try lowercase lookup
-        if clean_label.lower() in self._lowercase_map:
-            return self._lowercase_map[clean_label.lower()]
+        if clean_name.lower() in self._lowercase_map:
+            return self._lowercase_map[clean_name.lower()]
         
         # Partial match (contains keyword)
         for name, compound_id in self.common_mappings.items():
-            if name in clean_label or clean_label in name:
+            if name in clean_name or clean_name in name:
                 return compound_id
         
         return None
