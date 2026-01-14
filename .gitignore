@@ -100,6 +100,12 @@ test_output/
 # Utility scripts (development tools)
 scripts/
 
+# CLI tools (experimental/research validation tools)
+cli/
+
+# Development utilities (pre-commit, sync scripts)
+tools/
+
 # Development and archived code
 archive/
 dev/
