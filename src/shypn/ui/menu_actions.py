@@ -289,15 +289,18 @@ class MenuActions:
 	
 	def on_help_about(self, action, param):
 		"""Show about dialog."""
+		from shypn import __version__, __version_name__
+		
 		about_dialog = Gtk.AboutDialog()
 		about_dialog.set_transient_for(self.window)
 		about_dialog.set_modal(True)
-		about_dialog.set_program_name("Shypn")
-		about_dialog.set_version("0.9.0-skeleton-pattern")
-		about_dialog.set_comments("Systems Biology Pathway Editor")
+		about_dialog.set_program_name("SHYpn")
+		about_dialog.set_version(f"{__version__} ({__version_name__})")
+		about_dialog.set_comments("Signal Hierarchical Petri Nets for Systems Biology")
 		about_dialog.set_website("https://github.com/simao-eugenio/shypn")
-		about_dialog.set_license_type(Gtk.License.GPL_3_0)
-		about_dialog.set_authors(["Simão Eugénio"])
+		about_dialog.set_license_type(Gtk.License.MIT_X11)
+		about_dialog.set_authors(["Eugénio Simão"])
+		about_dialog.set_copyright("Copyright © 2024-2026 Eugénio Simão")
 		about_dialog.run()
 		about_dialog.destroy()
 	

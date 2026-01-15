@@ -1,6 +1,6 @@
 # shypn/
 
-This is the main Python package for the Shypn project - a GTK3-based Stochastic Hybrid Petri Net modeling application. All code modules, subpackages, and application logic reside here.
+This is the main Python package for the SHYpn project (Signal Hierarchical Petri Nets) - a GTK3-based biological Petri net modeling application with signal hierarchy theory and thermodynamic constraints. All code modules, subpackages, and application logic reside here.
 
 ## Package Structure
 

@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite both the software and the paper."
 type: software
-title: "SHYpn: Stochastic Hybrid Petri Nets for Systems Biology"
+title: "SHYpn: Signal Hierarchical Petri Nets for Systems Biology"
 version: 2.5.5
-date-released: 2025-12-22
+date-released: 2026-01-15
 url: "https://github.com/simao-eugenio/shypn"
 repository-code: "https://github.com/simao-eugenio/shypn"
 license: MIT
@@ -14,22 +14,25 @@ authors:
     affiliation: "Federal University of Santa Catarina (UFSC)"
 preferred-citation:
   type: article
-  title: "Weak Independence and Coupled Parallelism in Biological Petri Nets"
+  title: "Thermodynamic Constraints Drive Hierarchical Preemption in Bacillus subtilis Sporulation: A Signal Hierarchical Petri Net Analysis"
   authors:
     - family-names: "Simão"
       given-names: "Eugénio"
-  year: 2025
+  year: 2026
   journal: "arXiv preprint"
   identifiers:
     - type: other
-      value: "arXiv:2512.17106"
+      value: "arXiv:2501.03850"
       description: "arXiv identifier"
-  url: "https://arxiv.org/abs/2512.17106"
+  url: "https://arxiv.org/abs/2501.03850"
 keywords:
-  - Petri nets
+  - Signal Hierarchical Petri Nets
   - biological modeling
   - systems biology
   - stochastic simulation
   - hybrid systems
   - weak independence
+  - signal hierarchy theory
+  - thermodynamic constraints
   - pathway analysis
+  - hierarchical preemption
