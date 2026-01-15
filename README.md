@@ -1,12 +1,12 @@
-# SHYpn - Stochastic Hybrid Petri Nets for Systems Biology
+# SHYpn - Signal Hierarchical Petri Nets
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![GTK 3.0](https://img.shields.io/badge/GTK-3.0-blue.svg)](https://www.gtk.org/)
 
-**Extended Biological Petri Net Framework with Weak Independence Theory for Pathway Modeling, Simulation, and Analysis**
+**Extended Biological Petri Net Framework with Signal Hierarchy Theory and Weak Independence for Systems Biology**
 
-SHYpn is a comprehensive GTK3-based platform for systems biology that combines stochastic hybrid Petri nets with weak independence theory to enable efficient modeling, simulation, and analysis of biological pathways and regulatory networks.
+SHYpn (Signal Hierarchical Petri Nets) is a comprehensive GTK3-based platform for systems biology that integrates signal hierarchy theory, weak independence, and thermodynamic constraints to enable rigorous modeling, simulation, and analysis of biological pathways, regulatory networks, and cellular decision-making.
 
 ## Quick Start
 
@@ -65,11 +65,12 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 ## Features
 
 ### Core Simulation & Theory
-- ✅ **Stochastic Hybrid Petri Nets** - Extended biological Petri net formalism with immediate, timed, stochastic, and continuous transitions
-- ✅ **Unified 13-Tuple Formalism** - Complete Extended Bio-PN definition integrating weak independence and signal hierarchy (December 2025)
-- ✅ **Signal Hierarchy Theory** - Information-theoretic framework for hierarchical control with signal token consumption semantics
+- ✅ **Signal Hierarchical Petri Nets (SHYpn)** - Extended biological Petri net formalism with immediate, timed, stochastic, and continuous transitions for hierarchical biological systems
+- ✅ **Unified 13-Tuple Formalism** - Complete Extended Bio-PN definition integrating weak independence and signal hierarchy theory (December 2025)
+- ✅ **Signal Hierarchy Theory** - Mathematical framework for hierarchical preemption and information-driven pathway selection with signal token consumption semantics
 - ✅ **Weak Independence Theory** - Efficient simulation through dependency analysis (convergent, competitive, regulatory coupling)
 - ✅ **Two-Phase Execution** - Hierarchical constraint propagation via signal flow arcs (enabling check vs. consumption)
+- ✅ **Thermodynamic Constraints** - ATP-dependent rate modulation and Gibbs free energy validation ensure biophysical realism
 - ✅ **τ-Leaping Engine** - Approximate stochastic simulation with Skellam distribution for reversible reactions (v0.3.0)
 
 ### SBML Import & Assignment Rules
@@ -156,12 +157,20 @@ MIT License - See [LICENSE](LICENSE) file for details.
 If you use SHYpn in your research, please cite:
 
 ```bibtex
-@article{simao2025unified,
-  title={Unifying Weak Independence and Signal Hierarchy Theory: Extended Biological Petri Net Formalism with Application to Vibrio fischeri Quorum Sensing},
+@article{simao2026thermodynamic,
+  title={Thermodynamic Constraints Drive Hierarchical Preemption in Bacillus subtilis Sporulation: A Signal Hierarchical Petri Net Analysis},
   author={Sim{\~a}o, Eug{\'e}nio},
-  journal={arXiv preprint},
-  year={2025},
-  note={Submitted to arXiv, December 2025}
+  journal={arXiv preprint arXiv:2501.03850},
+  year={2026},
+  url={https://arxiv.org/abs/2501.03850}
+}
+
+@article{simao2026adaptation,
+  title={Adaptation Dynamics Emerge from Signal Hierarchy Theory: Formal Semantics for Biological Petri Nets with Application to MAPK Cascades},
+  author={Sim{\~a}o, Eug{\'é}nio},
+  journal={bioRxiv preprint},
+  year={2026},
+  note={Submitted to bioRxiv, January 2026}
 }
 
 @article{simao2025weak,
@@ -174,7 +183,8 @@ If you use SHYpn in your research, please cite:
 ```
 
 **Latest Publications:**
-- **Unified Formalism (2025)** - Extended 13-tuple Bio-PN integrating Weak Independence and Signal Hierarchy theories with V. fischeri quorum sensing validation
+- **Thermodynamic Hierarchy (2026)** - [arXiv:2501.03850](https://arxiv.org/abs/2501.03850) - Demonstrates 16× ATP reduction in stress-induced B. subtilis sporulation through hierarchical preemption
+- **Signal Hierarchy Theory (2026)** - Formal semantics for Signal Hierarchical Petri Nets with MAPK adaptation analysis (bioRxiv submission)
 - **Foundation Paper (2025)** - [arXiv:2512.17106](https://arxiv.org/abs/2512.17106) - Weak Independence and Coupled Parallelism in Biological Petri Nets
 
 **Software:** https://github.com/simao-eugenio/shypn
