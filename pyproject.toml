@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "shypn"
 version = "2.5.5"
-description = "Systems Biology Pathway Modeling Platform - Hybrid Petri Net Platform for Biological Pathway and Regulatory Network Modeling, Simulation, and Analysis"
+description = "Signal Hierarchical Petri Nets (SHYpn) - Extended Biological Petri Net Framework with Signal Hierarchy Theory for Systems Biology Modeling and Analysis"
 authors = [
     { name="Simão Eugénio", email="simao-eugenio@github.com" }
 ]
