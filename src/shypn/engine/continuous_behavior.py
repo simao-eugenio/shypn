@@ -187,6 +187,9 @@ class ContinuousBehavior(TransitionBehavior):
     def _compile_rate_function(self, expr: str) -> Callable:
         """Compile rate function expression to callable.
         
+        Supports both bracket notation [PlaceName] (chemistry convention for concentration)
+        and plain PlaceName references.
+        
         Args:
             expr: String expression or callable
         
@@ -202,6 +205,11 @@ class ContinuousBehavior(TransitionBehavior):
             return lambda places, t: constant_rate
         except ValueError:
             pass
+        
+        # Preprocess expression: convert [PlaceName] to PlaceName
+        # This supports chemistry notation where [X] means "concentration of X"
+        import re
+        expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', expr)
         
         # Parse expression with place references (simple parser)
         # Format: "a * P1 + b * P2" or "min(c, P1)" or "sigmoid(time, 10, 0.5)" etc.
@@ -269,8 +277,8 @@ class ContinuousBehavior(TransitionBehavior):
                     if hasattr(place, 'name') and place.name:
                         context[place.name] = tokens_safe
                 
-                # Evaluate expression safely
-                result = eval(expr, {"__builtins__": {}}, context)
+                # Evaluate expression safely (use preprocessed expression)
+                result = eval(expr_processed, {"__builtins__": {}}, context)
                 return float(result)
             except Exception as e:
                 # Check if this is first error for this transition
