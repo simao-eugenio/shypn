@@ -139,6 +139,11 @@ workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.blg
 workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.out
 workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.bbl
 
+# Exclude SBML imports and project metadata (development artifacts)
+workspace/projects/Biochemical-Examples/models/
+workspace/projects/Biochemical-Examples/pathways/
+workspace/projects/Biochemical-Examples/.project.shy
+
 # LaTeX auxiliary files
 *.aux
 *.log
