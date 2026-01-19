@@ -131,6 +131,14 @@ workspace/projects/Biochemical-Examples/results/
 workspace/projects/Biochemical-Examples/*/metadata/
 workspace/projects/Biochemical-Examples/*/results/
 
+# Signal_hierarchy_foundation: Track manuscript but exclude LaTeX artifacts
+!workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/
+workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.aux
+workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.log
+workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.blg
+workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.out
+workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.bbl
+
 # LaTeX auxiliary files
 *.aux
 *.log
