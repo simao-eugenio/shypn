@@ -69,6 +69,21 @@ ENV/
 env.bak/
 venv.bak/
 
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -143,6 +158,20 @@ workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.bbl
 workspace/projects/Biochemical-Examples/models/
 workspace/projects/Biochemical-Examples/pathways/
 workspace/projects/Biochemical-Examples/.project.shy
+
+# Hidden files and view state (SHYpn internal, not for version control)
+**/.view_state*.json
+**/.*_view_state*.json
+**/.project.shy
+**/*.Zone.Identifier
+
+# arXiv and PLOS manuscript directories hidden files
+workspace/projects/Biochemical-Examples/23_arXiv_*/**/.view_state*.json
+workspace/projects/Biochemical-Examples/24_arXiv_*/**/.view_state*.json
+workspace/projects/Biochemical-Examples/25_arXiv_*/**/.view_state*.json
+workspace/projects/Biochemical-Examples/26_arXiv_*/**/.view_state*.json
+workspace/projects/Biochemical-Examples/27_PLOS_*/**/.view_state*.json
+workspace/projects/Biochemical-Examples/2*_*/**/*.Zone.Identifier
 
 # LaTeX auxiliary files
 *.aux
