@@ -27,6 +27,7 @@ from shypn.topology.biological.mass_balance import MassBalanceAnalyzer
 from shypn.topology.biological.stoichiometry import StoichiometryAnalyzer
 from shypn.topology.biological.flux_balance import FluxBalanceAnalyzer
 from shypn.topology.biological.thermodynamic_analyzer_adapter import ThermodynamicAnalyzerAdapter
+from shypn.topology.biological.signal_hierarchy import SignalHierarchyAnalyzer
 
 
 class BiologicalCategory(BaseTopologyCategory):
@@ -71,6 +72,7 @@ class BiologicalCategory(BaseTopologyCategory):
             'dependency_coupling': DependencyAndCouplingAnalyzer,
             'regulatory_structure': RegulatoryStructureAnalyzer,
             'thermodynamics': ThermodynamicAnalyzerAdapter,
+            'signal_hierarchy': SignalHierarchyAnalyzer,
         }
     
     def _build_content(self):
@@ -388,6 +390,88 @@ class BiologicalCategory(BaseTopologyCategory):
                     0.0,
                     'Negative Feedback',
                     f'Inhibits {inhibitor_usage} transition(s)'
+                ))
+        
+        elif analyzer_name == 'signal_hierarchy':
+            # Result format: {'signal_places': [...], 'signal_flow_arcs': [...], 'hierarchy': {...}, 'validation': {...}, 'statistics': {...}}
+            signal_places = result.get('signal_places', [])
+            signal_flow_arcs = result.get('signal_flow_arcs', [])
+            hierarchy = result.get('hierarchy', {})
+            validation = result.get('validation', {})
+            statistics = result.get('statistics', {})
+            
+            # Show summary first
+            layer_count = hierarchy.get('layer_count', 0)
+            signal_count = len(signal_places)
+            arc_count = len(signal_flow_arcs)
+            
+            if signal_count > 0:
+                rows.append((
+                    'Signal Hierarchy',
+                    'Summary',
+                    f'{signal_count} signal places, {layer_count} layers',
+                    0.0,
+                    '✓ Detected',
+                    f'{arc_count} signal flow arcs'
+                ))
+            
+            # Show each signal place with its layer
+            layers_dict = hierarchy.get('layers', {})
+            for sp in signal_places:
+                sp_id = sp.get('id', '')
+                sp_name = sp.get('name', sp_id)
+                signal_type = sp.get('signal_type', 'unknown')
+                layer_num = layers_dict.get(sp_id, 'N/A')
+                flow_count = sp.get('signal_flow_count', 0)
+                
+                rows.append((
+                    f'Signal Place (Layer {layer_num})',
+                    sp_name,
+                    f'Type: {signal_type}',
+                    0.0,
+                    'Information Channel',
+                    f'{flow_count} outgoing flow arc(s)'
+                ))
+            
+            # Show validation issues if any
+            if not validation.get('is_valid', True):
+                for issue in validation.get('issues', []):
+                    issue_type = issue.get('type', 'unknown')
+                    message = issue.get('message', '')
+                    arc_id = issue.get('arc_id', '')
+                    
+                    rows.append((
+                        f'⚠️ Validation Issue',
+                        issue_type.replace('_', ' ').title(),
+                        message[:60],
+                        0.5,
+                        'Warning',
+                        f'Arc: {arc_id}'
+                    ))
+            
+            # Show hierarchy preemption relationships
+            preemption_map = hierarchy.get('preemption_map', {})
+            if preemption_map:
+                for higher_layer, lower_layers in list(preemption_map.items())[:5]:  # First 5
+                    lower_str = ', '.join(map(str, lower_layers))
+                    rows.append((
+                        'Preemption',
+                        f'Layer {higher_layer}',
+                        f'Controls layers: {lower_str}',
+                        0.0,
+                        'Hierarchical Control',
+                        'Higher layer gates lower'
+                    ))
+            
+            # If no signal places found
+            if signal_count == 0:
+                rows.append((
+                    'Signal Hierarchy',
+                    'Not Detected',
+                    'No signal places annotated',
+                    0.0,
+                    'ℹ️ INFO',
+                    'Use place type "signal" to enable'
                 ))
         
         return rows
