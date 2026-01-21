@@ -41,9 +41,7 @@ try:
 	gi.require_version('cairo', '1.0')
 	from gi.repository import cairo as _gi_cairo  # noqa: F401
 except (ImportError, ValueError):
-	pass  # Cairo integration may not be available
-
-try:
+	pass  # Cairo integration may no
 	from gi.repository import Gtk, Gdk, GLib
 	
 	# Initialize Gdk early to avoid initialization issues in imports
