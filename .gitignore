@@ -118,6 +118,8 @@ test_output/
 
 # Utility scripts (development tools)
 scripts/
+# Allow scripts in organized manuscript directories
+!workspace/projects/Biochemical-Examples/2*_*/scripts/
 
 # CLI tools (experimental/research validation tools)
 cli/
@@ -188,6 +190,10 @@ workspace/projects/Biochemical-Examples/2*_*/**/*.Zone.Identifier
 *.fdb_latexmk
 *.synctex.gz
 
-# PDF outputs (except final paper if needed)
+# PDF outputs (except manuscript PDFs and figures in organized directories)
 doc/**/*.pdf
 *.pdf
+# Allow PDFs in organized manuscript directories (arXiv and PLOS)
+!workspace/projects/Biochemical-Examples/2*_*/manuscript/*.pdf
+!workspace/projects/Biochemical-Examples/2*_*/figures/*.pdf
+!workspace/projects/Biochemical-Examples/2*_*/scripts/*.pdf
