@@ -103,6 +103,8 @@ test_output/
 
 # Utility scripts (development tools)
 scripts/
+# Allow scripts in organized manuscript directories
+!workspace/projects/Biochemical-Examples/2*_*/scripts/
 
 # CLI tools (experimental/research validation tools)
 cli/
