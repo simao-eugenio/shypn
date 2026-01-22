@@ -8,13 +8,12 @@ Author: Simão Eugénio
 Date: January 22, 2026
 """
 
-from abc import ABC, abstractmethod
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 
-class BaseResultsView(ABC, Gtk.Box):
+class BaseResultsView(Gtk.Box):
     """Abstract base class for result viewing components.
     
     Provides:
@@ -56,16 +55,14 @@ class BaseResultsView(ABC, Gtk.Box):
         # Build UI (subclass implements)
         self.setup_ui()
     
-    @abstractmethod
     def setup_ui(self):
         """Build UI components.
         
         Subclasses must implement this to construct their specific UI.
         Should create all widgets and pack them into self (Gtk.Box).
         """
-        pass
+        raise NotImplementedError("Subclass must implement setup_ui()")
     
-    @abstractmethod
     def display_result(self, result_data):
         """Display a result.
         
@@ -79,16 +76,15 @@ class BaseResultsView(ABC, Gtk.Box):
                 - status (str): 'success', 'error', etc.
                 - data: Experiment-specific result data
         """
-        pass
+        raise NotImplementedError("Subclass must implement display_result()")
     
-    @abstractmethod
     def clear_results(self):
         """Clear all displayed results.
         
         Subclasses must implement this to remove all results from view.
         Should also clear self.results dictionary.
         """
-        pass
+        raise NotImplementedError("Subclass must implement clear_results()")
     
     def set_model(self, model):
         """Update model reference.
