@@ -212,6 +212,44 @@ class ResultsBrowserView(BaseResultsView):
         # === PAGE 2: Plot View ===
         plot_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
+        # Plot mode controls (E4 enhancement)
+        plot_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        plot_controls.set_margin_start(6)
+        plot_controls.set_margin_end(6)
+        plot_controls.set_margin_top(6)
+        plot_controls.set_margin_bottom(6)
+        
+        # Plot mode selector
+        mode_label = Gtk.Label(label="Plot Mode:")
+        plot_controls.pack_start(mode_label, False, False, 0)
+        
+        self.plot_mode_combo = Gtk.ComboBoxText()
+        self.plot_mode_combo.append("trajectory", "Trajectory Plot")
+        self.plot_mode_combo.append("heatmap", "Heatmap (2D Factorial)")
+        self.plot_mode_combo.set_active(0)
+        self.plot_mode_combo.set_tooltip_text("Select visualization mode")
+        plot_controls.pack_start(self.plot_mode_combo, False, False, 0)
+        
+        # Response metric selector (for heatmap)
+        response_label = Gtk.Label(label="Response Metric:")
+        plot_controls.pack_start(response_label, False, False, 0)
+        
+        self.heatmap_response_combo = Gtk.ComboBoxText()
+        self.heatmap_response_combo.append("deadlock_rate", "Deadlock Rate (%)")
+        self.heatmap_response_combo.append("viable_rate", "Viability Rate (%)")
+        self.heatmap_response_combo.append("mean_tokens", "Mean Token Count")
+        self.heatmap_response_combo.set_active(0)
+        self.heatmap_response_combo.set_tooltip_text("Metric to display in heatmap")
+        plot_controls.pack_start(self.heatmap_response_combo, False, False, 0)
+        
+        # Generate button
+        generate_plot_button = Gtk.Button(label="📊 Generate Plot")
+        generate_plot_button.connect("clicked", self._on_generate_plot_clicked)
+        generate_plot_button.set_tooltip_text("Generate selected plot type from all results")
+        plot_controls.pack_start(generate_plot_button, False, False, 0)
+        
+        plot_page.pack_start(plot_controls, False, False, 0)
+        
         # Create matplotlib figure and canvas
         self.figure = Figure(figsize=(8, 6), dpi=80)
         self.canvas = FigureCanvas(self.figure)
@@ -452,6 +490,202 @@ class ResultsBrowserView(BaseResultsView):
             
         except Exception as e:
             self._show_error(f"Dose-response analysis failed:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_generate_plot_clicked(self, button):
+        """Generate plot based on selected mode (E4 enhancement).
+        
+        Handles both trajectory plots and factorial heatmaps.
+        """
+        plot_mode = self.plot_mode_combo.get_active_id()
+        
+        if plot_mode == "trajectory":
+            # Use existing trajectory plot functionality
+            name, result = self.get_selected_result()
+            if name and result:
+                self.notebook.set_current_page(1)  # Switch to plot page
+                self._plot_trajectories(name, result)
+            else:
+                self._show_error("Please select an experiment from the Results List first")
+        
+        elif plot_mode == "heatmap":
+            # Generate 2D factorial heatmap
+            self._generate_heatmap()
+        
+        else:
+            self._show_error(f"Unknown plot mode: {plot_mode}")
+    
+    def _generate_heatmap(self):
+        """Generate 2D heatmap for factorial experiment data (E4 enhancement).
+        
+        Detects if results form a 2D factorial grid and creates a heatmap
+        showing parameter interactions.
+        """
+        import numpy as np
+        
+        # Get response metric
+        response_metric = self.heatmap_response_combo.get_active_id()
+        if not response_metric:
+            response_metric = "deadlock_rate"
+        
+        # Extract factorial data from all results
+        # Format: experiment names like "param1=val1_param2=val2"
+        factorial_data = []
+        
+        for row in self.results_store:
+            name = row[1]  # Column 1 = name
+            if name not in self.results:
+                continue
+            
+            result = self.results[name]
+            
+            # Parse parameter values from name
+            params = {}
+            for part in name.split('_'):
+                if '=' in part:
+                    key, val = part.split('=', 1)
+                    try:
+                        params[key] = float(val)
+                    except ValueError:
+                        continue
+            
+            # Extract response value
+            stats = result.get('statistics', {})
+            if response_metric == 'deadlock_rate':
+                response_value = stats.get('deadlock_rate', 0.0) * 100  # Convert to %
+            elif response_metric == 'viable_rate':
+                response_value = (1 - stats.get('deadlock_rate', 0.0)) * 100  # Viability %
+            elif response_metric == 'mean_tokens':
+                species_stats = stats.get('species_statistics', {})
+                # Average mean tokens across all places
+                mean_token_values = [
+                    sp_stats.get('mean', 0.0)
+                    for sp_id, sp_stats in species_stats.items()
+                    if sp_id.startswith('P')  # Places only
+                ]
+                response_value = np.mean(mean_token_values) if mean_token_values else 0.0
+            else:
+                continue
+            
+            params['_response'] = response_value
+            factorial_data.append(params)
+        
+        if len(factorial_data) < 4:
+            self._show_error(f"Need at least 4 data points for heatmap (found {len(factorial_data)})")
+            return
+        
+        # Detect parameter names (exclude _response)
+        param_names = sorted(set(
+            key for data in factorial_data for key in data.keys()
+            if key != '_response'
+        ))
+        
+        if len(param_names) < 2:
+            self._show_error(
+                f"Heatmap requires 2D factorial data (2+ parameters).\n"
+                f"Found only {len(param_names)} parameter(s): {param_names}"
+            )
+            return
+        
+        # Use first two parameters for heatmap axes
+        param_x = param_names[0]
+        param_y = param_names[1]
+        
+        if len(param_names) > 2:
+            # Warn user we're only plotting first 2 parameters
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"3D+ Factorial Data Detected"
+            )
+            dialog.format_secondary_text(
+                f"Found {len(param_names)} parameters: {', '.join(param_names)}\n\n"
+                f"Displaying 2D heatmap for: {param_x} × {param_y}\n"
+                f"(Additional parameters averaged)"
+            )
+            dialog.run()
+            dialog.destroy()
+        
+        # Extract unique values for each parameter
+        x_values = sorted(set(d[param_x] for d in factorial_data if param_x in d))
+        y_values = sorted(set(d[param_y] for d in factorial_data if param_y in d))
+        
+        # Create 2D grid
+        z_matrix = np.full((len(y_values), len(x_values)), np.nan)
+        
+        # Fill grid with response values
+        for data in factorial_data:
+            if param_x not in data or param_y not in data:
+                continue
+            
+            try:
+                x_idx = x_values.index(data[param_x])
+                y_idx = y_values.index(data[param_y])
+                
+                # If multiple values for same (x, y) coordinate, average them
+                if np.isnan(z_matrix[y_idx, x_idx]):
+                    z_matrix[y_idx, x_idx] = data['_response']
+                else:
+                    z_matrix[y_idx, x_idx] = (z_matrix[y_idx, x_idx] + data['_response']) / 2
+            except ValueError:
+                continue
+        
+        # Check if grid has enough data
+        valid_points = np.sum(~np.isnan(z_matrix))
+        if valid_points < 4:
+            self._show_error(f"Insufficient 2D grid data (only {valid_points} valid points)")
+            return
+        
+        # Generate heatmap
+        try:
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            
+            # Create pcolormesh
+            # Need to create mesh grid coordinates for edges
+            x_edges = np.append(x_values, x_values[-1] + (x_values[-1] - x_values[-2]))
+            y_edges = np.append(y_values, y_values[-1] + (y_values[-1] - y_values[-2]))
+            
+            X, Y = np.meshgrid(x_edges, y_edges)
+            
+            # Plot heatmap
+            im = ax.pcolormesh(X, Y, z_matrix, shading='flat', cmap='RdYlGn_r')
+            
+            # Add colorbar
+            cbar = self.figure.colorbar(im, ax=ax)
+            cbar.set_label(self.heatmap_response_combo.get_active_text(), fontsize=10)
+            
+            # Annotate cells with values
+            for i, y in enumerate(y_values):
+                for j, x in enumerate(x_values):
+                    value = z_matrix[i, j]
+                    if not np.isnan(value):
+                        text_color = 'white' if value > np.nanmedian(z_matrix) else 'black'
+                        ax.text(x, y, f'{value:.1f}', 
+                               ha='center', va='center',
+                               color=text_color, fontsize=9, fontweight='bold')
+            
+            # Styling
+            ax.set_xlabel(param_x, fontsize=11, fontweight='bold')
+            ax.set_ylabel(param_y, fontsize=11, fontweight='bold')
+            ax.set_title(f'Factorial Heatmap: {param_x} × {param_y}', 
+                        fontsize=12, fontweight='bold')
+            
+            # Set ticks to parameter values
+            ax.set_xticks(x_values)
+            ax.set_yticks(y_values)
+            
+            self.figure.tight_layout()
+            self.canvas.draw()
+            
+            # Switch to plot page
+            self.notebook.set_current_page(1)
+            
+        except Exception as e:
+            self._show_error(f"Heatmap generation failed:\n\n{str(e)}")
             import traceback
             traceback.print_exc()
     
