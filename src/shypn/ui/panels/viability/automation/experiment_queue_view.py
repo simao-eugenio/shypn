@@ -115,6 +115,19 @@ class ExperimentQueueView(Gtk.Box):
         reset_button.connect("clicked", self._on_reset_clicked)
         button_box.pack_start(reset_button, False, False, 0)
         
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        button_box.pack_start(separator, False, False, 0)
+        
+        # Parallel execution checkbox (E2 enhancement)
+        self.parallel_checkbox = Gtk.CheckButton(label="Parallel Execution")
+        self.parallel_checkbox.set_tooltip_text(
+            "Execute experiments in parallel using multiple CPU cores\n"
+            "Significantly faster for large batches (e.g., 100 experiments: 6h → 36min)"
+        )
+        self.parallel_checkbox.set_active(False)  # Default: sequential (safe)
+        button_box.pack_start(self.parallel_checkbox, False, False, 0)
+        
         # Status label
         self.status_label = Gtk.Label()
         self.status_label.set_markup("<i>Queue empty</i>")
