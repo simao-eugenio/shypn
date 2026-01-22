@@ -226,7 +226,234 @@ class ResultsBrowserView(BaseResultsView):
         self.notebook.append_page(list_page, Gtk.Label(label="Results List"))
         self.notebook.append_page(plot_page, Gtk.Label(label="Plot View"))
         
+        # === PAGE 3: Dose-Response Analysis (E3 enhancement) ===
+        dr_page = self._build_dose_response_page()
+        self.notebook.append_page(dr_page, Gtk.Label(label="Dose-Response"))
+        
         self.pack_start(self.notebook, True, True, 0)
+    
+    def _build_dose_response_page(self):
+        """Build dose-response analysis page (E3 enhancement).
+        
+        Returns:
+            Gtk.Box: Page widget with dose-response fitting UI
+        """
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        
+        # Instructions
+        instructions = Gtk.Label()
+        instructions.set_markup(
+            "<b>Dose-Response Analysis</b>\n"
+            "Select experiments with varying dose parameter (e.g., ATP concentration sweep).\n"
+            "Fits 4-parameter logistic (Hill equation) to calculate IC50/EC50."
+        )
+        instructions.set_xalign(0)
+        instructions.set_margin_start(6)
+        instructions.set_margin_end(6)
+        instructions.set_margin_top(6)
+        page.pack_start(instructions, False, False, 0)
+        
+        # Parameter selection
+        param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        param_box.set_margin_start(6)
+        param_box.set_margin_end(6)
+        
+        param_label = Gtk.Label(label="Dose Parameter:")
+        param_box.pack_start(param_label, False, False, 0)
+        
+        # Combo to select which parameter is the "dose" (auto-detect from sweep)
+        self.dr_param_combo = Gtk.ComboBoxText()
+        self.dr_param_combo.set_tooltip_text("Select which parameter represents the dose/concentration")
+        param_box.pack_start(self.dr_param_combo, True, True, 0)
+        
+        # Response metric selection
+        response_label = Gtk.Label(label="Response Metric:")
+        param_box.pack_start(response_label, False, False, 0)
+        
+        self.dr_response_combo = Gtk.ComboBoxText()
+        self.dr_response_combo.append("deadlock_rate", "Deadlock Rate (%)")
+        self.dr_response_combo.append("viable_rate", "Viability Rate (%)")
+        self.dr_response_combo.append("mean_tokens", "Mean Token Count")
+        self.dr_response_combo.set_active(0)
+        self.dr_response_combo.set_tooltip_text("Select response metric to analyze")
+        param_box.pack_start(self.dr_response_combo, True, True, 0)
+        
+        # Analyze button
+        analyze_button = Gtk.Button(label="📈 Analyze Dose-Response")
+        analyze_button.connect("clicked", self._on_analyze_dose_response)
+        param_box.pack_start(analyze_button, False, False, 0)
+        
+        page.pack_start(param_box, False, False, 0)
+        
+        # Results display area (figure + statistics)
+        results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Matplotlib figure for dose-response curve
+        self.dr_figure = Figure(figsize=(8, 5), dpi=80)
+        self.dr_canvas = FigureCanvas(self.dr_figure)
+        self.dr_canvas.set_size_request(600, 350)
+        
+        # Navigation toolbar
+        self.dr_toolbar = NavigationToolbar2GTK3(self.dr_canvas)
+        results_box.pack_start(self.dr_toolbar, False, False, 0)
+        results_box.pack_start(self.dr_canvas, True, True, 0)
+        
+        # Statistics frame
+        stats_frame = Gtk.Frame()
+        stats_frame.set_label("Fit Parameters")
+        stats_frame.set_margin_start(6)
+        stats_frame.set_margin_end(6)
+        stats_frame.set_margin_bottom(6)
+        
+        self.dr_stats_label = Gtk.Label()
+        self.dr_stats_label.set_markup("<i>No analysis performed yet</i>")
+        self.dr_stats_label.set_xalign(0)
+        self.dr_stats_label.set_margin_start(12)
+        self.dr_stats_label.set_margin_end(12)
+        self.dr_stats_label.set_margin_top(6)
+        self.dr_stats_label.set_margin_bottom(6)
+        
+        stats_frame.add(self.dr_stats_label)
+        results_box.pack_start(stats_frame, False, False, 0)
+        
+        page.pack_start(results_box, True, True, 0)
+        
+        return page
+    
+    def _on_analyze_dose_response(self, button):
+        """Analyze dose-response relationship from sweep data (E3 enhancement).
+        
+        Fits 4-parameter logistic curve to dose-response data and displays
+        IC50/EC50, Hill slope, and curve plot.
+        """
+        from .dose_response_analyzer import DoseResponseAnalyzer
+        import numpy as np
+        
+        # Get dose parameter from combo
+        dose_param_name = self.dr_param_combo.get_active_text()
+        if not dose_param_name:
+            self._show_error("Please select a dose parameter first")
+            return
+        
+        # Get response metric
+        response_metric = self.dr_response_combo.get_active_id()
+        if not response_metric:
+            response_metric = "deadlock_rate"
+        
+        # Collect dose-response data from all results
+        doses = []
+        responses = []
+        
+        for row in self.results_store:
+            name = row[1]  # Column 1 = name
+            if name not in self.results:
+                continue
+            
+            result = self.results[name]
+            
+            # Extract dose value from experiment name
+            # Format: "param_name=value" or "param1=val1_param2=val2_..."
+            dose_value = None
+            for part in name.split('_'):
+                if '=' in part:
+                    key, val = part.split('=', 1)
+                    if key == dose_param_name:
+                        try:
+                            dose_value = float(val)
+                            break
+                        except ValueError:
+                            continue
+            
+            if dose_value is None:
+                continue
+            
+            # Extract response value
+            stats = result.get('statistics', {})
+            if response_metric == 'deadlock_rate':
+                response_value = stats.get('deadlock_rate', 0.0) * 100  # Convert to %
+            elif response_metric == 'viable_rate':
+                response_value = (1 - stats.get('deadlock_rate', 0.0)) * 100  # Viability %
+            elif response_metric == 'mean_tokens':
+                species_stats = stats.get('species_statistics', {})
+                # Average mean tokens across all places
+                mean_token_values = [
+                    sp_stats.get('mean', 0.0)
+                    for sp_id, sp_stats in species_stats.items()
+                    if sp_id.startswith('P')  # Places only
+                ]
+                response_value = np.mean(mean_token_values) if mean_token_values else 0.0
+            else:
+                continue
+            
+            doses.append(dose_value)
+            responses.append(response_value)
+        
+        # Check if we have enough data
+        if len(doses) < 4:
+            self._show_error(f"Need at least 4 dose-response points for curve fitting (found {len(doses)})")
+            return
+        
+        # Perform dose-response analysis
+        try:
+            analyzer = DoseResponseAnalyzer(doses, responses)
+            analyzer.fit()
+            
+            # Generate smooth curve for plotting
+            doses_smooth, responses_smooth = analyzer.generate_smooth_curve(n_points=100)
+            
+            # Plot dose-response curve
+            self.dr_figure.clear()
+            ax = self.dr_figure.add_subplot(111)
+            
+            # Plot data points
+            ax.scatter(doses, responses, s=100, alpha=0.7, color='#2E86AB', 
+                      label='Experimental Data', zorder=3)
+            
+            # Plot fitted curve
+            ax.plot(doses_smooth, responses_smooth, '-', color='#A23B72', linewidth=2,
+                   label='4PL Fit', zorder=2)
+            
+            # Mark IC50 with vertical line
+            ic50_response = analyzer.bottom + (analyzer.top - analyzer.bottom) / 2
+            ax.axvline(analyzer.ic50, color='#F18F01', linestyle='--', linewidth=1.5,
+                      label=f'IC50 = {analyzer.ic50:.2e}', zorder=1)
+            ax.axhline(ic50_response, color='#F18F01', linestyle=':', linewidth=1,
+                      alpha=0.5, zorder=1)
+            
+            # Styling
+            ax.set_xlabel(f'{dose_param_name} (log scale)', fontsize=11)
+            ax.set_ylabel(f'{self.dr_response_combo.get_active_text()}', fontsize=11)
+            ax.set_title(f'Dose-Response Curve (R² = {analyzer.r_squared:.4f})', 
+                        fontsize=12, fontweight='bold')
+            ax.set_xscale('log')
+            ax.grid(True, alpha=0.3, linestyle=':')
+            ax.legend(frameon=True, shadow=True)
+            
+            self.dr_canvas.draw()
+            
+            # Update statistics display
+            summary = analyzer.get_summary()
+            ic50_lower, ic50_upper = summary['ic50_ci']
+            hill_lower, hill_upper = summary['hill_slope_ci']
+            
+            stats_text = (
+                f"<b>Fit Parameters</b>\n\n"
+                f"<b>IC50:</b> {summary['ic50']:.3e} (95% CI: {ic50_lower:.3e} - {ic50_upper:.3e})\n"
+                f"<b>Hill Slope:</b> {summary['hill_slope']:.3f} (95% CI: {hill_lower:.3f} - {hill_upper:.3f})\n"
+                f"<b>Top:</b> {summary['top']:.2f}\n"
+                f"<b>Bottom:</b> {summary['bottom']:.2f}\n"
+                f"<b>R²:</b> {summary['r_squared']:.4f}\n"
+                f"<b>Data Points:</b> {summary['n_points']}"
+            )
+            self.dr_stats_label.set_markup(stats_text)
+            
+            # Switch to dose-response tab
+            self.notebook.set_current_page(2)  # Page 2 = Dose-Response tab
+            
+        except Exception as e:
+            self._show_error(f"Dose-response analysis failed:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def display_result(self, result_data):
         """Display a result in the TreeView.
@@ -271,6 +498,9 @@ class ResultsBrowserView(BaseResultsView):
         
         # Store and display using parent method
         super().add_result(name, result_with_name)
+        
+        # Auto-detect sweep parameters for dose-response analysis (E3)
+        self._update_dose_response_parameters()
     
     
     def clear_results(self):
@@ -1151,3 +1381,36 @@ class ResultsBrowserView(BaseResultsView):
                     related_places.add(target_id)
         
         return sorted(list(related_places))  # Sort for consistent ordering
+    
+    def _update_dose_response_parameters(self):
+        """Auto-detect sweep parameters from experiment names (E3 enhancement).
+        
+        Parses experiment names to find varying parameters and populates
+        the dose parameter combo box for dose-response analysis.
+        """
+        # Extract all parameters from experiment names
+        # Format: "param1=val1_param2=val2_..."
+        all_params = set()
+        
+        for row in self.results_store:
+            name = row[1]  # Column 1 = name
+            for part in name.split('_'):
+                if '=' in part:
+                    param_name = part.split('=', 1)[0]
+                    all_params.add(param_name)
+        
+        # Update combo if parameters found
+        if all_params and hasattr(self, 'dr_param_combo'):
+            # Store current selection
+            current_selection = self.dr_param_combo.get_active_text()
+            
+            # Clear and repopulate
+            self.dr_param_combo.remove_all()
+            for param in sorted(all_params):
+                self.dr_param_combo.append_text(param)
+            
+            # Restore selection if still valid, otherwise select first
+            if current_selection and current_selection in all_params:
+                self.dr_param_combo.set_active_id(current_selection)
+            elif len(all_params) > 0:
+                self.dr_param_combo.set_active(0)
