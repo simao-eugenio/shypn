@@ -84,9 +84,9 @@ class ResultsBrowserView(BaseResultsView):
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_size_request(-1, 150)
         
-        # Create ListStore: selected (bool), name, replicates, duration, status
-        # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str), 4=status (str)
-        self.results_store = Gtk.ListStore(bool, str, int, str, str)
+        # Create ListStore: selected (bool), name, replicates, duration, status, error_msg
+        # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str), 4=status (str), 5=error_msg (str)
+        self.results_store = Gtk.ListStore(bool, str, int, str, str, str)
         
         # Create TreeView
         self.results_tree = Gtk.TreeView(model=self.results_store)
@@ -122,11 +122,12 @@ class ResultsBrowserView(BaseResultsView):
         column_dur.set_min_width(80)
         self.results_tree.append_column(column_dur)
         
-        # Column 4: Status
+        # Column 4: Status (with error tooltip)
         renderer_status = Gtk.CellRendererText()
         column_status = Gtk.TreeViewColumn("Status", renderer_status, text=4)
         column_status.set_min_width(80)
         self.results_tree.append_column(column_status)
+        self.results_tree.set_tooltip_column(5)  # Column 5 = error message
         
         # Connect selection changed
         selection = self.results_tree.get_selection()
@@ -1336,13 +1337,15 @@ class ResultsBrowserView(BaseResultsView):
         # Extract info
         n_replicates = result_data.get('statistics', {}).get('n_replicates', 0)
         duration = result_data.get('duration', 0.0)
-        status = "error" if "error" in result_data else "completed"
+        error_msg = result_data.get('error', '')
+        status = "✗ Error" if error_msg else "✓ Completed"
         
         # Format duration
         duration_str = f"{duration:.2f}s"
         
         # Add to store (default: not selected)
-        self.results_store.append([False, name, n_replicates, duration_str, status])
+        # Include full error message in column 5 for tooltip
+        self.results_store.append([False, name, n_replicates, duration_str, status, error_msg])
         
         self._update_status_label()
     
