@@ -201,6 +201,13 @@ class ResultsBrowserView(BaseResultsView):
         self.compare_button.connect("clicked", self._on_compare_selected_clicked)
         button_box.pack_start(self.compare_button, False, False, 0)
         
+        # Sensitivity Analysis button (E7 enhancement)
+        self.sensitivity_button = Gtk.Button(label="🎯 Sensitivity (PRCC)")
+        self.sensitivity_button.set_tooltip_text("Compute PRCC from LHS parameter sweep results")
+        self.sensitivity_button.set_sensitive(False)
+        self.sensitivity_button.connect("clicked", self._on_sensitivity_analysis_clicked)
+        button_box.pack_start(self.sensitivity_button, False, False, 0)
+        
         # Add to Report button
         self.report_button = Gtk.Button(label="Add to Report")
         self.report_button.set_tooltip_text("Add selected results to Report panel")
@@ -1089,6 +1096,240 @@ class ResultsBrowserView(BaseResultsView):
             import traceback
             traceback.print_exc()
     
+    def _on_sensitivity_analysis_clicked(self, button):
+        """Perform sensitivity analysis on all results (E7 enhancement).
+        
+        Computes Partial Rank Correlation Coefficients (PRCC) from experiment
+        results to identify which parameters most strongly influence outputs.
+        Assumes experiments were generated using Latin Hypercube Sampling or
+        cover a representative range of parameter values.
+        """
+        from .sensitivity_analyzer import SensitivityAnalyzer
+        import numpy as np
+        
+        # Need at least 10 experiments for meaningful PRCC
+        if len(self.results) < 10:
+            self._show_error(
+                f"Need at least 10 experiments for sensitivity analysis (found {len(self.results)})\n\n"
+                "Sensitivity analysis works best with:\n"
+                "• Latin Hypercube Sampling (LHS) parameter sweep\n"
+                "• Factorial design with multiple parameters\n"
+                "• At least 10 × n_parameters experiments"
+            )
+            return
+        
+        # Select output metric
+        metric_dialog = Gtk.Dialog(
+            title="Select Output Metric",
+            transient_for=self.get_toplevel(),
+            flags=0
+        )
+        metric_dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        
+        content = metric_dialog.get_content_area()
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        
+        label = Gtk.Label(label="Select the output metric for sensitivity analysis:")
+        label.set_xalign(0)
+        content.pack_start(label, False, False, 6)
+        
+        metric_combo = Gtk.ComboBoxText()
+        metric_combo.append("deadlock_rate", "Deadlock Rate (%)")
+        metric_combo.append("viable_rate", "Viability Rate (%)")
+        metric_combo.append("mean_tokens", "Mean Token Count")
+        metric_combo.append("mean_duration", "Mean Simulation Duration")
+        metric_combo.set_active(0)
+        content.pack_start(metric_combo, False, False, 6)
+        
+        metric_dialog.show_all()
+        response = metric_dialog.run()
+        metric_id = metric_combo.get_active_id()
+        metric_name = metric_combo.get_active_text()
+        metric_dialog.destroy()
+        
+        if response != Gtk.ResponseType.OK or not metric_id:
+            return
+        
+        # Extract parameter values and outputs from experiment names and results
+        # Parse experiment names: "param1=val1_param2=val2_..."
+        all_params = {}
+        outputs = []
+        valid_experiments = []
+        
+        for name, result in self.results.items():
+            # Parse parameters from name
+            params = {}
+            for part in name.split('_'):
+                if '=' in part:
+                    key, val = part.split('=', 1)
+                    try:
+                        params[key] = float(val)
+                    except ValueError:
+                        continue
+            
+            if not params:
+                continue
+            
+            # Extract output value
+            stats = result.get('statistics', {})
+            
+            if metric_id == 'deadlock_rate':
+                output_value = stats.get('deadlock_rate', 0.0) * 100
+            elif metric_id == 'viable_rate':
+                output_value = (1.0 - stats.get('deadlock_rate', 0.0)) * 100
+            elif metric_id == 'mean_tokens':
+                species_stats = stats.get('species_statistics', {})
+                mean_values = [
+                    sp_stats.get('mean', 0.0)
+                    for sp_id, sp_stats in species_stats.items()
+                    if sp_id.startswith('P')
+                ]
+                output_value = np.mean(mean_values) if mean_values else 0.0
+            elif metric_id == 'mean_duration':
+                output_value = stats.get('mean_duration', 0.0)
+            else:
+                continue
+            
+            # Store parameter values
+            for param_name, param_value in params.items():
+                if param_name not in all_params:
+                    all_params[param_name] = []
+                all_params[param_name].append(param_value)
+            
+            outputs.append(output_value)
+            valid_experiments.append(name)
+        
+        # Check if we have enough data
+        if len(valid_experiments) < 10:
+            self._show_error(
+                f"Only {len(valid_experiments)} experiments have parseable parameter values.\n\n"
+                "Experiment names must follow format: param1=value1_param2=value2_..."
+            )
+            return
+        
+        # Verify all parameters have consistent data
+        param_names = []
+        samples = {}
+        
+        for param_name, values in all_params.items():
+            if len(values) == len(outputs):
+                param_names.append(param_name)
+                samples[param_name] = np.array(values)
+        
+        if len(param_names) < 2:
+            self._show_error(
+                f"Need at least 2 parameters for sensitivity analysis (found {len(param_names)})\n\n"
+                "Parameters detected: " + ", ".join(param_names) if param_names else "None"
+            )
+            return
+        
+        # Compute PRCC
+        try:
+            # Determine parameter ranges from data
+            param_ranges = {
+                name: (np.min(values), np.max(values))
+                for name, values in samples.items()
+            }
+            
+            analyzer = SensitivityAnalyzer(param_ranges, n_samples=len(outputs))
+            prcc_results = analyzer.compute_prcc(samples, outputs, output_name=metric_name)
+            
+            # Generate tornado plot
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            
+            plot_data = analyzer.get_tornado_plot_data(prcc_results, top_n=10)
+            
+            # Create horizontal bar chart (tornado plot)
+            y_pos = np.arange(len(plot_data['param_names']))
+            
+            bars = ax.barh(y_pos, plot_data['prcc_values'], color=plot_data['colors'], alpha=0.8)
+            
+            # Add significance markers
+            for i, (name, prcc, sig) in enumerate(zip(
+                plot_data['param_names'],
+                plot_data['prcc_values'],
+                plot_data['significant']
+            )):
+                if sig:
+                    # Add star for significant
+                    x_pos = prcc + (0.05 if prcc > 0 else -0.05)
+                    ax.text(x_pos, i, '★', ha='left' if prcc > 0 else 'right',
+                           va='center', fontsize=12, color='black')
+            
+            # Vertical line at zero
+            ax.axvline(0, color='black', linewidth=1, linestyle='-', alpha=0.5)
+            
+            # Styling
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(plot_data['param_names'])
+            ax.set_xlabel('PRCC (Partial Rank Correlation Coefficient)', fontsize=11)
+            ax.set_title(f'Sensitivity Analysis: {metric_name}\n'
+                        f'({len(outputs)} experiments, {len(param_names)} parameters)',
+                        fontsize=12, fontweight='bold')
+            ax.set_xlim(-1, 1)
+            ax.grid(True, axis='x', alpha=0.3, linestyle=':')
+            
+            # Add legend
+            from matplotlib.patches import Patch
+            legend_elements = [
+                Patch(facecolor='#2ca02c', label='Positive (↑ param → ↑ output)'),
+                Patch(facecolor='#d62728', label='Negative (↑ param → ↓ output)'),
+                Patch(facecolor='#999999', label='Not significant (p ≥ 0.05)')
+            ]
+            ax.legend(handles=legend_elements, loc='best', frameon=True, shadow=True)
+            
+            self.figure.tight_layout()
+            self.canvas.draw()
+            
+            # Switch to plot page
+            self.notebook.set_current_page(1)
+            
+            # Show detailed statistics in dialog
+            stats_text = analyzer.format_prcc_results(prcc_results, include_insignificant=True)
+            
+            stats_dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="Sensitivity Analysis Results (PRCC)"
+            )
+            
+            scrolled = Gtk.ScrolledWindow()
+            scrolled.set_size_request(600, 400)
+            scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            
+            stats_label = Gtk.Label()
+            stats_label.set_text(stats_text)
+            stats_label.set_xalign(0)
+            stats_label.set_yalign(0)
+            stats_label.set_selectable(True)
+            stats_label.set_margin_start(12)
+            stats_label.set_margin_end(12)
+            stats_label.set_margin_top(12)
+            stats_label.set_margin_bottom(12)
+            
+            scrolled.add(stats_label)
+            
+            content_area = stats_dialog.get_content_area()
+            content_area.pack_start(scrolled, True, True, 0)
+            
+            stats_dialog.show_all()
+            stats_dialog.run()
+            stats_dialog.destroy()
+            
+        except Exception as e:
+            self._show_error(f"Sensitivity analysis failed:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+    
     def display_result(self, result_data):
         """Display a result in the TreeView.
         
@@ -1218,6 +1459,9 @@ class ResultsBrowserView(BaseResultsView):
             
             # Enable compare button if 2+ experiments checked (E6 enhancement)
             self.compare_button.set_sensitive(checked_count >= 2)
+            
+            # Enable sensitivity analysis if 10+ total experiments (E7 enhancement)
+            self.sensitivity_button.set_sensitive(total >= 10)
     
     def _on_selection_changed(self, selection):
         """Handle result selection change."""
