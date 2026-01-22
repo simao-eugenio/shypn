@@ -165,13 +165,29 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             place.tokens = float(marking)
             place.marking = float(marking)
     
-    # Apply transition rates
+    # Apply transition rates (handle both numeric and formula strings)
     for trans_id, rate in transition_rates.items():
         trans = next((t for t in model.transitions if t.id == trans_id), None)
         if trans:
             if not hasattr(trans, 'properties') or trans.properties is None:
                 trans.properties = {}
-            trans.properties['rate'] = float(rate)
+            
+            # Check if rate is numeric or a formula string
+            if isinstance(rate, str):
+                # Try to parse as number first
+                try:
+                    numeric_rate = float(rate)
+                    # It's a numeric string - store as number
+                    trans.rate = numeric_rate
+                    trans.properties['rate'] = numeric_rate
+                except ValueError:
+                    # It's a formula string - store in properties for evaluation
+                    trans.properties['rate_function'] = rate
+                    trans.rate = rate  # Store formula string
+            else:
+                # It's numeric - convert to float
+                trans.rate = float(rate)
+                trans.properties['rate'] = float(rate)
     
     # Apply arc weights
     for arc_id, weight in arc_weights.items():
