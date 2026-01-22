@@ -981,19 +981,13 @@ class ViabilityPanel(Gtk.Box):
         # Create DocumentModel
         model = DocumentModel()
         
-        # Copy places via serialization (preserves all properties)
-        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_places_set]
-        
-        # Copy transitions via serialization
-        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_transitions_set]
-        
-        # Build ID lookup dictionaries for arc deserialization
-        places_dict = {p.id: p for p in model.places}
-        transitions_dict = {t.id: t for t in model.transitions}
-        
-        # Copy arcs (need references to copied places/transitions)
-        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
-                      for a in subnet_arcs_set]
+        # CRITICAL FIX: Use direct references to canvas objects, NOT copies!
+        # Previously used from_dict(to_dict()) which created deep copies.
+        # Edits to copies were not reflected in the canvas manager, so saves lost changes.
+        # Now use direct references so edits update the actual canvas objects.
+        model.places = list(subnet_places_set)
+        model.transitions = list(subnet_transitions_set)
+        model.arcs = list(subnet_arcs_set)
         
         # Store the subnet model
         self.subnet_model = model
