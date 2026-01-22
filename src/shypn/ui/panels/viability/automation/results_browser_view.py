@@ -92,13 +92,17 @@ class ResultsBrowserView(BaseResultsView):
         self.results_tree = Gtk.TreeView(model=self.results_store)
         self.results_tree.set_headers_visible(True)
         
-        # Column 0: Checkbox for multi-selection
+        # Column 0: Checkbox for multi-selection (clickable header for select/deselect all)
         renderer_toggle = Gtk.CellRendererToggle()
         renderer_toggle.set_activatable(True)
         renderer_toggle.connect("toggled", self._on_row_toggled)
-        column_select = Gtk.TreeViewColumn("☑", renderer_toggle, active=0)
+        column_select = Gtk.TreeViewColumn("☐", renderer_toggle, active=0)
         column_select.set_min_width(40)
+        column_select.set_clickable(True)
+        column_select.connect("clicked", self._on_checkbox_header_clicked)
         self.results_tree.append_column(column_select)
+        self.checkbox_column = column_select
+        self._all_selected = False
         
         # Column 1: Experiment Name
         renderer_name = Gtk.CellRendererText()
@@ -1665,6 +1669,58 @@ class ResultsBrowserView(BaseResultsView):
         current_value = self.results_store.get_value(iter, 0)
         self.results_store.set_value(iter, 0, not current_value)
         self._update_status_label()
+        
+        # Update header icon based on selection state
+        self._update_checkbox_header()
+    
+    def _on_checkbox_header_clicked(self, column):
+        """Handle click on checkbox column header to select/deselect all.
+        
+        Toggles between selecting all rows and deselecting all rows.
+        Updates header icon to show current state (☐ = none selected, ☑ = all selected).
+        """
+        # Toggle state
+        self._all_selected = not self._all_selected
+        
+        # Update all rows
+        iter = self.results_store.get_iter_first()
+        while iter:
+            self.results_store.set_value(iter, 0, self._all_selected)
+            iter = self.results_store.iter_next(iter)
+        
+        # Update header icon
+        if self._all_selected:
+            column.set_title("☑")
+        else:
+            column.set_title("☐")
+        
+        # Update status label
+        self._update_status_label()
+    
+    def _update_checkbox_header(self):
+        """Update checkbox header icon based on current selection state."""
+        # Count selected rows
+        selected_count = 0
+        total_count = 0
+        iter = self.results_store.get_iter_first()
+        while iter:
+            if self.results_store.get_value(iter, 0):
+                selected_count += 1
+            total_count += 1
+            iter = self.results_store.iter_next(iter)
+        
+        # Update header icon and internal state
+        if selected_count == 0:
+            self.checkbox_column.set_title("☐")
+            self._all_selected = False
+        elif selected_count == total_count:
+            self.checkbox_column.set_title("☑")
+            self._all_selected = True
+        else:
+            # Partially selected - show empty box
+            self.checkbox_column.set_title("☐")
+            self._all_selected = False
+
     
     def _on_report_clicked(self, button):
         """Handle Add to Report button click."""
