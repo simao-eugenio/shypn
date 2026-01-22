@@ -45,34 +45,16 @@ class SimulationControlToolbar(Gtk.Box):
         label.set_markup("<b>Experiment:</b>")
         row.pack_start(label, False, False, 0)
         
-        # Experiment selector combo
+        # Experiment selector combo (read-only for testing current state)
         self.experiment_combo = Gtk.ComboBoxText()
         self.experiment_combo.append_text("Current")
         self.experiment_combo.set_active(0)
-        self.experiment_combo.set_tooltip_text("Select experiment configuration")
+        self.experiment_combo.set_sensitive(False)  # Read-only - use automation for experiments
+        self.experiment_combo.set_tooltip_text("Current subnet state (use Automation below for experiments)")
         row.pack_start(self.experiment_combo, False, False, 0)
         
-        # Management buttons
-        self.add_exp_button = Gtk.Button(label="+ Add")
-        self.add_exp_button.set_tooltip_text("Create new experiment from current parameters")
-        row.pack_start(self.add_exp_button, False, False, 0)
-        
-        self.copy_exp_button = Gtk.Button(label="Copy")
-        self.copy_exp_button.set_tooltip_text("Duplicate current experiment for variation")
-        row.pack_start(self.copy_exp_button, False, False, 0)
-        
-        # Sync button (always visible)
-        self.sync_baseline_button = Gtk.Button(label="↻ Sync to Automation")
-        self.sync_baseline_button.set_tooltip_text("Update automation baseline from current table values")
-        self.sync_baseline_button.get_style_context().add_class("suggested-action")
-        row.pack_start(self.sync_baseline_button, False, False, 0)
-        
-        # Stale warning indicator (hidden by default)
-        self.stale_warning_label = Gtk.Label()
-        self.stale_warning_label.set_markup("<span foreground='orange'>⚠</span>")
-        self.stale_warning_label.set_tooltip_text("Parameters changed - baseline is stale")
-        self.stale_warning_label.set_no_show_all(True)  # Hidden by default
-        row.pack_start(self.stale_warning_label, False, False, 0)
+        # Removed Add/Copy/Sync buttons - automation category handles experiment management
+        # Sync button and warning hidden - auto-sync implemented
 
         # Settings moved here: Time and Steps beside Copy
         row.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
@@ -250,14 +232,10 @@ class SimulationControlToolbar(Gtk.Box):
         self.experiment_combo.set_active(self.experiment_combo.get_model().iter_n_children(None) - 1)
     
     def show_stale_baseline_warning(self, show=True):
-        """Show or hide stale baseline warning.
+        """Show or hide stale baseline warning (deprecated - auto-sync enabled).
         
         Args:
             show: True to show warning, False to hide
         """
-        if show:
-            self.stale_warning_label.show()
-            self.sync_baseline_button.show()
-        else:
-            self.stale_warning_label.hide()
-            self.sync_baseline_button.hide()
+        # No-op: Auto-sync eliminates need for stale warnings
+        pass
