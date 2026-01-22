@@ -252,15 +252,24 @@ class ExperimentAutomationCategory:
                 self.sweep_builder.name_combo.set_active(0)
     
     def _on_sweep_generate(self, config):
-        """Handle parameter sweep generation.
+        """Handle parameter sweep generation (single or factorial).
         
         Args:
-            config: Dictionary with sweep configuration:
-                - parameter_type: 'places', 'transitions', 'arcs'
-                - parameter_name: Name of parameter to vary
-                - values: List of values to test
-                - replicates: Number of replicates per experiment
-                - duration: Simulation duration
+            config: Dictionary with sweep configuration.
+                
+                Single-parameter sweep:
+                    - parameter_type: 'places', 'transitions', 'arcs'
+                    - parameter_name: Name of parameter to vary
+                    - values: List of values to test
+                    - replicates: Number of replicates per experiment
+                    - duration: Simulation duration
+                
+                Factorial design:
+                    - design_type: 'factorial'
+                    - parameters: List of parameter dicts with name, type, id, values
+                    - combinations: List of tuples (value1, value2, ...)
+                    - replicates: Number of replicates per experiment
+                    - duration: Simulation duration
         """
         if self.experiment_manager is None:
             self._show_error("ExperimentManager not available. Please ensure a model is loaded in Viability Panel.")
@@ -306,21 +315,26 @@ class ExperimentAutomationCategory:
             # Store baseline snapshot count
             baseline_count = len(self.experiment_manager.snapshots)
             
-            # Generate sweep snapshots
-            count = self.experiment_manager.generate_sweep_snapshots(
-                parameter_type=config['parameter_type'],
-                parameter_id=config.get('parameter_id', config['parameter_name']),  # Use ID if available
-                parameter_name=config['parameter_name'],  # Display name
-                values=config['values'],
-                base_snapshot=base_snapshot
-            )
-            
-            # Update visual indicators in parameter tables
-            if self.parent_panel and hasattr(self.parent_panel, 'update_sweep_indicators') and count > 0:
-                self.parent_panel.update_sweep_indicators(
-                    config['parameter_type'],
-                    config.get('parameter_id', config['parameter_name'])
+            # Check design type
+            if config.get('design_type') == 'factorial':
+                # Handle factorial design
+                count = self._generate_factorial_snapshots(config, base_snapshot)
+            else:
+                # Handle single-parameter sweep
+                count = self.experiment_manager.generate_sweep_snapshots(
+                    parameter_type=config['parameter_type'],
+                    parameter_id=config.get('parameter_id', config['parameter_name']),  # Use ID if available
+                    parameter_name=config['parameter_name'],  # Display name
+                    values=config['values'],
+                    base_snapshot=base_snapshot
                 )
+                
+                # Update visual indicators in parameter tables (single-param only)
+                if self.parent_panel and hasattr(self.parent_panel, 'update_sweep_indicators') and count > 0:
+                    self.parent_panel.update_sweep_indicators(
+                        config['parameter_type'],
+                        config.get('parameter_id', config['parameter_name'])
+                    )
             
             # Update preview
             if hasattr(self.sweep_builder, 'preview_label'):
@@ -343,6 +357,59 @@ class ExperimentAutomationCategory:
             
         except Exception as e:
             self._show_error(f"Sweep generation failed: {str(e)}")
+    
+    def _generate_factorial_snapshots(self, config, base_snapshot):
+        """Generate experiment snapshots for factorial design.
+        
+        Args:
+            config: Factorial design configuration with parameters and combinations
+            base_snapshot: Base snapshot to clone for each experiment
+            
+        Returns:
+            int: Number of snapshots created
+        """
+        parameters = config['parameters']
+        combinations = config['combinations']
+        
+        count = 0
+        for combo in combinations:
+            # Build descriptive name from combination values
+            name_parts = []
+            for i, param in enumerate(parameters):
+                value = combo[i]
+                # Format value nicely
+                if isinstance(value, float):
+                    if value.is_integer():
+                        value_str = str(int(value))
+                    else:
+                        value_str = f"{value:.2f}"
+                else:
+                    value_str = str(value)
+                name_parts.append(f"{param['name']}={value_str}")
+            
+            snapshot_name = "_".join(name_parts)
+            
+            # Create new snapshot by cloning baseline
+            snapshot = self.experiment_manager.add_snapshot(snapshot_name)
+            snapshot.clone_from(base_snapshot)
+            
+            # Apply parameter modifications for this combination
+            for i, param in enumerate(parameters):
+                param_type = param['type']
+                param_id = param['id']
+                value = combo[i]
+                
+                # Update the appropriate parameter storage
+                if param_type == 'places':
+                    snapshot.place_markings[param_id] = value
+                elif param_type == 'transitions':
+                    snapshot.transition_rates[param_id] = value
+                elif param_type == 'arcs':
+                    snapshot.arc_weights[param_id] = value
+            
+            count += 1
+        
+        return count
     
     def _on_queue_run(self, pending_experiments):
         """Handle queue run request.
