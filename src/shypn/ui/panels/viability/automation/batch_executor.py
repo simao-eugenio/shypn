@@ -572,6 +572,10 @@ class BatchExecutor:
                 for args in experiment_args:
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
                     async_results.append((args['queue_index'], args['name'], async_result))
+                    
+                    # Set initial running status when experiment is submitted
+                    if progress_callback:
+                        progress_callback(args['queue_index'], "running", "0%")
                 
                 # Poll for completion
                 while async_results and not self.is_cancelled:
