@@ -133,7 +133,7 @@ class ExperimentQueueView(Gtk.Box):
             "Execute experiments in parallel using multiple CPU cores\n"
             "Significantly faster for large batches (e.g., 100 experiments: 6h → 36min)"
         )
-        self.parallel_checkbox.set_active(False)  # Default: sequential (safe)
+        self.parallel_checkbox.set_active(True)  # Default: enabled for speed
         button_box.pack_start(self.parallel_checkbox, False, False, 0)
         
         # Status label
