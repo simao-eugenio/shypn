@@ -555,13 +555,37 @@ class ExperimentAutomationCategory:
         GLib.idle_add(complete_ui_updates, priority=GLib.PRIORITY_DEFAULT)
     
     def _on_export_results(self, name, result, format_type):
-        """Handle export results request.
+        """Handle export results request - supports single and batch export.
         
         Args:
             name: Experiment name
             result: Result dictionary
-            format_type: 'csv' or 'json'
+            format_type: 'csv', 'json', 'csv_batch', or 'json_batch'
         """
+        # Check if this is a batch export
+        is_batch = format_type.endswith('_batch')
+        
+        if is_batch:
+            # Batch export - use pre-selected directory from result
+            directory = result.get('_batch_export_dir')
+            batch_name = result.get('_batch_export_name', name)
+            
+            if directory:
+                # Generate safe filename
+                safe_name = batch_name.replace(' ', '_').replace('/', '_').replace('=', '_')
+                base_format = format_type.replace('_batch', '')
+                filepath = f"{directory}/{safe_name}.{base_format}"
+                
+                try:
+                    if base_format == 'csv':
+                        self._export_csv(filepath, batch_name, result)
+                    elif base_format == 'json':
+                        self._export_json(filepath, batch_name, result)
+                except Exception as e:
+                    print(f"Batch export error for {batch_name}: {e}")
+            return
+        
+        # Single export - show file chooser dialog
         # Get parent window for dialog
         parent_window = None
         if self.parent_panel:
