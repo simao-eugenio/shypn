@@ -32,8 +32,7 @@ class ResultsBrowserView(BaseResultsView):
     - Integration with Report panel
     
     Features:
-    - Multi-select checkboxes for batch export
-    - Select All / Deselect All buttons
+    - Multi-select checkboxes for batch export (click header to toggle all)
     - Notebook with Results List and Plot View tabs
     """
     
@@ -150,21 +149,6 @@ class ResultsBrowserView(BaseResultsView):
         
         # Action buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        
-        # Select All / Deselect All buttons
-        select_all_button = Gtk.Button(label="☑ Select All")
-        select_all_button.set_tooltip_text("Select all results for batch export")
-        select_all_button.connect("clicked", self._on_select_all_clicked)
-        button_box.pack_start(select_all_button, False, False, 0)
-        
-        deselect_all_button = Gtk.Button(label="☐ Deselect All")
-        deselect_all_button.set_tooltip_text("Deselect all results")
-        deselect_all_button.connect("clicked", self._on_deselect_all_clicked)
-        button_box.pack_start(deselect_all_button, False, False, 0)
-        
-        # Separator
-        separator = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        button_box.pack_start(separator, False, False, 4)
         
         # Export CSV button (single or batch)
         self.export_csv_button = Gtk.Button(label="Export CSV")
@@ -1680,22 +1664,6 @@ class ResultsBrowserView(BaseResultsView):
         iter = self.results_store.get_iter(path)
         current_value = self.results_store.get_value(iter, 0)
         self.results_store.set_value(iter, 0, not current_value)
-        self._update_status_label()
-    
-    def _on_select_all_clicked(self, button):
-        """Select all results for batch operations."""
-        iter = self.results_store.get_iter_first()
-        while iter:
-            self.results_store.set_value(iter, 0, True)
-            iter = self.results_store.iter_next(iter)
-        self._update_status_label()
-    
-    def _on_deselect_all_clicked(self, button):
-        """Deselect all results."""
-        iter = self.results_store.get_iter_first()
-        while iter:
-            self.results_store.set_value(iter, 0, False)
-            iter = self.results_store.iter_next(iter)
         self._update_status_label()
     
     def _on_report_clicked(self, button):
