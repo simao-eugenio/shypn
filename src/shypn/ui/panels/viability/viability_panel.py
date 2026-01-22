@@ -203,6 +203,18 @@ class ViabilityPanel(Gtk.Box):
         sep.set_margin_top(10)
         main_box.pack_start(sep, False, False, 0)
         
+        # === INTERACTIVE TESTING SECTION LABEL ===
+        interactive_label = Gtk.Label()
+        interactive_label.set_markup(
+            "<b>INTERACTIVE TESTING</b>\n"
+            "<span size='small'>For Petri net debugging: step-by-step execution, pause/resume, deadlock investigation</span>"
+        )
+        interactive_label.set_halign(Gtk.Align.START)
+        interactive_label.set_margin_start(10)
+        interactive_label.set_margin_top(10)
+        interactive_label.set_margin_bottom(5)
+        main_box.pack_start(interactive_label, False, False, 0)
+        
         # === SIMULATION CONTROLS (NEW) ===
         self.simulation_toolbar = SimulationControlToolbar()
         main_box.pack_start(self.simulation_toolbar, False, False, 0)
@@ -305,22 +317,6 @@ class ViabilityPanel(Gtk.Box):
 
         # Add results container to main layout
         main_box.pack_start(self.content_box, False, False, 0)
-        
-        # === INTERACTIVE TESTING SECTION LABEL ===
-        sep3 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep3.set_margin_top(15)
-        sep3.set_margin_bottom(5)
-        main_box.pack_start(sep3, False, False, 0)
-        
-        interactive_label = Gtk.Label()
-        interactive_label.set_markup(
-            "<b>INTERACTIVE TESTING</b>\n"
-            "<span size='small'>For Petri net debugging: step-by-step execution, pause/resume, deadlock investigation</span>"
-        )
-        interactive_label.set_halign(Gtk.Align.START)
-        interactive_label.set_margin_start(10)
-        interactive_label.set_margin_bottom(5)
-        main_box.pack_start(interactive_label, False, False, 0)
         
         # === AUTOMATED EXPERIMENTATION SECTION LABEL ===
         sep4 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
