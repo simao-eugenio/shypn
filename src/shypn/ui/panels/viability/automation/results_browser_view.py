@@ -187,6 +187,13 @@ class ResultsBrowserView(BaseResultsView):
         self.plot_button.connect("clicked", self._on_plot_clicked)
         button_box.pack_start(self.plot_button, False, False, 0)
         
+        # Statistical Tests button (E5 enhancement)
+        self.stats_test_button = Gtk.Button(label="📈 Statistical Tests")
+        self.stats_test_button.set_tooltip_text("Run ANOVA and post-hoc tests on selected experiments")
+        self.stats_test_button.set_sensitive(False)
+        self.stats_test_button.connect("clicked", self._on_statistical_tests_clicked)
+        button_box.pack_start(self.stats_test_button, False, False, 0)
+        
         # Add to Report button
         self.report_button = Gtk.Button(label="Add to Report")
         self.report_button.set_tooltip_text("Add selected results to Report panel")
@@ -689,6 +696,248 @@ class ResultsBrowserView(BaseResultsView):
             import traceback
             traceback.print_exc()
     
+    def _on_statistical_tests_clicked(self, button):
+        """Run statistical tests on checked experiments (E5 enhancement).
+        
+        Performs one-way ANOVA if 3+ groups selected, or t-test if 2 groups.
+        If ANOVA is significant, runs Tukey HSD post-hoc tests.
+        """
+        from .statistical_comparator import StatisticalComparator, TTestComparator
+        import numpy as np
+        
+        # Get checked experiments
+        checked = self.get_checked_results()
+        
+        if len(checked) < 2:
+            self._show_error("Please check at least 2 experiments for statistical comparison")
+            return
+        
+        # Select response metric to compare
+        metric_dialog = Gtk.Dialog(
+            title="Select Response Metric",
+            transient_for=self.get_toplevel(),
+            flags=0
+        )
+        metric_dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        
+        content = metric_dialog.get_content_area()
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        
+        label = Gtk.Label(label="Select the metric to compare across experiments:")
+        label.set_xalign(0)
+        content.pack_start(label, False, False, 6)
+        
+        metric_combo = Gtk.ComboBoxText()
+        metric_combo.append("deadlock_rate", "Deadlock Rate (%)")
+        metric_combo.append("viable_rate", "Viability Rate (%)")
+        metric_combo.append("mean_tokens", "Mean Token Count")
+        metric_combo.append("mean_duration", "Mean Simulation Duration")
+        metric_combo.set_active(0)
+        content.pack_start(metric_combo, False, False, 6)
+        
+        metric_dialog.show_all()
+        response = metric_dialog.run()
+        metric_id = metric_combo.get_active_id()
+        metric_dialog.destroy()
+        
+        if response != Gtk.ResponseType.OK or not metric_id:
+            return
+        
+        # Extract data for each experiment
+        groups = {}
+        
+        for name, result in checked:
+            stats = result.get('statistics', {})
+            
+            # Get metric value (use replicate-level data if available)
+            if metric_id == 'deadlock_rate':
+                # Try to get per-replicate deadlock status
+                replicate_data = result.get('replicate_data', [])
+                if replicate_data:
+                    values = [1.0 if rep.get('deadlocked', False) else 0.0 for rep in replicate_data]
+                else:
+                    # Fallback to aggregate rate
+                    values = [stats.get('deadlock_rate', 0.0)]
+                values = [v * 100 for v in values]  # Convert to %
+            
+            elif metric_id == 'viable_rate':
+                replicate_data = result.get('replicate_data', [])
+                if replicate_data:
+                    values = [0.0 if rep.get('deadlocked', False) else 1.0 for rep in replicate_data]
+                else:
+                    values = [1.0 - stats.get('deadlock_rate', 0.0)]
+                values = [v * 100 for v in values]  # Convert to %
+            
+            elif metric_id == 'mean_tokens':
+                # Average token count across all places
+                species_stats = stats.get('species_statistics', {})
+                mean_values = [
+                    sp_stats.get('mean', 0.0)
+                    for sp_id, sp_stats in species_stats.items()
+                    if sp_id.startswith('P')
+                ]
+                values = [np.mean(mean_values)] if mean_values else [0.0]
+            
+            elif metric_id == 'mean_duration':
+                replicate_data = result.get('replicate_data', [])
+                if replicate_data:
+                    values = [rep.get('duration', 0.0) for rep in replicate_data]
+                else:
+                    values = [stats.get('mean_duration', 0.0)]
+            
+            else:
+                continue
+            
+            groups[name] = values
+        
+        # Check if we have valid data
+        if len(groups) < 2:
+            self._show_error("Insufficient data for statistical comparison")
+            return
+        
+        # Perform statistical test
+        try:
+            if len(groups) == 2:
+                # Two-sample t-test
+                group_names = list(groups.keys())
+                result_stats = TTestComparator.independent_ttest(
+                    groups[group_names[0]],
+                    groups[group_names[1]],
+                    equal_var=True
+                )
+                
+                # Format results
+                results_text = (
+                    f"<b>Two-Sample t-Test</b>\n\n"
+                    f"<b>Groups:</b>\n"
+                    f"  • {group_names[0]} (n={result_stats['n1']})\n"
+                    f"  • {group_names[1]} (n={result_stats['n2']})\n\n"
+                    f"<b>Test Statistics:</b>\n"
+                    f"  t-statistic: {result_stats['t_statistic']:.4f}\n"
+                    f"  p-value: {result_stats['p_value']:.4f}"
+                )
+                
+                if result_stats['p_value'] < 0.001:
+                    results_text += " ***"
+                elif result_stats['p_value'] < 0.01:
+                    results_text += " **"
+                elif result_stats['p_value'] < 0.05:
+                    results_text += " *"
+                else:
+                    results_text += " (ns)"
+                
+                results_text += (
+                    f"\n  df: {result_stats['df']}\n\n"
+                    f"<b>Effect Size:</b>\n"
+                    f"  Mean Difference: {result_stats['mean_diff']:.3f}\n"
+                    f"  Cohen's d: {result_stats['cohens_d']:.3f}\n"
+                    f"  95% CI: [{result_stats['ci_lower']:.3f}, {result_stats['ci_upper']:.3f}]\n\n"
+                    f"<b>Interpretation:</b>\n"
+                )
+                
+                if result_stats['significant']:
+                    results_text += f"  <span foreground='green'>✓ Significant difference detected (p &lt; 0.05)</span>"
+                else:
+                    results_text += f"  <span foreground='orange'>✗ No significant difference (p ≥ 0.05)</span>"
+            
+            else:
+                # One-way ANOVA with Tukey HSD
+                comparator = StatisticalComparator(groups)
+                summary = comparator.get_summary(include_posthoc=True)
+                
+                anova = summary['anova']
+                
+                results_text = (
+                    f"<b>One-Way ANOVA</b>\n\n"
+                    f"<b>Groups ({len(groups)}):</b>\n"
+                )
+                
+                for name in groups.keys():
+                    n = anova['group_ns'][name]
+                    mean = anova['group_means'][name]
+                    std = anova['group_stds'][name]
+                    results_text += f"  • {name}: {mean:.2f} ± {std:.2f} (n={n})\n"
+                
+                results_text += (
+                    f"\n<b>ANOVA Results:</b>\n"
+                    f"  F-statistic: {anova['f_statistic']:.4f}\n"
+                    f"  p-value: {anova['p_value']:.4f}"
+                )
+                
+                if anova['p_value'] < 0.001:
+                    results_text += " ***"
+                elif anova['p_value'] < 0.01:
+                    results_text += " **"
+                elif anova['p_value'] < 0.05:
+                    results_text += " *"
+                else:
+                    results_text += " (ns)"
+                
+                results_text += (
+                    f"\n  df: ({anova['df_between']}, {anova['df_within']})\n\n"
+                )
+                
+                if anova['significant']:
+                    results_text += f"<b><span foreground='green'>✓ Significant differences detected (p &lt; 0.05)</span></b>\n\n"
+                    
+                    # Show Tukey HSD results
+                    if 'tukey' in summary:
+                        results_text += "<b>Tukey HSD Post-Hoc Tests:</b>\n"
+                        tukey = summary['formatted_comparisons']
+                        
+                        for comparison, stats in tukey.items():
+                            sig_marker = "***" if stats['p_value'] < 0.001 else "**" if stats['p_value'] < 0.01 else "*" if stats['p_value'] < 0.05 else "ns"
+                            results_text += f"  • {comparison}:\n"
+                            results_text += f"    Δμ = {stats['mean_diff']:.3f}, "
+                            results_text += f"p = {stats['p_value']:.4f} {sig_marker}\n"
+                else:
+                    results_text += f"<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
+            
+            # Display results in dialog
+            results_dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="Statistical Test Results"
+            )
+            
+            # Use scrolled window for long results
+            scrolled = Gtk.ScrolledWindow()
+            scrolled.set_size_request(500, 400)
+            scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            
+            results_label = Gtk.Label()
+            results_label.set_markup(results_text)
+            results_label.set_xalign(0)
+            results_label.set_yalign(0)
+            results_label.set_line_wrap(True)
+            results_label.set_selectable(True)
+            results_label.set_margin_start(12)
+            results_label.set_margin_end(12)
+            results_label.set_margin_top(12)
+            results_label.set_margin_bottom(12)
+            
+            scrolled.add(results_label)
+            
+            content_area = results_dialog.get_content_area()
+            content_area.pack_start(scrolled, True, True, 0)
+            
+            results_dialog.show_all()
+            results_dialog.run()
+            results_dialog.destroy()
+            
+        except Exception as e:
+            self._show_error(f"Statistical test failed:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+    
     def display_result(self, result_data):
         """Display a result in the TreeView.
         
@@ -812,6 +1061,9 @@ class ResultsBrowserView(BaseResultsView):
             has_checked = checked_count > 0
             self.export_csv_button.set_sensitive(has_checked or self.get_selected_result()[0] is not None)
             self.export_json_button.set_sensitive(has_checked or self.get_selected_result()[0] is not None)
+            
+            # Enable statistical tests button if 2+ experiments checked (E5 enhancement)
+            self.stats_test_button.set_sensitive(checked_count >= 2)
     
     def _on_selection_changed(self, selection):
         """Handle result selection change."""
