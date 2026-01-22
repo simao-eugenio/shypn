@@ -120,29 +120,64 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
 
 
 def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
-    """Apply snapshot parameters to model (simplified version for worker)."""
-    if not snapshot or 'parameters' not in snapshot:
+    """Apply snapshot parameters to model (simplified version for worker).
+    
+    Args:
+        snapshot: ExperimentSnapshot object or dict with parameters
+        model: DocumentModel with places, transitions, arcs
+        baseline_params: Baseline parameter values dict
+    """
+    if not snapshot:
         return
     
-    # Apply parameter changes from snapshot
-    for param in snapshot['parameters']:
-        obj_type = param.get('obj_type')
-        obj_id = param.get('obj_id')
-        attr_name = param.get('attr')
-        new_value = param.get('value')
+    # Handle both ExperimentSnapshot objects and dict format
+    if hasattr(snapshot, 'place_markings'):
+        # ExperimentSnapshot object - use its attributes
+        place_markings = snapshot.place_markings
+        transition_rates = snapshot.transition_rates
+        arc_weights = snapshot.arc_weights
+    elif isinstance(snapshot, dict) and 'parameters' in snapshot:
+        # Old dict format - convert to place/transition/arc mappings
+        place_markings = {}
+        transition_rates = {}
+        arc_weights = {}
         
-        # Find object in model
-        obj = None
-        if obj_type == 'place':
-            obj = next((p for p in model.places if p.id == obj_id), None)
-        elif obj_type == 'transition':
-            obj = next((t for t in model.transitions if t.id == obj_id), None)
-        elif obj_type == 'arc':
-            obj = next((a for a in model.arcs if a.id == obj_id), None)
-        
-        # Set attribute
-        if obj and hasattr(obj, attr_name):
-            setattr(obj, attr_name, new_value)
+        for param in snapshot['parameters']:
+            obj_type = param.get('obj_type')
+            obj_id = param.get('obj_id')
+            attr_name = param.get('attr')
+            new_value = param.get('value')
+            
+            if obj_type == 'place' and attr_name in ('marking', 'tokens'):
+                place_markings[obj_id] = new_value
+            elif obj_type == 'transition' and attr_name == 'rate':
+                transition_rates[obj_id] = new_value
+            elif obj_type == 'arc' and attr_name == 'weight':
+                arc_weights[obj_id] = new_value
+    else:
+        # No valid snapshot format
+        return
+    
+    # Apply place markings
+    for place_id, marking in place_markings.items():
+        place = next((p for p in model.places if p.id == place_id), None)
+        if place:
+            place.tokens = float(marking)
+            place.marking = float(marking)
+    
+    # Apply transition rates
+    for trans_id, rate in transition_rates.items():
+        trans = next((t for t in model.transitions if t.id == trans_id), None)
+        if trans:
+            if not hasattr(trans, 'properties') or trans.properties is None:
+                trans.properties = {}
+            trans.properties['rate'] = float(rate)
+    
+    # Apply arc weights
+    for arc_id, weight in arc_weights.items():
+        arc = next((a for a in model.arcs if a.id == arc_id), None)
+        if arc:
+            arc.weight = float(weight)
 
 
 class BatchExecutor:
