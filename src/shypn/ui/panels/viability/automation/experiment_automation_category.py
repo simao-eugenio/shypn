@@ -91,6 +91,32 @@ class ExperimentAutomationCategory:
         self.content_box.set_margin_top(6)
         self.content_box.set_margin_bottom(6)
         
+        # === STAGE 3: QUICK RUN BUTTON ===
+        # Add Quick Run button at top for easy single-experiment execution
+        quick_run_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        quick_run_box.set_margin_bottom(8)
+        
+        self.quick_run_button = Gtk.Button(label="⚡ Quick Run (Current Baseline)")
+        self.quick_run_button.set_tooltip_text(
+            "Run single experiment with current baseline parameters\n"
+            "Faster alternative to manual toolbar for quick tests"
+        )
+        self.quick_run_button.get_style_context().add_class("suggested-action")
+        self.quick_run_button.connect("clicked", self._on_quick_run)
+        quick_run_box.pack_start(self.quick_run_button, False, False, 0)
+        
+        # Status label for quick run
+        self.quick_run_status = Gtk.Label(label="")
+        self.quick_run_status.set_halign(Gtk.Align.START)
+        quick_run_box.pack_start(self.quick_run_status, True, True, 0)
+        
+        self.content_box.pack_start(quick_run_box, False, False, 0)
+        
+        # Separator after quick run
+        sep_quick = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep_quick.set_margin_bottom(8)
+        self.content_box.pack_start(sep_quick, False, False, 0)
+        
         # Build sweep builder content (Phase 2)
         self._build_placeholder_content()
         
@@ -138,6 +164,7 @@ class ExperimentAutomationCategory:
         self.queue_view.set_run_callback(self._on_queue_run)
         self.queue_view.set_cancel_callback(self._on_queue_cancel)
         self.queue_view.set_clear_callback(self._on_queue_cleared)
+        self.queue_view.set_pause_callback(self._on_queue_pause)  # Stage 3
         self.content_box.pack_start(self.queue_view, True, True, 0)
         
         # Create batch executor
@@ -250,6 +277,65 @@ class ExperimentAutomationCategory:
             if hasattr(self.sweep_builder, 'name_combo'):
                 self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
                 self.sweep_builder.name_combo.set_active(0)
+    
+    def _on_quick_run(self, button):
+        """Handle Quick Run button - run single experiment with current baseline.
+        
+        Stage 3 feature: Provides fast single-experiment execution without
+        needing to use manual simulation toolbar. Creates one experiment
+        from current baseline and executes immediately.
+        """
+        # Update status
+        self.quick_run_status.set_markup("<i>Running...</i>")
+        
+        # Check prerequisites
+        if not self.parent_panel or not hasattr(self.parent_panel, 'selected_localities'):
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
+            return
+        
+        if not self.parent_panel.selected_localities:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
+            return
+        
+        # Ensure baseline exists
+        if len(self.experiment_manager.snapshots) == 0:
+            if self.parent_panel and hasattr(self.parent_panel, 'places_store'):
+                baseline = self.experiment_manager.add_snapshot("Baseline")
+                baseline.capture_from_treeviews(
+                    self.parent_panel.places_store,
+                    self.parent_panel.transitions_store,
+                    self.parent_panel.arcs_store
+                )
+        
+        # Create single experiment from baseline
+        baseline = self.experiment_manager.get_active_snapshot()
+        
+        # Get method from sweep builder if available, otherwise use Gillespie
+        method = 'gillespie'
+        if hasattr(self.sweep_builder, 'method_combo'):
+            method = self.sweep_builder.method_combo.get_active_id() or 'gillespie'
+        
+        # Create experiment config
+        experiment = {
+            'name': 'Quick Run',
+            'snapshot': baseline,
+            'replicates': 100,  # Quick test with fewer replicates
+            'duration': 100.0,
+            'method': method,
+            'parameter_values': {}
+        }
+        
+        # Clear queue and add single experiment
+        self.queue_view.clear_queue()
+        self.queue_view.add_experiment(experiment)
+        
+        # Run immediately
+        pending = self.queue_view.get_pending_experiments()
+        if pending:
+            self._on_queue_run(pending)
+            self.quick_run_status.set_markup("<span foreground='green'>✓ Running 1 experiment</span>")
+        else:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ Failed to queue</span>")
     
     def _on_sweep_generate(self, config):
         """Handle parameter sweep generation (single or factorial).
@@ -505,6 +591,25 @@ class ExperimentAutomationCategory:
         # Update UI immediately (completion callback will be called by executor)
         if self.queue_view:
             GLib.idle_add(lambda: self.queue_view.set_running(False) or False)
+    
+    def _on_queue_pause(self, should_pause):
+        """Handle queue pause/resume request (Stage 3).
+        
+        Args:
+            should_pause: True to pause, False to resume
+        """
+        if not self.batch_executor:
+            return
+        
+        # Toggle paused state
+        self.batch_executor.set_paused(should_pause)
+        
+        # Update UI to reflect paused state
+        if self.queue_view:
+            GLib.idle_add(lambda: self.queue_view.set_running(
+                is_running=True, 
+                is_paused=should_pause
+            ) or False)
     
     def _on_queue_cleared(self):
         """Handle queue cleared event.

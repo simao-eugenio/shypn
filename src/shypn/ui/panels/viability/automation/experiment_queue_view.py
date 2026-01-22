@@ -41,6 +41,7 @@ class ExperimentQueueView(Gtk.Box):
         self.on_run_callback = None
         self.on_cancel_callback = None
         self.on_clear_callback = None
+        self.on_pause_callback = None  # Stage 3
         
         # Build UI
         self._build_ui()
@@ -96,9 +97,16 @@ class ExperimentQueueView(Gtk.Box):
         self.run_button.connect("clicked", self._on_run_clicked)
         button_box.pack_start(self.run_button, False, False, 0)
         
+        # Pause/Resume button (Stage 3)
+        self.pause_button = Gtk.Button(label="⏸ Pause")
+        self.pause_button.set_tooltip_text("Pause execution after current experiment")
+        self.pause_button.set_sensitive(False)
+        self.pause_button.connect("clicked", self._on_pause_clicked)
+        button_box.pack_start(self.pause_button, False, False, 0)
+        
         # Cancel button
-        self.cancel_button = Gtk.Button(label="⏸ Cancel")
-        self.cancel_button.set_tooltip_text("Cancel running execution")
+        self.cancel_button = Gtk.Button(label="⏹ Stop")
+        self.cancel_button.set_tooltip_text("Stop execution immediately")
         self.cancel_button.set_sensitive(False)
         self.cancel_button.connect("clicked", self._on_cancel_clicked)
         button_box.pack_start(self.cancel_button, False, False, 0)
@@ -235,16 +243,27 @@ class ExperimentQueueView(Gtk.Box):
             index += 1
         return pending
     
-    def set_running(self, is_running):
-        """Update UI for running/stopped state.
+    def set_running(self, is_running, is_paused=False):
+        """Update UI for running/stopped/paused state (Stage 3).
         
         Args:
-            is_running: True if execution is running
+            is_running: True if execution is running or paused
+            is_paused: True if execution is paused (requires is_running=True)
         """
+        # Button states
         self.run_button.set_sensitive(not is_running)
         self.cancel_button.set_sensitive(is_running)
+        self.pause_button.set_sensitive(is_running)  # Stage 3
         
-        # Update status label to reflect running state
+        # Update pause button label based on paused state
+        if is_paused:
+            self.pause_button.set_label("▶ Resume")
+            self.pause_button.set_tooltip_text("Resume execution")
+        else:
+            self.pause_button.set_label("⏸ Pause")
+            self.pause_button.set_tooltip_text("Pause execution after current experiment")
+        
+        # Update status label to reflect running/paused state
         if is_running:
             # Count running/pending experiments
             running = 0
@@ -258,7 +277,9 @@ class ExperimentQueueView(Gtk.Box):
                     pending += 1
                 iter = self.queue_store.iter_next(iter)
             
-            if running > 0 or pending > 0:
+            if is_paused:
+                self.status_label.set_markup(f"<span foreground='orange'><b>Paused</b> - {running} active, {pending} pending</span>")
+            elif running > 0 or pending > 0:
                 self.status_label.set_markup(f"<b>Running... ({running} active, {pending} pending)</b>")
         else:
             # Not running - refresh normal status
@@ -329,6 +350,29 @@ class ExperimentQueueView(Gtk.Box):
         if self.on_cancel_callback:
             self.on_cancel_callback()
     
+    def _on_pause_clicked(self, button):
+        """Handle Pause/Resume button click (Stage 3).
+        
+        Toggles between paused and running states. When paused, execution
+        stops after the current experiment completes.
+        """
+        # Check current label to determine action
+        if self.pause_button.get_label() == "⏸ Pause":
+            # Pause execution
+            if hasattr(self, 'on_pause_callback') and self.on_pause_callback:
+                self.on_pause_callback(True)  # True = pause
+            self.pause_button.set_label("▶ Resume")
+            self.pause_button.set_tooltip_text("Resume execution")
+            self.status_label.set_markup("<span foreground='orange'><b>Paused</b> - click Resume to continue</span>")
+        else:
+            # Resume execution
+            if hasattr(self, 'on_pause_callback') and self.on_pause_callback:
+                self.on_pause_callback(False)  # False = resume
+            self.pause_button.set_label("⏸ Pause")
+            self.pause_button.set_tooltip_text("Pause execution after current experiment")
+            self.status_label.set_markup("<i>Resumed execution</i>")
+            GLib.timeout_add(1000, self._update_status_label)  # Restore normal status after 1s
+    
     def _on_clear_clicked(self, button):
         """Handle Clear Completed button click."""
         count_before = len(self.queue_store)
@@ -394,3 +438,11 @@ class ExperimentQueueView(Gtk.Box):
             callback: Function to call after clearing
         """
         self.on_clear_callback = callback
+    
+    def set_pause_callback(self, callback):
+        """Set callback for Pause/Resume button (Stage 3).
+        
+        Args:
+            callback: Function to call with boolean (True=pause, False=resume)
+        """
+        self.on_pause_callback = callback
