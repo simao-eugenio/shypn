@@ -445,6 +445,11 @@ class ExperimentAutomationCategory:
             except:
                 pass
         
+        # Get parallel execution setting from queue view checkbox (E2 enhancement)
+        use_parallel = False
+        if hasattr(self.queue_view, 'parallel_checkbox'):
+            use_parallel = self.queue_view.parallel_checkbox.get_active()
+        
         # Clear pending updates tracking
         self._pending_updates.clear()
         
@@ -459,7 +464,7 @@ class ExperimentAutomationCategory:
         # Update UI for running state
         self.queue_view.set_running(True)
         
-        # Start batch execution
+        # Start batch execution with parallel option
         try:
             self.batch_executor.run_batch(
                 experiments=pending_experiments,
@@ -468,7 +473,8 @@ class ExperimentAutomationCategory:
                 termination_condition=termination_condition,
                 progress_callback=self._on_experiment_progress,
                 complete_callback=self._on_batch_complete,
-                experiment_result_callback=self._on_experiment_result
+                experiment_result_callback=self._on_experiment_result,
+                use_parallel=use_parallel  # E2: Enable parallel execution if checkbox is checked
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
