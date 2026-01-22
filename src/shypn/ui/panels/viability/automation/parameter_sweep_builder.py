@@ -36,6 +36,10 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_values = []
         self._param_name_to_id = {}  # Mapping for name to ID resolution
         
+        # Factorial design state
+        self.design_mode = 'single'  # 'single' or 'factorial'
+        self.factorial_parameters = []  # List of selected parameters for factorial
+        
         # Reference to viability panel for accessing model state
         self.viability_panel = None
         
@@ -56,6 +60,30 @@ class ParameterSweepBuilder(Gtk.Box):
         title_label.set_markup("<b>Parameter Sweep Configuration</b>")
         title_label.set_xalign(0)
         self.pack_start(title_label, False, False, 0)
+        
+        # === DESIGN MODE SELECTION ===
+        mode_frame = Gtk.Frame()
+        mode_frame.set_label("Design Mode")
+        mode_frame.set_margin_top(6)
+        
+        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        mode_box.set_margin_start(12)
+        mode_box.set_margin_end(12)
+        mode_box.set_margin_top(6)
+        mode_box.set_margin_bottom(6)
+        
+        self.single_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Single Parameter Sweep")
+        self.single_radio.set_tooltip_text("Vary one parameter at a time")
+        self.single_radio.connect("toggled", self._on_design_mode_changed)
+        mode_box.pack_start(self.single_radio, False, False, 0)
+        
+        self.factorial_radio = Gtk.RadioButton.new_with_label_from_widget(self.single_radio, "Factorial Design")
+        self.factorial_radio.set_tooltip_text("Vary multiple parameters simultaneously (creates all combinations)")
+        self.factorial_radio.connect("toggled", self._on_design_mode_changed)
+        mode_box.pack_start(self.factorial_radio, False, False, 0)
+        
+        mode_frame.add(mode_box)
+        self.pack_start(mode_frame, False, False, 0)
         
         # === PARAMETER SELECTION ===
         selection_frame = Gtk.Frame()
@@ -85,7 +113,7 @@ class ParameterSweepBuilder(Gtk.Box):
         
         selection_box.pack_start(type_box, False, False, 0)
         
-        # Parameter Name
+        # Parameter Name (for single mode)
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         name_label = Gtk.Label(label="Parameter:")
         name_label.set_size_request(100, -1)
@@ -98,6 +126,48 @@ class ParameterSweepBuilder(Gtk.Box):
         name_box.pack_start(self.name_combo, True, True, 0)
         
         selection_box.pack_start(name_box, False, False, 0)
+        self.single_param_box = name_box  # Store reference for show/hide
+        
+        # Factorial parameter selection (initially hidden)
+        self.factorial_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Add parameter button
+        add_param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.factorial_add_combo = Gtk.ComboBoxText()
+        self.factorial_add_combo.set_tooltip_text("Select parameter to add to factorial design")
+        add_param_box.pack_start(self.factorial_add_combo, True, True, 0)
+        
+        add_button = Gtk.Button(label="Add")
+        add_button.connect("clicked", self._on_factorial_add_clicked)
+        add_param_box.pack_start(add_button, False, False, 0)
+        
+        self.factorial_box.pack_start(add_param_box, False, False, 0)
+        
+        # List of selected parameters
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(80)
+        
+        self.factorial_list = Gtk.ListStore(str, str, str)  # name, type, id
+        self.factorial_view = Gtk.TreeView(model=self.factorial_list)
+        self.factorial_view.set_headers_visible(True)
+        
+        col_name = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
+        col_type = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
+        self.factorial_view.append_column(col_name)
+        self.factorial_view.append_column(col_type)
+        
+        scroll.add(self.factorial_view)
+        self.factorial_box.pack_start(scroll, True, True, 0)
+        
+        # Remove button
+        remove_button = Gtk.Button(label="Remove Selected")
+        remove_button.connect("clicked", self._on_factorial_remove_clicked)
+        self.factorial_box.pack_start(remove_button, False, False, 0)
+        
+        selection_box.pack_start(self.factorial_box, True, True, 0)
+        self.factorial_box.set_no_show_all(True)
+        self.factorial_box.hide()
         
         selection_frame.add(selection_box)
         self.pack_start(selection_frame, False, False, 0)
@@ -257,6 +327,107 @@ class ParameterSweepBuilder(Gtk.Box):
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
     
+    def _on_design_mode_changed(self, radio):
+        """Handle design mode change between single and factorial."""
+        if not radio.get_active():
+            return
+        
+        if self.single_radio.get_active():
+            self.design_mode = 'single'
+            self.single_param_box.show()
+            self.factorial_box.hide()
+        else:
+            self.design_mode = 'factorial'
+            self.single_param_box.hide()
+            self.factorial_box.show()
+    
+    def _on_factorial_add_clicked(self, button):
+        """Add parameter to factorial design."""
+        param_id = self.factorial_add_combo.get_active_id()
+        param_name = self.factorial_add_combo.get_active_text()
+        
+        if not param_id or param_id == "none":
+            return
+        
+        # Check if already added
+        for row in self.factorial_list:
+            if row[2] == param_id:  # Check ID column
+                return
+        
+        # Check limit (max 3 parameters for factorial)
+        if len(self.factorial_list) >= 3:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="Maximum 3 parameters for factorial design"
+            )
+            dialog.format_secondary_text("Factorial designs become very large with >3 parameters. For more parameters, consider fractional factorial designs or sequential optimization.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        # Add to list
+        param_type = self.parameter_type
+        type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
+        self.factorial_list.append([param_name, type_display, param_id])
+        
+        # Update preview
+        self._update_factorial_preview()
+    
+    def _on_factorial_remove_clicked(self, button):
+        """Remove selected parameter from factorial design."""
+        selection = self.factorial_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if tree_iter:
+            model.remove(tree_iter)
+            self._update_factorial_preview()
+    
+    def _update_factorial_preview(self):
+        """Update preview for factorial design."""
+        if len(self.factorial_list) == 0:
+            self.preview_label.set_markup("<i>Add 2-3 parameters for factorial design</i>")
+            self.generate_button.set_sensitive(False)
+            return
+        
+        try:
+            # Calculate experiment count
+            total = 1
+            param_counts = []
+            
+            for row in self.factorial_list:
+                # Compute values for this parameter
+                values = self._compute_parameter_values()
+                param_counts.append(len(values))
+                total *= len(values)
+            
+            # Show preview
+            if len(param_counts) == 2:
+                self.preview_label.set_markup(
+                    f"<span foreground='blue'>Ready: {param_counts[0]} × {param_counts[1]} = {total} experiments</span>"
+                )
+            elif len(param_counts) == 3:
+                self.preview_label.set_markup(
+                    f"<span foreground='blue'>Ready: {param_counts[0]} × {param_counts[1]} × {param_counts[2]} = {total} experiments</span>"
+                )
+            else:
+                self.preview_label.set_markup(
+                    f"<span foreground='blue'>Ready: {total} experiments will be generated</span>"
+                )
+            
+            self.generate_button.set_sensitive(total > 0 and total <= 500)
+            
+            if total > 500:
+                self.preview_label.set_markup(
+                    f"<span foreground='red'>Too many experiments ({total}). Reduce parameter ranges.</span>"
+                )
+        
+        except Exception as e:
+            self.preview_label.set_markup(f"<span foreground='red'>Error: {str(e)}</span>")
+            self.generate_button.set_sensitive(False)
+    
     def _on_name_changed(self, combo):
         """Handle parameter name selection - auto-predict range and settings."""
         # Prevent recursion when prefill_parameter changes the combo
@@ -359,38 +530,85 @@ class ParameterSweepBuilder(Gtk.Box):
         """Generate experiment snapshots."""
         if self.on_generate_callback:
             try:
-                # Ensure parameter_type is set
-                if self.parameter_type is None:
-                    self.parameter_type = self.type_combo.get_active_id()
-                    if self.parameter_type is None:
-                        raise ValueError("Please select a parameter type")
-                
-                # Get parameter ID (internal key) from combo
-                param_id = self.name_combo.get_active_id()
-                param_name = self.name_combo.get_active_text()  # Display name for labels
-                
-                if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
-                    raise ValueError("Please select a parameter from the dropdown")
-                
-                values = self._compute_parameter_values()
-                if not values:
-                    raise ValueError("No parameter values to generate. Check range configuration.")
-                
-                config = {
-                    'parameter_type': self.parameter_type,
-                    'parameter_id': param_id,  # Internal ID for matching
-                    'parameter_name': param_name,  # Display name for labels
-                    'values': values,
-                    'replicates': int(self.replicates_entry.get_text()),
-                    'duration': float(self.duration_entry.get_text()),
-                    'termination_condition': self.termination_combo.get_active_id()
-                }
-                
-                self.on_generate_callback(config)
+                if self.design_mode == 'factorial':
+                    self._generate_factorial_experiments()
+                else:
+                    self._generate_single_parameter_experiments()
             except Exception as e:
                 self.preview_label.set_markup(
                     f"<span foreground='red'>Generation failed: {str(e)}</span>"
                 )
+    
+    def _generate_single_parameter_experiments(self):
+        """Generate single parameter sweep experiments (original behavior)."""
+        # Ensure parameter_type is set
+        if self.parameter_type is None:
+            self.parameter_type = self.type_combo.get_active_id()
+            if self.parameter_type is None:
+                raise ValueError("Please select a parameter type")
+        
+        # Get parameter ID (internal key) from combo
+        param_id = self.name_combo.get_active_id()
+        param_name = self.name_combo.get_active_text()  # Display name for labels
+        
+        if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
+            raise ValueError("Please select a parameter from the dropdown")
+        
+        values = self._compute_parameter_values()
+        if not values:
+            raise ValueError("No parameter values to generate. Check range configuration.")
+        
+        config = {
+            'parameter_type': self.parameter_type,
+            'parameter_id': param_id,  # Internal ID for matching
+            'parameter_name': param_name,  # Display name for labels
+            'values': values,
+            'replicates': int(self.replicates_entry.get_text()),
+            'duration': float(self.duration_entry.get_text()),
+            'termination_condition': self.termination_combo.get_active_id()
+        }
+        
+        self.on_generate_callback(config)
+    
+    def _generate_factorial_experiments(self):
+        """Generate factorial design experiments."""
+        if len(self.factorial_list) < 2:
+            raise ValueError("Factorial design requires at least 2 parameters")
+        
+        # Collect all parameters and their values
+        parameters = []
+        for row in self.factorial_list:
+            param_name = row[0]
+            param_type = row[1].lower() + "s"  # "Place" -> "places"
+            param_id = row[2]
+            
+            # Get current parameter values (same range spec applies to all)
+            values = self._compute_parameter_values()
+            if not values:
+                raise ValueError(f"No values computed for {param_name}")
+            
+            parameters.append({
+                'name': param_name,
+                'type': param_type,
+                'id': param_id,
+                'values': values
+            })
+        
+        # Generate factorial grid
+        import itertools
+        param_combinations = list(itertools.product(*[p['values'] for p in parameters]))
+        
+        # Create experiments for each combination
+        factorial_config = {
+            'design_type': 'factorial',
+            'parameters': parameters,
+            'combinations': param_combinations,
+            'replicates': int(self.replicates_entry.get_text()),
+            'duration': float(self.duration_entry.get_text()),
+            'termination_condition': self.termination_combo.get_active_id()
+        }
+        
+        self.on_generate_callback(factorial_config)
     
     def _on_clear_clicked(self, button):
         """Clear all inputs and notify parent to clear queue."""
@@ -486,6 +704,7 @@ class ParameterSweepBuilder(Gtk.Box):
         """
         # Clear existing
         self.name_combo.remove_all()
+        self.factorial_add_combo.remove_all()
         
         # Store ID mapping for later retrieval
         self._param_name_to_id = {}
@@ -496,6 +715,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 # New format: (name, id) tuple
                 name, param_id = param
                 self.name_combo.append(param_id, name)  # Store ID as key, display name
+                self.factorial_add_combo.append(param_id, name)
                 self._param_name_to_id[name] = param_id
             else:
                 # Old format: just name/ID (backward compatibility)
