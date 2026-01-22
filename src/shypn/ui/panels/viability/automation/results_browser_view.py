@@ -4,8 +4,10 @@
 Shows completed experiments with statistics, visualizations, and export options.
 Integrates with BatchExecutor for retrieving results.
 
+REFACTORED: Now inherits from BaseResultsView (OOP architecture compliance).
+
 Author: Simão Eugénio
-Date: December 7, 2025
+Date: January 22, 2026 (Refactored to BaseResultsView)
 """
 
 import gi
@@ -16,16 +18,23 @@ matplotlib.use('GTK3Agg')
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
+from .base_results_view import BaseResultsView
 
 
-class ResultsBrowserView(Gtk.Box):
+class ResultsBrowserView(BaseResultsView):
     """Widget for browsing and analyzing experiment results.
     
-    Features:
+    Inherits from BaseResultsView to provide:
     - TreeView listing completed experiments
     - Statistics display (mean, stddev, confidence intervals)
-    - Export to CSV/JSON
+    - Export to CSV/JSON (single and batch)
+    - Embedded matplotlib plotting
     - Integration with Report panel
+    
+    Features:
+    - Multi-select checkboxes for batch export
+    - Select All / Deselect All buttons
+    - Notebook with Results List and Plot View tabs
     """
     
     def __init__(self, model=None):
@@ -34,28 +43,29 @@ class ResultsBrowserView(Gtk.Box):
         Args:
             model: Optional model reference for resolving IDs to names
         """
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        
-        # Results data: experiment_name -> results_dict
-        self.results = {}
-        
-        # Model reference for ID->name resolution
-        self.model = model
-        
-        # Callbacks
-        self.on_export_callback = None
-        self.on_report_callback = None
-        
         # Matplotlib components for embedded plotting
         self.figure = None
         self.canvas = None
         self.toolbar = None
         
-        # Build UI
-        self._build_ui()
+        # TreeView components (initialized in setup_ui)
+        self.results_store = None
+        self.results_tree = None
+        self.notebook = None
+        
+        # Status label
+        self.status_label = None
+        
+        # Call parent constructor (which calls setup_ui)
+        super().__init__(model)
     
-    def _build_ui(self):
-        """Build results browser UI with notebook for list/plot views."""
+    
+    def setup_ui(self):
+        """Build results browser UI with notebook for list/plot views.
+        
+        Implements abstract method from BaseResultsView.
+        Creates TreeView with multi-select checkboxes and matplotlib plot view.
+        """
         # Title
         title_label = Gtk.Label()
         title_label.set_markup("<b>Experiment Results</b>")
@@ -75,35 +85,43 @@ class ResultsBrowserView(Gtk.Box):
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_size_request(-1, 150)
         
-        # Create ListStore: name, replicates, duration, status
-        # Columns: 0=name (str), 1=n_replicates (int), 2=duration (str), 3=status (str)
-        self.results_store = Gtk.ListStore(str, int, str, str)
+        # Create ListStore: selected (bool), name, replicates, duration, status
+        # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str), 4=status (str)
+        self.results_store = Gtk.ListStore(bool, str, int, str, str)
         
         # Create TreeView
         self.results_tree = Gtk.TreeView(model=self.results_store)
         self.results_tree.set_headers_visible(True)
         
+        # Column 0: Checkbox for multi-selection
+        renderer_toggle = Gtk.CellRendererToggle()
+        renderer_toggle.set_activatable(True)
+        renderer_toggle.connect("toggled", self._on_row_toggled)
+        column_select = Gtk.TreeViewColumn("☑", renderer_toggle, active=0)
+        column_select.set_min_width(40)
+        self.results_tree.append_column(column_select)
+        
         # Column 1: Experiment Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Experiment", renderer_name, text=0)
+        column_name = Gtk.TreeViewColumn("Experiment", renderer_name, text=1)
         column_name.set_expand(True)
         self.results_tree.append_column(column_name)
         
         # Column 2: Replicates
         renderer_reps = Gtk.CellRendererText()
-        column_reps = Gtk.TreeViewColumn("Replicates", renderer_reps, text=1)
+        column_reps = Gtk.TreeViewColumn("Replicates", renderer_reps, text=2)
         column_reps.set_min_width(80)
         self.results_tree.append_column(column_reps)
         
         # Column 3: Duration
         renderer_dur = Gtk.CellRendererText()
-        column_dur = Gtk.TreeViewColumn("Duration", renderer_dur, text=2)
+        column_dur = Gtk.TreeViewColumn("Duration", renderer_dur, text=3)
         column_dur.set_min_width(80)
         self.results_tree.append_column(column_dur)
         
         # Column 4: Status
         renderer_status = Gtk.CellRendererText()
-        column_status = Gtk.TreeViewColumn("Status", renderer_status, text=3)
+        column_status = Gtk.TreeViewColumn("Status", renderer_status, text=4)
         column_status.set_min_width(80)
         self.results_tree.append_column(column_status)
         
@@ -133,16 +151,31 @@ class ResultsBrowserView(Gtk.Box):
         # Action buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         
-        # Export CSV button
+        # Select All / Deselect All buttons
+        select_all_button = Gtk.Button(label="☑ Select All")
+        select_all_button.set_tooltip_text("Select all results for batch export")
+        select_all_button.connect("clicked", self._on_select_all_clicked)
+        button_box.pack_start(select_all_button, False, False, 0)
+        
+        deselect_all_button = Gtk.Button(label="☐ Deselect All")
+        deselect_all_button.set_tooltip_text("Deselect all results")
+        deselect_all_button.connect("clicked", self._on_deselect_all_clicked)
+        button_box.pack_start(deselect_all_button, False, False, 0)
+        
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        button_box.pack_start(separator, False, False, 4)
+        
+        # Export CSV button (single or batch)
         self.export_csv_button = Gtk.Button(label="Export CSV")
-        self.export_csv_button.set_tooltip_text("Export selected results to CSV")
+        self.export_csv_button.set_tooltip_text("Export selected result(s) to CSV (batch if multiple checked)")
         self.export_csv_button.set_sensitive(False)
         self.export_csv_button.connect("clicked", self._on_export_csv_clicked)
         button_box.pack_start(self.export_csv_button, False, False, 0)
         
-        # Export JSON button
+        # Export JSON button (single or batch)
         self.export_json_button = Gtk.Button(label="Export JSON")
-        self.export_json_button.set_tooltip_text("Export selected results to JSON")
+        self.export_json_button.set_tooltip_text("Export selected result(s) to JSON (batch if multiple checked)")
         self.export_json_button.set_sensitive(False)
         self.export_json_button.connect("clicked", self._on_export_json_clicked)
         button_box.pack_start(self.export_json_button, False, False, 0)
@@ -195,31 +228,57 @@ class ResultsBrowserView(Gtk.Box):
         
         self.pack_start(self.notebook, True, True, 0)
     
-    def add_result(self, name, result):
-        """Add experiment result to browser.
+    def display_result(self, result_data):
+        """Display a result in the TreeView.
+        
+        Implements abstract method from BaseResultsView.
+        Adds result to TreeView with default unchecked state.
         
         Args:
-            name: Experiment name
-            result: Results dictionary from BatchExecutor
+            result_data (dict): Result dictionary with keys:
+                - name (str): Experiment name
+                - statistics (dict): Contains n_replicates
+                - duration (float): Execution time in seconds
+                - status or error indicator
         """
-        
-        self.results[name] = result
+        name = result_data.get('name', 'Unknown')
         
         # Extract info
-        n_replicates = result.get('statistics', {}).get('n_replicates', 0)
-        duration = result.get('duration', 0.0)
-        status = "error" if "error" in result else "completed"
+        n_replicates = result_data.get('statistics', {}).get('n_replicates', 0)
+        duration = result_data.get('duration', 0.0)
+        status = "error" if "error" in result_data else "completed"
         
         # Format duration
         duration_str = f"{duration:.2f}s"
         
-        # Add to store
-        self.results_store.append([name, n_replicates, duration_str, status])
+        # Add to store (default: not selected)
+        self.results_store.append([False, name, n_replicates, duration_str, status])
         
         self._update_status_label()
     
+    def add_result(self, name, result):
+        """Add experiment result to browser.
+        
+        Overrides BaseResultsView.add_result to inject name into result_data.
+        
+        Args:
+            name (str): Experiment name
+            result (dict): Results dictionary from BatchExecutor
+        """
+        # Inject name into result data for display_result
+        result_with_name = result.copy()
+        result_with_name['name'] = name
+        
+        # Store and display using parent method
+        super().add_result(name, result_with_name)
+    
+    
     def clear_results(self):
-        """Clear all results."""
+        """Clear all results.
+        
+        Implements abstract method from BaseResultsView.
+        Clears TreeView store, results dictionary, and resets status label.
+        """
         self.results.clear()
         self.results_store.clear()
         self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
@@ -234,22 +293,44 @@ class ResultsBrowserView(Gtk.Box):
         selection = self.results_tree.get_selection()
         model, iter = selection.get_selected()
         if iter:
-            name = model.get_value(iter, 0)
+            name = model.get_value(iter, 1)  # Column 1 is name (0 is checkbox)
             return name, self.results.get(name)
         return None, None
     
+    def get_checked_results(self):
+        """Get all checked results for batch operations.
+        
+        Returns:
+            list: List of (name, result_dict) tuples for checked rows
+        """
+        checked = []
+        iter = self.results_store.get_iter_first()
+        while iter:
+            is_checked = self.results_store.get_value(iter, 0)
+            if is_checked:
+                name = self.results_store.get_value(iter, 1)
+                result = self.results.get(name)
+                if result:
+                    checked.append((name, result))
+            iter = self.results_store.iter_next(iter)
+        return checked
+    
     def _update_status_label(self):
-        """Update status label with result count."""
+        """Update status label with result count and selection count."""
         total = len(self.results_store)
         if total == 0:
             self.status_label.set_markup("<i>No results</i>")
         else:
-            # Count completed vs errors
+            # Count completed vs errors and checked items
             completed = 0
             errors = 0
+            checked_count = 0
             iter = self.results_store.get_iter_first()
             while iter:
-                status = self.results_store.get_value(iter, 3)
+                is_checked = self.results_store.get_value(iter, 0)
+                status = self.results_store.get_value(iter, 4)  # Column 4 is status
+                if is_checked:
+                    checked_count += 1
                 if status == "completed":
                     completed += 1
                 elif status == "error":
@@ -257,9 +338,16 @@ class ResultsBrowserView(Gtk.Box):
                 iter = self.results_store.iter_next(iter)
             
             text = f"{total} results"
+            if checked_count > 0:
+                text += f" (<b>{checked_count} selected</b>)"
             if errors > 0:
                 text += f" (<span foreground='red'>{errors} errors</span>)"
             self.status_label.set_markup(text)
+            
+            # Enable/disable export buttons based on selection
+            has_checked = checked_count > 0
+            self.export_csv_button.set_sensitive(has_checked or self.get_selected_result()[0] is not None)
+            self.export_json_button.set_sensitive(has_checked or self.get_selected_result()[0] is not None)
     
     def _on_selection_changed(self, selection):
         """Handle result selection change."""
@@ -339,16 +427,162 @@ class ResultsBrowserView(Gtk.Box):
         self.stats_label.set_markup(text)
     
     def _on_export_csv_clicked(self, button):
-        """Handle Export CSV button click."""
-        name, result = self.get_selected_result()
-        if name and result and self.on_export_callback:
-            self.on_export_callback(name, result, "csv")
+        """Handle Export CSV button click - supports batch export if multiple checked."""
+        checked_results = self.get_checked_results()
+        
+        if len(checked_results) > 1:
+            # Batch export - export all checked results
+            self._batch_export_csv(checked_results)
+        elif len(checked_results) == 1:
+            # Single checked result
+            name, result = checked_results[0]
+            if self.on_export_callback:
+                self.on_export_callback(name, result, "csv")
+        else:
+            # No checked results - use current selection
+            name, result = self.get_selected_result()
+            if name and result and self.on_export_callback:
+                self.on_export_callback(name, result, "csv")
     
     def _on_export_json_clicked(self, button):
-        """Handle Export JSON button click."""
-        name, result = self.get_selected_result()
-        if name and result and self.on_export_callback:
-            self.on_export_callback(name, result, "json")
+        """Handle Export JSON button click - supports batch export if multiple checked."""
+        checked_results = self.get_checked_results()
+        
+        if len(checked_results) > 1:
+            # Batch export - export all checked results
+            self._batch_export_json(checked_results)
+        elif len(checked_results) == 1:
+            # Single checked result
+            name, result = checked_results[0]
+            if self.on_export_callback:
+                self.on_export_callback(name, result, "json")
+        else:
+            # No checked results - use current selection
+            name, result = self.get_selected_result()
+            if name and result and self.on_export_callback:
+                self.on_export_callback(name, result, "json")
+    
+    def _batch_export_csv(self, checked_results):
+        """Export multiple checked results to CSV files in one batch operation.
+        
+        Args:
+            checked_results: List of (name, result) tuples
+        """
+        # Choose directory for batch export
+        dialog = Gtk.FileChooserDialog(
+            title="Choose Directory for Batch CSV Export",
+            parent=self.get_toplevel(),
+            action=Gtk.FileChooserAction.SELECT_FOLDER
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Select", Gtk.ResponseType.OK
+        )
+        
+        response = dialog.run()
+        directory = dialog.get_filename()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.OK and directory:
+            # Export each checked result to the selected directory
+            success_count = 0
+            for name, result in checked_results:
+                if self.on_export_callback:
+                    # Call export callback with directory prefix
+                    result_with_dir = result.copy()
+                    result_with_dir['_batch_export_dir'] = directory
+                    result_with_dir['_batch_export_name'] = name
+                    self.on_export_callback(name, result_with_dir, "csv_batch")
+                    success_count += 1
+            
+            # Show completion message
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"Batch Export Complete"
+            )
+            dialog.format_secondary_text(
+                f"Exported {success_count} CSV files to:\n{directory}"
+            )
+            dialog.run()
+            dialog.destroy()
+    
+    def _batch_export_json(self, checked_results):
+        """Export multiple checked results to JSON files in one batch operation.
+        
+        Args:
+            checked_results: List of (name, result) tuples
+        """
+        # Choose directory for batch export
+        dialog = Gtk.FileChooserDialog(
+            title="Choose Directory for Batch JSON Export",
+            parent=self.get_toplevel(),
+            action=Gtk.FileChooserAction.SELECT_FOLDER
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Select", Gtk.ResponseType.OK
+        )
+        
+        response = dialog.run()
+        directory = dialog.get_filename()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.OK and directory:
+            # Export each checked result to the selected directory
+            success_count = 0
+            for name, result in checked_results:
+                if self.on_export_callback:
+                    # Call export callback with directory prefix
+                    result_with_dir = result.copy()
+                    result_with_dir['_batch_export_dir'] = directory
+                    result_with_dir['_batch_export_name'] = name
+                    self.on_export_callback(name, result_with_dir, "json_batch")
+                    success_count += 1
+            
+            # Show completion message
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"Batch Export Complete"
+            )
+            dialog.format_secondary_text(
+                f"Exported {success_count} JSON files to:\n{directory}"
+            )
+            dialog.run()
+            dialog.destroy()
+    
+    def _on_row_toggled(self, renderer, path):
+        """Handle checkbox toggle in results list.
+        
+        Args:
+            renderer: CellRendererToggle that was clicked
+            path: TreePath of the toggled row
+        """
+        iter = self.results_store.get_iter(path)
+        current_value = self.results_store.get_value(iter, 0)
+        self.results_store.set_value(iter, 0, not current_value)
+        self._update_status_label()
+    
+    def _on_select_all_clicked(self, button):
+        """Select all results for batch operations."""
+        iter = self.results_store.get_iter_first()
+        while iter:
+            self.results_store.set_value(iter, 0, True)
+            iter = self.results_store.iter_next(iter)
+        self._update_status_label()
+    
+    def _on_deselect_all_clicked(self, button):
+        """Deselect all results."""
+        iter = self.results_store.get_iter_first()
+        while iter:
+            self.results_store.set_value(iter, 0, False)
+            iter = self.results_store.iter_next(iter)
+        self._update_status_label()
     
     def _on_report_clicked(self, button):
         """Handle Add to Report button click."""

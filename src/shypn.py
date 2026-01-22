@@ -41,22 +41,18 @@ try:
 	gi.require_version('cairo', '1.0')
 	from gi.repository import cairo as _gi_cairo  # noqa: F401
 except (ImportError, ValueError):
-	pass  # Cairo integration may no
-	from gi.repository import Gtk, Gdk, GLib
-	
-	# Initialize Gdk early to avoid initialization issues in imports
-	Gdk.init(sys.argv)
-	
-	# WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environment variable
-	# GDK prints these directly to stderr before our log handler can catch them
-	# Setting G_MESSAGES_DEBUG to empty suppresses GDK messages at the C level
-	import os
-	if 'G_MESSAGES_DEBUG' not in os.environ:
-		os.environ['G_MESSAGES_DEBUG'] = ''
-	
-except Exception as e:
-	logging.getLogger(__name__).error('GTK3 (PyGObject) not available: %s', e)
-	sys.exit(1)
+	pass  # Cairo integration may not be available
+
+from gi.repository import Gtk, Gdk, GLib
+
+# Initialize Gdk early to avoid initialization issues in imports
+Gdk.init(sys.argv)
+
+# WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environment variable
+# GDK prints these directly to stderr before our log handler can catch them
+# Setting G_MESSAGES_DEBUG to empty suppresses GDK messages at the C level
+if 'G_MESSAGES_DEBUG' not in os.environ:
+	os.environ['G_MESSAGES_DEBUG'] = ''
 
 # TEST MODE: Check which file panel to use
 USE_SIMPLE_TEST_PANEL = os.environ.get('SHYPN_USE_SIMPLE_PANEL', '0') == '1'
