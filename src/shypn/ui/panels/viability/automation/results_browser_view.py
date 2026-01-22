@@ -194,6 +194,13 @@ class ResultsBrowserView(BaseResultsView):
         self.stats_test_button.connect("clicked", self._on_statistical_tests_clicked)
         button_box.pack_start(self.stats_test_button, False, False, 0)
         
+        # Compare Selected button (E6 enhancement)
+        self.compare_button = Gtk.Button(label="📊 Compare Selected")
+        self.compare_button.set_tooltip_text("Overlay trajectories of checked experiments")
+        self.compare_button.set_sensitive(False)
+        self.compare_button.connect("clicked", self._on_compare_selected_clicked)
+        button_box.pack_start(self.compare_button, False, False, 0)
+        
         # Add to Report button
         self.report_button = Gtk.Button(label="Add to Report")
         self.report_button.set_tooltip_text("Add selected results to Report panel")
@@ -938,6 +945,150 @@ class ResultsBrowserView(BaseResultsView):
             import traceback
             traceback.print_exc()
     
+    def _on_compare_selected_clicked(self, button):
+        """Overlay trajectories of checked experiments (E6 enhancement).
+        
+        Creates a single plot with multiple trajectories, color-coded by
+        experiment name or swept parameter value.
+        """
+        import numpy as np
+        
+        # Get checked experiments
+        checked = self.get_checked_results()
+        
+        if len(checked) < 2:
+            self._show_error("Please check at least 2 experiments to compare")
+            return
+        
+        if len(checked) > 10:
+            # Warn about too many comparisons
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text="Many Experiments Selected"
+            )
+            dialog.format_secondary_text(
+                f"You've selected {len(checked)} experiments. This may create a cluttered plot.\n\n"
+                "Continue anyway?"
+            )
+            response = dialog.run()
+            dialog.destroy()
+            
+            if response != Gtk.ResponseType.YES:
+                return
+        
+        # Select species to plot
+        species_dialog = Gtk.Dialog(
+            title="Select Species to Compare",
+            transient_for=self.get_toplevel(),
+            flags=0
+        )
+        species_dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        
+        content = species_dialog.get_content_area()
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        
+        label = Gtk.Label(label="Select species (place/transition) to compare:")
+        label.set_xalign(0)
+        content.pack_start(label, False, False, 6)
+        
+        # Get all available species from first experiment
+        first_name, first_result = checked[0]
+        species_stats = first_result.get('statistics', {}).get('species_statistics', {})
+        
+        species_combo = Gtk.ComboBoxText()
+        for species_id in sorted(species_stats.keys()):
+            display_name = self._get_species_display_name(species_id)
+            species_combo.append(species_id, display_name)
+        
+        if len(species_stats) > 0:
+            species_combo.set_active(0)
+        
+        content.pack_start(species_combo, False, False, 6)
+        
+        species_dialog.show_all()
+        response = species_dialog.run()
+        species_id = species_combo.get_active_id()
+        species_dialog.destroy()
+        
+        if response != Gtk.ResponseType.OK or not species_id:
+            return
+        
+        # Generate comparison plot
+        try:
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            
+            # Color palette for experiments
+            colors = [
+                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+            ]
+            
+            legend_entries = []
+            
+            for idx, (name, result) in enumerate(checked):
+                stats = result.get('statistics', {})
+                species_stats = stats.get('species_statistics', {})
+                time_points = stats.get('time_points', [])
+                
+                if species_id not in species_stats or not time_points:
+                    continue
+                
+                species_data = species_stats[species_id]
+                mean_trajectory = species_data.get('mean', [])
+                std_trajectory = species_data.get('std', [])
+                
+                if not mean_trajectory:
+                    continue
+                
+                # Plot mean trajectory
+                color = colors[idx % len(colors)]
+                line, = ax.plot(time_points, mean_trajectory, color=color, linewidth=2, label=name)
+                legend_entries.append((name, line))
+                
+                # Add confidence interval (mean ± std)
+                if std_trajectory:
+                    lower_bound = [m - s for m, s in zip(mean_trajectory, std_trajectory)]
+                    upper_bound = [m + s for m, s in zip(mean_trajectory, std_trajectory)]
+                    ax.fill_between(time_points, lower_bound, upper_bound, 
+                                    color=color, alpha=0.2)
+            
+            # Styling
+            species_display = self._get_species_display_name(species_id)
+            ax.set_xlabel('Time', fontsize=11)
+            ax.set_ylabel(f'{species_display}', fontsize=11)
+            ax.set_title(f'Experiment Comparison: {species_display}', 
+                        fontsize=12, fontweight='bold')
+            ax.grid(True, alpha=0.3, linestyle=':')
+            
+            # Legend with experiment names
+            if len(legend_entries) <= 10:
+                ax.legend(frameon=True, shadow=True, loc='best')
+            else:
+                # Too many for legend, just show in title
+                ax.set_title(f'Experiment Comparison: {species_display}\n({len(legend_entries)} experiments)', 
+                            fontsize=12, fontweight='bold')
+            
+            self.figure.tight_layout()
+            self.canvas.draw()
+            
+            # Switch to plot page
+            self.notebook.set_current_page(1)
+            
+        except Exception as e:
+            self._show_error(f"Comparison plot failed:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+    
     def display_result(self, result_data):
         """Display a result in the TreeView.
         
@@ -1064,6 +1215,9 @@ class ResultsBrowserView(BaseResultsView):
             
             # Enable statistical tests button if 2+ experiments checked (E5 enhancement)
             self.stats_test_button.set_sensitive(checked_count >= 2)
+            
+            # Enable compare button if 2+ experiments checked (E6 enhancement)
+            self.compare_button.set_sensitive(checked_count >= 2)
     
     def _on_selection_changed(self, selection):
         """Handle result selection change."""
