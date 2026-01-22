@@ -41,6 +41,7 @@ from .ui.investigation_view import InvestigationView
 from .experiment_manager import ExperimentManager
 from .subnet_simulator import SubnetSimulator
 from .ui.simulation_control_toolbar import SimulationControlToolbar
+from .ui.subnet_parameters_view import SubnetParametersView
 
 
 class ViabilityPanel(Gtk.Box):
@@ -217,61 +218,27 @@ class ViabilityPanel(Gtk.Box):
         # Auto-sync handles baseline updates automatically
         
         # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
-        self.subnet_expander = Gtk.Expander()
-        self.subnet_expander.set_expanded(True)
-        self.subnet_expander.set_margin_start(10)
-        self.subnet_expander.set_margin_end(10)
-        self.subnet_expander.set_margin_top(10)
+        self.subnet_params_view = SubnetParametersView()
+        main_box.pack_start(self.subnet_params_view, False, False, 0)
         
-        subnet_label = Gtk.Label()
-        subnet_label.set_xalign(0)
-        subnet_label.set_markup("<b>SUBNET PARAMETERS</b>")
-        self.subnet_expander.set_label_widget(subnet_label)
+        # Connect edit callbacks to viability panel methods
+        self.subnet_params_view.on_place_marking_edited = self._on_place_marking_edited
+        self.subnet_params_view.on_transition_rate_edited = self._on_transition_rate_edited
+        self.subnet_params_view.on_transition_formula_edited = self._on_transition_formula_edited
+        self.subnet_params_view.on_arc_weight_edited = self._on_arc_weight_edited
+        self.subnet_params_view.on_create_sweep_from_place = self._on_create_sweep_from_place
+        self.subnet_params_view.on_create_sweep_from_transition = self._on_create_sweep_from_transition
+        self.subnet_params_view.on_create_sweep_from_arc = self._on_create_sweep_from_arc
         
-        # Subnet parameters notebook (tabs for Places, Transitions, Arcs)
-        self.subnet_notebook = Gtk.Notebook()
-        self.subnet_notebook.set_margin_start(12)
-        self.subnet_notebook.set_margin_top(6)
-        self.subnet_notebook.set_margin_bottom(6)
-        
-        # Places tab with editable TreeView
-        places_scroll = Gtk.ScrolledWindow()
-        places_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        places_scroll.set_size_request(-1, 200)
-        
-        self.places_treeview, self.places_store = self._create_places_treeview()
-        places_scroll.add(self.places_treeview)
-        self.subnet_notebook.append_page(places_scroll, Gtk.Label(label="Places"))
-        
-        # Transitions tab with editable TreeView
-        transitions_scroll = Gtk.ScrolledWindow()
-        transitions_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        transitions_scroll.set_size_request(-1, 200)
-        
-        self.transitions_treeview, self.transitions_store = self._create_transitions_treeview()
-        transitions_scroll.add(self.transitions_treeview)
-        self.subnet_notebook.append_page(transitions_scroll, Gtk.Label(label="Transitions"))
-        
-        # Arcs tab with editable TreeView
-        arcs_scroll = Gtk.ScrolledWindow()
-        arcs_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        arcs_scroll.set_size_request(-1, 200)
-        
-        self.arcs_treeview, self.arcs_store = self._create_arcs_treeview()
-        arcs_scroll.add(self.arcs_treeview)
-        self.subnet_notebook.append_page(arcs_scroll, Gtk.Label(label="Arcs"))
-        
-        # Results tab with simulation results (NEW)
-        results_scroll = Gtk.ScrolledWindow()
-        results_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        results_scroll.set_size_request(-1, 200)
-        
-        self.results_treeview, self.results_store = self._create_results_treeview()
-        results_scroll.add(self.results_treeview)
-        self.subnet_notebook.append_page(results_scroll, Gtk.Label(label="Results"))
-        
-        self.subnet_expander.add(self.subnet_notebook)
-        main_box.pack_start(self.subnet_expander, False, False, 0)
+        # Store references to TreeViews and stores for backward compatibility
+        self.places_treeview = self.subnet_params_view.places_treeview
+        self.places_store = self.subnet_params_view.places_store
+        self.transitions_treeview = self.subnet_params_view.transitions_treeview
+        self.transitions_store = self.subnet_params_view.transitions_store
+        self.arcs_treeview = self.subnet_params_view.arcs_treeview
+        self.arcs_store = self.subnet_params_view.arcs_store
+        self.results_treeview = self.subnet_params_view.results_treeview
+        self.results_store = self.subnet_params_view.results_store
         
         # Separator
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -450,231 +417,8 @@ class ViabilityPanel(Gtk.Box):
         
         return treeview, store
     
-    def _create_places_treeview(self):
-        """Create TreeView for editing place parameters.
-        
-        Columns: ID, Name, Marking (editable), Type, Label, Background
-        """
-        # Create ListStore: id, name, marking (int, editable), type, label, background
-        store = Gtk.ListStore(str, str, int, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        treeview.set_search_column(1)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
-        column_id.set_resizable(True)
-        column_id.set_min_width(60)
-        treeview.append_column(column_id)
-        
-        # Column 1: Name
-        renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=5)
-        column_name.set_resizable(True)
-        column_name.set_min_width(100)
-        treeview.append_column(column_name)
-        
-        # Column 2: Marking (EDITABLE)
-        renderer_marking = Gtk.CellRendererText()
-        renderer_marking.set_property("editable", True)
-        renderer_marking.connect("edited", self._on_place_marking_edited, store)
-        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2, background=5)
-        column_marking.set_resizable(True)
-        column_marking.set_min_width(80)
-        treeview.append_column(column_marking)
-        
-        # Column 3: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3, background=5)
-        column_type.set_resizable(True)
-        column_type.set_min_width(100)
-        treeview.append_column(column_type)
-        
-        # Column 4: Label
-        renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4, background=5)
-        column_label.set_resizable(True)
-        column_label.set_expand(True)
-        column_label.set_min_width(150)
-        treeview.append_column(column_label)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_places_table_button_press)
-        
-        return treeview, store
-    
-    def _create_transitions_treeview(self):
-        """Create TreeView for editing transition parameters.
-        
-        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background
-        """
-        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background
-        store = Gtk.ListStore(str, str, float, str, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        treeview.set_search_column(1)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=6)
-        column_id.set_resizable(True)
-        column_id.set_min_width(60)
-        treeview.append_column(column_id)
-        
-        # Column 1: Name
-        renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=6)
-        column_name.set_resizable(True)
-        column_name.set_min_width(100)
-        treeview.append_column(column_name)
-        
-        # Column 2: Rate (EDITABLE)
-        renderer_rate = Gtk.CellRendererText()
-        renderer_rate.set_property("editable", True)
-        renderer_rate.connect("edited", self._on_transition_rate_edited, store)
-        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2, background=6)
-        column_rate.set_resizable(True)
-        column_rate.set_min_width(80)
-        treeview.append_column(column_rate)
-        
-        # Column 3: Formula (EDITABLE)
-        renderer_formula = Gtk.CellRendererText()
-        renderer_formula.set_property("editable", True)
-        renderer_formula.connect("edited", self._on_transition_formula_edited, store)
-        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3, background=6)
-        column_formula.set_resizable(True)
-        column_formula.set_expand(True)
-        column_formula.set_min_width(200)
-        treeview.append_column(column_formula)
-        
-        # Column 4: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=6)
-        column_type.set_resizable(True)
-        column_type.set_min_width(100)
-        treeview.append_column(column_type)
-        
-        # Column 5: Label
-        renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5, background=6)
-        column_label.set_resizable(True)
-        column_label.set_min_width(150)
-        treeview.append_column(column_label)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_transitions_table_button_press)
-        
-        return treeview, store
-    
-    def _create_arcs_treeview(self):
-        """Create TreeView for editing arc parameters.
-        
-        Columns: ID, From, To, Weight (editable), Type, Background
-        """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background
-        store = Gtk.ListStore(str, str, str, int, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
-        column_id.set_resizable(True)
-        column_id.set_min_width(80)
-        treeview.append_column(column_id)
-        
-        # Column 1: From
-        renderer_from = Gtk.CellRendererText()
-        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1, background=5)
-        column_from.set_resizable(True)
-        column_from.set_min_width(100)
-        treeview.append_column(column_from)
-        
-        # Column 2: To
-        renderer_to = Gtk.CellRendererText()
-        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2, background=5)
-        column_to.set_resizable(True)
-        column_to.set_min_width(100)
-        treeview.append_column(column_to)
-        
-        # Column 3: Weight (EDITABLE)
-        renderer_weight = Gtk.CellRendererText()
-        renderer_weight.set_property("editable", True)
-        renderer_weight.connect("edited", self._on_arc_weight_edited, store)
-        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3, background=5)
-        column_weight.set_resizable(True)
-        column_weight.set_min_width(80)
-        treeview.append_column(column_weight)
-        
-        # Column 4: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=5)
-        column_type.set_resizable(True)
-        column_type.set_expand(True)
-        column_type.set_min_width(150)
-        treeview.append_column(column_type)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_arcs_table_button_press)
-        
-        return treeview, store
-    
-    def _create_results_treeview(self):
-        """Create TreeView for simulation results display.
-        
-        Columns: Element, Initial, Final, Change, Notes
-        """
-        # Create ListStore: element, initial, final, change, notes
-        store = Gtk.ListStore(str, str, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(False)
-        
-        # Column 0: Element
-        renderer_elem = Gtk.CellRendererText()
-        column_elem = Gtk.TreeViewColumn("Element", renderer_elem, text=0)
-        column_elem.set_resizable(True)
-        column_elem.set_min_width(150)
-        treeview.append_column(column_elem)
-        
-        # Column 1: Initial
-        renderer_init = Gtk.CellRendererText()
-        column_init = Gtk.TreeViewColumn("Initial", renderer_init, text=1)
-        column_init.set_resizable(True)
-        column_init.set_min_width(80)
-        treeview.append_column(column_init)
-        
-        # Column 2: Final
-        renderer_final = Gtk.CellRendererText()
-        column_final = Gtk.TreeViewColumn("Final", renderer_final, text=2)
-        column_final.set_resizable(True)
-        column_final.set_min_width(80)
-        treeview.append_column(column_final)
-        
-        # Column 3: Change
-        renderer_change = Gtk.CellRendererText()
-        column_change = Gtk.TreeViewColumn("Change", renderer_change, text=3)
-        column_change.set_resizable(True)
-        column_change.set_min_width(80)
-        treeview.append_column(column_change)
-        
-        # Column 4: Notes
-        renderer_notes = Gtk.CellRendererText()
-        column_notes = Gtk.TreeViewColumn("Notes", renderer_notes, text=4)
-        column_notes.set_resizable(True)
-        column_notes.set_expand(True)
-        column_notes.set_min_width(200)
-        treeview.append_column(column_notes)
-        
-        return treeview, store
+    # TreeView creation methods moved to SubnetParametersView class
+    # Keeping _create_suggestions_treeview here as it's for investigation view
     
     def _get_current_model(self):
         """Get THIS panel's canvas manager (which contains the actual rendered objects).
@@ -2769,36 +2513,23 @@ class ViabilityPanel(Gtk.Box):
             swept_param_type: 'place', 'transition', or 'arc'
             swept_param_id: ID of the swept parameter
         """
-        # Clear all indicators first
-        self._clear_sweep_indicators()
-        
-        # Highlight the swept parameter
-        if swept_param_type == 'place':
-            for row in self.places_store:
-                if row[0] == swept_param_id:
-                    row[5] = "#B3D9FF"  # Medium blue - more visible
-                    break
-        elif swept_param_type == 'transition':
-            for row in self.transitions_store:
-                if row[0] == swept_param_id:
-                    row[6] = "#B3D9FF"  # Medium blue - more visible
-                    break
-        elif swept_param_type == 'arc':
-            for row in self.arcs_store:
-                if row[0] == swept_param_id:
-                    row[5] = "#B3D9FF"  # Medium blue - more visible
-                    break
+        # Delegate to SubnetParametersView
+        # Convert type names to plural for consistency
+        type_mapping = {
+            'place': 'places',
+            'transition': 'transitions',
+            'arc': 'arcs'
+        }
+        plural_type = type_mapping.get(swept_param_type, swept_param_type)
+        self.subnet_params_view.update_sweep_indicators(plural_type, swept_param_id)
     
     def _clear_sweep_indicators(self):
         """Reset all row backgrounds to white."""
-        for row in self.places_store:
-            row[5] = "#FFFFFF"
-        for row in self.transitions_store:
-            row[6] = "#FFFFFF"
-        for row in self.arcs_store:
-            row[5] = "#FFFFFF"
+        # Delegate to SubnetParametersView
+        self.subnet_params_view.clear_sweep_indicators()
     
-    def _on_places_table_button_press(self, treeview, event):
+    # Context menu handlers moved to SubnetParametersView class
+    # These stub methods exist for backward compatibility but delegate to SubnetParametersView
         """Handle right-click on places table to show context menu."""
         if event.button == 3:  # Right-click
             # Get clicked row
