@@ -89,15 +89,18 @@ def main(argv=None):
     def on_activate(a):
         """Application activation handler (REFACTORED - much shorter)."""
         
-        # Create main window (handles geometry, Wayland, menu)
-        window = MainWindow(a, UI_PATH, file_to_open)
+        # Create main window wrapper (handles geometry, Wayland, menu)
+        main_window = MainWindow(a, UI_PATH, file_to_open)
+        
+        # Get the actual GTK window
+        window = main_window.window
         
         # Create panel manager (handles toggle/float/attach)
-        panel_manager = PanelManager(window)
-        window.panel_manager = panel_manager
+        panel_manager = PanelManager(main_window)
+        main_window.panel_manager = panel_manager
         
         # Get UI components from builder
-        builder = window.builder
+        builder = main_window.builder
         left_paned = builder.get_object('left_paned')
         left_dock_stack = builder.get_object('left_dock_stack')
         canvas_notebook = builder.get_object('canvas_notebook')
@@ -147,13 +150,13 @@ def main(argv=None):
         panel_manager.set_ui_components(left_paned, left_dock_stack, model_canvas_loader)
         
         # Wire window close event
-        window.connect('delete-event', window.on_delete_event)
+        main_window.connect('delete-event', main_window.on_delete_event)
         
         # Show window
-        window.show_all()
+        main_window.show_all()
         
         # Apply maximized state after show (Wayland Error 71 prevention)
-        window.apply_maximize_state()
+        main_window.apply_maximize_state()
     
     app.connect('activate', on_activate)
     return app.run(argv)

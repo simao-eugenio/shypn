@@ -16,8 +16,8 @@ from gi.repository import Gtk, Gdk, GLib
 import logging
 
 
-class MainWindow(Gtk.Window):
-    """Main SHYPN application window.
+class MainWindow:
+    """Main SHYPN application window wrapper.
     
     Responsibilities:
     - Window geometry management (size, position, maximize/minimize)
@@ -27,12 +27,13 @@ class MainWindow(Gtk.Window):
     - Panel attachment/floating coordination (via PanelManager)
     
     Architecture:
-    - Loads main_window.ui via GtkBuilder
+    - Wraps window from main_window.ui (doesn't inherit from Gtk.Window)
     - Delegates panel management to PanelManager class
     - Uses WorkspaceSettings for geometry persistence
     - Wayland-safe: No X11-specific APIs
     
     Attributes:
+        window (Gtk.Window): The actual window from builder
         builder (Gtk.Builder): UI builder for main_window.ui
         panel_manager: PanelManager instance for panel coordination
         workspace_settings: WorkspaceSettings for persistence
@@ -47,8 +48,6 @@ class MainWindow(Gtk.Window):
             ui_path (str): Path to main_window.ui file
             file_to_open (str): Optional file path to open on startup
         """
-        super().__init__(application=app)
-        
         self.app = app
         self.ui_path = ui_path
         self.file_to_open = file_to_open
@@ -72,30 +71,19 @@ class MainWindow(Gtk.Window):
         """Load main window UI from Glade file."""
         self.builder = Gtk.Builder.new_from_file(self.ui_path)
         
-        # Get main window from builder (we inherit from Gtk.Window, so we need to transfer properties)
-        # NOTE: This is a limitation - we're creating a new window, not using builder's window
-        # Alternative: Use builder.get_object('main_window') and add methods to that instance
-        # For now, we'll manually reconstruct the UI structure
+        # Get the actual window from builder
+        self.window = self.builder.get_object('main_window')
+        if not self.window:
+            raise RuntimeError("main_window object not found in UI file")
         
-        # Get essential widgets from builder
+        # Set application
+        self.window.set_application(self.app)
+        
+        # Store references to essential widgets
         self.header_bar = self.builder.get_object('header_bar')
         self.main_box = self.builder.get_object('main_box')
         self.canvas_notebook = self.builder.get_object('canvas_notebook')
         self.left_box = self.builder.get_object('left_box')
-        
-        # Transfer widgets to self
-        if self.header_bar:
-            self.set_titlebar(self.header_bar)
-        
-        if self.main_box:
-            # Reparent main_box to self
-            parent = self.main_box.get_parent()
-            if parent:
-                parent.remove(self.main_box)
-            self.add(self.main_box)
-        
-        self.set_title("SHYPN - Systems Hybrid Petri Nets")
-        self.set_default_size(1200, 800)
     
     def _setup_css(self):
         """Load CSS styling for main window."""
@@ -123,13 +111,13 @@ class MainWindow(Gtk.Window):
         # Set size
         width = geom.get('width', 1200)
         height = geom.get('height', 800)
-        self.set_default_size(width, height)
+        self.window.set_default_size(width, height)
         
         # Position (may be ignored on Wayland)
         x = geom.get('x')
         y = geom.get('y')
         if x is not None and y is not None:
-            self.move(x, y)
+            self.window.move(x, y)
         
         # Note: Maximized state applied AFTER panels loaded (Wayland Error 71 prevention)
         self._should_maximize = geom.get('maximized', False)
@@ -140,23 +128,23 @@ class MainWindow(Gtk.Window):
         Prevents Error 71 on monitor switches and configuration changes.
         """
         # Configure event mask for multi-monitor support
-        self.connect('realize', self._on_realize)
+        self.window.connect('realize', self._on_realize)
         
         # Monitor configuration changes
-        self.connect('configure-event', self._on_configure_event)
+        self.window.connect('configure-event', self._on_configure_event)
         
         # Screen change protection (hotplug)
-        self.connect('screen-changed', self._on_screen_changed)
+        self.window.connect('screen-changed', self._on_screen_changed)
         
         # Window state changes
-        self.connect('window-state-event', self._on_window_state_changed)
+        self.window.connect('window-state-event', self._on_window_state_changed)
     
     def _on_realize(self, widget):
         """Handle window realization - setup event mask."""
-        if self.get_window():
+        if widget.get_window():
             try:
-                self.get_window().set_events(
-                    self.get_window().get_events() | 
+                widget.get_window().set_events(
+                    widget.get_window().get_events() | 
                     Gdk.EventMask.STRUCTURE_MASK |
                     Gdk.EventMask.PROPERTY_CHANGE_MASK
                 )
@@ -194,7 +182,7 @@ class MainWindow(Gtk.Window):
         # Update maximize button icon if available
         maximize_button_image = self.builder.get_object('maximize_button_image')
         if maximize_button_image:
-            if self.is_maximized():
+            if self.window.is_maximized():
                 maximize_button_image.set_from_icon_name('window-restore-symbolic', 1)
             else:
                 maximize_button_image.set_from_icon_name('window-maximize-symbolic', 1)
@@ -218,17 +206,17 @@ class MainWindow(Gtk.Window):
     def _on_minimize_clicked(self, button):
         """Minimize window (Wayland-safe)."""
         try:
-            self.iconify()
+            self.window.iconify()
         except Exception as e:
             logging.getLogger(__name__).warning('Failed to minimize: %s', e)
     
     def _on_maximize_clicked(self, button):
         """Toggle maximize/unmaximize (Wayland-safe)."""
         try:
-            if self.is_maximized():
-                self.unmaximize()
+            if self.window.is_maximized():
+                self.window.unmaximize()
             else:
-                self.maximize()
+                self.window.maximize()
         except Exception as e:
             logging.getLogger(__name__).warning('Failed to toggle maximize: %s', e)
     
@@ -257,7 +245,7 @@ class MainWindow(Gtk.Window):
     def apply_maximize_state(self):
         """Apply maximized state after panels loaded (Wayland Error 71 prevention)."""
         if hasattr(self, '_should_maximize') and self._should_maximize:
-            GLib.idle_add(self.maximize)
+            GLib.idle_add(self.window.maximize)
     
     def save_geometry(self):
         """Save current window geometry to workspace settings."""
@@ -265,9 +253,9 @@ class MainWindow(Gtk.Window):
             return
         
         # Get current geometry
-        width, height = self.get_size()
-        x, y = self.get_position()
-        maximized = self.is_maximized()
+        width, height = self.window.get_size()
+        x, y = self.window.get_position()
+        maximized = self.window.is_maximized()
         
         # Save to settings
         self.workspace_settings.set_window_geometry({
@@ -286,3 +274,16 @@ class MainWindow(Gtk.Window):
         """
         self.save_geometry()
         return False  # Allow close
+    
+    # Proxy methods to access window properties
+    def show_all(self):
+        """Show window and all children."""
+        self.window.show_all()
+    
+    def connect(self, signal, handler):
+        """Connect signal handler to window."""
+        return self.window.connect(signal, handler)
+    
+    def get_window(self):
+        """Get the underlying GdkWindow."""
+        return self.window.get_window()
