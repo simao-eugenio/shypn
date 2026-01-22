@@ -11,7 +11,138 @@ Date: December 7, 2025
 import threading
 import time
 import numpy as np
+import multiprocessing
+import os
 from typing import Optional, Callable, Dict, Any, List
+
+
+def _worker_run_experiment(args: dict) -> Dict[str, Any]:
+    """Worker function to run a single experiment in parallel process.
+    
+    This function must be at module level for multiprocessing to pickle it.
+    
+    Args:
+        args: Dictionary with experiment parameters
+    
+    Returns:
+        Result dictionary
+    """
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    
+    start_time = time.time()
+    
+    try:
+        # Extract arguments
+        name = args['name']
+        snapshot = args['snapshot']
+        replicates = args['replicates']
+        duration = args['duration']
+        termination_condition = args['termination_condition']
+        subnet_data = args['subnet_data']
+        baseline_params = args['baseline_params']
+        
+        # Create fresh DocumentModel from subnet data
+        model = DocumentModel()
+        
+        # Copy places and transitions
+        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
+        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
+        
+        # Normalize transition types
+        type_name_map = {
+            'Immediate': 'immediate',
+            'Timed (TPN)': 'timed',
+            'Stochastic (FSPN)': 'stochastic',
+            'Continuous (SHPN)': 'continuous'
+        }
+        for t in model.transitions:
+            if hasattr(t, 'transition_type') and t.transition_type in type_name_map:
+                t.transition_type = type_name_map[t.transition_type]
+        
+        # Build ID lookup dictionaries
+        places_dict = {p.id: p for p in model.places}
+        transitions_dict = {t.id: t for t in model.transitions}
+        
+        # Copy arcs
+        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict)
+                      for a in subnet_data['arcs']]
+        
+        # Apply snapshot parameters
+        _apply_snapshot_to_worker_model(snapshot, model, baseline_params)
+        
+        # Run replicates
+        runner = ReplicateRunner(model)
+        results = runner.run_replicates(
+            n=replicates,
+            use_parallel=False,
+            use_tau_leaping=True,
+            duration=duration,
+            termination_condition=termination_condition,
+            seed_base=hash(name) % (2**31),  # Unique seed per experiment
+            verbose=False,
+            progress_callback=None  # No progress in worker
+        )
+        
+        elapsed_time = time.time() - start_time
+        
+        # Compute statistics
+        if results and len(results) > 0:
+            statistics = runner.compute_statistics(results)
+            statistics['elapsed_time'] = elapsed_time
+            statistics['n_replicates'] = len(results)
+            
+            return {
+                'name': name,
+                'snapshot_index': args['snapshot_index'],
+                'statistics': statistics,
+                'n_replicates': len(results),
+                'elapsed_time': elapsed_time,
+                'status': 'success'
+            }
+        else:
+            return {
+                'name': name,
+                'snapshot_index': args['snapshot_index'],
+                'error': 'No successful replicates',
+                'elapsed_time': elapsed_time,
+                'status': 'failed'
+            }
+    
+    except Exception as e:
+        import traceback
+        return {
+            'name': args.get('name', 'unknown'),
+            'error': f"{type(e).__name__}: {str(e)}",
+            'traceback': traceback.format_exc(),
+            'status': 'failed'
+        }
+
+
+def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
+    """Apply snapshot parameters to model (simplified version for worker)."""
+    if not snapshot or 'parameters' not in snapshot:
+        return
+    
+    # Apply parameter changes from snapshot
+    for param in snapshot['parameters']:
+        obj_type = param.get('obj_type')
+        obj_id = param.get('obj_id')
+        attr_name = param.get('attr')
+        new_value = param.get('value')
+        
+        # Find object in model
+        obj = None
+        if obj_type == 'place':
+            obj = next((p for p in model.places if p.id == obj_id), None)
+        elif obj_type == 'transition':
+            obj = next((t for t in model.transitions if t.id == obj_id), None)
+        elif obj_type == 'arc':
+            obj = next((a for a in model.arcs if a.id == obj_id), None)
+        
+        # Set attribute
+        if obj and hasattr(obj, attr_name):
+            setattr(obj, attr_name, new_value)
 
 
 class BatchExecutor:
@@ -53,7 +184,9 @@ class BatchExecutor:
         termination_condition: str = "deadlock",
         progress_callback: Optional[Callable] = None,
         complete_callback: Optional[Callable] = None,
-        experiment_result_callback: Optional[Callable] = None
+        experiment_result_callback: Optional[Callable] = None,
+        use_parallel: bool = False,
+        n_workers: Optional[int] = None
     ):
         """Run batch of experiments asynchronously.
         
@@ -63,6 +196,8 @@ class BatchExecutor:
             duration: Simulation duration
             termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with (exp_index, status, progress)
+            use_parallel: Enable parallel execution across multiple CPU cores
+            n_workers: Number of worker processes (None = auto-detect CPU count)
             complete_callback: Called when batch completes
             experiment_result_callback: Called with (name, result) when each experiment completes
         """
@@ -105,7 +240,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers),
             daemon=True
         )
         self.executor_thread.start()
@@ -132,9 +267,53 @@ class BatchExecutor:
         experiment_result_callback: Optional[Callable],
         base_model,  # Pre-extracted DocumentModel
         subnet_data: dict,  # Pre-extracted subnet data
+        baseline_params: dict,  # Baseline parameters to reset between experiments
+        use_parallel: bool = False,
+        n_workers: Optional[int] = None
+    ):
+        """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
+        
+        Args:
+            experiments: List of (index, name, snapshot_index) tuples
+            replicates: Number of replicates per experiment
+            duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
+            progress_callback: Callback for progress updates (queue_index, status, progress_str)
+            complete_callback: Callback when complete
+            experiment_result_callback: Callback for each experiment result (name, result)
+            base_model: Pre-extracted DocumentModel (from main thread)
+            subnet_data: Pre-extracted subnet dict (from main thread)
+            baseline_params: Baseline parameter values to reset model between experiments
+            use_parallel: Enable parallel execution
+            n_workers: Number of worker processes (None = auto-detect)
+        """
+        if use_parallel:
+            self._execute_batch_parallel(
+                experiments, replicates, duration, termination_condition,
+                progress_callback, complete_callback, experiment_result_callback,
+                base_model, subnet_data, baseline_params, n_workers
+            )
+        else:
+            self._execute_batch_sequential(
+                experiments, replicates, duration, termination_condition,
+                progress_callback, complete_callback, experiment_result_callback,
+                base_model, subnet_data, baseline_params
+            )
+    
+    def _execute_batch_sequential(
+        self,
+        experiments: List[tuple],
+        replicates: int,
+        duration: float,
+        termination_condition: str,
+        progress_callback: Optional[Callable],
+        complete_callback: Optional[Callable],
+        experiment_result_callback: Optional[Callable],
+        base_model,  # Pre-extracted DocumentModel
+        subnet_data: dict,  # Pre-extracted subnet data
         baseline_params: dict  # Baseline parameters to reset between experiments
     ):
-        """Execute batch in background thread - SEQUENTIAL EXECUTION.
+        """Execute batch sequentially in background thread.
         
         Args:
             experiments: List of (index, name, snapshot_index) tuples
@@ -250,6 +429,143 @@ class BatchExecutor:
             
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
+                from gi.repository import GLib
+                cancelled = self.is_cancelled
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+    
+    def _execute_batch_parallel(
+        self,
+        experiments: List[tuple],
+        replicates: int,
+        duration: float,
+        termination_condition: str,
+        progress_callback: Optional[Callable],
+        complete_callback: Optional[Callable],
+        experiment_result_callback: Optional[Callable],
+        base_model,
+        subnet_data: dict,
+        baseline_params: dict,
+        n_workers: Optional[int] = None
+    ):
+        """Execute batch in parallel using multiprocessing.
+        
+        Args:
+            experiments: List of (index, name, snapshot_index) tuples
+            replicates: Number of replicates per experiment
+            duration: Simulation duration
+            termination_condition: When to stop
+            progress_callback: Callback for progress updates
+            complete_callback: Callback when complete
+            experiment_result_callback: Callback for each experiment result
+            base_model: Pre-extracted DocumentModel
+            subnet_data: Pre-extracted subnet dict
+            baseline_params: Baseline parameter values
+            n_workers: Number of worker processes (None = CPU count)
+        """
+        try:
+            # Determine number of workers
+            if n_workers is None:
+                n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
+            
+            print(f"[PARALLEL] Starting parallel execution with {n_workers} workers")
+            
+            # Prepare experiment arguments for workers
+            experiment_args = []
+            for queue_index, name, snapshot_index in experiments:
+                # Get snapshot
+                if snapshot_index >= len(self.experiment_manager.snapshots):
+                    print(f"[PARALLEL] Skipping invalid snapshot index: {snapshot_index}")
+                    continue
+                
+                snapshot = self.experiment_manager.snapshots[snapshot_index]
+                
+                # Serialize all data for pickling
+                experiment_args.append({
+                    'queue_index': queue_index,
+                    'name': name,
+                    'snapshot_index': snapshot_index,
+                    'snapshot': snapshot,
+                    'replicates': replicates,
+                    'duration': duration,
+                    'termination_condition': termination_condition,
+                    'subnet_data': subnet_data,
+                    'baseline_params': baseline_params
+                })
+            
+            # Create process pool and execute
+            total = len(experiment_args)
+            completed = 0
+            
+            with multiprocessing.Pool(processes=n_workers) as pool:
+                # Submit all experiments
+                async_results = []
+                for args in experiment_args:
+                    async_result = pool.apply_async(_worker_run_experiment, (args,))
+                    async_results.append((args['queue_index'], args['name'], async_result))
+                
+                # Poll for completion
+                while async_results and not self.is_cancelled:
+                    time.sleep(0.1)  # Check every 100ms
+                    
+                    # Check completed experiments
+                    still_running = []
+                    for queue_index, name, async_result in async_results:
+                        if async_result.ready():
+                            try:
+                                result = async_result.get(timeout=0.1)
+                                
+                                # Store result
+                                self.results[name] = result
+                                
+                                # Update UI via callbacks
+                                if progress_callback:
+                                    progress_callback(queue_index, "completed", "100%")
+                                
+                                if experiment_result_callback:
+                                    from gi.repository import GLib
+                                    GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
+                                
+                                completed += 1
+                                print(f"[PARALLEL] Completed {completed}/{total}: {name}")
+                                
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                
+                                error_msg = str(e)[:100]
+                                if progress_callback:
+                                    progress_callback(queue_index, "failed", error_msg)
+                                
+                                self.results[name] = {
+                                    "error": str(e),
+                                    "name": name
+                                }
+                        else:
+                            still_running.append((queue_index, name, async_result))
+                    
+                    async_results = still_running
+                
+                # Handle cancellation
+                if self.is_cancelled:
+                    print(f"[PARALLEL] Cancelling remaining experiments...")
+                    pool.terminate()
+                    pool.join()
+                    
+                    # Mark remaining as cancelled
+                    for queue_index, name, async_result in async_results:
+                        if progress_callback:
+                            progress_callback(queue_index, "cancelled", "Cancelled")
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+        
+        finally:
+            # Reset execution state
+            self.is_running = False
+            self.current_experiment = None
+            
+            if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
                 GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
