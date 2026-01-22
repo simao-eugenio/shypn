@@ -170,6 +170,7 @@ class BatchExecutor:
         # Execution state
         self.is_running = False
         self.is_cancelled = False
+        self.is_paused = False  # Stage 3
         self.current_experiment = None
         self.executor_thread = None
         
@@ -256,6 +257,14 @@ class BatchExecutor:
         if self.executor_thread and self.executor_thread.is_alive():
             self.executor_thread.join(timeout=2.0)
     
+    def set_paused(self, should_pause):
+        """Set paused state for batch execution (Stage 3).
+        
+        Args:
+            should_pause: True to pause, False to resume
+        """
+        self.is_paused = should_pause
+    
     def _execute_batch(
         self,
         experiments: List[tuple],
@@ -337,6 +346,16 @@ class BatchExecutor:
                     if progress_callback:
                         progress_callback(queue_index, "cancelled", "Cancelled")
                     continue  # Skip to next experiment
+                
+                # Check pause state (Stage 3)
+                while self.is_paused and not self.is_cancelled:
+                    time.sleep(0.1)  # Wait for resume or cancel
+                
+                # Recheck cancellation after pause
+                if self.is_cancelled:
+                    if progress_callback:
+                        progress_callback(queue_index, "cancelled", "Cancelled")
+                    continue
                 
                 # print(f"[BATCH] Experiment {i+1}/{total}: '{name}' (queue_index={queue_index})")
                 
