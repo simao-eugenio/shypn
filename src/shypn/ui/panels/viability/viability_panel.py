@@ -213,11 +213,8 @@ class ViabilityPanel(Gtk.Box):
         self.simulation_toolbar.stop_button.connect("clicked", self._on_stop_simulation)
         self.simulation_toolbar.reset_button.connect("clicked", self._on_reset_simulation)
         
-        # Connect experiment management signals
-        self.simulation_toolbar.add_exp_button.connect("clicked", self._on_add_experiment)
-        self.simulation_toolbar.copy_exp_button.connect("clicked", self._on_copy_experiment)
-        self.simulation_toolbar.experiment_combo.connect("changed", self._on_experiment_changed)
-        self.simulation_toolbar.sync_baseline_button.connect("clicked", self._on_sync_baseline)
+        # Removed experiment management connections - buttons removed from toolbar
+        # Auto-sync handles baseline updates automatically
         
         # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
         self.subnet_expander = Gtk.Expander()
@@ -342,10 +339,37 @@ class ViabilityPanel(Gtk.Box):
         # Add results container to main layout
         main_box.pack_start(self.content_box, False, False, 0)
         
-        # Separator before experiment automation
+        # === INTERACTIVE TESTING SECTION LABEL ===
+        sep3 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep3.set_margin_top(15)
+        sep3.set_margin_bottom(5)
+        main_box.pack_start(sep3, False, False, 0)
+        
+        interactive_label = Gtk.Label()
+        interactive_label.set_markup(
+            "<b>INTERACTIVE TESTING</b>\n"
+            "<span size='small'>For Petri net debugging: step-by-step execution, pause/resume, deadlock investigation</span>"
+        )
+        interactive_label.set_halign(Gtk.Align.START)
+        interactive_label.set_margin_start(10)
+        interactive_label.set_margin_bottom(5)
+        main_box.pack_start(interactive_label, False, False, 0)
+        
+        # === AUTOMATED EXPERIMENTATION SECTION LABEL ===
         sep4 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep4.set_margin_top(10)
+        sep4.set_margin_top(15)
+        sep4.set_margin_bottom(5)
         main_box.pack_start(sep4, False, False, 0)
+        
+        automation_label = Gtk.Label()
+        automation_label.set_markup(
+            "<b>AUTOMATED EXPERIMENTATION</b>\n"
+            "<span size='small'>Batch parameter sweeps, parallel execution, statistical analysis, sensitivity analysis</span>"
+        )
+        automation_label.set_halign(Gtk.Align.START)
+        automation_label.set_margin_start(10)
+        automation_label.set_margin_bottom(5)
+        main_box.pack_start(automation_label, False, False, 0)
         
         # === SECTION 8: EXPERIMENT AUTOMATION CATEGORY (NEW) ===
         from .automation import ExperimentAutomationCategory
@@ -353,7 +377,7 @@ class ViabilityPanel(Gtk.Box):
         self.automation_category = ExperimentAutomationCategory(
             model_canvas=self.model_canvas,
             experiment_manager=self.experiment_manager,
-            expanded=False  # Collapsed by default
+            expanded=True  # Expanded by default - primary workflow
         )
         self.automation_category.set_parent_panel(self)
         
@@ -1255,10 +1279,8 @@ class ViabilityPanel(Gtk.Box):
                         place.marking = new_marking
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -1279,10 +1301,8 @@ class ViabilityPanel(Gtk.Box):
                         transition.rate = new_rate
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -1301,10 +1321,8 @@ class ViabilityPanel(Gtk.Box):
                     transition.formula = new_text
                     break
         
-        # Mark baseline as stale (needs resync for automation)
-        if hasattr(self, 'experiment_manager'):
-            self.experiment_manager.mark_baseline_stale()
-            self._show_stale_baseline_warning()
+        # Auto-sync baseline to automation (no manual sync needed)
+        self._auto_sync_baseline_to_automation()
     
     def _on_arc_weight_edited(self, widget, path, new_text, store):
         """Handle arc weight edit."""
@@ -1323,10 +1341,8 @@ class ViabilityPanel(Gtk.Box):
                         arc.weight = new_weight
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -2687,9 +2703,26 @@ class ViabilityPanel(Gtk.Box):
             self._append_diagnostics_log(f"Switched to: {snapshot.name}")
     
     def _show_stale_baseline_warning(self):
-        """Show visual warning that baseline is stale."""
-        if hasattr(self, 'simulation_toolbar'):
-            self.simulation_toolbar.show_stale_baseline_warning(True)
+        """Show visual warning that baseline is stale (DEPRECATED - auto-sync enabled)."""
+        # No longer used - auto-sync handles baseline updates automatically
+        pass
+    
+    def _auto_sync_baseline_to_automation(self):
+        """Automatically sync baseline to automation after parameter edits.
+        
+        Silently updates automation baseline when user edits subnet parameters.
+        No confirmation needed - this is background synchronization.
+        """
+        if not hasattr(self, 'experiment_manager'):
+            return
+        
+        # Silently sync baseline from current tables
+        if hasattr(self.experiment_manager, 'sync_baseline_from_tables'):
+            self.experiment_manager.sync_baseline_from_tables(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
     
     def _on_sync_baseline(self, button):
         """Sync automation baseline from current table values."""
