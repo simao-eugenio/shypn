@@ -281,46 +281,53 @@ class SubnetParametersView(Gtk.Box):
     def _create_results_treeview(self):
         """Create TreeView for displaying simulation results.
         
-        Columns: Time, Step, Transition, Markings
+        Columns: Label, Value1, Value2, Value3, Info
         """
-        # Create ListStore: time (float), step (int), transition (str), markings (str)
-        store = Gtk.ListStore(float, int, str, str)
+        # Create ListStore: 5 string columns for flexible display
+        store = Gtk.ListStore(str, str, str, str, str)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
         treeview.set_enable_search(True)
-        treeview.set_search_column(2)
+        treeview.set_search_column(0)
         
-        # Column 0: Time
-        renderer_time = Gtk.CellRendererText()
-        column_time = Gtk.TreeViewColumn("Time", renderer_time, text=0)
-        column_time.set_resizable(True)
-        column_time.set_min_width(80)
-        treeview.append_column(column_time)
+        # Column 0: Label/Name
+        renderer_0 = Gtk.CellRendererText()
+        column_0 = Gtk.TreeViewColumn("Label", renderer_0, text=0)
+        column_0.set_resizable(True)
+        column_0.set_min_width(150)
+        treeview.append_column(column_0)
         
-        # Column 1: Step
-        renderer_step = Gtk.CellRendererText()
-        column_step = Gtk.TreeViewColumn("Step", renderer_step, text=1)
-        column_step.set_resizable(True)
-        column_step.set_min_width(60)
-        treeview.append_column(column_step)
+        # Column 1: Value 1
+        renderer_1 = Gtk.CellRendererText()
+        column_1 = Gtk.TreeViewColumn("Value 1", renderer_1, text=1)
+        column_1.set_resizable(True)
+        column_1.set_min_width(80)
+        treeview.append_column(column_1)
         
-        # Column 2: Transition
-        renderer_trans = Gtk.CellRendererText()
-        column_trans = Gtk.TreeViewColumn("Transition", renderer_trans, text=2)
-        column_trans.set_resizable(True)
-        column_trans.set_min_width(150)
-        treeview.append_column(column_trans)
+        # Column 2: Value 2
+        renderer_2 = Gtk.CellRendererText()
+        column_2 = Gtk.TreeViewColumn("Value 2", renderer_2, text=2)
+        column_2.set_resizable(True)
+        column_2.set_min_width(80)
+        treeview.append_column(column_2)
         
-        # Column 3: Markings
-        renderer_markings = Gtk.CellRendererText()
-        renderer_markings.set_property("wrap-mode", Pango.WrapMode.WORD)
-        renderer_markings.set_property("wrap-width", 300)
-        column_markings = Gtk.TreeViewColumn("Markings", renderer_markings, text=3)
-        column_markings.set_resizable(True)
-        column_markings.set_expand(True)
-        column_markings.set_min_width(300)
-        treeview.append_column(column_markings)
+        # Column 3: Value 3
+        renderer_3 = Gtk.CellRendererText()
+        column_3 = Gtk.TreeViewColumn("Value 3", renderer_3, text=3)
+        column_3.set_resizable(True)
+        column_3.set_min_width(80)
+        treeview.append_column(column_3)
+        
+        # Column 4: Info/Status
+        renderer_4 = Gtk.CellRendererText()
+        renderer_4.set_property("wrap-mode", Pango.WrapMode.WORD)
+        renderer_4.set_property("wrap-width", 250)
+        column_4 = Gtk.TreeViewColumn("Info", renderer_4, text=4)
+        column_4.set_resizable(True)
+        column_4.set_expand(True)
+        column_4.set_min_width(200)
+        treeview.append_column(column_4)
         
         return treeview, store
     
