@@ -809,6 +809,27 @@ def ornstein_uhlenbeck(t: float, x_current: float, theta: float = 1.0,
 # =============================================================================
 
 FUNCTION_CATALOG = {
+    # Basic math functions (from Python math module)
+    'exp': math.exp,
+    'log': math.log,
+    'log10': math.log10,
+    'sqrt': math.sqrt,
+    'pow': math.pow,
+    'sin': math.sin,
+    'cos': math.cos,
+    'tan': math.tan,
+    'asin': math.asin,
+    'acos': math.acos,
+    'atan': math.atan,
+    'sinh': math.sinh,
+    'cosh': math.cosh,
+    'tanh': math.tanh,
+    'floor': math.floor,
+    'ceil': math.ceil,
+    'abs': abs,
+    'min': min,
+    'max': max,
+    
     # Activation functions
     'sigmoid': sigmoid,
     'tanh': tanh_activation,

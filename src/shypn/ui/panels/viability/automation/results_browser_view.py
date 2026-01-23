@@ -1531,7 +1531,16 @@ class ResultsBrowserView(BaseResultsView):
                 mean_traj = species_data.get('mean', [])
                 if len(mean_traj) > 0:
                     final_mean = mean_traj[-1]
-                    final_std = species_data.get('std', [])[-1] if species_data.get('std') else 0
+                    # Handle case where final_mean is a list/array - take first element
+                    if isinstance(final_mean, (list, tuple)):
+                        final_mean = final_mean[0] if len(final_mean) > 0 else 0.0
+                    
+                    std_traj = species_data.get('std', [])
+                    final_std = std_traj[-1] if std_traj else 0.0
+                    # Handle case where final_std is a list/array - take first element
+                    if isinstance(final_std, (list, tuple)):
+                        final_std = final_std[0] if len(final_std) > 0 else 0.0
+                    
                     text += f"  {species_id}: {final_mean:.2f} ± {final_std:.2f}\n"
             
             if len(species_stats) > 3:
