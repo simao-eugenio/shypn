@@ -115,6 +115,7 @@ class ParameterSweepBuilder(Gtk.Box):
         type_box.pack_start(self.type_combo, True, True, 0)
         
         selection_box.pack_start(type_box, False, False, 0)
+        self.type_box = type_box  # Store reference for show/hide
         
         # Parameter Name (for single mode)
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -347,10 +348,12 @@ class ParameterSweepBuilder(Gtk.Box):
         
         if self.single_radio.get_active():
             self.design_mode = 'single'
+            self.type_box.show()  # Show type selector in single mode
             self.single_param_box.show()
             self.factorial_box.hide()
         else:
             self.design_mode = 'factorial'
+            self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
             self.single_param_box.hide()
             self.factorial_box.show()
             
