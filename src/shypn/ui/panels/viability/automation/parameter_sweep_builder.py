@@ -163,24 +163,41 @@ class ParameterSweepBuilder(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroll.set_min_content_height(80)
         
-        self.factorial_list = Gtk.ListStore(str, str, str)  # name, type, id
+        self.factorial_list = Gtk.ListStore(str, str, str, object)  # name, type, id, range_config
         self.factorial_view = Gtk.TreeView(model=self.factorial_list)
         self.factorial_view.set_headers_visible(True)
         
         col_name = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
         col_name.set_resizable(True)
+        self.factorial_view.append_column(col_name)
+        
         col_type = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
         col_type.set_resizable(True)
-        self.factorial_view.append_column(col_name)
         self.factorial_view.append_column(col_type)
+        
+        # Add Range column showing summary of range configuration
+        renderer_range = Gtk.CellRendererText()
+        renderer_range.set_property("foreground", "#0066CC")
+        col_range = Gtk.TreeViewColumn("Range", renderer_range)
+        col_range.set_cell_data_func(renderer_range, self._format_range_column)
+        col_range.set_resizable(True)
+        self.factorial_view.append_column(col_range)
         
         scroll.add(self.factorial_view)
         self.factorial_box.pack_start(scroll, True, True, 0)
         
-        # Remove button
+        # Button box for Edit Range and Remove
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        edit_range_button = Gtk.Button(label="Edit Range...")
+        edit_range_button.connect("clicked", self._on_factorial_edit_range_clicked)
+        button_box.pack_start(edit_range_button, False, False, 0)
+        
         remove_button = Gtk.Button(label="Remove Selected")
         remove_button.connect("clicked", self._on_factorial_remove_clicked)
-        self.factorial_box.pack_start(remove_button, False, False, 0)
+        button_box.pack_start(remove_button, False, False, 0)
+        
+        self.factorial_box.pack_start(button_box, False, False, 0)
         
         selection_box.pack_start(self.factorial_box, True, True, 0)
         self.factorial_box.set_no_show_all(True)
@@ -408,10 +425,23 @@ class ParameterSweepBuilder(Gtk.Box):
             dialog.destroy()
             return
         
-        # Add to list
+        # Add to list with default range configuration
         param_type = self.parameter_type
         type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
-        self.factorial_list.append([param_name, type_display, param_id])
+        
+        # Default range config: linear 0.1 to 1.0, step 0.1 (10 values)
+        default_range = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
+        
+        self.factorial_list.append([param_name, type_display, param_id, default_range])
         
         # Update preview
         self._update_factorial_preview()
@@ -426,47 +456,64 @@ class ParameterSweepBuilder(Gtk.Box):
             self._update_factorial_preview()
     
     def _update_factorial_preview(self):
-        """Update preview for factorial design."""
+        """Update preview for factorial design with example combinations."""
         if len(self.factorial_list) == 0:
             self.preview_label.set_markup("<i>Add 2-3 parameters for factorial design</i>")
             self.generate_button.set_sensitive(False)
             return
         
         try:
-            # Calculate experiment count
+            # Calculate experiment count per parameter
             total = 1
-            param_counts = []
+            param_info = []
             
             for row in self.factorial_list:
-                # Compute values for this parameter
-                values = self._compute_parameter_values()
-                param_counts.append(len(values))
+                param_name = row[0]
+                range_config = row[3]
+                
+                # Compute values for this parameter's specific range
+                values = self._compute_parameter_values_from_config(range_config)
+                param_info.append({
+                    'name': param_name,
+                    'count': len(values),
+                    'values': values
+                })
                 total *= len(values)
             
-            # Show preview
-            if len(param_counts) == 2:
-                self.preview_label.set_markup(
-                    f"<span foreground='blue'>Ready: {param_counts[0]} × {param_counts[1]} = {total} experiments</span>"
-                )
-            elif len(param_counts) == 3:
-                self.preview_label.set_markup(
-                    f"<span foreground='blue'>Ready: {param_counts[0]} × {param_counts[1]} × {param_counts[2]} = {total} experiments</span>"
-                )
-            else:
-                self.preview_label.set_markup(
-                    f"<span foreground='blue'>Ready: {total} experiments will be generated</span>"
-                )
+            # Build preview with multiplication and examples
+            counts_str = " × ".join([str(p['count']) for p in param_info])
+            preview_text = f"<span foreground='blue'><b>{counts_str} = {total} experiments</b></span>"
             
+            # Add example combinations (first 3)
+            if total > 0:
+                import itertools
+                param_values = [p['values'] for p in param_info]
+                combinations = list(itertools.product(*param_values))
+                
+                examples = []
+                for i, combo in enumerate(combinations[:3]):
+                    parts = [f"{param_info[j]['name'][:15]}={combo[j]:.3g}" for j in range(len(combo))]
+                    examples.append(", ".join(parts))
+                
+                if examples:
+                    preview_text += "\n<span foreground='#666' size='small'>Examples:\n" + "\n".join(examples)
+                    if total > 3:
+                        preview_text += f"\n... ({total - 3} more)"
+                    preview_text += "</span>"
+            
+            self.preview_label.set_markup(preview_text)
             self.generate_button.set_sensitive(total > 0 and total <= 500)
             
             if total > 500:
                 self.preview_label.set_markup(
-                    f"<span foreground='red'>Too many experiments ({total}). Reduce parameter ranges.</span>"
+                    f"<span foreground='red'>Too many experiments ({total}). Reduce parameter ranges or values.</span>"
                 )
         
         except Exception as e:
             self.preview_label.set_markup(f"<span foreground='red'>Error: {str(e)}</span>")
             self.generate_button.set_sensitive(False)
+            import traceback
+            traceback.print_exc()
     
     def _on_name_changed(self, combo):
         """Handle parameter name selection - auto-predict range and settings."""
@@ -630,9 +677,10 @@ class ParameterSweepBuilder(Gtk.Box):
             param_name = row[0]
             param_type = row[1].lower() + "s"  # "Place" -> "places"
             param_id = row[2]
+            range_config = row[3]
             
-            # Get current parameter values (same range spec applies to all)
-            values = self._compute_parameter_values()
+            # Get parameter values from its specific range configuration
+            values = self._compute_parameter_values_from_config(range_config)
             if not values:
                 raise ValueError(f"No values computed for {param_name}")
             
@@ -744,6 +792,280 @@ class ParameterSweepBuilder(Gtk.Box):
             return values
         
         return []
+    
+    def _compute_parameter_values_from_config(self, config):
+        """Compute parameter values from a range configuration dict.
+        
+        Args:
+            config: Dictionary with keys: mode, start, stop, step, list_values, percent, percent_steps, baseline
+            
+        Returns:
+            list: List of parameter values
+        """
+        mode = config.get('mode', 'linear')
+        
+        if mode == 'linear':
+            start = config['start']
+            stop = config['stop']
+            step = config['step']
+            
+            if step <= 0:
+                raise ValueError("Step must be positive")
+            if start == stop:
+                raise ValueError("Start and stop must be different")
+            
+            values = []
+            if start < stop:
+                current = start
+                while current <= stop:
+                    values.append(current)
+                    current += step
+            else:
+                current = start
+                while current >= stop:
+                    values.append(current)
+                    current -= step
+            
+            return values
+            
+        elif mode == 'list':
+            text = config.get('list_values', '').strip()
+            if not text:
+                raise ValueError("Value list is empty")
+            values = [float(v.strip()) for v in text.split(',')]
+            return values
+            
+        elif mode == 'percent':
+            baseline = config.get('baseline', 1.0)
+            percent = config.get('percent', 20.0)
+            steps = config.get('percent_steps', 5)
+            
+            if steps <= 0:
+                raise ValueError("Steps must be positive")
+            
+            min_val = baseline * (1 - percent / 100)
+            max_val = baseline * (1 + percent / 100)
+            
+            if steps == 1:
+                return [baseline]
+            
+            step_size = (max_val - min_val) / (steps - 1)
+            values = [min_val + i * step_size for i in range(steps)]
+            return values
+        
+        return []
+    
+    def _format_range_column(self, column, cell, model, iter, data):
+        """Format the range column to show a summary of the range configuration."""
+        range_config = model.get_value(iter, 3)
+        if not range_config:
+            cell.set_property('text', 'Not configured')
+            return
+        
+        mode = range_config.get('mode', 'linear')
+        
+        try:
+            values = self._compute_parameter_values_from_config(range_config)
+            n = len(values)
+            
+            if mode == 'linear':
+                start = range_config['start']
+                stop = range_config['stop']
+                cell.set_property('text', f"{start:.3g} to {stop:.3g} ({n} values)")
+            elif mode == 'list':
+                if n <= 4:
+                    vals_str = ', '.join([f"{v:.3g}" for v in values])
+                    cell.set_property('text', vals_str)
+                else:
+                    cell.set_property('text', f"{values[0]:.3g}, {values[1]:.3g}, ... ({n} values)")
+            elif mode == 'percent':
+                baseline = range_config.get('baseline', 1.0)
+                percent = range_config.get('percent', 20.0)
+                cell.set_property('text', f"{baseline:.3g} ± {percent}% ({n} values)")
+            else:
+                cell.set_property('text', f"{n} values")
+        except Exception as e:
+            cell.set_property('text', f'Error: {str(e)[:30]}')
+    
+    def _on_factorial_edit_range_clicked(self, button):
+        """Open dialog to edit range configuration for selected parameter."""
+        selection = self.factorial_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if not tree_iter:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No parameter selected"
+            )
+            dialog.format_secondary_text("Please select a parameter from the list to edit its range.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        param_name = model.get_value(tree_iter, 0)
+        current_config = model.get_value(tree_iter, 3)
+        
+        # Open range configuration dialog
+        new_config = self._show_range_config_dialog(param_name, current_config)
+        
+        if new_config:
+            # Update the range configuration
+            model.set_value(tree_iter, 3, new_config)
+            # Update preview
+            self._update_factorial_preview()
+    
+    def _show_range_config_dialog(self, param_name, current_config):
+        """Show dialog to configure range for a parameter.
+        
+        Returns:
+            dict or None: New configuration dict or None if cancelled
+        """
+        dialog = Gtk.Dialog(
+            title=f"Configure Range: {param_name}",
+            transient_for=self.get_toplevel(),
+            flags=0
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        dialog.set_default_size(400, 300)
+        
+        content = dialog.get_content_area()
+        content.set_spacing(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        
+        # Radio buttons for mode
+        linear_radio = Gtk.RadioButton(label="Linear Range")
+        content.pack_start(linear_radio, False, False, 0)
+        
+        # Linear range inputs
+        linear_grid = Gtk.Grid()
+        linear_grid.set_column_spacing(6)
+        linear_grid.set_row_spacing(6)
+        linear_grid.set_margin_start(24)
+        
+        linear_grid.attach(Gtk.Label(label="Start:", xalign=0), 0, 0, 1, 1)
+        start_entry = Gtk.Entry()
+        start_entry.set_text(str(current_config.get('start', 0.1)))
+        start_entry.set_width_chars(10)
+        linear_grid.attach(start_entry, 1, 0, 1, 1)
+        
+        linear_grid.attach(Gtk.Label(label="Stop:", xalign=0), 2, 0, 1, 1)
+        stop_entry = Gtk.Entry()
+        stop_entry.set_text(str(current_config.get('stop', 1.0)))
+        stop_entry.set_width_chars(10)
+        linear_grid.attach(stop_entry, 3, 0, 1, 1)
+        
+        linear_grid.attach(Gtk.Label(label="Step:", xalign=0), 4, 0, 1, 1)
+        step_entry = Gtk.Entry()
+        step_entry.set_text(str(current_config.get('step', 0.1)))
+        step_entry.set_width_chars(10)
+        linear_grid.attach(step_entry, 5, 0, 1, 1)
+        
+        content.pack_start(linear_grid, False, False, 0)
+        
+        # List values radio
+        list_radio = Gtk.RadioButton(group=linear_radio, label="Value List")
+        content.pack_start(list_radio, False, False, 0)
+        
+        # List values input
+        list_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        list_box.set_margin_start(24)
+        list_entry = Gtk.Entry()
+        list_entry.set_placeholder_text("e.g., 0.1, 0.5, 1.0, 2.0")
+        list_entry.set_text(current_config.get('list_values', ''))
+        list_box.pack_start(list_entry, True, True, 0)
+        content.pack_start(list_box, False, False, 0)
+        
+        # Percentage variation radio
+        percent_radio = Gtk.RadioButton(group=linear_radio, label="Percentage Variation")
+        content.pack_start(percent_radio, False, False, 0)
+        
+        # Percentage inputs
+        percent_grid = Gtk.Grid()
+        percent_grid.set_column_spacing(6)
+        percent_grid.set_row_spacing(6)
+        percent_grid.set_margin_start(24)
+        
+        percent_grid.attach(Gtk.Label(label="Baseline:", xalign=0), 0, 0, 1, 1)
+        baseline_entry = Gtk.Entry()
+        baseline_entry.set_text(str(current_config.get('baseline', 1.0)))
+        baseline_entry.set_width_chars(8)
+        percent_grid.attach(baseline_entry, 1, 0, 1, 1)
+        
+        percent_grid.attach(Gtk.Label(label="±", xalign=0), 2, 0, 1, 1)
+        percent_entry = Gtk.Entry()
+        percent_entry.set_text(str(current_config.get('percent', 20.0)))
+        percent_entry.set_width_chars(6)
+        percent_grid.attach(percent_entry, 3, 0, 1, 1)
+        percent_grid.attach(Gtk.Label(label="%", xalign=0), 4, 0, 1, 1)
+        
+        percent_grid.attach(Gtk.Label(label="Steps:", xalign=0), 0, 1, 1, 1)
+        percent_steps_entry = Gtk.Entry()
+        percent_steps_entry.set_text(str(current_config.get('percent_steps', 5)))
+        percent_steps_entry.set_width_chars(6)
+        percent_grid.attach(percent_steps_entry, 1, 1, 1, 1)
+        
+        content.pack_start(percent_grid, False, False, 0)
+        
+        # Set active radio based on current mode
+        mode = current_config.get('mode', 'linear')
+        if mode == 'list':
+            list_radio.set_active(True)
+        elif mode == 'percent':
+            percent_radio.set_active(True)
+        else:
+            linear_radio.set_active(True)
+        
+        dialog.show_all()
+        response = dialog.run()
+        
+        result = None
+        if response == Gtk.ResponseType.OK:
+            # Build new config based on selected mode
+            if linear_radio.get_active():
+                result = {
+                    'mode': 'linear',
+                    'start': float(start_entry.get_text()),
+                    'stop': float(stop_entry.get_text()),
+                    'step': float(step_entry.get_text()),
+                    'list_values': current_config.get('list_values', ''),
+                    'percent': current_config.get('percent', 20.0),
+                    'percent_steps': current_config.get('percent_steps', 5),
+                    'baseline': current_config.get('baseline', 1.0)
+                }
+            elif list_radio.get_active():
+                result = {
+                    'mode': 'list',
+                    'list_values': list_entry.get_text(),
+                    'start': current_config.get('start', 0.1),
+                    'stop': current_config.get('stop', 1.0),
+                    'step': current_config.get('step', 0.1),
+                    'percent': current_config.get('percent', 20.0),
+                    'percent_steps': current_config.get('percent_steps', 5),
+                    'baseline': current_config.get('baseline', 1.0)
+                }
+            elif percent_radio.get_active():
+                result = {
+                    'mode': 'percent',
+                    'baseline': float(baseline_entry.get_text()),
+                    'percent': float(percent_entry.get_text()),
+                    'percent_steps': int(percent_steps_entry.get_text()),
+                    'start': current_config.get('start', 0.1),
+                    'stop': current_config.get('stop', 1.0),
+                    'step': current_config.get('step', 0.1),
+                    'list_values': current_config.get('list_values', '')
+                }
+        
+        dialog.destroy()
+        return result
     
     def set_available_parameters(self, parameter_type, parameters):
         """Set available parameters for selection.
