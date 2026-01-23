@@ -43,6 +43,9 @@ class ParameterSweepBuilder(Gtk.Box):
         # Reference to viability panel for accessing model state
         self.viability_panel = None
         
+        # Reference to parent automation category for refresh
+        self.parent_category = None
+        
         # Flag to prevent recursive prefill
         self._in_prefill = False
         
@@ -350,6 +353,10 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'factorial'
             self.single_param_box.hide()
             self.factorial_box.show()
+            
+            # Trigger parameter refresh to load ALL parameters in factorial mode
+            if hasattr(self, 'parent_category') and self.parent_category:
+                self.parent_category.refresh_parameters()
     
     def _on_factorial_add_clicked(self, button):
         """Add parameter to factorial design."""
