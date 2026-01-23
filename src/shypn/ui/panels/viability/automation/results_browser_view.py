@@ -99,6 +99,7 @@ class ResultsBrowserView(BaseResultsView):
         renderer_toggle.connect("toggled", self._on_row_toggled)
         column_select = Gtk.TreeViewColumn("☐", renderer_toggle, active=0)
         column_select.set_min_width(40)
+        column_select.set_resizable(True)
         column_select.set_clickable(True)
         column_select.connect("clicked", self._on_checkbox_header_clicked)
         self.results_tree.append_column(column_select)
