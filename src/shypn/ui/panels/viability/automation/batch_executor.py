@@ -615,7 +615,6 @@ class BatchExecutor:
                                     GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
                                 
                                 completed += 1
-                                print(f"[PARALLEL] Completed {completed}/{total}: {name}")
                                 
                             except Exception as e:
                                 import traceback
