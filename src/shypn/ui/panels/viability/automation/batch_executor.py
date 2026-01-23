@@ -42,12 +42,16 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         subnet_data = args['subnet_data']
         baseline_params = args['baseline_params']
         
-        # Create fresh DocumentModel from subnet data
+        # Create fresh DocumentModel from subnet data (dicts from to_dict())
         model = DocumentModel()
         
-        # Copy places and transitions
-        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
-        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
+        # Reconstruct places and transitions from serialized dicts
+        from shypn.netobjs.place import Place
+        from shypn.netobjs.transition import Transition
+        from shypn.netobjs.arc import Arc
+        
+        model.places = [Place.from_dict(p_dict) for p_dict in subnet_data['places']]
+        model.transitions = [Transition.from_dict(t_dict) for t_dict in subnet_data['transitions']]
         
         # Normalize transition types
         type_name_map = {
@@ -64,9 +68,9 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         places_dict = {p.id: p for p in model.places}
         transitions_dict = {t.id: t for t in model.transitions}
         
-        # Copy arcs
-        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict)
-                      for a in subnet_data['arcs']]
+        # Reconstruct arcs from serialized dicts
+        model.arcs = [Arc.from_dict(a_dict, places_dict, transitions_dict)
+                      for a_dict in subnet_data['arcs']]
         
         # Apply snapshot parameters
         _apply_snapshot_to_worker_model(snapshot, model, baseline_params)
@@ -270,11 +274,12 @@ class BatchExecutor:
             
             subnet_model = self.parent_panel.subnet_model
             
-            # Convert subnet elements to dict format for compatibility with existing code
+            # Convert subnet elements to dict format for pickling (GObjects can't be pickled)
+            # Serialize to dicts for multiprocessing, will be reconstructed in worker
             subnet_data = {
-                'places': subnet_model.places,
-                'transitions': subnet_model.transitions,
-                'arcs': subnet_model.arcs
+                'places': [p.to_dict() for p in subnet_model.places],
+                'transitions': [t.to_dict() for t in subnet_model.transitions],
+                'arcs': [a.to_dict() for a in subnet_model.arcs]
             }
             
             if not subnet_data['transitions']:
@@ -548,12 +553,21 @@ class BatchExecutor:
                 
                 snapshot = self.experiment_manager.snapshots[snapshot_index]
                 
+                # Extract only picklable data from snapshot (avoid GTK/Builder objects)
+                snapshot_data = {
+                    'name': snapshot.name,
+                    'place_markings': snapshot.place_markings.copy(),
+                    'arc_weights': snapshot.arc_weights.copy(),
+                    'transition_rates': snapshot.transition_rates.copy(),
+                    'swept_parameter': snapshot.swept_parameter
+                }
+                
                 # Serialize all data for pickling
                 experiment_args.append({
                     'queue_index': queue_index,
                     'name': name,
                     'snapshot_index': snapshot_index,
-                    'snapshot': snapshot,
+                    'snapshot': snapshot_data,  # Use extracted dict, not snapshot object
                     'replicates': replicates,
                     'duration': duration,
                     'termination_condition': termination_condition,
