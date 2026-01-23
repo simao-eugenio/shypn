@@ -178,8 +178,7 @@ class SimulationControlToolbar(Gtk.Box):
         
         # Disable experiment switching during simulation
         self.experiment_combo.set_sensitive(not is_running)
-        self.add_exp_button.set_sensitive(not is_running)
-        self.copy_exp_button.set_sensitive(not is_running)
+        # Note: Add/Copy buttons removed - automation handles experiments
     
     def get_simulation_settings(self):
         """Get current simulation settings.
