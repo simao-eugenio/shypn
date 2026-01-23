@@ -130,9 +130,9 @@ class ParameterSweepBuilder(Gtk.Box):
         name_box.pack_start(self.name_combo, True, True, 0)
         
         # Edit Range button for single mode
-        single_edit_range_button = Gtk.Button(label="Edit Range...")
-        single_edit_range_button.connect("clicked", self._on_single_edit_range_clicked)
-        name_box.pack_start(single_edit_range_button, False, False, 0)
+        self.single_edit_range_button = Gtk.Button(label="Edit Range...")
+        self.single_edit_range_button.connect("clicked", self._on_single_edit_range_clicked)
+        name_box.pack_start(self.single_edit_range_button, False, False, 0)
         
         selection_box.pack_start(name_box, False, False, 0)
         self.single_param_box = name_box  # Store reference for show/hide
@@ -303,6 +303,7 @@ class ParameterSweepBuilder(Gtk.Box):
         # Initialize visibility: single mode is default
         self.design_mode = 'single'
         self.single_param_box.show_all()  # Ensure all widgets in single mode are visible initially
+        self.single_edit_range_button.show()  # Explicitly show the button
     
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
