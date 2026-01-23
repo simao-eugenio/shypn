@@ -117,7 +117,10 @@ class ParameterSweepBuilder(Gtk.Box):
         selection_box.pack_start(type_box, False, False, 0)
         self.type_box = type_box  # Store reference for show/hide
         
-        # Parameter Name (for single mode)
+        # === SINGLE PARAMETER MODE UI ===
+        self.single_param_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Parameter selector with Add button
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         name_label = Gtk.Label(label="Parameter:")
         name_label.set_size_request(100, -1)
@@ -126,30 +129,58 @@ class ParameterSweepBuilder(Gtk.Box):
         
         self.name_combo = Gtk.ComboBoxText()
         self.name_combo.set_tooltip_text("Load a model with subnet parameters to see available parameters")
-        self.name_combo.connect("changed", self._on_name_changed)
         name_box.pack_start(self.name_combo, True, True, 0)
         
-        # Edit Range button for single mode
+        add_single_button = Gtk.Button(label="Set Parameter")
+        add_single_button.connect("clicked", self._on_single_set_parameter_clicked)
+        name_box.pack_start(add_single_button, False, False, 0)
+        
+        self.single_param_box.pack_start(name_box, False, False, 0)
+        
+        # TreeView for selected parameter
+        scroll_single = Gtk.ScrolledWindow()
+        scroll_single.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll_single.set_min_content_height(80)
+        
+        self.single_list = Gtk.ListStore(str, str, str, object)  # name, type, id, range_config
+        self.single_view = Gtk.TreeView(model=self.single_list)
+        self.single_view.set_headers_visible(True)
+        
+        col_name_single = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
+        col_name_single.set_resizable(True)
+        self.single_view.append_column(col_name_single)
+        
+        col_type_single = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
+        col_type_single.set_resizable(True)
+        self.single_view.append_column(col_type_single)
+        
+        # Add Range column
+        renderer_range_single = Gtk.CellRendererText()
+        renderer_range_single.set_property("foreground", "#0066CC")
+        col_range_single = Gtk.TreeViewColumn("Range", renderer_range_single)
+        col_range_single.set_cell_data_func(renderer_range_single, self._format_range_column)
+        col_range_single.set_resizable(True)
+        self.single_view.append_column(col_range_single)
+        
+        scroll_single.add(self.single_view)
+        self.single_param_box.pack_start(scroll_single, True, True, 0)
+        
+        # Button box for Edit Range and Remove
+        button_box_single = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
         self.single_edit_range_button = Gtk.Button(label="Edit Range...")
         self.single_edit_range_button.connect("clicked", self._on_single_edit_range_clicked)
-        name_box.pack_start(self.single_edit_range_button, False, False, 0)
+        button_box_single.pack_start(self.single_edit_range_button, False, False, 0)
         
-        selection_box.pack_start(name_box, False, False, 0)
-        self.single_param_box = name_box  # Store reference for show/hide
+        single_remove_button = Gtk.Button(label="Remove Selected")
+        single_remove_button.connect("clicked", self._on_single_remove_clicked)
+        button_box_single.pack_start(single_remove_button, False, False, 0)
         
-        # Store range config for single parameter mode
-        self.single_range_config = {
-            'mode': 'linear',
-            'start': 0.1,
-            'stop': 1.0,
-            'step': 0.1,
-            'list_values': '',
-            'percent': 20.0,
-            'percent_steps': 5,
-            'baseline': 1.0
-        }
+        self.single_param_box.pack_start(button_box_single, False, False, 0)
         
-        # Factorial parameter selection (initially hidden)
+        selection_box.pack_start(self.single_param_box, True, True, 0)
+        
+        # === FACTORIAL PARAMETER MODE UI ===
         self.factorial_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         
         # Add label for clarity
@@ -310,6 +341,39 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
+    
+    def _on_single_set_parameter_clicked(self, button):
+        """Add/update parameter in single parameter mode."""
+        param_id = self.name_combo.get_active_id()
+        param_name = self.name_combo.get_active_text()
+        
+        if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
+            return
+        
+        # Clear existing parameter (single mode only has one parameter)
+        self.single_list.clear()
+        
+        # Add to list with default range configuration
+        param_type = self.parameter_type
+        type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
+        
+        # Default range config
+        default_range = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
+        
+        self.single_list.append([param_name, type_display, param_id, default_range])
+    
+    def _on_single_remove_clicked(self, button):
+        """Remove parameter from single parameter list."""
+        self.single_list.clear()
     
     def _on_design_mode_changed(self, radio):
         """Handle design mode change between single and factorial."""
@@ -575,26 +639,30 @@ class ParameterSweepBuilder(Gtk.Box):
                 )
     
     def _generate_single_parameter_experiments(self):
-        """Generate single parameter sweep experiments (original behavior)."""
-        # Ensure parameter_type is set
-        if self.parameter_type is None:
-            self.parameter_type = self.type_combo.get_active_id()
-            if self.parameter_type is None:
-                raise ValueError("Please select a parameter type")
+        """Generate single parameter sweep experiments using TreeView."""
+        # Get parameter from TreeView
+        if len(self.single_list) == 0:
+            raise ValueError("Please add a parameter using 'Set Parameter' button")
         
-        # Get parameter ID (internal key) from combo
-        param_id = self.name_combo.get_active_id()
-        param_name = self.name_combo.get_active_text()  # Display name for labels
+        tree_iter = self.single_list.get_iter_first()
+        if not tree_iter:
+            raise ValueError("Please add a parameter using 'Set Parameter' button")
         
-        if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
-            raise ValueError("Please select a parameter from the dropdown")
+        param_name = self.single_list.get_value(tree_iter, 0)
+        param_type_display = self.single_list.get_value(tree_iter, 1)
+        param_id = self.single_list.get_value(tree_iter, 2)
+        range_config = self.single_list.get_value(tree_iter, 3)
         
-        values = self._compute_parameter_values()
+        # Convert type display back to parameter_type
+        type_map = {"Place": "places", "Transition": "transitions", "Arc": "arcs"}
+        parameter_type = type_map.get(param_type_display, "places")
+        
+        values = self._compute_parameter_values_from_config(range_config)
         if not values:
             raise ValueError("No parameter values to generate. Check range configuration.")
         
         config = {
-            'parameter_type': self.parameter_type,
+            'parameter_type': parameter_type,
             'parameter_id': param_id,  # Internal ID for matching
             'parameter_name': param_name,  # Display name for labels
             'values': values,
@@ -650,17 +718,8 @@ class ParameterSweepBuilder(Gtk.Box):
     
     def _on_clear_clicked(self, button):
         """Clear all inputs and notify parent to clear queue."""
-        # Reset single parameter range config to defaults
-        self.single_range_config = {
-            'mode': 'linear',
-            'start': 0.1,
-            'stop': 1.0,
-            'step': 0.1,
-            'list_values': '',
-            'percent': 20.0,
-            'percent_steps': 5,
-            'baseline': 1.0
-        }
+        # Clear single parameter list
+        self.single_list.clear()
         
         self.replicates_entry.set_text("500")
         self.duration_entry.set_text("100.0")
@@ -678,14 +737,25 @@ class ParameterSweepBuilder(Gtk.Box):
         Returns:
             list: List of parameter values to test
         """
-        # Use stored config for single parameter mode
-        return self._compute_parameter_values_from_config(self.single_range_config)
+        # Get config from TreeView for single parameter mode
+        if len(self.single_list) == 0:
+            return []
+        
+        tree_iter = self.single_list.get_iter_first()
+        if tree_iter:
+            range_config = self.single_list.get_value(tree_iter, 3)
+            return self._compute_parameter_values_from_config(range_config)
+        
+        return []
     
 
     def _on_single_edit_range_clicked(self, button):
         """Open dialog to edit range configuration for single parameter mode."""
-        param_name = self.name_combo.get_active_text()
-        if not param_name or param_name.startswith("("):
+        # Get selected parameter from TreeView
+        selection = self.single_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if not tree_iter:
             dialog = Gtk.MessageDialog(
                 transient_for=self.get_toplevel(),
                 flags=0,
@@ -693,17 +763,20 @@ class ParameterSweepBuilder(Gtk.Box):
                 buttons=Gtk.ButtonsType.OK,
                 text="No parameter selected"
             )
-            dialog.format_secondary_text("Please select a parameter from the dropdown first.")
+            dialog.format_secondary_text("Please add a parameter using 'Set Parameter' button first.")
             dialog.run()
             dialog.destroy()
             return
         
+        param_name = model.get_value(tree_iter, 0)
+        current_config = model.get_value(tree_iter, 3)
+        
         # Open range configuration dialog
-        new_config = self._show_range_config_dialog(param_name, self.single_range_config)
+        new_config = self._show_range_config_dialog(param_name, current_config)
         
         if new_config:
-            # Update the range configuration
-            self.single_range_config = new_config
+            # Update the range configuration in the TreeView
+            model.set_value(tree_iter, 3, new_config)
     
     def _compute_parameter_values_from_config(self, config):
         """Compute parameter values from a range configuration dict.
