@@ -22,6 +22,23 @@ from .base_results_view import BaseResultsView
 
 
 class ResultsBrowserView(BaseResultsView):
+    
+    def _show_error(self, message):
+        """Show error dialog.
+        
+        Args:
+            message: Error message to display
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=self.get_toplevel(),
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Error"
+        )
+        dialog.format_secondary_text(message)
+        dialog.run()
+        dialog.destroy()
     """Widget for browsing and analyzing experiment results.
     
     Inherits from BaseResultsView to provide:
@@ -659,8 +676,16 @@ class ResultsBrowserView(BaseResultsView):
             
             # Create pcolormesh
             # Need to create mesh grid coordinates for edges
-            x_edges = np.append(x_values, x_values[-1] + (x_values[-1] - x_values[-2]))
-            y_edges = np.append(y_values, y_values[-1] + (y_values[-1] - y_values[-2]))
+            # Handle edge cases for arrays with < 2 elements
+            if len(x_values) >= 2:
+                x_edges = np.append(x_values, x_values[-1] + (x_values[-1] - x_values[-2]))
+            else:
+                x_edges = np.array([x_values[0] - 0.5, x_values[0] + 0.5]) if len(x_values) > 0 else np.array([0, 1])
+            
+            if len(y_values) >= 2:
+                y_edges = np.append(y_values, y_values[-1] + (y_values[-1] - y_values[-2]))
+            else:
+                y_edges = np.array([y_values[0] - 0.5, y_values[0] + 0.5]) if len(y_values) > 0 else np.array([0, 1])
             
             X, Y = np.meshgrid(x_edges, y_edges)
             
@@ -2145,16 +2170,16 @@ class ResultsBrowserView(BaseResultsView):
             # Check if this is the swept transition
             is_swept_transition = (species_id == swept_transition_id)
             
-            mean = np.array(species_data.get('mean', []))
-            std = np.array(species_data.get('std', []))
+            mean = np.array(species_data.get('mean', [])).flatten()
+            std = np.array(species_data.get('std', [])).flatten()
             
             if len(mean) == 0 or len(time_points) == 0:
                 ax.text(0.5, 0.5, 'No data', ha='center', va='center')
                 ax.set_title(species_id)
                 continue
             
-            # Convert to numpy arrays if needed
-            time_points_arr = np.array(time_points)
+            # Convert to numpy arrays if needed and flatten
+            time_points_arr = np.array(time_points).flatten()
             
             # Use different colors for transition vs places
             if is_swept_transition:

@@ -269,13 +269,13 @@ class ParameterSweepBuilder(Gtk.Box):
         
         sim_box.attach(Gtk.Label(label="Replicates:", xalign=0), 0, 0, 1, 1)
         self.replicates_entry = Gtk.Entry()
-        self.replicates_entry.set_text("500")
+        self.replicates_entry.set_text("3")
         self.replicates_entry.set_width_chars(8)
         sim_box.attach(self.replicates_entry, 1, 0, 1, 1)
         
         sim_box.attach(Gtk.Label(label="Duration:", xalign=0), 2, 0, 1, 1)
         self.duration_entry = Gtk.Entry()
-        self.duration_entry.set_text("100.0")
+        self.duration_entry.set_text("60.0")
         self.duration_entry.set_width_chars(8)
         self.duration_entry.set_tooltip_text("Maximum simulation time (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
@@ -721,8 +721,8 @@ class ParameterSweepBuilder(Gtk.Box):
         # Clear single parameter list
         self.single_list.clear()
         
-        self.replicates_entry.set_text("500")
-        self.duration_entry.set_text("100.0")
+        self.replicates_entry.set_text("3")
+        self.duration_entry.set_text("60.0")
         self.termination_combo.set_active_id("deadlock")
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)

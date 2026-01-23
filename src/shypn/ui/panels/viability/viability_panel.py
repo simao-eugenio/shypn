@@ -29,6 +29,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, GLib, Pango
+import re
 
 from .data.data_puller import DataPuller
 from .data.data_cache import CachedDataPuller, DataCache
@@ -596,6 +597,117 @@ class ViabilityPanel(Gtk.Box):
         # Set arc color
         arc_obj.color = color_rgb
     
+    def _detect_formula_referenced_places(self, transition_obj):
+        """Detect places referenced in transition rate formula.
+        
+        Args:
+            transition_obj: Transition object to check
+            
+        Returns:
+            list: List of Place objects referenced in formula but not in locality
+        """
+        # Get all places from the full model
+        canvas_mgr = self._get_canvas_manager()
+        if not canvas_mgr or not canvas_mgr._document_model:
+            return []
+        
+        all_places = {p.id: p for p in canvas_mgr._document_model.places}
+        
+        # Check if transition has a formula
+        # Formulas are stored in properties['rate_function'] dictionary
+        formula = None
+        
+        # Priority 1: Check properties dict (where transition property dialog stores formulas)
+        if hasattr(transition_obj, 'properties') and isinstance(transition_obj.properties, dict):
+            formula = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
+        
+        # Priority 2: Check if rate is a string (fallback for old format)
+        if not formula:
+            rate_attr = getattr(transition_obj, 'rate', None)
+            if rate_attr and isinstance(rate_attr, str) and rate_attr.strip():
+                formula = rate_attr
+        
+        if not formula:
+            return []
+        
+        # Extract place references from formula
+        # Look for patterns like: place_id, place.tokens, [place_id]
+        # Match place IDs (alphanumeric with underscores)
+        referenced_place_ids = set()
+        
+        # Pattern: Direct place ID references (alphanumeric + underscore)
+        place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+        matches = re.findall(place_id_pattern, formula)
+        
+        for match in matches:
+            # Check if this ID exists as a place in the model
+            if match in all_places:
+                referenced_place_ids.add(match)
+        
+        # Get locality to determine which places are already included
+        from shypn.diagnostic import LocalityDetector
+        model = self._get_current_model()
+        if not model:
+            return []
+        
+        locality_detector = LocalityDetector(model)
+        locality = locality_detector.get_locality_for_transition(transition_obj)
+        
+        # Get all locality place IDs
+        locality_place_ids = set()
+        for place_obj in locality.input_places:
+            locality_place_ids.add(place_obj.id)
+        for place_obj in locality.output_places:
+            locality_place_ids.add(place_obj.id)
+        for place_obj in locality.catalyst_places:
+            locality_place_ids.add(place_obj.id)
+        
+        # Find places referenced in formula but NOT in locality
+        formula_only_places = []
+        for place_id in referenced_place_ids:
+            if place_id not in locality_place_ids and place_id in all_places:
+                formula_only_places.append(all_places[place_id])
+        
+        return formula_only_places
+    
+    def _extract_place_ids_from_formula(self, formula: str, model, transition_id: str = None):
+        """Extract place objects referenced in a formula.
+        
+        Args:
+            formula: Formula string to parse
+            model: Model containing places
+            transition_id: Optional transition ID to filter out places already in its locality
+            
+        Returns:
+            list: List of place objects referenced in the formula but not in locality
+        """
+        if not formula or not model:
+            return []
+        
+        # Build map of place IDs to place objects
+        all_places = {p.id: p for p in model.places}
+        
+        # Extract place references using regex
+        place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+        matches = re.findall(place_id_pattern, formula)
+        
+        # Get locality place IDs to exclude (if transition_id provided)
+        locality_place_ids = set()
+        if transition_id and transition_id in self.selected_localities:
+            locality = self.selected_localities[transition_id].get('locality')
+            if locality:
+                locality_place_ids.update(p.id for p in locality.input_places)
+                locality_place_ids.update(p.id for p in locality.output_places)
+                locality_place_ids.update(p.id for p in locality.catalyst_places)
+        
+        # Filter to only actual place IDs that exist in model AND are not in locality
+        referenced_places = []
+        for match in matches:
+            if match in all_places and match not in locality_place_ids:
+                referenced_places.append(all_places[match])
+        
+        return referenced_places
+    
     def _add_transition_to_list(self, transition_obj):
         """Add a transition to the localities list (matching plot panel style).
         
@@ -616,6 +728,9 @@ class ViabilityPanel(Gtk.Box):
         locality_detector = LocalityDetector(model)
         locality = locality_detector.get_locality_for_transition(transition_obj)
         
+        # Note: Formula-referenced places will be detected later in _refresh_subnet_parameters()
+        # when we have access to the full model context and rate_function attribute
+        
         # === COLOR ALL LOCALITY OBJECTS FIRST ===
         
         # Color transition
@@ -632,6 +747,8 @@ class ViabilityPanel(Gtk.Box):
         # Color catalyst places (from test arcs - enzymes/cofactors)
         for place_obj in locality.catalyst_places:
             self._color_locality_place(place_obj)
+        
+        # Note: Formula-referenced places will be colored later when detected
         
         # Color input arcs
         for arc_obj in locality.input_arcs:
@@ -695,6 +812,8 @@ class ViabilityPanel(Gtk.Box):
         for place_obj in locality.catalyst_places:
             self._add_locality_place_row_to_list(place_obj, "Catalyst:")
         
+        # Note: Formula-referenced places will be added later when detected
+        
         # Show all new widgets (only if panel is packed)
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
@@ -704,7 +823,8 @@ class ViabilityPanel(Gtk.Box):
             'row': transition_row,
             'checkbox': checkbox,
             'transition': transition_obj,
-            'locality': locality
+            'locality': locality,
+            'formula_places': []  # Will be populated later when formulas are detected
         }
         
         # Trigger canvas redraw to show colored elements
@@ -809,6 +929,15 @@ class ViabilityPanel(Gtk.Box):
             for p_obj in locality_obj.output_places:
                 ColorSchemaManager.reset_place_color(p_obj)
             
+            # Reset catalyst place colors
+            for p_obj in locality_obj.catalyst_places:
+                ColorSchemaManager.reset_place_color(p_obj)
+            
+            # Reset formula-referenced place colors
+            formula_places = data.get('formula_places', [])
+            for p_obj in formula_places:
+                ColorSchemaManager.reset_place_color(p_obj)
+            
             # Reset input arc colors
             for a_obj in locality_obj.input_arcs:
                 ColorSchemaManager.reset_arc_color(a_obj)
@@ -852,6 +981,29 @@ class ViabilityPanel(Gtk.Box):
         if not model:
             return
         
+        # PRE-PROCESS: Detect formula-referenced places for all transitions FIRST
+        # This must happen before collecting place IDs
+        for transition_id, data in self.selected_localities.items():
+            locality = data.get('locality')
+            if not locality:
+                continue
+            
+            transition_obj = locality.transition
+            
+            # Check if transition has a formula in properties dict
+            formula = None
+            if hasattr(transition_obj, 'properties') and isinstance(transition_obj.properties, dict):
+                formula = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
+            
+            if formula and isinstance(formula, str) and formula.strip():
+                formula_places = self._extract_place_ids_from_formula(formula, model, transition_id)
+                if formula_places:
+                    data['formula_places'] = formula_places
+                else:
+                    data['formula_places'] = []
+            else:
+                data['formula_places'] = []
+        
         # Collect all unique place IDs, transition IDs, and arc IDs from localities
         all_place_ids = set()
         all_transition_ids = set()
@@ -869,6 +1021,10 @@ class ViabilityPanel(Gtk.Box):
             all_place_ids.update(p.id for p in locality.input_places)
             all_place_ids.update(p.id for p in locality.output_places)
             all_place_ids.update(p.id for p in locality.catalyst_places)  # Include catalyst/enzyme places
+            
+            # Add formula-referenced place IDs
+            formula_places = data.get('formula_places', [])
+            all_place_ids.update(p.id for p in formula_places)
             
             # Add arc IDs (extract IDs from arc objects)
             all_arc_ids.update(a.id for a in locality.input_arcs)
@@ -896,7 +1052,10 @@ class ViabilityPanel(Gtk.Box):
         for transition in model.transitions:
             if transition.id in all_transition_ids:
                 rate = transition.rate if hasattr(transition, 'rate') else 1.0
-                formula = transition.formula if hasattr(transition, 'formula') else ""
+                # Check rate_function in properties dict (where formulas/expressions are actually stored)
+                formula = ""
+                if hasattr(transition, 'properties') and isinstance(transition.properties, dict):
+                    formula = transition.properties.get('rate_function', '') or transition.properties.get('rate_function_display', '')
                 
                 # Handle case where rate might be a string formula
                 if isinstance(rate, str):
@@ -921,6 +1080,71 @@ class ViabilityPanel(Gtk.Box):
                     label,
                     "#FFFFFF"  # Background color
                 ])
+                
+                # Detect formula-referenced places NOW that we have the formula
+                if formula and isinstance(formula, str) and formula.strip():
+                    formula_places = self._extract_place_ids_from_formula(formula, model, transition.id)
+                    if formula_places:
+                        # Update selected_localities with formula places
+                        if transition.id in self.selected_localities:
+                            self.selected_localities[transition.id]['formula_places'] = formula_places
+                            # Color the formula places using the standard coloring method
+                            for place in formula_places:
+                                self._color_locality_place(place)
+                            # Trigger canvas redraw to show the new colors
+                            self._trigger_canvas_redraw()
+                            
+                            # Add UI rows for formula places in the localities listbox
+                            # Find the transition's row to insert after it
+                            transition_row = self.selected_localities[transition.id].get('row')
+                            if transition_row:
+                                # Get all children to find where to insert
+                                children = self.localities_listbox.get_children()
+                                insert_index = -1
+                                for i, child in enumerate(children):
+                                    if child == transition_row:
+                                        insert_index = i + 1
+                                        # Skip existing place rows (input/output/catalyst)
+                                        while insert_index < len(children):
+                                            next_child = children[insert_index]
+                                            # Check if it's a place row (indented)
+                                            hbox = next_child.get_child()
+                                            if hbox and hbox.get_margin_start() > 10:
+                                                insert_index += 1
+                                            else:
+                                                break
+                                        break
+                                
+                                # Add formula place rows at the correct position
+                                for place in formula_places:
+                                    place_row = Gtk.ListBoxRow()
+                                    place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                                    place_hbox.set_margin_start(40)  # Indent like other places
+                                    place_hbox.set_margin_end(6)
+                                    place_hbox.set_margin_top(1)
+                                    place_hbox.set_margin_bottom(1)
+                                    
+                                    # Checkbox
+                                    place_checkbox = Gtk.CheckButton()
+                                    place_checkbox.set_active(True)
+                                    place_checkbox.place_id = place.id
+                                    place_hbox.pack_start(place_checkbox, False, False, 0)
+                                    
+                                    # Label with formula prefix
+                                    place_label_text = f"Formula: {place.id}"
+                                    if hasattr(place, 'label') and place.label:
+                                        place_label_text += f" ({place.label})"
+                                    place_label = Gtk.Label(label=place_label_text)
+                                    place_label.set_xalign(0)
+                                    place_hbox.pack_start(place_label, True, True, 0)
+                                    
+                                    place_row.add(place_hbox)
+                                    self.localities_listbox.insert(place_row, insert_index)
+                                    insert_index += 1
+                                
+                                # Show new rows
+                                self.localities_listbox.show_all()
+        
         
         # Populate Arcs table
         for arc in model.arcs:
@@ -975,6 +1199,10 @@ class ViabilityPanel(Gtk.Box):
             subnet_places_set.update(locality.output_places)
             subnet_places_set.update(locality.catalyst_places)
             
+            # Add formula-referenced places if stored
+            formula_places = data.get('formula_places', [])
+            subnet_places_set.update(formula_places)
+            
             # Add arcs
             subnet_arcs_set.update(locality.input_arcs)
             subnet_arcs_set.update(locality.output_arcs)
@@ -1010,15 +1238,19 @@ class ViabilityPanel(Gtk.Box):
         import re
         
         # Get all places from the full model
-        if not self.canvas_manager or not self.canvas_manager.document_model:
+        canvas_mgr = self._get_canvas_manager()
+        if not canvas_mgr or not canvas_mgr._document_model:
             return
         
-        all_places = {p.id: p for p in self.canvas_manager.document_model.places}
+        all_places = {p.id: p for p in canvas_mgr._document_model.places}
         
         for transition in transitions:
-            # Check if transition has a formula
+            # Check if transition has a formula in properties dict
             formula = None
-            if hasattr(transition, 'formula') and transition.formula:
+            if hasattr(transition, 'properties') and isinstance(transition.properties, dict):
+                formula = transition.properties.get('rate_function') or transition.properties.get('rate_function_display')
+            # Fallback to old format
+            elif hasattr(transition, 'formula') and transition.formula:
                 formula = transition.formula
             elif isinstance(transition.rate, str):
                 formula = transition.rate
