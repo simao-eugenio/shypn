@@ -135,8 +135,19 @@ class ParameterSweepBuilder(Gtk.Box):
         # Factorial parameter selection (initially hidden)
         self.factorial_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         
-        # Add parameter button
+        # Add label for clarity
+        factorial_label = Gtk.Label(label="Add parameters to factorial design:")
+        factorial_label.set_xalign(0)
+        self.factorial_box.pack_start(factorial_label, False, False, 0)
+        
+        # Add parameter combo with label
         add_param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        param_label = Gtk.Label(label="Parameter:")
+        param_label.set_size_request(100, -1)
+        param_label.set_xalign(0)
+        add_param_box.pack_start(param_label, False, False, 0)
+        
         self.factorial_add_combo = Gtk.ComboBoxText()
         self.factorial_add_combo.set_tooltip_text("Select parameter to add to factorial design")
         add_param_box.pack_start(self.factorial_add_combo, True, True, 0)
