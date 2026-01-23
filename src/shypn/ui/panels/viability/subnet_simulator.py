@@ -247,7 +247,12 @@ class SubnetSimulator:
                 subnet['transitions'].append(trans_obj)
             
             # Get place objects (handle both object and ID forms)
-            all_places = set(locality.input_places) | set(locality.output_places)
+            all_places = set(locality.input_places) | set(locality.output_places) | set(locality.catalyst_places)
+            
+            # Include formula-referenced places
+            formula_places = data.get('formula_places', [])
+            all_places.update(formula_places)
+            
             for place in all_places:
                 if hasattr(place, 'id'):
                     place_obj = place

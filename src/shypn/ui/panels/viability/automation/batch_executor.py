@@ -543,14 +543,11 @@ class BatchExecutor:
             if n_workers is None:
                 n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
             
-            print(f"[PARALLEL] Starting parallel execution with {n_workers} workers")
-            
             # Prepare experiment arguments for workers
             experiment_args = []
             for queue_index, name, snapshot_index in experiments:
                 # Get snapshot
                 if snapshot_index >= len(self.experiment_manager.snapshots):
-                    print(f"[PARALLEL] Skipping invalid snapshot index: {snapshot_index}")
                     continue
                 
                 snapshot = self.experiment_manager.snapshots[snapshot_index]
@@ -635,7 +632,6 @@ class BatchExecutor:
                 
                 # Handle cancellation
                 if self.is_cancelled:
-                    print(f"[PARALLEL] Cancelling remaining experiments...")
                     pool.terminate()
                     pool.join()
                     

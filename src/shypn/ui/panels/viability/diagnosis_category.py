@@ -657,10 +657,17 @@ class DiagnosisCategory(BaseViabilityCategory):
         
         # Build combined locality scope (all selected transitions and their places)
         all_relevant_ids = set()
-        for transition, locality in zip(transitions, localities):
-            all_relevant_ids.add(transition.id)
+        for transition_id, data in self.panel.selected_localities.items():
+            locality = data.get('locality')
+            if not locality:
+                continue
+            all_relevant_ids.add(locality.transition.id)
             all_relevant_ids.update(p.id for p in locality.input_places)
             all_relevant_ids.update(p.id for p in locality.output_places)
+            all_relevant_ids.update(p.id for p in locality.catalyst_places)
+            # Include formula-referenced places
+            formula_places = data.get('formula_places', [])
+            all_relevant_ids.update(p.id for p in formula_places)
         
         
         # Run diagnosis (scan all issues)
@@ -807,6 +814,17 @@ class DiagnosisCategory(BaseViabilityCategory):
         if not is_sink:  # Sink transitions have no outputs
             for place in locality.output_places:
                 self._add_place_row_to_list(place, "Output:", transition)
+        
+        # Add catalyst places
+        for place in locality.catalyst_places:
+            self._add_place_row_to_list(place, "Catalyst:", transition)
+        
+        # Add formula-referenced places from selected_localities
+        if hasattr(self, 'panel') and hasattr(self.panel, 'selected_localities'):
+            if transition.id in self.panel.selected_localities:
+                formula_places = self.panel.selected_localities[transition.id].get('formula_places', [])
+                for place in formula_places:
+                    self._add_place_row_to_list(place, "Formula:", transition)
         
         self.locality_listbox.show_all()
     

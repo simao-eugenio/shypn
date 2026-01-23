@@ -328,6 +328,8 @@ class ExperimentAutomationCategory:
         Stage 3 feature: Provides fast single-experiment execution without
         needing to use manual simulation toolbar. Creates one experiment
         from current baseline and executes immediately.
+        
+        Respects locality selection: Only checked localities are included.
         """
         # Update status
         self.quick_run_status.set_markup("<i>Running...</i>")
@@ -339,6 +341,17 @@ class ExperimentAutomationCategory:
         
         if not self.parent_panel.selected_localities:
             self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
+            return
+        
+        # Check which localities are CHECKED (enabled) - only use those for Quick Run
+        enabled_localities = {}
+        for transition_id, data in self.parent_panel.selected_localities.items():
+            checkbox = data.get('checkbox')
+            if checkbox and checkbox.get_active():  # Only include checked localities
+                enabled_localities[transition_id] = data
+        
+        if not enabled_localities:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No localities checked</span>")
             return
         
         # Ensure baseline exists
@@ -354,24 +367,15 @@ class ExperimentAutomationCategory:
         # Create single experiment from baseline
         baseline = self.experiment_manager.get_active_snapshot()
         
-        # Get method from sweep builder if available, otherwise use Gillespie
-        method = 'gillespie'
-        if hasattr(self.sweep_builder, 'method_combo'):
-            method = self.sweep_builder.method_combo.get_active_id() or 'gillespie'
+        # Get snapshot index for current baseline
+        snapshot_index = self.experiment_manager.active_index
         
-        # Create experiment config
-        experiment = {
-            'name': 'Quick Run',
-            'snapshot': baseline,
-            'replicates': 100,  # Quick test with fewer replicates
-            'duration': 100.0,
-            'method': method,
-            'parameter_values': {}
-        }
+        # Add single experiment to queue (don't clear - let user see it)
+        # add_experiment expects (name, snapshot_index) not a dict
+        self.queue_view.add_experiment("Quick Run", snapshot_index)
         
-        # Clear queue and add single experiment
-        self.queue_view.clear_queue()
-        self.queue_view.add_experiment(experiment)
+        # Ensure queue is visible
+        self.queue_view.show_all()
         
         # Run immediately
         pending = self.queue_view.get_pending_experiments()
@@ -560,23 +564,34 @@ class ExperimentAutomationCategory:
             return
         
         # Get replicates and duration from sweep builder
-        replicates = 500
-        duration = 100.0
+        replicates = 3
+        duration = 60.0
         termination_condition = "deadlock"  # Default
+        
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
-                replicates = int(self.sweep_builder.replicates_entry.get_text())
-            except:
-                pass
+                text = self.sweep_builder.replicates_entry.get_text().strip()
+                if text:
+                    replicates = int(text)
+            except Exception as e:
+                print(f"[WARNING] Failed to read replicates: {e}, using default: {replicates}")
+        
         if hasattr(self.sweep_builder, 'duration_entry'):
             try:
-                duration = float(self.sweep_builder.duration_entry.get_text())
-            except:
-                pass
+                text = self.sweep_builder.duration_entry.get_text().strip()
+                if text:
+                    duration = float(text)
+                    if duration <= 0:
+                        print(f"[WARNING] Duration is {duration}, using default 60.0")
+                        duration = 60.0
+            except Exception as e:
+                print(f"[WARNING] Failed to read duration: {e}, using default: {duration}")
+        
         if hasattr(self.sweep_builder, 'termination_combo'):
             try:
                 termination_condition = self.sweep_builder.termination_combo.get_active_id() or "deadlock"
-            except:
+            except Exception as e:
+                print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
         
         # Get parallel execution setting from queue view checkbox (E2 enhancement)
