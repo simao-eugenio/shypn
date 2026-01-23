@@ -299,6 +299,10 @@ class ParameterSweepBuilder(Gtk.Box):
         action_box.pack_end(clear_button, False, False, 0)
         
         self.pack_start(action_box, False, False, 0)
+        
+        # Initialize visibility: single mode is default
+        self.design_mode = 'single'
+        self.single_param_box.show_all()  # Ensure all widgets in single mode are visible initially
     
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
