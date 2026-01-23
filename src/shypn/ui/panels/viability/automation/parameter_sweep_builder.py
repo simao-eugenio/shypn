@@ -129,8 +129,25 @@ class ParameterSweepBuilder(Gtk.Box):
         self.name_combo.connect("changed", self._on_name_changed)
         name_box.pack_start(self.name_combo, True, True, 0)
         
+        # Edit Range button for single mode
+        single_edit_range_button = Gtk.Button(label="Edit Range...")
+        single_edit_range_button.connect("clicked", self._on_single_edit_range_clicked)
+        name_box.pack_start(single_edit_range_button, False, False, 0)
+        
         selection_box.pack_start(name_box, False, False, 0)
         self.single_param_box = name_box  # Store reference for show/hide
+        
+        # Store range config for single parameter mode
+        self.single_range_config = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
         
         # Factorial parameter selection (initially hidden)
         self.factorial_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -205,89 +222,6 @@ class ParameterSweepBuilder(Gtk.Box):
         
         selection_frame.add(selection_box)
         self.pack_start(selection_frame, False, False, 0)
-        
-        # === RANGE SPECIFICATION ===
-        range_frame = Gtk.Frame()
-        range_frame.set_label("Range Specification")
-        range_frame.set_margin_top(6)
-        
-        range_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        range_box.set_margin_start(12)
-        range_box.set_margin_end(12)
-        range_box.set_margin_top(6)
-        range_box.set_margin_bottom(6)
-        
-        # Radio buttons for range type
-        self.linear_radio = Gtk.RadioButton(label="Linear Range")
-        range_box.pack_start(self.linear_radio, False, False, 0)
-        
-        # Linear range inputs
-        linear_grid = Gtk.Grid()
-        linear_grid.set_column_spacing(6)
-        linear_grid.set_row_spacing(6)
-        linear_grid.set_margin_start(24)
-        
-        linear_grid.attach(Gtk.Label(label="Start:", xalign=0), 0, 0, 1, 1)
-        self.start_entry = Gtk.Entry()
-        self.start_entry.set_text("0.1")
-        self.start_entry.set_width_chars(10)
-        linear_grid.attach(self.start_entry, 1, 0, 1, 1)
-        
-        linear_grid.attach(Gtk.Label(label="Stop:", xalign=0), 2, 0, 1, 1)
-        self.stop_entry = Gtk.Entry()
-        self.stop_entry.set_text("1.0")
-        self.stop_entry.set_width_chars(10)
-        linear_grid.attach(self.stop_entry, 3, 0, 1, 1)
-        
-        linear_grid.attach(Gtk.Label(label="Step:", xalign=0), 4, 0, 1, 1)
-        self.step_entry = Gtk.Entry()
-        self.step_entry.set_text("0.1")
-        self.step_entry.set_width_chars(10)
-        linear_grid.attach(self.step_entry, 5, 0, 1, 1)
-        
-        range_box.pack_start(linear_grid, False, False, 0)
-        
-        # List values radio
-        self.list_radio = Gtk.RadioButton(group=self.linear_radio, label="Value List")
-        range_box.pack_start(self.list_radio, False, False, 0)
-        
-        # List values input
-        list_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        list_box.set_margin_start(24)
-        self.list_entry = Gtk.Entry()
-        self.list_entry.set_placeholder_text("e.g., 0.1, 0.5, 1.0, 2.0")
-        list_box.pack_start(self.list_entry, True, True, 0)
-        range_box.pack_start(list_box, False, False, 0)
-        
-        # Percentage variation radio
-        self.percent_radio = Gtk.RadioButton(group=self.linear_radio, label="Percentage Variation")
-        range_box.pack_start(self.percent_radio, False, False, 0)
-        
-        # Percentage inputs
-        percent_grid = Gtk.Grid()
-        percent_grid.set_column_spacing(6)
-        percent_grid.set_row_spacing(6)
-        percent_grid.set_margin_start(24)
-        
-        percent_grid.attach(Gtk.Label(label="Baseline ±", xalign=0), 0, 0, 1, 1)
-        self.percent_entry = Gtk.Entry()
-        self.percent_entry.set_text("20")
-        self.percent_entry.set_width_chars(6)
-        percent_grid.attach(self.percent_entry, 1, 0, 1, 1)
-        
-        percent_grid.attach(Gtk.Label(label="% (", xalign=0), 2, 0, 1, 1)
-        self.percent_steps_entry = Gtk.Entry()
-        self.percent_steps_entry.set_text("5")
-        self.percent_steps_entry.set_width_chars(4)
-        percent_grid.attach(self.percent_steps_entry, 3, 0, 1, 1)
-        
-        percent_grid.attach(Gtk.Label(label="steps )", xalign=0), 4, 0, 1, 1)
-        
-        range_box.pack_start(percent_grid, False, False, 0)
-        
-        range_frame.add(range_box)
-        self.range_frame = range_frame  # Store reference for show/hide
-        self.pack_start(range_frame, False, False, 0)
         
         # === SIMULATION SETTINGS ===
         sim_frame = Gtk.Frame()
@@ -381,7 +315,6 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'single'
             self.type_box.show()  # Show type selector in single mode
             self.single_param_box.show()
-            self.range_frame.show()  # Show range specification in single mode
             self.factorial_box.hide()
             self.factorial_box.set_no_show_all(True)  # Prevent accidental showing
             
@@ -392,7 +325,6 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'factorial'
             self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
             self.single_param_box.hide()
-            self.range_frame.hide()  # Hide range specification in factorial mode (use Edit Range button)
             # Unset no_show_all flag to allow showing
             self.factorial_box.set_no_show_all(False)
             self.factorial_box.show_all()  # show_all() to display all children
@@ -713,12 +645,18 @@ class ParameterSweepBuilder(Gtk.Box):
     
     def _on_clear_clicked(self, button):
         """Clear all inputs and notify parent to clear queue."""
-        self.start_entry.set_text("0.1")
-        self.stop_entry.set_text("1.0")
-        self.step_entry.set_text("0.1")
-        self.list_entry.set_text("")
-        self.percent_entry.set_text("20")
-        self.percent_steps_entry.set_text("5")
+        # Reset single parameter range config to defaults
+        self.single_range_config = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
+        
         self.replicates_entry.set_text("500")
         self.duration_entry.set_text("100.0")
         self.termination_combo.set_active_id("deadlock")
@@ -735,66 +673,32 @@ class ParameterSweepBuilder(Gtk.Box):
         Returns:
             list: List of parameter values to test
         """
-        if self.linear_radio.get_active():
-            # Linear range (supports both increasing and decreasing)
-            start = float(self.start_entry.get_text())
-            stop = float(self.stop_entry.get_text())
-            step = float(self.step_entry.get_text())
-            
-            if step <= 0:
-                raise ValueError("Step must be positive")
-            if start == stop:
-                raise ValueError("Start and stop must be different")
-            
-            values = []
-            
-            # Determine direction
-            if start < stop:
-                # Increasing range
-                current = start
-                while current <= stop:
-                    values.append(current)
-                    current += step
-            else:
-                # Decreasing range (e.g., NAD 2mM → 0mM)
-                current = start
-                while current >= stop:
-                    values.append(current)
-                    current -= step
-            
-            return values
-            
-        elif self.list_radio.get_active():
-            # Value list
-            text = self.list_entry.get_text().strip()
-            if not text:
-                raise ValueError("Value list is empty")
-            
-            values = [float(v.strip()) for v in text.split(',')]
-            return values
-            
-        elif self.percent_radio.get_active():
-            # Percentage variation (needs baseline value from current model)
-            # For now, use a default baseline of 1.0
-            baseline = 1.0
-            percent = float(self.percent_entry.get_text())
-            steps = int(self.percent_steps_entry.get_text())
-            
-            if steps <= 0:
-                raise ValueError("Steps must be positive")
-            
-            # Generate values: baseline * (1 ± percent/100)
-            min_val = baseline * (1 - percent / 100)
-            max_val = baseline * (1 + percent / 100)
-            
-            if steps == 1:
-                return [baseline]
-            
-            step_size = (max_val - min_val) / (steps - 1)
-            values = [min_val + i * step_size for i in range(steps)]
-            return values
+        # Use stored config for single parameter mode
+        return self._compute_parameter_values_from_config(self.single_range_config)
+    
+
+    def _on_single_edit_range_clicked(self, button):
+        """Open dialog to edit range configuration for single parameter mode."""
+        param_name = self.name_combo.get_active_text()
+        if not param_name or param_name.startswith("("):
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No parameter selected"
+            )
+            dialog.format_secondary_text("Please select a parameter from the dropdown first.")
+            dialog.run()
+            dialog.destroy()
+            return
         
-        return []
+        # Open range configuration dialog
+        new_config = self._show_range_config_dialog(param_name, self.single_range_config)
+        
+        if new_config:
+            # Update the range configuration
+            self.single_range_config = new_config
     
     def _compute_parameter_values_from_config(self, config):
         """Compute parameter values from a range configuration dict.
