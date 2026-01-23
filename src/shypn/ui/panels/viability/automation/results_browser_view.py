@@ -179,13 +179,6 @@ class ResultsBrowserView(BaseResultsView):
         self.export_json_button.connect("clicked", self._on_export_json_clicked)
         button_box.pack_start(self.export_json_button, False, False, 0)
         
-        # Plot button
-        self.plot_button = Gtk.Button(label="📊 Plot")
-        self.plot_button.set_tooltip_text("Plot mean trajectories with confidence intervals")
-        self.plot_button.set_sensitive(False)
-        self.plot_button.connect("clicked", self._on_plot_clicked)
-        button_box.pack_start(self.plot_button, False, False, 0)
-        
         # Statistical Tests button (E5 enhancement)
         self.stats_test_button = Gtk.Button(label="📈 Statistical Tests")
         self.stats_test_button.set_tooltip_text("Run ANOVA and post-hoc tests on selected experiments")
@@ -1472,7 +1465,6 @@ class ResultsBrowserView(BaseResultsView):
             # Enable action buttons
             self.export_csv_button.set_sensitive(True)
             self.export_json_button.set_sensitive(True)
-            self.plot_button.set_sensitive(True)
             self.report_button.set_sensitive(True)
             
             # Display statistics
@@ -1486,7 +1478,6 @@ class ResultsBrowserView(BaseResultsView):
             # Disable action buttons
             self.export_csv_button.set_sensitive(False)
             self.export_json_button.set_sensitive(False)
-            self.plot_button.set_sensitive(False)
             self.report_button.set_sensitive(False)
             
             self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
@@ -1769,15 +1760,6 @@ class ResultsBrowserView(BaseResultsView):
         
         if response == Gtk.ResponseType.YES:
             self.clear_results()
-    
-    def _on_plot_clicked(self, button):
-        """Handle Plot button click - show trajectory plot in embedded canvas."""
-        name, result = self.get_selected_result()
-        if name and result:
-            # Switch to plot view tab
-            self.notebook.set_current_page(1)
-            # Render plot in embedded canvas
-            self._plot_trajectories(name, result)
     
     def _plot_trajectories(self, name, result):
         """Plot mean trajectories with confidence intervals in embedded canvas.
