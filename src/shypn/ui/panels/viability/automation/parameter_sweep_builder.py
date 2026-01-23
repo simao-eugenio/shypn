@@ -131,7 +131,7 @@ class ParameterSweepBuilder(Gtk.Box):
         self.name_combo.set_tooltip_text("Load a model with subnet parameters to see available parameters")
         name_box.pack_start(self.name_combo, True, True, 0)
         
-        add_single_button = Gtk.Button(label="Set Parameter")
+        add_single_button = Gtk.Button(label="Add")
         add_single_button.connect("clicked", self._on_single_set_parameter_clicked)
         name_box.pack_start(add_single_button, False, False, 0)
         
@@ -642,11 +642,11 @@ class ParameterSweepBuilder(Gtk.Box):
         """Generate single parameter sweep experiments using TreeView."""
         # Get parameter from TreeView
         if len(self.single_list) == 0:
-            raise ValueError("Please add a parameter using 'Set Parameter' button")
+            raise ValueError("Please add a parameter using 'Add' button")
         
         tree_iter = self.single_list.get_iter_first()
         if not tree_iter:
-            raise ValueError("Please add a parameter using 'Set Parameter' button")
+            raise ValueError("Please add a parameter using 'Add' button")
         
         param_name = self.single_list.get_value(tree_iter, 0)
         param_type_display = self.single_list.get_value(tree_iter, 1)
@@ -763,7 +763,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 buttons=Gtk.ButtonsType.OK,
                 text="No parameter selected"
             )
-            dialog.format_secondary_text("Please add a parameter using 'Set Parameter' button first.")
+            dialog.format_secondary_text("Please add a parameter using 'Add' button first.")
             dialog.run()
             dialog.destroy()
             return
