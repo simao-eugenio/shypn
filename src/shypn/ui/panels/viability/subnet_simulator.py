@@ -103,12 +103,12 @@ class SubnetSimulator:
             
             @property
             def current_markings(self):
-                return {p.id: p.tokens for p in self.controller.model_adapter.places}
+                return {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
             
             @property
             def firing_counts(self):
                 return {t.id: getattr(t, 'firing_count', 0) 
-                       for t in self.controller.model_adapter.transitions}
+                       for t in self.controller.model_adapter.transitions.values()}
             
             @property
             def step_count(self):
@@ -318,14 +318,14 @@ class SubnetSimulator:
             return None
         
         # Get markings before step
-        markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
         time_before = self.controller.time
         
         # Execute one simulation step using real controller
         success = self.controller.step()
         
         # Get markings after step
-        markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
         time_after = self.controller.time
         
         # Calculate what changed
@@ -512,7 +512,7 @@ class SubnetSimulator:
             if log_callback and (step_count % 100 == 0):
                 markings_summary = ", ".join([
                     f"{p.id}={p.tokens}"
-                    for p in list(self.controller.model_adapter.places)[:3]
+                    for p in list(self.controller.model_adapter.places.values())[:3]
                 ])
                 log_callback(f"Step {step_count}: t={self.controller.time:.2f}s | {markings_summary}...")
         
@@ -526,10 +526,10 @@ class SubnetSimulator:
         
         # Build results from controller state
         results = SimulationResults()
-        results.final_markings = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        results.final_markings = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
         results.firing_counts = {
             t.id: getattr(t, 'firing_count', 0)
-            for t in self.controller.model_adapter.transitions
+            for t in self.controller.model_adapter.transitions.values()
         }
         results.execution_time = time.time() - start_real_time
         results.sim_time = self.controller.time
@@ -549,7 +549,7 @@ class SubnetSimulator:
         # Check for deadlock
         results.deadlocked = not any(
             self.controller._get_behavior(t).can_fire()[0]
-            for t in self.controller.model_adapter.transitions
+            for t in self.controller.model_adapter.transitions.values()
         )
         
         # Calculate fluxes (firings per unit time)
@@ -576,12 +576,12 @@ class SubnetSimulator:
             return
         
         # Reset place markings to initial values
-        for place in self.controller.model_adapter.places:
+        for place in self.controller.model_adapter.places.values():
             if place.id in self.initial_markings:
                 place.tokens = self.initial_markings[place.id]
         
         # Reset transition firing counts
-        for trans in self.controller.model_adapter.transitions:
+        for trans in self.controller.model_adapter.transitions.values():
             if hasattr(trans, 'firing_count'):
                 trans.firing_count = 0
         
