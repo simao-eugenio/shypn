@@ -286,6 +286,7 @@ class ParameterSweepBuilder(Gtk.Box):
         range_box.pack_start(percent_grid, False, False, 0)
         
         range_frame.add(range_box)
+        self.range_frame = range_frame  # Store reference for show/hide
         self.pack_start(range_frame, False, False, 0)
         
         # === SIMULATION SETTINGS ===
@@ -380,6 +381,7 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'single'
             self.type_box.show()  # Show type selector in single mode
             self.single_param_box.show()
+            self.range_frame.show()  # Show range specification in single mode
             self.factorial_box.hide()
             self.factorial_box.set_no_show_all(True)  # Prevent accidental showing
             
@@ -390,6 +392,7 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'factorial'
             self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
             self.single_param_box.hide()
+            self.range_frame.hide()  # Hide range specification in factorial mode (use Edit Range button)
             # Unset no_show_all flag to allow showing
             self.factorial_box.set_no_show_all(False)
             self.factorial_box.show_all()  # show_all() to display all children
