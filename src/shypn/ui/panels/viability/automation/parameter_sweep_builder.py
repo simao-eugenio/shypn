@@ -314,7 +314,7 @@ class ParameterSweepBuilder(Gtk.Box):
         if self.single_radio.get_active():
             self.design_mode = 'single'
             self.type_box.show()  # Show type selector in single mode
-            self.single_param_box.show()
+            self.single_param_box.show_all()  # Use show_all() to show all children including button
             self.factorial_box.hide()
             self.factorial_box.set_no_show_all(True)  # Prevent accidental showing
             
