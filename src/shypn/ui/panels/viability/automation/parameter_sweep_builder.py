@@ -362,6 +362,7 @@ class ParameterSweepBuilder(Gtk.Box):
             self.type_box.show()  # Show type selector in single mode
             self.single_param_box.show()
             self.factorial_box.hide()
+            self.factorial_box.set_no_show_all(True)  # Prevent accidental showing
             
             # Trigger parameter refresh to load selected type parameters in single mode
             if hasattr(self, 'parent_category') and self.parent_category:
@@ -370,7 +371,9 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'factorial'
             self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
             self.single_param_box.hide()
-            self.factorial_box.show_all()  # show_all() needed because set_no_show_all(True)
+            # Unset no_show_all flag to allow showing
+            self.factorial_box.set_no_show_all(False)
+            self.factorial_box.show_all()  # show_all() to display all children
             
             # Trigger parameter refresh to load ALL parameters in factorial mode
             if hasattr(self, 'parent_category') and self.parent_category:
