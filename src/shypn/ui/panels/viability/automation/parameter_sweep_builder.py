@@ -351,6 +351,10 @@ class ParameterSweepBuilder(Gtk.Box):
             self.type_box.show()  # Show type selector in single mode
             self.single_param_box.show()
             self.factorial_box.hide()
+            
+            # Trigger parameter refresh to load selected type parameters in single mode
+            if hasattr(self, 'parent_category') and self.parent_category:
+                self.parent_category.refresh_parameters()
         else:
             self.design_mode = 'factorial'
             self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
@@ -729,7 +733,7 @@ class ParameterSweepBuilder(Gtk.Box):
         """Set available parameters for selection.
         
         Args:
-            parameter_type: Type of parameters ('places', 'transitions', 'arcs')
+            parameter_type: Type of parameters ('places', 'transitions', 'arcs', 'all')
             parameters: List of (name, id) tuples or parameter names (for backward compatibility)
         """
         # Clear existing
@@ -750,15 +754,20 @@ class ParameterSweepBuilder(Gtk.Box):
             else:
                 # Old format: just name/ID (backward compatibility)
                 self.name_combo.append(param, param)
+                self.factorial_add_combo.append(param, param)
                 self._param_name_to_id[param] = param
         
         # Select first if available
         if parameters:
             self.name_combo.set_active(0)
+            self.factorial_add_combo.set_active(0)
         else:
             # Show placeholder if no parameters
-            self.name_combo.append("none", "(No parameters available)")
+            placeholder_msg = "(Load subnet via right-click transition)" if parameter_type == 'all' else "(No parameters available)"
+            self.name_combo.append("none", placeholder_msg)
             self.name_combo.set_active(0)
+            self.factorial_add_combo.append("none", placeholder_msg)
+            self.factorial_add_combo.set_active(0)
     
     def set_generate_callback(self, callback):
         """Set callback for generate button.
