@@ -137,6 +137,7 @@ class ExperimentAutomationCategory:
         # Create sweep builder
         self.sweep_builder = ParameterSweepBuilder()
         self.sweep_builder.viability_panel = self.parent_panel  # Set reference for auto-prediction
+        self.sweep_builder.parent_category = self  # Set reference for refresh callback
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
         self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
         
@@ -218,65 +219,108 @@ class ExperimentAutomationCategory:
         if not self.parent_panel or not self.sweep_builder:
             return
         
-        # Get current parameter type
-        param_type = self.sweep_builder.type_combo.get_active_id()
-        # Pull parameters from parent panel's TreeViews
-        # Store as list of (name, id) tuples for ID/name separation
-        params = []
-        
-        if param_type == 'transitions':
-            # Get from transitions_store (TreeView data)
+        # In factorial mode, load ALL parameter types at once
+        # In single mode, load only the selected type
+        if self.sweep_builder.design_mode == 'factorial':
+            # Collect all parameters from all types
+            all_params = []
+            
+            # Get transitions
             if hasattr(self.parent_panel, 'transitions_store'):
                 store = self.parent_panel.transitions_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = ID (internal), Column 1 = Name (display)
                     transition_id = store.get_value(iter, 0)
                     transition_name = store.get_value(iter, 1)
                     if transition_id and transition_name:
-                        params.append((transition_name, transition_id))
+                        all_params.append((f"T: {transition_name}", transition_id))
                     iter = store.iter_next(iter)
-        
-        elif param_type == 'places':
-            # Get from places_store
+            
+            # Get places
             if hasattr(self.parent_panel, 'places_store'):
                 store = self.parent_panel.places_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = ID (internal), Column 1 = Name (display)
                     place_id = store.get_value(iter, 0)
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
-                        params.append((place_name, place_id))
+                        all_params.append((f"P: {place_name}", place_id))
                     iter = store.iter_next(iter)
-        
-        elif param_type == 'arcs':
-            # Get from arcs_store
+            
+            # Get arcs
             if hasattr(self.parent_panel, 'arcs_store'):
                 store = self.parent_panel.arcs_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = arc ID, Columns 1,2 = source/target IDs
                     arc_id = store.get_value(iter, 0)
                     source_id = store.get_value(iter, 1)
                     target_id = store.get_value(iter, 2)
-                    
-                    # Construct display name from source/target names (lookup if needed)
-                    # For now, use IDs for arcs since they don't have independent names
                     if arc_id:
                         arc_name = f"{source_id}→{target_id}"
-                        params.append((arc_name, arc_id))
+                        all_params.append((f"A: {arc_name}", arc_id))
                     iter = store.iter_next(iter)
-        
-        # Update sweep builder with actual parameters (name/ID pairs)
-        if params:
-            self.sweep_builder.set_available_parameters(param_type, params)
+            
+            # Update factorial dropdown with all parameters
+            self.sweep_builder.set_available_parameters('all', all_params)
+            
         else:
-            # Show helpful message if no subnet loaded
-            self.sweep_builder.set_available_parameters(param_type, [])
-            if hasattr(self.sweep_builder, 'name_combo'):
-                self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
-                self.sweep_builder.name_combo.set_active(0)
+            # Single parameter mode - use selected type only
+            param_type = self.sweep_builder.type_combo.get_active_id()
+            params = []
+            
+            if param_type == 'transitions':
+                # Get from transitions_store (TreeView data)
+                if hasattr(self.parent_panel, 'transitions_store'):
+                    store = self.parent_panel.transitions_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = ID (internal), Column 1 = Name (display)
+                        transition_id = store.get_value(iter, 0)
+                        transition_name = store.get_value(iter, 1)
+                        if transition_id and transition_name:
+                            params.append((transition_name, transition_id))
+                        iter = store.iter_next(iter)
+            
+            elif param_type == 'places':
+                # Get from places_store
+                if hasattr(self.parent_panel, 'places_store'):
+                    store = self.parent_panel.places_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = ID (internal), Column 1 = Name (display)
+                        place_id = store.get_value(iter, 0)
+                        place_name = store.get_value(iter, 1)
+                        if place_id and place_name:
+                            params.append((place_name, place_id))
+                        iter = store.iter_next(iter)
+            
+            elif param_type == 'arcs':
+                # Get from arcs_store
+                if hasattr(self.parent_panel, 'arcs_store'):
+                    store = self.parent_panel.arcs_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = arc ID, Columns 1,2 = source/target IDs
+                        arc_id = store.get_value(iter, 0)
+                        source_id = store.get_value(iter, 1)
+                        target_id = store.get_value(iter, 2)
+                        
+                        # Construct display name from source/target names (lookup if needed)
+                        # For now, use IDs for arcs since they don't have independent names
+                        if arc_id:
+                            arc_name = f"{source_id}→{target_id}"
+                            params.append((arc_name, arc_id))
+                        iter = store.iter_next(iter)
+            
+            # Update sweep builder with actual parameters (name/ID pairs)
+            if params:
+                self.sweep_builder.set_available_parameters(param_type, params)
+            else:
+                # Show helpful message if no subnet loaded
+                self.sweep_builder.set_available_parameters(param_type, [])
+                if hasattr(self.sweep_builder, 'name_combo'):
+                    self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
+                    self.sweep_builder.name_combo.set_active(0)
     
     def _on_quick_run(self, button):
         """Handle Quick Run button - run single experiment with current baseline.
