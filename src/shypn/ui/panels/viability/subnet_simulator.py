@@ -317,22 +317,38 @@ class SubnetSimulator:
         if not self.controller:
             return None
         
-        # Get markings before step
+        # Get markings and firing counts before step
         markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
+        firing_counts_before = {
+            t.id: getattr(t, 'firing_count', 0) 
+            for t in self.controller.model_adapter.transitions.values()
+        }
         time_before = self.controller.time
         
         # Execute one simulation step using real controller
         success = self.controller.step()
         
-        # Get markings after step
+        # Get markings and firing counts after step
         markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
+        firing_counts_after = {
+            t.id: getattr(t, 'firing_count', 0) 
+            for t in self.controller.model_adapter.transitions.values()
+        }
         time_after = self.controller.time
         
-        # Calculate what changed
+        # Calculate marking changes
         marking_changes = {}
         for pid in markings_before:
             if markings_before[pid] != markings_after.get(pid, 0):
                 marking_changes[pid] = (markings_before[pid], markings_after[pid])
+        
+        # Detect which transition(s) fired by checking firing_count changes
+        fired_transitions = []
+        for tid in firing_counts_before:
+            count_before = firing_counts_before[tid]
+            count_after = firing_counts_after.get(tid, 0)
+            if count_after > count_before:
+                fired_transitions.append(tid)
         
         # Get enabled transitions
         enabled_ids = []
@@ -352,14 +368,8 @@ class SubnetSimulator:
                 'deadlocked': len(enabled_ids) == 0
             }
         
-        # Determine which transition fired (approximate from changes)
-        # In a real step, the controller doesn't track this explicitly,
-        # so we infer from the last recorded events or just report success
-        fired_transition = None
-        if marking_changes:
-            # Could be any enabled transition - just report first for now
-            # A better approach would be to track this in the controller
-            fired_transition = enabled_ids[0] if enabled_ids else None
+        # Report first fired transition (or None if none detected)
+        fired_transition = fired_transitions[0] if fired_transitions else None
         
         return {
             'fired_transition': fired_transition,
@@ -610,14 +620,6 @@ class SubnetSimulator:
         """Stop running simulation."""
         if self.state:
             self.state.is_running = False
-    
-    def is_initialized(self):
-        """Check if simulator is ready.
-        
-        Returns:
-            bool: True if initialized
-        """
-        return self.state is not None and self.subnet is not None
     
     def __repr__(self):
         status = "initialized" if self.is_initialized() else "uninitialized"
