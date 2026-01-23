@@ -168,7 +168,9 @@ class ParameterSweepBuilder(Gtk.Box):
         self.factorial_view.set_headers_visible(True)
         
         col_name = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
+        col_name.set_resizable(True)
         col_type = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
+        col_type.set_resizable(True)
         self.factorial_view.append_column(col_name)
         self.factorial_view.append_column(col_type)
         

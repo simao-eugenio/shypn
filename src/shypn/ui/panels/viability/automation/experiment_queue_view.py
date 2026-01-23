@@ -71,18 +71,21 @@ class ExperimentQueueView(Gtk.Box):
         renderer_name = Gtk.CellRendererText()
         column_name = Gtk.TreeViewColumn("Experiment", renderer_name, text=0)
         column_name.set_expand(True)
+        column_name.set_resizable(True)
         self.queue_tree.append_column(column_name)
         
         # Column 2: Status
         renderer_status = Gtk.CellRendererText()
         column_status = Gtk.TreeViewColumn("Status", renderer_status, text=1)
         column_status.set_min_width(100)
+        column_status.set_resizable(True)
         self.queue_tree.append_column(column_status)
         
         # Column 3: Progress
         renderer_progress = Gtk.CellRendererText()
         column_progress = Gtk.TreeViewColumn("Progress", renderer_progress, text=2)
         column_progress.set_min_width(80)
+        column_progress.set_resizable(True)
         self.queue_tree.append_column(column_progress)
         
         scrolled.add(self.queue_tree)
