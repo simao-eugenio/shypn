@@ -516,6 +516,14 @@ class ParameterSweepBuilder(Gtk.Box):
     def _on_preview_clicked(self, button):
         """Preview experiment count based on current configuration."""
         try:
+            # Check factorial design requirements
+            if self.design_mode == 'factorial' and len(self.factorial_list) < 2:
+                self.preview_label.set_markup(
+                    "<span foreground='orange'><b>Factorial Design:</b> Add at least 2 parameters to the list below</span>"
+                )
+                self.generate_button.set_sensitive(False)
+                return
+            
             values = self._compute_parameter_values()
             count = len(values)
             
@@ -584,7 +592,7 @@ class ParameterSweepBuilder(Gtk.Box):
     def _generate_factorial_experiments(self):
         """Generate factorial design experiments."""
         if len(self.factorial_list) < 2:
-            raise ValueError("Factorial design requires at least 2 parameters")
+            raise ValueError("Factorial design requires at least 2 parameters. Please add more parameters to the list.")
         
         # Collect all parameters and their values
         parameters = []
