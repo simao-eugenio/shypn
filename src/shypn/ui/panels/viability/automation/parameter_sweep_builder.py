@@ -359,7 +359,7 @@ class ParameterSweepBuilder(Gtk.Box):
             self.design_mode = 'factorial'
             self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
             self.single_param_box.hide()
-            self.factorial_box.show()
+            self.factorial_box.show_all()  # show_all() needed because set_no_show_all(True)
             
             # Trigger parameter refresh to load ALL parameters in factorial mode
             if hasattr(self, 'parent_category') and self.parent_category:
