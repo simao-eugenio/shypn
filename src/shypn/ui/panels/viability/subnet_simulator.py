@@ -280,7 +280,7 @@ class SubnetSimulator:
             marking = row[2]
             place_obj = next((p for p in subnet['places'] if p.id == place_id), None)
             if place_obj:
-                place_obj.marking = marking
+                place_obj.tokens = marking  # Use .tokens not .marking
         
         # Update transition rates - prefer formulas from experiment_manager baseline
         for row in self.panel.transitions_store:

@@ -163,7 +163,6 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         place = next((p for p in model.places if p.id == place_id), None)
         if place:
             place.tokens = float(marking)
-            place.marking = float(marking)
     
     # Apply transition rates (handle both numeric and formula strings)
     for trans_id, rate in transition_rates.items():
@@ -1040,8 +1039,6 @@ class BatchExecutor:
             place = next((p for p in places if p.id == place_id), None)
             if place:
                 place.tokens = float(marking)
-                if hasattr(place, 'marking'):
-                    place.marking = float(marking)
         
         # Restore transition rates (handle both numeric and formula types)
         for trans_id, rate in saved_values['transition_rates'].items():
@@ -1112,7 +1109,6 @@ class BatchExecutor:
                 # For non-swept parameters, skip zeros to preserve baseline
                 if place_id == swept_place_id or marking_float != 0.0:
                     place.tokens = marking_float
-                    place.marking = marking_float
                     applied_markings += 1
                 else:
                     # Keep baseline value from model (don't overwrite with zero)

@@ -762,10 +762,8 @@ class ViabilityPanel(Gtk.Box):
         place_name = place.name if hasattr(place, 'name') else place.id
         place_label_text = f"{label_prefix} {place_name}"
         
-        # Add marking/tokens if available
-        if hasattr(place, 'marking'):
-            place_label_text += f" ({place.marking} tokens)"
-        elif hasattr(place, 'tokens'):
+        # Add tokens if available
+        if hasattr(place, 'tokens'):
             place_label_text += f" ({place.tokens} tokens)"
         
         place_label = Gtk.Label()
@@ -1011,7 +1009,7 @@ class ViabilityPanel(Gtk.Box):
             if model:
                 for place in model.places:
                     if place.id == place_id:
-                        place.marking = new_marking
+                        place.tokens = new_marking
                         break
             
             # Auto-sync baseline to automation (no manual sync needed)
