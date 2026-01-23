@@ -521,7 +521,11 @@ class ExperimentAutomationCategory:
             
             # Create new snapshot by cloning baseline
             snapshot = self.experiment_manager.add_snapshot(snapshot_name)
-            snapshot.clone_from(base_snapshot)
+            # Copy values from base snapshot
+            snapshot.place_markings = base_snapshot.place_markings.copy()
+            snapshot.arc_weights = base_snapshot.arc_weights.copy()
+            snapshot.transition_rates = base_snapshot.transition_rates.copy()
+            snapshot.notes = base_snapshot.notes
             
             # Apply parameter modifications for this combination
             for i, param in enumerate(parameters):
