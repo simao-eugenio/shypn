@@ -951,6 +951,9 @@ class ViabilityPanel(Gtk.Box):
         This creates the subnet model immediately when localities are added,
         ensuring all elements (places, transitions, arcs) are captured correctly.
         The model is stored and reused by batch execution.
+        
+        IMPORTANT: Also includes places referenced in transition rate formulas,
+        even if they are not directly connected via arcs.
         """
         from shypn.data.canvas.document_model import DocumentModel
         
@@ -977,6 +980,10 @@ class ViabilityPanel(Gtk.Box):
             subnet_arcs_set.update(locality.output_arcs)
             subnet_arcs_set.update(locality.catalyst_arcs)
         
+        # Check for places referenced in transition rate formulas
+        # that are not already in the subnet
+        self._add_formula_referenced_places(subnet_transitions_set, subnet_places_set)
+        
         # Create DocumentModel
         model = DocumentModel()
         
@@ -992,6 +999,53 @@ class ViabilityPanel(Gtk.Box):
         self.subnet_model = model
         
         return model
+    
+    def _add_formula_referenced_places(self, transitions, places_set):
+        """Add places referenced in transition rate formulas to the subnet.
+        
+        Args:
+            transitions: Set of transitions to check
+            places_set: Set of places (will be modified to add referenced places)
+        """
+        import re
+        
+        # Get all places from the full model
+        if not self.canvas_manager or not self.canvas_manager.document_model:
+            return
+        
+        all_places = {p.id: p for p in self.canvas_manager.document_model.places}
+        
+        for transition in transitions:
+            # Check if transition has a formula
+            formula = None
+            if hasattr(transition, 'formula') and transition.formula:
+                formula = transition.formula
+            elif isinstance(transition.rate, str):
+                formula = transition.rate
+            
+            if not formula:
+                continue
+            
+            # Extract place references from formula
+            # Look for patterns like: place_id, place.tokens, [place_id]
+            # Match place IDs (alphanumeric with underscores)
+            referenced_place_ids = set()
+            
+            # Pattern 1: Direct place ID references (alphanumeric + underscore)
+            place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+            matches = re.findall(place_id_pattern, formula)
+            
+            for match in matches:
+                # Check if this ID exists as a place in the model
+                if match in all_places:
+                    referenced_place_ids.add(match)
+            
+            # Add referenced places that aren't already in the subnet
+            current_place_ids = {p.id for p in places_set}
+            for place_id in referenced_place_ids:
+                if place_id not in current_place_ids and place_id in all_places:
+                    places_set.add(all_places[place_id])
+                    print(f"[SUBNET] Added place '{place_id}' referenced in formula for transition '{transition.id}'")
     
     # === EDITING CALLBACKS ===
     
