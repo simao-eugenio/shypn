@@ -140,7 +140,7 @@ class SubnetSimulator:
             def enabled_transitions(self):
                 # Return list of currently enabled transitions
                 enabled = []
-                for trans in self.controller.model_adapter.transitions:
+                for trans in self.controller.model_adapter.transitions.values():
                     behavior = self.controller._get_behavior(trans)
                     can_fire, _ = behavior.can_fire()
                     if can_fire:
@@ -336,7 +336,7 @@ class SubnetSimulator:
         
         # Get enabled transitions
         enabled_ids = []
-        for trans in self.controller.model_adapter.transitions:
+        for trans in self.controller.model_adapter.transitions.values():
             behavior = self.controller._get_behavior(trans)
             can_fire, _ = behavior.can_fire()
             if can_fire:
@@ -487,7 +487,7 @@ class SubnetSimulator:
         while step_count < max_steps and self.controller.time < max_time:
             # Check for enabled transitions (deadlock detection)
             has_enabled = False
-            for trans in self.controller.model_adapter.transitions:
+            for trans in self.controller.model_adapter.transitions.values():
                 behavior = self.controller._get_behavior(trans)
                 can_fire, _ = behavior.can_fire()
                 if can_fire:
