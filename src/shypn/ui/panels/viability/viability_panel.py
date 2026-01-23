@@ -251,6 +251,7 @@ class ViabilityPanel(Gtk.Box):
         self.arcs_store = self.subnet_params_view.arcs_store
         self.results_treeview = self.subnet_params_view.results_treeview
         self.results_store = self.subnet_params_view.results_store
+        self.subnet_notebook = self.subnet_params_view.subnet_notebook
         
         # Separator
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
