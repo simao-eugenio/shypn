@@ -88,9 +88,10 @@ class ResultsBrowserView(BaseResultsView):
         # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str), 4=status (str), 5=error_msg (str)
         self.results_store = Gtk.ListStore(bool, str, int, str, str, str)
         
-        # Create TreeView
+        # Create TreeView with sortable columns
         self.results_tree = Gtk.TreeView(model=self.results_store)
         self.results_tree.set_headers_visible(True)
+        self.results_tree.set_headers_clickable(True)  # Enable column header clicking for sorting
         
         # Column 0: Checkbox for multi-selection (clickable header for select/deselect all)
         renderer_toggle = Gtk.CellRendererToggle()
@@ -104,28 +105,36 @@ class ResultsBrowserView(BaseResultsView):
         self.checkbox_column = column_select
         self._all_selected = False
         
-        # Column 1: Experiment Name
+        # Column 1: Experiment Name (sortable)
         renderer_name = Gtk.CellRendererText()
         column_name = Gtk.TreeViewColumn("Experiment", renderer_name, text=1)
         column_name.set_expand(True)
+        column_name.set_sort_column_id(1)  # Sort by column 1 (name)
+        column_name.set_resizable(True)
         self.results_tree.append_column(column_name)
         
-        # Column 2: Replicates
+        # Column 2: Replicates (sortable)
         renderer_reps = Gtk.CellRendererText()
         column_reps = Gtk.TreeViewColumn("Replicates", renderer_reps, text=2)
         column_reps.set_min_width(80)
+        column_reps.set_sort_column_id(2)  # Sort by column 2 (replicates)
+        column_reps.set_resizable(True)
         self.results_tree.append_column(column_reps)
         
-        # Column 3: Duration
+        # Column 3: Duration (sortable)
         renderer_dur = Gtk.CellRendererText()
         column_dur = Gtk.TreeViewColumn("Duration", renderer_dur, text=3)
         column_dur.set_min_width(80)
+        column_dur.set_sort_column_id(3)  # Sort by column 3 (duration)
+        column_dur.set_resizable(True)
         self.results_tree.append_column(column_dur)
         
-        # Column 4: Status (with error tooltip)
+        # Column 4: Status (sortable, with error tooltip)
         renderer_status = Gtk.CellRendererText()
         column_status = Gtk.TreeViewColumn("Status", renderer_status, text=4)
         column_status.set_min_width(80)
+        column_status.set_sort_column_id(4)  # Sort by column 4 (status)
+        column_status.set_resizable(True)
         self.results_tree.append_column(column_status)
         self.results_tree.set_tooltip_column(5)  # Column 5 = error message
         
