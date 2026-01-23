@@ -286,7 +286,8 @@ class BatchExecutor:
                 raise RuntimeError("No transitions in subnet model")
             
             # Save baseline parameters to reset between experiments
-            baseline_params = self._save_current_parameters(subnet_model, subnet_data)
+            # Use subnet_model (objects) not subnet_data (dicts) for parameter extraction
+            baseline_params = self._save_current_parameters(subnet_model, subnet=None)
         except Exception as e:
             self.is_running = False
             if complete_callback:
@@ -416,7 +417,8 @@ class BatchExecutor:
                 
                 # Reset model to baseline before each experiment to avoid state corruption
                 # print(f"[BATCH] Resetting model to baseline...")
-                self._restore_parameters(base_model, subnet_data, baseline_params)
+                # Use base_model (objects) not subnet_data (dicts) for parameter restoration
+                self._restore_parameters(base_model, subnet=None, saved_values=baseline_params)
                 # print(f"[BATCH] Model reset complete")
                 
                 # CRITICAL: Set status to running BEFORE execution
