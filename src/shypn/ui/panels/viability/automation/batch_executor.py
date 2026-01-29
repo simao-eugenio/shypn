@@ -828,6 +828,16 @@ class BatchExecutor:
                 'arc_ids': [a.id for a in subnet_data['arcs']]
             }
             
+            # Extract replicate-level data for statistical tests
+            replicate_data = []
+            if results:
+                for rep in results:
+                    if 'error' not in rep:
+                        replicate_data.append({
+                            'deadlocked': rep.get('deadlocked', False),
+                            'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0
+                        })
+            
             # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
@@ -837,7 +847,8 @@ class BatchExecutor:
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
                 'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
-                'subnet_structure': subnet_structure  # Include actual subnet composition
+                'subnet_structure': subnet_structure,  # Include actual subnet composition
+                'replicate_data': replicate_data  # Per-replicate outcomes for statistical tests
             }
             
             return result
