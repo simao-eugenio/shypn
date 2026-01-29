@@ -338,6 +338,7 @@ class ParameterSweepBuilder(Gtk.Box):
     
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
+        old_type = self.parameter_type
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
@@ -353,8 +354,16 @@ class ParameterSweepBuilder(Gtk.Box):
         # Clear existing parameter (single mode only has one parameter)
         self.single_list.clear()
         
-        # Add to list with default range configuration
-        param_type = self.parameter_type
+        # Detect parameter type from ID prefix
+        if param_id.startswith('T'):
+            param_type = 'transitions'
+        elif param_id.startswith('A'):
+            param_type = 'arcs'
+        elif param_id.startswith('P'):
+            param_type = 'places'
+        else:
+            param_type = self.parameter_type  # Fallback to dropdown
+        
         type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
         
         # Default range config
@@ -429,8 +438,16 @@ class ParameterSweepBuilder(Gtk.Box):
             dialog.destroy()
             return
         
-        # Add to list with default range configuration
-        param_type = self.parameter_type
+        # Detect parameter type from ID prefix
+        if param_id.startswith('T'):
+            param_type = 'transitions'
+        elif param_id.startswith('A'):
+            param_type = 'arcs'
+        elif param_id.startswith('P'):
+            param_type = 'places'
+        else:
+            param_type = self.parameter_type  # Fallback to dropdown
+        
         type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
         
         # Default range config: linear 0.1 to 1.0, step 0.1 (10 values)

@@ -153,21 +153,24 @@ class SimulationController:
         # Time-based recording (default): ensures consistent data density at all playback speeds
         # recording_time_interval=0.05s means 20 data points per second of model time
         from shypn.engine.simulation.data_collector import DataCollector
+        
+        # Create settings first so we can access recorded_objects
+        from shypn.engine.simulation.settings import SimulationSettings
+        self.settings = SimulationSettings()
+        
+        # Pass recorded_objects to DataCollector (if empty, will record all)
         self.data_collector = DataCollector(
             model, 
             controller=self, 
             recording_interval=recording_interval,
             time_based_recording=time_based_recording,
-            recording_time_interval=0.05  # 20 Hz sampling rate
+            recording_time_interval=0.05,  # 20 Hz sampling rate
+            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
         )
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
         self._on_simulation_complete = None
-        
-        # Timing configuration (composition pattern)
-        from shypn.engine.simulation.settings import SimulationSettings
-        self.settings = SimulationSettings()
         
         # === NEW: Mode elimination architecture ===
         # State detection replaces explicit mode checks
@@ -248,7 +251,11 @@ class SimulationController:
         
         # Reinitialize data collector with current model
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(self.model, controller=self)
+        self.data_collector = DataCollector(
+            self.model, 
+            controller=self,
+            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
+        )
         
         # CRITICAL: Notify any observers that data_collector changed
         # This ensures analyses panels get the new data_collector reference
@@ -947,6 +954,15 @@ class SimulationController:
         # Use effective dt if not specified
         if time_step is None:
             time_step = self.get_effective_dt()
+        
+        # STOICHIOMETRY FIX: Clamp time step to not exceed duration
+        # This ensures the final step reaches exactly the duration, maintaining mass balance
+        duration_seconds = self.settings.get_duration_seconds()
+        if duration_seconds is not None:
+            remaining_time = duration_seconds - self.time
+            if remaining_time > 0 and time_step > remaining_time:
+                # Take shortened final step to reach exactly duration
+                time_step = remaining_time
         
         # Validate time step is non-negative
         if time_step < 0:
@@ -2554,6 +2570,8 @@ class SimulationController:
                 self._timeout_id = None
                 return False
             if self._max_steps is not None and self._steps_executed >= self._max_steps:
+                import logging
+                logging.getLogger(__name__).info(f"[LOOP] Stopping: steps_executed={self._steps_executed} >= max_steps={self._max_steps}")
                 if DEBUG_LOOP:
                     pass
                 self._running = False
@@ -2563,9 +2581,15 @@ class SimulationController:
             # Execute one simulation step
             success = self.step(self._time_step)
             if not success:
+                import logging
+                logging.getLogger(__name__).info(f"[LOOP] step() returned False at time={self.time}, steps_executed={self._steps_executed}")
                 # Simulation completed (duration reached)
                 self._running = False
                 self._timeout_id = None
+                
+                # Record final state before stopping collection (force=True to bypass interval check)
+                if self.data_collector and self.data_collector.is_collecting:
+                    self.data_collector.record_state(self.time, force=True)
                 
                 # Stop data collection
                 if self.data_collector:
@@ -2721,7 +2745,11 @@ class SimulationController:
         
         # Recreate data collector with new model
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(new_model, controller=self)
+        self.data_collector = DataCollector(
+            new_model, 
+            controller=self,
+            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
+        )
         
         # CRITICAL: Notify any observers that data_collector changed
         # This ensures analyses panels get the new data_collector reference

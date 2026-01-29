@@ -22,23 +22,6 @@ from .base_results_view import BaseResultsView
 
 
 class ResultsBrowserView(BaseResultsView):
-    
-    def _show_error(self, message):
-        """Show error dialog.
-        
-        Args:
-            message: Error message to display
-        """
-        dialog = Gtk.MessageDialog(
-            transient_for=self.get_toplevel(),
-            flags=0,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text="Error"
-        )
-        dialog.format_secondary_text(message)
-        dialog.run()
-        dialog.destroy()
     """Widget for browsing and analyzing experiment results.
     
     Inherits from BaseResultsView to provide:
@@ -300,6 +283,23 @@ class ResultsBrowserView(BaseResultsView):
         
         self.pack_start(self.notebook, True, True, 0)
     
+    def _show_error(self, message):
+        """Display error message dialog.
+        
+        Args:
+            message: Error message to display
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=self.get_toplevel(),
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Error"
+        )
+        dialog.format_secondary_text(message)
+        dialog.run()
+        dialog.destroy()
+    
     def _build_dose_response_page(self):
         """Build dose-response analysis page (E3 enhancement).
         
@@ -535,7 +535,12 @@ class ResultsBrowserView(BaseResultsView):
             name, result = self.get_selected_result()
             if name and result:
                 self.notebook.set_current_page(1)  # Switch to plot page
-                self._plot_trajectories(name, result)
+                try:
+                    self._plot_trajectories(name, result)
+                except Exception as e:
+                    self._show_error(f"Trajectory plotting failed:\n\n{str(e)}")
+                    import traceback
+                    traceback.print_exc()
             else:
                 self._show_error("Please select an experiment from the Results List first")
         
@@ -825,6 +830,15 @@ class ResultsBrowserView(BaseResultsView):
             else:
                 continue
             
+            # Check if we have enough values per group
+            if len(values) < 2:
+                self._show_error(
+                    f"Insufficient replicate data for '{name}'.\n\n"
+                    f"Statistical tests require at least 2 replicates per group.\n"
+                    f"Please re-run experiments with multiple replicates."
+                )
+                return
+            
             groups[name] = values
         
         # Check if we have valid data
@@ -964,6 +978,19 @@ class ResultsBrowserView(BaseResultsView):
             results_dialog.run()
             results_dialog.destroy()
             
+        except ValueError as e:
+            # Handle insufficient replicates gracefully
+            error_msg = str(e)
+            if "at least 2" in error_msg.lower() or "value(s)" in error_msg:
+                self._show_error(
+                    "Insufficient Replicate Data\n\n"
+                    "Statistical tests require at least 2 replicates per experimental condition.\n\n"
+                    "Your results appear to be from experiments run with a single replicate only.\n"
+                    "Please re-run experiments with 2 or more replicates to enable statistical comparison.\n\n"
+                    f"Technical details: {error_msg}"
+                )
+            else:
+                self._show_error(f"Statistical test failed:\n\n{error_msg}")
         except Exception as e:
             self._show_error(f"Statistical test failed:\n\n{str(e)}")
             import traceback
@@ -1030,7 +1057,7 @@ class ResultsBrowserView(BaseResultsView):
         
         species_combo = Gtk.ComboBoxText()
         for species_id in sorted(species_stats.keys()):
-            display_name = self._get_species_display_name(species_id)
+            display_name = self._resolve_species_name(species_id)
             species_combo.append(species_id, display_name)
         
         if len(species_stats) > 0:
@@ -1076,8 +1103,8 @@ class ResultsBrowserView(BaseResultsView):
                 
                 # Plot mean trajectory
                 color = colors[idx % len(colors)]
-                line, = ax.plot(time_points, mean_trajectory, color=color, linewidth=2, label=name)
-                legend_entries.append((name, line))
+                lines = ax.plot(time_points, mean_trajectory, color=color, linewidth=2, label=name)
+                legend_entries.append((name, lines[0]))
                 
                 # Add confidence interval (mean ± std)
                 if std_trajectory:
@@ -1087,7 +1114,7 @@ class ResultsBrowserView(BaseResultsView):
                                     color=color, alpha=0.2)
             
             # Styling
-            species_display = self._get_species_display_name(species_id)
+            species_display = self._resolve_species_name(species_id)
             ax.set_xlabel('Time', fontsize=11)
             ax.set_ylabel(f'{species_display}', fontsize=11)
             ax.set_title(f'Experiment Comparison: {species_display}', 
@@ -1997,6 +2024,12 @@ class ResultsBrowserView(BaseResultsView):
             mean = np.array(trans_data.get('mean', []))
             std = np.array(trans_data.get('std', []))
             
+            # Ensure arrays are 1D
+            if mean.ndim > 1:
+                mean = mean.flatten()
+            if std.ndim > 1:
+                std = std.flatten()
+            
             if len(mean) == 0:
                 continue
             
@@ -2062,6 +2095,12 @@ class ResultsBrowserView(BaseResultsView):
             place_data = species_stats[place_id]
             mean = np.array(place_data.get('mean', []))
             std = np.array(place_data.get('std', []))
+            
+            # Ensure arrays are 1D
+            if mean.ndim > 1:
+                mean = mean.flatten()
+            if std.ndim > 1:
+                std = std.flatten()
             
             if len(mean) == 0:
                 continue
@@ -2170,16 +2209,30 @@ class ResultsBrowserView(BaseResultsView):
             # Check if this is the swept transition
             is_swept_transition = (species_id == swept_transition_id)
             
-            mean = np.array(species_data.get('mean', [])).flatten()
-            std = np.array(species_data.get('std', [])).flatten()
+            mean = np.array(species_data.get('mean', []))
+            std = np.array(species_data.get('std', []))
+            
+            # Ensure arrays are 1D (flatten if needed)
+            if mean.ndim > 1:
+                mean = mean.flatten()
+            if std.ndim > 1:
+                std = std.flatten()
             
             if len(mean) == 0 or len(time_points) == 0:
                 ax.text(0.5, 0.5, 'No data', ha='center', va='center')
                 ax.set_title(species_id)
                 continue
             
-            # Convert to numpy arrays if needed and flatten
-            time_points_arr = np.array(time_points).flatten()
+            # Convert to numpy arrays if needed
+            time_points_arr = np.array(time_points)
+            if time_points_arr.ndim > 1:
+                time_points_arr = time_points_arr.flatten()
+            
+            # Ensure arrays have same length
+            min_len = min(len(time_points_arr), len(mean), len(std))
+            time_points_arr = time_points_arr[:min_len]
+            mean = mean[:min_len]
+            std = std[:min_len]
             
             # Use different colors for transition vs places
             if is_swept_transition:
@@ -2205,6 +2258,9 @@ class ResultsBrowserView(BaseResultsView):
             percentiles = species_data.get('percentiles', {})
             if '50' in percentiles:
                 median = np.array(percentiles['50'])
+                if median.ndim > 1:
+                    median = median.flatten()
+                median = median[:min_len]
                 ax.plot(time_points_arr, median, color=color, linestyle='--', 
                        linewidth=1, alpha=0.7, label='Median')
             
