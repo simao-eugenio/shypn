@@ -48,7 +48,7 @@ from gi.repository import Gtk, Gdk, GLib
 # Initialize Gdk early to avoid initialization issues in imports
 Gdk.init(sys.argv)
 
-# WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environment variable
+# WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environ
 # GDK prints these directly to stderr before our log handler can catch them
 # Setting G_MESSAGES_DEBUG to empty suppresses GDK messages at the C level
 if 'G_MESSAGES_DEBUG' not in os.environ:

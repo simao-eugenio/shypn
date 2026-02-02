@@ -21,6 +21,7 @@ from shypn.ui.panels.topology.structural_category import StructuralCategory
 from shypn.ui.panels.topology.graph_network_category import GraphNetworkCategory
 from shypn.ui.panels.topology.behavioral_category import BehavioralCategory
 from shypn.ui.panels.topology.biological_category import BiologicalCategory
+from shypn.ui.parallel_mode_dialog import ParallelModeButton
 
 
 class TopologyPanel(Gtk.Box):
@@ -58,6 +59,12 @@ class TopologyPanel(Gtk.Box):
         header_label.set_halign(Gtk.Align.START)
         header_label.set_valign(Gtk.Align.CENTER)
         header_box.pack_start(header_label, True, True, 0)
+        
+        # Parallel config button (before float button)
+        self.parallel_button = ParallelModeButton()
+        self.parallel_button.set_relief(Gtk.ReliefStyle.NONE)  # Flat button
+        self.parallel_button.set_valign(Gtk.Align.CENTER)
+        header_box.pack_end(self.parallel_button, False, False, 5)
         
         # Float button on the far right (icon only)
         self.float_button = Gtk.ToggleButton(label="⬈")
