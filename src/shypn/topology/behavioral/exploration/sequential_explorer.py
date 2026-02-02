@@ -109,5 +109,10 @@ class SequentialExplorer(StateSpaceExplorer):
             'max_depth': max_depth_reached,
             'states': states,
             'graph': graph,
-            'deadlock_states': deadlock_states
+            'deadlock_states': deadlock_states,
+            'exploration_stats': {
+                'strategy': 'sequential',
+                'mode': 'single-threaded',
+                'num_workers': 1
+            }
         }
