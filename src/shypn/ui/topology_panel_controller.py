@@ -32,6 +32,9 @@ from shypn.topology.behavioral.liveness import LivenessAnalyzer
 from shypn.topology.behavioral.deadlocks import DeadlockAnalyzer
 from shypn.topology.behavioral.fairness import FairnessAnalyzer
 
+# Configuration and factory (OOP approach)
+from shypn.ui.topology_analysis_config import TopologyAnalysisConfig, AnalyzerFactory
+
 
 class TopologyPanelController:
     """Controller for Topology Panel (Expander Design).
@@ -85,6 +88,10 @@ class TopologyPanelController:
         
         # Track last seen drawing_area to detect tab switches
         self._last_drawing_area = None
+        
+        # Configuration and factory (OOP)
+        self.config = TopologyAnalysisConfig.get_instance()
+        self.factory = AnalyzerFactory(self.config)
         
         # Initialize all 12 analyzers
         self._init_analyzers()
@@ -292,11 +299,14 @@ class TopologyPanelController:
         if not analyzer_class:
             raise Exception(f"Unknown analyzer: {analyzer_name}")
         
-        # Canvas manager IS the model (has places, transitions, arcs)
-        analyzer = analyzer_class(canvas_manager)
+        # Use factory to create configured analyzer (handles parallel mode)
+        analyzer = self.factory.create_analyzer(analyzer_name, canvas_manager)
         
-        # Run analysis
-        result = analyzer.analyze()
+        # Get analysis kwargs (includes parallel settings for reachability)
+        kwargs = self.factory.get_analysis_kwargs(analyzer_name)
+        
+        # Run analysis with configuration
+        result = analyzer.analyze(**kwargs)
         
         return result
     
@@ -1060,6 +1070,17 @@ class TopologyPanelController:
                 lines.append(f"  <i>... and {len(priority_conflicts) - 5} more</i>")
         
         return '\n'.join(lines)
+    
+    def get_currently_expanded_analyzer(self) -> Optional[str]:
+        """Get the name of the currently expanded analyzer.
+        
+        Returns:
+            str or None: Name of expanded analyzer, or None if none expanded
+        """
+        for analyzer_name, expander in self.expanders.items():
+            if expander.get_expanded():
+                return analyzer_name
+        return None
 
 
 # Module exports
