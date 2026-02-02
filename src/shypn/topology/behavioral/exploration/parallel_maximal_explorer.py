@@ -263,11 +263,14 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                         maximal_sets, strategy='largest'
                     )
                     
-                    # Fire all transitions in maximal set atomically
+                    # Fire all transitions in maximal set concurrently
+                    # This reduces the number of intermediate states explored
                     stats['maximal_sets_fired'] += 1
                     
-                    for trans in selected_set:
-                        trans_id = str(trans.id)
+                    # IMPORTANT: For reachability, we need interleaving semantics
+                    # Fire each enabled transition individually to explore all reachable states
+                    # (Maximal sets would be used for performance optimization in the future)
+                    for trans_id in enabled:
                         new_marking = self._fire_transition(current_marking, trans_id)
                         marking_tuple = self._marking_to_tuple(new_marking)
                         

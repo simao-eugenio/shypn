@@ -35,6 +35,11 @@ from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
 from shypn.topology.base.exceptions import TopologyAnalysisError
 
+# Import exploration strategies (OOP pattern)
+from shypn.topology.behavioral.exploration.sequential_explorer import SequentialExplorer
+from shypn.topology.behavioral.exploration.parallel_basic_explorer import ParallelBasicExplorer
+from shypn.topology.behavioral.exploration.parallel_maximal_explorer import ParallelMaximalExplorer
+
 
 class ReachabilityAnalyzer(TopologyAnalyzer):
     """Analyzer for exploring reachable marking space of Petri nets.
@@ -63,7 +68,9 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         max_states: int = 10000,
         max_depth: int = 100,
         compute_graph: bool = True,
-        find_deadlocks: bool = True
+        find_deadlocks: bool = True,
+        parallel: Any = False,
+        num_workers: Optional[int] = None
     ) -> AnalysisResult:
         """Analyze reachability of the Petri net.
         
@@ -72,6 +79,11 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             max_depth: Maximum firing sequence depth
             compute_graph: Build full reachability graph
             find_deadlocks: Identify deadlock states
+            parallel: Parallelization mode:
+                - False: Sequential exploration (default)
+                - True or 'basic': Phase 1 work-stealing
+                - 'maximal': Phase 2 maximal concurrent sets
+            num_workers: Number of worker processes (None = auto)
             
         Returns:
             AnalysisResult with:
@@ -155,39 +167,43 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             # Get initial marking
             initial_marking = self._get_initial_marking()
             
-            # Explore reachability graph
-            graph_data = self._explore_reachability(
-                initial_marking,
-                max_states,
-                max_depth,
-                compute_graph
+            # Select exploration strategy (OOP pattern)
+            explorer = self._create_explorer(parallel, num_workers)
+            
+            # Explore reachable markings using strategy
+            exploration_results = explorer.explore(
+                initial_marking=initial_marking,
+                max_states=max_states,
+                max_depth=max_depth,
+                compute_graph=compute_graph,
+                find_deadlocks=find_deadlocks
             )
             
-            # Find deadlock states
-            deadlock_states = []
-            if find_deadlocks:
-                deadlock_states = self._find_deadlock_states(graph_data['states'])
+            # Get deadlock states (already found by explorer)
+            deadlock_states = exploration_results.get('deadlock_states', [])
             
             # Check if bounded
-            is_bounded = graph_data['total_states'] < max_states
-            exploration_complete = is_bounded and graph_data['max_depth'] < max_depth
+            is_bounded = exploration_results['total_states'] < max_states
+            exploration_complete = is_bounded and exploration_results['max_depth'] < max_depth
             
             return AnalysisResult(
                 success=True,
                 data={
-                    'total_states': graph_data['total_states'],
-                    'total_transitions': graph_data['total_transitions'],
-                    'max_depth_reached': graph_data['max_depth'],
+                    'total_states': exploration_results['total_states'],
+                    'total_transitions': exploration_results['total_transitions'],
+                    'max_depth_reached': exploration_results['max_depth'],
                     'is_bounded': is_bounded,
                     'deadlock_states': deadlock_states,
-                    'reachability_graph': graph_data['graph'] if compute_graph else None,
+                    'reachability_graph': exploration_results['graph'],
                     'exploration_complete': exploration_complete,
                     'initial_marking': initial_marking
                 },
                 metadata={
                     'analysis_time': self._end_timer(start_time),
                     'max_states_limit': max_states,
-                    'max_depth_limit': max_depth
+                    'max_depth_limit': max_depth,
+                    'mode': exploration_results.get('exploration_stats', {}).get('strategy', 'sequential'),
+                    'num_workers': exploration_results.get('exploration_stats', {}).get('num_workers', 1)
                 }
             )
             
@@ -197,6 +213,26 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
                 errors=[f"Reachability analysis failed: {str(e)}"],
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
+    
+    def _create_explorer(self, parallel: Any, num_workers: Optional[int]):
+        """Create appropriate explorer strategy (OOP factory pattern).
+        
+        Args:
+            parallel: Parallelization mode
+            num_workers: Number of workers
+            
+        Returns:
+            Explorer instance (SequentialExplorer, ParallelBasicExplorer, or ParallelMaximalExplorer)
+        """
+        if not parallel or (num_workers is not None and num_workers == 1):
+            # Sequential mode
+            return SequentialExplorer(self)
+        elif parallel == 'maximal':
+            # Phase 2: Maximal concurrent sets
+            return ParallelMaximalExplorer(self, num_workers)
+        else:
+            # Phase 1: Basic work-stealing (default parallel mode)
+            return ParallelBasicExplorer(self, num_workers)
     
     def _get_initial_marking(self) -> Dict[str, int]:
         """Get initial marking from model.
@@ -210,104 +246,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             marking[place_id] = getattr(place, 'marking', 0)
         return marking
     
-    def _explore_reachability(
-        self,
-        initial_marking: Dict[str, int],
-        max_states: int,
-        max_depth: int,
-        compute_graph: bool
-    ) -> Dict[str, Any]:
-        """Explore reachable markings using breadth-first search.
-        
-        Args:
-            initial_marking: Initial marking to start from
-            max_states: Maximum states to explore
-            max_depth: Maximum depth to explore
-            compute_graph: Whether to build graph structure
-            
-        Returns:
-            Dictionary with exploration results
-        """
-        # Convert marking to hashable tuple for set operations
-        def marking_to_tuple(m):
-            return tuple(sorted(m.items()))
-        
-        def tuple_to_marking(t):
-            return dict(t)
-        
-        # Initialize exploration
-        visited = set()
-        queue = deque([(initial_marking, 0)])  # (marking, depth)
-        visited.add(marking_to_tuple(initial_marking))
-        
-        states = [initial_marking]
-        transitions_fired = 0
-        max_depth_reached = 0
-        
-        # Graph structure
-        graph = {'nodes': [], 'edges': []} if compute_graph else None
-        if compute_graph:
-            graph['nodes'].append({
-                'id': 0,
-                'marking': initial_marking.copy(),
-                'depth': 0
-            })
-        
-        state_index = {marking_to_tuple(initial_marking): 0}
-        next_state_id = 1
-        
-        # BFS exploration
-        while queue and len(visited) < max_states:
-            current_marking, depth = queue.popleft()
-            
-            if depth > max_depth:
-                continue
-            
-            max_depth_reached = max(max_depth_reached, depth)
-            
-            # Find enabled transitions
-            enabled = self._get_enabled_transitions(current_marking)
-            
-            # Fire each enabled transition
-            for trans_id in enabled:
-                new_marking = self._fire_transition(current_marking, trans_id)
-                marking_tuple = marking_to_tuple(new_marking)
-                
-                transitions_fired += 1
-                
-                # Check if new state
-                if marking_tuple not in visited:
-                    visited.add(marking_tuple)
-                    states.append(new_marking)
-                    queue.append((new_marking, depth + 1))
-                    
-                    if compute_graph:
-                        state_index[marking_tuple] = next_state_id
-                        graph['nodes'].append({
-                            'id': next_state_id,
-                            'marking': new_marking.copy(),
-                            'depth': depth + 1
-                        })
-                        next_state_id += 1
-                
-                # Add edge to graph
-                if compute_graph:
-                    source_id = state_index[marking_to_tuple(current_marking)]
-                    target_id = state_index[marking_tuple]
-                    graph['edges'].append({
-                        'source': source_id,
-                        'target': target_id,
-                        'transition': trans_id,
-                        'transition_name': self._get_transition_name(trans_id)
-                    })
-        
-        return {
-            'total_states': len(visited),
-            'total_transitions': transitions_fired,
-            'max_depth': max_depth_reached,
-            'states': states,
-            'graph': graph
-        }
+    # Note: _explore_reachability() removed - delegated to explorer classes (OOP pattern)
     
     def _get_enabled_transitions(self, marking: Dict[str, int]) -> List[str]:
         """Get list of enabled transitions in given marking.
