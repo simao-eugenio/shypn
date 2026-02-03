@@ -8,6 +8,7 @@ explore them concurrently.
 from typing import Any, Dict, List
 import multiprocessing
 import queue
+import time
 
 from .base_explorer import StateSpaceExplorer
 
@@ -57,6 +58,7 @@ class ParallelBasicExplorer(StateSpaceExplorer):
             'transitions_fired': 0,
             'max_depth': 0,
             'workers_active': 0,
+            'work_in_progress': 0,  # Track states currently being processed
             'work_steals': 0,
             'next_state_id': 1  # State 0 is initial
         })
@@ -120,16 +122,11 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         graph = {'nodes': [], 'edges': []} if compute_graph else None
         deadlock_states = []
         
-        # Keep collecting while workers are active OR queue has items
-        # Track idle time to detect completion
-        import time
-        last_activity = time.time()
-        idle_timeout = 20.0  # Be very conservative - 20s of no results means done
-        
-        while not shutdown_event.is_set():
+        # Keep collecting while workers are active
+        # Workers will exit on their own when exploration is complete
+        while stats['workers_active'] > 0 or not result_queue.empty():
             try:
                 result = result_queue.get(timeout=0.1)
-                last_activity = time.time()  # Reset on activity
                 
                 if result['type'] == 'new_state' and compute_graph:
                     graph['nodes'].append({
@@ -153,15 +150,6 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                     })
             
             except queue.Empty:
-                # Check if we should shut down:
-                # - Work queue empty (no more work to process)
-                # - No activity for a while (no results being produced)
-                # Note: workers are always "active" (counted) even when blocked on queue.get()
-                if (work_queue.empty() and 
-                    time.time() - last_activity > idle_timeout):
-                    # Likely done - shut down
-                    shutdown_event.set()
-                    break
                 continue
         
         # Signal workers to shut down
@@ -240,12 +228,18 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         stats['workers_active'] += 1
         
         try:
+            consecutive_empty = 0
+            max_consecutive_empty = 10  # 5 seconds of empty queue
+            
             while not shutdown_event.is_set() and stats['next_state_id'] < max_states:
                 try:
                     current_marking, depth, state_id = work_queue.get(timeout=0.5)
+                    consecutive_empty = 0  # Reset on successful get
+                    stats['work_in_progress'] += 1  # Mark state as being processed
                     
                     # Check depth limit
                     if depth >= max_depth:
+                        stats['work_in_progress'] -= 1  # Decrement before continue
                         continue
                     
                     # Find enabled transitions
@@ -258,6 +252,7 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                             'state_id': state_id,
                             'marking': current_marking
                         })
+                        stats['work_in_progress'] -= 1  # Decrement before continue
                         continue
                     
                     # Fire each enabled transition
@@ -299,9 +294,14 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                         })
                         
                         stats['transitions_fired'] += 1
+                    
+                    # Mark this state as fully processed
+                    stats['work_in_progress'] -= 1
                 
                 except queue.Empty:
-                    # Continue waiting - shutdown event will signal when done
+                    consecutive_empty += 1
+                    if consecutive_empty >= max_consecutive_empty:
+                        break  # Queue empty for 5 seconds - done
                     continue
         
         finally:

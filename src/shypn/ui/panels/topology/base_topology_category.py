@@ -105,8 +105,58 @@ ANALYZER_METADATA = {
         'typical_time': '0.5-1s',
         'timeout_seconds': 30
     },
+    'centrality': {
+        'priority': 2,
+        'complexity': 'O(n³)',
+        'description': 'Cubic - centrality measures',
+        'safe_for_auto_run': True,
+        'typical_time': '1-5s',
+        'timeout_seconds': 60
+    },
+    'communities': {
+        'priority': 2,
+        'complexity': 'O(n log n)',
+        'description': 'Community detection (Louvain)',
+        'safe_for_auto_run': True,
+        'typical_time': '1-3s',
+        'timeout_seconds': 60
+    },
+    'clustering': {
+        'priority': 2,
+        'complexity': 'O(n²)',
+        'description': 'Clustering coefficients',
+        'safe_for_auto_run': True,
+        'typical_time': '0.5-2s',
+        'timeout_seconds': 60
+    },
+    'throughput': {
+        'priority': 2,
+        'complexity': 'O(n*k)',
+        'description': 'Simulation-based (10k steps)',
+        'safe_for_auto_run': True,
+        'typical_time': '2-5s',
+        'timeout_seconds': 60
+    },
+    'response_time': {
+        'priority': 2,
+        'complexity': 'O(n*k)',
+        'description': 'Simulation-based (10k steps)',
+        'safe_for_auto_run': True,
+        'typical_time': '2-5s',
+        'timeout_seconds': 60
+    },
     
     # SLOW ALGORITHMS - Priority 3 (5-30 seconds, limited exploration)
+    'coverability': {
+        'priority': 3,
+        'complexity': 'O(k^n)',
+        'description': 'Coverability graph (omega)',
+        'safe_for_auto_run': False,
+        'typical_time': '5-30s',
+        'timeout_seconds': 90,
+        'warning': '⚠️ <b>CAUTION:</b> Can take 10-90s on unbounded models.',
+        'risk': 'MEDIUM-HIGH'
+    },
     'reachability': {
         'priority': 3,
         'complexity': 'O(k^n)',
@@ -1741,6 +1791,79 @@ class BaseTopologyCategory:
         # Update button state based on model complexity (behavioral category only)
         if self.use_grouped_table and self.run_all_button:
             self._update_button_complexity_state()
+    
+    def clear_results(self, drawing_area=None):
+        """Clear all cached results and reset analyzer state.
+        
+        Called when a model is closed to clean up resources.
+        
+        Args:
+            drawing_area: Specific drawing area to clear (None = current)
+        """
+        if drawing_area is None:
+            drawing_area = self._get_current_drawing_area()
+        
+        if not drawing_area:
+            return
+        
+        # Clear results cache
+        if drawing_area in self.results_cache:
+            del self.results_cache[drawing_area]
+        
+        # Clear analyzed set
+        if drawing_area in self.analyzed:
+            del self.analyzed[drawing_area]
+        
+        # Stop any running analyzers
+        if hasattr(self, 'analyzing'):
+            self.analyzing.clear()
+        
+        # Cancel any pending timeouts
+        if hasattr(self, 'analyzer_timeouts'):
+            for timeout_id in self.analyzer_timeouts.values():
+                if timeout_id:
+                    from gi.repository import GLib
+                    GLib.source_remove(timeout_id)
+            self.analyzer_timeouts.clear()
+        
+        # Clear start times
+        if hasattr(self, 'analyzer_start_times'):
+            self.analyzer_start_times.clear()
+        
+        # Reset UI state
+        if self.use_grouped_table:
+            # Clear grouped table
+            if self.grouped_table_store:
+                self.grouped_table_store.clear()
+            
+            # Reset status label
+            if hasattr(self, 'grouped_status_label') and self.grouped_status_label:
+                self.grouped_status_label.set_markup("<i>No model loaded</i>")
+            
+            # Stop spinner
+            if self.grouped_spinner and self.grouped_spinner.get_visible():
+                self.grouped_spinner.stop()
+                self.grouped_spinner.hide()
+            
+            # Re-enable button
+            if self.run_all_button:
+                self.run_all_button.set_sensitive(True)
+        else:
+            # Clear individual analyzer labels
+            for label in self.analyzer_labels.values():
+                if label:
+                    label.set_markup("<i>No model loaded</i>")
+            
+            # Hide all spinners
+            for spinner_box in self.spinner_boxes.values():
+                if spinner_box and spinner_box.get_visible():
+                    spinner_box.hide()
+        
+        # Update summary
+        if self.summary_label:
+            self.summary_label.set_markup(
+                "<i>ℹ️ No model loaded - open or create a model to analyze</i>"
+            )
     
     def set_model_canvas(self, model_canvas):
         """Set model canvas and refresh.

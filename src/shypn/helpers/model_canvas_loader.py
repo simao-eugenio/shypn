@@ -1300,6 +1300,11 @@ class ModelCanvasLoader:
             # Cleanup overlay manager and all its palettes
             overlay_manager = self.overlay_managers[drawing_area]
             
+            # Clear topology panel data before cleanup
+            if hasattr(overlay_manager, 'topology_panel_loader') and overlay_manager.topology_panel_loader:
+                if hasattr(overlay_manager.topology_panel_loader, 'on_tab_closed'):
+                    overlay_manager.topology_panel_loader.on_tab_closed(drawing_area)
+            
             # Clear report panel data before cleanup
             if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
                 if hasattr(overlay_manager.report_panel_loader, 'panel') and overlay_manager.report_panel_loader.panel:
@@ -5809,6 +5814,9 @@ class ModelCanvasLoader:
     def _on_convert_to_signal(self, place, signal_type, manager, drawing_area):
         """Convert place to signal place with specified type.
         
+        Also converts all connected normal arcs to SignalFlowArcs to maintain
+        semantic consistency (signal places must use signal flow arcs).
+        
         Args:
             place: Place object to convert
             signal_type: Signal type ('energy', 'regulatory', 'quorum', 'spatial')
@@ -5823,6 +5831,43 @@ class ModelCanvasLoader:
         from shypn.utils.color_schema_manager import ColorSchemaManager
         place.shape = 'hexagon'
         ColorSchemaManager.reset_place_color(place)  # Blue border for signal places
+        
+        # Convert connected arcs to SignalFlowArcs
+        from shypn.netobjs.arc import Arc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.netobjs.test_arc import TestArc
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+        from shypn.utils.arc_transform import convert_to_signal_flow
+        
+        arcs_converted = 0
+        arcs_to_replace = []  # List of (old_arc, new_arc) tuples
+        
+        for arc in manager.arcs[:]:  # Iterate over copy to allow modification
+            # Skip if arc doesn't connect to this place
+            if arc.source != place and arc.target != place:
+                continue
+            
+            # Skip if arc is already a SignalFlowArc
+            if isinstance(arc, SignalFlowArc):
+                continue
+            
+            # Skip test arcs and inhibitor arcs (they have special semantics)
+            if isinstance(arc, (TestArc, InhibitorArc)):
+                continue
+            
+            # Convert regular Arc to SignalFlowArc
+            if isinstance(arc, Arc) and arc.__class__ == Arc:
+                try:
+                    new_arc = convert_to_signal_flow(arc)
+                    arcs_to_replace.append((arc, new_arc))
+                    arcs_converted += 1
+                except ValueError as e:
+                    # Conversion failed (shouldn't happen, but log if it does)
+                    print(f"Warning: Failed to convert arc {arc.id}: {e}")
+        
+        # Replace arcs in manager
+        for old_arc, new_arc in arcs_to_replace:
+            manager.replace_arc(old_arc, new_arc)
         
         # Mark document dirty
         if self.persistency:
@@ -5839,10 +5884,18 @@ class ModelCanvasLoader:
             'spatial': 'Ψₛ - Spatial/Compartment Sensing'
         }
         type_label = type_labels.get(signal_type, signal_type)
-        # print(f"Converted '{place.name}' to signal place: {type_label}")
+        
+        if arcs_converted > 0:
+            print(f"Converted '{place.name}' to signal place: {type_label}")
+            print(f"  → Converted {arcs_converted} connected arc(s) to SignalFlowArc")
+        # else:
+        #     print(f"Converted '{place.name}' to signal place: {type_label}")
     
     def _on_remove_signal_designation(self, place, manager, drawing_area):
         """Remove signal place designation from place.
+        
+        Also converts SignalFlowArcs back to normal Arcs if they no longer
+        connect to any signal places.
         
         Args:
             place: Place object to modify
@@ -5858,6 +5911,42 @@ class ModelCanvasLoader:
         place.shape = 'circle'
         ColorSchemaManager.reset_place_color(place)
         
+        # Convert SignalFlowArcs back to normal Arcs if they don't connect to other signal places
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.netobjs.place import Place
+        from shypn.utils.arc_transform import convert_to_normal
+        
+        arcs_converted = 0
+        arcs_to_replace = []  # List of (old_arc, new_arc) tuples
+        
+        for arc in manager.arcs[:]:  # Iterate over copy to allow modification
+            # Skip if arc doesn't connect to this place
+            if arc.source != place and arc.target != place:
+                continue
+            
+            # Only process SignalFlowArcs
+            if not isinstance(arc, SignalFlowArc):
+                continue
+            
+            # Check if arc still connects to another signal place
+            source_is_signal = (isinstance(arc.source, Place) and 
+                               getattr(arc.source, 'is_signal_place', False))
+            target_is_signal = (isinstance(arc.target, Place) and 
+                               getattr(arc.target, 'is_signal_place', False))
+            
+            # If arc no longer connects to any signal place, convert back to normal
+            if not (source_is_signal or target_is_signal):
+                try:
+                    new_arc = convert_to_normal(arc)
+                    arcs_to_replace.append((arc, new_arc))
+                    arcs_converted += 1
+                except Exception as e:
+                    print(f"Warning: Failed to convert arc {arc.id} back to normal: {e}")
+        
+        # Replace arcs in manager
+        for old_arc, new_arc in arcs_to_replace:
+            manager.replace_arc(old_arc, new_arc)
+        
         # Mark document dirty
         if self.persistency:
             self.persistency.mark_dirty()
@@ -5865,7 +5954,11 @@ class ModelCanvasLoader:
         # Redraw canvas
         drawing_area.queue_draw()
         
-        print(f"Removed signal designation from '{place.name}'")
+        if arcs_converted > 0:
+            print(f"Removed signal designation from '{place.name}'")
+            print(f"  → Converted {arcs_converted} SignalFlowArc(s) back to normal Arc")
+        else:
+            print(f"Removed signal designation from '{place.name}'")
 
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.

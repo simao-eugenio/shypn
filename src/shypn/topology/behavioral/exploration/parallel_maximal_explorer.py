@@ -10,6 +10,7 @@ Expected additional speedup: 2-3× over Phase 1 basic work-stealing.
 from typing import Any, Dict, List
 import multiprocessing
 import queue
+import time
 
 from .base_explorer import StateSpaceExplorer
 from .maximal_sets import IndependenceAnalyzer, MaximalSetComputer
@@ -78,6 +79,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
             'maximal_sets_fired': 0,  # Track concurrent firings
             'max_depth': 0,
             'workers_active': 0,
+            'work_in_progress': 0,  # Track states currently being processed
             'work_steals': 0,
             'next_state_id': 1
         })
@@ -141,14 +143,9 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         graph = {'nodes': [], 'edges': []} if compute_graph else None
         deadlock_states = []
         
-        import time
-        last_activity = time.time()
-        idle_timeout = 20.0
-        
-        while not shutdown_event.is_set():
+        while stats['workers_active'] > 0 or not result_queue.empty():
             try:
                 result = result_queue.get(timeout=0.1)
-                last_activity = time.time()
                 
                 if result['type'] == 'new_state' and compute_graph:
                     graph['nodes'].append({
@@ -172,11 +169,6 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                     })
             
             except queue.Empty:
-                # Shutdown when work queue empty and no results for a while
-                if (work_queue.empty() and 
-                    time.time() - last_activity > idle_timeout):
-                    shutdown_event.set()
-                    break
                 continue
         
         # Signal workers to shut down
@@ -254,11 +246,17 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         stats['workers_active'] += 1
         
         try:
+            consecutive_empty = 0
+            max_consecutive_empty = 10  # 5 seconds of empty queue
+            
             while not shutdown_event.is_set() and stats['next_state_id'] < max_states:
                 try:
                     current_marking, depth, state_id = work_queue.get(timeout=0.5)
+                    consecutive_empty = 0  # Reset on successful get
+                    stats['work_in_progress'] += 1  # Mark state as being processed
                     
                     if depth >= max_depth:
+                        stats['work_in_progress'] -= 1
                         continue
                     
                     # Get enabled transitions
@@ -271,6 +269,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                                 'state_id': state_id,
                                 'marking': current_marking
                             })
+                        stats['work_in_progress'] -= 1
                         continue
                     
                     # Convert to transition objects for maximal set computation
@@ -330,9 +329,14 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                         })
                         
                         stats['transitions_fired'] += 1
+                    
+                    # Mark this state as fully processed
+                    stats['work_in_progress'] -= 1
                 
                 except queue.Empty:
-                    # Continue waiting
+                    consecutive_empty += 1
+                    if consecutive_empty >= max_consecutive_empty:
+                        break  # Queue empty for 5 seconds - done
                     continue
         
         finally:
