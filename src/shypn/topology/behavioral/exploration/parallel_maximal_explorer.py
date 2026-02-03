@@ -70,6 +70,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         visited_lock = manager.Lock()
         work_queue = manager.Queue()
         result_queue = manager.Queue()
+        shutdown_event = manager.Event()  # Signal workers to stop
         
         stats = manager.dict({
             'states_explored': 0,
@@ -121,11 +122,18 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                     stats,
                     max_states,
                     max_depth,
-                    find_deadlocks
+                    find_deadlocks,
+                    shutdown_event
                 )
             )
             worker.start()
             workers.append(worker)
+        
+        # Wait for all workers to start (with timeout)
+        import time
+        start_wait = time.time()
+        while stats['workers_active'] < self.num_workers and time.time() - start_wait < 5.0:
+            time.sleep(0.01)
         
         # ====================================================================
         # COLLECT RESULTS
@@ -133,9 +141,14 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         graph = {'nodes': [], 'edges': []} if compute_graph else None
         deadlock_states = []
         
-        while stats['workers_active'] > 0 or not result_queue.empty():
+        import time
+        last_activity = time.time()
+        idle_timeout = 20.0
+        
+        while not shutdown_event.is_set():
             try:
                 result = result_queue.get(timeout=0.1)
+                last_activity = time.time()
                 
                 if result['type'] == 'new_state' and compute_graph:
                     graph['nodes'].append({
@@ -159,11 +172,20 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                     })
             
             except queue.Empty:
+                # Shutdown when work queue empty and no results for a while
+                if (work_queue.empty() and 
+                    time.time() - last_activity > idle_timeout):
+                    shutdown_event.set()
+                    break
                 continue
         
-        # Final drain
+        # Signal workers to shut down
+        shutdown_event.set()
+        
         for worker in workers:
-            worker.join(timeout=2.0)
+            worker.join(timeout=5.0)
+            if worker.is_alive():
+                worker.terminate()
         
         while not result_queue.empty():
             try:
@@ -225,15 +247,16 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         stats: Any,
         max_states: int,
         max_depth: int,
-        find_deadlocks: bool
+        find_deadlocks: bool,
+        shutdown_event: Any
     ):
         """Worker process with maximal concurrent set firing."""
         stats['workers_active'] += 1
         
         try:
-            while stats['next_state_id'] < max_states:
+            while not shutdown_event.is_set() and stats['next_state_id'] < max_states:
                 try:
-                    current_marking, depth, state_id = work_queue.get(timeout=1.0)
+                    current_marking, depth, state_id = work_queue.get(timeout=0.5)
                     
                     if depth >= max_depth:
                         continue
@@ -309,7 +332,8 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                         stats['transitions_fired'] += 1
                 
                 except queue.Empty:
-                    break
+                    # Continue waiting
+                    continue
         
         finally:
             stats['workers_active'] -= 1

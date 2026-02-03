@@ -50,6 +50,7 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         visited_lock = manager.Lock()
         work_queue = manager.Queue()
         result_queue = manager.Queue()
+        shutdown_event = manager.Event()  # Signal workers to stop
         
         stats = manager.dict({
             'states_explored': 0,
@@ -100,11 +101,18 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                     stats,
                     max_states,
                     max_depth,
-                    find_deadlocks
+                    find_deadlocks,
+                    shutdown_event
                 )
             )
             worker.start()
             workers.append(worker)
+        
+        # Wait for all workers to start (with timeout)
+        import time
+        start_wait = time.time()
+        while stats['workers_active'] < self.num_workers and time.time() - start_wait < 5.0:
+            time.sleep(0.01)
         
         # ====================================================================
         # COLLECT RESULTS
@@ -113,9 +121,15 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         deadlock_states = []
         
         # Keep collecting while workers are active OR queue has items
-        while stats['workers_active'] > 0 or not result_queue.empty():
+        # Track idle time to detect completion
+        import time
+        last_activity = time.time()
+        idle_timeout = 20.0  # Be very conservative - 20s of no results means done
+        
+        while not shutdown_event.is_set():
             try:
                 result = result_queue.get(timeout=0.1)
+                last_activity = time.time()  # Reset on activity
                 
                 if result['type'] == 'new_state' and compute_graph:
                     graph['nodes'].append({
@@ -139,11 +153,25 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                     })
             
             except queue.Empty:
+                # Check if we should shut down:
+                # - Work queue empty (no more work to process)
+                # - No activity for a while (no results being produced)
+                # Note: workers are always "active" (counted) even when blocked on queue.get()
+                if (work_queue.empty() and 
+                    time.time() - last_activity > idle_timeout):
+                    # Likely done - shut down
+                    shutdown_event.set()
+                    break
                 continue
         
-        # Final drain: wait for workers to finish, then drain queue completely
+        # Signal workers to shut down
+        shutdown_event.set()
+        
+        # Wait for workers to finish
         for worker in workers:
-            worker.join(timeout=2.0)
+            worker.join(timeout=5.0)
+            if worker.is_alive():
+                worker.terminate()
         
         # Drain any remaining items in queue
         while not result_queue.empty():
@@ -205,15 +233,16 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         stats: Any,
         max_states: int,
         max_depth: int,
-        find_deadlocks: bool
+        find_deadlocks: bool,
+        shutdown_event: Any
     ):
         """Worker process main loop."""
         stats['workers_active'] += 1
         
         try:
-            while stats['next_state_id'] < max_states:
+            while not shutdown_event.is_set() and stats['next_state_id'] < max_states:
                 try:
-                    current_marking, depth, state_id = work_queue.get(timeout=1.0)
+                    current_marking, depth, state_id = work_queue.get(timeout=0.5)
                     
                     # Check depth limit
                     if depth >= max_depth:
@@ -272,7 +301,8 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                         stats['transitions_fired'] += 1
                 
                 except queue.Empty:
-                    break
+                    # Continue waiting - shutdown event will signal when done
+                    continue
         
         finally:
             stats['workers_active'] -= 1
