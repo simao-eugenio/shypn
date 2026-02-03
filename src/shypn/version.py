@@ -9,7 +9,7 @@ Usage:
 """
 
 # Main package version (semantic versioning: MAJOR.MINOR.PATCH)
-__version__ = "2.5.5"
+__version__ = "2.5.6"
 
 # Version metadata
 __version_name__ = "Pulsating Singularity Dynamics"
