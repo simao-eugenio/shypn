@@ -97,7 +97,9 @@ class HierarchicalBenchmark:
         model_name: str,
         initial_marking: Dict[str, int],
         max_states: int = 10000,
-        max_depth: int = 100
+        max_depth: int = 100,
+        use_parallel: bool = False,
+        num_workers: int = 4
     ) -> BenchmarkResult:
         """Benchmark Phase 3 hierarchical exploration.
         
@@ -107,6 +109,8 @@ class HierarchicalBenchmark:
             initial_marking: Initial marking
             max_states: Maximum states to explore
             max_depth: Maximum depth
+            use_parallel: Enable parallel exploration
+            num_workers: Number of worker processes
             
         Returns:
             BenchmarkResult with performance metrics
@@ -114,7 +118,8 @@ class HierarchicalBenchmark:
         from shypn.topology.behavioral.exploration import HierarchicalExplorer
         import tracemalloc
         
-        logger.info(f"Benchmarking hierarchical exploration on {model_name}...")
+        mode_str = f"parallel ({num_workers} workers)" if use_parallel else "sequential"
+        logger.info(f"Benchmarking hierarchical exploration ({mode_str}) on {model_name}...")
         
         # Track memory
         tracemalloc.start()
@@ -128,7 +133,9 @@ class HierarchicalBenchmark:
             initial_marking,
             max_states=max_states,
             max_depth=max_depth,
-            find_deadlocks=True
+            find_deadlocks=True,
+            use_parallel=use_parallel,
+            num_workers=num_workers
         )
         execution_time = time.time() - start_time
         
@@ -138,8 +145,9 @@ class HierarchicalBenchmark:
         memory_mb = peak / 1024 / 1024
         
         # Extract metrics
+        strategy_name = f"Phase 3: Hierarchical ({mode_str})"
         benchmark_result = BenchmarkResult(
-            strategy='Phase 3: Hierarchical',
+            strategy=strategy_name,
             model_name=model_name,
             num_places=len(model.places) if hasattr(model, 'places') else 0,
             num_transitions=len(model.transitions) if hasattr(model, 'transitions') else 0,
@@ -150,7 +158,9 @@ class HierarchicalBenchmark:
             memory_mb=memory_mb,
             extra_metrics={
                 'layer_count': result.get('layer_count', 0),
-                'exploration_mode': result.get('exploration_mode', 'unknown')
+                'exploration_mode': result.get('exploration_mode', 'unknown'),
+                'parallel': use_parallel,
+                'num_workers': num_workers if use_parallel else 0
             }
         )
         
@@ -187,9 +197,16 @@ class HierarchicalBenchmark:
         
         results = {}
         
-        # Benchmark Phase 3 (hierarchical)
-        results['hierarchical'] = self.benchmark_hierarchical(
-            model, model_name, initial_marking, max_states
+        # Benchmark Phase 3 (hierarchical) - Sequential
+        results['hierarchical_seq'] = self.benchmark_hierarchical(
+            model, model_name, initial_marking, max_states,
+            use_parallel=False
+        )
+        
+        # Benchmark Phase 3 (hierarchical) - Parallel
+        results['hierarchical_par'] = self.benchmark_hierarchical(
+            model, model_name, initial_marking, max_states,
+            use_parallel=True, num_workers=4
         )
         
         # TODO: Add Phase 1 and Phase 2 benchmarks when integrated
