@@ -1071,10 +1071,25 @@ class BaseTopologyCategory:
         Returns:
             tuple or list: Row(s) for table
         """
-        # Default implementation
+        # Get number of columns from table definition
+        columns = self._define_table_columns()
+        num_cols = len(columns)
+        
+        # Default implementation - create row with appropriate number of columns
         title = self._format_analyzer_title(analyzer_name)
         message = f"⏱️ Timeout ({timeout_seconds}s) - Model too complex for {complexity} algorithm"
-        return (title, message, '⚠️ TIMEOUT')
+        status = '⚠️ TIMEOUT'
+        
+        # Pad with appropriate default values based on column types
+        row = [title, message, status]
+        for i in range(3, num_cols):
+            col_type = columns[i][1]
+            if col_type in (int, float):
+                row.append(0.0)
+            else:
+                row.append('')
+        
+        return tuple(row[:num_cols])  # Ensure exactly num_cols elements
     
     def _format_error_row(self, analyzer_name, error_message):
         """Format error message as table row.
@@ -1088,10 +1103,25 @@ class BaseTopologyCategory:
         Returns:
             tuple or list: Row(s) for table
         """
-        # Default implementation
+        # Get number of columns from table definition
+        columns = self._define_table_columns()
+        num_cols = len(columns)
+        
+        # Default implementation - create row with appropriate number of columns
         title = self._format_analyzer_title(analyzer_name)
         message = f"❌ Error: {error_message[:100]}"
-        return (title, message, '⚠️ ERROR')
+        status = '⚠️ ERROR'
+        
+        # Pad with appropriate default values based on column types
+        row = [title, message, status]
+        for i in range(3, num_cols):
+            col_type = columns[i][1]
+            if col_type in (int, float):
+                row.append(0.0)
+            else:
+                row.append('')
+        
+        return tuple(row[:num_cols])  # Ensure exactly num_cols elements
     
     def _format_analyzer_row(self, analyzer_name, result):
         """Format analyzer result as table row(s).
