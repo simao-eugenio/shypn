@@ -52,18 +52,28 @@ class AdaptiveHybridBehavior(TransitionBehavior):
     Properties:
         volume_threshold (float): Threshold in fL (default 1.0)
         prefer_continuous (bool): Prefer continuous when volume not set (default True)
+        adaptive_filter (str): Which places to check for volume (default 'inputs_only')
+            - 'all': Check all input and output places
+            - 'inputs_only': Check only input places (substrates drive propensity)
+            - 'spatial_only': Check only spatial signal places
+            - 'inputs_spatial': Check input places that are spatial signals
         
     State Management:
         - Continuous mode: No scheduling needed, fires based on rate
         - Stochastic mode: Uses enablement_time and scheduled_fire_time
         - Mode switches: Preserves token state, resets scheduling
     
+    Biological Rationale for 'inputs_only' (default):
+        - Input places = substrates that determine reaction propensity
+        - Output places = products that don't affect firing decision
+        - Substrate concentrations govern whether reaction uses stochastic or continuous dynamics
+    
     Example:
         >>> behavior = AdaptiveHybridBehavior(transition, model)
-        >>> # At t=0, volume=0.5 fL → Uses stochastic
+        >>> # At t=0, input volume=0.5 fL → Uses stochastic
         >>> behavior.fire(...)  # Discrete burst firing
         >>> 
-        >>> # Later, volume=100 fL → Switches to continuous
+        >>> # Later, input volume=100 fL → Switches to continuous
         >>> behavior.integrate_step(...)  # Smooth ODE integration
     """
     
@@ -86,6 +96,10 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         self.volume_threshold = float(props.get('volume_threshold', 1.0))
         self.prefer_continuous = props.get('prefer_continuous', True)
         
+        # Place filtering strategy for mode selection
+        # Options: 'all', 'inputs_only', 'spatial_only', 'inputs_spatial'
+        self.place_filter = props.get('adaptive_filter', 'inputs_only')
+        
         # Create behavior delegates
         self.continuous_behavior = ContinuousBehavior(transition, model)
         self.stochastic_behavior = StochasticBehavior(transition, model)
@@ -99,29 +113,80 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         self.logger.info(
             f"Created AdaptiveHybridBehavior for '{transition.name}' "
-            f"(threshold={self.volume_threshold} fL)"
+            f"(threshold={self.volume_threshold} fL, filter={self.place_filter})"
         )
     
     def _get_connected_places(self) -> List:
-        """Get all places connected to this transition.
+        """Get places for mode selection based on filter strategy.
+        
+        Filter strategies:
+            'all': All input and output places (original behavior)
+            'inputs_only': Only input places (substrates drive propensity)
+            'spatial_only': Only spatial signal places
+            'inputs_spatial': Input places that are spatial signals
         
         Returns:
-            List of Place objects (both input and output)
+            List of Place objects filtered by strategy
         """
-        places = []
+        all_input_places = []
+        all_output_places = []
         
-        # Get arcs through transition behavior's helper methods
+        # Collect input places
         for arc in self.get_input_arcs():
             place = self._get_place(arc.source_id)
-            if place and place not in places:
-                places.append(place)
+            if place and place not in all_input_places:
+                all_input_places.append(place)
         
+        # Collect output places
         for arc in self.get_output_arcs():
             place = self._get_place(arc.target_id)
-            if place and place not in places:
-                places.append(place)
+            if place and place not in all_output_places:
+                all_output_places.append(place)
         
-        return places
+        # Apply filter strategy
+        if self.place_filter == 'inputs_only':
+            # Only check input places (substrates)
+            return all_input_places
+        
+        elif self.place_filter == 'spatial_only':
+            # Only check spatial signal places
+            all_places = all_input_places + all_output_places
+            return [p for p in all_places if self._is_spatial_signal(p)]
+        
+        elif self.place_filter == 'inputs_spatial':
+            # Only check input places that are spatial signals
+            return [p for p in all_input_places if self._is_spatial_signal(p)]
+        
+        else:  # 'all' or unknown
+            # Check all connected places (original behavior)
+            all_places = all_input_places + all_output_places
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_places = []
+            for p in all_places:
+                if p.id not in seen:
+                    seen.add(p.id)
+                    unique_places.append(p)
+            return unique_places
+    
+    def _is_spatial_signal(self, place) -> bool:
+        """Check if place is a spatial signal.
+        
+        Args:
+            place: Place object
+        
+        Returns:
+            bool: True if place has SPATIAL signal type
+        """
+        if not hasattr(place, 'is_spatial_signal'):
+            return False
+        
+        try:
+            return place.is_spatial_signal()
+        except:
+            # Fallback: check signal_type attribute
+            from shypn.netobjs.signal_type import SignalType
+            return getattr(place, 'signal_type', None) == SignalType.SPATIAL
     
     def _select_mode(self) -> str:
         """Select execution mode based on current volumes.
@@ -341,11 +406,12 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         """Get detailed adaptive behavior information.
         
         Returns:
-            Dictionary with threshold, current mode, and volume details
+            Dictionary with threshold, current mode, filter, and volume details
         """
         return {
             'volume_threshold': self.volume_threshold,
             'prefer_continuous': self.prefer_continuous,
+            'place_filter': self.place_filter,
             'current_mode': self._current_mode,
             'last_volume_check': self._last_volume_check,
             'continuous_info': self.continuous_behavior.get_continuous_info(),
