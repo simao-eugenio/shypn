@@ -5,9 +5,20 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
-from typing import Optional, List
+from typing import Optional, List, Tuple
+from enum import Enum
 from shypn.netobjs.petri_net_object import PetriNetObject
 from shypn.netobjs.signal_type import SignalType
+
+
+class BoundaryType(Enum):
+    """Compartment boundary permeability for spatial signal places.
+    
+    Controls whether signals can cross compartment boundaries and how.
+    """
+    PERMEABLE = "permeable"      # Free diffusion across boundary
+    SELECTIVE = "selective"       # Requires specific transport transition
+    IMPERMEABLE = "impermeable"  # Cannot cross boundary
 
 
 class Place(PetriNetObject):
@@ -70,6 +81,15 @@ class Place(PetriNetObject):
         # is_compartment_place: True if in non-default compartment (e.g., extracellular)
         #   Rendered as violet circle (NOT hexagon - those are only for signal places)
         self.is_compartment_place = False
+        
+        # Spatial signal properties (Layer 1 - SPATIAL signals)
+        # These properties govern behavior of connected transitions and enable spatial modeling
+        self.diffusion_coefficient: Optional[float] = None  # μm²/s - diffusion rate
+        self.boundary_type: Optional[BoundaryType] = None  # Permeability control
+        self.gradient_vector: Optional[Tuple[float, float, float]] = None  # (dx, dy, dz) direction
+        self.compartment_volume: Optional[float] = None  # fL - scales stochasticity
+        self.neighbor_compartments: List[str] = []  # Adjacent compartment IDs
+        self.spatial_position: Optional[Tuple[float, float, float]] = None  # (x, y, z) in μm
         
         # Apply color schema based on place type (after all properties initialized)
         from shypn.utils.color_schema_manager import ColorSchemaManager
@@ -375,7 +395,15 @@ class Place(PetriNetObject):
             "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
             "is_signal_place": getattr(self, 'is_signal_place', False),  # Save signal place flag (13-tuple Ψ)
             "is_compartment_place": getattr(self, 'is_compartment_place', False),  # Save compartment place flag
-            "is_regulatory_place": getattr(self, 'is_regulatory_place', False)  # Save regulatory place flag
+            "is_regulatory_place": getattr(self, 'is_regulatory_place', False),  # Save regulatory place flag
+            
+            # Spatial signal properties (Layer 1)
+            "diffusion_coefficient": getattr(self, 'diffusion_coefficient', None),
+            "boundary_type": self.boundary_type.value if hasattr(self, 'boundary_type') and self.boundary_type else None,
+            "gradient_vector": list(self.gradient_vector) if hasattr(self, 'gradient_vector') and self.gradient_vector else None,
+            "compartment_volume": getattr(self, 'compartment_volume', None),
+            "neighbor_compartments": getattr(self, 'neighbor_compartments', []),
+            "spatial_position": list(self.spatial_position) if hasattr(self, 'spatial_position') and self.spatial_position else None,
         })
         
         # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
@@ -463,5 +491,26 @@ class Place(PetriNetObject):
         # Restore metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
         if "metadata" in data:
             place.metadata = data["metadata"]
+        
+        # Restore spatial signal properties (Layer 1)
+        place.diffusion_coefficient = data.get("diffusion_coefficient", None)
+        
+        boundary_str = data.get("boundary_type", None)
+        if boundary_str:
+            try:
+                place.boundary_type = BoundaryType(boundary_str)
+            except (ValueError, KeyError):
+                place.boundary_type = None
+        else:
+            place.boundary_type = None
+        
+        gradient = data.get("gradient_vector", None)
+        place.gradient_vector = tuple(gradient) if gradient else None
+        
+        place.compartment_volume = data.get("compartment_volume", None)
+        place.neighbor_compartments = data.get("neighbor_compartments", [])
+        
+        position = data.get("spatial_position", None)
+        place.spatial_position = tuple(position) if position else None
         
         return place

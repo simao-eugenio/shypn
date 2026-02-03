@@ -1,6 +1,16 @@
 # Simulation Engine
 
-This directory contains the simulation engine and transition behavior implementations for Petri Net execution.
+This directory contains the simulation engine and transition behavior implementations for **Stochastic Hybrid Petri Nets (SHPN)**.
+
+## Architecture Overview
+
+SHYPN implements a **Stochastic Hybrid Petri Net (SHPN)** formalism that unifies:
+- **Discrete token semantics** for regulatory and signaling networks
+- **Continuous ODE dynamics** for metabolic reactions and concentration flows
+- **Stochastic firing** for low-copy molecular events (Gillespie-like)
+- **Deterministic timing** for scheduled biological events
+
+This hybrid approach enables modeling of multi-scale biological systems where discrete gene regulation interacts with continuous metabolic fluxes.
 
 ## Transition Behaviors
 
@@ -62,19 +72,21 @@ if enabled:
 ```
 
 ### `continuous_behavior.py`
-**Continuous Transitions**
+**Continuous Transitions (Hybrid PN Semantics)**
 
-Transitions with continuous firing rates:
-- **Rate Functions**: Flow rate as function of markings
-- **Differential Equations**: Token flow modeled as ODE
+Transitions with continuous firing rates implementing **Hybrid Petri Net** ODE dynamics:
+- **Rate Functions**: Flow rate as function of markings r(t) = f(m(t), params)
+- **Differential Equations**: Token flow modeled as dm/dt = r(t)
+- **Numerical Integration**: Runge-Kutta 4th order (RK4) method
+- **Continuous Places**: Places support continuous (float) token concentrations
 - **Time-driven**: Fires continuously over time
-- **Use Cases**: Fluid models, population dynamics, chemical reactions
+- **Use Cases**: Metabolic fluxes, enzyme kinetics, concentration dynamics, diffusion
 
 **Behavior:**
 ```python
-rate = evaluate_rate_function(markings)
-token_delta = rate * time_delta
-update_markings(token_delta)
+rate = evaluate_rate_function(markings, time)  # r(t)
+token_delta = rate * time_delta  # dm = r(t) * dt
+update_markings(token_delta)     # Integrate via RK4
 ```
 
 ### `behavior_factory.py`
@@ -204,6 +216,62 @@ place.set_tokens(place.tokens + arc.weight)
 if place.capacity and tokens > place.capacity:
     raise CapacityExceeded()
 ```
+
+## Hybrid Petri Net Capabilities
+
+### Place Semantics
+Places in SHYPN support both discrete and continuous token semantics:
+
+**Discrete Places:**
+- Token count: Integer values (0, 1, 2, ...)
+- Suitable for: Gene copies, protein complexes, cell counts
+- Transitions: Immediate, Timed, Stochastic
+
+**Continuous Places:**
+- Token concentration: Real values (0.0, 2.38, 145.7, ...)
+- Suitable for: Metabolite concentrations, pH, membrane potential
+- Transitions: Continuous (ODE integration)
+
+**Hybrid Models:**
+- Mix discrete and continuous places in same network
+- Example: Discrete gene regulation → Continuous enzyme production
+- Enables multi-scale biological modeling
+
+### Continuous Dynamics (ODE Integration)
+Continuous transitions implement differential equation semantics:
+
+```python
+# Rate function defines differential equation
+rate_function = "Vmax * S / (Km + S)"  # Michaelis-Menten
+
+# Integration via RK4 method
+dm/dt = rate_function(m(t), t)
+m(t + dt) = RK4_integrate(m(t), rate_function, dt)
+```
+
+**Supported Rate Functions:**
+- Constant rates: "5.0"
+- Mass action: "k * P1 * P2"
+- Michaelis-Menten: "Vmax * S / (Km + S)"
+- Hill equation: "Vmax * S^n / (K^n + S^n)"
+- Custom expressions with SBML/KEGG parameters
+
+### Stochastic Dynamics (Gillespie-like)
+Stochastic transitions implement probabilistic firing:
+
+```python
+# Exponential delay distribution
+delay ~ Exp(rate)  # Memoryless property
+
+# Burst firing for molecular copy number variation
+burst_size ~ Uniform(1, max_burst)
+tokens_consumed = arc_weight * burst_size
+```
+
+**Use Cases:**
+- Low-copy gene expression (transcription bursts)
+- Molecular noise in signaling
+- Stochastic commitment decisions
 
 ## Use Cases
 

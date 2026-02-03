@@ -13,11 +13,12 @@ This package contains the core Petri net modeling primitives:
 - CurvedSignalFlowArc: Signal flow arcs with bezier curve (dashed curve, angled arrow)
 - Module: Subsystem partition for modular Bio-PN architecture
 - SignalType: Enumeration for signal place classification
+- BoundaryType: Enumeration for spatial signal boundary permeability
 
 All classes are exported at the package level for convenient importing.
 """
 from shypn.netobjs.petri_net_object import PetriNetObject
-from shypn.netobjs.place import Place
+from shypn.netobjs.place import Place, BoundaryType
 from shypn.netobjs.transition import Transition
 from shypn.netobjs.arc import Arc
 from shypn.netobjs.inhibitor_arc import InhibitorArc
@@ -31,8 +32,7 @@ from shypn.netobjs.signal_type import SignalType
 
 __all__ = [
     'PetriNetObject',
-    'Place',
-    'Transition',
+    'Place',    'BoundaryType',    'Transition',
     'Arc',
     'InhibitorArc',
     'TestArc',
