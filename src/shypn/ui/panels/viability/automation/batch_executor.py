@@ -11,7 +11,192 @@ Date: December 7, 2025
 import threading
 import time
 import numpy as np
+import multiprocessing
+import os
 from typing import Optional, Callable, Dict, Any, List
+
+
+def _worker_run_experiment(args: dict) -> Dict[str, Any]:
+    """Worker function to run a single experiment in parallel process.
+    
+    This function must be at module level for multiprocessing to pickle it.
+    
+    Args:
+        args: Dictionary with experiment parameters
+    
+    Returns:
+        Result dictionary
+    """
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    
+    start_time = time.time()
+    
+    try:
+        # Extract arguments
+        name = args['name']
+        snapshot = args['snapshot']
+        replicates = args['replicates']
+        duration = args['duration']
+        termination_condition = args['termination_condition']
+        subnet_data = args['subnet_data']
+        baseline_params = args['baseline_params']
+        
+        # Create fresh DocumentModel from subnet data (dicts from to_dict())
+        model = DocumentModel()
+        
+        # Reconstruct places and transitions from serialized dicts
+        from shypn.netobjs.place import Place
+        from shypn.netobjs.transition import Transition
+        from shypn.netobjs.arc import Arc
+        
+        model.places = [Place.from_dict(p_dict) for p_dict in subnet_data['places']]
+        model.transitions = [Transition.from_dict(t_dict) for t_dict in subnet_data['transitions']]
+        
+        # Normalize transition types
+        type_name_map = {
+            'Immediate': 'immediate',
+            'Timed (TPN)': 'timed',
+            'Stochastic (FSPN)': 'stochastic',
+            'Continuous (SHPN)': 'continuous'
+        }
+        for t in model.transitions:
+            if hasattr(t, 'transition_type') and t.transition_type in type_name_map:
+                t.transition_type = type_name_map[t.transition_type]
+        
+        # Build ID lookup dictionaries
+        places_dict = {p.id: p for p in model.places}
+        transitions_dict = {t.id: t for t in model.transitions}
+        
+        # Reconstruct arcs from serialized dicts
+        model.arcs = [Arc.from_dict(a_dict, places_dict, transitions_dict)
+                      for a_dict in subnet_data['arcs']]
+        
+        # Apply snapshot parameters
+        _apply_snapshot_to_worker_model(snapshot, model, baseline_params)
+        
+        # Run replicates
+        runner = ReplicateRunner(model)
+        results = runner.run_replicates(
+            n=replicates,
+            use_parallel=False,
+            use_tau_leaping=True,
+            duration=duration,
+            termination_condition=termination_condition,
+            seed_base=hash(name) % (2**31),  # Unique seed per experiment
+            verbose=False,
+            progress_callback=None  # No progress in worker
+        )
+        
+        elapsed_time = time.time() - start_time
+        
+        # Compute statistics
+        if results and len(results) > 0:
+            statistics = runner.compute_statistics(results)
+            statistics['elapsed_time'] = elapsed_time
+            statistics['n_replicates'] = len(results)
+            
+            return {
+                'name': name,
+                'snapshot_index': args['snapshot_index'],
+                'statistics': statistics,
+                'n_replicates': len(results),
+                'elapsed_time': elapsed_time,
+                'status': 'success'
+            }
+        else:
+            return {
+                'name': name,
+                'snapshot_index': args['snapshot_index'],
+                'error': 'No successful replicates',
+                'elapsed_time': elapsed_time,
+                'status': 'failed'
+            }
+    
+    except Exception as e:
+        import traceback
+        return {
+            'name': args.get('name', 'unknown'),
+            'error': f"{type(e).__name__}: {str(e)}",
+            'traceback': traceback.format_exc(),
+            'status': 'failed'
+        }
+
+
+def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
+    """Apply snapshot parameters to model (simplified version for worker).
+    
+    Args:
+        snapshot: ExperimentSnapshot object or dict with parameters
+        model: DocumentModel with places, transitions, arcs
+        baseline_params: Baseline parameter values dict
+    """
+    if not snapshot:
+        return
+    
+    # Handle both ExperimentSnapshot objects and dict format
+    if hasattr(snapshot, 'place_markings'):
+        # ExperimentSnapshot object - use its attributes
+        place_markings = snapshot.place_markings
+        transition_rates = snapshot.transition_rates
+        arc_weights = snapshot.arc_weights
+    elif isinstance(snapshot, dict) and 'parameters' in snapshot:
+        # Old dict format - convert to place/transition/arc mappings
+        place_markings = {}
+        transition_rates = {}
+        arc_weights = {}
+        
+        for param in snapshot['parameters']:
+            obj_type = param.get('obj_type')
+            obj_id = param.get('obj_id')
+            attr_name = param.get('attr')
+            new_value = param.get('value')
+            
+            if obj_type == 'place' and attr_name in ('marking', 'tokens'):
+                place_markings[obj_id] = new_value
+            elif obj_type == 'transition' and attr_name == 'rate':
+                transition_rates[obj_id] = new_value
+            elif obj_type == 'arc' and attr_name == 'weight':
+                arc_weights[obj_id] = new_value
+    else:
+        # No valid snapshot format
+        return
+    
+    # Apply place markings
+    for place_id, marking in place_markings.items():
+        place = next((p for p in model.places if p.id == place_id), None)
+        if place:
+            place.tokens = float(marking)
+    
+    # Apply transition rates (handle both numeric and formula strings)
+    for trans_id, rate in transition_rates.items():
+        trans = next((t for t in model.transitions if t.id == trans_id), None)
+        if trans:
+            if not hasattr(trans, 'properties') or trans.properties is None:
+                trans.properties = {}
+            
+            # Check if rate is numeric or a formula string
+            if isinstance(rate, str):
+                # Try to parse as number first
+                try:
+                    numeric_rate = float(rate)
+                    # It's a numeric string - store as number
+                    trans.rate = numeric_rate
+                    trans.properties['rate'] = numeric_rate
+                except ValueError:
+                    # It's a formula string - store in properties for evaluation
+                    trans.properties['rate_function'] = rate
+                    trans.rate = rate  # Store formula string
+            else:
+                # It's numeric - convert to float
+                trans.rate = float(rate)
+                trans.properties['rate'] = float(rate)
+    
+    # Apply arc weights
+    for arc_id, weight in arc_weights.items():
+        arc = next((a for a in model.arcs if a.id == arc_id), None)
+        if arc:
+            arc.weight = float(weight)
 
 
 class BatchExecutor:
@@ -39,6 +224,7 @@ class BatchExecutor:
         # Execution state
         self.is_running = False
         self.is_cancelled = False
+        self.is_paused = False  # Stage 3
         self.current_experiment = None
         self.executor_thread = None
         
@@ -53,7 +239,9 @@ class BatchExecutor:
         termination_condition: str = "deadlock",
         progress_callback: Optional[Callable] = None,
         complete_callback: Optional[Callable] = None,
-        experiment_result_callback: Optional[Callable] = None
+        experiment_result_callback: Optional[Callable] = None,
+        use_parallel: bool = False,
+        n_workers: Optional[int] = None
     ):
         """Run batch of experiments asynchronously.
         
@@ -63,6 +251,8 @@ class BatchExecutor:
             duration: Simulation duration
             termination_condition: When to stop ("time_only", "deadlock", "steady_state")
             progress_callback: Called with (exp_index, status, progress)
+            use_parallel: Enable parallel execution across multiple CPU cores
+            n_workers: Number of worker processes (None = auto-detect CPU count)
             complete_callback: Called when batch completes
             experiment_result_callback: Called with (name, result) when each experiment completes
         """
@@ -84,18 +274,20 @@ class BatchExecutor:
             
             subnet_model = self.parent_panel.subnet_model
             
-            # Convert subnet elements to dict format for compatibility with existing code
+            # Convert subnet elements to dict format for pickling (GObjects can't be pickled)
+            # Serialize to dicts for multiprocessing, will be reconstructed in worker
             subnet_data = {
-                'places': subnet_model.places,
-                'transitions': subnet_model.transitions,
-                'arcs': subnet_model.arcs
+                'places': [p.to_dict() for p in subnet_model.places],
+                'transitions': [t.to_dict() for t in subnet_model.transitions],
+                'arcs': [a.to_dict() for a in subnet_model.arcs]
             }
             
             if not subnet_data['transitions']:
                 raise RuntimeError("No transitions in subnet model")
             
             # Save baseline parameters to reset between experiments
-            baseline_params = self._save_current_parameters(subnet_model, subnet_data)
+            # Use subnet_model (objects) not subnet_data (dicts) for parameter extraction
+            baseline_params = self._save_current_parameters(subnet_model, subnet=None)
         except Exception as e:
             self.is_running = False
             if complete_callback:
@@ -105,7 +297,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers),
             daemon=True
         )
         self.executor_thread.start()
@@ -121,7 +313,59 @@ class BatchExecutor:
         if self.executor_thread and self.executor_thread.is_alive():
             self.executor_thread.join(timeout=2.0)
     
+    def set_paused(self, should_pause):
+        """Set paused state for batch execution (Stage 3).
+        
+        Args:
+            should_pause: True to pause, False to resume
+        """
+        self.is_paused = should_pause
+    
     def _execute_batch(
+        self,
+        experiments: List[tuple],
+        replicates: int,
+        duration: float,
+        termination_condition: str,
+        progress_callback: Optional[Callable],
+        complete_callback: Optional[Callable],
+        experiment_result_callback: Optional[Callable],
+        base_model,  # Pre-extracted DocumentModel
+        subnet_data: dict,  # Pre-extracted subnet data
+        baseline_params: dict,  # Baseline parameters to reset between experiments
+        use_parallel: bool = False,
+        n_workers: Optional[int] = None
+    ):
+        """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
+        
+        Args:
+            experiments: List of (index, name, snapshot_index) tuples
+            replicates: Number of replicates per experiment
+            duration: Simulation duration
+            termination_condition: When to stop ("time_only", "deadlock", "steady_state")
+            progress_callback: Callback for progress updates (queue_index, status, progress_str)
+            complete_callback: Callback when complete
+            experiment_result_callback: Callback for each experiment result (name, result)
+            base_model: Pre-extracted DocumentModel (from main thread)
+            subnet_data: Pre-extracted subnet dict (from main thread)
+            baseline_params: Baseline parameter values to reset model between experiments
+            use_parallel: Enable parallel execution
+            n_workers: Number of worker processes (None = auto-detect)
+        """
+        if use_parallel:
+            self._execute_batch_parallel(
+                experiments, replicates, duration, termination_condition,
+                progress_callback, complete_callback, experiment_result_callback,
+                base_model, subnet_data, baseline_params, n_workers
+            )
+        else:
+            self._execute_batch_sequential(
+                experiments, replicates, duration, termination_condition,
+                progress_callback, complete_callback, experiment_result_callback,
+                base_model, subnet_data, baseline_params
+            )
+    
+    def _execute_batch_sequential(
         self,
         experiments: List[tuple],
         replicates: int,
@@ -134,7 +378,7 @@ class BatchExecutor:
         subnet_data: dict,  # Pre-extracted subnet data
         baseline_params: dict  # Baseline parameters to reset between experiments
     ):
-        """Execute batch in background thread - SEQUENTIAL EXECUTION.
+        """Execute batch sequentially in background thread.
         
         Args:
             experiments: List of (index, name, snapshot_index) tuples
@@ -159,11 +403,22 @@ class BatchExecutor:
                         progress_callback(queue_index, "cancelled", "Cancelled")
                     continue  # Skip to next experiment
                 
+                # Check pause state (Stage 3)
+                while self.is_paused and not self.is_cancelled:
+                    time.sleep(0.1)  # Wait for resume or cancel
+                
+                # Recheck cancellation after pause
+                if self.is_cancelled:
+                    if progress_callback:
+                        progress_callback(queue_index, "cancelled", "Cancelled")
+                    continue
+                
                 # print(f"[BATCH] Experiment {i+1}/{total}: '{name}' (queue_index={queue_index})")
                 
                 # Reset model to baseline before each experiment to avoid state corruption
                 # print(f"[BATCH] Resetting model to baseline...")
-                self._restore_parameters(base_model, subnet_data, baseline_params)
+                # Use base_model (objects) not subnet_data (dicts) for parameter restoration
+                self._restore_parameters(base_model, subnet=None, saved_values=baseline_params)
                 # print(f"[BATCH] Model reset complete")
                 
                 # CRITICAL: Set status to running BEFORE execution
@@ -250,6 +505,151 @@ class BatchExecutor:
             
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
+                from gi.repository import GLib
+                cancelled = self.is_cancelled
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+    
+    def _execute_batch_parallel(
+        self,
+        experiments: List[tuple],
+        replicates: int,
+        duration: float,
+        termination_condition: str,
+        progress_callback: Optional[Callable],
+        complete_callback: Optional[Callable],
+        experiment_result_callback: Optional[Callable],
+        base_model,
+        subnet_data: dict,
+        baseline_params: dict,
+        n_workers: Optional[int] = None
+    ):
+        """Execute batch in parallel using multiprocessing.
+        
+        Args:
+            experiments: List of (index, name, snapshot_index) tuples
+            replicates: Number of replicates per experiment
+            duration: Simulation duration
+            termination_condition: When to stop
+            progress_callback: Callback for progress updates
+            complete_callback: Callback when complete
+            experiment_result_callback: Callback for each experiment result
+            base_model: Pre-extracted DocumentModel
+            subnet_data: Pre-extracted subnet dict
+            baseline_params: Baseline parameter values
+            n_workers: Number of worker processes (None = CPU count)
+        """
+        try:
+            # Determine number of workers
+            if n_workers is None:
+                n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
+            
+            # Prepare experiment arguments for workers
+            experiment_args = []
+            for queue_index, name, snapshot_index in experiments:
+                # Get snapshot
+                if snapshot_index >= len(self.experiment_manager.snapshots):
+                    continue
+                
+                snapshot = self.experiment_manager.snapshots[snapshot_index]
+                
+                # Extract only picklable data from snapshot (avoid GTK/Builder objects)
+                snapshot_data = {
+                    'name': snapshot.name,
+                    'place_markings': snapshot.place_markings.copy(),
+                    'arc_weights': snapshot.arc_weights.copy(),
+                    'transition_rates': snapshot.transition_rates.copy(),
+                    'swept_parameter': snapshot.swept_parameter
+                }
+                
+                # Serialize all data for pickling
+                experiment_args.append({
+                    'queue_index': queue_index,
+                    'name': name,
+                    'snapshot_index': snapshot_index,
+                    'snapshot': snapshot_data,  # Use extracted dict, not snapshot object
+                    'replicates': replicates,
+                    'duration': duration,
+                    'termination_condition': termination_condition,
+                    'subnet_data': subnet_data,
+                    'baseline_params': baseline_params
+                })
+            
+            # Create process pool and execute
+            total = len(experiment_args)
+            completed = 0
+            
+            with multiprocessing.Pool(processes=n_workers) as pool:
+                # Submit all experiments
+                async_results = []
+                for args in experiment_args:
+                    async_result = pool.apply_async(_worker_run_experiment, (args,))
+                    async_results.append((args['queue_index'], args['name'], async_result))
+                    
+                    # Set initial running status when experiment is submitted
+                    if progress_callback:
+                        progress_callback(args['queue_index'], "running", "0%")
+                
+                # Poll for completion
+                while async_results and not self.is_cancelled:
+                    time.sleep(0.1)  # Check every 100ms
+                    
+                    # Check completed experiments
+                    still_running = []
+                    for queue_index, name, async_result in async_results:
+                        if async_result.ready():
+                            try:
+                                result = async_result.get(timeout=0.1)
+                                
+                                # Store result
+                                self.results[name] = result
+                                
+                                # Update UI via callbacks
+                                if progress_callback:
+                                    progress_callback(queue_index, "completed", "100%")
+                                
+                                if experiment_result_callback:
+                                    from gi.repository import GLib
+                                    GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
+                                
+                                completed += 1
+                                
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                
+                                error_msg = str(e)[:100]
+                                if progress_callback:
+                                    progress_callback(queue_index, "failed", error_msg)
+                                
+                                self.results[name] = {
+                                    "error": str(e),
+                                    "name": name
+                                }
+                        else:
+                            still_running.append((queue_index, name, async_result))
+                    
+                    async_results = still_running
+                
+                # Handle cancellation
+                if self.is_cancelled:
+                    pool.terminate()
+                    pool.join()
+                    
+                    # Mark remaining as cancelled
+                    for queue_index, name, async_result in async_results:
+                        if progress_callback:
+                            progress_callback(queue_index, "cancelled", "Cancelled")
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+        
+        finally:
+            # Reset execution state
+            self.is_running = False
+            self.current_experiment = None
+            
+            if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
                 GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
@@ -428,6 +828,16 @@ class BatchExecutor:
                 'arc_ids': [a.id for a in subnet_data['arcs']]
             }
             
+            # Extract replicate-level data for statistical tests
+            replicate_data = []
+            if results:
+                for rep in results:
+                    if 'error' not in rep:
+                        replicate_data.append({
+                            'deadlocked': rep.get('deadlocked', False),
+                            'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0
+                        })
+            
             # Return complete result dict with statistics (plottable from statistics)
             result = {
                 'name': name,
@@ -437,7 +847,8 @@ class BatchExecutor:
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
                 'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
-                'subnet_structure': subnet_structure  # Include actual subnet composition
+                'subnet_structure': subnet_structure,  # Include actual subnet composition
+                'replicate_data': replicate_data  # Per-replicate outcomes for statistical tests
             }
             
             return result
@@ -650,8 +1061,6 @@ class BatchExecutor:
             place = next((p for p in places if p.id == place_id), None)
             if place:
                 place.tokens = float(marking)
-                if hasattr(place, 'marking'):
-                    place.marking = float(marking)
         
         # Restore transition rates (handle both numeric and formula types)
         for trans_id, rate in saved_values['transition_rates'].items():
@@ -722,7 +1131,6 @@ class BatchExecutor:
                 # For non-swept parameters, skip zeros to preserve baseline
                 if place_id == swept_place_id or marking_float != 0.0:
                     place.tokens = marking_float
-                    place.marking = marking_float
                     applied_markings += 1
                 else:
                     # Keep baseline value from model (don't overwrite with zero)

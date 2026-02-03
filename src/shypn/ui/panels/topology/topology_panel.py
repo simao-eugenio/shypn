@@ -208,6 +208,19 @@ class TopologyPanel(Gtk.Box):
         for category in self.categories:
             category.refresh()
     
+    def clear_all_results(self, drawing_area=None):
+        """Clear all analyzer results for a specific model.
+        
+        Called when a tab/model is closed to clean up resources.
+        
+        Args:
+            drawing_area: The drawing area whose results should be cleared
+                         (None = current drawing area)
+        """
+        for category in self.categories:
+            if hasattr(category, 'clear_results'):
+                category.clear_results(drawing_area)
+    
     def auto_run_all_analyzers(self):
         """Auto-run all analyzers in background when model is loaded.
         

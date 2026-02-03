@@ -37,7 +37,9 @@ class HubAnalyzer(TopologyAnalyzer):
         self,
         min_degree: int = 3,
         top_n: int = 20,
-        node_type: Optional[str] = None
+        node_type: Optional[str] = None,
+        parallel: bool = False,
+        num_workers: Optional[int] = None
     ) -> AnalysisResult:
         """Find hubs (high-degree nodes) in the Petri net.
         
@@ -45,6 +47,8 @@ class HubAnalyzer(TopologyAnalyzer):
             min_degree: Minimum degree to be considered a hub
             top_n: Return top N hubs by degree
             node_type: Filter by node type ('place', 'transition', or None for all)
+            parallel: Use parallel processing for degree calculation
+            num_workers: Number of worker processes (None = CPU count)
             
         Returns:
             AnalysisResult with:
@@ -64,51 +68,16 @@ class HubAnalyzer(TopologyAnalyzer):
             graph = self._build_graph()
             
             # Calculate degrees for all nodes
-            node_degrees = []
-            for node_id in graph.nodes():
-                node_data = graph.nodes[node_id]
-                
-                # Filter by type if specified
-                if node_type and node_data['type'] != node_type:
-                    continue
-                
-                # Calculate degrees
-                in_degree = graph.in_degree(node_id)
-                out_degree = graph.out_degree(node_id)
-                total_degree = in_degree + out_degree
-                
-                # Calculate weighted degrees
-                weighted_in = sum(
-                    graph.edges[u, node_id].get('weight', 1)
-                    for u in graph.predecessors(node_id)
+            if parallel and len(graph.nodes()) > 10:
+                node_degrees = self._calculate_degrees_parallel(
+                    graph, node_type, num_workers
                 )
-                weighted_out = sum(
-                    graph.edges[node_id, v].get('weight', 1)
-                    for v in graph.successors(node_id)
+            else:
+                node_degrees = self._calculate_degrees_sequential(
+                    graph, node_type
                 )
-                weighted_total = weighted_in + weighted_out
-                
-                # Get node object and name
-                obj = node_data['obj']
-                name = getattr(obj, 'name', None)
-                if not name or name.strip() == "":
-                    if node_data['type'] == 'place':
-                        name = f"P{node_id}"
-                    else:
-                        name = f"T{node_id}"
-                
-                node_degrees.append({
-                    'id': node_id,
-                    'name': name,
-                    'type': node_data['type'],
-                    'degree': total_degree,
-                    'in_degree': in_degree,
-                    'out_degree': out_degree,
-                    'weighted_degree': weighted_total,
-                    'weighted_in_degree': weighted_in,
-                    'weighted_out_degree': weighted_out,
-                })
             
+            # Continue with filtering and sorting
             # Filter by minimum degree
             hubs = [n for n in node_degrees if n['degree'] >= min_degree]
             
@@ -214,6 +183,142 @@ class HubAnalyzer(TopologyAnalyzer):
         
         except Exception:
             return False
+    
+    def _calculate_degrees_sequential(
+        self,
+        graph: nx.DiGraph,
+        node_type: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Calculate node degrees sequentially."""
+        node_degrees = []
+        for node_id in graph.nodes():
+            node_data = graph.nodes[node_id]
+            
+            # Filter by type if specified
+            if node_type and node_data['type'] != node_type:
+                continue
+            
+            degree_info = self._compute_node_degree(graph, node_id, node_data)
+            node_degrees.append(degree_info)
+        
+        return node_degrees
+    
+    def _calculate_degrees_parallel(
+        self,
+        graph: nx.DiGraph,
+        node_type: Optional[str],
+        num_workers: Optional[int]
+    ) -> List[Dict[str, Any]]:
+        """Calculate node degrees in parallel using multiprocessing."""
+        from multiprocessing import Pool, cpu_count
+        
+        # Get node list with type filter
+        nodes_to_process = [
+            (node_id, graph.nodes[node_id])
+            for node_id in graph.nodes()
+            if not node_type or graph.nodes[node_id]['type'] == node_type
+        ]
+        
+        # Use specified workers or default to CPU count
+        workers = num_workers if num_workers else cpu_count()
+        
+        # Prepare data for workers (graph edges as dict for serialization)
+        graph_data = {
+            'edges': list(graph.edges(data=True)),
+            'predecessors': {n: list(graph.predecessors(n)) for n in graph.nodes()},
+            'successors': {n: list(graph.successors(n)) for n in graph.nodes()}
+        }
+        
+        # Parallel degree calculation
+        with Pool(workers) as pool:
+            node_degrees = pool.starmap(
+                self._compute_node_degree_worker,
+                [(node_id, node_data, graph_data) for node_id, node_data in nodes_to_process]
+            )
+        
+        return node_degrees
+    
+    def _compute_node_degree(self, graph, node_id, node_data):
+        """Compute degree information for a single node."""
+        in_degree = graph.in_degree(node_id)
+        out_degree = graph.out_degree(node_id)
+        total_degree = in_degree + out_degree
+        
+        # Calculate weighted degrees
+        weighted_in = sum(
+            graph.edges[u, node_id].get('weight', 1)
+            for u in graph.predecessors(node_id)
+        )
+        weighted_out = sum(
+            graph.edges[node_id, v].get('weight', 1)
+            for v in graph.successors(node_id)
+        )
+        weighted_total = weighted_in + weighted_out
+        
+        # Get node name
+        obj = node_data['obj']
+        name = getattr(obj, 'name', None)
+        if not name or name.strip() == "":
+            if node_data['type'] == 'place':
+                name = f"P{node_id}"
+            else:
+                name = f"T{node_id}"
+        
+        return {
+            'id': node_id,
+            'name': name,
+            'type': node_data['type'],
+            'degree': total_degree,
+            'in_degree': in_degree,
+            'out_degree': out_degree,
+            'weighted_degree': weighted_total,
+            'weighted_in_degree': weighted_in,
+            'weighted_out_degree': weighted_out,
+        }
+    
+    @staticmethod
+    def _compute_node_degree_worker(node_id, node_data, graph_data):
+        """Worker function for parallel degree calculation (must be static for pickling)."""
+        predecessors = graph_data['predecessors'].get(node_id, [])
+        successors = graph_data['successors'].get(node_id, [])
+        
+        in_degree = len(predecessors)
+        out_degree = len(successors)
+        total_degree = in_degree + out_degree
+        
+        # Calculate weighted degrees from edges
+        weighted_in = sum(
+            edge[2].get('weight', 1)
+            for edge in graph_data['edges']
+            if edge[1] == node_id
+        )
+        weighted_out = sum(
+            edge[2].get('weight', 1)
+            for edge in graph_data['edges']
+            if edge[0] == node_id
+        )
+        weighted_total = weighted_in + weighted_out
+        
+        # Get node name
+        obj = node_data['obj']
+        name = getattr(obj, 'name', None)
+        if not name or name.strip() == "":
+            if node_data['type'] == 'place':
+                name = f"P{node_id}"
+            else:
+                name = f"T{node_id}"
+        
+        return {
+            'id': node_id,
+            'name': name,
+            'type': node_data['type'],
+            'degree': total_degree,
+            'in_degree': in_degree,
+            'out_degree': out_degree,
+            'weighted_degree': weighted_total,
+            'weighted_in_degree': weighted_in,
+            'weighted_out_degree': weighted_out,
+        }
     
     def get_node_degree_info(self, node_id: int) -> Optional[Dict[str, Any]]:
         """Get degree information for a specific node.

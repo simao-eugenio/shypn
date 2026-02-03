@@ -704,6 +704,19 @@ class BiGGCategory(BasePathwayCategory):
                     parsed_pathway = self.sbml_parser.parse_file(sbml_path)
                     self.logger.info(f"  Parsed: {len(parsed_pathway.species)} species, "
                                    f"{len(parsed_pathway.reactions)} reactions")
+                    
+                    # Check memory requirements for large models
+                    from shypn.data.pathway.memory_optimizer import estimate_memory_requirements
+                    mem_est = estimate_memory_requirements(
+                        len(parsed_pathway.species),
+                        len(parsed_pathway.reactions)
+                    )
+                    if mem_est['use_optimization']:
+                        self.logger.warning(f"  Large model detected: {mem_est['estimated_memory_mb']} MB estimated")
+                        self.logger.warning(f"  {mem_est['recommendation']}")
+                        # Force garbage collection before conversion
+                        import gc
+                        gc.collect()
                 
                 # Update SBML metadata inspector (on main thread)
                 GLib.idle_add(self._update_sbml_metadata_view, parsed_pathway)
@@ -714,7 +727,24 @@ class BiGGCategory(BasePathwayCategory):
                 
                 # Step 4: Convert to Petri net → DocumentModel
                 self.logger.info(f"Step 4: Converting to Petri net")
-                document_model = self.converter.convert(processed_pathway)
+                
+                # Check if this is a large model requiring memory optimization
+                species_count = len(processed_pathway.species)
+                reaction_count = len(processed_pathway.reactions)
+                
+                if species_count > 500 or reaction_count > 500:
+                    # Use memory-optimized conversion for large models
+                    self.logger.info(f"  Using memory-optimized conversion (large model)")
+                    from shypn.data.pathway.memory_optimizer import optimize_large_model_import
+                    document_model = optimize_large_model_import(
+                        processed_pathway, 
+                        self.converter, 
+                        self.logger
+                    )
+                else:
+                    # Standard conversion for smaller models
+                    document_model = self.converter.convert(processed_pathway)
+                
                 self.logger.info(f"  Converted: {len(document_model.places)} places, "
                                f"{len(document_model.transitions)} transitions")
                 

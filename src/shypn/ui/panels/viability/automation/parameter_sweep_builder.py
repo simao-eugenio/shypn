@@ -36,8 +36,15 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_values = []
         self._param_name_to_id = {}  # Mapping for name to ID resolution
         
+        # Factorial design state
+        self.design_mode = 'single'  # 'single' or 'factorial'
+        self.factorial_parameters = []  # List of selected parameters for factorial
+        
         # Reference to viability panel for accessing model state
         self.viability_panel = None
+        
+        # Reference to parent automation category for refresh
+        self.parent_category = None
         
         # Flag to prevent recursive prefill
         self._in_prefill = False
@@ -56,6 +63,30 @@ class ParameterSweepBuilder(Gtk.Box):
         title_label.set_markup("<b>Parameter Sweep Configuration</b>")
         title_label.set_xalign(0)
         self.pack_start(title_label, False, False, 0)
+        
+        # === DESIGN MODE SELECTION ===
+        mode_frame = Gtk.Frame()
+        mode_frame.set_label("Design Mode")
+        mode_frame.set_margin_top(6)
+        
+        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        mode_box.set_margin_start(12)
+        mode_box.set_margin_end(12)
+        mode_box.set_margin_top(6)
+        mode_box.set_margin_bottom(6)
+        
+        self.single_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Single Parameter Sweep")
+        self.single_radio.set_tooltip_text("Vary one parameter at a time")
+        self.single_radio.connect("toggled", self._on_design_mode_changed)
+        mode_box.pack_start(self.single_radio, False, False, 0)
+        
+        self.factorial_radio = Gtk.RadioButton.new_with_label_from_widget(self.single_radio, "Factorial Design")
+        self.factorial_radio.set_tooltip_text("Vary multiple parameters simultaneously (creates all combinations)")
+        self.factorial_radio.connect("toggled", self._on_design_mode_changed)
+        mode_box.pack_start(self.factorial_radio, False, False, 0)
+        
+        mode_frame.add(mode_box)
+        self.pack_start(mode_frame, False, False, 0)
         
         # === PARAMETER SELECTION ===
         selection_frame = Gtk.Frame()
@@ -84,8 +115,12 @@ class ParameterSweepBuilder(Gtk.Box):
         type_box.pack_start(self.type_combo, True, True, 0)
         
         selection_box.pack_start(type_box, False, False, 0)
+        self.type_box = type_box  # Store reference for show/hide
         
-        # Parameter Name
+        # === SINGLE PARAMETER MODE UI ===
+        self.single_param_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Parameter selector with Add button
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         name_label = Gtk.Label(label="Parameter:")
         name_label.set_size_request(100, -1)
@@ -94,95 +129,130 @@ class ParameterSweepBuilder(Gtk.Box):
         
         self.name_combo = Gtk.ComboBoxText()
         self.name_combo.set_tooltip_text("Load a model with subnet parameters to see available parameters")
-        self.name_combo.connect("changed", self._on_name_changed)
         name_box.pack_start(self.name_combo, True, True, 0)
         
-        selection_box.pack_start(name_box, False, False, 0)
+        add_single_button = Gtk.Button(label="Add")
+        add_single_button.connect("clicked", self._on_single_set_parameter_clicked)
+        name_box.pack_start(add_single_button, False, False, 0)
+        
+        self.single_param_box.pack_start(name_box, False, False, 0)
+        
+        # TreeView for selected parameter
+        scroll_single = Gtk.ScrolledWindow()
+        scroll_single.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll_single.set_min_content_height(80)
+        
+        self.single_list = Gtk.ListStore(str, str, str, object)  # name, type, id, range_config
+        self.single_view = Gtk.TreeView(model=self.single_list)
+        self.single_view.set_headers_visible(True)
+        
+        col_name_single = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
+        col_name_single.set_resizable(True)
+        self.single_view.append_column(col_name_single)
+        
+        col_type_single = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
+        col_type_single.set_resizable(True)
+        self.single_view.append_column(col_type_single)
+        
+        # Add Range column
+        renderer_range_single = Gtk.CellRendererText()
+        renderer_range_single.set_property("foreground", "#0066CC")
+        col_range_single = Gtk.TreeViewColumn("Range", renderer_range_single)
+        col_range_single.set_cell_data_func(renderer_range_single, self._format_range_column)
+        col_range_single.set_resizable(True)
+        self.single_view.append_column(col_range_single)
+        
+        scroll_single.add(self.single_view)
+        self.single_param_box.pack_start(scroll_single, True, True, 0)
+        
+        # Button box for Edit Range and Remove
+        button_box_single = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        self.single_edit_range_button = Gtk.Button(label="Edit Range...")
+        self.single_edit_range_button.connect("clicked", self._on_single_edit_range_clicked)
+        button_box_single.pack_start(self.single_edit_range_button, False, False, 0)
+        
+        single_remove_button = Gtk.Button(label="Remove Selected")
+        single_remove_button.connect("clicked", self._on_single_remove_clicked)
+        button_box_single.pack_start(single_remove_button, False, False, 0)
+        
+        self.single_param_box.pack_start(button_box_single, False, False, 0)
+        
+        selection_box.pack_start(self.single_param_box, True, True, 0)
+        
+        # === FACTORIAL PARAMETER MODE UI ===
+        self.factorial_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Add label for clarity
+        factorial_label = Gtk.Label(label="Add parameters to factorial design:")
+        factorial_label.set_xalign(0)
+        self.factorial_box.pack_start(factorial_label, False, False, 0)
+        
+        # Add parameter combo with label
+        add_param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        param_label = Gtk.Label(label="Parameter:")
+        param_label.set_size_request(100, -1)
+        param_label.set_xalign(0)
+        add_param_box.pack_start(param_label, False, False, 0)
+        
+        self.factorial_add_combo = Gtk.ComboBoxText()
+        self.factorial_add_combo.set_tooltip_text("Select parameter to add to factorial design")
+        add_param_box.pack_start(self.factorial_add_combo, True, True, 0)
+        
+        add_button = Gtk.Button(label="Add")
+        add_button.connect("clicked", self._on_factorial_add_clicked)
+        add_param_box.pack_start(add_button, False, False, 0)
+        
+        self.factorial_box.pack_start(add_param_box, False, False, 0)
+        
+        # List of selected parameters
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(80)
+        
+        self.factorial_list = Gtk.ListStore(str, str, str, object)  # name, type, id, range_config
+        self.factorial_view = Gtk.TreeView(model=self.factorial_list)
+        self.factorial_view.set_headers_visible(True)
+        
+        col_name = Gtk.TreeViewColumn("Parameter", Gtk.CellRendererText(), text=0)
+        col_name.set_resizable(True)
+        self.factorial_view.append_column(col_name)
+        
+        col_type = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=1)
+        col_type.set_resizable(True)
+        self.factorial_view.append_column(col_type)
+        
+        # Add Range column showing summary of range configuration
+        renderer_range = Gtk.CellRendererText()
+        renderer_range.set_property("foreground", "#0066CC")
+        col_range = Gtk.TreeViewColumn("Range", renderer_range)
+        col_range.set_cell_data_func(renderer_range, self._format_range_column)
+        col_range.set_resizable(True)
+        self.factorial_view.append_column(col_range)
+        
+        scroll.add(self.factorial_view)
+        self.factorial_box.pack_start(scroll, True, True, 0)
+        
+        # Button box for Edit Range and Remove
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        edit_range_button = Gtk.Button(label="Edit Range...")
+        edit_range_button.connect("clicked", self._on_factorial_edit_range_clicked)
+        button_box.pack_start(edit_range_button, False, False, 0)
+        
+        remove_button = Gtk.Button(label="Remove Selected")
+        remove_button.connect("clicked", self._on_factorial_remove_clicked)
+        button_box.pack_start(remove_button, False, False, 0)
+        
+        self.factorial_box.pack_start(button_box, False, False, 0)
+        
+        selection_box.pack_start(self.factorial_box, True, True, 0)
+        self.factorial_box.set_no_show_all(True)
+        self.factorial_box.hide()
         
         selection_frame.add(selection_box)
         self.pack_start(selection_frame, False, False, 0)
-        
-        # === RANGE SPECIFICATION ===
-        range_frame = Gtk.Frame()
-        range_frame.set_label("Range Specification")
-        range_frame.set_margin_top(6)
-        
-        range_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        range_box.set_margin_start(12)
-        range_box.set_margin_end(12)
-        range_box.set_margin_top(6)
-        range_box.set_margin_bottom(6)
-        
-        # Radio buttons for range type
-        self.linear_radio = Gtk.RadioButton(label="Linear Range")
-        range_box.pack_start(self.linear_radio, False, False, 0)
-        
-        # Linear range inputs
-        linear_grid = Gtk.Grid()
-        linear_grid.set_column_spacing(6)
-        linear_grid.set_row_spacing(6)
-        linear_grid.set_margin_start(24)
-        
-        linear_grid.attach(Gtk.Label(label="Start:", xalign=0), 0, 0, 1, 1)
-        self.start_entry = Gtk.Entry()
-        self.start_entry.set_text("0.1")
-        self.start_entry.set_width_chars(10)
-        linear_grid.attach(self.start_entry, 1, 0, 1, 1)
-        
-        linear_grid.attach(Gtk.Label(label="Stop:", xalign=0), 2, 0, 1, 1)
-        self.stop_entry = Gtk.Entry()
-        self.stop_entry.set_text("1.0")
-        self.stop_entry.set_width_chars(10)
-        linear_grid.attach(self.stop_entry, 3, 0, 1, 1)
-        
-        linear_grid.attach(Gtk.Label(label="Step:", xalign=0), 4, 0, 1, 1)
-        self.step_entry = Gtk.Entry()
-        self.step_entry.set_text("0.1")
-        self.step_entry.set_width_chars(10)
-        linear_grid.attach(self.step_entry, 5, 0, 1, 1)
-        
-        range_box.pack_start(linear_grid, False, False, 0)
-        
-        # List values radio
-        self.list_radio = Gtk.RadioButton(group=self.linear_radio, label="Value List")
-        range_box.pack_start(self.list_radio, False, False, 0)
-        
-        # List values input
-        list_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        list_box.set_margin_start(24)
-        self.list_entry = Gtk.Entry()
-        self.list_entry.set_placeholder_text("e.g., 0.1, 0.5, 1.0, 2.0")
-        list_box.pack_start(self.list_entry, True, True, 0)
-        range_box.pack_start(list_box, False, False, 0)
-        
-        # Percentage variation radio
-        self.percent_radio = Gtk.RadioButton(group=self.linear_radio, label="Percentage Variation")
-        range_box.pack_start(self.percent_radio, False, False, 0)
-        
-        # Percentage inputs
-        percent_grid = Gtk.Grid()
-        percent_grid.set_column_spacing(6)
-        percent_grid.set_row_spacing(6)
-        percent_grid.set_margin_start(24)
-        
-        percent_grid.attach(Gtk.Label(label="Baseline ±", xalign=0), 0, 0, 1, 1)
-        self.percent_entry = Gtk.Entry()
-        self.percent_entry.set_text("20")
-        self.percent_entry.set_width_chars(6)
-        percent_grid.attach(self.percent_entry, 1, 0, 1, 1)
-        
-        percent_grid.attach(Gtk.Label(label="% (", xalign=0), 2, 0, 1, 1)
-        self.percent_steps_entry = Gtk.Entry()
-        self.percent_steps_entry.set_text("5")
-        self.percent_steps_entry.set_width_chars(4)
-        percent_grid.attach(self.percent_steps_entry, 3, 0, 1, 1)
-        
-        percent_grid.attach(Gtk.Label(label="steps )", xalign=0), 4, 0, 1, 1)
-        
-        range_box.pack_start(percent_grid, False, False, 0)
-        
-        range_frame.add(range_box)
-        self.pack_start(range_frame, False, False, 0)
         
         # === SIMULATION SETTINGS ===
         sim_frame = Gtk.Frame()
@@ -199,16 +269,26 @@ class ParameterSweepBuilder(Gtk.Box):
         
         sim_box.attach(Gtk.Label(label="Replicates:", xalign=0), 0, 0, 1, 1)
         self.replicates_entry = Gtk.Entry()
-        self.replicates_entry.set_text("500")
+        self.replicates_entry.set_text("3")
         self.replicates_entry.set_width_chars(8)
         sim_box.attach(self.replicates_entry, 1, 0, 1, 1)
         
         sim_box.attach(Gtk.Label(label="Duration:", xalign=0), 2, 0, 1, 1)
         self.duration_entry = Gtk.Entry()
-        self.duration_entry.set_text("100.0")
+        self.duration_entry.set_text("60.0")
         self.duration_entry.set_width_chars(8)
         self.duration_entry.set_tooltip_text("Maximum simulation time (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
+        
+        # === STAGE 3: METHOD SELECTOR ===
+        sim_box.attach(Gtk.Label(label="Method:", xalign=0), 4, 0, 1, 1)
+        self.method_combo = Gtk.ComboBoxText()
+        self.method_combo.append("gillespie", "Gillespie (Stochastic)")
+        self.method_combo.append("ode", "ODE (Deterministic)")
+        self.method_combo.append("hybrid", "Hybrid (Mixed)")
+        self.method_combo.set_active_id("gillespie")
+        self.method_combo.set_tooltip_text("Simulation algorithm for batch experiments")
+        sim_box.attach(self.method_combo, 5, 0, 1, 1)
         
         # Termination condition
         sim_box.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
@@ -250,12 +330,211 @@ class ParameterSweepBuilder(Gtk.Box):
         action_box.pack_end(clear_button, False, False, 0)
         
         self.pack_start(action_box, False, False, 0)
+        
+        # Initialize visibility: single mode is default
+        self.design_mode = 'single'
+        self.single_param_box.show_all()  # Ensure all widgets in single mode are visible initially
+        self.single_edit_range_button.show()  # Explicitly show the button
     
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
+        old_type = self.parameter_type
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
+    
+    def _on_single_set_parameter_clicked(self, button):
+        """Add/update parameter in single parameter mode."""
+        param_id = self.name_combo.get_active_id()
+        param_name = self.name_combo.get_active_text()
+        
+        if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
+            return
+        
+        # Clear existing parameter (single mode only has one parameter)
+        self.single_list.clear()
+        
+        # Detect parameter type from ID prefix
+        if param_id.startswith('T'):
+            param_type = 'transitions'
+        elif param_id.startswith('A'):
+            param_type = 'arcs'
+        elif param_id.startswith('P'):
+            param_type = 'places'
+        else:
+            param_type = self.parameter_type  # Fallback to dropdown
+        
+        type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
+        
+        # Default range config
+        default_range = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
+        
+        self.single_list.append([param_name, type_display, param_id, default_range])
+    
+    def _on_single_remove_clicked(self, button):
+        """Remove parameter from single parameter list."""
+        self.single_list.clear()
+    
+    def _on_design_mode_changed(self, radio):
+        """Handle design mode change between single and factorial."""
+        if not radio.get_active():
+            return
+        
+        if self.single_radio.get_active():
+            self.design_mode = 'single'
+            self.type_box.show()  # Show type selector in single mode
+            self.single_param_box.show_all()  # Use show_all() to show all children including button
+            self.factorial_box.hide()
+            self.factorial_box.set_no_show_all(True)  # Prevent accidental showing
+            
+            # Trigger parameter refresh to load selected type parameters in single mode
+            if hasattr(self, 'parent_category') and self.parent_category:
+                self.parent_category.refresh_parameters()
+        else:
+            self.design_mode = 'factorial'
+            self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
+            self.single_param_box.hide()
+            # Unset no_show_all flag to allow showing
+            self.factorial_box.set_no_show_all(False)
+            self.factorial_box.show_all()  # show_all() to display all children
+            
+            # Trigger parameter refresh to load ALL parameters in factorial mode
+            if hasattr(self, 'parent_category') and self.parent_category:
+                self.parent_category.refresh_parameters()
+    
+    def _on_factorial_add_clicked(self, button):
+        """Add parameter to factorial design."""
+        param_id = self.factorial_add_combo.get_active_id()
+        param_name = self.factorial_add_combo.get_active_text()
+        
+        if not param_id or param_id == "none":
+            return
+        
+        # Check if already added
+        for row in self.factorial_list:
+            if row[2] == param_id:  # Check ID column
+                return
+        
+        # Check limit (max 3 parameters for factorial)
+        if len(self.factorial_list) >= 3:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="Maximum 3 parameters for factorial design"
+            )
+            dialog.format_secondary_text("Factorial designs become very large with >3 parameters. For more parameters, consider fractional factorial designs or sequential optimization.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        # Detect parameter type from ID prefix
+        if param_id.startswith('T'):
+            param_type = 'transitions'
+        elif param_id.startswith('A'):
+            param_type = 'arcs'
+        elif param_id.startswith('P'):
+            param_type = 'places'
+        else:
+            param_type = self.parameter_type  # Fallback to dropdown
+        
+        type_display = {"places": "Place", "transitions": "Transition", "arcs": "Arc"}.get(param_type, param_type)
+        
+        # Default range config: linear 0.1 to 1.0, step 0.1 (10 values)
+        default_range = {
+            'mode': 'linear',
+            'start': 0.1,
+            'stop': 1.0,
+            'step': 0.1,
+            'list_values': '',
+            'percent': 20.0,
+            'percent_steps': 5,
+            'baseline': 1.0
+        }
+        
+        self.factorial_list.append([param_name, type_display, param_id, default_range])
+        
+        # Update preview
+        self._update_factorial_preview()
+    
+    def _on_factorial_remove_clicked(self, button):
+        """Remove selected parameter from factorial design."""
+        selection = self.factorial_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if tree_iter:
+            model.remove(tree_iter)
+            self._update_factorial_preview()
+    
+    def _update_factorial_preview(self):
+        """Update preview for factorial design with example combinations."""
+        if len(self.factorial_list) == 0:
+            self.preview_label.set_markup("<i>Add 2-3 parameters for factorial design</i>")
+            self.generate_button.set_sensitive(False)
+            return
+        
+        try:
+            # Calculate experiment count per parameter
+            total = 1
+            param_info = []
+            
+            for row in self.factorial_list:
+                param_name = row[0]
+                range_config = row[3]
+                
+                # Compute values for this parameter's specific range
+                values = self._compute_parameter_values_from_config(range_config)
+                param_info.append({
+                    'name': param_name,
+                    'count': len(values),
+                    'values': values
+                })
+                total *= len(values)
+            
+            # Build preview with multiplication and examples
+            counts_str = " × ".join([str(p['count']) for p in param_info])
+            preview_text = f"<span foreground='blue'><b>{counts_str} = {total} experiments</b></span>"
+            
+            # Add example combinations (first 3)
+            if total > 0:
+                import itertools
+                param_values = [p['values'] for p in param_info]
+                combinations = list(itertools.product(*param_values))
+                
+                examples = []
+                for i, combo in enumerate(combinations[:3]):
+                    parts = [f"{param_info[j]['name'][:15]}={combo[j]:.3g}" for j in range(len(combo))]
+                    examples.append(", ".join(parts))
+                
+                if examples:
+                    preview_text += "\n<span foreground='#666' size='small'>Examples:\n" + "\n".join(examples)
+                    if total > 3:
+                        preview_text += f"\n... ({total - 3} more)"
+                    preview_text += "</span>"
+            
+            self.preview_label.set_markup(preview_text)
+            self.generate_button.set_sensitive(total > 0 and total <= 500)
+            
+            if total > 500:
+                self.preview_label.set_markup(
+                    f"<span foreground='red'>Too many experiments ({total}). Reduce parameter ranges or values.</span>"
+                )
+        
+        except Exception as e:
+            self.preview_label.set_markup(f"<span foreground='red'>Error: {str(e)}</span>")
+            self.generate_button.set_sensitive(False)
+            import traceback
+            traceback.print_exc()
     
     def _on_name_changed(self, combo):
         """Handle parameter name selection - auto-predict range and settings."""
@@ -335,6 +614,14 @@ class ParameterSweepBuilder(Gtk.Box):
     def _on_preview_clicked(self, button):
         """Preview experiment count based on current configuration."""
         try:
+            # Check factorial design requirements
+            if self.design_mode == 'factorial' and len(self.factorial_list) < 2:
+                self.preview_label.set_markup(
+                    "<span foreground='orange'><b>Factorial Design:</b> Add at least 2 parameters to the list below</span>"
+                )
+                self.generate_button.set_sensitive(False)
+                return
+            
             values = self._compute_parameter_values()
             count = len(values)
             
@@ -359,49 +646,100 @@ class ParameterSweepBuilder(Gtk.Box):
         """Generate experiment snapshots."""
         if self.on_generate_callback:
             try:
-                # Ensure parameter_type is set
-                if self.parameter_type is None:
-                    self.parameter_type = self.type_combo.get_active_id()
-                    if self.parameter_type is None:
-                        raise ValueError("Please select a parameter type")
-                
-                # Get parameter ID (internal key) from combo
-                param_id = self.name_combo.get_active_id()
-                param_name = self.name_combo.get_active_text()  # Display name for labels
-                
-                if not param_id or param_id == "none" or not param_name or param_name.startswith("("):
-                    raise ValueError("Please select a parameter from the dropdown")
-                
-                values = self._compute_parameter_values()
-                if not values:
-                    raise ValueError("No parameter values to generate. Check range configuration.")
-                
-                config = {
-                    'parameter_type': self.parameter_type,
-                    'parameter_id': param_id,  # Internal ID for matching
-                    'parameter_name': param_name,  # Display name for labels
-                    'values': values,
-                    'replicates': int(self.replicates_entry.get_text()),
-                    'duration': float(self.duration_entry.get_text()),
-                    'termination_condition': self.termination_combo.get_active_id()
-                }
-                
-                self.on_generate_callback(config)
+                if self.design_mode == 'factorial':
+                    self._generate_factorial_experiments()
+                else:
+                    self._generate_single_parameter_experiments()
             except Exception as e:
                 self.preview_label.set_markup(
                     f"<span foreground='red'>Generation failed: {str(e)}</span>"
                 )
     
+    def _generate_single_parameter_experiments(self):
+        """Generate single parameter sweep experiments using TreeView."""
+        # Get parameter from TreeView
+        if len(self.single_list) == 0:
+            raise ValueError("Please add a parameter using 'Add' button")
+        
+        tree_iter = self.single_list.get_iter_first()
+        if not tree_iter:
+            raise ValueError("Please add a parameter using 'Add' button")
+        
+        param_name = self.single_list.get_value(tree_iter, 0)
+        param_type_display = self.single_list.get_value(tree_iter, 1)
+        param_id = self.single_list.get_value(tree_iter, 2)
+        range_config = self.single_list.get_value(tree_iter, 3)
+        
+        # Convert type display back to parameter_type
+        type_map = {"Place": "places", "Transition": "transitions", "Arc": "arcs"}
+        parameter_type = type_map.get(param_type_display, "places")
+        
+        values = self._compute_parameter_values_from_config(range_config)
+        if not values:
+            raise ValueError("No parameter values to generate. Check range configuration.")
+        
+        config = {
+            'parameter_type': parameter_type,
+            'parameter_id': param_id,  # Internal ID for matching
+            'parameter_name': param_name,  # Display name for labels
+            'values': values,
+            'replicates': int(self.replicates_entry.get_text()),
+            'duration': float(self.duration_entry.get_text()),
+            'termination_condition': self.termination_combo.get_active_id(),
+            'method': self.method_combo.get_active_id()  # Stage 3: Include simulation method
+        }
+        
+        self.on_generate_callback(config)
+    
+    def _generate_factorial_experiments(self):
+        """Generate factorial design experiments."""
+        if len(self.factorial_list) < 2:
+            raise ValueError("Factorial design requires at least 2 parameters. Please add more parameters to the list.")
+        
+        # Collect all parameters and their values
+        parameters = []
+        for row in self.factorial_list:
+            param_name = row[0]
+            param_type = row[1].lower() + "s"  # "Place" -> "places"
+            param_id = row[2]
+            range_config = row[3]
+            
+            # Get parameter values from its specific range configuration
+            values = self._compute_parameter_values_from_config(range_config)
+            if not values:
+                raise ValueError(f"No values computed for {param_name}")
+            
+            parameters.append({
+                'name': param_name,
+                'type': param_type,
+                'id': param_id,
+                'values': values
+            })
+        
+        # Generate factorial grid
+        import itertools
+        param_combinations = list(itertools.product(*[p['values'] for p in parameters]))
+        
+        # Create experiments for each combination
+        factorial_config = {
+            'design_type': 'factorial',
+            'parameters': parameters,
+            'combinations': param_combinations,
+            'replicates': int(self.replicates_entry.get_text()),
+            'duration': float(self.duration_entry.get_text()),
+            'termination_condition': self.termination_combo.get_active_id(),
+            'method': self.method_combo.get_active_id()  # Stage 3: Include simulation method
+        }
+        
+        self.on_generate_callback(factorial_config)
+    
     def _on_clear_clicked(self, button):
         """Clear all inputs and notify parent to clear queue."""
-        self.start_entry.set_text("0.1")
-        self.stop_entry.set_text("1.0")
-        self.step_entry.set_text("0.1")
-        self.list_entry.set_text("")
-        self.percent_entry.set_text("20")
-        self.percent_steps_entry.set_text("5")
-        self.replicates_entry.set_text("500")
-        self.duration_entry.set_text("100.0")
+        # Clear single parameter list
+        self.single_list.clear()
+        
+        self.replicates_entry.set_text("3")
+        self.duration_entry.set_text("60.0")
         self.termination_combo.set_active_id("deadlock")
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
@@ -416,11 +754,62 @@ class ParameterSweepBuilder(Gtk.Box):
         Returns:
             list: List of parameter values to test
         """
-        if self.linear_radio.get_active():
-            # Linear range (supports both increasing and decreasing)
-            start = float(self.start_entry.get_text())
-            stop = float(self.stop_entry.get_text())
-            step = float(self.step_entry.get_text())
+        # Get config from TreeView for single parameter mode
+        if len(self.single_list) == 0:
+            return []
+        
+        tree_iter = self.single_list.get_iter_first()
+        if tree_iter:
+            range_config = self.single_list.get_value(tree_iter, 3)
+            return self._compute_parameter_values_from_config(range_config)
+        
+        return []
+    
+
+    def _on_single_edit_range_clicked(self, button):
+        """Open dialog to edit range configuration for single parameter mode."""
+        # Get selected parameter from TreeView
+        selection = self.single_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if not tree_iter:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No parameter selected"
+            )
+            dialog.format_secondary_text("Please add a parameter using 'Add' button first.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        param_name = model.get_value(tree_iter, 0)
+        current_config = model.get_value(tree_iter, 3)
+        
+        # Open range configuration dialog
+        new_config = self._show_range_config_dialog(param_name, current_config)
+        
+        if new_config:
+            # Update the range configuration in the TreeView
+            model.set_value(tree_iter, 3, new_config)
+    
+    def _compute_parameter_values_from_config(self, config):
+        """Compute parameter values from a range configuration dict.
+        
+        Args:
+            config: Dictionary with keys: mode, start, stop, step, list_values, percent, percent_steps, baseline
+            
+        Returns:
+            list: List of parameter values
+        """
+        mode = config.get('mode', 'linear')
+        
+        if mode == 'linear':
+            start = config['start']
+            stop = config['stop']
+            step = config['step']
             
             if step <= 0:
                 raise ValueError("Step must be positive")
@@ -428,16 +817,12 @@ class ParameterSweepBuilder(Gtk.Box):
                 raise ValueError("Start and stop must be different")
             
             values = []
-            
-            # Determine direction
             if start < stop:
-                # Increasing range
                 current = start
                 while current <= stop:
                     values.append(current)
                     current += step
             else:
-                # Decreasing range (e.g., NAD 2mM → 0mM)
                 current = start
                 while current >= stop:
                     values.append(current)
@@ -445,26 +830,21 @@ class ParameterSweepBuilder(Gtk.Box):
             
             return values
             
-        elif self.list_radio.get_active():
-            # Value list
-            text = self.list_entry.get_text().strip()
+        elif mode == 'list':
+            text = config.get('list_values', '').strip()
             if not text:
                 raise ValueError("Value list is empty")
-            
             values = [float(v.strip()) for v in text.split(',')]
             return values
             
-        elif self.percent_radio.get_active():
-            # Percentage variation (needs baseline value from current model)
-            # For now, use a default baseline of 1.0
-            baseline = 1.0
-            percent = float(self.percent_entry.get_text())
-            steps = int(self.percent_steps_entry.get_text())
+        elif mode == 'percent':
+            baseline = config.get('baseline', 1.0)
+            percent = config.get('percent', 20.0)
+            steps = config.get('percent_steps', 5)
             
             if steps <= 0:
                 raise ValueError("Steps must be positive")
             
-            # Generate values: baseline * (1 ± percent/100)
             min_val = baseline * (1 - percent / 100)
             max_val = baseline * (1 + percent / 100)
             
@@ -477,15 +857,228 @@ class ParameterSweepBuilder(Gtk.Box):
         
         return []
     
+    def _format_range_column(self, column, cell, model, iter, data):
+        """Format the range column to show a summary of the range configuration."""
+        range_config = model.get_value(iter, 3)
+        if not range_config:
+            cell.set_property('text', 'Not configured')
+            return
+        
+        mode = range_config.get('mode', 'linear')
+        
+        try:
+            values = self._compute_parameter_values_from_config(range_config)
+            n = len(values)
+            
+            if mode == 'linear':
+                start = range_config['start']
+                stop = range_config['stop']
+                cell.set_property('text', f"{start:.3g} to {stop:.3g} ({n} values)")
+            elif mode == 'list':
+                if n <= 4:
+                    vals_str = ', '.join([f"{v:.3g}" for v in values])
+                    cell.set_property('text', vals_str)
+                else:
+                    cell.set_property('text', f"{values[0]:.3g}, {values[1]:.3g}, ... ({n} values)")
+            elif mode == 'percent':
+                baseline = range_config.get('baseline', 1.0)
+                percent = range_config.get('percent', 20.0)
+                cell.set_property('text', f"{baseline:.3g} ± {percent}% ({n} values)")
+            else:
+                cell.set_property('text', f"{n} values")
+        except Exception as e:
+            cell.set_property('text', f'Error: {str(e)[:30]}')
+    
+    def _on_factorial_edit_range_clicked(self, button):
+        """Open dialog to edit range configuration for selected parameter."""
+        selection = self.factorial_view.get_selection()
+        model, tree_iter = selection.get_selected()
+        
+        if not tree_iter:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No parameter selected"
+            )
+            dialog.format_secondary_text("Please select a parameter from the list to edit its range.")
+            dialog.run()
+            dialog.destroy()
+            return
+        
+        param_name = model.get_value(tree_iter, 0)
+        current_config = model.get_value(tree_iter, 3)
+        
+        # Open range configuration dialog
+        new_config = self._show_range_config_dialog(param_name, current_config)
+        
+        if new_config:
+            # Update the range configuration
+            model.set_value(tree_iter, 3, new_config)
+            # Update preview
+            self._update_factorial_preview()
+    
+    def _show_range_config_dialog(self, param_name, current_config):
+        """Show dialog to configure range for a parameter.
+        
+        Returns:
+            dict or None: New configuration dict or None if cancelled
+        """
+        dialog = Gtk.Dialog(
+            title=f"Configure Range: {param_name}",
+            transient_for=self.get_toplevel(),
+            flags=0
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        dialog.set_default_size(400, 300)
+        
+        content = dialog.get_content_area()
+        content.set_spacing(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        
+        # Radio buttons for mode
+        linear_radio = Gtk.RadioButton(label="Linear Range")
+        content.pack_start(linear_radio, False, False, 0)
+        
+        # Linear range inputs
+        linear_grid = Gtk.Grid()
+        linear_grid.set_column_spacing(6)
+        linear_grid.set_row_spacing(6)
+        linear_grid.set_margin_start(24)
+        
+        linear_grid.attach(Gtk.Label(label="Start:", xalign=0), 0, 0, 1, 1)
+        start_entry = Gtk.Entry()
+        start_entry.set_text(str(current_config.get('start', 0.1)))
+        start_entry.set_width_chars(10)
+        linear_grid.attach(start_entry, 1, 0, 1, 1)
+        
+        linear_grid.attach(Gtk.Label(label="Stop:", xalign=0), 2, 0, 1, 1)
+        stop_entry = Gtk.Entry()
+        stop_entry.set_text(str(current_config.get('stop', 1.0)))
+        stop_entry.set_width_chars(10)
+        linear_grid.attach(stop_entry, 3, 0, 1, 1)
+        
+        linear_grid.attach(Gtk.Label(label="Step:", xalign=0), 4, 0, 1, 1)
+        step_entry = Gtk.Entry()
+        step_entry.set_text(str(current_config.get('step', 0.1)))
+        step_entry.set_width_chars(10)
+        linear_grid.attach(step_entry, 5, 0, 1, 1)
+        
+        content.pack_start(linear_grid, False, False, 0)
+        
+        # List values radio
+        list_radio = Gtk.RadioButton(group=linear_radio, label="Value List")
+        content.pack_start(list_radio, False, False, 0)
+        
+        # List values input
+        list_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        list_box.set_margin_start(24)
+        list_entry = Gtk.Entry()
+        list_entry.set_placeholder_text("e.g., 0.1, 0.5, 1.0, 2.0")
+        list_entry.set_text(current_config.get('list_values', ''))
+        list_box.pack_start(list_entry, True, True, 0)
+        content.pack_start(list_box, False, False, 0)
+        
+        # Percentage variation radio
+        percent_radio = Gtk.RadioButton(group=linear_radio, label="Percentage Variation")
+        content.pack_start(percent_radio, False, False, 0)
+        
+        # Percentage inputs
+        percent_grid = Gtk.Grid()
+        percent_grid.set_column_spacing(6)
+        percent_grid.set_row_spacing(6)
+        percent_grid.set_margin_start(24)
+        
+        percent_grid.attach(Gtk.Label(label="Baseline:", xalign=0), 0, 0, 1, 1)
+        baseline_entry = Gtk.Entry()
+        baseline_entry.set_text(str(current_config.get('baseline', 1.0)))
+        baseline_entry.set_width_chars(8)
+        percent_grid.attach(baseline_entry, 1, 0, 1, 1)
+        
+        percent_grid.attach(Gtk.Label(label="±", xalign=0), 2, 0, 1, 1)
+        percent_entry = Gtk.Entry()
+        percent_entry.set_text(str(current_config.get('percent', 20.0)))
+        percent_entry.set_width_chars(6)
+        percent_grid.attach(percent_entry, 3, 0, 1, 1)
+        percent_grid.attach(Gtk.Label(label="%", xalign=0), 4, 0, 1, 1)
+        
+        percent_grid.attach(Gtk.Label(label="Steps:", xalign=0), 0, 1, 1, 1)
+        percent_steps_entry = Gtk.Entry()
+        percent_steps_entry.set_text(str(current_config.get('percent_steps', 5)))
+        percent_steps_entry.set_width_chars(6)
+        percent_grid.attach(percent_steps_entry, 1, 1, 1, 1)
+        
+        content.pack_start(percent_grid, False, False, 0)
+        
+        # Set active radio based on current mode
+        mode = current_config.get('mode', 'linear')
+        if mode == 'list':
+            list_radio.set_active(True)
+        elif mode == 'percent':
+            percent_radio.set_active(True)
+        else:
+            linear_radio.set_active(True)
+        
+        dialog.show_all()
+        response = dialog.run()
+        
+        result = None
+        if response == Gtk.ResponseType.OK:
+            # Build new config based on selected mode
+            if linear_radio.get_active():
+                result = {
+                    'mode': 'linear',
+                    'start': float(start_entry.get_text()),
+                    'stop': float(stop_entry.get_text()),
+                    'step': float(step_entry.get_text()),
+                    'list_values': current_config.get('list_values', ''),
+                    'percent': current_config.get('percent', 20.0),
+                    'percent_steps': current_config.get('percent_steps', 5),
+                    'baseline': current_config.get('baseline', 1.0)
+                }
+            elif list_radio.get_active():
+                result = {
+                    'mode': 'list',
+                    'list_values': list_entry.get_text(),
+                    'start': current_config.get('start', 0.1),
+                    'stop': current_config.get('stop', 1.0),
+                    'step': current_config.get('step', 0.1),
+                    'percent': current_config.get('percent', 20.0),
+                    'percent_steps': current_config.get('percent_steps', 5),
+                    'baseline': current_config.get('baseline', 1.0)
+                }
+            elif percent_radio.get_active():
+                result = {
+                    'mode': 'percent',
+                    'baseline': float(baseline_entry.get_text()),
+                    'percent': float(percent_entry.get_text()),
+                    'percent_steps': int(percent_steps_entry.get_text()),
+                    'start': current_config.get('start', 0.1),
+                    'stop': current_config.get('stop', 1.0),
+                    'step': current_config.get('step', 0.1),
+                    'list_values': current_config.get('list_values', '')
+                }
+        
+        dialog.destroy()
+        return result
+    
     def set_available_parameters(self, parameter_type, parameters):
         """Set available parameters for selection.
         
         Args:
-            parameter_type: Type of parameters ('places', 'transitions', 'arcs')
+            parameter_type: Type of parameters ('places', 'transitions', 'arcs', 'all')
             parameters: List of (name, id) tuples or parameter names (for backward compatibility)
         """
         # Clear existing
         self.name_combo.remove_all()
+        self.factorial_add_combo.remove_all()
         
         # Store ID mapping for later retrieval
         self._param_name_to_id = {}
@@ -496,19 +1089,25 @@ class ParameterSweepBuilder(Gtk.Box):
                 # New format: (name, id) tuple
                 name, param_id = param
                 self.name_combo.append(param_id, name)  # Store ID as key, display name
+                self.factorial_add_combo.append(param_id, name)
                 self._param_name_to_id[name] = param_id
             else:
                 # Old format: just name/ID (backward compatibility)
                 self.name_combo.append(param, param)
+                self.factorial_add_combo.append(param, param)
                 self._param_name_to_id[param] = param
         
         # Select first if available
         if parameters:
             self.name_combo.set_active(0)
+            self.factorial_add_combo.set_active(0)
         else:
             # Show placeholder if no parameters
-            self.name_combo.append("none", "(No parameters available)")
+            placeholder_msg = "(Load subnet via right-click transition)" if parameter_type == 'all' else "(No parameters available)"
+            self.name_combo.append("none", placeholder_msg)
             self.name_combo.set_active(0)
+            self.factorial_add_combo.append("none", placeholder_msg)
+            self.factorial_add_combo.set_active(0)
     
     def set_generate_callback(self, callback):
         """Set callback for generate button.

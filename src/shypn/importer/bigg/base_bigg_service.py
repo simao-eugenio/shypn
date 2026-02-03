@@ -54,5 +54,18 @@ class BaseBiGGService(ABC):
             BiGGServiceError: Always raised with context information
         """
         error_msg = f"Failed to {context}: {error}"
+        
+        # Add helpful hints for common errors
+        if "404" in str(error) and "model" in context.lower():
+            error_msg += "\n\nCommon issues:"
+            error_msg += "\n- Check model ID spelling (case-sensitive)"
+            error_msg += "\n- Note: iJO1366 uses letter 'O', not digit '0'"
+            error_msg += "\n- Browse available models at: http://bigg.ucsd.edu/models"
+            error_msg += "\n\nPopular model IDs:"
+            error_msg += "\n- e_coli_core (E. coli core metabolism)"
+            error_msg += "\n- iJO1366 (E. coli genome-scale)"
+            error_msg += "\n- iML1515 (E. coli K-12 MG1655)"
+            error_msg += "\n- iAF1260 (E. coli legacy)"
+        
         self.logger.error(error_msg)
         raise BiGGServiceError(error_msg) from error

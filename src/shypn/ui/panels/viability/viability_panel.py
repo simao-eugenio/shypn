@@ -29,6 +29,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, GLib, Pango
+import re
 
 from .data.data_puller import DataPuller
 from .data.data_cache import CachedDataPuller, DataCache
@@ -41,6 +42,7 @@ from .ui.investigation_view import InvestigationView
 from .experiment_manager import ExperimentManager
 from .subnet_simulator import SubnetSimulator
 from .ui.simulation_control_toolbar import SimulationControlToolbar
+from .ui.subnet_parameters_view import SubnetParametersView
 
 
 class ViabilityPanel(Gtk.Box):
@@ -202,6 +204,18 @@ class ViabilityPanel(Gtk.Box):
         sep.set_margin_top(10)
         main_box.pack_start(sep, False, False, 0)
         
+        # === INTERACTIVE TESTING SECTION LABEL ===
+        interactive_label = Gtk.Label()
+        interactive_label.set_markup(
+            "<b>INTERACTIVE TESTING</b>\n"
+            "<span size='small'>For Petri net debugging: step-by-step execution, pause/resume, deadlock investigation</span>"
+        )
+        interactive_label.set_halign(Gtk.Align.START)
+        interactive_label.set_margin_start(10)
+        interactive_label.set_margin_top(10)
+        interactive_label.set_margin_bottom(5)
+        main_box.pack_start(interactive_label, False, False, 0)
+        
         # === SIMULATION CONTROLS (NEW) ===
         self.simulation_toolbar = SimulationControlToolbar()
         main_box.pack_start(self.simulation_toolbar, False, False, 0)
@@ -213,68 +227,32 @@ class ViabilityPanel(Gtk.Box):
         self.simulation_toolbar.stop_button.connect("clicked", self._on_stop_simulation)
         self.simulation_toolbar.reset_button.connect("clicked", self._on_reset_simulation)
         
-        # Connect experiment management signals
-        self.simulation_toolbar.add_exp_button.connect("clicked", self._on_add_experiment)
-        self.simulation_toolbar.copy_exp_button.connect("clicked", self._on_copy_experiment)
-        self.simulation_toolbar.experiment_combo.connect("changed", self._on_experiment_changed)
-        self.simulation_toolbar.sync_baseline_button.connect("clicked", self._on_sync_baseline)
+        # Removed experiment management connections - buttons removed from toolbar
+        # Auto-sync handles baseline updates automatically
         
         # === SECTION 2: SUBNET PARAMETERS EXPANDER ===
-        self.subnet_expander = Gtk.Expander()
-        self.subnet_expander.set_expanded(True)
-        self.subnet_expander.set_margin_start(10)
-        self.subnet_expander.set_margin_end(10)
-        self.subnet_expander.set_margin_top(10)
+        self.subnet_params_view = SubnetParametersView()
+        main_box.pack_start(self.subnet_params_view, False, False, 0)
         
-        subnet_label = Gtk.Label()
-        subnet_label.set_xalign(0)
-        subnet_label.set_markup("<b>SUBNET PARAMETERS</b>")
-        self.subnet_expander.set_label_widget(subnet_label)
+        # Connect edit callbacks to viability panel methods
+        self.subnet_params_view.on_place_marking_edited = self._on_place_marking_edited
+        self.subnet_params_view.on_transition_rate_edited = self._on_transition_rate_edited
+        self.subnet_params_view.on_transition_formula_edited = self._on_transition_formula_edited
+        self.subnet_params_view.on_arc_weight_edited = self._on_arc_weight_edited
+        self.subnet_params_view.on_create_sweep_from_place = self._on_create_sweep_from_place
+        self.subnet_params_view.on_create_sweep_from_transition = self._on_create_sweep_from_transition
+        self.subnet_params_view.on_create_sweep_from_arc = self._on_create_sweep_from_arc
         
-        # Subnet parameters notebook (tabs for Places, Transitions, Arcs)
-        self.subnet_notebook = Gtk.Notebook()
-        self.subnet_notebook.set_margin_start(12)
-        self.subnet_notebook.set_margin_top(6)
-        self.subnet_notebook.set_margin_bottom(6)
-        
-        # Places tab with editable TreeView
-        places_scroll = Gtk.ScrolledWindow()
-        places_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        places_scroll.set_size_request(-1, 200)
-        
-        self.places_treeview, self.places_store = self._create_places_treeview()
-        places_scroll.add(self.places_treeview)
-        self.subnet_notebook.append_page(places_scroll, Gtk.Label(label="Places"))
-        
-        # Transitions tab with editable TreeView
-        transitions_scroll = Gtk.ScrolledWindow()
-        transitions_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        transitions_scroll.set_size_request(-1, 200)
-        
-        self.transitions_treeview, self.transitions_store = self._create_transitions_treeview()
-        transitions_scroll.add(self.transitions_treeview)
-        self.subnet_notebook.append_page(transitions_scroll, Gtk.Label(label="Transitions"))
-        
-        # Arcs tab with editable TreeView
-        arcs_scroll = Gtk.ScrolledWindow()
-        arcs_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        arcs_scroll.set_size_request(-1, 200)
-        
-        self.arcs_treeview, self.arcs_store = self._create_arcs_treeview()
-        arcs_scroll.add(self.arcs_treeview)
-        self.subnet_notebook.append_page(arcs_scroll, Gtk.Label(label="Arcs"))
-        
-        # Results tab with simulation results (NEW)
-        results_scroll = Gtk.ScrolledWindow()
-        results_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        results_scroll.set_size_request(-1, 200)
-        
-        self.results_treeview, self.results_store = self._create_results_treeview()
-        results_scroll.add(self.results_treeview)
-        self.subnet_notebook.append_page(results_scroll, Gtk.Label(label="Results"))
-        
-        self.subnet_expander.add(self.subnet_notebook)
-        main_box.pack_start(self.subnet_expander, False, False, 0)
+        # Store references to TreeViews and stores for backward compatibility
+        self.places_treeview = self.subnet_params_view.places_treeview
+        self.places_store = self.subnet_params_view.places_store
+        self.transitions_treeview = self.subnet_params_view.transitions_treeview
+        self.transitions_store = self.subnet_params_view.transitions_store
+        self.arcs_treeview = self.subnet_params_view.arcs_treeview
+        self.arcs_store = self.subnet_params_view.arcs_store
+        self.results_treeview = self.subnet_params_view.results_treeview
+        self.results_store = self.subnet_params_view.results_store
+        self.subnet_notebook = self.subnet_params_view.subnet_notebook
         
         # Separator
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -342,10 +320,21 @@ class ViabilityPanel(Gtk.Box):
         # Add results container to main layout
         main_box.pack_start(self.content_box, False, False, 0)
         
-        # Separator before experiment automation
+        # === AUTOMATED EXPERIMENTATION SECTION LABEL ===
         sep4 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep4.set_margin_top(10)
+        sep4.set_margin_top(15)
+        sep4.set_margin_bottom(5)
         main_box.pack_start(sep4, False, False, 0)
+        
+        automation_label = Gtk.Label()
+        automation_label.set_markup(
+            "<b>AUTOMATED EXPERIMENTATION</b>\n"
+            "<span size='small'>Batch parameter sweeps, parallel execution, statistical analysis, sensitivity analysis</span>"
+        )
+        automation_label.set_halign(Gtk.Align.START)
+        automation_label.set_margin_start(10)
+        automation_label.set_margin_bottom(5)
+        main_box.pack_start(automation_label, False, False, 0)
         
         # === SECTION 8: EXPERIMENT AUTOMATION CATEGORY (NEW) ===
         from .automation import ExperimentAutomationCategory
@@ -353,7 +342,7 @@ class ViabilityPanel(Gtk.Box):
         self.automation_category = ExperimentAutomationCategory(
             model_canvas=self.model_canvas,
             experiment_manager=self.experiment_manager,
-            expanded=False  # Collapsed by default
+            expanded=True  # Expanded by default - primary workflow
         )
         self.automation_category.set_parent_panel(self)
         
@@ -426,231 +415,8 @@ class ViabilityPanel(Gtk.Box):
         
         return treeview, store
     
-    def _create_places_treeview(self):
-        """Create TreeView for editing place parameters.
-        
-        Columns: ID, Name, Marking (editable), Type, Label, Background
-        """
-        # Create ListStore: id, name, marking (int, editable), type, label, background
-        store = Gtk.ListStore(str, str, int, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        treeview.set_search_column(1)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
-        column_id.set_resizable(True)
-        column_id.set_min_width(60)
-        treeview.append_column(column_id)
-        
-        # Column 1: Name
-        renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=5)
-        column_name.set_resizable(True)
-        column_name.set_min_width(100)
-        treeview.append_column(column_name)
-        
-        # Column 2: Marking (EDITABLE)
-        renderer_marking = Gtk.CellRendererText()
-        renderer_marking.set_property("editable", True)
-        renderer_marking.connect("edited", self._on_place_marking_edited, store)
-        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2, background=5)
-        column_marking.set_resizable(True)
-        column_marking.set_min_width(80)
-        treeview.append_column(column_marking)
-        
-        # Column 3: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3, background=5)
-        column_type.set_resizable(True)
-        column_type.set_min_width(100)
-        treeview.append_column(column_type)
-        
-        # Column 4: Label
-        renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4, background=5)
-        column_label.set_resizable(True)
-        column_label.set_expand(True)
-        column_label.set_min_width(150)
-        treeview.append_column(column_label)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_places_table_button_press)
-        
-        return treeview, store
-    
-    def _create_transitions_treeview(self):
-        """Create TreeView for editing transition parameters.
-        
-        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background
-        """
-        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background
-        store = Gtk.ListStore(str, str, float, str, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        treeview.set_search_column(1)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=6)
-        column_id.set_resizable(True)
-        column_id.set_min_width(60)
-        treeview.append_column(column_id)
-        
-        # Column 1: Name
-        renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=6)
-        column_name.set_resizable(True)
-        column_name.set_min_width(100)
-        treeview.append_column(column_name)
-        
-        # Column 2: Rate (EDITABLE)
-        renderer_rate = Gtk.CellRendererText()
-        renderer_rate.set_property("editable", True)
-        renderer_rate.connect("edited", self._on_transition_rate_edited, store)
-        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2, background=6)
-        column_rate.set_resizable(True)
-        column_rate.set_min_width(80)
-        treeview.append_column(column_rate)
-        
-        # Column 3: Formula (EDITABLE)
-        renderer_formula = Gtk.CellRendererText()
-        renderer_formula.set_property("editable", True)
-        renderer_formula.connect("edited", self._on_transition_formula_edited, store)
-        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3, background=6)
-        column_formula.set_resizable(True)
-        column_formula.set_expand(True)
-        column_formula.set_min_width(200)
-        treeview.append_column(column_formula)
-        
-        # Column 4: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=6)
-        column_type.set_resizable(True)
-        column_type.set_min_width(100)
-        treeview.append_column(column_type)
-        
-        # Column 5: Label
-        renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5, background=6)
-        column_label.set_resizable(True)
-        column_label.set_min_width(150)
-        treeview.append_column(column_label)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_transitions_table_button_press)
-        
-        return treeview, store
-    
-    def _create_arcs_treeview(self):
-        """Create TreeView for editing arc parameters.
-        
-        Columns: ID, From, To, Weight (editable), Type, Background
-        """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background
-        store = Gtk.ListStore(str, str, str, int, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(True)
-        
-        # Column 0: ID
-        renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
-        column_id.set_resizable(True)
-        column_id.set_min_width(80)
-        treeview.append_column(column_id)
-        
-        # Column 1: From
-        renderer_from = Gtk.CellRendererText()
-        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1, background=5)
-        column_from.set_resizable(True)
-        column_from.set_min_width(100)
-        treeview.append_column(column_from)
-        
-        # Column 2: To
-        renderer_to = Gtk.CellRendererText()
-        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2, background=5)
-        column_to.set_resizable(True)
-        column_to.set_min_width(100)
-        treeview.append_column(column_to)
-        
-        # Column 3: Weight (EDITABLE)
-        renderer_weight = Gtk.CellRendererText()
-        renderer_weight.set_property("editable", True)
-        renderer_weight.connect("edited", self._on_arc_weight_edited, store)
-        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3, background=5)
-        column_weight.set_resizable(True)
-        column_weight.set_min_width(80)
-        treeview.append_column(column_weight)
-        
-        # Column 4: Type
-        renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=5)
-        column_type.set_resizable(True)
-        column_type.set_expand(True)
-        column_type.set_min_width(150)
-        treeview.append_column(column_type)
-        
-        # Add right-click context menu
-        treeview.connect("button-press-event", self._on_arcs_table_button_press)
-        
-        return treeview, store
-    
-    def _create_results_treeview(self):
-        """Create TreeView for simulation results display.
-        
-        Columns: Element, Initial, Final, Change, Notes
-        """
-        # Create ListStore: element, initial, final, change, notes
-        store = Gtk.ListStore(str, str, str, str, str)
-        
-        # Create TreeView
-        treeview = Gtk.TreeView(model=store)
-        treeview.set_enable_search(False)
-        
-        # Column 0: Element
-        renderer_elem = Gtk.CellRendererText()
-        column_elem = Gtk.TreeViewColumn("Element", renderer_elem, text=0)
-        column_elem.set_resizable(True)
-        column_elem.set_min_width(150)
-        treeview.append_column(column_elem)
-        
-        # Column 1: Initial
-        renderer_init = Gtk.CellRendererText()
-        column_init = Gtk.TreeViewColumn("Initial", renderer_init, text=1)
-        column_init.set_resizable(True)
-        column_init.set_min_width(80)
-        treeview.append_column(column_init)
-        
-        # Column 2: Final
-        renderer_final = Gtk.CellRendererText()
-        column_final = Gtk.TreeViewColumn("Final", renderer_final, text=2)
-        column_final.set_resizable(True)
-        column_final.set_min_width(80)
-        treeview.append_column(column_final)
-        
-        # Column 3: Change
-        renderer_change = Gtk.CellRendererText()
-        column_change = Gtk.TreeViewColumn("Change", renderer_change, text=3)
-        column_change.set_resizable(True)
-        column_change.set_min_width(80)
-        treeview.append_column(column_change)
-        
-        # Column 4: Notes
-        renderer_notes = Gtk.CellRendererText()
-        column_notes = Gtk.TreeViewColumn("Notes", renderer_notes, text=4)
-        column_notes.set_resizable(True)
-        column_notes.set_expand(True)
-        column_notes.set_min_width(200)
-        treeview.append_column(column_notes)
-        
-        return treeview, store
+    # TreeView creation methods moved to SubnetParametersView class
+    # Keeping _create_suggestions_treeview here as it's for investigation view
     
     def _get_current_model(self):
         """Get THIS panel's canvas manager (which contains the actual rendered objects).
@@ -831,6 +597,117 @@ class ViabilityPanel(Gtk.Box):
         # Set arc color
         arc_obj.color = color_rgb
     
+    def _detect_formula_referenced_places(self, transition_obj):
+        """Detect places referenced in transition rate formula.
+        
+        Args:
+            transition_obj: Transition object to check
+            
+        Returns:
+            list: List of Place objects referenced in formula but not in locality
+        """
+        # Get all places from the full model
+        canvas_mgr = self._get_canvas_manager()
+        if not canvas_mgr or not canvas_mgr._document_model:
+            return []
+        
+        all_places = {p.id: p for p in canvas_mgr._document_model.places}
+        
+        # Check if transition has a formula
+        # Formulas are stored in properties['rate_function'] dictionary
+        formula = None
+        
+        # Priority 1: Check properties dict (where transition property dialog stores formulas)
+        if hasattr(transition_obj, 'properties') and isinstance(transition_obj.properties, dict):
+            formula = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
+        
+        # Priority 2: Check if rate is a string (fallback for old format)
+        if not formula:
+            rate_attr = getattr(transition_obj, 'rate', None)
+            if rate_attr and isinstance(rate_attr, str) and rate_attr.strip():
+                formula = rate_attr
+        
+        if not formula:
+            return []
+        
+        # Extract place references from formula
+        # Look for patterns like: place_id, place.tokens, [place_id]
+        # Match place IDs (alphanumeric with underscores)
+        referenced_place_ids = set()
+        
+        # Pattern: Direct place ID references (alphanumeric + underscore)
+        place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+        matches = re.findall(place_id_pattern, formula)
+        
+        for match in matches:
+            # Check if this ID exists as a place in the model
+            if match in all_places:
+                referenced_place_ids.add(match)
+        
+        # Get locality to determine which places are already included
+        from shypn.diagnostic import LocalityDetector
+        model = self._get_current_model()
+        if not model:
+            return []
+        
+        locality_detector = LocalityDetector(model)
+        locality = locality_detector.get_locality_for_transition(transition_obj)
+        
+        # Get all locality place IDs
+        locality_place_ids = set()
+        for place_obj in locality.input_places:
+            locality_place_ids.add(place_obj.id)
+        for place_obj in locality.output_places:
+            locality_place_ids.add(place_obj.id)
+        for place_obj in locality.catalyst_places:
+            locality_place_ids.add(place_obj.id)
+        
+        # Find places referenced in formula but NOT in locality
+        formula_only_places = []
+        for place_id in referenced_place_ids:
+            if place_id not in locality_place_ids and place_id in all_places:
+                formula_only_places.append(all_places[place_id])
+        
+        return formula_only_places
+    
+    def _extract_place_ids_from_formula(self, formula: str, model, transition_id: str = None):
+        """Extract place objects referenced in a formula.
+        
+        Args:
+            formula: Formula string to parse
+            model: Model containing places
+            transition_id: Optional transition ID to filter out places already in its locality
+            
+        Returns:
+            list: List of place objects referenced in the formula but not in locality
+        """
+        if not formula or not model:
+            return []
+        
+        # Build map of place IDs to place objects
+        all_places = {p.id: p for p in model.places}
+        
+        # Extract place references using regex
+        place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+        matches = re.findall(place_id_pattern, formula)
+        
+        # Get locality place IDs to exclude (if transition_id provided)
+        locality_place_ids = set()
+        if transition_id and transition_id in self.selected_localities:
+            locality = self.selected_localities[transition_id].get('locality')
+            if locality:
+                locality_place_ids.update(p.id for p in locality.input_places)
+                locality_place_ids.update(p.id for p in locality.output_places)
+                locality_place_ids.update(p.id for p in locality.catalyst_places)
+        
+        # Filter to only actual place IDs that exist in model AND are not in locality
+        referenced_places = []
+        for match in matches:
+            if match in all_places and match not in locality_place_ids:
+                referenced_places.append(all_places[match])
+        
+        return referenced_places
+    
     def _add_transition_to_list(self, transition_obj):
         """Add a transition to the localities list (matching plot panel style).
         
@@ -851,6 +728,9 @@ class ViabilityPanel(Gtk.Box):
         locality_detector = LocalityDetector(model)
         locality = locality_detector.get_locality_for_transition(transition_obj)
         
+        # Note: Formula-referenced places will be detected later in _refresh_subnet_parameters()
+        # when we have access to the full model context and rate_function attribute
+        
         # === COLOR ALL LOCALITY OBJECTS FIRST ===
         
         # Color transition
@@ -867,6 +747,8 @@ class ViabilityPanel(Gtk.Box):
         # Color catalyst places (from test arcs - enzymes/cofactors)
         for place_obj in locality.catalyst_places:
             self._color_locality_place(place_obj)
+        
+        # Note: Formula-referenced places will be colored later when detected
         
         # Color input arcs
         for arc_obj in locality.input_arcs:
@@ -930,6 +812,8 @@ class ViabilityPanel(Gtk.Box):
         for place_obj in locality.catalyst_places:
             self._add_locality_place_row_to_list(place_obj, "Catalyst:")
         
+        # Note: Formula-referenced places will be added later when detected
+        
         # Show all new widgets (only if panel is packed)
         if self.get_parent() is not None:
             self.localities_listbox.show_all()
@@ -939,7 +823,8 @@ class ViabilityPanel(Gtk.Box):
             'row': transition_row,
             'checkbox': checkbox,
             'transition': transition_obj,
-            'locality': locality
+            'locality': locality,
+            'formula_places': []  # Will be populated later when formulas are detected
         }
         
         # Trigger canvas redraw to show colored elements
@@ -997,10 +882,8 @@ class ViabilityPanel(Gtk.Box):
         place_name = place.name if hasattr(place, 'name') else place.id
         place_label_text = f"{label_prefix} {place_name}"
         
-        # Add marking/tokens if available
-        if hasattr(place, 'marking'):
-            place_label_text += f" ({place.marking} tokens)"
-        elif hasattr(place, 'tokens'):
+        # Add tokens if available
+        if hasattr(place, 'tokens'):
             place_label_text += f" ({place.tokens} tokens)"
         
         place_label = Gtk.Label()
@@ -1046,6 +929,15 @@ class ViabilityPanel(Gtk.Box):
             for p_obj in locality_obj.output_places:
                 ColorSchemaManager.reset_place_color(p_obj)
             
+            # Reset catalyst place colors
+            for p_obj in locality_obj.catalyst_places:
+                ColorSchemaManager.reset_place_color(p_obj)
+            
+            # Reset formula-referenced place colors
+            formula_places = data.get('formula_places', [])
+            for p_obj in formula_places:
+                ColorSchemaManager.reset_place_color(p_obj)
+            
             # Reset input arc colors
             for a_obj in locality_obj.input_arcs:
                 ColorSchemaManager.reset_arc_color(a_obj)
@@ -1089,6 +981,29 @@ class ViabilityPanel(Gtk.Box):
         if not model:
             return
         
+        # PRE-PROCESS: Detect formula-referenced places for all transitions FIRST
+        # This must happen before collecting place IDs
+        for transition_id, data in self.selected_localities.items():
+            locality = data.get('locality')
+            if not locality:
+                continue
+            
+            transition_obj = locality.transition
+            
+            # Check if transition has a formula in properties dict
+            formula = None
+            if hasattr(transition_obj, 'properties') and isinstance(transition_obj.properties, dict):
+                formula = transition_obj.properties.get('rate_function') or transition_obj.properties.get('rate_function_display')
+            
+            if formula and isinstance(formula, str) and formula.strip():
+                formula_places = self._extract_place_ids_from_formula(formula, model, transition_id)
+                if formula_places:
+                    data['formula_places'] = formula_places
+                else:
+                    data['formula_places'] = []
+            else:
+                data['formula_places'] = []
+        
         # Collect all unique place IDs, transition IDs, and arc IDs from localities
         all_place_ids = set()
         all_transition_ids = set()
@@ -1106,6 +1021,10 @@ class ViabilityPanel(Gtk.Box):
             all_place_ids.update(p.id for p in locality.input_places)
             all_place_ids.update(p.id for p in locality.output_places)
             all_place_ids.update(p.id for p in locality.catalyst_places)  # Include catalyst/enzyme places
+            
+            # Add formula-referenced place IDs
+            formula_places = data.get('formula_places', [])
+            all_place_ids.update(p.id for p in formula_places)
             
             # Add arc IDs (extract IDs from arc objects)
             all_arc_ids.update(a.id for a in locality.input_arcs)
@@ -1133,7 +1052,10 @@ class ViabilityPanel(Gtk.Box):
         for transition in model.transitions:
             if transition.id in all_transition_ids:
                 rate = transition.rate if hasattr(transition, 'rate') else 1.0
-                formula = transition.formula if hasattr(transition, 'formula') else ""
+                # Check rate_function in properties dict (where formulas/expressions are actually stored)
+                formula = ""
+                if hasattr(transition, 'properties') and isinstance(transition.properties, dict):
+                    formula = transition.properties.get('rate_function', '') or transition.properties.get('rate_function_display', '')
                 
                 # Handle case where rate might be a string formula
                 if isinstance(rate, str):
@@ -1158,6 +1080,71 @@ class ViabilityPanel(Gtk.Box):
                     label,
                     "#FFFFFF"  # Background color
                 ])
+                
+                # Detect formula-referenced places NOW that we have the formula
+                if formula and isinstance(formula, str) and formula.strip():
+                    formula_places = self._extract_place_ids_from_formula(formula, model, transition.id)
+                    if formula_places:
+                        # Update selected_localities with formula places
+                        if transition.id in self.selected_localities:
+                            self.selected_localities[transition.id]['formula_places'] = formula_places
+                            # Color the formula places using the standard coloring method
+                            for place in formula_places:
+                                self._color_locality_place(place)
+                            # Trigger canvas redraw to show the new colors
+                            self._trigger_canvas_redraw()
+                            
+                            # Add UI rows for formula places in the localities listbox
+                            # Find the transition's row to insert after it
+                            transition_row = self.selected_localities[transition.id].get('row')
+                            if transition_row:
+                                # Get all children to find where to insert
+                                children = self.localities_listbox.get_children()
+                                insert_index = -1
+                                for i, child in enumerate(children):
+                                    if child == transition_row:
+                                        insert_index = i + 1
+                                        # Skip existing place rows (input/output/catalyst)
+                                        while insert_index < len(children):
+                                            next_child = children[insert_index]
+                                            # Check if it's a place row (indented)
+                                            hbox = next_child.get_child()
+                                            if hbox and hbox.get_margin_start() > 10:
+                                                insert_index += 1
+                                            else:
+                                                break
+                                        break
+                                
+                                # Add formula place rows at the correct position
+                                for place in formula_places:
+                                    place_row = Gtk.ListBoxRow()
+                                    place_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                                    place_hbox.set_margin_start(40)  # Indent like other places
+                                    place_hbox.set_margin_end(6)
+                                    place_hbox.set_margin_top(1)
+                                    place_hbox.set_margin_bottom(1)
+                                    
+                                    # Checkbox
+                                    place_checkbox = Gtk.CheckButton()
+                                    place_checkbox.set_active(True)
+                                    place_checkbox.place_id = place.id
+                                    place_hbox.pack_start(place_checkbox, False, False, 0)
+                                    
+                                    # Label with formula prefix
+                                    place_label_text = f"Formula: {place.id}"
+                                    if hasattr(place, 'label') and place.label:
+                                        place_label_text += f" ({place.label})"
+                                    place_label = Gtk.Label(label=place_label_text)
+                                    place_label.set_xalign(0)
+                                    place_hbox.pack_start(place_label, True, True, 0)
+                                    
+                                    place_row.add(place_hbox)
+                                    self.localities_listbox.insert(place_row, insert_index)
+                                    insert_index += 1
+                                
+                                # Show new rows
+                                self.localities_listbox.show_all()
+        
         
         # Populate Arcs table
         for arc in model.arcs:
@@ -1188,6 +1175,9 @@ class ViabilityPanel(Gtk.Box):
         This creates the subnet model immediately when localities are added,
         ensuring all elements (places, transitions, arcs) are captured correctly.
         The model is stored and reused by batch execution.
+        
+        IMPORTANT: Also includes places referenced in transition rate formulas,
+        even if they are not directly connected via arcs.
         """
         from shypn.data.canvas.document_model import DocumentModel
         
@@ -1209,32 +1199,85 @@ class ViabilityPanel(Gtk.Box):
             subnet_places_set.update(locality.output_places)
             subnet_places_set.update(locality.catalyst_places)
             
+            # Add formula-referenced places if stored
+            formula_places = data.get('formula_places', [])
+            subnet_places_set.update(formula_places)
+            
             # Add arcs
             subnet_arcs_set.update(locality.input_arcs)
             subnet_arcs_set.update(locality.output_arcs)
             subnet_arcs_set.update(locality.catalyst_arcs)
         
+        # Check for places referenced in transition rate formulas
+        # that are not already in the subnet
+        self._add_formula_referenced_places(subnet_transitions_set, subnet_places_set)
+        
         # Create DocumentModel
         model = DocumentModel()
         
-        # Copy places via serialization (preserves all properties)
-        model.places = [type(p).from_dict(p.to_dict()) for p in subnet_places_set]
-        
-        # Copy transitions via serialization
-        model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_transitions_set]
-        
-        # Build ID lookup dictionaries for arc deserialization
-        places_dict = {p.id: p for p in model.places}
-        transitions_dict = {t.id: t for t in model.transitions}
-        
-        # Copy arcs (need references to copied places/transitions)
-        model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
-                      for a in subnet_arcs_set]
+        # CRITICAL FIX: Use direct references to canvas objects, NOT copies!
+        # Previously used from_dict(to_dict()) which created deep copies.
+        # Edits to copies were not reflected in the canvas manager, so saves lost changes.
+        # Now use direct references so edits update the actual canvas objects.
+        model.places = list(subnet_places_set)
+        model.transitions = list(subnet_transitions_set)
+        model.arcs = list(subnet_arcs_set)
         
         # Store the subnet model
         self.subnet_model = model
         
         return model
+    
+    def _add_formula_referenced_places(self, transitions, places_set):
+        """Add places referenced in transition rate formulas to the subnet.
+        
+        Args:
+            transitions: Set of transitions to check
+            places_set: Set of places (will be modified to add referenced places)
+        """
+        import re
+        
+        # Get all places from the full model
+        canvas_mgr = self._get_canvas_manager()
+        if not canvas_mgr or not canvas_mgr._document_model:
+            return
+        
+        all_places = {p.id: p for p in canvas_mgr._document_model.places}
+        
+        for transition in transitions:
+            # Check if transition has a formula in properties dict
+            formula = None
+            if hasattr(transition, 'properties') and isinstance(transition.properties, dict):
+                formula = transition.properties.get('rate_function') or transition.properties.get('rate_function_display')
+            # Fallback to old format
+            elif hasattr(transition, 'formula') and transition.formula:
+                formula = transition.formula
+            elif isinstance(transition.rate, str):
+                formula = transition.rate
+            
+            if not formula:
+                continue
+            
+            # Extract place references from formula
+            # Look for patterns like: place_id, place.tokens, [place_id]
+            # Match place IDs (alphanumeric with underscores)
+            referenced_place_ids = set()
+            
+            # Pattern 1: Direct place ID references (alphanumeric + underscore)
+            place_id_pattern = r'\b([A-Za-z_][A-Za-z0-9_]*)\b'
+            matches = re.findall(place_id_pattern, formula)
+            
+            for match in matches:
+                # Check if this ID exists as a place in the model
+                if match in all_places:
+                    referenced_place_ids.add(match)
+            
+            # Add referenced places that aren't already in the subnet
+            current_place_ids = {p.id for p in places_set}
+            for place_id in referenced_place_ids:
+                if place_id not in current_place_ids and place_id in all_places:
+                    places_set.add(all_places[place_id])
+                    print(f"[SUBNET] Added place '{place_id}' referenced in formula for transition '{transition.id}'")
     
     # === EDITING CALLBACKS ===
     
@@ -1252,13 +1295,11 @@ class ViabilityPanel(Gtk.Box):
             if model:
                 for place in model.places:
                     if place.id == place_id:
-                        place.marking = new_marking
+                        place.tokens = new_marking
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -1279,10 +1320,8 @@ class ViabilityPanel(Gtk.Box):
                         transition.rate = new_rate
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -1301,10 +1340,8 @@ class ViabilityPanel(Gtk.Box):
                     transition.formula = new_text
                     break
         
-        # Mark baseline as stale (needs resync for automation)
-        if hasattr(self, 'experiment_manager'):
-            self.experiment_manager.mark_baseline_stale()
-            self._show_stale_baseline_warning()
+        # Auto-sync baseline to automation (no manual sync needed)
+        self._auto_sync_baseline_to_automation()
     
     def _on_arc_weight_edited(self, widget, path, new_text, store):
         """Handle arc weight edit."""
@@ -1323,10 +1360,8 @@ class ViabilityPanel(Gtk.Box):
                         arc.weight = new_weight
                         break
             
-            # Mark baseline as stale (needs resync for automation)
-            if hasattr(self, 'experiment_manager'):
-                self.experiment_manager.mark_baseline_stale()
-                self._show_stale_baseline_warning()
+            # Auto-sync baseline to automation (no manual sync needed)
+            self._auto_sync_baseline_to_automation()
         except ValueError:
             pass
     
@@ -2687,9 +2722,26 @@ class ViabilityPanel(Gtk.Box):
             self._append_diagnostics_log(f"Switched to: {snapshot.name}")
     
     def _show_stale_baseline_warning(self):
-        """Show visual warning that baseline is stale."""
-        if hasattr(self, 'simulation_toolbar'):
-            self.simulation_toolbar.show_stale_baseline_warning(True)
+        """Show visual warning that baseline is stale (DEPRECATED - auto-sync enabled)."""
+        # No longer used - auto-sync handles baseline updates automatically
+        pass
+    
+    def _auto_sync_baseline_to_automation(self):
+        """Automatically sync baseline to automation after parameter edits.
+        
+        Silently updates automation baseline when user edits subnet parameters.
+        No confirmation needed - this is background synchronization.
+        """
+        if not hasattr(self, 'experiment_manager'):
+            return
+        
+        # Silently sync baseline from current tables
+        if hasattr(self.experiment_manager, 'sync_baseline_from_tables'):
+            self.experiment_manager.sync_baseline_from_tables(
+                self.places_store,
+                self.transitions_store,
+                self.arcs_store
+            )
     
     def _on_sync_baseline(self, button):
         """Sync automation baseline from current table values."""
@@ -2736,36 +2788,23 @@ class ViabilityPanel(Gtk.Box):
             swept_param_type: 'place', 'transition', or 'arc'
             swept_param_id: ID of the swept parameter
         """
-        # Clear all indicators first
-        self._clear_sweep_indicators()
-        
-        # Highlight the swept parameter
-        if swept_param_type == 'place':
-            for row in self.places_store:
-                if row[0] == swept_param_id:
-                    row[5] = "#B3D9FF"  # Medium blue - more visible
-                    break
-        elif swept_param_type == 'transition':
-            for row in self.transitions_store:
-                if row[0] == swept_param_id:
-                    row[6] = "#B3D9FF"  # Medium blue - more visible
-                    break
-        elif swept_param_type == 'arc':
-            for row in self.arcs_store:
-                if row[0] == swept_param_id:
-                    row[5] = "#B3D9FF"  # Medium blue - more visible
-                    break
+        # Delegate to SubnetParametersView
+        # Convert type names to plural for consistency
+        type_mapping = {
+            'place': 'places',
+            'transition': 'transitions',
+            'arc': 'arcs'
+        }
+        plural_type = type_mapping.get(swept_param_type, swept_param_type)
+        self.subnet_params_view.update_sweep_indicators(plural_type, swept_param_id)
     
     def _clear_sweep_indicators(self):
         """Reset all row backgrounds to white."""
-        for row in self.places_store:
-            row[5] = "#FFFFFF"
-        for row in self.transitions_store:
-            row[6] = "#FFFFFF"
-        for row in self.arcs_store:
-            row[5] = "#FFFFFF"
+        # Delegate to SubnetParametersView
+        self.subnet_params_view.clear_sweep_indicators()
     
-    def _on_places_table_button_press(self, treeview, event):
+    # Context menu handlers moved to SubnetParametersView class
+    # These stub methods exist for backward compatibility but delegate to SubnetParametersView
         """Handle right-click on places table to show context menu."""
         if event.button == 3:  # Right-click
             # Get clicked row

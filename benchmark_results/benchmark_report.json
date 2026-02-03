@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-02-03 11:00:47",
+  "results": [
+    {
+      "strategy": "Phase 3: Hierarchical (sequential)",
+      "model_name": "Glycolysis + Quorum + Gene Regulation",
+      "model_size": {
+        "places": 14,
+        "transitions": 9
+      },
+      "performance": {
+        "execution_time_s": 0.23769831657409668,
+        "states_explored": 5000,
+        "transitions_fired": 17191,
+        "deadlocks_found": 2,
+        "memory_mb": 10.605907440185547
+      },
+      "extra_metrics": {
+        "layer_count": 3,
+        "exploration_mode": "hierarchical",
+        "parallel": false,
+        "num_workers": 0
+      }
+    },
+    {
+      "strategy": "Phase 3: Hierarchical (parallel (4 workers))",
+      "model_name": "Glycolysis + Quorum + Gene Regulation",
+      "model_size": {
+        "places": 14,
+        "transitions": 9
+      },
+      "performance": {
+        "execution_time_s": 0.1709744930267334,
+        "states_explored": 5000,
+        "transitions_fired": 17191,
+        "deadlocks_found": 2,
+        "memory_mb": 10.08346939086914
+      },
+      "extra_metrics": {
+        "layer_count": 3,
+        "exploration_mode": "hierarchical",
+        "parallel": true,
+        "num_workers": 4
+      }
+    }
+  ],
+  "summary": {
+    "total_benchmarks": 2,
+    "total_time": 0.4086728096008301,
+    "total_states_explored": 10000,
+    "average_time": 0.20433640480041504,
+    "strategies": [
+      "Phase 3: Hierarchical (parallel (4 workers))",
+      "Phase 3: Hierarchical (sequential)"
+    ]
+  }
+}

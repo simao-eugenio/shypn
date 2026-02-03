@@ -342,11 +342,15 @@ class ExperimentManager:
         # "NAD*0.5" -> "NAD*4.5"
         # "(0.5)*NAD" -> "(4.5)*NAD"
         
-        # Try to find coefficient at start: "0.5*..."
-        match = re.match(r'^([\d.]+)\s*\*', original_str)
+        # Try to find coefficient at start: "0.5*..." or "0.5 *..."
+        match = re.match(r'^([\d.]+)(\s*\*)', original_str)
         if match:
             old_coefficient = match.group(1)
-            modified = original_str.replace(f'{old_coefficient}*', f'{new_value}*', 1)
+            whitespace_and_operator = match.group(2)  # Captures " *" or "*"
+            # Replace the full matched pattern (coefficient + whitespace + operator)
+            old_pattern = old_coefficient + whitespace_and_operator
+            new_pattern = str(new_value) + whitespace_and_operator
+            modified = original_str.replace(old_pattern, new_pattern, 1)
             return modified
         
         # Try to find coefficient after multiplication: "...*0.5"

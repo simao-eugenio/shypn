@@ -41,7 +41,8 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         min_support: int = 1,
         max_invariants: int = 100,
         normalize: bool = True,
-        classify: bool = True
+        classify: bool = True,
+        num_threads: Optional[int] = None
     ) -> AnalysisResult:
         """Find all minimal T-invariants (transition invariants).
         
@@ -50,6 +51,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
             max_invariants: Maximum number of invariants to return
             normalize: Whether to normalize to smallest integer weights
             classify: Whether to classify invariant types
+            num_threads: Number of threads for NumPy/BLAS (None = auto)
             
         Returns:
             AnalysisResult with:
@@ -64,6 +66,11 @@ class TInvariantAnalyzer(TopologyAnalyzer):
             TopologyAnalysisError: If analysis fails
         """
         start_time = self._start_timer()
+        
+        # Configure NumPy threading if specified
+        old_thread_settings = None
+        if num_threads is not None:
+            old_thread_settings = self._set_numpy_threads(num_threads)
         
         try:
             # Validate model
@@ -155,6 +162,59 @@ class TInvariantAnalyzer(TopologyAnalyzer):
                 errors=[f"T-invariant analysis failed: {str(e)}"],
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
+        
+        finally:
+            # Restore thread settings
+            if old_thread_settings is not None:
+                self._restore_numpy_threads(old_thread_settings)
+    
+    def _set_numpy_threads(self, num_threads: int) -> Dict[str, Any]:
+        """Configure NumPy/BLAS threading.
+        
+        Args:
+            num_threads: Number of threads to use
+            
+        Returns:
+            Dictionary of old settings for restoration
+        """
+        import os
+        old_settings = {}
+        
+        # Save old environment variables
+        env_vars = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']
+        for var in env_vars:
+            old_settings[var] = os.environ.get(var)
+            os.environ[var] = str(num_threads)
+        
+        # Try threadpoolctl if available (more reliable)
+        try:
+            from threadpoolctl import threadpool_limits
+            old_settings['threadpool_limits'] = threadpool_limits(limits=num_threads)
+        except ImportError:
+            old_settings['threadpool_limits'] = None
+        
+        return old_settings
+    
+    def _restore_numpy_threads(self, old_settings: Dict[str, Any]):
+        """Restore NumPy/BLAS threading settings.
+        
+        Args:
+            old_settings: Dictionary returned by _set_numpy_threads
+        """
+        import os
+        
+        # Restore environment variables
+        env_vars = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']
+        for var in env_vars:
+            old_val = old_settings.get(var)
+            if old_val is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = old_val
+        
+        # Restore threadpoolctl
+        if old_settings.get('threadpool_limits') is not None:
+            old_settings['threadpool_limits'].__exit__(None, None, None)
     
     def _build_incidence_matrix(self) -> Tuple[np.ndarray, Dict[int, Any], Dict[int, Any]]:
         """Build incidence matrix C.
