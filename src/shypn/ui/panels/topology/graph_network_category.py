@@ -17,6 +17,9 @@ from shypn.ui.panels.topology.base_topology_category import BaseTopologyCategory
 from shypn.topology.graph.cycles import CycleAnalyzer
 from shypn.topology.graph.paths import PathAnalyzer
 from shypn.topology.network.hubs import HubAnalyzer
+from shypn.topology.network.centrality import CentralityAnalyzer
+from shypn.topology.network.communities import CommunitiesAnalyzer
+from shypn.topology.network.clustering import ClusteringAnalyzer
 
 
 class GraphNetworkCategory(BaseTopologyCategory):
@@ -54,6 +57,9 @@ class GraphNetworkCategory(BaseTopologyCategory):
             'cycles': CycleAnalyzer,
             'paths': PathAnalyzer,
             'hubs': HubAnalyzer,
+            'centrality': CentralityAnalyzer,
+            'communities': CommunitiesAnalyzer,
+            'clustering': ClusteringAnalyzer,
         }
     
     def _build_content(self):
@@ -175,6 +181,90 @@ class GraphNetworkCategory(BaseTopologyCategory):
                     'Hub',
                     f'Hub_{name}',
                     degree,
+                    name,
+                    properties,
+                    sig
+                ))
+        
+        elif analyzer_name == 'centrality':
+            # Result format: {'measures': {measure_name: {node_id: score}}, 'top_nodes': {measure: [nodes]}}
+            top_nodes = result.get('top_nodes', {})
+            for measure_name, nodes in top_nodes.items():
+                for i, node_info in enumerate(nodes[:10], 1):  # Top 10 per measure
+                    node_id = node_info.get('id', '')
+                    name = node_info.get('name', str(node_id))
+                    score = node_info.get('score', 0.0)
+                    node_type = node_info.get('type', 'unknown')
+                    
+                    properties = f"{measure_name.replace('_', ' ').title()}, {node_type.title()}"
+                    sig = 'High' if i <= 3 else 'Medium' if i <= 7 else 'Low'
+                    
+                    rows.append((
+                        'Centrality',
+                        f'{measure_name}_{i}',
+                        int(score * 100) if score < 1 else int(score),
+                        name,
+                        properties,
+                        sig
+                    ))
+        
+        elif analyzer_name == 'communities':
+            # Result format: {'communities': [{id, nodes, size, modularity}], 'modularity': float}
+            communities = result.get('communities', [])
+            for comm in communities:
+                comm_id = comm.get('id', 0)
+                size = comm.get('size', 0)
+                nodes = comm.get('nodes', [])
+                mod = comm.get('modularity_contribution', 0.0)
+                
+                # Get node names
+                node_names = [n.get('name', str(n.get('id', ''))) for n in nodes[:5]]
+                nodes_str = ', '.join(node_names)
+                if len(nodes) > 5:
+                    nodes_str += f' (+{len(nodes)-5} more)'
+                
+                properties = f"Modularity: {mod:.3f}"
+                sig = 'High' if size > 10 else 'Medium' if size > 5 else 'Low'
+                
+                rows.append((
+                    'Community',
+                    f'Comm_{comm_id}',
+                    size,
+                    nodes_str,
+                    properties,
+                    sig
+                ))
+        
+        elif analyzer_name == 'clustering':
+            # Result format: {'clustering': {node_id: coefficient}, 'top_nodes': [nodes], 'global_clustering': float}
+            top_nodes = result.get('top_nodes', [])
+            global_cc = result.get('global_clustering', 0.0)
+            
+            # Add global clustering row
+            rows.append((
+                'Global',
+                'Global_Clustering',
+                int(global_cc * 100),
+                'Network-wide',
+                f'Transitivity: {result.get("transitivity", 0.0):.3f}',
+                'High' if global_cc > 0.5 else 'Medium' if global_cc > 0.2 else 'Low'
+            ))
+            
+            # Add top clustered nodes
+            for i, node_info in enumerate(top_nodes[:10], 1):
+                node_id = node_info.get('id', '')
+                name = node_info.get('name', str(node_id))
+                coeff = node_info.get('clustering', 0.0)
+                node_type = node_info.get('type', 'unknown')
+                triangles = node_info.get('triangles', 0)
+                
+                properties = f"{node_type.title()}, Triangles: {triangles}"
+                sig = 'High' if coeff > 0.7 else 'Medium' if coeff > 0.4 else 'Low'
+                
+                rows.append((
+                    'Clustering',
+                    f'Node_{i}',
+                    int(coeff * 100),
                     name,
                     properties,
                     sig

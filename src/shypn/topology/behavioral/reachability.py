@@ -218,20 +218,24 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         """Create appropriate explorer strategy (OOP factory pattern).
         
         Args:
-            parallel: Parallelization mode
+            parallel: Parallelization mode (WARNING: parallel modes are experimental and significantly slower than sequential)
             num_workers: Number of workers
             
         Returns:
-            Explorer instance (SequentialExplorer, ParallelBasicExplorer, or ParallelMaximalExplorer)
+            Explorer instance (SequentialExplorer recommended for production use)
         """
         if not parallel or (num_workers is not None and num_workers == 1):
-            # Sequential mode
+            # Sequential mode (RECOMMENDED - 100x faster than parallel)
             return SequentialExplorer(self)
         elif parallel == 'maximal':
-            # Phase 2: Maximal concurrent sets
+            # Phase 2: Maximal concurrent sets (EXPERIMENTAL - slow due to Python multiprocessing overhead)
+            import warnings
+            warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
             return ParallelMaximalExplorer(self, num_workers)
         else:
-            # Phase 1: Basic work-stealing (default parallel mode)
+            # Phase 1: Basic work-stealing (EXPERIMENTAL - slow due to Python multiprocessing overhead)
+            import warnings
+            warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
             return ParallelBasicExplorer(self, num_workers)
     
     def _get_initial_marking(self) -> Dict[str, int]:

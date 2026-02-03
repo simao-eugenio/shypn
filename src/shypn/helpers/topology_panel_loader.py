@@ -151,6 +151,28 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         # Refresh all categories
         if self.panel:
             self.panel.refresh()
+    
+    def on_tab_closed(self, drawing_area):
+        """Handle tab close event - clear analyzer results.
+        
+        Args:
+            drawing_area: The drawing area being closed
+        """
+        # Clear all analyzer results for this drawing area
+        if self.panel and hasattr(self.panel, 'clear_all_results'):
+            self.panel.clear_all_results(drawing_area)
+    
+    def cleanup(self):
+        """Cleanup resources when panel is destroyed.
+        
+        Called when the associated tab is closed.
+        """
+        # Clear all results
+        if self.panel and hasattr(self.panel, 'clear_all_results'):
+            self.panel.clear_all_results()
+        
+        # Call parent cleanup
+        super().cleanup()
 
 
 # === Factory Function ===
