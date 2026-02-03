@@ -14,6 +14,7 @@ from .immediate_behavior import ImmediateBehavior
 from .timed_behavior import TimedBehavior
 from .stochastic_behavior import StochasticBehavior
 from .continuous_behavior import ContinuousBehavior
+from .adaptive_hybrid_behavior import AdaptiveHybridBehavior
 
 
 def create_behavior(transition, model) -> TransitionBehavior:
@@ -47,6 +48,7 @@ def create_behavior(transition, model) -> TransitionBehavior:
         'timed': TimedBehavior,
         'stochastic': StochasticBehavior,
         'continuous': ContinuousBehavior,
+        'adaptive': AdaptiveHybridBehavior,
     }
     
     # Get behavior class
@@ -71,7 +73,7 @@ def get_available_types() -> list:
     Returns:
         List of type strings like ['immediate', 'timed', ...]
     """
-    return ['immediate', 'timed', 'stochastic', 'continuous']
+    return ['immediate', 'timed', 'stochastic', 'continuous', 'adaptive']
 
 
 def is_type_implemented(transition_type: str) -> bool:
