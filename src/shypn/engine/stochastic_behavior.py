@@ -21,6 +21,7 @@ import logging
 from .transition_behavior import TransitionBehavior
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
+from .spatial_utils import BoundaryValidator, VolumeAdaptiveSelector
 
 
 class StochasticBehavior(TransitionBehavior):
@@ -64,6 +65,31 @@ class StochasticBehavior(TransitionBehavior):
         
         # Logger for warnings
         self.logger = logging.getLogger(self.__class__.__name__)
+        
+        # Initialize spatial property integration utilities
+        self.boundary_validator = BoundaryValidator(model)
+        self.volume_selector = VolumeAdaptiveSelector(threshold_fL=1.0)
+        
+        # Check if connected places suggest stochastic is appropriate
+        input_arcs = self.get_input_arcs()
+        output_arcs = self.get_output_arcs()
+        
+        input_places = [self._get_place(arc.source_id) for arc in input_arcs 
+                       if self._get_place(arc.source_id)]
+        output_places = [self._get_place(arc.target_id) for arc in output_arcs 
+                        if self._get_place(arc.target_id)]
+        
+        if input_places or output_places:
+            use_stochastic, details = self.volume_selector.analyze_transition(
+                input_places, output_places
+            )
+            
+            if not use_stochastic and details.get('reason') == 'volume-based':
+                self.logger.warning(
+                    f"Stochastic transition '{transition.name}' connected to large volume "
+                    f"places (min={details.get('min_volume'):.2f} fL). "
+                    f"Consider using continuous transition type for better performance."
+                )
         
         # Rate limiting for negative rate warnings (avoid console spam)
         self._negative_rate_warnings = {}  # transition_name -> (count, last_logged_time)
