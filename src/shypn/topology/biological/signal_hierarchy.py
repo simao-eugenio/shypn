@@ -110,10 +110,9 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
             # Generate interpretation
             interpretation = self._generate_interpretation(signal_places, signal_flow_arcs, hierarchy, validation_results)
             
-            elapsed_time = self._stop_timer(start_time)
+            elapsed_time = self._end_timer(start_time)
             
             return AnalysisResult(
-                analyzer_name=self.name,
                 success=True,
                 data={
                     'signal_places': signal_places,
@@ -123,13 +122,12 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
                     'statistics': statistics,
                     'interpretation': interpretation
                 },
-                elapsed_time=elapsed_time
+                metadata={'elapsed_time': elapsed_time, 'analyzer_name': self.name}
             )
         except Exception as e:
-            elapsed_time = self._stop_timer(start_time)
+            elapsed_time = self._end_timer(start_time)
             raise TopologyAnalysisError(
-                f"Signal hierarchy analysis failed: {str(e)}",
-                analyzer_name=self.name
+                f"Signal hierarchy analysis failed: {str(e)}"
             ) from e
     
     def _detect_signal_places(self) -> List[Dict[str, Any]]:

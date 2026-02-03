@@ -103,12 +103,12 @@ class SubnetSimulator:
             
             @property
             def current_markings(self):
-                return {p.id: p.tokens for p in self.controller.model_adapter.places}
+                return {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
             
             @property
             def firing_counts(self):
                 return {t.id: getattr(t, 'firing_count', 0) 
-                       for t in self.controller.model_adapter.transitions}
+                       for t in self.controller.model_adapter.transitions.values()}
             
             @property
             def step_count(self):
@@ -140,7 +140,7 @@ class SubnetSimulator:
             def enabled_transitions(self):
                 # Return list of currently enabled transitions
                 enabled = []
-                for trans in self.controller.model_adapter.transitions:
+                for trans in self.controller.model_adapter.transitions.values():
                     behavior = self.controller._get_behavior(trans)
                     can_fire, _ = behavior.can_fire()
                     if can_fire:
@@ -247,7 +247,12 @@ class SubnetSimulator:
                 subnet['transitions'].append(trans_obj)
             
             # Get place objects (handle both object and ID forms)
-            all_places = set(locality.input_places) | set(locality.output_places)
+            all_places = set(locality.input_places) | set(locality.output_places) | set(locality.catalyst_places)
+            
+            # Include formula-referenced places
+            formula_places = data.get('formula_places', [])
+            all_places.update(formula_places)
+            
             for place in all_places:
                 if hasattr(place, 'id'):
                     place_obj = place
@@ -280,7 +285,7 @@ class SubnetSimulator:
             marking = row[2]
             place_obj = next((p for p in subnet['places'] if p.id == place_id), None)
             if place_obj:
-                place_obj.marking = marking
+                place_obj.tokens = marking  # Use .tokens not .marking
         
         # Update transition rates - prefer formulas from experiment_manager baseline
         for row in self.panel.transitions_store:
@@ -317,26 +322,42 @@ class SubnetSimulator:
         if not self.controller:
             return None
         
-        # Get markings before step
-        markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        # Get markings and firing counts before step
+        markings_before = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
+        firing_counts_before = {
+            t.id: getattr(t, 'firing_count', 0) 
+            for t in self.controller.model_adapter.transitions.values()
+        }
         time_before = self.controller.time
         
         # Execute one simulation step using real controller
         success = self.controller.step()
         
-        # Get markings after step
-        markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        # Get markings and firing counts after step
+        markings_after = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
+        firing_counts_after = {
+            t.id: getattr(t, 'firing_count', 0) 
+            for t in self.controller.model_adapter.transitions.values()
+        }
         time_after = self.controller.time
         
-        # Calculate what changed
+        # Calculate marking changes
         marking_changes = {}
         for pid in markings_before:
             if markings_before[pid] != markings_after.get(pid, 0):
                 marking_changes[pid] = (markings_before[pid], markings_after[pid])
         
+        # Detect which transition(s) fired by checking firing_count changes
+        fired_transitions = []
+        for tid in firing_counts_before:
+            count_before = firing_counts_before[tid]
+            count_after = firing_counts_after.get(tid, 0)
+            if count_after > count_before:
+                fired_transitions.append(tid)
+        
         # Get enabled transitions
         enabled_ids = []
-        for trans in self.controller.model_adapter.transitions:
+        for trans in self.controller.model_adapter.transitions.values():
             behavior = self.controller._get_behavior(trans)
             can_fire, _ = behavior.can_fire()
             if can_fire:
@@ -352,14 +373,8 @@ class SubnetSimulator:
                 'deadlocked': len(enabled_ids) == 0
             }
         
-        # Determine which transition fired (approximate from changes)
-        # In a real step, the controller doesn't track this explicitly,
-        # so we infer from the last recorded events or just report success
-        fired_transition = None
-        if marking_changes:
-            # Could be any enabled transition - just report first for now
-            # A better approach would be to track this in the controller
-            fired_transition = enabled_ids[0] if enabled_ids else None
+        # Report first fired transition (or None if none detected)
+        fired_transition = fired_transitions[0] if fired_transitions else None
         
         return {
             'fired_transition': fired_transition,
@@ -487,7 +502,7 @@ class SubnetSimulator:
         while step_count < max_steps and self.controller.time < max_time:
             # Check for enabled transitions (deadlock detection)
             has_enabled = False
-            for trans in self.controller.model_adapter.transitions:
+            for trans in self.controller.model_adapter.transitions.values():
                 behavior = self.controller._get_behavior(trans)
                 can_fire, _ = behavior.can_fire()
                 if can_fire:
@@ -512,7 +527,7 @@ class SubnetSimulator:
             if log_callback and (step_count % 100 == 0):
                 markings_summary = ", ".join([
                     f"{p.id}={p.tokens}"
-                    for p in list(self.controller.model_adapter.places)[:3]
+                    for p in list(self.controller.model_adapter.places.values())[:3]
                 ])
                 log_callback(f"Step {step_count}: t={self.controller.time:.2f}s | {markings_summary}...")
         
@@ -526,10 +541,10 @@ class SubnetSimulator:
         
         # Build results from controller state
         results = SimulationResults()
-        results.final_markings = {p.id: p.tokens for p in self.controller.model_adapter.places}
+        results.final_markings = {p.id: p.tokens for p in self.controller.model_adapter.places.values()}
         results.firing_counts = {
             t.id: getattr(t, 'firing_count', 0)
-            for t in self.controller.model_adapter.transitions
+            for t in self.controller.model_adapter.transitions.values()
         }
         results.execution_time = time.time() - start_real_time
         results.sim_time = self.controller.time
@@ -549,7 +564,7 @@ class SubnetSimulator:
         # Check for deadlock
         results.deadlocked = not any(
             self.controller._get_behavior(t).can_fire()[0]
-            for t in self.controller.model_adapter.transitions
+            for t in self.controller.model_adapter.transitions.values()
         )
         
         # Calculate fluxes (firings per unit time)
@@ -576,12 +591,12 @@ class SubnetSimulator:
             return
         
         # Reset place markings to initial values
-        for place in self.controller.model_adapter.places:
+        for place in self.controller.model_adapter.places.values():
             if place.id in self.initial_markings:
                 place.tokens = self.initial_markings[place.id]
         
         # Reset transition firing counts
-        for trans in self.controller.model_adapter.transitions:
+        for trans in self.controller.model_adapter.transitions.values():
             if hasattr(trans, 'firing_count'):
                 trans.firing_count = 0
         
@@ -610,14 +625,6 @@ class SubnetSimulator:
         """Stop running simulation."""
         if self.state:
             self.state.is_running = False
-    
-    def is_initialized(self):
-        """Check if simulator is ready.
-        
-        Returns:
-            bool: True if initialized
-        """
-        return self.state is not None and self.subnet is not None
     
     def __repr__(self):
         status = "initialized" if self.is_initialized() else "uninitialized"

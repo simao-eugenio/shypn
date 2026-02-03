@@ -39,11 +39,13 @@ class DiagnosisView(Gtk.ScrolledWindow):
         renderer_text = Gtk.CellRendererText()
         column = Gtk.TreeViewColumn("Issue", renderer_text, text=0)
         column.add_attribute(renderer_text, "text", 3)  # Description
+        column.set_resizable(True)
         self.tree_view.append_column(column)
         
         # Column 2: Type
         renderer_type = Gtk.CellRendererText()
         column_type = Gtk.TreeViewColumn("Type", renderer_type, text=2)
+        column_type.set_resizable(True)
         self.tree_view.append_column(column_type)
         
         self.add(self.tree_view)

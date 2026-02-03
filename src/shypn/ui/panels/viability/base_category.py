@@ -219,6 +219,7 @@ class BaseViabilityCategory:
         
         column_select = Gtk.TreeViewColumn("☐", renderer_toggle, active=0)
         column_select.set_fixed_width(40)
+        column_select.set_resizable(True)
         column_select.set_clickable(True)
         column_select.connect('clicked', self._on_header_column_clicked)
         self.issues_tree.append_column(column_select)
@@ -231,6 +232,7 @@ class BaseViabilityCategory:
         renderer_icon = Gtk.CellRendererText()
         column_icon = Gtk.TreeViewColumn("", renderer_icon, text=1)
         column_icon.set_fixed_width(40)
+        column_icon.set_resizable(True)
         column_icon.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         self.issues_tree.append_column(column_icon)
         
@@ -256,6 +258,7 @@ class BaseViabilityCategory:
         renderer_conf = Gtk.CellRendererText()
         column_conf = Gtk.TreeViewColumn("Confidence", renderer_conf, text=4)
         column_conf.set_fixed_width(100)
+        column_conf.set_resizable(True)
         column_conf.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         self.issues_tree.append_column(column_conf)
         

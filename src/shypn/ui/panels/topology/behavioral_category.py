@@ -6,16 +6,20 @@ Manages behavioral property analyzers with prioritized execution:
 PRIORITY ORDER (fast to slow):
 1. Boundedness (Priority 1) - O(n) - Simple token counting (<0.5s)
 2. Fairness (Priority 1) - O(n+e) - Conflict analysis (<0.5s)
-3. Deadlocks (Priority 3) - O(2^n) - Siphon detection (5-30s)
-4. Liveness (Priority 3) - O(k^n) - Depends on reachability (5-30s)
-5. Reachability (Priority 3) - O(k^n) - State explosion (5-30s)
+3. Throughput (Priority 2) - O(n*k) - Simulation-based (2-5s)
+4. ResponseTime (Priority 2) - O(n*k) - Simulation-based (2-5s)
+5. Coverability (Priority 3) - O(k^n) - Graph construction (5-30s)
+6. Deadlocks (Priority 3) - O(2^n) - Siphon detection (5-30s)
+7. Liveness (Priority 3) - O(k^n) - Depends on reachability (5-30s)
+8. Reachability (Priority 3) - O(k^n) - State explosion (5-30s)
 
-Fast analyzers (Boundedness, Fairness) run first to provide instant feedback,
-while expensive analyzers (Reachability, Liveness, Deadlocks) run last.
+Fast analyzers run first to provide instant feedback,
+while expensive analyzers run last.
 
 Author: Simão Eugénio
 Date: 2025-10-29
 Updated: 2025-11-09 - Added algorithm prioritization
+Updated: 2026-02-03 - Added coverability, throughput, response_time
 """
 import gi
 gi.require_version('Gtk', '3.0')
@@ -28,6 +32,9 @@ from shypn.topology.behavioral.boundedness import BoundednessAnalyzer
 from shypn.topology.behavioral.liveness import LivenessAnalyzer
 from shypn.topology.behavioral.deadlocks import DeadlockAnalyzer
 from shypn.topology.behavioral.fairness import FairnessAnalyzer
+from shypn.topology.behavioral.coverability import CoverabilityAnalyzer
+from shypn.topology.behavioral.throughput import ThroughputAnalyzer
+from shypn.topology.behavioral.response_time import ResponseTimeAnalyzer
 
 
 class BehavioralCategory(BaseTopologyCategory):
@@ -35,11 +42,14 @@ class BehavioralCategory(BaseTopologyCategory):
     
     Contains:
     - Analysis Summary section
-    - Reachability analyzer
     - Boundedness analyzer
-    - Liveness analyzer
-    - Deadlocks analyzer
     - Fairness analyzer
+    - Throughput analyzer
+    - Response Time analyzer
+    - Coverability analyzer
+    - Deadlocks analyzer
+    - Liveness analyzer
+    - Reachability analyzer
     """
     
     def __init__(self, model_canvas=None, expanded=False, use_grouped_table=False):
@@ -85,7 +95,12 @@ class BehavioralCategory(BaseTopologyCategory):
             ('boundedness', BoundednessAnalyzer),  # O(n) - token counting
             ('fairness', FairnessAnalyzer),         # O(n+e) - conflict analysis
             
-            # MODERATE/SLOW - Priority 3 (5-30s)
+            # MODERATE - Priority 2 (1-5s)
+            ('throughput', ThroughputAnalyzer),     # O(n*k) - simulation-based
+            ('response_time', ResponseTimeAnalyzer), # O(n*k) - simulation-based
+            
+            # SLOW - Priority 3 (5-30s)
+            ('coverability', CoverabilityAnalyzer), # O(k^n) - graph construction
             ('deadlocks', DeadlockAnalyzer),        # O(2^n) - siphon detection
             ('liveness', LivenessAnalyzer),         # O(k^n) - depends on reachability
             ('reachability', ReachabilityAnalyzer), # O(k^n) - state space exploration
@@ -172,50 +187,76 @@ class BehavioralCategory(BaseTopologyCategory):
         return main_box
     
     def _create_properties_matrix(self):
-        """Create single-row properties matrix table with columns in priority order.
+        """Create transposed properties matrix table with analyzers as rows.
         
-        Columns are ordered by algorithm execution priority:
-        1. Boundedness (fastest)
-        2. Fairness (fast)
-        3. Deadlocks (moderate)
-        4. Liveness (slow)
-        5. Reachability (slowest)
-        
-        This matches the execution order, so results populate left-to-right.
+        Shows each analyzer in its own row with detailed results across multiple columns.
+        Rows are ordered by algorithm execution priority.
         
         Returns:
             Gtk.TreeView: Properties matrix
         """
-        # 5 columns for the 5 properties (IN PRIORITY ORDER)
+        # Columns: Analyzer Name | Status | Result | Details | Time
         self.properties_table_store = Gtk.ListStore(str, str, str, str, str)
         
-        # Add initial placeholder row
-        self.properties_table_store.append([
-            'Not analyzed',  # Boundedness
-            'Not analyzed',  # Fairness
-            'Not analyzed',  # Deadlocks
-            'Not analyzed',  # Liveness
-            'Not analyzed'   # Reachability
-        ])
+        # Add rows for each analyzer (IN PRIORITY ORDER)
+        analyzers = [
+            ('Boundedness', 'boundedness'),
+            ('Fairness', 'fairness'),
+            ('Throughput', 'throughput'),
+            ('Response Time', 'response_time'),
+            ('Coverability', 'coverability'),
+            ('Deadlocks', 'deadlocks'),
+            ('Liveness', 'liveness'),
+            ('Reachability', 'reachability')
+        ]
+        
+        for display_name, internal_name in analyzers:
+            self.properties_table_store.append([
+                display_name,      # Analyzer name
+                'Not analyzed',    # Status
+                '',                # Result
+                '',                # Details
+                ''                 # Time
+            ])
         
         treeview = Gtk.TreeView(model=self.properties_table_store)
         treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
         
-        # Column names (IN PRIORITY ORDER - matches execution sequence)
-        column_names = [
-            'Boundedness',   # ⚡ Priority 1 - Results appear first
-            'Fairness',      # ⚡ Priority 1 - Results appear second
-            'Deadlocks',     # ⚠️ Priority 3 - Results appear third
-            'Liveness',      # ⚠️ Priority 3 - Results appear fourth
-            'Reachability'   # ⚠️ Priority 3 - Results appear last
-        ]
+        # Column 0: Analyzer Name (bold)
+        renderer = Gtk.CellRendererText()
+        renderer.set_property('weight', 700)  # Bold
+        column = Gtk.TreeViewColumn('Analyzer', renderer, text=0)
+        column.set_resizable(True)
+        column.set_min_width(120)
+        treeview.append_column(column)
         
-        for i, col_name in enumerate(column_names):
-            renderer = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn(col_name, renderer, text=i)
-            column.set_resizable(True)
-            column.set_min_width(120)
-            treeview.append_column(column)
+        # Column 1: Status (⏳, ✓, ✗, ⚠, ⏱️, ❌)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn('Status', renderer, text=1)
+        column.set_resizable(True)
+        column.set_min_width(100)
+        treeview.append_column(column)
+        
+        # Column 2: Result (main finding)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn('Result', renderer, text=2)
+        column.set_resizable(True)
+        column.set_min_width(120)
+        treeview.append_column(column)
+        
+        # Column 3: Details (additional info)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn('Details', renderer, text=3)
+        column.set_resizable(True)
+        column.set_min_width(150)
+        treeview.append_column(column)
+        
+        # Column 4: Time (computation time)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn('Time', renderer, text=4)
+        column.set_resizable(True)
+        column.set_min_width(80)
+        treeview.append_column(column)
         
         return treeview
     
@@ -351,10 +392,8 @@ class BehavioralCategory(BaseTopologyCategory):
     def _update_properties_matrix(self):
         """Update the properties matrix based on cached results.
         
-        Columns are in PRIORITY ORDER (Boundedness, Fairness, Deadlocks, Liveness, Reachability)
-        so results populate left-to-right as fast algorithms complete first.
-        
-        Shows "Analyzing..." for algorithms currently running, "Not analyzed" for pending.
+        Updates each analyzer's row with status, result, details, and computation time.
+        Rows are in PRIORITY ORDER so results populate top-to-bottom as fast algorithms complete first.
         """
         drawing_area = self._get_current_drawing_area()
         if not drawing_area:
@@ -362,138 +401,259 @@ class BehavioralCategory(BaseTopologyCategory):
         
         results = self.results_cache.get(drawing_area, {})
         
-        # Check which analyzers are currently running (in priority order)
-        analyzers_list = ['boundedness', 'fairness', 'deadlocks', 'liveness', 'reachability']
+        # Analyzer order (matches row order in table)
+        analyzers_list = [
+            ('Boundedness', 'boundedness'),
+            ('Fairness', 'fairness'),
+            ('Throughput', 'throughput'),
+            ('Response Time', 'response_time'),
+            ('Coverability', 'coverability'),
+            ('Deadlocks', 'deadlocks'),
+            ('Liveness', 'liveness'),
+            ('Reachability', 'reachability')
+        ]
         
-        texts = []
-        for analyzer_name in analyzers_list:
+        # Update each row
+        for row_idx, (display_name, analyzer_name) in enumerate(analyzers_list):
             if analyzer_name in self.analyzing:
-                # Currently running - show spinner text
-                texts.append('⏳ Analyzing...')
+                # Currently running
+                status = '⏳ Analyzing'
+                result_text = ''
+                details = ''
+                time_text = ''
             elif analyzer_name in results:
-                # Completed - show formatted result
-                format_method = getattr(self, f'_format_{analyzer_name}')
-                texts.append(format_method(results[analyzer_name]))
+                # Completed - get formatted result
+                result_obj = results[analyzer_name]
+                status, result_text, details, time_text = self._format_analyzer_row(analyzer_name, result_obj)
             else:
                 # Not started yet
-                texts.append('Not analyzed')
-        
-        # Update table (clear and add new row)
-        self.properties_table_store.clear()
-        self.properties_table_store.append(texts)
+                status = 'Not analyzed'
+                result_text = ''
+                details = ''
+                time_text = ''
+            
+            # Update row
+            iter = self.properties_table_store.get_iter(row_idx)
+            self.properties_table_store.set(iter,
+                0, display_name,
+                1, status,
+                2, result_text,
+                3, details,
+                4, time_text
+            )
     
-    def _format_reachability(self, result):
-        """Format reachability result for matrix cell."""
-        if not result:
-            return 'Not analyzed'
+    def _format_analyzer_row(self, analyzer_name, result):
+        """Format analyzer result into table row (status, result, details, time).
         
+        Args:
+            analyzer_name: Name of analyzer
+            result: Analysis result object or dict
+            
+        Returns:
+            Tuple of (status, result_text, details, time_text)
+        """
         # Check for timeout
         if isinstance(result, dict) and result.get('timeout'):
             timeout = result.get('timeout_seconds', '?')
-            return f'⏱️ Timeout\n({timeout}s)'
+            return ('⏱️ Timeout', f'{timeout}s exceeded', '', '')
         
         # Check for error
         if isinstance(result, dict) and result.get('error'):
-            return '❌ Error\n(see logs)'
+            error_msg = result.get('error_message', 'Unknown error')
+            return ('❌ Error', error_msg[:50], '', '')
         
+        # Check if analysis failed (AnalysisResult with success=False)
+        if hasattr(result, 'success') and not result.success:
+            errors = result.errors if hasattr(result, 'errors') else []
+            error_text = errors[0] if errors else 'Analysis failed'
+            return ('❌ Failed', error_text[:50], '', '')
+        
+        # Get result data and metadata
         data = result.data if hasattr(result, 'data') else result
-        state_count = data.get('state_count', 0)
+        metadata = result.metadata if hasattr(result, 'metadata') else {}
+        comp_time = metadata.get('computation_time', 0)
+        time_text = f'{comp_time:.3f}s' if comp_time else ''
+        
+        # Call specific formatter
+        if analyzer_name == 'reachability':
+            return self._format_reachability_row(data, time_text)
+        elif analyzer_name == 'boundedness':
+            return self._format_boundedness_row(data, time_text)
+        elif analyzer_name == 'liveness':
+            return self._format_liveness_row(data, time_text)
+        elif analyzer_name == 'deadlocks':
+            return self._format_deadlocks_row(data, time_text)
+        elif analyzer_name == 'fairness':
+            return self._format_fairness_row(data, time_text)
+        elif analyzer_name == 'throughput':
+            return self._format_throughput_row(data, time_text)
+        elif analyzer_name == 'response_time':
+            return self._format_response_time_row(data, time_text)
+        elif analyzer_name == 'coverability':
+            return self._format_coverability_row(data, time_text)
+        else:
+            return ('✓ Complete', '', '', time_text)
+    
+    def _format_reachability_row(self, data, time_text):
+        """Format reachability result as table row."""
+        state_count = data.get('total_states', 0)
+        trans_count = data.get('total_transitions', 0)
+        max_depth = data.get('max_depth_reached', 0)
+        exploration_complete = data.get('exploration_complete', False)
         
         if state_count > 0:
-            return f'✓ Yes\n{state_count} states'
-        return '✗ No'
+            if exploration_complete:
+                status = '✓ Complete'
+            else:
+                status = '⚠ Partial'
+            result = f'{state_count} states'
+            details = f'{trans_count} transitions, depth {max_depth}'
+        else:
+            status = '⚠ Empty'
+            result = 'No states found'
+            details = f'Check model (got {state_count} states)'
+        
+        return (status, result, details, time_text)
     
-    def _format_boundedness(self, result):
-        """Format boundedness result for matrix cell."""
-        if not result:
-            return 'Not analyzed'
-        
-        # Check for timeout
-        if isinstance(result, dict) and result.get('timeout'):
-            timeout = result.get('timeout_seconds', '?')
-            return f'⏱️ Timeout\n({timeout}s)'
-        
-        # Check for error
-        if isinstance(result, dict) and result.get('error'):
-            return '❌ Error\n(see logs)'
-        
-        data = result.data if hasattr(result, 'data') else result
+    def _format_boundedness_row(self, data, time_text):
+        """Format boundedness result as table row."""
         is_bounded = data.get('bounded', False)
         bound = data.get('k', 0)
+        unbounded_places = data.get('unbounded_places', [])
         
         if is_bounded:
-            return f'✓ Yes\nk={bound}'
-        return '✗ Unbounded'
+            status = '✓ Bounded'
+            result = f'k = {bound}'
+            details = f'All places ≤ {bound} tokens'
+        else:
+            status = '✗ Unbounded'
+            result = f'{len(unbounded_places)} places'
+            details = ', '.join(unbounded_places[:3])
+            if len(unbounded_places) > 3:
+                details += f', ... (+{len(unbounded_places) - 3} more)'
+        
+        return (status, result, details, time_text)
     
-    def _format_liveness(self, result):
-        """Format liveness result for matrix cell."""
-        if not result:
-            return 'Not analyzed'
-        
-        # Check for timeout
-        if isinstance(result, dict) and result.get('timeout'):
-            timeout = result.get('timeout_seconds', '?')
-            return f'⏱️ Timeout\n({timeout}s)'
-        
-        # Check for error
-        if isinstance(result, dict) and result.get('error'):
-            return '❌ Error\n(see logs)'
-        
-        data = result.data if hasattr(result, 'data') else result
+    def _format_liveness_row(self, data, time_text):
+        """Format liveness result as table row."""
         is_live = data.get('live', False)
         percentage = data.get('percentage', 0)
+        live_count = data.get('live_transitions', 0)
+        total_count = data.get('total_transitions', 0)
         
         if is_live:
-            return '✓ Yes\n100%'
+            status = '✓ Live'
+            result = '100% transitions'
+            details = f'{total_count}/{total_count} live'
         elif percentage > 0:
-            return f'⚠ Quasi-Live\n{percentage}%'
-        return '✗ No'
+            status = '⚠ Quasi-Live'
+            result = f'{percentage}% transitions'
+            details = f'{live_count}/{total_count} live'
+        else:
+            status = '✗ Not Live'
+            result = '0% transitions'
+            details = 'No live transitions'
+        
+        return (status, result, details, time_text)
     
-    def _format_deadlocks(self, result):
-        """Format deadlocks result for matrix cell."""
-        if not result:
-            return 'Not analyzed'
-        
-        # Check for timeout
-        if isinstance(result, dict) and result.get('timeout'):
-            timeout = result.get('timeout_seconds', '?')
-            return f'⏱️ Timeout\n({timeout}s)'
-        
-        # Check for error
-        if isinstance(result, dict) and result.get('error'):
-            return '❌ Error\n(see logs)'
-        
-        data = result.data if hasattr(result, 'data') else result
+    def _format_deadlocks_row(self, data, time_text):
+        """Format deadlocks result as table row."""
         has_deadlock = data.get('has_deadlock', False)
+        deadlock_count = data.get('deadlock_count', 0)
         deadlock_type = data.get('deadlock_type', 'unknown')
         
         if has_deadlock:
-            return f'✗ Yes\n{deadlock_type}'
-        return '✓ No'
+            status = '✗ Found'
+            result = f'{deadlock_count} deadlock(s)'
+            details = f'Type: {deadlock_type}'
+        else:
+            status = '✓ None'
+            result = 'No deadlocks'
+            details = 'All states reachable'
+        
+        return (status, result, details, time_text)
     
-    def _format_fairness(self, result):
-        """Format fairness result for matrix cell."""
-        if not result:
-            return 'Not analyzed'
-        
-        # Check for timeout
-        if isinstance(result, dict) and result.get('timeout'):
-            timeout = result.get('timeout_seconds', '?')
-            return f'⏱️ Timeout\n({timeout}s)'
-        
-        # Check for error
-        if isinstance(result, dict) and result.get('error'):
-            return '❌ Error\n(see logs)'
-        
-        data = result.data if hasattr(result, 'data') else result
+    def _format_fairness_row(self, data, time_text):
+        """Format fairness result as table row."""
         is_fair = data.get('is_fair', False)
         fairness_level = data.get('fairness_level', 'unknown')
+        unfair_count = data.get('unfair_transitions', 0)
         
         if is_fair:
-            return '✓ Yes'
+            status = '✓ Fair'
+            result = 'All transitions'
+            details = 'Bounded waiting times'
         elif fairness_level != 'unknown':
-            return f'⚠ {fairness_level}'
-        return '✗ No'
+            status = f'⚠ {fairness_level}'
+            result = f'{unfair_count} unfair'
+            details = 'Some unbounded waiting'
+        else:
+            status = '✗ Unfair'
+            result = 'Not analyzed'
+            details = ''
+        
+        return (status, result, details, time_text)
+    
+    def _format_throughput_row(self, data, time_text):
+        """Format throughput result as table row."""
+        throughput = data.get('throughput', 0.0)
+        bottlenecks = data.get('bottlenecks', [])
+        steps = data.get('statistics', {}).get('total_steps', 0)
+        firings = data.get('statistics', {}).get('total_firings', 0)
+        
+        if bottlenecks:
+            status = '⚠ Bottlenecks'
+            result = f'{throughput:.2f} fires/step'
+            details = f'{len(bottlenecks)} bottleneck(s) detected'
+        else:
+            status = '✓ Good'
+            result = f'{throughput:.2f} fires/step'
+            details = f'{firings} firings in {steps} steps'
+        
+        return (status, result, details, time_text)
+    
+    def _format_response_time_row(self, data, time_text):
+        """Format response time result as table row."""
+        avg_times = data.get('inter_firing_times', {})
+        steps = data.get('statistics', {}).get('total_steps', 0)
+        
+        if avg_times:
+            # Calculate overall average
+            overall_avg = sum(avg_times.values()) / len(avg_times) if avg_times else 0
+            max_avg = max(avg_times.values()) if avg_times else 0
+            
+            if max_avg > 100:
+                status = '⚠ Slow'
+                result = f'avg: {overall_avg:.1f} steps'
+                details = f'max: {max_avg:.1f} steps'
+            else:
+                status = '✓ Fast'
+                result = f'avg: {overall_avg:.1f} steps'
+                details = f'max: {max_avg:.1f} steps'
+        else:
+            status = '✓ Complete'
+            result = f'{steps} steps'
+            details = 'No inter-firing data'
+        
+        return (status, result, details, time_text)
+    
+    def _format_coverability_row(self, data, time_text):
+        """Format coverability result as table row."""
+        node_count = data.get('statistics', {}).get('total_nodes', 0)
+        unbounded = data.get('unbounded_places', [])
+        
+        if unbounded:
+            status = '⚠ Unbounded'
+            result = f'{len(unbounded)} place(s)'
+            details = ', '.join(unbounded[:3])
+            if len(unbounded) > 3:
+                details += f', ... (+{len(unbounded) - 3} more)'
+        else:
+            status = '✓ Bounded'
+            result = f'{node_count} nodes'
+            details = 'All places bounded'
+        
+        return (status, result, details, time_text)
     
     def _update_deadlocks_table(self, result_data):
         """Update deadlocks table with detected deadlocks.

@@ -91,6 +91,32 @@ class ExperimentAutomationCategory:
         self.content_box.set_margin_top(6)
         self.content_box.set_margin_bottom(6)
         
+        # === STAGE 3: QUICK RUN BUTTON ===
+        # Add Quick Run button at top for easy single-experiment execution
+        quick_run_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        quick_run_box.set_margin_bottom(8)
+        
+        self.quick_run_button = Gtk.Button(label="⚡ Quick Run (Current Baseline)")
+        self.quick_run_button.set_tooltip_text(
+            "Run single experiment with current baseline parameters\n"
+            "Faster alternative to manual toolbar for quick tests"
+        )
+        self.quick_run_button.get_style_context().add_class("suggested-action")
+        self.quick_run_button.connect("clicked", self._on_quick_run)
+        quick_run_box.pack_start(self.quick_run_button, False, False, 0)
+        
+        # Status label for quick run
+        self.quick_run_status = Gtk.Label(label="")
+        self.quick_run_status.set_halign(Gtk.Align.START)
+        quick_run_box.pack_start(self.quick_run_status, True, True, 0)
+        
+        self.content_box.pack_start(quick_run_box, False, False, 0)
+        
+        # Separator after quick run
+        sep_quick = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep_quick.set_margin_bottom(8)
+        self.content_box.pack_start(sep_quick, False, False, 0)
+        
         # Build sweep builder content (Phase 2)
         self._build_placeholder_content()
         
@@ -111,6 +137,7 @@ class ExperimentAutomationCategory:
         # Create sweep builder
         self.sweep_builder = ParameterSweepBuilder()
         self.sweep_builder.viability_panel = self.parent_panel  # Set reference for auto-prediction
+        self.sweep_builder.parent_category = self  # Set reference for refresh callback
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
         self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
         
@@ -138,6 +165,7 @@ class ExperimentAutomationCategory:
         self.queue_view.set_run_callback(self._on_queue_run)
         self.queue_view.set_cancel_callback(self._on_queue_cancel)
         self.queue_view.set_clear_callback(self._on_queue_cleared)
+        self.queue_view.set_pause_callback(self._on_queue_pause)  # Stage 3
         self.content_box.pack_start(self.queue_view, True, True, 0)
         
         # Create batch executor
@@ -191,76 +219,191 @@ class ExperimentAutomationCategory:
         if not self.parent_panel or not self.sweep_builder:
             return
         
-        # Get current parameter type
-        param_type = self.sweep_builder.type_combo.get_active_id()
-        # Pull parameters from parent panel's TreeViews
-        # Store as list of (name, id) tuples for ID/name separation
-        params = []
-        
-        if param_type == 'transitions':
-            # Get from transitions_store (TreeView data)
+        # In factorial mode, load ALL parameter types at once
+        # In single mode, load only the selected type
+        if self.sweep_builder.design_mode == 'factorial':
+            # Collect all parameters from all types
+            all_params = []
+            
+            # Get transitions
             if hasattr(self.parent_panel, 'transitions_store'):
                 store = self.parent_panel.transitions_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = ID (internal), Column 1 = Name (display)
                     transition_id = store.get_value(iter, 0)
                     transition_name = store.get_value(iter, 1)
                     if transition_id and transition_name:
-                        params.append((transition_name, transition_id))
+                        all_params.append((f"T: {transition_name}", transition_id))
                     iter = store.iter_next(iter)
-        
-        elif param_type == 'places':
-            # Get from places_store
+            
+            # Get places
             if hasattr(self.parent_panel, 'places_store'):
                 store = self.parent_panel.places_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = ID (internal), Column 1 = Name (display)
                     place_id = store.get_value(iter, 0)
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
-                        params.append((place_name, place_id))
+                        all_params.append((f"P: {place_name}", place_id))
                     iter = store.iter_next(iter)
-        
-        elif param_type == 'arcs':
-            # Get from arcs_store
+            
+            # Get arcs
             if hasattr(self.parent_panel, 'arcs_store'):
                 store = self.parent_panel.arcs_store
                 iter = store.get_iter_first()
                 while iter:
-                    # Column 0 = arc ID, Columns 1,2 = source/target IDs
                     arc_id = store.get_value(iter, 0)
                     source_id = store.get_value(iter, 1)
                     target_id = store.get_value(iter, 2)
-                    
-                    # Construct display name from source/target names (lookup if needed)
-                    # For now, use IDs for arcs since they don't have independent names
                     if arc_id:
                         arc_name = f"{source_id}→{target_id}"
-                        params.append((arc_name, arc_id))
+                        all_params.append((f"A: {arc_name}", arc_id))
                     iter = store.iter_next(iter)
-        
-        # Update sweep builder with actual parameters (name/ID pairs)
-        if params:
-            self.sweep_builder.set_available_parameters(param_type, params)
+            
+            # Update factorial dropdown with all parameters
+            self.sweep_builder.set_available_parameters('all', all_params)
+            
         else:
-            # Show helpful message if no subnet loaded
-            self.sweep_builder.set_available_parameters(param_type, [])
-            if hasattr(self.sweep_builder, 'name_combo'):
-                self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
-                self.sweep_builder.name_combo.set_active(0)
+            # Single parameter mode - use selected type only
+            param_type = self.sweep_builder.type_combo.get_active_id()
+            params = []
+            
+            if param_type == 'transitions':
+                # Get from transitions_store (TreeView data)
+                if hasattr(self.parent_panel, 'transitions_store'):
+                    store = self.parent_panel.transitions_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = ID (internal), Column 1 = Name (display)
+                        transition_id = store.get_value(iter, 0)
+                        transition_name = store.get_value(iter, 1)
+                        if transition_id and transition_name:
+                            params.append((transition_name, transition_id))
+                        iter = store.iter_next(iter)
+            
+            elif param_type == 'places':
+                # Get from places_store
+                if hasattr(self.parent_panel, 'places_store'):
+                    store = self.parent_panel.places_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = ID (internal), Column 1 = Name (display)
+                        place_id = store.get_value(iter, 0)
+                        place_name = store.get_value(iter, 1)
+                        if place_id and place_name:
+                            params.append((place_name, place_id))
+                        iter = store.iter_next(iter)
+            
+            elif param_type == 'arcs':
+                # Get from arcs_store
+                if hasattr(self.parent_panel, 'arcs_store'):
+                    store = self.parent_panel.arcs_store
+                    iter = store.get_iter_first()
+                    while iter:
+                        # Column 0 = arc ID, Columns 1,2 = source/target IDs
+                        arc_id = store.get_value(iter, 0)
+                        source_id = store.get_value(iter, 1)
+                        target_id = store.get_value(iter, 2)
+                        
+                        # Construct display name from source/target names (lookup if needed)
+                        # For now, use IDs for arcs since they don't have independent names
+                        if arc_id:
+                            arc_name = f"{source_id}→{target_id}"
+                            params.append((arc_name, arc_id))
+                        iter = store.iter_next(iter)
+            
+            # Update sweep builder with actual parameters (name/ID pairs)
+            if params:
+                self.sweep_builder.set_available_parameters(param_type, params)
+            else:
+                # Show helpful message if no subnet loaded
+                self.sweep_builder.set_available_parameters(param_type, [])
+                if hasattr(self.sweep_builder, 'name_combo'):
+                    self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
+                    self.sweep_builder.name_combo.set_active(0)
+    
+    def _on_quick_run(self, button):
+        """Handle Quick Run button - run single experiment with current baseline.
+        
+        Stage 3 feature: Provides fast single-experiment execution without
+        needing to use manual simulation toolbar. Creates one experiment
+        from current baseline and executes immediately.
+        
+        Respects locality selection: Only checked localities are included.
+        """
+        # Update status
+        self.quick_run_status.set_markup("<i>Running...</i>")
+        
+        # Check prerequisites
+        if not self.parent_panel or not hasattr(self.parent_panel, 'selected_localities'):
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
+            return
+        
+        if not self.parent_panel.selected_localities:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
+            return
+        
+        # Check which localities are CHECKED (enabled) - only use those for Quick Run
+        enabled_localities = {}
+        for transition_id, data in self.parent_panel.selected_localities.items():
+            checkbox = data.get('checkbox')
+            if checkbox and checkbox.get_active():  # Only include checked localities
+                enabled_localities[transition_id] = data
+        
+        if not enabled_localities:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ No localities checked</span>")
+            return
+        
+        # Ensure baseline exists
+        if len(self.experiment_manager.snapshots) == 0:
+            if self.parent_panel and hasattr(self.parent_panel, 'places_store'):
+                baseline = self.experiment_manager.add_snapshot("Baseline")
+                baseline.capture_from_treeviews(
+                    self.parent_panel.places_store,
+                    self.parent_panel.transitions_store,
+                    self.parent_panel.arcs_store
+                )
+        
+        # Create single experiment from baseline
+        baseline = self.experiment_manager.get_active_snapshot()
+        
+        # Get snapshot index for current baseline
+        snapshot_index = self.experiment_manager.active_index
+        
+        # Add single experiment to queue (don't clear - let user see it)
+        # add_experiment expects (name, snapshot_index) not a dict
+        self.queue_view.add_experiment("Quick Run", snapshot_index)
+        
+        # Ensure queue is visible
+        self.queue_view.show_all()
+        
+        # Run immediately
+        pending = self.queue_view.get_pending_experiments()
+        if pending:
+            self._on_queue_run(pending)
+            self.quick_run_status.set_markup("<span foreground='green'>✓ Running 1 experiment</span>")
+        else:
+            self.quick_run_status.set_markup("<span foreground='red'>✗ Failed to queue</span>")
     
     def _on_sweep_generate(self, config):
-        """Handle parameter sweep generation.
+        """Handle parameter sweep generation (single or factorial).
         
         Args:
-            config: Dictionary with sweep configuration:
-                - parameter_type: 'places', 'transitions', 'arcs'
-                - parameter_name: Name of parameter to vary
-                - values: List of values to test
-                - replicates: Number of replicates per experiment
-                - duration: Simulation duration
+            config: Dictionary with sweep configuration.
+                
+                Single-parameter sweep:
+                    - parameter_type: 'places', 'transitions', 'arcs'
+                    - parameter_name: Name of parameter to vary
+                    - values: List of values to test
+                    - replicates: Number of replicates per experiment
+                    - duration: Simulation duration
+                
+                Factorial design:
+                    - design_type: 'factorial'
+                    - parameters: List of parameter dicts with name, type, id, values
+                    - combinations: List of tuples (value1, value2, ...)
+                    - replicates: Number of replicates per experiment
+                    - duration: Simulation duration
         """
         if self.experiment_manager is None:
             self._show_error("ExperimentManager not available. Please ensure a model is loaded in Viability Panel.")
@@ -306,21 +449,26 @@ class ExperimentAutomationCategory:
             # Store baseline snapshot count
             baseline_count = len(self.experiment_manager.snapshots)
             
-            # Generate sweep snapshots
-            count = self.experiment_manager.generate_sweep_snapshots(
-                parameter_type=config['parameter_type'],
-                parameter_id=config.get('parameter_id', config['parameter_name']),  # Use ID if available
-                parameter_name=config['parameter_name'],  # Display name
-                values=config['values'],
-                base_snapshot=base_snapshot
-            )
-            
-            # Update visual indicators in parameter tables
-            if self.parent_panel and hasattr(self.parent_panel, 'update_sweep_indicators') and count > 0:
-                self.parent_panel.update_sweep_indicators(
-                    config['parameter_type'],
-                    config.get('parameter_id', config['parameter_name'])
+            # Check design type
+            if config.get('design_type') == 'factorial':
+                # Handle factorial design
+                count = self._generate_factorial_snapshots(config, base_snapshot)
+            else:
+                # Handle single-parameter sweep
+                count = self.experiment_manager.generate_sweep_snapshots(
+                    parameter_type=config['parameter_type'],
+                    parameter_id=config.get('parameter_id', config['parameter_name']),  # Use ID if available
+                    parameter_name=config['parameter_name'],  # Display name
+                    values=config['values'],
+                    base_snapshot=base_snapshot
                 )
+                
+                # Update visual indicators in parameter tables (single-param only)
+                if self.parent_panel and hasattr(self.parent_panel, 'update_sweep_indicators') and count > 0:
+                    self.parent_panel.update_sweep_indicators(
+                        config['parameter_type'],
+                        config.get('parameter_id', config['parameter_name'])
+                    )
             
             # Update preview
             if hasattr(self.sweep_builder, 'preview_label'):
@@ -344,6 +492,63 @@ class ExperimentAutomationCategory:
         except Exception as e:
             self._show_error(f"Sweep generation failed: {str(e)}")
     
+    def _generate_factorial_snapshots(self, config, base_snapshot):
+        """Generate experiment snapshots for factorial design.
+        
+        Args:
+            config: Factorial design configuration with parameters and combinations
+            base_snapshot: Base snapshot to clone for each experiment
+            
+        Returns:
+            int: Number of snapshots created
+        """
+        parameters = config['parameters']
+        combinations = config['combinations']
+        
+        count = 0
+        for combo in combinations:
+            # Build descriptive name from combination values
+            name_parts = []
+            for i, param in enumerate(parameters):
+                value = combo[i]
+                # Format value nicely
+                if isinstance(value, float):
+                    if value.is_integer():
+                        value_str = str(int(value))
+                    else:
+                        value_str = f"{value:.2f}"
+                else:
+                    value_str = str(value)
+                name_parts.append(f"{param['name']}={value_str}")
+            
+            snapshot_name = "_".join(name_parts)
+            
+            # Create new snapshot by cloning baseline
+            snapshot = self.experiment_manager.add_snapshot(snapshot_name)
+            # Copy values from base snapshot
+            snapshot.place_markings = base_snapshot.place_markings.copy()
+            snapshot.arc_weights = base_snapshot.arc_weights.copy()
+            snapshot.transition_rates = base_snapshot.transition_rates.copy()
+            snapshot.notes = base_snapshot.notes
+            
+            # Apply parameter modifications for this combination
+            for i, param in enumerate(parameters):
+                param_type = param['type']
+                param_id = param['id']
+                value = combo[i]
+                
+                # Update the appropriate parameter storage
+                if param_type == 'places':
+                    snapshot.place_markings[param_id] = value
+                elif param_type == 'transitions':
+                    snapshot.transition_rates[param_id] = value
+                elif param_type == 'arcs':
+                    snapshot.arc_weights[param_id] = value
+            
+            count += 1
+        
+        return count
+    
     def _on_queue_run(self, pending_experiments):
         """Handle queue run request.
         
@@ -359,24 +564,40 @@ class ExperimentAutomationCategory:
             return
         
         # Get replicates and duration from sweep builder
-        replicates = 500
-        duration = 100.0
+        replicates = 3
+        duration = 60.0
         termination_condition = "deadlock"  # Default
+        
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
-                replicates = int(self.sweep_builder.replicates_entry.get_text())
-            except:
-                pass
+                text = self.sweep_builder.replicates_entry.get_text().strip()
+                if text:
+                    replicates = int(text)
+            except Exception as e:
+                print(f"[WARNING] Failed to read replicates: {e}, using default: {replicates}")
+        
         if hasattr(self.sweep_builder, 'duration_entry'):
             try:
-                duration = float(self.sweep_builder.duration_entry.get_text())
-            except:
-                pass
+                text = self.sweep_builder.duration_entry.get_text().strip()
+                if text:
+                    duration = float(text)
+                    if duration <= 0:
+                        print(f"[WARNING] Duration is {duration}, using default 60.0")
+                        duration = 60.0
+            except Exception as e:
+                print(f"[WARNING] Failed to read duration: {e}, using default: {duration}")
+        
         if hasattr(self.sweep_builder, 'termination_combo'):
             try:
                 termination_condition = self.sweep_builder.termination_combo.get_active_id() or "deadlock"
-            except:
+            except Exception as e:
+                print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
+        
+        # Get parallel execution setting from queue view checkbox (E2 enhancement)
+        use_parallel = False
+        if hasattr(self.queue_view, 'parallel_checkbox'):
+            use_parallel = self.queue_view.parallel_checkbox.get_active()
         
         # Clear pending updates tracking
         self._pending_updates.clear()
@@ -392,7 +613,7 @@ class ExperimentAutomationCategory:
         # Update UI for running state
         self.queue_view.set_running(True)
         
-        # Start batch execution
+        # Start batch execution with parallel option
         try:
             self.batch_executor.run_batch(
                 experiments=pending_experiments,
@@ -401,7 +622,8 @@ class ExperimentAutomationCategory:
                 termination_condition=termination_condition,
                 progress_callback=self._on_experiment_progress,
                 complete_callback=self._on_batch_complete,
-                experiment_result_callback=self._on_experiment_result
+                experiment_result_callback=self._on_experiment_result,
+                use_parallel=use_parallel  # E2: Enable parallel execution if checkbox is checked
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
@@ -432,6 +654,25 @@ class ExperimentAutomationCategory:
         # Update UI immediately (completion callback will be called by executor)
         if self.queue_view:
             GLib.idle_add(lambda: self.queue_view.set_running(False) or False)
+    
+    def _on_queue_pause(self, should_pause):
+        """Handle queue pause/resume request (Stage 3).
+        
+        Args:
+            should_pause: True to pause, False to resume
+        """
+        if not self.batch_executor:
+            return
+        
+        # Toggle paused state
+        self.batch_executor.set_paused(should_pause)
+        
+        # Update UI to reflect paused state
+        if self.queue_view:
+            GLib.idle_add(lambda: self.queue_view.set_running(
+                is_running=True, 
+                is_paused=should_pause
+            ) or False)
     
     def _on_queue_cleared(self):
         """Handle queue cleared event.
@@ -555,13 +796,37 @@ class ExperimentAutomationCategory:
         GLib.idle_add(complete_ui_updates, priority=GLib.PRIORITY_DEFAULT)
     
     def _on_export_results(self, name, result, format_type):
-        """Handle export results request.
+        """Handle export results request - supports single and batch export.
         
         Args:
             name: Experiment name
             result: Result dictionary
-            format_type: 'csv' or 'json'
+            format_type: 'csv', 'json', 'csv_batch', or 'json_batch'
         """
+        # Check if this is a batch export
+        is_batch = format_type.endswith('_batch')
+        
+        if is_batch:
+            # Batch export - use pre-selected directory from result
+            directory = result.get('_batch_export_dir')
+            batch_name = result.get('_batch_export_name', name)
+            
+            if directory:
+                # Generate safe filename
+                safe_name = batch_name.replace(' ', '_').replace('/', '_').replace('=', '_')
+                base_format = format_type.replace('_batch', '')
+                filepath = f"{directory}/{safe_name}.{base_format}"
+                
+                try:
+                    if base_format == 'csv':
+                        self._export_csv(filepath, batch_name, result)
+                    elif base_format == 'json':
+                        self._export_json(filepath, batch_name, result)
+                except Exception as e:
+                    print(f"Batch export error for {batch_name}: {e}")
+            return
+        
+        # Single export - show file chooser dialog
         # Get parent window for dialog
         parent_window = None
         if self.parent_panel:

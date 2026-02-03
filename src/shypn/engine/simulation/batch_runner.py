@@ -120,6 +120,10 @@ class BatchSimulationRunner:
                 # Copy settings from original controller
                 replicate_controller.settings = deepcopy(settings)
                 
+                # Update DataCollector's recorded_objects to match settings
+                # If recorded_objects is empty, DataCollector will record ALL objects
+                replicate_controller.data_collector.recorded_objects = recorded_objects
+                
                 # CRITICAL: Ensure stochastic/continuous mode with tau-leaping
                 replicate_controller.settings.use_tau_leaping = True
                 replicate_controller.settings.use_parallel_stochastic = True
@@ -165,20 +169,25 @@ class BatchSimulationRunner:
                         self.is_cancelled = True
                         break
                 
-                # Collect data - but only for recorded objects
+                # Collect data - if recorded_objects is empty, include everything
                 time_points = replicate_controller.data_collector.time_points.copy()
                 
-                # Filter place data to only recorded places
-                place_data = {}
-                for place_id, data in replicate_controller.data_collector.place_data.items():
-                    if place_id in recorded_objects:
-                        place_data[place_id] = data.copy()
-                
-                # Filter transition data to only recorded transitions
-                transition_data = {}
-                for trans_id, data in replicate_controller.data_collector.transition_data.items():
-                    if trans_id in recorded_objects:
-                        transition_data[trans_id] = data.copy()
+                # If no objects specified for recording, export ALL data
+                if not recorded_objects:
+                    place_data = {place_id: data.copy() for place_id, data in replicate_controller.data_collector.place_data.items()}
+                    transition_data = {trans_id: data.copy() for trans_id, data in replicate_controller.data_collector.transition_data.items()}
+                else:
+                    # Filter place data to only recorded places
+                    place_data = {}
+                    for place_id, data in replicate_controller.data_collector.place_data.items():
+                        if place_id in recorded_objects:
+                            place_data[place_id] = data.copy()
+                    
+                    # Filter transition data to only recorded transitions
+                    transition_data = {}
+                    for trans_id, data in replicate_controller.data_collector.transition_data.items():
+                        if trans_id in recorded_objects:
+                            transition_data[trans_id] = data.copy()
                 
                 # Store replicate result
                 result = {

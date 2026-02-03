@@ -63,7 +63,9 @@ class SiphonAnalyzer(TopologyAnalyzer):
         min_size: int = 1,
         max_size: Optional[int] = None,
         max_siphons: int = 100,
-        check_marking: bool = True
+        check_marking: bool = True,
+        parallel: bool = False,
+        num_workers: Optional[int] = None
     ) -> AnalysisResult:
         """Find all siphons in the Petri net.
         
@@ -72,6 +74,8 @@ class SiphonAnalyzer(TopologyAnalyzer):
             max_size: Maximum number of places to check (None = all)
             max_siphons: Maximum number of siphons to return
             check_marking: Whether to check current marking status
+            parallel: Use parallel processing for siphon detection
+            num_workers: Number of worker processes (None = CPU count)
             
         Returns:
             AnalysisResult with:
@@ -155,13 +159,22 @@ class SiphonAnalyzer(TopologyAnalyzer):
             # Build connectivity maps
             place_presets, place_postsets = self._build_place_connectivity()
             
-            # Find all siphons
-            all_siphons = self._find_siphons(
-                place_presets,
-                place_postsets,
-                min_size,
-                max_size
-            )
+            # Find all siphons (parallel or sequential)
+            if parallel and len(self.model.places) >= 8:
+                all_siphons = self._find_siphons_parallel(
+                    place_presets,
+                    place_postsets,
+                    min_size,
+                    max_size,
+                    num_workers
+                )
+            else:
+                all_siphons = self._find_siphons(
+                    place_presets,
+                    place_postsets,
+                    min_size,
+                    max_size
+                )
             
             # Filter to minimal siphons
             minimal_siphons = self._filter_minimal_siphons(all_siphons)
@@ -237,6 +250,104 @@ class SiphonAnalyzer(TopologyAnalyzer):
                 place_postsets[source_id].add(target_id)
         
         return place_presets, place_postsets
+    
+    def _find_siphons_parallel(
+        self,
+        place_presets: Dict[str, Set[str]],
+        place_postsets: Dict[str, Set[str]],
+        min_size: int,
+        max_size: Optional[int],
+        num_workers: Optional[int]
+    ) -> List[Set[str]]:
+        """Find siphons in parallel by partitioning subset checks.
+        
+        Args:
+            place_presets: Map of place_id -> input transitions
+            place_postsets: Map of place_id -> output transitions
+            min_size: Minimum siphon size
+            max_size: Maximum siphon size
+            num_workers: Number of worker processes
+            
+        Returns:
+            List of siphon sets (place IDs)
+        """
+        from multiprocessing import Pool, cpu_count
+        from itertools import combinations
+        
+        workers = num_workers if num_workers else cpu_count()
+        place_ids = list(place_presets.keys())
+        n_places = len(place_ids)
+        max_size = min(max_size or n_places, n_places)
+        
+        # Collect all combinations to check (partitioned by size)
+        all_combinations = []
+        for size in range(min_size, max_size + 1):
+            combos = list(combinations(place_ids, size))
+            all_combinations.extend(combos)
+        
+        # Partition work among workers
+        chunk_size = max(1, len(all_combinations) // workers)
+        work_chunks = [
+            all_combinations[i:i + chunk_size]
+            for i in range(0, len(all_combinations), chunk_size)
+        ]
+        
+        # Parallel siphon checking
+        with Pool(workers) as pool:
+            results = pool.starmap(
+                self._check_siphons_worker,
+                [(chunk, place_presets, place_postsets) for chunk in work_chunks]
+            )
+        
+        # Flatten results
+        siphons = []
+        for chunk_siphons in results:
+            siphons.extend(chunk_siphons)
+        
+        return siphons
+    
+    @staticmethod
+    def _check_siphons_worker(
+        combinations_to_check: List[tuple],
+        place_presets: Dict[str, Set[str]],
+        place_postsets: Dict[str, Set[str]]
+    ) -> List[Set[str]]:
+        """Worker function to check if place subsets are siphons (static for pickling).
+        
+        Args:
+            combinations_to_check: List of place ID tuples to check
+            place_presets: Map of place_id -> input transitions
+            place_postsets: Map of place_id -> output transitions
+            
+        Returns:
+            List of confirmed siphon sets
+        """
+        siphons = []
+        
+        for combo in combinations_to_check:
+            place_set = set(combo)
+            
+            # Check siphon property: ∀p ∈ S: •p ⊆ S•
+            is_siphon = True
+            
+            # Collect all input transitions to S
+            input_transitions = set()
+            for place_id in place_set:
+                input_transitions.update(place_presets.get(place_id, set()))
+            
+            # Collect all output transitions from S
+            output_transitions = set()
+            for place_id in place_set:
+                output_transitions.update(place_postsets.get(place_id, set()))
+            
+            # Check if input ⊆ output (siphon property)
+            if not input_transitions.issubset(output_transitions):
+                is_siphon = False
+            
+            if is_siphon:
+                siphons.append(place_set)
+        
+        return siphons
     
     def _find_siphons(
         self,

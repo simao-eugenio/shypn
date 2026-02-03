@@ -17,7 +17,7 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model, controller=None, recording_interval: int = 1, time_based_recording: bool = True, recording_time_interval: float = 0.05):
+    def __init__(self, model, controller=None, recording_interval: int = 1, time_based_recording: bool = True, recording_time_interval: float = 0.05, recorded_objects: Optional[set] = None):
         """Initialize data collector.
         
         Args:
@@ -27,9 +27,11 @@ class DataCollector:
                               Only used if time_based_recording=False. Higher values reduce overhead for batch mode
             time_based_recording: If True, record at fixed model-time intervals (guarantees consistent data density)
             recording_time_interval: Model-time interval between recordings (default 0.05s = 20 Hz)
+            recorded_objects: Optional set of place/transition IDs to record. If None or empty, records ALL objects.
         """
         self.model = model
         self.controller = controller  # For accessing behavior cache
+        self.recorded_objects = recorded_objects  # Store for filtering
         self.time_points: List[float] = []
         self.place_data: Dict[str, List[int]] = {}
         self.transition_data: Dict[str, List[int]] = {}  # Cumulative counts
@@ -42,33 +44,51 @@ class DataCollector:
         self._last_recorded_time = None  # Track last recording time for time-based mode
         
     def start_collection(self):
-        """Initialize data structures and start collecting."""
+        """Initialize data structures and start collecting.
+        
+        If recorded_objects is None or empty, records ALL places and transitions.
+        Otherwise, only records objects in the recorded_objects set.
+        """
         self.time_points = []
         self._record_counter = 0  # Reset counter
         self._last_recorded_time = None  # Reset time tracking
         
-        # Initialize place data with empty lists
-        self.place_data = {p.id: [] for p in self.model.places}
+        # Refresh recorded_objects from controller settings if available
+        # This ensures we pick up any objects added to analysis after initialization
+        if self.controller and hasattr(self.controller, 'settings'):
+            if hasattr(self.controller.settings, 'recorded_objects'):
+                self.recorded_objects = self.controller.settings.recorded_objects
         
-        # Initialize transition data with empty lists (cumulative counts)
-        self.transition_data = {t.id: [] for t in self.model.transitions}
-        
-        # Initialize transition rates (instantaneous propensity/rate values)
-        self.transition_rates = {t.id: [] for t in self.model.transitions}
+        # If no objects specified, record everything (default behavior)
+        if not self.recorded_objects:
+            # Initialize place data with empty lists for ALL places
+            self.place_data = {p.id: [] for p in self.model.places}
+            
+            # Initialize transition data with empty lists for ALL transitions
+            self.transition_data = {t.id: [] for t in self.model.transitions}
+            
+            # Initialize transition rates for ALL transitions
+            self.transition_rates = {t.id: [] for t in self.model.transitions}
+        else:
+            # Selective recording: only initialize data for recorded objects
+            self.place_data = {p.id: [] for p in self.model.places if p.id in self.recorded_objects}
+            self.transition_data = {t.id: [] for t in self.model.transitions if t.id in self.recorded_objects}
+            self.transition_rates = {t.id: [] for t in self.model.transitions if t.id in self.recorded_objects}
         
         self.is_collecting = True
         
-    def record_state(self, current_time: float):
+    def record_state(self, current_time: float, force: bool = False):
         """Record current state at given time point.
         
         Args:
             current_time: Current simulation time
+            force: If True, bypass recording interval checks (for initial/final states)
         """
         if not self.is_collecting:
             return
         
         # Time-based recording: guarantees consistent data density regardless of playback speed
-        if self.time_based_recording:
+        if self.time_based_recording and not force:
             # Always record first point
             if self._last_recorded_time is None:
                 self._last_recorded_time = current_time
@@ -77,7 +97,7 @@ class DataCollector:
                 self._last_recorded_time = current_time
             else:
                 return  # Skip - not enough time elapsed
-        else:
+        elif not force:
             # Legacy step-based recording - only record every Nth call
             self._record_counter += 1
             if self._record_counter % self.recording_interval != 0:
