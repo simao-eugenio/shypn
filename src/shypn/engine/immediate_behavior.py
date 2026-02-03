@@ -10,11 +10,16 @@ Mathematical Model:
     - Time delay: 0 (instant)
     - Token mode: Discrete (arc_weight units)
 
+Spatial Signal Integration:
+    - Reads boundary_type → validates transport enablement
+    - Respects neighbor_compartments topology
+
 Extracted from: legacy/shypnpy/core/petri.py:1908-1970
 """
 
 from typing import Dict, Tuple, List, Any
 from .transition_behavior import TransitionBehavior
+from .spatial_utils import BoundaryValidator
 
 
 class ImmediateBehavior(TransitionBehavior):
@@ -38,6 +43,18 @@ class ImmediateBehavior(TransitionBehavior):
                 behavior.get_output_arcs()
             )
     """
+    
+    def __init__(self, transition, model):
+        """Initialize immediate behavior with spatial utilities.
+        
+        Args:
+            transition: Transition object
+            model: Model instance for context access
+        """
+        super().__init__(transition, model)
+        
+        # Initialize spatial property integration utilities
+        self.boundary_validator = BoundaryValidator(model)
     
     def _is_signal_place(self, place) -> bool:
         """Check if a place is a signal place (read-only, non-consuming).
@@ -116,6 +133,17 @@ class ImmediateBehavior(TransitionBehavior):
             # Check sufficient tokens (applies to both normal arcs and test arcs)
             if source_place.tokens < arc.weight:
                 return False, f"insufficient-tokens-{source_place.name}"
+        
+        # NEW: Validate spatial boundary constraints
+        boundary_valid, boundary_reason = self.boundary_validator.validate_transition_arcs(
+            self.transition,
+            input_arcs,
+            self.get_output_arcs(),
+            self._get_place
+        )
+        
+        if not boundary_valid:
+            return False, boundary_reason
         
         return True, "enabled"
     

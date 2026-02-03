@@ -375,6 +375,114 @@ class Place(PetriNetObject):
         self.tokens = self.initial_marking
         self._trigger_redraw()
     
+    # ============================================================================
+    # Spatial Signal Helper Methods (Layer 1)
+    # ============================================================================
+    
+    def is_spatial_signal(self) -> bool:
+        """Check if this place is a spatial signal (Layer 1).
+        
+        Returns:
+            bool: True if signal_type is SPATIAL
+        """
+        return self.signal_type == SignalType.SPATIAL
+    
+    def set_diffusion_properties(
+        self,
+        coefficient: float,
+        boundary: BoundaryType,
+        volume: Optional[float] = None
+    ):
+        """Set diffusion properties for spatial signal place.
+        
+        Args:
+            coefficient: Diffusion coefficient in μm²/s
+            boundary: Boundary permeability type
+            volume: Optional compartment volume in fL
+        """
+        self.diffusion_coefficient = coefficient
+        self.boundary_type = boundary
+        if volume is not None:
+            self.compartment_volume = volume
+    
+    def set_spatial_gradient(self, dx: float, dy: float, dz: float = 0.0):
+        """Set spatial gradient vector.
+        
+        Args:
+            dx: Gradient component in x direction
+            dy: Gradient component in y direction
+            dz: Gradient component in z direction (default 0)
+        """
+        self.gradient_vector = (dx, dy, dz)
+    
+    def add_neighbor_compartment(self, compartment_id: str):
+        """Add a neighbor compartment ID to topology.
+        
+        Args:
+            compartment_id: ID of adjacent compartment
+        """
+        if compartment_id not in self.neighbor_compartments:
+            self.neighbor_compartments.append(compartment_id)
+    
+    def is_neighbor(self, compartment_id: str) -> bool:
+        """Check if given compartment is a neighbor.
+        
+        Args:
+            compartment_id: ID to check
+        
+        Returns:
+            bool: True if compartment_id is in neighbor list
+        """
+        return compartment_id in self.neighbor_compartments
+    
+    def get_gradient_magnitude(self) -> float:
+        """Calculate magnitude of gradient vector.
+        
+        Returns:
+            float: ||gradient|| or 0.0 if not set
+        """
+        if self.gradient_vector is None:
+            return 0.0
+        
+        dx, dy, dz = self.gradient_vector
+        return math.sqrt(dx*dx + dy*dy + dz*dz)
+    
+    def get_spatial_distance(self, other: 'Place') -> Optional[float]:
+        """Calculate Euclidean distance to another place.
+        
+        Args:
+            other: Target place
+        
+        Returns:
+            float: Distance in μm, or None if positions not set
+        """
+        if self.spatial_position is None or other.spatial_position is None:
+            return None
+        
+        x1, y1, z1 = self.spatial_position
+        x2, y2, z2 = other.spatial_position
+        
+        dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
+        return math.sqrt(dx*dx + dy*dy + dz*dz)
+    
+    def should_use_stochastic(self, threshold_volume: float = 1.0) -> bool:
+        """Check if compartment volume suggests stochastic dynamics.
+        
+        Args:
+            threshold_volume: Volume threshold in fL (default 1.0)
+        
+        Returns:
+            bool: True if volume < threshold (use stochastic)
+        """
+        if self.compartment_volume is None:
+            return False  # No volume set - default to continuous
+        
+        return self.compartment_volume < threshold_volume
+    
+    # ============================================================================
+    # Serialization
+    # ============================================================================
+    
     def to_dict(self) -> dict:
         """Serialize place to dictionary for persistence.
         

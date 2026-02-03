@@ -1,19 +1,28 @@
-"""Timed Behavior - Time Petri Net (TPN) with timing windows.
+#!/usr/bin/env python3
+"""Timed Behavior - Deterministic delay transitions (Time Petri Net formalism).
 
-Timed transitions use [earliest, latest] timing windows (Merlin & Farber 1976).
-A transition becomes newly enabled at time t_enable, and can fire during
-the interval [t_enable + earliest, t_enable + latest].
+Timed transitions fire after a deterministic delay if enabled.
+They support delay windows [tmin, tmax] where:
+- Transition becomes enabled at t_enable + tmin
+- Transition must fire by t_enable + tmax
+- If disabled before firing, delay resets on next enablement
 
 Mathematical Model:
-    - Static interval: [α(t), β(t)] where α = earliest, β = latest
-    - Enabled interval: [t + α(t), t + β(t)] for enablement time t
-    - Firing constraint: t_enable + α(t) ≤ t_fire ≤ t_enable + β(t)
-    - Token mode: Discrete (like immediate)
+    - Static interval: [delay, delay] (single deterministic delay)
+    - Dynamic interval: [tmin, tmax] (timing window)
+    - Enablement: tokens available AND t ∈ [t_enable + tmin, t_enable + tmax]
+    - Firing: Discrete token transfer (like immediate transitions)
 
-Extracted from: legacy/shypnpy/core/petri.py:1971-2050+
+Spatial Signal Integration:
+    - Reads boundary_type → validates transport
+    - Respects neighbor_compartments topology
+
+Extracted from: legacy/shypnpy/core/petri.py:1972-2099
 """
+
 from typing import Dict, Tuple, List, Any, Optional
 from .transition_behavior import TransitionBehavior
+from .spatial_utils import BoundaryValidator
 
 class TimedBehavior(TransitionBehavior):
     """Time Petri Net (TPN) transition firing behavior.
@@ -100,6 +109,9 @@ class TimedBehavior(TransitionBehavior):
         self._enablement_time = None
         self._was_too_early = False  # Track if we've been checked while too early
         self._was_in_window = False  # Track if we've been in the firing window
+        
+        # Initialize spatial property integration utilities
+        self.boundary_validator = BoundaryValidator(model)
 
     def _is_signal_place(self, place) -> bool:
         """Check if a place is a signal place (read-only, non-consuming).
@@ -201,6 +213,17 @@ class TimedBehavior(TransitionBehavior):
                 
                 if source_place.tokens < required:
                     return (False, f'insufficient-tokens-P{arc.source_id}')
+        
+        # NEW: Validate spatial boundary constraints
+        boundary_valid, boundary_reason = self.boundary_validator.validate_transition_arcs(
+            self.transition,
+            self.get_input_arcs(),
+            self.get_output_arcs(),
+            self._get_place
+        )
+        
+        if not boundary_valid:
+            return (False, boundary_reason)
         
         if self._enablement_time is None:
             return (False, 'not-enabled-yet')

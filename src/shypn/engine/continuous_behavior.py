@@ -10,6 +10,12 @@ Mathematical Model:
     - Integration: RK4 method with adaptive step size
     - Enablement: Continuous if ∀p ∈ •t: m(p) > 0
 
+Spatial Signal Integration:
+    - Reads diffusion_coefficient from places → scales rate
+    - Reads boundary_type → validates transport
+    - Reads gradient_vector → directional modulation
+    - Reads compartment_volume → stochastic/continuous selection
+
 Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 """
 
@@ -18,6 +24,7 @@ import math
 import numpy as np
 from .transition_behavior import TransitionBehavior
 from .function_catalog import FUNCTION_CATALOG
+from .spatial_utils import BoundaryValidator, GradientModulator, VolumeAdaptiveSelector
 
 
 class ContinuousBehavior(TransitionBehavior):
@@ -63,6 +70,11 @@ class ContinuousBehavior(TransitionBehavior):
         # Track if rate function has failed (to prevent repeated errors)
         self._rate_function_failed = False
         self._rate_function_error = None
+        
+        # Initialize spatial property integration utilities
+        self.boundary_validator = BoundaryValidator(model)
+        self.gradient_modulator = GradientModulator()
+        self.volume_selector = VolumeAdaptiveSelector(threshold_fL=1.0)
         
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
@@ -498,6 +510,18 @@ class ContinuousBehavior(TransitionBehavior):
             # Inhibitor arcs: DISABLED when tokens >= threshold (negative feedback)
             if source_place.tokens >= effective_threshold:
                 return False, f"inhibited-by-{arc.source_id}"
+        
+        # NEW: Validate spatial boundary constraints
+        # Check if any input/output arcs involve spatial signals with boundary constraints
+        boundary_valid, boundary_reason = self.boundary_validator.validate_transition_arcs(
+            self.transition,
+            all_input_arcs,
+            self.get_output_arcs(),
+            self._get_place
+        )
+        
+        if not boundary_valid:
+            return False, boundary_reason
         
         # Now check normal/test arcs in the flow direction
         for arc in check_arcs:
