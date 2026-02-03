@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-02-03 10:54:41",
+  "results": [
+    {
+      "strategy": "Phase 3: Hierarchical",
+      "model_name": "Glycolysis + Quorum + Gene Regulation",
+      "model_size": {
+        "places": 14,
+        "transitions": 9
+      },
+      "performance": {
+        "execution_time_s": 0.22946953773498535,
+        "states_explored": 5000,
+        "transitions_fired": 17191,
+        "deadlocks_found": 2,
+        "memory_mb": 10.60555648803711
+      },
+      "extra_metrics": {
+        "layer_count": 3,
+        "exploration_mode": "hierarchical"
+      }
+    }
+  ],
+  "summary": {
+    "total_benchmarks": 1,
+    "total_time": 0.22946953773498535,
+    "total_states_explored": 5000,
+    "average_time": 0.22946953773498535,
+    "strategies": [
+      "Phase 3: Hierarchical"
+    ]
+  }
+}
