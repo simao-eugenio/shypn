@@ -1145,7 +1145,9 @@ class SimulationController:
         
         # Phase 3: Continuous transitions with conflict resolution
         # Group continuous transitions by locality conflicts and apply firing policies
-        continuous_transitions = [t for t in self.model.transitions if t.transition_type == 'continuous']
+        # NOTE: Include adaptive transitions here - they may be in continuous mode
+        continuous_transitions = [t for t in self.model.transitions 
+                                  if t.transition_type in ('continuous', 'adaptive')]
         
         # DIAGNOSTIC: Log continuous phase
         if continuous_transitions:
@@ -1226,8 +1228,10 @@ class SimulationController:
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
         # Execute if NO timed transitions fired (timed has priority)
         # NOTE: Stochastic CAN fire alongside continuous (they operate on different time scales)
+        # NOTE: Include adaptive transitions here - they may be in stochastic mode
         if not discrete_fired:  # Only if no timed fired
-            stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
+            stochastic_transitions = [t for t in self.model.transitions 
+                                     if t.transition_type in ('stochastic', 'adaptive')]
             
             # For tau-leaping: Check structural enabling only (sufficient tokens)
             # Don't use can_fire() which requires scheduled fire time (only for exact SSA)
@@ -1294,7 +1298,7 @@ class SimulationController:
                     # For hybrid models (stochastic + continuous/deterministic), clamp tau to dt
                     # For pure stochastic models, let tau-leaping control its own time step
                     is_pure_stochastic = all(
-                        t.transition_type == 'stochastic' 
+                        t.transition_type in ('stochastic', 'adaptive')
                         for t in self.model.transitions 
                         if hasattr(t, 'transition_type')
                     )

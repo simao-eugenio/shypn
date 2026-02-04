@@ -109,10 +109,10 @@ class TauLeapingEngine:
         model = controller.model
         current_time = controller.time
         
-        # Get all stochastic transitions
+        # Get all stochastic transitions (including adaptive in stochastic mode)
         stochastic_transitions = [
             t for t in model.transitions
-            if t.transition_type == 'stochastic'
+            if t.transition_type in ('stochastic', 'adaptive')
         ]
         
         if not stochastic_transitions:

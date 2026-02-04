@@ -52,6 +52,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self._setup_color_picker()
         self._setup_signal_handlers()
         self._populate_fields()
+        self._populate_spatial_properties()
         self._setup_topology_tab()
 
     def _load_ui(self):
@@ -176,6 +177,7 @@ class PlacePropDialogLoader(GObject.GObject):
         """
         if response_id == Gtk.ResponseType.OK:
             self._apply_changes()
+            self._save_spatial_properties()  # Save spatial properties
             if self.persistency_manager:
                 self.persistency_manager.mark_dirty()
             self.emit('properties-changed')
@@ -314,6 +316,137 @@ class PlacePropDialogLoader(GObject.GObject):
         except Exception as e:
             # Log exception with traceback but do not crash dialog
             logger.exception(f"Error setting up topology tab: {type(e).__name__}: {e}")
+    
+    def _populate_spatial_properties(self):
+        """Populate spatial properties fields from place object."""
+        # Compartment volume
+        volume_entry = self.builder.get_object('compartment_volume_entry')
+        if volume_entry and hasattr(self.place_obj, 'compartment_volume'):
+            if self.place_obj.compartment_volume is not None:
+                volume_entry.set_text(str(self.place_obj.compartment_volume))
+        
+        # Diffusion coefficient
+        diff_entry = self.builder.get_object('diffusion_coefficient_entry')
+        if diff_entry and hasattr(self.place_obj, 'diffusion_coefficient'):
+            if self.place_obj.diffusion_coefficient is not None:
+                diff_entry.set_text(str(self.place_obj.diffusion_coefficient))
+        
+        # Boundary type
+        boundary_combo = self.builder.get_object('boundary_type_combo')
+        if boundary_combo and hasattr(self.place_obj, 'boundary_type'):
+            boundary_map = {None: 0, 'PERMEABLE': 1, 'SELECTIVE': 2, 'IMPERMEABLE': 3}
+            boundary_combo.set_active(boundary_map.get(self.place_obj.boundary_type, 0))
+        
+        # Module ID
+        module_entry = self.builder.get_object('module_id_entry')
+        if module_entry and hasattr(self.place_obj, 'module_id'):
+            if self.place_obj.module_id:
+                module_entry.set_text(self.place_obj.module_id)
+        
+        # Gradient vector
+        if hasattr(self.place_obj, 'gradient_vector') and self.place_obj.gradient_vector:
+            if len(self.place_obj.gradient_vector) >= 3:
+                dx, dy, dz = self.place_obj.gradient_vector[:3]
+                dx_entry = self.builder.get_object('gradient_vector_dx_entry')
+                dy_entry = self.builder.get_object('gradient_vector_dy_entry')
+                dz_entry = self.builder.get_object('gradient_vector_dz_entry')
+                if dx_entry: dx_entry.set_text(str(dx))
+                if dy_entry: dy_entry.set_text(str(dy))
+                if dz_entry: dz_entry.set_text(str(dz))
+        
+        # Spatial position
+        if hasattr(self.place_obj, 'spatial_position') and self.place_obj.spatial_position:
+            if len(self.place_obj.spatial_position) >= 3:
+                x, y, z = self.place_obj.spatial_position[:3]
+                x_entry = self.builder.get_object('spatial_position_x_entry')
+                y_entry = self.builder.get_object('spatial_position_y_entry')
+                z_entry = self.builder.get_object('spatial_position_z_entry')
+                if x_entry: x_entry.set_text(str(x))
+                if y_entry: y_entry.set_text(str(y))
+                if z_entry: z_entry.set_text(str(z))
+        
+        # Neighbor compartments
+        if hasattr(self.place_obj, 'neighbor_compartments') and self.place_obj.neighbor_compartments:
+            textview = self.builder.get_object('neighbor_compartments_textview')
+            if textview:
+                buffer = textview.get_buffer()
+                buffer.set_text('\n'.join(self.place_obj.neighbor_compartments))
+    
+    def _save_spatial_properties(self):
+        """Save spatial properties from UI to place object."""
+        # Compartment volume
+        volume_entry = self.builder.get_object('compartment_volume_entry')
+        if volume_entry:
+            text = volume_entry.get_text().strip()
+            try:
+                self.place_obj.compartment_volume = float(text) if text else None
+            except ValueError:
+                self.place_obj.compartment_volume = None
+        
+        # Diffusion coefficient
+        diff_entry = self.builder.get_object('diffusion_coefficient_entry')
+        if diff_entry:
+            text = diff_entry.get_text().strip()
+            try:
+                self.place_obj.diffusion_coefficient = float(text) if text else None
+            except ValueError:
+                self.place_obj.diffusion_coefficient = None
+        
+        # Boundary type
+        boundary_combo = self.builder.get_object('boundary_type_combo')
+        if boundary_combo:
+            boundary_list = [None, 'PERMEABLE', 'SELECTIVE', 'IMPERMEABLE']
+            self.place_obj.boundary_type = boundary_list[boundary_combo.get_active()]
+        
+        # Module ID
+        module_entry = self.builder.get_object('module_id_entry')
+        if module_entry:
+            text = module_entry.get_text().strip()
+            self.place_obj.module_id = text if text else None
+        
+        # Gradient vector
+        dx_entry = self.builder.get_object('gradient_vector_dx_entry')
+        dy_entry = self.builder.get_object('gradient_vector_dy_entry')
+        dz_entry = self.builder.get_object('gradient_vector_dz_entry')
+        if dx_entry and dy_entry and dz_entry:
+            dx = dx_entry.get_text().strip()
+            dy = dy_entry.get_text().strip()
+            dz = dz_entry.get_text().strip()
+            if dx and dy and dz:
+                try:
+                    self.place_obj.gradient_vector = [float(dx), float(dy), float(dz)]
+                except ValueError:
+                    self.place_obj.gradient_vector = None
+            else:
+                self.place_obj.gradient_vector = None
+        
+        # Spatial position
+        x_entry = self.builder.get_object('spatial_position_x_entry')
+        y_entry = self.builder.get_object('spatial_position_y_entry')
+        z_entry = self.builder.get_object('spatial_position_z_entry')
+        if x_entry and y_entry and z_entry:
+            x = x_entry.get_text().strip()
+            y = y_entry.get_text().strip()
+            z = z_entry.get_text().strip()
+            if x and y and z:
+                try:
+                    self.place_obj.spatial_position = [float(x), float(y), float(z)]
+                except ValueError:
+                    self.place_obj.spatial_position = None
+            else:
+                self.place_obj.spatial_position = None
+        
+        # Neighbor compartments
+        textview = self.builder.get_object('neighbor_compartments_textview')
+        if textview:
+            buffer = textview.get_buffer()
+            text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
+            if text.strip():
+                # Split by newlines and filter empty lines
+                neighbors = [line.strip() for line in text.split('\n') if line.strip()]
+                self.place_obj.neighbor_compartments = neighbors if neighbors else []
+            else:
+                self.place_obj.neighbor_compartments = []
 
     def run(self):
         """Show the dialog and run it modally.
