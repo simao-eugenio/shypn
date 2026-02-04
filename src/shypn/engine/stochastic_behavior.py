@@ -106,6 +106,7 @@ class StochasticBehavior(TransitionBehavior):
         props = getattr(transition, 'properties', {})
         
         # Check if has rate_function (SBML formulas)
+        # Rate function should ONLY be in properties dict, not as top-level attribute
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
         
@@ -319,8 +320,20 @@ class StochasticBehavior(TransitionBehavior):
                 )
                 self._eval_debug_count += 1
             
+            # Preprocess expression: convert [PlaceName] to PlaceName
+            # This supports chemistry notation where [X] means "concentration of X"
+            import re
+            expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', self.rate_function_expr)
+            
+            # CRITICAL DEBUG: T10/T11 eval preprocessing
+            if self.transition.id in ['T10', 'T11']:
+                print(f"[EVAL] {self.transition.id}:")
+                print(f"  Original: {self.rate_function_expr}")
+                print(f"  Processed: {expr_processed}")
+                print(f"  Context has: {list(context.keys())}")
+            
             # Evaluate formula
-            result = eval(self.rate_function_expr, {"__builtins__": {}}, context)
+            result = eval(expr_processed, {"__builtins__": {}}, context)
             rate = float(result)
             
             # Handle zero/negative rates gracefully for τ-leaping
@@ -409,10 +422,12 @@ class StochasticBehavior(TransitionBehavior):
             
             for place in places_to_iterate:
                 if hasattr(place, 'tokens'):
-                    # Add by ID (P1, P2, etc.) - used in most rate formulas
+                    # Add by internal ID (P1, P2, P7, P8, etc.)
+                    # IDs are system-generated and always have the prefix
                     if hasattr(place, 'id'):
                         places_dict[place.id] = place.tokens
-                    # Also add by name if it exists (for SBML models)
+                    # Also add by user-defined name (ATP_pool, Drug_ext, etc.)
+                    # Names are user-controlled aliases - use as-is WITHOUT prefix
                     if hasattr(place, 'name') and place.name:
                         places_dict[place.name] = place.tokens
             
@@ -424,10 +439,10 @@ class StochasticBehavior(TransitionBehavior):
             if hasattr(arc, 'source'):
                 place = arc.source
                 if hasattr(place, 'tokens'):
-                    # Add by ID (P1, P2, etc.)
+                    # Add by internal ID (P1, P2, P7, P8, etc.)
                     if hasattr(place, 'id'):
                         places_dict[place.id] = place.tokens
-                    # Also add by name if it exists
+                    # Also add by user-defined name - use as-is WITHOUT prefix
                     if hasattr(place, 'name') and place.name:
                         places_dict[place.name] = place.tokens
         
@@ -436,10 +451,10 @@ class StochasticBehavior(TransitionBehavior):
             if hasattr(arc, 'target'):
                 place = arc.target
                 if hasattr(place, 'tokens'):
-                    # Add by ID (P1, P2, etc.)
+                    # Add by internal ID (P1, P2, P7, P8, etc.)
                     if hasattr(place, 'id'):
                         places_dict[place.id] = place.tokens
-                    # Also add by name if it exists
+                    # Also add by user-defined name - use as-is WITHOUT prefix
                     if hasattr(place, 'name') and place.name:
                         places_dict[place.name] = place.tokens
         

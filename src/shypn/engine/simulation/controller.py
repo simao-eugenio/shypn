@@ -1145,13 +1145,30 @@ class SimulationController:
         
         # Phase 3: Continuous transitions with conflict resolution
         # Group continuous transitions by locality conflicts and apply firing policies
-        # NOTE: Include adaptive transitions here - they may be in continuous mode
-        continuous_transitions = [t for t in self.model.transitions 
-                                  if t.transition_type in ('continuous', 'adaptive')]
+        # NOTE: Include adaptive transitions ONLY if they're in continuous mode
+        continuous_transitions = []
+        for t in self.model.transitions:
+            if t.transition_type == 'continuous':
+                continuous_transitions.append(t)
+            elif t.transition_type == 'adaptive':
+                # Check if adaptive transition is in continuous mode
+                behavior = self._get_behavior(t)
+                if behavior and hasattr(behavior, 'get_current_mode'):
+                    current_mode = behavior.get_current_mode()
+                    if current_mode == 'continuous':
+                        continuous_transitions.append(t)
+                elif behavior:
+                    # No current_mode cached - determine mode now
+                    from shypn.engine.adaptive_hybrid_behavior import AdaptiveHybridBehavior
+                    if isinstance(behavior, AdaptiveHybridBehavior):
+                        mode = behavior._select_mode()  # Returns mode string
+                        if mode == 'continuous':
+                            continuous_transitions.append(t)
         
         # DIAGNOSTIC: Log continuous phase
-        if continuous_transitions:
-            pass
+        adaptive_in_continuous = [t.name for t in continuous_transitions if t.transition_type == 'adaptive']
+        if adaptive_in_continuous:
+            print(f"[CONTROLLER DEBUG] Phase 3 - Adaptive transitions in CONTINUOUS mode: {adaptive_in_continuous}")
         
         continuous_enabled = []
         for transition in continuous_transitions:

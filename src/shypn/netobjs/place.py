@@ -91,9 +91,63 @@ class Place(PetriNetObject):
         self.neighbor_compartments: List[str] = []  # Adjacent compartment IDs
         self.spatial_position: Optional[Tuple[float, float, float]] = None  # (x, y, z) in μm
         
+        # Protected attributes - use properties/methods to access
+        self._properties = {}  # Private: place-specific parameters (access via properties)
+        self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
+        
         # Apply color schema based on place type (after all properties initialized)
         from shypn.utils.color_schema_manager import ColorSchemaManager
         self.border_color = ColorSchemaManager.get_place_border_color(self)
+    
+    # ========== Property Decorators (OOP Pattern) ==========
+    
+    @property
+    def properties(self) -> dict:
+        """Get properties dict (for backward compatibility).
+        
+        Returns:
+            dict: Properties dictionary
+        """
+        return self._properties
+    
+    @properties.setter
+    def properties(self, value: dict):
+        """Set properties dict (for backward compatibility).
+        
+        Args:
+            value: Properties dictionary
+        
+        Raises:
+            TypeError: If value is not a dict
+        """
+        if value is not None and not isinstance(value, dict):
+            raise TypeError("Properties must be a dictionary")
+        self._properties = value if value is not None else {}
+    
+    @property
+    def metadata(self) -> dict:
+        """Get metadata dict (for annotations and provenance).
+        
+        Returns:
+            dict: Metadata dictionary
+        """
+        return self._metadata
+    
+    @metadata.setter
+    def metadata(self, value: dict):
+        """Set metadata dict with validation.
+        
+        Args:
+            value: Metadata dictionary
+        
+        Raises:
+            TypeError: If value is not a dict
+        """
+        if value is not None and not isinstance(value, dict):
+            raise TypeError("Metadata must be a dictionary")
+        self._metadata = value if value is not None else {}
+    
+    # ========== End Property Decorators ==========
     
     def get_bounding_box(self):
         """Calculate bounding box for the place.

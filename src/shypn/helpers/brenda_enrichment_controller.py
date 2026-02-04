@@ -581,13 +581,13 @@ class BRENDAEnrichmentController:
             # Simple Michaelis-Menten with named parameters
             rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
         
-        # Set rate function in transition properties AND as attribute
+        # Set rate function in transition using proper setter method
+        transition.set_rate_function(rate_function)
+        
+        # Store source in properties for tracking
         if not hasattr(transition, 'properties'):
             transition.properties = {}
-        
-        transition.properties['rate_function'] = rate_function
         transition.properties['rate_function_source'] = 'brenda_auto_generated'
-        transition.rate_function = rate_function  # Set as attribute for property dialog
         
         # Also store in metadata for consistency with SABIO-RK
         if not hasattr(transition, 'metadata'):

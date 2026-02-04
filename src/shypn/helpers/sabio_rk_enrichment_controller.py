@@ -706,14 +706,10 @@ class SabioRKEnrichmentController:
             # Basic Michaelis-Menten
             rate_function = f"michaelis_menten({substrate_place}, vmax={vmax}, km={km})"
         
-        # Apply to transition
-        if not hasattr(transition, 'properties') or transition.properties is None:
-            transition.properties = {}
+        # Apply to transition using proper setter method
+        transition.set_rate_function(rate_function)
         
-        transition.properties['rate_function'] = rate_function
-        transition.rate_function = rate_function  # Store as rate_function, not rate
-        
-        # Mark source
+        # Mark source in metadata
         metadata['rate_function_source'] = 'sabio_rk_enriched'
         
         self.logger.info(f"[SABIO-RK] Generated rate function: {rate_function}")

@@ -76,6 +76,10 @@ class Transition(PetriNetObject):
         # Simulation statistics
         self.firing_count = 0  # Cumulative count of firings during simulation
         
+        # Protected attributes - use properties/methods to access
+        self._properties = {}  # Private: rate functions, kinetic parameters (access via properties)
+        self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
+        
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
         
@@ -94,6 +98,131 @@ class Transition(PetriNetObject):
         # Module assignment (modular Bio-PN architecture)
         # Transitions belong to modules, enabling network partitioning
         self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
+    
+    # ========== Property Decorators (OOP Pattern) ==========
+    
+    @property
+    def rate_function(self) -> Optional[str]:
+        """Get rate function expression (OOP property access).
+        
+        Returns:
+            Optional[str]: Rate function formula, or None if not set
+        """
+        return self._properties.get('rate_function')
+    
+    @rate_function.setter
+    def rate_function(self, expression: Optional[str]):
+        """Set rate function expression with validation (OOP property access).
+        
+        Args:
+            expression: Rate function formula (e.g., "0.5 * [ADP_pool]")
+        
+        Raises:
+            TypeError: If expression is not a string or None
+            ValueError: If continuous/adaptive transition has no rate function
+        """
+        if expression is not None and not isinstance(expression, str):
+            raise TypeError("Rate function must be a string or None")
+        
+        # Validate that continuous/adaptive transitions have rate functions
+        if self.transition_type in ['continuous', 'adaptive'] and not expression:
+            raise ValueError(f"{self.transition_type} transitions require a rate function")
+        
+        self._properties['rate_function'] = expression
+    
+    @property
+    def rate_forward(self) -> Optional[str]:
+        """Get forward rate expression for reversible reactions (OOP property access).
+        
+        Returns:
+            Optional[str]: Forward rate formula, or None if not set
+        """
+        return self._properties.get('rate_forward')
+    
+    @rate_forward.setter
+    def rate_forward(self, expression: Optional[str]):
+        """Set forward rate expression for reversible reactions (OOP property access).
+        
+        Args:
+            expression: Forward rate formula
+        
+        Raises:
+            TypeError: If expression is not a string or None
+        """
+        if expression is not None and not isinstance(expression, str):
+            raise TypeError("Forward rate must be a string or None")
+        self._properties['rate_forward'] = expression
+    
+    @property
+    def rate_reverse(self) -> Optional[str]:
+        """Get reverse rate expression for reversible reactions (OOP property access).
+        
+        Returns:
+            Optional[str]: Reverse rate formula, or None if not set
+        """
+        return self._properties.get('rate_reverse')
+    
+    @rate_reverse.setter
+    def rate_reverse(self, expression: Optional[str]):
+        """Set reverse rate expression for reversible reactions (OOP property access).
+        
+        Args:
+            expression: Reverse rate formula
+        
+        Raises:
+            TypeError: If expression is not a string or None
+        """
+        if expression is not None and not isinstance(expression, str):
+            raise TypeError("Reverse rate must be a string or None")
+        self._properties['rate_reverse'] = expression
+    
+    @property
+    def properties(self) -> dict:
+        """Get properties dict (for backward compatibility).
+        
+        Returns:
+            dict: Properties dictionary
+        """
+        return self._properties
+    
+    @properties.setter
+    def properties(self, value: dict):
+        """Set properties dict (for backward compatibility).
+        
+        Args:
+            value: Properties dictionary
+        
+        Raises:
+            TypeError: If value is not a dict
+        """
+        if value is not None and not isinstance(value, dict):
+            raise TypeError("Properties must be a dictionary")
+        self._properties = value if value is not None else {}
+    
+    @property
+    def metadata(self) -> dict:
+        """Get metadata dict (for annotations and provenance).
+        
+        Returns:
+            dict: Metadata dictionary
+        """
+        return self._metadata
+    
+    @metadata.setter
+    def metadata(self, value: dict):
+        """Set metadata dict with validation.
+        
+        Args:
+            value: Metadata dictionary
+        
+        Raises:
+            TypeError: If value is not a dict
+        """
+        if value is not None and not isinstance(value, dict):
+            raise TypeError("Metadata must be a dictionary")
+        self._metadata = value if value is not None else {}
+    
+    # ========== End Property Decorators ==========
     
     def get_bounding_box(self):
         """Calculate bounding box for the transition.
@@ -470,21 +599,79 @@ class Transition(PetriNetObject):
         # Store the value
         self.rate = rate_value
         
-        # DEPRECATED: Legacy sync to properties dict
-        # NOTE: As of 2026-01-04, continuous_behavior.py now prefers top-level
-        # rate_function field over properties['rate_function']. This sync is
-        # maintained for backwards compatibility only and will be removed in future.
-        if self.transition_type == 'continuous':
-            if not hasattr(self, 'properties') or self.properties is None:
-                self.properties = {}
-            
-            # Store expression for evaluation (legacy)
-            if isinstance(rate_value, str):
-                self.properties['rate_function'] = rate_value
-            else:
-                # Convert number to string for consistency
-                self.properties['rate_function'] = str(rate_value)
+        # NOTE: As of 2026-02-04, rate functions should be stored ONLY in properties dict
+        # Continuous transitions: Use properties['rate_function'] for complex expressions
+        # Stochastic transitions: Use properties['rate_function'] for formulas OR simple rate attribute
+        # This method (set_rate) only sets the rate attribute. For rate functions, set properties['rate_function'] directly.
     
+    def get_rate_function(self) -> str:
+        """Get the rate function expression for this transition.
+        
+        Returns:
+            str: Rate function expression, or None if not set
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            return None
+        return self.properties.get('rate_function')
+    
+    def set_rate_function(self, expression: str):
+        """Set the rate function expression for this transition.
+        
+        Args:
+            expression: Rate function formula (e.g., "0.5 * [ADP_pool]")
+        
+        Raises:
+            ValueError: If expression is invalid for this transition type
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            self.properties = {}
+        
+        # Validate that continuous/adaptive transitions have rate functions
+        if self.transition_type in ['continuous', 'adaptive'] and not expression:
+            raise ValueError(f"{self.transition_type} transitions require a rate function")
+        
+        self.properties['rate_function'] = expression
+    
+    def get_rate_forward(self) -> str:
+        """Get the forward rate expression for reversible reactions.
+        
+        Returns:
+            str: Forward rate expression, or None if not set
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            return None
+        return self.properties.get('rate_forward')
+    
+    def set_rate_forward(self, expression: str):
+        """Set the forward rate expression for reversible reactions.
+        
+        Args:
+            expression: Forward rate formula
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            self.properties = {}
+        self.properties['rate_forward'] = expression
+    
+    def get_rate_reverse(self) -> str:
+        """Get the reverse rate expression for reversible reactions.
+        
+        Returns:
+            str: Reverse rate expression, or None if not set
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            return None
+        return self.properties.get('rate_reverse')
+    
+    def set_rate_reverse(self, expression: str):
+        """Set the reverse rate expression for reversible reactions.
+        
+        Args:
+            expression: Reverse rate formula
+        """
+        if not hasattr(self, 'properties') or self.properties is None:
+            self.properties = {}
+        self.properties['rate_reverse'] = expression
+
     def set_guard(self, guard_value):
         """Set guard expression with storage for evaluation.
         
@@ -550,6 +737,10 @@ class Transition(PetriNetObject):
             data["guard"] = self.guard
         if self.rate is not None:
             data["rate"] = self.rate
+        
+        # NOTE: Top-level rate_function/rate_forward/rate_reverse are legacy attributes
+        # Modern code should use properties dict, but we save top-level for backward compatibility
+        # The from_dict() method will migrate these to properties dict on load
         if hasattr(self, 'rate_function') and self.rate_function:
             data["rate_function"] = self.rate_function
         if hasattr(self, 'formula') and self.formula:
@@ -722,19 +913,23 @@ class Transition(PetriNetObject):
             transition.guard = 1 if guard_value is None else guard_value
         if "rate" in data:
             transition.rate = data["rate"]
-        if "rate_function" in data:
+            
+        # CRITICAL: Load properties dict FIRST before individual rate fields
+        # This ensures rate_function in properties dict takes precedence
+        if "properties" in data:
+            transition.properties = data["properties"]
+        
+        # Legacy support: Load top-level rate_function (only if not in properties)
+        if "rate_function" in data and 'rate_function' not in transition.properties:
             transition.rate_function = data["rate_function"]
         if "formula" in data:
             transition.formula = data["formula"]
         
-        # Restore directional rates for reversible reactions
-        if "rate_forward" in data:
+        # Legacy support: Load directional rates (only if not in properties)
+        if "rate_forward" in data and 'rate_forward' not in transition.properties:
             transition.rate_forward = data["rate_forward"]
-        if "rate_reverse" in data:
+        if "rate_reverse" in data and 'rate_reverse' not in transition.properties:
             transition.rate_reverse = data["rate_reverse"]
-            
-        if "properties" in data:
-            transition.properties = data["properties"]
         
         # Restore source/sink markers
         if "is_source" in data:

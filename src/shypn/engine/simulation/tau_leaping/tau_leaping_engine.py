@@ -580,6 +580,10 @@ class TauLeapingEngine:
                     mode='tau_leaping',
                     firings=actual_firings
                 )
+                
+                # DEBUG: Log firing count after
+                if transition.transition_type == 'adaptive':
+                    print(f"  Firing count after: {transition.firing_count}")
             
             # Notify step listeners that have on_transition_fired (for analyses/plotting)
             if hasattr(controller, 'step_listeners'):
