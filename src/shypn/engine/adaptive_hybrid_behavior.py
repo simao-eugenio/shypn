@@ -210,7 +210,13 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         self._last_volume_check = details
         
-        return 'stochastic' if use_stochastic else 'continuous'
+        mode = 'stochastic' if use_stochastic else 'continuous'
+        
+        # Cache the mode (without triggering full mode change logic)
+        if self._current_mode != mode:
+            self._current_mode = mode
+        
+        return mode
     
     def _handle_mode_change(self, new_mode: str):
         """Handle transition between execution modes.
@@ -242,6 +248,36 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         # Clear stochastic scheduling state when switching away from stochastic
         if old_mode == 'stochastic' and new_mode == 'continuous':
             self.stochastic_behavior.clear_enablement()
+    
+    def _evaluate_rate_at_enablement(self, time: float) -> float:
+        """Evaluate propensity/rate for stochastic sampling.
+        
+        This method is called by tau-leaping engine to calculate propensities.
+        Delegates to the currently selected behavior.
+        
+        Args:
+            time: Current simulation time
+            
+        Returns:
+            Propensity value (rate × tokens for stochastic mode)
+        """
+        mode = self._select_mode()
+        self._handle_mode_change(mode)
+        
+        if mode == 'stochastic':
+            # Delegate to stochastic behavior
+            return self.stochastic_behavior._evaluate_rate_at_enablement(time)
+        else:
+            # Continuous mode: use evaluate_rate
+            # Build places dict with numeric token values
+            places = {}
+            places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
+            for p in places_to_iterate:
+                if hasattr(p, 'id') and hasattr(p, 'tokens'):
+                    places[p.id] = p.tokens
+                    if hasattr(p, 'name') and p.name:
+                        places[p.name] = p.tokens
+            return self.continuous_behavior.evaluate_rate(places, time)
     
     def can_fire(self) -> Tuple[bool, str]:
         """Check if transition can fire (delegates to current mode).

@@ -79,49 +79,20 @@ class ContinuousBehavior(TransitionBehavior):
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
         
-        # Support multiple formats (priority order):
-        # 1. transition.rate_function (top-level JSON field - AUTHORITATIVE)
-        # 2. transition.rate_forward/rate_reverse (directional reactions)
-        # 3. properties['rate_function'] (legacy/fallback only)
-        # 4. properties['rate'] (callable format)
-        # 5. transition.rate attribute (simple numeric value)
-        
+        # Rate function is stored in properties dict only
         rate_expr = None
         rate_forward_expr = None
         rate_reverse_expr = None
         
-        # Check for directional rate functions first
-        # Check both props dict AND transition attributes
-        rate_forward_expr = props.get('rate_forward') or getattr(transition, 'rate_forward', None)
-        rate_reverse_expr = props.get('rate_reverse') or getattr(transition, 'rate_reverse', None)
+        # Check for directional rate functions
+        rate_forward_expr = props.get('rate_forward')
+        rate_reverse_expr = props.get('rate_reverse')
         
         if rate_forward_expr or rate_reverse_expr:
             self.use_directional_rates = True
         else:
             self.use_directional_rates = False
-            
-            # PRIORITY 1: Check top-level rate_function attribute (from JSON "rate_function" field)
-            # This is the authoritative source set by the UI
-            if getattr(transition, 'rate_function', None):
-                rate_expr = transition.rate_function
-            # PRIORITY 2: Legacy fallback - properties dict (only if no top-level field)
-            elif 'rate_function' in props:
-                rate_expr = props.get('rate_function')
-            elif 'rate' in props and callable(props['rate']):
-                # Dict format with callable: {'rate': lambda ...}
-                rate_expr = props['rate']
-            else:
-                # Fallback: Use transition.rate attribute (UI stores simple value)
-                rate = getattr(transition, 'rate', None)
-                if rate is not None:
-                    # Check if it's a dict with 'rate' key
-                    if isinstance(rate, dict) and 'rate' in rate:
-                        rate_expr = rate['rate']
-                    else:
-                        # Accept string expressions or numeric constants
-                        rate_expr = str(rate)
-                else:
-                    rate_expr = '1.0'  # Default constant rate
+            rate_expr = props.get('rate_function')
         
         self.max_rate = float(props.get('max_rate', float('inf')))
         self.min_rate = float(props.get('min_rate', -float('inf')))  # Allow negative for reversible
@@ -133,6 +104,11 @@ class ContinuousBehavior(TransitionBehavior):
             # Combined rate = forward - reverse
             self.rate_function = lambda places, t: self.rate_forward_function(places, t) - self.rate_reverse_function(places, t)
         else:
+            if rate_expr is None:
+                raise ValueError(
+                    f"Continuous transition '{self.transition.label}' (id={self.transition.id}) "
+                    f"missing required 'rate_function' in properties dict"
+                )
             self.rate_function = self._compile_rate_function(rate_expr)
         
         # Integration parameters
@@ -208,6 +184,11 @@ class ContinuousBehavior(TransitionBehavior):
         Returns:
             Callable that takes (places_dict, time) and returns rate
         """
+        if expr is None:
+            raise ValueError(
+                f"Cannot compile None rate expression for transition '{self.transition.label}' (id={self.transition.id})"
+            )
+        
         if callable(expr):
             return expr
         
@@ -260,9 +241,9 @@ class ContinuousBehavior(TransitionBehavior):
                 
                 context.update(params)
                 
-                # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
-                # IMPORTANT: Also add by place.name for SBML formulas that use names
-                # Add small epsilon to prevent division by zero in rate formulas
+                # Add place tokens for evaluation context
+                # Keys in places dict are internal IDs (P1, P2, P7, P8, etc.)
+                # Add both by ID and by user-defined name (without prefix)
                 for place_id, place in places.items():
                     # Get tokens safely - handle both direct attribute and method
                     if hasattr(place, 'tokens'):
@@ -276,16 +257,12 @@ class ContinuousBehavior(TransitionBehavior):
                     # Use max() to ensure at least epsilon value to prevent division by zero
                     tokens_safe = max(float(tokens), 1e-10)
                     
-                    # Add by ID (for numeric IDs like 1, 2, 3)
-                    if isinstance(place_id, str) and place_id.startswith('P'):
-                        # ID already has P prefix (e.g., "P105")
-                        context[place_id] = tokens_safe
-                    else:
-                        # Numeric ID needs P prefix (e.g., 1 → P1)
-                        context[f'P{place_id}'] = tokens_safe
+                    # Add by internal ID (P1, P2, P7, P8, etc.)
+                    # IDs are system-generated and always have the prefix
+                    context[place_id] = tokens_safe
                     
-                    # ALSO add by place name (for SBML formulas)
-                    # Place name might be "P1", "P5", etc. from SBML conversion
+                    # ALSO add by user-defined name (ATP_pool, Drug_ext, etc.)
+                    # Names are user-controlled aliases - use as-is WITHOUT prefix
                     if hasattr(place, 'name') and place.name:
                         context[place.name] = tokens_safe
                 

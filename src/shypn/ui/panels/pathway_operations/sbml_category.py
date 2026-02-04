@@ -744,24 +744,24 @@ class SBMLCategory(BasePathwayCategory):
         for transition in self.controller.model.transitions:
             if transition.name == transition_name:
                 if direction == 'forward':
-                    transition.rate_forward = value
+                    transition.set_rate_forward(value)
                     # Update rate_function if it exists
-                    if hasattr(transition, 'rate_function') and transition.rate_function:
+                    rate_func = transition.get_rate_function()
+                    if rate_func:
                         # Update k_f or k_forward in the formula
                         import re
-                        formula = transition.rate_function
-                        formula = re.sub(r'\bk_f\b', str(value), formula)
+                        formula = re.sub(r'\bk_f\b', str(value), rate_func)
                         formula = re.sub(r'\bk_forward\b', str(value), formula)
-                        transition.rate_function = formula
+                        transition.set_rate_function(formula)
                 elif direction == 'reverse':
-                    transition.rate_reverse = value
+                    transition.set_rate_reverse(value)
                     # Update rate_function if it exists
-                    if hasattr(transition, 'rate_function') and transition.rate_function:
+                    rate_func = transition.get_rate_function()
+                    if rate_func:
                         import re
-                        formula = transition.rate_function
-                        formula = re.sub(r'\bk_r\b', str(value), formula)
+                        formula = re.sub(r'\bk_r\b', str(value), rate_func)
                         formula = re.sub(r'\bk_reverse\b', str(value), formula)
-                        transition.rate_function = formula
+                        transition.set_rate_function(formula)
                 
                 self.logger.debug(f"Updated {transition_name}.{direction} = {value}")
                 return
