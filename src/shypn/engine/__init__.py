@@ -34,6 +34,7 @@ Transition Types:
     - 'timed': Fire within [earliest, latest] timing window (TPN)
     - 'stochastic': Fire with exponential distribution and bursting (FSPN)
     - 'continuous': Fire with continuous flow and rate functions (SHPN)
+    - 'adaptive': Runtime switching between stochastic and continuous (Adaptive Hybrid)
 """
 
 # Version info
@@ -48,6 +49,7 @@ from .immediate_behavior import ImmediateBehavior
 from .timed_behavior import TimedBehavior
 from .stochastic_behavior import StochasticBehavior
 from .continuous_behavior import ContinuousBehavior
+from .adaptive_hybrid_behavior import AdaptiveHybridBehavior
 
 # Factory function
 from .behavior_factory import create_behavior, get_available_types, is_type_implemented
@@ -62,6 +64,7 @@ __all__ = [
     'TimedBehavior',
     'StochasticBehavior',
     'ContinuousBehavior',
+    'AdaptiveHybridBehavior',
     
     # Factory functions
     'create_behavior',

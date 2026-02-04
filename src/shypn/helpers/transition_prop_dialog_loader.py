@@ -69,6 +69,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         self._setup_color_picker()
         self._populate_fields()
         self._update_field_visibility()
+        self._update_adaptive_visibility()  # Initial visibility for adaptive box
         self._setup_type_change_handler()
         self._setup_rate_sync()
         self._setup_topology_tab()
@@ -141,9 +142,24 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Transition type
         type_combo = self.builder.get_object('prop_transition_type_combo')
         if type_combo and hasattr(self.transition_obj, 'transition_type'):
-            type_map = {'immediate': 0, 'timed': 1, 'stochastic': 2, 'continuous': 3}
+            type_map = {'immediate': 0, 'timed': 1, 'stochastic': 2, 'continuous': 3, 'adaptive': 4}
             transition_type = self.transition_obj.transition_type or 'continuous'
             type_combo.set_active(type_map.get(transition_type, 3))
+        
+        # Adaptive properties
+        if hasattr(self.transition_obj, 'properties') and isinstance(self.transition_obj.properties, dict):
+            # Adaptive filter
+            adaptive_filter_combo = self.builder.get_object('adaptive_filter_combo')
+            if adaptive_filter_combo:
+                filter_value = self.transition_obj.properties.get('adaptive_filter', 'inputs_only')
+                filter_map = {'inputs_only': 0, 'outputs_only': 1, 'all_places': 2}
+                adaptive_filter_combo.set_active(filter_map.get(filter_value, 0))
+            
+            # Volume threshold
+            volume_threshold_spin = self.builder.get_object('volume_threshold_spin')
+            if volume_threshold_spin:
+                threshold_value = self.transition_obj.properties.get('volume_threshold', 1.0)
+                volume_threshold_spin.set_value(float(threshold_value))
         
         # Firing policy (replaces priority spinner)
         firing_policy_combo = self.builder.get_object('firing_policy_combo')
@@ -450,6 +466,14 @@ class TransitionPropDialogLoader(GObject.GObject):
             description = self.transition_obj.get_type_description()
             desc_label.set_text(description)
     
+    def _update_adaptive_visibility(self):
+        """Show/hide adaptive properties box based on transition type."""
+        adaptive_box = self.builder.get_object('adaptive_properties_box')
+        if adaptive_box:
+            is_adaptive = hasattr(self.transition_obj, 'transition_type') and \
+                         self.transition_obj.transition_type == 'adaptive'
+            adaptive_box.set_visible(is_adaptive)
+    
     def _setup_type_change_handler(self):
         """Setup handler for transition type changes."""
         type_combo = self.builder.get_object('prop_transition_type_combo')
@@ -458,7 +482,7 @@ class TransitionPropDialogLoader(GObject.GObject):
     
     def _on_type_changed(self, combo):
         """Handle transition type change - update field visibility."""
-        type_list = ['immediate', 'timed', 'stochastic', 'continuous']
+        type_list = ['immediate', 'timed', 'stochastic', 'continuous', 'adaptive']
         new_type = type_list[combo.get_active()]
         
         # Update transition object temporarily (not persisted until OK)
@@ -467,6 +491,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Update UI
         self._update_field_visibility()
         self._update_type_description()
+        self._update_adaptive_visibility()
     
     def _setup_rate_sync(self):
         """Setup synchronization between rate function TextView and rate entry."""
@@ -620,8 +645,24 @@ class TransitionPropDialogLoader(GObject.GObject):
             # Transition type
             type_combo = self.builder.get_object('prop_transition_type_combo')
             if type_combo:
-                type_list = ['immediate', 'timed', 'stochastic', 'continuous']
+                type_list = ['immediate', 'timed', 'stochastic', 'continuous', 'adaptive']
                 self.transition_obj.transition_type = type_list[type_combo.get_active()]
+            
+            # Adaptive properties (save to properties dict)
+            if self.transition_obj.transition_type == 'adaptive':
+                if not hasattr(self.transition_obj, 'properties') or not isinstance(self.transition_obj.properties, dict):
+                    self.transition_obj.properties = {}
+                
+                # Save adaptive filter
+                adaptive_filter_combo = self.builder.get_object('adaptive_filter_combo')
+                if adaptive_filter_combo:
+                    filter_list = ['inputs_only', 'outputs_only', 'all_places']
+                    self.transition_obj.properties['adaptive_filter'] = filter_list[adaptive_filter_combo.get_active()]
+                
+                # Save volume threshold
+                volume_threshold_spin = self.builder.get_object('volume_threshold_spin')
+                if volume_threshold_spin:
+                    self.transition_obj.properties['volume_threshold'] = volume_threshold_spin.get_value()
             
             # Firing policy (replaces priority spinner)
             firing_policy_combo = self.builder.get_object('firing_policy_combo')
