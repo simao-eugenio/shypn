@@ -198,12 +198,71 @@ class ViabilityPanelLoader:
         if self.widget:
             self.widget.set_no_show_all(False)
             self.widget.show_all()  # Ensure all children are shown
+        
+        # ENHANCEMENT: Auto-select entire model if no localities selected
+        # When user switches to Viability panel without selecting anything,
+        # automatically select all transitions for batch simulation
+        if self.panel and hasattr(self.panel, 'selected_localities'):
+            if not self.panel.selected_localities:
+                self._auto_select_entire_model()
     
     def hide_in_stack(self):
         """Hide this panel in the GtkStack (Master Palette control)."""
         # Just hide container - don't use no_show_all as it breaks other panels
         if self.parent_container:
             self.parent_container.set_visible(False)
+    
+    def _auto_select_entire_model(self):
+        """Auto-select all transitions in the model when panel becomes visible with no selection.
+        
+        This enhancement provides a better user experience for batch simulation:
+        - If user manually selected transitions, respect that choice
+        - If user didn't select anything, automatically select entire model
+        - Allows immediate batch parameter sweeping without manual selection
+        """
+        if not self.panel:
+            return
+        
+        # Get current model
+        model = None
+        if hasattr(self.panel, '_get_current_model'):
+            model = self.panel._get_current_model()
+        
+        if not model or not hasattr(model, 'transitions'):
+            return
+        
+        # Check if model has any transitions
+        if not model.transitions:
+            return
+        
+        # Track success count for feedback
+        added_count = 0
+        
+        # Add all transitions to the viability panel
+        for transition_obj in model.transitions:
+            # Skip if already added (safety check)
+            if hasattr(self.panel, 'selected_localities'):
+                if transition_obj.id in self.panel.selected_localities:
+                    continue
+            
+            # Add transition to analysis list
+            if hasattr(self.panel, '_add_transition_to_list'):
+                try:
+                    self.panel._add_transition_to_list(transition_obj)
+                    added_count += 1
+                except Exception as e:
+                    # Silently ignore errors for individual transitions
+                    # (e.g., if transition has missing properties)
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"Could not auto-add transition {transition_obj.id}: {e}")
+        
+        # Show feedback to user about auto-selection
+        if added_count > 0 and hasattr(self.panel, '_show_feedback'):
+            self.panel._show_feedback(
+                f"Auto-selected entire model ({added_count} transition{'s' if added_count != 1 else ''}) for batch analysis",
+                "info"
+            )
     
     def hang_on(self, container):
         """Hang this panel on a container (attach).
@@ -218,6 +277,11 @@ class ViabilityPanelLoader:
             # Make sure container is visible when re-showing
             if not container.get_visible():
                 container.set_visible(True)
+            
+            # ENHANCEMENT: Auto-select entire model if no localities selected
+            if self.panel and hasattr(self.panel, 'selected_localities'):
+                if not self.panel.selected_localities:
+                    self._auto_select_entire_model()
             return
         
         # Hide independent window
@@ -247,6 +311,11 @@ class ViabilityPanelLoader:
             self._updating_button = True
             self.panel.float_button.set_active(False)
             self._updating_button = False
+        
+        # ENHANCEMENT: Auto-select entire model if no localities selected
+        if self.panel and hasattr(self.panel, 'selected_localities'):
+            if not self.panel.selected_localities:
+                self._auto_select_entire_model()
         
         # Notify host to expand/show docked area if needed
         if callable(self.on_attach_callback):

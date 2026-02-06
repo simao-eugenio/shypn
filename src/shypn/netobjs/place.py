@@ -537,6 +537,29 @@ class Place(PetriNetObject):
     # Serialization
     # ============================================================================
     
+    def _serialize_signal_type(self) -> Optional[str]:
+        """Serialize signal_type to string for persistence.
+        
+        Handles both SignalType enum and string values since signal_type
+        can be set from UI dialog (string) or from loading (enum).
+        
+        Returns:
+            str or None: Signal type as string ('energy', 'spatial', etc.) or None
+        """
+        if self.signal_type is None:
+            return None
+        
+        # Handle SignalType enum
+        if hasattr(self.signal_type, 'value'):
+            return str(self.signal_type.value)
+        
+        # Already a string (set from dialog)
+        if isinstance(self.signal_type, str):
+            return self.signal_type
+        
+        # Fallback: convert to string
+        return str(self.signal_type)
+    
     def to_dict(self) -> dict:
         """Serialize place to dictionary for persistence.
         
@@ -556,6 +579,7 @@ class Place(PetriNetObject):
             "border_width": self.border_width,
             "is_catalyst": getattr(self, 'is_catalyst', False),  # Save catalyst flag
             "is_signal_place": getattr(self, 'is_signal_place', False),  # Save signal place flag (13-tuple Ψ)
+            "signal_type": self._serialize_signal_type(),  # Save signal classification (energy/spatial/quorum/regulatory)
             "is_compartment_place": getattr(self, 'is_compartment_place', False),  # Save compartment place flag
             "is_regulatory_place": getattr(self, 'is_regulatory_place', False),  # Save regulatory place flag
             
@@ -623,6 +647,30 @@ class Place(PetriNetObject):
         place.is_catalyst = data.get("is_catalyst", False)
         # Restore signal place flag (13-tuple formalism: Ψ)
         place.is_signal_place = data.get("is_signal_place", False)
+        
+        # Restore signal type classification (energy/spatial/quorum/regulatory)
+        signal_type_str = data.get("signal_type")
+        if not signal_type_str and "properties" in data:
+            # Fallback: check properties dict for signal_type
+            signal_type_str = data["properties"].get("signal_type")
+        
+        if signal_type_str:
+            try:
+                # Normalize to lowercase for enum lookup
+                signal_type_str = str(signal_type_str).lower()
+                place.signal_type = SignalType(signal_type_str)
+            except (ValueError, KeyError) as e:
+                # Invalid signal type - log warning and set to None
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Invalid signal_type '{signal_type_str}' for place {place.id}. "
+                    f"Valid types: energy, spatial, quorum, regulatory. Setting to None."
+                )
+                place.signal_type = None
+        else:
+            place.signal_type = None
+        
         # Restore compartment place flag (non-default compartments)
         place.is_compartment_place = data.get("is_compartment_place", False)
         # Restore regulatory place flag (genes/resources)

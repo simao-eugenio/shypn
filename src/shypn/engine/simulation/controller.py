@@ -1167,8 +1167,6 @@ class SimulationController:
         
         # DIAGNOSTIC: Log continuous phase
         adaptive_in_continuous = [t.name for t in continuous_transitions if t.transition_type == 'adaptive']
-        if adaptive_in_continuous:
-            print(f"[CONTROLLER DEBUG] Phase 3 - Adaptive transitions in CONTINUOUS mode: {adaptive_in_continuous}")
         
         continuous_enabled = []
         for transition in continuous_transitions:

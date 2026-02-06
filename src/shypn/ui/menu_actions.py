@@ -66,7 +66,7 @@ class MenuActions:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.save_current_document()
 			else:
-				print("DEBUG: file_explorer_panel is None in on_file_save")
+
 				self._show_error_dialog("Save Error", "File explorer panel not initialized")
 		except Exception as e:
 			import traceback
@@ -79,7 +79,7 @@ class MenuActions:
 			if self.file_explorer_panel:
 				self.file_explorer_panel.save_current_document_as()
 			else:
-				print("DEBUG: file_explorer_panel is None in on_file_save_as")
+
 				self._show_error_dialog("Save As Error", "File explorer panel not initialized")
 		except Exception as e:
 			import traceback

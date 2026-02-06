@@ -154,13 +154,20 @@ class PlacePropDialogLoader(GObject.GObject):
             signal_type = getattr(self.place_obj, 'signal_type', None)
             if signal_type:
                 # Map signal type to combo box index
+                # Handle both SignalType enum and string values
+                if isinstance(signal_type, str):
+                    type_str = signal_type
+                else:
+                    # SignalType enum - get value
+                    type_str = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
+                
                 type_map = {
                     'energy': 0,
                     'regulatory': 1,
                     'quorum': 2,
                     'spatial': 3
                 }
-                idx = type_map.get(signal_type, 0)
+                idx = type_map.get(type_str, 0)
                 signal_type_combo.set_active(idx)
             else:
                 signal_type_combo.set_active(0)  # Default to energy
@@ -257,12 +264,13 @@ class PlacePropDialogLoader(GObject.GObject):
             if is_signal:
                 signal_type_combo = self.builder.get_object('signal_type_combo')
                 if signal_type_combo:
+                    from shypn.netobjs.signal_type import SignalType
                     active_idx = signal_type_combo.get_active()
-                    type_map = ['energy', 'regulatory', 'quorum', 'spatial']
+                    type_map = [SignalType.ENERGY, SignalType.REGULATORY, SignalType.QUORUM, SignalType.SPATIAL]
                     if 0 <= active_idx < len(type_map):
                         self.place_obj.signal_type = type_map[active_idx]
                     else:
-                        self.place_obj.signal_type = 'energy'  # Default
+                        self.place_obj.signal_type = SignalType.ENERGY  # Default
             else:
                 # Clear signal type when unchecked
                 self.place_obj.signal_type = None
@@ -334,8 +342,15 @@ class PlacePropDialogLoader(GObject.GObject):
         # Boundary type
         boundary_combo = self.builder.get_object('boundary_type_combo')
         if boundary_combo and hasattr(self.place_obj, 'boundary_type'):
-            boundary_map = {None: 0, 'PERMEABLE': 1, 'SELECTIVE': 2, 'IMPERMEABLE': 3}
-            boundary_combo.set_active(boundary_map.get(self.place_obj.boundary_type, 0))
+            from shypn.netobjs.place import BoundaryType
+            boundary_map = {
+                None: 0,
+                BoundaryType.PERMEABLE: 1,
+                BoundaryType.SELECTIVE: 2,
+                BoundaryType.IMPERMEABLE: 3
+            }
+            current_index = boundary_map.get(self.place_obj.boundary_type, 0)
+            boundary_combo.set_active(current_index)
         
         # Module ID
         module_entry = self.builder.get_object('module_id_entry')
@@ -395,8 +410,11 @@ class PlacePropDialogLoader(GObject.GObject):
         # Boundary type
         boundary_combo = self.builder.get_object('boundary_type_combo')
         if boundary_combo:
-            boundary_list = [None, 'PERMEABLE', 'SELECTIVE', 'IMPERMEABLE']
-            self.place_obj.boundary_type = boundary_list[boundary_combo.get_active()]
+            from shypn.netobjs.place import BoundaryType
+            boundary_list = [None, BoundaryType.PERMEABLE, BoundaryType.SELECTIVE, BoundaryType.IMPERMEABLE]
+            selected_index = boundary_combo.get_active()
+            selected_value = boundary_list[selected_index]
+            self.place_obj.boundary_type = selected_value
         
         # Module ID
         module_entry = self.builder.get_object('module_id_entry')
