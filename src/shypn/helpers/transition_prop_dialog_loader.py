@@ -769,30 +769,17 @@ class TransitionPropDialogLoader(GObject.GObject):
                         self._show_error_dialog("Invalid Rate Function", error_msg)
                         return False  # Validation failed, don't apply changes
                     
-                    # Save to properties for complex expressions/formulas
+                    # PHASE 2 REFACTORING: Always use rate_function (unified approach)
+                    # Save to properties dict - this is the canonical field for ALL rates
                     if not hasattr(self.transition_obj, 'properties'):
                         self.transition_obj.properties = {}
                     
-                    # If user edited a formula, it's now considered manual input
                     # Store as both display and computational versions
                     self.transition_obj.properties['rate_function_display'] = rate_text
                     self.transition_obj.properties['rate_function'] = rate_text
                     
-                    # Note: For manual edits, user must use P1, P2, P3 notation for simulation
-                    # or keep biological names if they want display-only
-                    
-                    # Clear the simple rate field - rate_function supersedes rate
-                    # Only set rate if it's a simple numeric value (for lambda)
-                    try:
-                        numeric_rate = float(rate_text)
-                        self.transition_obj.set_rate(numeric_rate)
-                        # If successful, this is just a simple lambda - clear rate_function
-                        del self.transition_obj.properties['rate_function']
-                        del self.transition_obj.properties['rate_function_display']
-                    except (ValueError, TypeError):
-                        # Not a simple number - it's a function expression
-                        # Clear rate field so rate_function takes precedence
-                        self.transition_obj.rate = None
+                    # Clear deprecated rate field (no longer used)
+                    self.transition_obj.rate = None
                 else:
                     # Clear rate_function if empty
                     if hasattr(self.transition_obj, 'properties'):

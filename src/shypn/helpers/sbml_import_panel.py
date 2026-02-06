@@ -897,24 +897,17 @@ class SBMLImportPanel:
         def parse_thread():
             try:
                 # Parse SBML file
-                print(f"[PARSE_THREAD_DEBUG] Calling parser.parse_file()...", flush=True)
                 parsed_pathway = self.parser.parse_file(filepath)
-                print(f"[PARSE_THREAD_DEBUG] Parse complete: {parsed_pathway is not None}", flush=True)
                 
                 if not parsed_pathway:
-                    print(f"[PARSE_THREAD_DEBUG] Parse failed - calling _on_parse_error", flush=True)
                     GLib.idle_add(self._on_parse_error, "Failed to parse SBML file")
                     return
                 
                 # Validate pathway
-                print(f"[PARSE_THREAD_DEBUG] Calling validator.validate()...", flush=True)
                 validation_result = self.validator.validate(parsed_pathway)
-                print(f"[PARSE_THREAD_DEBUG] Validation complete", flush=True)
                 
                 # Pass results back to main thread
-                print(f"[PARSE_THREAD_DEBUG] Calling GLib.idle_add(_on_parse_complete)...", flush=True)
                 GLib.idle_add(self._on_parse_complete, parsed_pathway, validation_result)
-                print(f"[PARSE_THREAD_DEBUG] GLib.idle_add called successfully", flush=True)
                 
             except Exception as e:
                 GLib.idle_add(self._on_parse_error, str(e))

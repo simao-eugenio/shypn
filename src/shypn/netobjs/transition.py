@@ -735,8 +735,12 @@ class Transition(PetriNetObject):
         # Serialize behavioral properties (guard, rate, formula, properties dict)
         if self.guard is not None:
             data["guard"] = self.guard
-        if self.rate is not None:
-            data["rate"] = self.rate
+        
+        # PHASE 3 REFACTORING: Deprecated - rate field no longer serialized
+        # All rates should be in properties.rate_function (see RATE_FIELD_REFACTORING_PLAN.md)
+        # Commenting out to prevent writing rate field to new/updated models
+        # if self.rate is not None:
+        #     data["rate"] = self.rate
         
         # NOTE: Top-level rate_function/rate_forward/rate_reverse are legacy attributes
         # Modern code should use properties dict, but we save top-level for backward compatibility
@@ -918,6 +922,19 @@ class Transition(PetriNetObject):
         # This ensures rate_function in properties dict takes precedence
         if "properties" in data:
             transition.properties = data["properties"]
+        else:
+            transition.properties = {}
+        
+        # PHASE 3 REFACTORING: Migrate legacy rate field to properties.rate_function
+        # This automatic migration ensures old models work with new architecture
+        if "rate" in data and data["rate"] is not None:
+            # Only migrate if rate_function doesn't already exist
+            if 'rate_function' not  in transition.properties:
+                # Convert numeric rate to string for rate_function
+                transition.properties['rate_function'] = str(data["rate"])
+                # Note: Engine will parse numeric strings and use as lambda
+                # Clear the deprecated rate field after migration
+                transition.rate = None
         
         # Legacy support: Load top-level rate_function (only if not in properties)
         if "rate_function" in data and 'rate_function' not in transition.properties:

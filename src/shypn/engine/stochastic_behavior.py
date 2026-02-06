@@ -105,53 +105,68 @@ class StochasticBehavior(TransitionBehavior):
         # Extract stochastic parameters
         props = getattr(transition, 'properties', {})
         
-        # Check if has rate_function (SBML formulas)
-        # Rate function should ONLY be in properties dict, not as top-level attribute
+        # PHASE 1 REFACTORING: Prioritize properties.rate_function (unified approach)
+        # Check for rate_function first (this is the canonical field)
         self.has_rate_function = 'rate_function' in props
         self.rate_function_expr = props.get('rate_function') if self.has_rate_function else None
         
-        # Detect signal places for quorum sensing (13-tuple formalism: Ψ)
+        # If rate_function is a simple numeric string, parse it as lambda rate
         if self.has_rate_function and self.rate_function_expr:
-            self._detect_signal_places()
+            rate_func_str = str(self.rate_function_expr).strip()
             
-            # Detect reversible reactions (formulas with subtraction)
-            formula_lower = str(self.rate_function_expr).lower()
-            if ' - ' in self.rate_function_expr or 'k_r' in formula_lower or 'kr_' in formula_lower:
-                self.logger.info(
-                    f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
-                    f"τ-leaping will use Skellam distribution for net flux sampling. "
-                    f"Formula: {self.rate_function_expr[:80]}..."
-                )
-        
-        # Support both properties dict AND transition.rate attribute (for UI compatibility)
-        if 'rate' in props:
-            # Explicit rate in properties
-            self.rate = float(props.get('rate'))
+            # Try to parse as simple number first
+            try:
+                self.rate = float(rate_func_str)
+                self.has_rate_function = False  # It's just a number, not a formula
+                self.rate_function_expr = None
+                self.logger.debug(f"Transition '{transition.name}': rate_function '{rate_func_str}' is numeric lambda = {self.rate}")
+            except ValueError:
+                # It's a formula - keep as rate_function
+                self._detect_signal_places()
+                self.rate = 1.0  # Placeholder (will be evaluated at enablement)
+                
+                # Detect reversible reactions (formulas with subtraction)
+                formula_lower = rate_func_str.lower()
+                if ' - ' in rate_func_str or 'k_r' in formula_lower or 'kr_' in formula_lower:
+                    self.logger.info(
+                        f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
+                        f"τ-leaping will use Skellam distribution for net flux sampling. "
+                        f"Formula: {rate_func_str[:80]}..."
+                    )
         else:
-            # Fallback: Use transition.rate attribute (UI stores it here)
-            rate = getattr(transition, 'rate', None)
-            if rate is not None:
-                if isinstance(rate, (int, float)):
-                    # Numeric rate - use directly
-                    self.rate = float(rate)
-                elif isinstance(rate, str):
-                    # String rate - check if it's a formula or simple number
-                    rate_str = rate.strip()
-                    try:
-                        # Try to convert to float (simple numeric string like "0.1")
-                        self.rate = float(rate_str)
-                        self.logger.debug(f"Transition '{transition.name}': parsed rate string '{rate_str}' as {self.rate}")
-                    except ValueError:
-                        # It's a formula (like "0.1 * (1 + 0.5 * CI_Dimer)")
-                        # Store it as rate_function for evaluation
-                        self.has_rate_function = True
-                        self.rate_function_expr = rate_str
-                        self.rate = 1.0  # Temporary placeholder (will be evaluated dynamically)
-                        self.logger.debug(f"Transition '{transition.name}': detected rate formula: {rate_str}")
-                else:
-                    self.rate = 1.0  # Safe default for unknown types
+            # LEGACY FALLBACK: Check old rate fields (deprecated, with warning)
+            # First check properties.rate (numeric)
+            if 'rate' in props:
+                self.rate = float(props.get('rate'))
+                self.logger.debug(f"Transition '{transition.name}': using properties.rate (legacy field)")
             else:
-                self.rate = 1.0  # Default rate
+                # Last resort: transition.rate attribute (deprecated)
+                rate = getattr(transition, 'rate', None)
+                if rate is not None:
+                    if isinstance(rate, (int, float)):
+                        self.rate = float(rate)
+                        self.logger.warning(
+                            f"Transition '{transition.name}': using deprecated transition.rate attribute. "
+                            f"Please migrate to properties.rate_function"
+                        )
+                    elif isinstance(rate, str):
+                        # String in old rate field - treat as formula
+                        rate_str = rate.strip()
+                        try:
+                            self.rate = float(rate_str)
+                        except ValueError:
+                            # Formula in old field - migrate it
+                            self.has_rate_function = True
+                            self.rate_function_expr = rate_str
+                            self.rate = 1.0
+                            self.logger.warning(
+                                f"Transition '{transition.name}': found formula in deprecated rate field. "
+                                f"Migrating to rate_function. Please save model to persist migration."
+                            )
+                    else:
+                        self.rate = 1.0
+                else:
+                    self.rate = 1.0  # Default rate
         
         self.max_burst = int(props.get('max_burst', 8))
         
@@ -324,13 +339,6 @@ class StochasticBehavior(TransitionBehavior):
             # This supports chemistry notation where [X] means "concentration of X"
             import re
             expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', self.rate_function_expr)
-            
-            # CRITICAL DEBUG: T10/T11 eval preprocessing
-            if self.transition.id in ['T10', 'T11']:
-                print(f"[EVAL] {self.transition.id}:")
-                print(f"  Original: {self.rate_function_expr}")
-                print(f"  Processed: {expr_processed}")
-                print(f"  Context has: {list(context.keys())}")
             
             # Evaluate formula
             result = eval(expr_processed, {"__builtins__": {}}, context)

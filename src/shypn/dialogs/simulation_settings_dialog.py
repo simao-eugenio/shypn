@@ -68,8 +68,6 @@ class SimulationSettingsDialog(Gtk.Dialog):
         # Load current settings
         self._load_from_settings()
         
-        print("DEBUG: SimulationSettingsDialog __init__ called")
-        
         # Manually trigger the initial state update for the entry field
         # This ensures the sensitivity is correctly set on dialog open
         self._update_dt_entry_sensitivity()
@@ -81,24 +79,12 @@ class SimulationSettingsDialog(Gtk.Dialog):
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
         ui_path = os.path.join(project_root, 'ui', 'dialogs', 'simulation_settings.ui')
         
-        print(f"DEBUG: Loading UI from: {ui_path}")
-        print(f"DEBUG: UI file exists: {os.path.exists(ui_path)}")
-        print(f"DEBUG: UI file size: {os.path.getsize(ui_path) if os.path.exists(ui_path) else 'N/A'} bytes")
-        
         if not os.path.exists(ui_path):
             raise FileNotFoundError(f"UI file not found: {ui_path}")
         
         # Load UI
         builder = Gtk.Builder()
         builder.add_from_file(ui_path)
-        
-        # Debug: Check if new expanders exist
-        sim_expander = builder.get_object('simulation_params_expander')
-        batch_expander = builder.get_object('batch_mode_expander')
-        tau_expander = builder.get_object('tau_leaping_expander')
-        print(f"DEBUG: simulation_params_expander found: {sim_expander is not None}")
-        print(f"DEBUG: batch_mode_expander found: {batch_expander is not None}")
-        print(f"DEBUG: tau_leaping_expander found: {tau_expander is not None}")
         
         # Get dialog object
         dialog_obj = builder.get_object('simulation_settings_dialog')
@@ -204,17 +190,8 @@ class SimulationSettingsDialog(Gtk.Dialog):
         is_manual_active = self._widgets['dt_manual_radio'].get_active()
         entry = self._widgets['dt_manual_entry']
         
-        # Debug output
-        print(f"DEBUG: Manual radio active: {is_manual_active}")
-        print(f"DEBUG: Entry sensitive before: {entry.get_sensitive()}")
-        print(f"DEBUG: Entry editable before: {entry.get_editable()}")
-        
         entry.set_sensitive(is_manual_active)
         entry.set_editable(True)
-        
-        print(f"DEBUG: Entry sensitive after: {entry.get_sensitive()}")
-        print(f"DEBUG: Entry editable after: {entry.get_editable()}")
-        print(f"DEBUG: Entry can-focus: {entry.get_can_focus()}")
     
     def _on_auto_dt_toggled(self, button):
         """Handle auto dt radio toggle.
@@ -222,7 +199,6 @@ class SimulationSettingsDialog(Gtk.Dialog):
         Args:
             button: GtkRadioButton that was toggled
         """
-        print(f"DEBUG _on_auto_dt_toggled: button active = {button.get_active()}")
         # Only act when button becomes active (not when it becomes inactive)
         if button.get_active():
             self._update_dt_entry_sensitivity()
@@ -233,7 +209,6 @@ class SimulationSettingsDialog(Gtk.Dialog):
         Args:
             button: GtkRadioButton that was toggled
         """
-        print(f"DEBUG _on_manual_dt_toggled: button active = {button.get_active()}")
         # Only act when button becomes active (not when it becomes inactive)
         if button.get_active():
             self._update_dt_entry_sensitivity()
