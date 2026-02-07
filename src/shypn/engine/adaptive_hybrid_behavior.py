@@ -201,6 +201,10 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         if not places:
             # No places connected - use preferred mode
+            self.logger.warning(
+                f"Adaptive transition '{self.transition.name}' has no connected places "
+                f"for volume checking (filter={self.place_filter})"
+            )
             return 'continuous' if self.prefer_continuous else 'stochastic'
         
         # Check volumes
@@ -209,6 +213,14 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         )
         
         self._last_volume_check = details
+        
+        # Warn if no volumes found (silent failure prevention)
+        if details.get('reason') == 'no-volumes-set':
+            self.logger.warning(
+                f"Adaptive transition '{self.transition.name}' has {len(places)} connected places "
+                f"but none have 'compartment_volume' property set. "
+                f"Defaulting to continuous mode. Set place.compartment_volume to enable adaptive behavior."
+            )
         
         mode = 'stochastic' if use_stochastic else 'continuous'
         

@@ -73,12 +73,12 @@ class PlotExporter:
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
                 
-                # Convert tokens to concentration if needed
-                converted_values = values
-                if self.model:
-                    place = self._get_place_obj(place_id)
-                    if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                        converted_values = [v / place.scale_factor for v in values]
+                # Convert tokens (μM) to mM when unit is 'mM'
+                # Assumption: 1 token = 1 μM in the model
+                if unit == 'mM':
+                    converted_values = [v / 1000.0 for v in values]  # μM → mM conversion
+                else:
+                    converted_values = values
                 
                 # Plot
                 ax.plot(self.time_points, converted_values, 
@@ -200,12 +200,12 @@ class PlotExporter:
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
                 
-                # Convert tokens to concentration
-                converted_values = values
-                if self.model:
-                    place = self._get_place_obj(place_id)
-                    if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                        converted_values = [v / place.scale_factor for v in values]
+                # Convert tokens (μM) to mM when unit is 'mM'
+                # Assumption: 1 token = 1 μM in the model
+                if unit == 'mM':
+                    converted_values = [v / 1000.0 for v in values]  # μM → mM conversion
+                else:
+                    converted_values = values
                 
                 ax1.plot(self.time_points, converted_values, 
                         color=color, linewidth=2, label=f"{place_name} ({unit})")

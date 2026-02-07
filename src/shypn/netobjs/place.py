@@ -717,7 +717,9 @@ class Place(PetriNetObject):
         gradient = data.get("gradient_vector", None)
         place.gradient_vector = tuple(gradient) if gradient else None
         
+        # Load compartment volume
         place.compartment_volume = data.get("compartment_volume", None)
+        
         place.neighbor_compartments = data.get("neighbor_compartments", [])
         
         position = data.get("spatial_position", None)

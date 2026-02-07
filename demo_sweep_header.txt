@@ -1,0 +1,51 @@
+# ============================================================================
+# SHYPN PARAMETER SWEEP DATA - HEADER PROTOCOL v1.0
+# Generated: 2026-02-07T00:03:35.173242Z
+# ============================================================================
+# 
+# [SWEEP CONFIGURATION]
+# Sweep_Type: Parameter_Dose_Response
+# Sweep_Parameter: P7.initial_marking
+# Sweep_Range: 0-5000
+# Sweep_Step: 10
+# Sweep_Units: µM
+# Total_Experiments: 501
+# Current_Experiment: initial_marking=100
+# Time_Span: 0-120
+# Time_Units: seconds
+# N_Replicates: 3
+# Random_Seed: 42
+# Solver: Gillespie_SSA
+# Timestep: adaptive
+# 
+# [PARAMETRIZATION STATE]
+# : # ATP hydrolysis arcs
+# Current_Phase: Phase_1_Data_Extraction
+# Stoichiometry_Status: INCOMPLETE
+# 
+# [CONSERVATION LAWS]
+# Drug_Total: 0  # P1+P2+P3+P4+P6
+# Energy_Total: 0  # P7+P8+P9
+# 
+# [VALIDATION FLAGS]
+# Energy_Depletion_Warning: UNCHECKED
+# Pi_Depletion_Warning: UNCHECKED
+# Negative_Concentration_Warning: UNCHECKED
+# Numerical_Instability_Warning: UNCHECKED
+# Execution_Status: SUCCESS
+# 
+# [INFERRED PROPERTIES]
+# Homeostasis_Detected: False
+# 
+# [TEMPORAL METADATA]
+# Sweep_Start_Time: 2026-02-07T00:03:35.173204Z
+# Experiment_Start_Time: 2026-02-07T00:03:35.173233Z
+# 
+# [REFERENCES]
+# Phase: Phase_1_Data_Extraction
+# Documentation: doc/PHASE1_COMPLETION_SUMMARY.md
+# Related_Analysis: atp_sweep_metrics.csv
+# 
+# ============================================================================
+# DATA SECTION BEGINS
+# ============================================================================

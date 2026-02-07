@@ -1155,6 +1155,9 @@ class SimulationController:
                 behavior = self._get_behavior(t)
                 if behavior and hasattr(behavior, 'get_current_mode'):
                     current_mode = behavior.get_current_mode()
+                    # If mode not yet determined (None), call _select_mode() to determine it
+                    if current_mode is None and hasattr(behavior, '_select_mode'):
+                        current_mode = behavior._select_mode()
                     if current_mode == 'continuous':
                         continuous_transitions.append(t)
                 elif behavior:

@@ -720,8 +720,13 @@ class TransitionPropDialogLoader(GObject.GObject):
                             return False
                         self.transition_obj.rate_forward = rate_fwd_text
                     else:
-                        if hasattr(self.transition_obj, 'rate_forward'):
-                            delattr(self.transition_obj, 'rate_forward')
+                        # No forward rate - set default "1" for continuous/adaptive transitions
+                        if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                            self.transition_obj.rate_forward = "1"
+                        else:
+                            # Clear forward rate from properties dict
+                            if 'rate_forward' in self.transition_obj.properties:
+                                del self.transition_obj.properties['rate_forward']
                 
                 # Reverse rate from reverse field
                 if rate_reverse_textview:
@@ -736,8 +741,13 @@ class TransitionPropDialogLoader(GObject.GObject):
                             return False
                         self.transition_obj.rate_reverse = rate_rev_text
                     else:
-                        if hasattr(self.transition_obj, 'rate_reverse'):
-                            delattr(self.transition_obj, 'rate_reverse')
+                        # No reverse rate - set default "1" for continuous/adaptive transitions
+                        if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                            self.transition_obj.rate_reverse = "1"
+                        else:
+                            # Clear reverse rate from properties dict
+                            if 'rate_reverse' in self.transition_obj.properties:
+                                del self.transition_obj.properties['rate_reverse']
                 
                 # Clear regular rate and properties when using directional
                 # Don't use set_rate(None) as it raises error for continuous transitions
@@ -751,11 +761,12 @@ class TransitionPropDialogLoader(GObject.GObject):
             
             elif rate_textview:
                 # Use regular rate function
-                # Clear directional rates
-                if hasattr(self.transition_obj, 'rate_forward'):
-                    delattr(self.transition_obj, 'rate_forward')
-                if hasattr(self.transition_obj, 'rate_reverse'):
-                    delattr(self.transition_obj, 'rate_reverse')
+                # Clear directional rates from properties dict
+                if hasattr(self.transition_obj, 'properties'):
+                    if 'rate_forward' in self.transition_obj.properties:
+                        del self.transition_obj.properties['rate_forward']
+                    if 'rate_reverse' in self.transition_obj.properties:
+                        del self.transition_obj.properties['rate_reverse']
                 
                 buffer = rate_textview.get_buffer()
                 start, end = buffer.get_bounds()
@@ -781,13 +792,23 @@ class TransitionPropDialogLoader(GObject.GObject):
                     # Clear deprecated rate field (no longer used)
                     self.transition_obj.rate = None
                 else:
-                    # Clear rate_function if empty
-                    if hasattr(self.transition_obj, 'properties'):
-                        if 'rate_function' in self.transition_obj.properties:
-                            del self.transition_obj.properties['rate_function']
-                        if 'rate_function_display' in self.transition_obj.properties:
-                            del self.transition_obj.properties['rate_function_display']
-                    self.transition_obj.set_rate(None)
+                    # No rate specified - set default value of "1" for continuous/adaptive transitions
+                    # to prevent missing rate_function errors
+                    if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                        # Set default rate function
+                        if not hasattr(self.transition_obj, 'properties'):
+                            self.transition_obj.properties = {}
+                        self.transition_obj.properties['rate_function_display'] = "1"
+                        self.transition_obj.properties['rate_function'] = "1"
+                        self.transition_obj.rate = None
+                    else:
+                        # For other transition types, clear rate_function
+                        if hasattr(self.transition_obj, 'properties'):
+                            if 'rate_function' in self.transition_obj.properties:
+                                del self.transition_obj.properties['rate_function']
+                            if 'rate_function_display' in self.transition_obj.properties:
+                                del self.transition_obj.properties['rate_function_display']
+                        self.transition_obj.set_rate(None)
             
             # Guard - validate and apply
             guard_textview = self.builder.get_object('guard_textview')
