@@ -110,7 +110,10 @@ class DoseResponseAnalyzer:
             RuntimeError: If curve fitting fails
         """
         # Convert doses to log scale for fitting
-        log_doses = np.log10(self.doses)
+        # Handle zero doses by adding small epsilon to avoid log10(0) = -inf
+        epsilon = 1e-10
+        self.safe_doses = np.maximum(self.doses, epsilon)
+        log_doses = np.log10(self.safe_doses)
         
         # Auto-detect initial guess if not provided
         if initial_guess is None:
@@ -122,12 +125,34 @@ class DoseResponseAnalyzer:
         
         # Set reasonable bounds if not provided
         if bounds is None:
-            # Allow bottom/top to vary ±50% from data range
+            # Calculate response range
             response_range = np.max(self.responses) - np.min(self.responses)
-            bottom_min = np.min(self.responses) - 0.5 * response_range
-            bottom_max = np.min(self.responses) + 0.5 * response_range
-            top_min = np.max(self.responses) - 0.5 * response_range
-            top_max = np.max(self.responses) + 0.5 * response_range
+            response_min = np.min(self.responses)
+            response_max = np.max(self.responses)
+            
+            # Handle edge case: all responses are identical
+            if response_range < 1e-6:  # Essentially zero
+                # Use arbitrary but reasonable bounds around constant response
+                response_range = max(abs(response_min), 1.0)  # At least 1.0 unit range
+                bottom_min = response_min - response_range
+                bottom_max = response_min + 0.5 * response_range
+                top_min = response_min + 0.5 * response_range
+                top_max = response_min + response_range
+            else:
+                # Normal case: allow bottom/top to vary ±50% from data range
+                bottom_min = response_min - 0.5 * response_range
+                bottom_max = response_min + 0.5 * response_range
+                top_min = response_max - 0.5 * response_range
+                top_max = response_max + 0.5 * response_range
+            
+            # Ensure ordering: bottom_min < bottom_max < top_min < top_max
+            # Add minimum separation of 1e-3 between adjacent bounds
+            min_sep = 1e-3
+            if bottom_max >= top_min:
+                # Adjust to ensure bottom_max < top_min
+                midpoint = (bottom_max + top_min) / 2
+                bottom_max = midpoint - min_sep
+                top_min = midpoint + min_sep
             
             # Allow log_ic50 to vary across dose range
             log_ic50_min = np.min(log_doses) - 1
@@ -141,6 +166,14 @@ class DoseResponseAnalyzer:
                 [bottom_min, top_min, log_ic50_min, hill_slope_min],
                 [bottom_max, top_max, log_ic50_max, hill_slope_max]
             )
+        
+        # Ensure initial guess is within bounds (clamp to valid range)
+        if initial_guess is not None and bounds is not None:
+            lower_bounds, upper_bounds = bounds
+            initial_guess = tuple([
+                max(lower_bounds[i], min(upper_bounds[i], initial_guess[i]))
+                for i in range(len(initial_guess))
+            ])
         
         try:
             # Perform curve fitting
@@ -200,8 +233,11 @@ class DoseResponseAnalyzer:
                           self.hill_slope + t_value * self.std_errors[3])
         }
         
-        # IC50 confidence interval (convert from log space)
+        # IC50 confidence interval (convert from log space with overflow protection)
         log_ic50_lower, log_ic50_upper = self.confidence_intervals['log_ic50']
+        # Clamp to prevent overflow (10^308 is near float64 max)
+        log_ic50_lower = np.clip(log_ic50_lower, -300, 300)
+        log_ic50_upper = np.clip(log_ic50_upper, -300, 300)
         self.confidence_intervals['ic50'] = (10 ** log_ic50_lower, 10 ** log_ic50_upper)
     
     def predict(self, doses):
@@ -219,7 +255,10 @@ class DoseResponseAnalyzer:
         if not self.is_fitted:
             raise RuntimeError("Must call fit() before predict()")
         
-        log_doses = np.log10(np.array(doses, dtype=float))
+        # Handle zero doses with epsilon
+        epsilon = 1e-10
+        safe_input_doses = np.maximum(np.array(doses, dtype=float), epsilon)
+        log_doses = np.log10(safe_input_doses)
         return self.hill_equation(log_doses, self.bottom, self.top, self.log_ic50, self.hill_slope)
     
     def get_summary(self):
@@ -266,9 +305,12 @@ class DoseResponseAnalyzer:
             raise RuntimeError("Must call fit() before generate_smooth_curve()")
         
         # Generate log-spaced doses covering data range + margins
-        log_doses_min = np.log10(np.min(self.doses)) - 0.5
-        log_doses_max = np.log10(np.max(self.doses)) + 0.5
+        # Use safe_doses (with epsilon) to avoid log10(0)
+        log_doses_min = np.log10(np.min(self.safe_doses)) - 0.5
+        log_doses_max = np.log10(np.max(self.safe_doses)) + 0.5
         log_doses_smooth = np.linspace(log_doses_min, log_doses_max, n_points)
+        # Clamp to prevent overflow
+        log_doses_smooth = np.clip(log_doses_smooth, -300, 300)
         doses_smooth = 10 ** log_doses_smooth
         
         # Predict responses

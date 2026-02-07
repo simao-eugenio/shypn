@@ -80,6 +80,10 @@ class Transition(PetriNetObject):
         self._properties = {}  # Private: rate functions, kinetic parameters (access via properties)
         self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
         
+        # Set default rate_function for continuous transitions to prevent missing rate errors
+        if self.transition_type in ['continuous', 'adaptive']:
+            self._properties['rate_function'] = "1"
+        
         # Kinetic metadata (optional, added by importers or enrichment)
         self.kinetic_metadata: Optional[KineticMetadata] = None
         
@@ -973,6 +977,11 @@ class Transition(PetriNetObject):
             transition.signal_places = data["signal_places"]
         if "is_environment_aware" in data:
             transition.is_environment_aware = data["is_environment_aware"]
+        
+        # Ensure continuous/adaptive transitions have rate_function (prevent missing rate errors)
+        if transition.transition_type in ['continuous', 'adaptive']:
+            if 'rate_function' not in transition.properties or not transition.properties['rate_function']:
+                transition.properties['rate_function'] = "1"
         
         return transition
     

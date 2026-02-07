@@ -119,6 +119,9 @@ class ReplicateRunner:
             progress_callback(0.0)
         
         for i in range(n):
+            # Track wall-clock time for this replicate
+            replicate_start_time = time.time()
+            
             if verbose and (i + 1) % 100 == 0:
                 print(f"  Progress: {i + 1}/{n} replicates")
             
@@ -203,13 +206,18 @@ class ReplicateRunner:
             except Exception as e:
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
-                # Store error but continue
+                # Store error but continue (include elapsed time even for errors)
+                replicate_elapsed = time.time() - replicate_start_time
                 results.append({
                     'replicate_id': i,
                     'seed': seed_base + i,
+                    'elapsed_time': replicate_elapsed,
                     'error': str(e)
                 })
                 continue
+            
+            # Calculate elapsed wall-clock time for this replicate
+            replicate_elapsed = time.time() - replicate_start_time
             
             # Collect results
             result = {
@@ -235,7 +243,8 @@ class ReplicateRunner:
                     t.id: getattr(t, 'firing_count', 0)
                     for t in self.model.transitions
                 },
-                'stopped_reason': stopped_reason
+                'stopped_reason': stopped_reason,
+                'elapsed_time': replicate_elapsed  # Wall-clock time in seconds
             }
             
             results.append(result)
@@ -306,13 +315,30 @@ class ReplicateRunner:
             'species_statistics': {}
         }
         
+        # Compute elapsed time statistics (wall-clock time per replicate)
+        elapsed_times = [r.get('elapsed_time', 0.0) for r in successful]
+        if elapsed_times:
+            statistics['mean_elapsed_time'] = float(np.mean(elapsed_times))
+            statistics['std_elapsed_time'] = float(np.std(elapsed_times))
+            statistics['min_elapsed_time'] = float(np.min(elapsed_times))
+            statistics['max_elapsed_time'] = float(np.max(elapsed_times))
+        
         # Compute statistics for each place
         for place_id in place_ids:
             # Stack trajectories into matrix (replicates × time_points)
-            trajectories = np.array([
-                r['place_data'][place_id]
-                for r in successful
-            ])
+            # Extract only token values (second element) from (time, tokens) tuples
+            trajectories = []
+            for r in successful:
+                place_values = r['place_data'][place_id]
+                # Handle both tuple format [(time, tokens), ...] and flat list [tokens, ...]
+                if place_values and isinstance(place_values[0], tuple):
+                    # Tuple format: extract tokens (second element)
+                    trajectories.append([tokens for time, tokens in place_values])
+                else:
+                    # Already flat list of token values
+                    trajectories.append(place_values)
+            
+            trajectories = np.array(trajectories)
             
             # Compute statistics
             mean = np.mean(trajectories, axis=0)
@@ -346,10 +372,19 @@ class ReplicateRunner:
         # Compute statistics for each transition (use instantaneous rates from simulation)
         for transition_id in transition_ids:
             # Stack rate trajectories into matrix (replicates × time_points)
-            rate_trajectories = np.array([
-                r['transition_rates'][transition_id]
-                for r in successful
-            ])
+            # Extract only rate values (second element) from (time, rate) tuples
+            rate_trajectories = []
+            for r in successful:
+                rate_values = r['transition_rates'][transition_id]
+                # Handle both tuple format [(time, rate), ...] and flat list [rate, ...]
+                if rate_values and isinstance(rate_values[0], tuple):
+                    # Tuple format: extract rate (second element)
+                    rate_trajectories.append([rate for time, rate in rate_values])
+                else:
+                    # Already flat list of rate values
+                    rate_trajectories.append(rate_values)
+            
+            rate_trajectories = np.array(rate_trajectories)
             
             # Compute statistics on instantaneous rates (no derivatives needed!)
             mean = np.mean(rate_trajectories, axis=0)

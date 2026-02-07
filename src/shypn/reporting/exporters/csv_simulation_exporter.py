@@ -61,7 +61,7 @@ class CSVSimulationExporter:
                     place_name = self._get_place_name(place_id)
                     unit = self._get_place_unit(place_id)
                     header = f"{place_name} ({unit})" if unit else place_name
-                    place_headers.append((place_id, header))
+                    place_headers.append((place_id, header, unit))  # Store unit for conversion
                     headers.append(header)
                 
                 # Add transition columns
@@ -113,14 +113,13 @@ class CSVSimulationExporter:
                     row = [f"{time:.6f}"]
                     
                     # Add place values
-                    for place_id, _ in place_headers:
+                    for place_id, _, unit in place_headers:
                         if i < len(self.place_data[place_id]):
                             _, value = self.place_data[place_id][i]  # Extract value from (time, tokens) tuple
-                            # Convert tokens to concentration if scale factor exists
-                            if self.model:
-                                place = self._get_place_obj(place_id)
-                                if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                                    value = value / place.scale_factor
+                            # Convert tokens (μM) to mM when unit is 'mM'
+                            # Assumption: 1 token = 1 μM in the model
+                            if unit == 'mM':
+                                value = value / 1000.0  # μM → mM conversion
                             row.append(f"{value:.6f}")
                         else:
                             row.append('')
@@ -166,12 +165,11 @@ class CSVSimulationExporter:
                     
                     for i, time in enumerate(self.time_points):
                         if i < len(values):
-                            value = values[i]
-                            # Convert tokens to concentration if scale factor exists
-                            if self.model:
-                                place = self._get_place_obj(place_id)
-                                if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                                    value = value / place.scale_factor
+                            _, value = values[i]  # Extract value from (time, tokens) tuple
+                            # Convert tokens (μM) to mM when unit is 'mM'
+                            # Assumption: 1 token = 1 μM in the model
+                            if unit == 'mM':
+                                value = value / 1000.0  # μM → mM conversion
                             
                             writer.writerow([
                                 f"{time:.6f}",
@@ -227,12 +225,15 @@ class CSVSimulationExporter:
                     place_name = self._get_place_name(place_id)
                     unit = self._get_place_unit(place_id)
                     
-                    # Convert to concentrations if needed
-                    converted_values = values
-                    if self.model:
-                        place = self._get_place_obj(place_id)
-                        if place and hasattr(place, 'scale_factor') and place.scale_factor:
-                            converted_values = [v / place.scale_factor for v in values]
+                    # Extract tokens from (time, tokens) tuples and convert μM → mM if needed
+                    token_values = [v[1] if isinstance(v, tuple) else v for v in values]
+                    
+                    # Convert tokens (μM) to mM when unit is 'mM'
+                    # Assumption: 1 token = 1 μM in the model
+                    if unit == 'mM':
+                        converted_values = [v / 1000.0 for v in token_values]  # μM → mM conversion
+                    else:
+                        converted_values = token_values
                     
                     stats = self._calculate_statistics(converted_values)
                     
@@ -254,7 +255,10 @@ class CSVSimulationExporter:
                         continue
                     
                     trans_name = self._get_transition_name(trans_id)
-                    stats = self._calculate_statistics(values)
+                    
+                    # Extract counts from (time, count) tuples
+                    count_values = [v[1] if isinstance(v, tuple) else v for v in values]
+                    stats = self._calculate_statistics(count_values)
                     
                     writer.writerow([
                         trans_name,

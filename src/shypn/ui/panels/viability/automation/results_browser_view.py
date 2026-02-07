@@ -122,11 +122,11 @@ class ResultsBrowserView(BaseResultsView):
         column_reps.set_resizable(True)
         self.results_tree.append_column(column_reps)
         
-        # Column 3: Duration (sortable)
+        # Column 3: Elapsed time per replicate (sortable)
         renderer_dur = Gtk.CellRendererText()
-        column_dur = Gtk.TreeViewColumn("Duration", renderer_dur, text=3)
+        column_dur = Gtk.TreeViewColumn("Elapsed", renderer_dur, text=3)
         column_dur.set_min_width(80)
-        column_dur.set_sort_column_id(3)  # Sort by column 3 (duration)
+        column_dur.set_sort_column_id(3)  # Sort by column 3 (elapsed time)
         column_dur.set_resizable(True)
         self.results_tree.append_column(column_dur)
         
@@ -226,14 +226,15 @@ class ResultsBrowserView(BaseResultsView):
         plot_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
         # Plot mode controls (E4 enhancement)
-        plot_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        plot_controls.set_margin_start(6)
-        plot_controls.set_margin_end(6)
-        plot_controls.set_margin_top(6)
-        plot_controls.set_margin_bottom(6)
+        plot_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        plot_controls.set_margin_start(12)
+        plot_controls.set_margin_end(12)
+        plot_controls.set_margin_top(8)
+        plot_controls.set_margin_bottom(8)
         
         # Plot mode selector
         mode_label = Gtk.Label(label="Plot Mode:")
+        mode_label.set_margin_end(6)
         plot_controls.pack_start(mode_label, False, False, 0)
         
         self.plot_mode_combo = Gtk.ComboBoxText()
@@ -241,10 +242,12 @@ class ResultsBrowserView(BaseResultsView):
         self.plot_mode_combo.append("heatmap", "Heatmap (2D Factorial)")
         self.plot_mode_combo.set_active(0)
         self.plot_mode_combo.set_tooltip_text("Select visualization mode")
+        self.plot_mode_combo.set_margin_end(18)
         plot_controls.pack_start(self.plot_mode_combo, False, False, 0)
         
         # Response metric selector (for heatmap)
         response_label = Gtk.Label(label="Response Metric:")
+        response_label.set_margin_end(6)
         plot_controls.pack_start(response_label, False, False, 0)
         
         self.heatmap_response_combo = Gtk.ComboBoxText()
@@ -253,6 +256,7 @@ class ResultsBrowserView(BaseResultsView):
         self.heatmap_response_combo.append("mean_tokens", "Mean Token Count")
         self.heatmap_response_combo.set_active(0)
         self.heatmap_response_combo.set_tooltip_text("Metric to display in heatmap")
+        self.heatmap_response_combo.set_margin_end(18)
         plot_controls.pack_start(self.heatmap_response_combo, False, False, 0)
         
         # Generate button
@@ -264,14 +268,30 @@ class ResultsBrowserView(BaseResultsView):
         plot_page.pack_start(plot_controls, False, False, 0)
         
         # Create matplotlib figure and canvas
-        self.figure = Figure(figsize=(8, 6), dpi=80)
+        self.figure = Figure(figsize=(12, 8), dpi=100)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.set_size_request(600, 400)
+        
+        # Wrap canvas in a layout to manage size properly
+        canvas_layout = Gtk.Layout()
+        canvas_layout.put(self.canvas, 0, 0)
+        
+        # Wrap layout in scrolled window to handle large plots
+        scrolled_plot = Gtk.ScrolledWindow()
+        scrolled_plot.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled_plot.set_hexpand(True)
+        scrolled_plot.set_vexpand(True)
+        scrolled_plot.add(canvas_layout)
         
         # Navigation toolbar
         self.toolbar = NavigationToolbar2GTK3(self.canvas)
         plot_page.pack_start(self.toolbar, False, False, 0)
-        plot_page.pack_start(self.canvas, True, True, 0)
+        plot_page.pack_start(scrolled_plot, True, True, 0)
+        
+        # Connect to canvas draw event to update size
+        self.canvas.mpl_connect('draw_event', self._on_canvas_draw)
+        
+        # Store layout reference for size updates
+        self.canvas_layout = canvas_layout
         
         # Add pages to notebook
         self.notebook.append_page(list_page, Gtk.Label(label="Results List"))
@@ -280,6 +300,10 @@ class ResultsBrowserView(BaseResultsView):
         # === PAGE 3: Dose-Response Analysis (E3 enhancement) ===
         dr_page = self._build_dose_response_page()
         self.notebook.append_page(dr_page, Gtk.Label(label="Dose-Response"))
+        
+        # === PAGE 4: Metadata View ===
+        metadata_page = self._build_metadata_page()
+        self.notebook.append_page(metadata_page, Gtk.Label(label="Metadata"))
         
         self.pack_start(self.notebook, True, True, 0)
     
@@ -299,6 +323,32 @@ class ResultsBrowserView(BaseResultsView):
         dialog.format_secondary_text(message)
         dialog.run()
         dialog.destroy()
+    
+    def _on_canvas_draw(self, event):
+        """Update canvas size request when figure is drawn.
+        
+        This ensures the scrolled window knows the actual size of the plot,
+        enabling proper scrolling behavior.
+        
+        Args:
+            event: Matplotlib draw event
+        """
+        if not self.figure:
+            return
+        
+        # Get figure size in pixels
+        width_inches, height_inches = self.figure.get_size_inches()
+        dpi = self.figure.get_dpi()
+        
+        width_px = int(width_inches * dpi)
+        height_px = int(height_inches * dpi)
+        
+        # Update canvas size request to match figure size
+        self.canvas.set_size_request(width_px, height_px)
+        
+        # Update the layout size to accommodate the canvas
+        if hasattr(self, 'canvas_layout'):
+            self.canvas_layout.set_size(width_px, height_px)
     
     def _build_dose_response_page(self):
         """Build dose-response analysis page (E3 enhancement).
@@ -322,20 +372,25 @@ class ResultsBrowserView(BaseResultsView):
         page.pack_start(instructions, False, False, 0)
         
         # Parameter selection
-        param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        param_box.set_margin_start(6)
-        param_box.set_margin_end(6)
+        param_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        param_box.set_margin_start(12)
+        param_box.set_margin_end(12)
+        param_box.set_margin_top(8)
+        param_box.set_margin_bottom(8)
         
         param_label = Gtk.Label(label="Dose Parameter:")
+        param_label.set_margin_end(6)
         param_box.pack_start(param_label, False, False, 0)
         
         # Combo to select which parameter is the "dose" (auto-detect from sweep)
         self.dr_param_combo = Gtk.ComboBoxText()
         self.dr_param_combo.set_tooltip_text("Select which parameter represents the dose/concentration")
-        param_box.pack_start(self.dr_param_combo, True, True, 0)
+        self.dr_param_combo.set_margin_end(18)
+        param_box.pack_start(self.dr_param_combo, False, False, 0)
         
         # Response metric selection
         response_label = Gtk.Label(label="Response Metric:")
+        response_label.set_margin_end(6)
         param_box.pack_start(response_label, False, False, 0)
         
         self.dr_response_combo = Gtk.ComboBoxText()
@@ -344,7 +399,8 @@ class ResultsBrowserView(BaseResultsView):
         self.dr_response_combo.append("mean_tokens", "Mean Token Count")
         self.dr_response_combo.set_active(0)
         self.dr_response_combo.set_tooltip_text("Select response metric to analyze")
-        param_box.pack_start(self.dr_response_combo, True, True, 0)
+        self.dr_response_combo.set_margin_end(18)
+        param_box.pack_start(self.dr_response_combo, False, False, 0)
         
         # Analyze button
         analyze_button = Gtk.Button(label="📈 Analyze Dose-Response")
@@ -385,6 +441,78 @@ class ResultsBrowserView(BaseResultsView):
         results_box.pack_start(stats_frame, False, False, 0)
         
         page.pack_start(results_box, True, True, 0)
+        
+        return page
+    
+    def _build_metadata_page(self):
+        """Build metadata view page.
+        
+        Returns:
+            Gtk.Box: Page widget displaying metadata fields in a tree view
+        """
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        
+        # Title and instructions
+        title = Gtk.Label()
+        title.set_markup(
+            "<b>Experiment Metadata</b>\n"
+            "Complete provenance and parametrization information for the selected experiment."
+        )
+        title.set_xalign(0)
+        title.set_margin_start(6)
+        title.set_margin_end(6)
+        title.set_margin_top(6)
+        page.pack_start(title, False, False, 0)
+        
+        # TreeView for metadata display
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_margin_start(6)
+        scrolled.set_margin_end(6)
+        scrolled.set_margin_bottom(6)
+        
+        # Create TreeStore: section (str), field (str), value (str)
+        self.metadata_store = Gtk.TreeStore(str, str, str)
+        
+        # Create TreeView
+        self.metadata_tree = Gtk.TreeView(model=self.metadata_store)
+        self.metadata_tree.set_headers_visible(True)
+        
+        # Column 0: Section
+        renderer_section = Gtk.CellRendererText()
+        renderer_section.set_property("weight", 700)  # Bold
+        column_section = Gtk.TreeViewColumn("Section", renderer_section, text=0)
+        column_section.set_resizable(True)
+        column_section.set_min_width(200)
+        self.metadata_tree.append_column(column_section)
+        
+        # Column 1: Field
+        renderer_field = Gtk.CellRendererText()
+        column_field = Gtk.TreeViewColumn("Field", renderer_field, text=1)
+        column_field.set_resizable(True)
+        column_field.set_min_width(200)
+        self.metadata_tree.append_column(column_field)
+        
+        # Column 2: Value
+        renderer_value = Gtk.CellRendererText()
+        column_value = Gtk.TreeViewColumn("Value", renderer_value, text=2)
+        column_value.set_resizable(True)
+        column_value.set_min_width(300)
+        self.metadata_tree.append_column(column_value)
+        
+        scrolled.add(self.metadata_tree)
+        page.pack_start(scrolled, True, True, 0)
+        
+        # Status label
+        self.metadata_status_label = Gtk.Label()
+        self.metadata_status_label.set_markup("<i>Select an experiment to view metadata</i>")
+        self.metadata_status_label.set_xalign(0)
+        self.metadata_status_label.set_margin_start(12)
+        self.metadata_status_label.set_margin_end(12)
+        self.metadata_status_label.set_margin_bottom(6)
+        page.pack_start(self.metadata_status_label, False, False, 0)
+        
+        print("📋 Metadata page initialized with TreeView and status label")
         
         return page
     
@@ -1101,17 +1229,31 @@ class ResultsBrowserView(BaseResultsView):
                 if not mean_trajectory:
                     continue
                 
+                # Trajectories should already be flat lists from statistics computation
+                # Just verify length matches time_points
+                if len(mean_trajectory) != len(time_points):
+                    print(f"Warning: Trajectory length mismatch for {name}: {len(mean_trajectory)} vs {len(time_points)} time points")
+                    continue
+                
+                # Verify we have valid numeric data
+                if not all(isinstance(x, (int, float)) for x in mean_trajectory):
+                    print(f"Warning: mean_trajectory for {name} contains non-numeric data")
+                    continue
+                
                 # Plot mean trajectory
                 color = colors[idx % len(colors)]
                 lines = ax.plot(time_points, mean_trajectory, color=color, linewidth=2, label=name)
                 legend_entries.append((name, lines[0]))
                 
                 # Add confidence interval (mean ± std)
-                if std_trajectory:
-                    lower_bound = [m - s for m, s in zip(mean_trajectory, std_trajectory)]
-                    upper_bound = [m + s for m, s in zip(mean_trajectory, std_trajectory)]
-                    ax.fill_between(time_points, lower_bound, upper_bound, 
-                                    color=color, alpha=0.2)
+                if std_trajectory and len(std_trajectory) == len(mean_trajectory):
+                    try:
+                        lower_bound = [m - s for m, s in zip(mean_trajectory, std_trajectory)]
+                        upper_bound = [m + s for m, s in zip(mean_trajectory, std_trajectory)]
+                        ax.fill_between(time_points, lower_bound, upper_bound, 
+                                        color=color, alpha=0.2)
+                    except TypeError as e:
+                        print(f"Warning: Could not compute confidence interval for {name}: {e}")
             
             # Styling
             species_display = self._resolve_species_name(species_id)
@@ -1390,13 +1532,20 @@ class ResultsBrowserView(BaseResultsView):
         name = result_data.get('name', 'Unknown')
         
         # Extract info
-        n_replicates = result_data.get('statistics', {}).get('n_replicates', 0)
-        duration = result_data.get('duration', 0.0)
+        statistics = result_data.get('statistics', {})
+        n_replicates = statistics.get('n_replicates', 0)
+        
+        # Use mean elapsed time per replicate if available, else batch duration
+        mean_elapsed = statistics.get('mean_elapsed_time')
+        if mean_elapsed is not None and mean_elapsed > 0:
+            duration_str = f"{mean_elapsed:.3f}s"
+        else:
+            # Fallback to total duration
+            duration = result_data.get('duration', 0.0)
+            duration_str = f"{duration:.2f}s"
+        
         error_msg = result_data.get('error', '')
         status = "✗ Error" if error_msg else "✓ Completed"
-        
-        # Format duration
-        duration_str = f"{duration:.2f}s"
         
         # Add to store (default: not selected)
         # Include full error message in column 5 for tooltip
@@ -1413,6 +1562,12 @@ class ResultsBrowserView(BaseResultsView):
             name (str): Experiment name
             result (dict): Results dictionary from BatchExecutor
         """
+        # Debug: Show what's in the result
+        has_metadata = 'metadata' in result
+        metadata_type = type(result.get('metadata')).__name__ if has_metadata else 'None'
+        print(f"📊 Adding result '{name}' - Keys: {list(result.keys())}")
+        print(f"   Metadata present: {has_metadata}, Type: {metadata_type}")
+        
         # Inject name into result data for display_result
         result_with_name = result.copy()
         result_with_name['name'] = name
@@ -1522,6 +1677,9 @@ class ResultsBrowserView(BaseResultsView):
             # Display statistics
             self._display_statistics(name, result)
             
+            # Display metadata
+            self._display_metadata(result)
+            
             # Auto-refresh plot if currently viewing plot tab
             if self.notebook.get_current_page() == 1:
                 # User is on plot view - update plot automatically
@@ -1533,6 +1691,11 @@ class ResultsBrowserView(BaseResultsView):
             self.report_button.set_sensitive(False)
             
             self.stats_label.set_markup("<i>Select an experiment to view statistics</i>")
+            
+            # Clear metadata display
+            if hasattr(self, 'metadata_store'):
+                self.metadata_store.clear()
+                self.metadata_status_label.set_markup("<i>Select an experiment to view metadata</i>")
             
             # Clear plot if on plot view
             if self.notebook.get_current_page() == 1 and self.figure:
@@ -1592,6 +1755,122 @@ class ResultsBrowserView(BaseResultsView):
             text += "<i>Computing statistics...</i>"
         
         self.stats_label.set_markup(text)
+    
+    def _display_metadata(self, result):
+        """Display metadata for selected result.
+        
+        Args:
+            result: Result dictionary (may contain 'metadata' key)
+        """
+        # Check if metadata widgets exist
+        if not hasattr(self, 'metadata_store') or not hasattr(self, 'metadata_status_label'):
+            print("⚠️ Metadata widgets not initialized")
+            return
+        
+        # Clear existing metadata
+        self.metadata_store.clear()
+        
+        # Add Results Summary section first (synthetic - not from metadata header)
+        name = result.get('name', 'Unknown')
+        stats = result.get('statistics', {})
+        
+        summary_iter = self.metadata_store.append(None, ["Results Summary", "", ""])
+        self.metadata_store.append(summary_iter, ["", "Experiment_Name", name])
+        
+        n_reps = stats.get('n_replicates', 0)
+        self.metadata_store.append(summary_iter, ["", "Total_Replicates", str(n_reps)])
+        
+        mean_elapsed = stats.get('mean_elapsed_time', 0.0)
+        if mean_elapsed > 0:
+            self.metadata_store.append(summary_iter, ["", "Mean_Time_Per_Replicate", f"{mean_elapsed:.3f}s"])
+        
+        # Show swept parameter if present
+        swept_param = result.get('swept_parameter')
+        if swept_param and isinstance(swept_param, dict):
+            param_name = swept_param.get('name', 'Unknown')
+            param_value = swept_param.get('value', 'N/A')
+            if isinstance(param_value, (int, float)):
+                self.metadata_store.append(summary_iter, ["", f"Swept_{param_name}", f"{param_value:.4g}"])
+            else:
+                self.metadata_store.append(summary_iter, ["", f"Swept_{param_name}", str(param_value)])
+        
+        # Show deadlock statistics if available
+        replicate_data = result.get('replicate_data', [])
+        if replicate_data:
+            deadlock_count = sum(1 for r in replicate_data if r.get('deadlocked', False))
+            deadlock_rate = (deadlock_count / len(replicate_data) * 100) if replicate_data else 0
+            self.metadata_store.append(summary_iter, ["", "Deadlock_Rate", f"{deadlock_rate:.1f}%"])
+        
+        # Show summary of final species values
+        species_stats = stats.get('species_statistics', {})
+        if species_stats:
+            self.metadata_store.append(summary_iter, ["", "Tracked_Species_Count", str(len(species_stats))])
+            
+            # Show first 3 species final values
+            for i, (species_id, species_data) in enumerate(list(species_stats.items())[:3]):
+                mean_traj = species_data.get('mean', [])
+                if mean_traj and len(mean_traj) > 0:
+                    final_val = mean_traj[-1]
+                    if isinstance(final_val, (list, tuple)) and len(final_val) > 0:
+                        final_val = final_val[0]
+                    self.metadata_store.append(summary_iter, ["", f"{species_id}_Final", f"{final_val:.4g}"])
+        
+        # Expand summary section
+        path = self.metadata_store.get_path(summary_iter)
+        self.metadata_tree.expand_row(path, False)
+        
+        # Check if result has metadata header
+        metadata_header = result.get('metadata')
+        if not metadata_header:
+            print(f"⚠️ No metadata header in result. Keys: {list(result.keys())}")
+            self.metadata_status_label.set_markup(
+                "<i>Showing results summary only (no detailed metadata)</i>"
+            )
+            return
+        
+        print(f"✓ Displaying metadata with {len(metadata_header.sections) if hasattr(metadata_header, 'sections') else 0} sections")
+        
+        # Display metadata sections
+        if hasattr(metadata_header, 'sections'):
+            for section in metadata_header.sections:
+                if not hasattr(section, '_fields') or not section._fields:
+                    continue
+                
+                # Add section as parent row
+                section_name = getattr(section, 'section_name', section.__class__.__name__)
+                parent_iter = self.metadata_store.append(None, [section_name, "", ""])
+                
+                # Add fields as child rows
+                for field_name, field_value in section._fields.items():
+                    # Format value for display
+                    if isinstance(field_value, (list, tuple)):
+                        if len(field_value) > 5:
+                            display_value = f"[{len(field_value)} items]"
+                        else:
+                            display_value = ", ".join(str(v) for v in field_value)
+                    elif isinstance(field_value, dict):
+                        display_value = f"{{...}} ({len(field_value)} keys)"
+                    elif hasattr(field_value, 'isoformat'):
+                        # datetime object
+                        display_value = field_value.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        display_value = str(field_value)
+                    
+                    self.metadata_store.append(parent_iter, ["", field_name, display_value])
+                
+                # Expand section by default
+                path = self.metadata_store.get_path(parent_iter)
+                self.metadata_tree.expand_row(path, False)
+            
+            print(f"✓ Populated metadata tree with {len(metadata_header.sections)} sections")
+            self.metadata_status_label.set_markup(
+                f"<i>1 results summary + {len(metadata_header.sections)} metadata sections</i>"
+            )
+        else:
+            print(f"⚠️ Invalid metadata format: {type(metadata_header)}")
+            self.metadata_status_label.set_markup(
+                "<i>Invalid metadata format</i>"
+            )
     
     def _on_export_csv_clicked(self, button):
         """Handle Export CSV button click - supports batch export if multiple checked."""
@@ -2181,6 +2460,22 @@ class ResultsBrowserView(BaseResultsView):
         n_cols = min(3, n_species)  # Max 3 columns
         n_rows = (n_species + n_cols - 1) // n_cols
         
+        # Calculate figure size based on subplot count
+        # Each subplot should be approximately 4x3 inches for good visibility
+        subplot_width = 4.5  # inches per subplot
+        subplot_height = 3.5  # inches per subplot
+        
+        # Add margins for title, labels, and padding
+        fig_width = n_cols * subplot_width + 1.5
+        fig_height = n_rows * subplot_height + 2.0  # Extra space for suptitle
+        
+        # Set reasonable bounds (don't make it too huge)
+        fig_width = min(fig_width, 20.0)  # Max 20 inches wide
+        fig_height = min(fig_height, 24.0)  # Max 24 inches tall
+        
+        # Apply the calculated size
+        self.figure.set_size_inches(fig_width, fig_height, forward=True)
+        
         # Add subtitle for transition sweeps
         title_text = f"Experiment: {name}\n{stats.get('n_replicates', 0)} replicates"
         if swept_param and swept_param['type'] == 'transitions':
@@ -2285,7 +2580,17 @@ class ResultsBrowserView(BaseResultsView):
         for idx in range(n_species, len(axes)):
             axes[idx].set_visible(False)
         
-        self.figure.tight_layout()
+        # Apply tight_layout with padding to prevent overlap
+        try:
+            self.figure.tight_layout(pad=1.5, h_pad=2.0, w_pad=2.0)
+        except Exception as e:
+            # Fallback to subplots_adjust if tight_layout fails
+            try:
+                self.figure.subplots_adjust(left=0.08, right=0.95, top=0.92, 
+                                           bottom=0.08, hspace=0.4, wspace=0.3)
+            except Exception:
+                pass  # Suppress all layout errors
+        
         self.canvas.draw()
     
     def set_export_callback(self, callback):

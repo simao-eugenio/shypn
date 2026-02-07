@@ -29,6 +29,7 @@ from shypn.engine.simulation import SimulationController
 from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
+from shypn.metadata import SweepHeaderGenerator
 
 class SimulateToolsPaletteLoader(GObject.GObject):
     """Loader for simulation tools palette - manages [R][P][S][T][⚙] button panel.
@@ -1452,9 +1453,33 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             # Write CSV with time and recorded objects
             csv_path = os.path.join(results_dir, f'run_{replicate_id + 1:03d}.csv')
             with open(csv_path, 'w', newline='') as f:
+                # Generate metadata header for this replicate
+                context = {
+                    'model_path': getattr(model, 'filepath', None),
+                    'model': model,
+                    'n_replicates': n_replicates,
+                    'recorded_objects': list(recorded_objects),
+                    'simulation_config': {
+                        'duration': self.simulation.settings.duration,
+                        'time_units': str(self.simulation.settings.time_units),
+                        'use_tau_leaping': self.simulation.settings.use_tau_leaping,
+                    },
+                    'current_replicate': replicate_id + 1,
+                    'total_replicates': n_replicates,
+                    'phase': 'Batch_Mode'
+                }
+                
+                generator = SweepHeaderGenerator()
+                generator.set_context(context)
+                generator.generate()
+                header_text = generator.to_header_text()
+                
+                # Write metadata header
+                f.write(header_text)
+                
                 writer = csv.writer(f)
                 
-                # Header row
+                # Header row (column names)
                 header = ['time'] + sorted(place_data.keys()) + sorted(transition_data.keys())
                 writer.writerow(header)
                 

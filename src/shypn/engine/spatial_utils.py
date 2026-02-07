@@ -277,15 +277,11 @@ class VolumeAdaptiveSelector:
         Returns:
             True if should use stochastic, False for continuous
         """
-        # Check if place has volume attribute
-        if not hasattr(place, 'compartment_volume'):
-            return False  # Default to continuous if volume not set
+        # Check compartment volume
+        if not hasattr(place, 'compartment_volume') or place.compartment_volume is None:
+            return False  # No volume set - default to continuous
         
-        volume = place.compartment_volume
-        if volume is None:
-            return False  # No volume set - use continuous
-        
-        return volume < self.threshold_fL
+        return place.compartment_volume < self.threshold_fL
     
     def analyze_transition(
         self,
@@ -305,6 +301,7 @@ class VolumeAdaptiveSelector:
         volumes = []
         
         for place in input_places + output_places:
+            # Check compartment volume
             if hasattr(place, 'compartment_volume') and place.compartment_volume is not None:
                 volumes.append(place.compartment_volume)
         

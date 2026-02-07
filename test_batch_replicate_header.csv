@@ -1,0 +1,63 @@
+# ============================================================================
+# SHYPN PARAMETER SWEEP DATA - HEADER PROTOCOL v1.0
+# Generated: 2026-02-07T10:57:04.079275Z
+# ============================================================================
+# 
+# [MODEL IDENTIFICATION]
+# Model_Name: model
+# Model_Path: workspace/projects/Biochemical-Examples/11_Glycolysis_TCA_Connection/model.shy
+# Model_Hash: sha256:e9cf20cd58d56a34  # First 16 chars of SHA-256
+# Model_Modified: 2025-11-28T15:55:00.967506Z
+# Formalism: Signal_Hierarchical_Petri_Net
+# Version: unknown
+# N_Places: 9
+# N_Transitions: 3
+# N_Arcs: 14
+# 
+# [SWEEP CONFIGURATION]
+# Sweep_Type: Parameter_Dose_Response
+# Sweep_Units: µM
+# Time_Span: 0-120
+# Time_Units: second
+# N_Replicates: 3
+# Random_Seed: 42
+# Solver: Gillespie_SSA
+# Timestep: adaptive
+# 
+# [PARAMETRIZATION STATE]
+# : # Critical pool initial conditions
+# P1_Pyruvate_cytosol: 500 µM
+# P2_Pyruvate_mito: 100 µM
+# P3_CoA: 1000 µM
+# P4_NAD: 2000 µM
+# P5_AcetylCoA: 5 µM
+# P6_CO2: 0 µM
+# P7_NADH: 10 µM
+# P8_Oxaloacetate: 20 µM
+# P9_Citrate: 0 µM
+# Current_Phase: Batch_Mode
+# 
+# [CONSERVATION LAWS]
+# 
+# [VALIDATION FLAGS]
+# Energy_Depletion_Warning: UNCHECKED
+# Pi_Depletion_Warning: UNCHECKED
+# Negative_Concentration_Warning: UNCHECKED
+# Numerical_Instability_Warning: UNCHECKED
+# Execution_Status: SUCCESS
+# 
+# [INFERRED PROPERTIES]
+# Homeostasis_Detected: False
+# 
+# [TEMPORAL METADATA]
+# 
+# [REFERENCES]
+# Phase: Batch_Mode
+# 
+# ============================================================================
+# DATA SECTION BEGINS
+# ============================================================================
+time,P1,P7,P8,P9,T1,T2
+0.0,1000,0,5000,5000,0,0
+100.0,950,50,4900,4905,10,5
+200.0,900,100,4800,4810,20,10

@@ -14,6 +14,7 @@ import numpy as np
 import multiprocessing
 import os
 from typing import Optional, Callable, Dict, Any, List
+from datetime import datetime, timezone
 
 
 def _worker_run_experiment(args: dict) -> Dict[str, Any]:
@@ -93,8 +94,86 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         # Compute statistics
         if results and len(results) > 0:
             statistics = runner.compute_statistics(results)
-            statistics['elapsed_time'] = elapsed_time
+            # Don't overwrite elapsed_time - preserve per-replicate timing from compute_statistics
             statistics['n_replicates'] = len(results)
+            
+            # Generate metadata for this experiment
+            metadata_header = None
+            try:
+                from shypn.metadata import SweepHeaderGenerator
+                
+                # Extract experiment-specific parameter values from snapshot
+                experiment_params = {}
+                if isinstance(snapshot, dict):
+                    # Get place markings
+                    if 'place_markings' in snapshot:
+                        experiment_params['place_markings'] = snapshot['place_markings']
+                    # Get transition rates
+                    if 'transition_rates' in snapshot:
+                        experiment_params['transition_rates'] = snapshot['transition_rates']
+                    # Get arc weights
+                    if 'arc_weights' in snapshot:
+                        experiment_params['arc_weights'] = snapshot['arc_weights']
+                elif hasattr(snapshot, 'place_markings'):
+                    experiment_params['place_markings'] = snapshot.place_markings
+                    experiment_params['transition_rates'] = getattr(snapshot, 'transition_rates', {})
+                    experiment_params['arc_weights'] = getattr(snapshot, 'arc_weights', {})
+                
+                # Prepare trajectory data for validation checks
+                trajectory_data = {}
+                warnings = []
+                errors = []
+                
+                if statistics and 'species_statistics' in statistics:
+                    species_stats = statistics['species_statistics']
+                    for species_id, species_data in species_stats.items():
+                        mean_traj = species_data.get('mean', [])
+                        if mean_traj:
+                            # Convert to list of values (flatten if needed)
+                            if isinstance(mean_traj, list) and len(mean_traj) > 0:
+                                if isinstance(mean_traj[0], (list, tuple)):
+                                    trajectory_data[species_id] = [v[0] if isinstance(v, (list, tuple)) else v for v in mean_traj]
+                                else:
+                                    trajectory_data[species_id] = mean_traj
+                
+                # Determine execution status
+                execution_status = 'SUCCESS'
+                error_count = sum(1 for r in results if 'error' in r)
+                if error_count > 0:
+                    errors.append(f"{error_count}/{len(results)} replicates failed")
+                    execution_status = 'WARNING' if error_count < len(results) else 'FAILED'
+                
+                metadata_context = {
+                    'model': model,
+                    'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
+                    'n_replicates': replicates,
+                    'experiment_index': args['snapshot_index'],
+                    'experiment_name': name,
+                    'experiment_parameters': experiment_params,
+                    'simulation_config': {
+                        'duration': duration,
+                        'time_units': 'minute',
+                        'use_tau_leaping': True,
+                    },
+                    'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
+                    'elapsed_time': elapsed_time,
+                    'phase': snapshot.get('name', name) if isinstance(snapshot, dict) else name,
+                    'swept_parameter': snapshot.get('swept_parameter') if isinstance(snapshot, dict) else None,
+                    # Validation data
+                    'trajectory_data': trajectory_data,
+                    'warnings': warnings,
+                    'errors': errors,
+                    'execution_status': execution_status
+                }
+                
+                generator = SweepHeaderGenerator()
+                generator.set_context(metadata_context)
+                generator.generate()
+                metadata_header = generator.header
+                print(f"✓ Worker generated metadata with {len(metadata_header.sections)} sections for {name}")
+            except Exception as e:
+                print(f"⚠️ Warning: Worker failed to generate metadata for {name}: {e}")
+                metadata_header = None
             
             return {
                 'name': name,
@@ -102,7 +181,8 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'statistics': statistics,
                 'n_replicates': len(results),
                 'elapsed_time': elapsed_time,
-                'status': 'success'
+                'status': 'success',
+                'metadata': metadata_header
             }
         else:
             return {
@@ -110,7 +190,8 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'snapshot_index': args['snapshot_index'],
                 'error': 'No successful replicates',
                 'elapsed_time': elapsed_time,
-                'status': 'failed'
+                'status': 'failed',
+                'metadata': None  # No metadata for failed experiments
             }
     
     except Exception as e:
@@ -131,42 +212,108 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         model: DocumentModel with places, transitions, arcs
         baseline_params: Baseline parameter values dict
     """
+    # DEBUG: File-based logging for worker process
+    import os
+    debug_log = os.path.expanduser("~/sweep_debug.log")
+    
     if not snapshot:
+        with open(debug_log, 'a') as f:
+            f.write("[WORKER] No snapshot provided!\n")
         return
     
     # Handle both ExperimentSnapshot objects and dict format
-    if hasattr(snapshot, 'place_markings'):
+    if isinstance(snapshot, dict):
+        # Dict format (used in parallel mode) - newer format with direct keys
+        if 'place_markings' in snapshot:
+            # New dict format from parallel execution
+            place_markings = snapshot['place_markings']
+            transition_rates = snapshot['transition_rates']
+            arc_weights = snapshot['arc_weights']
+            swept_param = snapshot.get('swept_parameter')
+            snap_name = snapshot.get('name', 'unknown')
+            
+            # DEBUG: Log snapshot info
+            with open(debug_log, 'a') as f:
+                f.write(f"\n[WORKER] Processing snapshot (dict): {snap_name}\n")
+                f.write(f"[WORKER] swept_parameter: {swept_param}\n")
+                f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
+                f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
+        elif 'parameters' in snapshot:
+            # Old dict format - convert to place/transition/arc mappings
+            place_markings = {}
+            transition_rates = {}
+            arc_weights = {}
+            
+            for param in snapshot['parameters']:
+                obj_type = param.get('obj_type')
+                obj_id = param.get('obj_id')
+                attr_name = param.get('attr')
+                new_value = param.get('value')
+                
+                if obj_type == 'place' and attr_name in ('marking', 'tokens'):
+                    place_markings[obj_id] = new_value
+                elif obj_type == 'transition' and attr_name == 'rate':
+                    transition_rates[obj_id] = new_value
+                elif obj_type == 'arc' and attr_name == 'weight':
+                    arc_weights[obj_id] = new_value
+            
+            swept_param = None  # Old format doesn't have swept_parameter
+        else:
+            # No valid dict format
+            with open(debug_log, 'a') as f:
+                f.write(f"[WORKER] ERROR: Unknown dict format, keys: {snapshot.keys()}\n")
+            return
+    elif hasattr(snapshot, 'place_markings'):
         # ExperimentSnapshot object - use its attributes
         place_markings = snapshot.place_markings
         transition_rates = snapshot.transition_rates
         arc_weights = snapshot.arc_weights
-    elif isinstance(snapshot, dict) and 'parameters' in snapshot:
-        # Old dict format - convert to place/transition/arc mappings
-        place_markings = {}
-        transition_rates = {}
-        arc_weights = {}
+        swept_param = getattr(snapshot, 'swept_parameter', None)
+        snap_name = getattr(snapshot, 'name', 'unknown')
         
-        for param in snapshot['parameters']:
-            obj_type = param.get('obj_type')
-            obj_id = param.get('obj_id')
-            attr_name = param.get('attr')
-            new_value = param.get('value')
-            
-            if obj_type == 'place' and attr_name in ('marking', 'tokens'):
-                place_markings[obj_id] = new_value
-            elif obj_type == 'transition' and attr_name == 'rate':
-                transition_rates[obj_id] = new_value
-            elif obj_type == 'arc' and attr_name == 'weight':
-                arc_weights[obj_id] = new_value
+        # DEBUG: Log snapshot info
+        with open(debug_log, 'a') as f:
+            f.write(f"\n[WORKER] Processing snapshot (object): {snap_name}\n")
+            f.write(f"[WORKER] swept_parameter: {swept_param}\n")
+            f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
+            f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
     else:
         # No valid snapshot format
         return
     
     # Apply place markings
+    import os
+    debug_log = os.path.expanduser("~/sweep_debug.log")
+    
+    # DEBUG: Check for swept parameter (works for both dict and object)
+    if isinstance(swept_param, dict):
+        swept_place_id = swept_param.get('id') if swept_param.get('type') == 'places' else None
+    else:
+        swept_place_id = None
+    
+    applied_count = 0
+    not_found_count = 0
+    
     for place_id, marking in place_markings.items():
         place = next((p for p in model.places if p.id == place_id), None)
         if place:
+            old_value = place.tokens
             place.tokens = float(marking)
+            applied_count += 1
+            
+            # DEBUG: Log swept parameter application
+            if place_id == swept_place_id:
+                with open(debug_log, 'a') as f:
+                    f.write(f"[WORKER] ✓ SWEPT PARAM: {place_id} = {old_value} → {marking}\n")
+        else:
+            not_found_count += 1
+            # DEBUG: Log place not found
+            with open(debug_log, 'a') as f:
+                f.write(f"[WORKER] ✗ Place NOT FOUND: {place_id}\n")
+    
+    # DEBUG: Summary
+    with open(debug_log, 'a') as f:
+        f.write(f"[WORKER] Applied: {applied_count}, Not found: {not_found_count}\n")
     
     # Apply transition rates (handle both numeric and formula strings)
     for trans_id, rate in transition_rates.items():
@@ -794,7 +941,7 @@ class BatchExecutor:
             if results and len(results) > 0:
                 # print(f"[EXPERIMENT] Computing statistics for {len(results)} replicates...")
                 statistics = runner.compute_statistics(results)
-                statistics['elapsed_time'] = elapsed_time
+                # Don't overwrite elapsed_time - preserve per-replicate timing from compute_statistics
                 statistics['n_replicates'] = len(results)
                 # print(f"[EXPERIMENT] Statistics computed successfully")
                 # print(f"[EXPERIMENT] Statistics keys: {statistics.keys()}")
@@ -835,8 +982,89 @@ class BatchExecutor:
                     if 'error' not in rep:
                         replicate_data.append({
                             'deadlocked': rep.get('deadlocked', False),
-                            'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0
+                            'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0,
+                            'elapsed_time': rep.get('elapsed_time', 0.0)  # Wall-clock time
                         })
+            
+            # Generate metadata for this experiment
+            from shypn.metadata import SweepHeaderGenerator
+            
+            # Extract experiment-specific parameter values from snapshot
+            experiment_params = {}
+            if hasattr(snapshot, 'place_markings'):
+                experiment_params['place_markings'] = snapshot.place_markings
+                experiment_params['transition_rates'] = getattr(snapshot, 'transition_rates', {})
+                experiment_params['arc_weights'] = getattr(snapshot, 'arc_weights', {})
+            
+            # Prepare trajectory data for validation checks
+            # Use mean trajectories from statistics
+            trajectory_data = {}
+            warnings = []
+            errors = []
+            
+            if statistics and 'species_statistics' in statistics:
+                species_stats = statistics['species_statistics']
+                for species_id, species_data in species_stats.items():
+                    mean_traj = species_data.get('mean', [])
+                    if mean_traj:
+                        # Convert to list of values (flatten if needed)
+                        if isinstance(mean_traj, list) and len(mean_traj) > 0:
+                            if isinstance(mean_traj[0], (list, tuple)):
+                                trajectory_data[species_id] = [v[0] if isinstance(v, (list, tuple)) else v for v in mean_traj]
+                            else:
+                                trajectory_data[species_id] = mean_traj
+            
+            # Determine execution status
+            execution_status = 'SUCCESS'
+            if results:
+                # Count errors in replicates
+                error_count = sum(1 for r in results if 'error' in r)
+                if error_count > 0:
+                    errors.append(f"{error_count}/{len(results)} replicates failed")
+                    execution_status = 'WARNING' if error_count < len(results) else 'FAILED'
+                
+                # Check for deadlocks
+                deadlock_count = sum(1 for r in replicate_data if r.get('deadlocked', False))
+                if deadlock_count > 0:
+                    deadlock_rate = (deadlock_count / len(replicate_data) * 100) if replicate_data else 0
+                    if deadlock_rate > 50:
+                        warnings.append(f"High deadlock rate: {deadlock_rate:.1f}%")
+            
+            metadata_context = {
+                'model': model,
+                'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
+                'n_replicates': replicates,
+                'experiment_index': snapshot_index,
+                'experiment_name': name,
+                'experiment_parameters': experiment_params,
+                'simulation_config': {
+                    'duration': duration,
+                    'time_units': 'minute',
+                    'use_tau_leaping': True,
+                },
+                'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
+                'elapsed_time': elapsed_time,
+                'phase': snapshot.name if hasattr(snapshot, 'name') else name,
+                'swept_parameter': swept_param,
+                # Validation data
+                'trajectory_data': trajectory_data,
+                'warnings': warnings,
+                'errors': errors,
+                'execution_status': execution_status
+            }
+            
+            # Generate metadata header (store for CSV export and display)
+            try:
+                generator = SweepHeaderGenerator()
+                generator.set_context(metadata_context)
+                generator.generate()
+                metadata_header = generator.header
+                print(f"✓ Generated metadata with {len(metadata_header.sections)} sections for {name}")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to generate metadata for {name}: {e}")
+                import traceback
+                traceback.print_exc()
+                metadata_header = None
             
             # Return complete result dict with statistics (plottable from statistics)
             result = {
@@ -848,7 +1076,8 @@ class BatchExecutor:
                 'duration': elapsed_time,
                 'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
                 'subnet_structure': subnet_structure,  # Include actual subnet composition
-                'replicate_data': replicate_data  # Per-replicate outcomes for statistical tests
+                'replicate_data': replicate_data,  # Per-replicate outcomes for statistical tests
+                'metadata': metadata_header  # Metadata header for display and CSV export
             }
             
             return result
@@ -1123,18 +1352,34 @@ class BatchExecutor:
             if snapshot.swept_parameter.get('type') == 'places':
                 swept_place_id = snapshot.swept_parameter.get('id')
         
+        # DEBUG: Print sweep info
+        print(f"\n[DEBUG SWEEP] Snapshot: {getattr(snapshot, 'name', 'unknown')}")
+        print(f"[DEBUG SWEEP] swept_parameter: {snapshot.swept_parameter if hasattr(snapshot, 'swept_parameter') else 'None'}")
+        print(f"[DEBUG SWEEP] swept_place_id: {swept_place_id}")
+        print(f"[DEBUG SWEEP] place_markings keys: {list(snapshot.place_markings.keys())[:5]}")  # First 5
+        print(f"[DEBUG SWEEP] Number of places to apply: {len(snapshot.place_markings)}")
+        print(f"[DEBUG SWEEP] Number of model places: {len(places)}")
+        
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
+                old_value = place.tokens
                 marking_float = float(marking)
                 # Always apply if this is the swept parameter (even zero values)
                 # For non-swept parameters, skip zeros to preserve baseline
                 if place_id == swept_place_id or marking_float != 0.0:
                     place.tokens = marking_float
                     applied_markings += 1
+                    # DEBUG: Print swept parameter application
+                    if place_id == swept_place_id:
+                        print(f"[DEBUG SWEEP] ✓ Applied SWEPT parameter: {place_id} = {old_value} → {marking_float}")
                 else:
                     # Keep baseline value from model (don't overwrite with zero)
                     skipped_zeros += 1
+            else:
+                print(f"[DEBUG SWEEP] ✗ Place NOT FOUND in model: {place_id}")
+        
+        print(f"[DEBUG SWEEP] Applied: {applied_markings}, Skipped zeros: {skipped_zeros}\n")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
