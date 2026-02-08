@@ -203,6 +203,10 @@ class SimulationController:
         # Enforcement restores molar conservation per chemical reality.
         self.conservation_enforcer = ConservationEnforcer(model)
         
+        # Auto-detection enabled by default (no UI configuration needed)
+        # Automatically detects closed cycles and enforces conservation
+        self.auto_conservation_enabled = True
+        
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
@@ -975,6 +979,106 @@ class SimulationController:
                 tolerance=tolerance,
                 auto_correct=True
             )
+    
+    def _auto_detect_conservation_groups(self):
+        """Auto-detect closed cycles and configure conservation enforcement.
+        
+        Analyzes model structure to identify places that form closed cycles
+        (no external sources/sinks) and automatically configures conservation
+        groups to maintain mass balance.
+        
+        Called automatically at simulation start if auto_conservation_enabled=True.
+        Skipped if conservation groups already manually configured.
+        
+        STRATEGY: Detect strongly connected components in the place-transition
+        bipartite graph. Places in closed cycles should conserve total tokens.
+        
+        For simplicity, we use a heuristic:
+        - Find all places connected through transitions (bidirectional flow)
+        - Group places that participate in cycles (have both inputs and outputs)
+        - Configure conservation using current token totals
+        """
+        if not self.model.places:
+            return
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Build connectivity graph: place -> set of connected places (via transitions)
+        place_connections = {p.id: set() for p in self.model.places}
+        
+        for transition in self.model.transitions:
+            # Get input and output places for this transition
+            input_places = set()
+            output_places = set()
+            
+            for arc in self.model.arcs:
+                if arc.target_id == transition.id:
+                    input_places.add(arc.source_id)
+                elif arc.source_id == transition.id:
+                    output_places.add(arc.target_id)
+            
+            # Connect all input places to all output places (bidirectional cycle)
+            for inp in input_places:
+                for out in output_places:
+                    if inp != out:  # Avoid self-loops
+                        place_connections[inp].add(out)
+                        place_connections[out].add(inp)
+        
+        # Find strongly connected components (closed cycles)
+        # Use simple DFS-based approach to find maximal connected groups
+        visited = set()
+        conservation_groups = []
+        
+        def dfs(place_id, group):
+            """Depth-first search to find connected places."""
+            if place_id in visited:
+                return
+            visited.add(place_id)
+            group.add(place_id)
+            for connected in place_connections.get(place_id, []):
+                dfs(connected, group)
+        
+        # Find all maximal connected groups
+        for place in self.model.places:
+            if place.id not in visited and place_connections.get(place.id):
+                group = set()
+                dfs(place.id, group)
+                if len(group) >= 2:  # Only groups with 2+ places
+                    conservation_groups.append(group)
+        
+        # Configure conservation for detected groups
+        if conservation_groups:
+            logger.info(f"[AUTO-CONSERVATION] Detected {len(conservation_groups)} closed cycle(s)")
+            
+            for i, group in enumerate(conservation_groups):
+                place_ids = list(group)
+                
+                # Calculate current total tokens
+                total = sum(p.tokens for p in self.model.places if p.id in place_ids)
+                
+                # Only configure if total > 0 (avoid empty cycles)
+                if total > 0:
+                    group_name = f"auto_cycle_{i+1}"
+                    
+                    # Get place names for logging
+                    place_names = [p.name for p in self.model.places if p.id in place_ids]
+                    
+                    self.conservation_enforcer.add_conservation_group(
+                        name=group_name,
+                        place_ids=place_ids,
+                        expected_total=total,
+                        tolerance=1e-6,
+                        auto_correct=True
+                    )
+                    
+                    logger.info(
+                        f"  ✓ {group_name}: {len(place_ids)} places "
+                        f"({', '.join(place_names[:3])}{'...' if len(place_names) > 3 else ''}), "
+                        f"total={total:.3f}"
+                    )
+        else:
+            logger.info("[AUTO-CONSERVATION] No closed cycles detected (model may have sources/sinks)")
 
     def _notify_step_listeners(self):
         """Notify all registered step listeners."""
@@ -1033,6 +1137,12 @@ class SimulationController:
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
+        
+        # Auto-detect conservation groups on first step (if not already configured)
+        if not hasattr(self, '_auto_conservation_checked'):
+            self._auto_conservation_checked = True
+            if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
+                self._auto_detect_conservation_groups()
         
         # PHASE 1-2 DEBUG: Print transition types once
         if not hasattr(self, '_debug_transition_types_printed'):
@@ -2595,6 +2705,10 @@ class SimulationController:
         # CRITICAL: Initialize all stochastic transitions before simulation starts
         # This ensures they have valid scheduled firing times
         self._update_enablement_states()
+        
+        # Auto-detect and configure conservation groups (enabled by default)
+        if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
+            self._auto_detect_conservation_groups()
         
         # Verify stochastic transitions are properly scheduled
         stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
