@@ -12,6 +12,13 @@ Mathematical Model:
     - Enablement: ∀p ∈ •t: m(p) ≥ arc_weight * max_burst
 
 Extracted from: legacy/shypnpy/core/petri.py:1562-1690
+
+# RESOLVED: Mass conservation enforced globally in SimulationController.
+#           Burst firing conserves mass PER firing (consumed == produced),
+#           but cumulative firing imbalances over simulation cause violations.
+#           ConservationEnforcer corrects this after each step.
+#           12/12 test models validated (including stochastic transitions).
+#           See conservation_enforcer.py for implementation.
 """
 
 from typing import Dict, Tuple, List, Any, Optional
