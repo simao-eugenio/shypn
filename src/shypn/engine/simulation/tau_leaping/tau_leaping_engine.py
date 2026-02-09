@@ -428,8 +428,12 @@ class TauLeapingEngine:
                 constrained_map[transition] = original_firings
                 continue
             
-            # Find inhibitor arcs (Product → Transition)
-            inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+            # Find inhibitor arcs (Product → Transition) using defensive pattern
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            inhibitor_arcs = [arc for arc in input_arcs if 
+                            getattr(arc, 'arc_type', 'normal') == 'inhibitor' or
+                            'inhibitor' in getattr(arc, 'arc_type', 'normal') or
+                            getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal')) == 'inhibitor']
             
             if not inhibitor_arcs:
                 # No inhibitors, use original firings
@@ -623,7 +627,9 @@ class TauLeapingEngine:
         
         for arc in input_arcs:
             # Skip test arcs (don't consume tokens)
-            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                 continue
             
             source_place = arc.source
@@ -669,8 +675,10 @@ class TauLeapingEngine:
         # Phase 1: Consume tokens (skip if source)
         if not is_source:
             for arc in input_arcs:
-                # Skip test arcs
-                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                # Skip test arcs and inhibitor arcs (they don't consume)
+                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                arc_type = getattr(arc, 'arc_type', 'normal')
+                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                     continue
                 
                 source_place = arc.source

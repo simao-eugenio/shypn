@@ -596,6 +596,10 @@ class Place(PetriNetObject):
         if hasattr(self, 'metadata') and self.metadata:
             data["metadata"] = self.metadata
         
+        # Serialize properties (thermodynamic data, custom parameters, etc.)
+        if hasattr(self, '_properties') and self._properties:
+            data["properties"] = self._properties
+        
         return data
     
     @classmethod
@@ -701,6 +705,10 @@ class Place(PetriNetObject):
         # Restore metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
         if "metadata" in data:
             place.metadata = data["metadata"]
+        
+        # Restore properties (thermodynamic data, custom parameters, etc.)
+        if "properties" in data:
+            place.properties = data["properties"]
         
         # Restore spatial signal properties (Layer 1)
         place.diffusion_coefficient = data.get("diffusion_coefficient", None)

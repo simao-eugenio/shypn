@@ -82,16 +82,29 @@ class DocumentModel:
     # Object Creation
     # ============================================================================
     
-    def create_place(self, x: float, y: float, label: str = "") -> Place:
+    def create_place(self, x: float, y: float, label: str = "", 
+                     compound_id: Optional[str] = None,
+                     auto_fetch_thermodynamics: bool = True) -> Place:
         """Create a new place at the given position.
         
         Args:
             x: X coordinate in world space
             y: Y coordinate in world space
             label: Optional label for the place
+            compound_id: Optional KEGG/ChEBI ID for thermodynamic enrichment
+            auto_fetch_thermodynamics: If True and compound_id provided, fetch
+                                       thermodynamic properties from local database
             
         Returns:
-            The created Place object
+            The created Place object with thermodynamic properties (if available)
+            
+        Example:
+            >>> # Manual creation without enrichment
+            >>> place = document.create_place(100, 100, "MyPlace")
+            
+            >>> # Creation with automatic thermodynamic enrichment
+            >>> atp = document.create_place(200, 100, "ATP", compound_id="C00002")
+            >>> print(atp.properties.get('delta_g_formation'))  # -2292.2 kJ/mol
         """
         place_id = self.id_manager.generate_place_id()
         place_name = place_id  # Name matches ID
@@ -100,6 +113,11 @@ class DocumentModel:
         # Apply default color schema
         from shypn.utils.color_schema_manager import ColorSchemaManager
         ColorSchemaManager.reset_place_color(place)
+        
+        # Auto-fetch thermodynamic properties if compound ID provided
+        if compound_id and auto_fetch_thermodynamics:
+            self.enrich_place_thermodynamics(place, compound_id)
+        
         self.places.append(place)
         return place
     
@@ -730,6 +748,125 @@ class DocumentModel:
             document.arcs[i] = signal_arc
         
         return document
+    
+    # ============================================================================
+    # Thermodynamic Data Management
+    # ============================================================================
+    
+    def enrich_place_thermodynamics(self, place: Place, compound_id: str) -> bool:
+        """Fetch and populate thermodynamic properties for a place.
+        
+        Queries local thermodynamic database and populates place.properties
+        with ΔG°_f, uncertainty, and other compound data.
+        
+        Args:
+            place: Place object to enrich
+            compound_id: KEGG C-number (e.g., 'C00002') or ChEBI ID
+            
+        Returns:
+            True if thermodynamic data found and populated, False otherwise
+            
+        Example:
+            >>> place = document.create_place(100, 100, "ATP")
+            >>> success = document.enrich_place_thermodynamics(place, "C00002")
+            >>> if success:
+            >>>     print(f"ΔG°_f = {place.properties['delta_g_formation']} kJ/mol")
+        """
+        try:
+            # Lazy-load thermodynamic provider
+            if not hasattr(self, '_thermo_provider'):
+                from shypn.thermodynamics.database import MultiSourceProvider
+                self._thermo_provider = MultiSourceProvider(
+                    enable_cache=True,
+                    enable_static=True,
+                    enable_web=False  # Only use local data for interactive creation
+                )
+            
+            # Get thermodynamic settings for query
+            ph = self.thermodynamic_settings.get('ph', 7.0)
+            temp = self.thermodynamic_settings.get('temperature', 298.15)
+            ionic = self.thermodynamic_settings.get('ionic_strength', 0.1)
+            
+            # Query database
+            compound_data = self._thermo_provider.get_compound(
+                compound_id, ph=ph, temperature=temp, ionic_strength=ionic
+            )
+            
+            if compound_data:
+                # Populate place properties
+                place.properties['compound_id'] = compound_data.compound_id
+                place.properties['compound_name'] = compound_data.name
+                place.properties['delta_g_formation'] = compound_data.delta_g_formation
+                place.properties['delta_g_uncertainty'] = compound_data.uncertainty
+                place.properties['thermodynamic_source'] = compound_data.source
+                place.properties['thermodynamic_conditions'] = {
+                    'pH': ph,
+                    'temperature': temp,
+                    'ionic_strength': ionic
+                }
+                
+                # Update metadata for traceability
+                if not hasattr(place, 'metadata'):
+                    place.metadata = {}
+                place.metadata['compound_id'] = compound_data.compound_id
+                place.metadata['has_thermodynamic_data'] = True
+                
+                return True
+            else:
+                # Compound not found in database
+                if not hasattr(place, 'metadata'):
+                    place.metadata = {}
+                place.metadata['compound_id'] = compound_id
+                place.metadata['has_thermodynamic_data'] = False
+                return False
+                
+        except Exception as e:
+            import logging
+            logging.getLogger('DocumentModel').warning(
+                f"Failed to fetch thermodynamic data for {compound_id}: {e}"
+            )
+            return False
+    
+    def enrich_all_places_thermodynamics(self, id_mapping: Optional[Dict[str, str]] = None) -> Dict[str, bool]:
+        """Batch enrich all places with thermodynamic data.
+        
+        Useful for post-import enrichment or updating existing models.
+        
+        Args:
+            id_mapping: Optional mapping of place_id → compound_id.
+                       If None, uses place.metadata['compound_id'] or place.metadata['kegg_id']
+            
+        Returns:
+            Dictionary mapping place_id → enrichment_success (True/False)
+            
+        Example:
+            >>> # Enrich all places that have KEGG IDs in metadata
+            >>> results = document.enrich_all_places_thermodynamics()
+            >>> enriched = sum(results.values())
+            >>> print(f"Enriched {enriched}/{len(results)} places")
+        """
+        results = {}
+        
+        for place in self.places:
+            # Determine compound ID
+            compound_id = None
+            
+            if id_mapping and place.id in id_mapping:
+                compound_id = id_mapping[place.id]
+            elif hasattr(place, 'metadata'):
+                # Try compound_id first, then kegg_id
+                compound_id = place.metadata.get('compound_id') or place.metadata.get('kegg_id')
+                # Clean KEGG ID if needed (remove 'cpd:' prefix)
+                if compound_id and ':' in compound_id:
+                    compound_id = compound_id.split(':')[-1]
+            
+            if compound_id:
+                success = self.enrich_place_thermodynamics(place, compound_id)
+                results[place.id] = success
+            else:
+                results[place.id] = False
+        
+        return results
     
     # ============================================================================
     # Thermodynamic Settings Management

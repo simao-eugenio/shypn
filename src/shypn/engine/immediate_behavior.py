@@ -26,8 +26,11 @@ Extracted from: legacy/shypnpy/core/petri.py:1908-1970
 """
 
 from typing import Dict, Tuple, List, Any
+import logging
 from .transition_behavior import TransitionBehavior
 from .spatial_utils import BoundaryValidator
+
+logger = logging.getLogger(__name__)
 
 
 class ImmediateBehavior(TransitionBehavior):
@@ -124,23 +127,28 @@ class ImmediateBehavior(TransitionBehavior):
         
         # Check each input place for sufficient tokens
         for arc in input_arcs:
-            # Skip inhibitor arcs in enablement check (they have inverted logic handled elsewhere)
-            from shypn.netobjs.inhibitor_arc import InhibitorArc
-            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-            if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
-                continue
+            # Use defensive pattern: check kind, properties['kind'], and arc_type
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
             
-            # Test arcs (catalysts) check token presence without consuming
-            # They require tokens to be present for enablement
+            logger.debug(f"  [ENABLEMENT] Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
             
             # Get source place directly from arc reference
             source_place = arc.source
             if source_place is None:
                 return False, f"missing-source-place-{arc.name}"
             
-            # Check sufficient tokens (applies to both normal arcs and test arcs)
-            if source_place.tokens < arc.weight:
-                return False, f"insufficient-tokens-{source_place.name}"
+            # Check based on arc type
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
+                # Inhibitor: INVERTED check - transition DISABLED when tokens >= weight
+                if source_place.tokens >= arc.weight:
+                    return False, f"inhibited-by-{source_place.name}"
+            else:
+                # Normal and test arcs: check token presence (tokens >= weight)
+                # Test arcs check enablement but don't consume (checked in fire)
+                if source_place.tokens < arc.weight:
+                    return False, f"insufficient-tokens-{source_place.name}"
         
         # NEW: Validate spatial boundary constraints
         boundary_valid, boundary_reason = self.boundary_validator.validate_transition_arcs(
@@ -198,9 +206,20 @@ class ImmediateBehavior(TransitionBehavior):
             
             # Phase 1: Consume tokens from input places (skip if source transition)
             if not is_source:
+                logger.debug(f"[IMMEDIATE FIRE] Transition {self.transition.id}: Consuming input tokens...")
+                
                 for arc in input_arcs:
-                    # Skip test arcs and inhibitor arcs - they don't consume tokens
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip inhibitor arcs and test arcs (they don't consume)
+                    # Use defensive pattern: check kind, properties['kind'], and arc_type
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    
+                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
+                    
+                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
+                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
+                    if arc_type == 'test':
+                        logger.debug(f"    → SKIP consumption (test arc - catalyst)")
                         continue
                     
                     # Get source place directly from arc reference
@@ -226,6 +245,8 @@ class ImmediateBehavior(TransitionBehavior):
                     old_tokens = source_place.tokens
                     source_place.set_tokens(source_place.tokens - arc.weight)
                     consumed_map[source_place.id] = float(arc.weight)
+                    
+                    logger.debug(f"    → CONSUMED {arc.weight} tokens from {source_place.id}: {old_tokens} → {source_place.tokens}")
                     
                     assert source_place.tokens == old_tokens - arc.weight, \
                         f"Token consumption error: expected {old_tokens - arc.weight}, got {source_place.tokens}"
@@ -299,9 +320,14 @@ class ImmediateBehavior(TransitionBehavior):
         
         for arc in input_arcs:
             kind = getattr(arc, 'kind', 'normal')
-            if kind != 'normal':
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            
+            # Skip inhibitor arcs (they don't provide tokens, they block firing)
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
                 continue
             
+            # Include both normal and test arcs (both provide enablement requirements)
             source_place = self._get_place(arc.source_id)
             if source_place is None:
                 info['is_enabled'] = False

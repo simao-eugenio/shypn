@@ -512,8 +512,6 @@ class ResultsBrowserView(BaseResultsView):
         self.metadata_status_label.set_margin_bottom(6)
         page.pack_start(self.metadata_status_label, False, False, 0)
         
-        print("📋 Metadata page initialized with TreeView and status label")
-        
         return page
     
     def _on_analyze_dose_response(self, button):

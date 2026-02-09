@@ -182,8 +182,6 @@ class TransitionBehavior(ABC):
         Returns:
             bool: True if enabled, False otherwise
         """
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
-        from shypn.netobjs.test_arc import TestArc
         from shypn.utils.threshold_evaluator import ThresholdEvaluator
         
         input_arcs = self.get_input_arcs()
@@ -201,17 +199,22 @@ class TransitionBehavior(ABC):
             # Evaluate effective threshold (supersedes weight if threshold is set)
             effective_threshold = evaluator.evaluate(arc, context)
             
+            # Check arc type using defensive pattern
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            
             # Check based on arc type
-            if isinstance(arc, InhibitorArc):
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
                 # Inhibitor: INVERTED check (tokens < threshold)
                 # Transition DISABLED when place has too many tokens (negative feedback)
                 # Transition ENABLED when place has few tokens (allows production)
                 if source_place.tokens >= effective_threshold:
                     return False  # INHIBITED by excess product
-            elif isinstance(arc, TestArc):
+            elif arc_type == 'test':
                 # Test arc: Same enablement as normal (tokens >= threshold)
                 # BUT does NOT consume tokens on fire (catalyst behavior)
-                # This is checked separately in fire() methods via consumes_tokens()
+                # This is checked separately in fire() methods via kind/arc_type checks
                 if source_place.tokens < effective_threshold:
                     return False  # Catalyst not present in sufficient quantity
             else:

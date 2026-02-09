@@ -28,11 +28,14 @@ Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 """
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
+import logging
 import math
 import numpy as np
 from .transition_behavior import TransitionBehavior
 from .function_catalog import FUNCTION_CATALOG
 from .spatial_utils import BoundaryValidator, GradientModulator, VolumeAdaptiveSelector
+
+logger = logging.getLogger(__name__)
 
 
 class ContinuousBehavior(TransitionBehavior):
@@ -459,29 +462,21 @@ class ContinuousBehavior(TransitionBehavior):
         
         # CRITICAL: Always check inhibitor arcs regardless of direction filtering
         # Inhibitor arcs provide regulatory control and must always be evaluated
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
-        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
         from shypn.utils.threshold_evaluator import ThresholdEvaluator  # NEW
         
         # Get all input arcs to check for inhibitors
         all_input_arcs = self.get_input_arcs()
-        inhibitor_arcs = [arc for arc in all_input_arcs 
-                         if isinstance(arc, (InhibitorArc, CurvedInhibitorArc))]
+        inhibitor_arcs = []
+        for arc in all_input_arcs:
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
+                inhibitor_arcs.append(arc)
         
         # Create threshold evaluator for dynamic threshold support
         evaluator = ThresholdEvaluator(self.model)
         context = {'time': current_time}
-        
-        # DEBUG: Log inhibitor arc checks for Example 08
-        if self.transition.id in ['T1', 'T2'] and len(inhibitor_arcs) > 0:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"[INHIBITOR CHECK] Transition {self.transition.id} has {len(inhibitor_arcs)} inhibitor arcs")
-            for arc in inhibitor_arcs:
-                source_place = self._get_place(arc.source_id)
-                if source_place:
-                    effective_threshold = evaluator.evaluate(arc, context)
-                    logger.info(f"  Arc {arc.id}: {source_place.id} tokens={source_place.tokens:.4f}, threshold={effective_threshold}, blocked={source_place.tokens >= effective_threshold}")
         
         # Check inhibitor arcs first (they can block transition regardless of direction)
         for arc in inhibitor_arcs:
@@ -510,8 +505,11 @@ class ContinuousBehavior(TransitionBehavior):
         
         # Now check normal/test arcs in the flow direction
         for arc in check_arcs:
-            # Skip inhibitor arcs (already checked above)
-            if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+            # Skip inhibitor arcs (already checked above) using defensive pattern
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
                 continue
                 
             # Get the place we're consuming from
@@ -526,13 +524,9 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place is None:
                 return False, f"missing-place-{place_id}"
             
-            # TEST ARC: Non-consuming arcs don't block on token threshold
-            # Consuming arcs (including SignalFlowArcs) must have tokens above threshold
-            if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
-                continue  # Test arcs don't block enablement
-            
-            # Normal/SignalFlow arcs: Require positive tokens for continuous enablement
-            # Continuous requires tokens above threshold
+            # ALL arcs (normal, test, signal) must check enablement: tokens >= weight
+            # Test arcs enable transitions but don't consume (checked during firing)
+            # Continuous requires tokens above threshold for ALL arc types
             if source_place.tokens <= self.min_token_threshold:
                 return False, f"place-below-threshold-{place_id}"
         
@@ -747,9 +741,8 @@ class ContinuousBehavior(TransitionBehavior):
             actual_flow = flow_magnitude
             if not is_source:
                 for arc in consume_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens OR limit flow
-                    # Test arcs are read-only (catalyst behavior) and should not affect rate
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip non-consuming arcs (test arcs don't limit flow)
+                    if not arc.consumes_tokens():
                         continue
                     
                     # For reversed flow, get source from arc.target_id (normally output)
@@ -767,8 +760,14 @@ class ContinuousBehavior(TransitionBehavior):
             # Phase 2: Consume tokens continuously
             if not is_source and actual_flow > 0:
                 for arc in consume_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip inhibitor arcs and test arcs (they don't consume)
+                    # Use defensive pattern: check kind, properties['kind'], and arc_type
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    
+                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
+                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
+                    if arc_type == 'test':
                         continue
                     
                     place_id = arc.source_id if not reverse_direction else arc.target_id

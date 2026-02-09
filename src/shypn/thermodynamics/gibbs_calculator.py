@@ -54,12 +54,13 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         concentrations: Optional[Dict[str, float]] = None,
         temperature: float = ThermodynamicCalculatorBase.STANDARD_TEMPERATURE,
         ph: float = ThermodynamicCalculatorBase.STANDARD_PH,
-        n_protons: int = 0
+        n_protons: int = 0,
+        property_overrides: Optional[Dict[str, float]] = None
     ) -> ReactionThermodynamics:
         """Calculate ΔG for a biochemical reaction.
         
         Steps:
-        1. Get ΔG°_f for all compounds from provider
+        1. Get ΔG°_f for all compounds from provider (or overrides)
         2. Calculate ΔG°_r = Σ(ν_products·ΔG°_f) - Σ(ν_reactants·ΔG°_f)
         3. Apply pH corrections for biochemical standard state (ΔG'°)
         4. Calculate K_eq = exp(-ΔG°/RT)
@@ -72,6 +73,8 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
             temperature: Temperature in Kelvin
             ph: pH value
             n_protons: Net protons consumed (negative if produced)
+            property_overrides: Optional {compound_id: delta_g_formation_kJ_per_mol}
+                              User-defined ΔG°_f values from place.properties take precedence over database
             
         Returns:
             ReactionThermodynamics with all calculated properties
@@ -80,7 +83,9 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
             ValueError: If compound data unavailable or invalid stoichiometry
         """
         # Calculate ΔG°_r from compound formation energies
-        delta_g_standard = self._calculate_delta_g_standard(reactants, products, ph, temperature)
+        delta_g_standard = self._calculate_delta_g_standard(
+            reactants, products, ph, temperature, property_overrides=property_overrides
+        )
         
         # Apply pH correction if n_protons specified
         if n_protons != 0:
@@ -209,7 +214,8 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         reactants: Dict[str, float],
         products: Dict[str, float],
         ph: float,
-        temperature: float
+        temperature: float,
+        property_overrides: Optional[Dict[str, float]] = None
     ) -> float:
         """Calculate ΔG°_r from compound formation energies.
         
@@ -220,6 +226,7 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
             products: {compound_id: stoichiometry}
             ph: pH value
             temperature: Temperature in Kelvin
+            property_overrides: Optional {compound_id: delta_g_formation} from place properties
             
         Returns:
             Standard Gibbs free energy of reaction (kJ/mol)
@@ -231,12 +238,12 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         
         # Products contribute positively
         for compound_id, stoich in products.items():
-            dg_f = self._get_compound_formation_energy(compound_id, ph, temperature)
+            dg_f = self._get_compound_formation_energy(compound_id, ph, temperature, property_overrides)
             delta_g += stoich * dg_f
         
         # Reactants contribute negatively
         for compound_id, stoich in reactants.items():
-            dg_f = self._get_compound_formation_energy(compound_id, ph, temperature)
+            dg_f = self._get_compound_formation_energy(compound_id, ph, temperature, property_overrides)
             delta_g -= stoich * dg_f
         
         return delta_g
@@ -245,14 +252,21 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         self,
         compound_id: str,
         ph: float,
-        temperature: float
+        temperature: float,
+        property_overrides: Optional[Dict[str, float]] = None
     ) -> float:
-        """Get ΔG°_f for a compound from provider or cache.
+        """Get ΔG°_f for a compound from overrides, cache, or provider.
+        
+        Priority order:
+        1. property_overrides (user-defined values from place.properties)
+        2. Cache (previously retrieved values)
+        3. Provider (thermodynamic database)
         
         Args:
             compound_id: KEGG C-number or ChEBI ID
             ph: pH value
             temperature: Temperature in Kelvin
+            property_overrides: Optional {compound_id: delta_g_formation} from place properties
             
         Returns:
             Standard Gibbs free energy of formation (kJ/mol)
@@ -260,12 +274,20 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         Raises:
             ValueError: If compound data unavailable
         """
-        # Check cache first
+        # Priority 1: Check property overrides (user-defined values in model)
+        if property_overrides and compound_id in property_overrides:
+            dg_f = property_overrides[compound_id]
+            logger.debug(
+                f"Using place property override for {compound_id}: ΔG°_f = {dg_f:.2f} kJ/mol"
+            )
+            return dg_f
+        
+        # Priority 2: Check cache
         cache_key = f"{compound_id}_{ph}_{temperature}"
         if cache_key in self._compound_cache:
             return self._compound_cache[cache_key]
         
-        # Query provider
+        # Priority 3: Query provider (database)
         if self.compound_provider is None:
             raise ValueError(
                 f"Compound data unavailable: {compound_id} "
@@ -284,7 +306,7 @@ class GibbsCalculator(ThermodynamicCalculatorBase):
         # Cache and return
         dg_f = compound.delta_g_formation
         self._compound_cache[cache_key] = dg_f
-        logger.debug(f"Retrieved ΔG°_f for {compound_id}: {dg_f:.2f} kJ/mol")
+        logger.debug(f"Retrieved ΔG°_f for {compound_id} from database: {dg_f:.2f} kJ/mol")
         
         return dg_f
     

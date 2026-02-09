@@ -24,7 +24,7 @@ class CSVSimulationExporter:
         """Initialize CSV exporter.
         
         Args:
-            simulation_data: Dict with 'time_points', 'place_data', 'transition_data', 'model'
+            simulation_data: Dict with 'time_points', 'place_data', 'transition_data', 'model', 'validation_results'
             metadata: Optional metadata dict
             accounting_data: Optional token accounting report dict
         """
@@ -35,6 +35,7 @@ class CSVSimulationExporter:
         self.place_data = simulation_data.get('place_data', {})
         self.transition_data = simulation_data.get('transition_data', {})
         self.model = simulation_data.get('model')
+        self.validation_results = simulation_data.get('validation_results')
     
     def export_timeseries_wide(self, filepath: str) -> bool:
         """Export time series in wide format (one column per species).
@@ -108,6 +109,36 @@ class CSVSimulationExporter:
                     firing_status_row.extend([''] * 2)
                     writer.writerow(firing_status_row)
                 
+                # Write thermodynamic validation results if available
+                if self.validation_results:
+                    validator_summaries = self.validation_results.get('validator_summaries', [])
+                    overall_status = self.validation_results.get('overall_status', 'NO_DATA')
+                    
+                    # Overall status header
+                    validation_header_row = ['# Thermodynamic Validation']
+                    validation_header_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                    validation_header_row.append(f'Overall: {overall_status}')
+                    validation_header_row.extend([''] * 2)
+                    writer.writerow(validation_header_row)
+                    
+                    # Per-validator results
+                    for summary in validator_summaries:
+                        validator_name = summary.get('validator', 'Unknown')
+                        worst_status = summary.get('worst_status', 'NO_DATA')
+                        latest_result = summary.get('latest_result')
+                        
+                        validator_row = [f'#   {validator_name}']
+                        validator_row.extend([''] * (len(place_headers) + len(transition_headers)))
+                        
+                        if latest_result:
+                            message = latest_result.get('message', 'No message')
+                            validator_row.append(f'{worst_status}: {message}')
+                        else:
+                            validator_row.append(f'{worst_status}')
+                        
+                        validator_row.extend([''] * 2)
+                        writer.writerow(validator_row)
+                
                 # Write data rows
                 for i, time in enumerate(self.time_points):
                     row = [f"{time:.6f}"]
@@ -116,10 +147,8 @@ class CSVSimulationExporter:
                     for place_id, _, unit in place_headers:
                         if i < len(self.place_data[place_id]):
                             _, value = self.place_data[place_id][i]  # Extract value from (time, tokens) tuple
-                            # Convert tokens (μM) to mM when unit is 'mM'
-                            # Assumption: 1 token = 1 μM in the model
-                            if unit == 'mM':
-                                value = value / 1000.0  # μM → mM conversion
+                            # Direct 1:1 conversion: 1 token = 1 mM
+                            # No conversion needed - models use mM directly
                             row.append(f"{value:.6f}")
                         else:
                             row.append('')
@@ -166,10 +195,8 @@ class CSVSimulationExporter:
                     for i, time in enumerate(self.time_points):
                         if i < len(values):
                             _, value = values[i]  # Extract value from (time, tokens) tuple
-                            # Convert tokens (μM) to mM when unit is 'mM'
-                            # Assumption: 1 token = 1 μM in the model
-                            if unit == 'mM':
-                                value = value / 1000.0  # μM → mM conversion
+                            # Direct 1:1 conversion: 1 token = 1 mM
+                            # No conversion needed - models use mM directly
                             
                             writer.writerow([
                                 f"{time:.6f}",
@@ -225,15 +252,12 @@ class CSVSimulationExporter:
                     place_name = self._get_place_name(place_id)
                     unit = self._get_place_unit(place_id)
                     
-                    # Extract tokens from (time, tokens) tuples and convert μM → mM if needed
+                    # Extract tokens from (time, tokens) tuples
                     token_values = [v[1] if isinstance(v, tuple) else v for v in values]
                     
-                    # Convert tokens (μM) to mM when unit is 'mM'
-                    # Assumption: 1 token = 1 μM in the model
-                    if unit == 'mM':
-                        converted_values = [v / 1000.0 for v in token_values]  # μM → mM conversion
-                    else:
-                        converted_values = token_values
+                    # Direct 1:1 conversion: 1 token = 1 mM
+                    # No conversion needed - models use mM directly
+                    converted_values = token_values
                     
                     stats = self._calculate_statistics(converted_values)
                     

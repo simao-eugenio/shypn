@@ -30,6 +30,8 @@ from shypn.netobjs.inhibitor_arc import InhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
 from .spatial_utils import BoundaryValidator, VolumeAdaptiveSelector
 
+logger = logging.getLogger(__name__)
+
 
 class StochasticBehavior(TransitionBehavior):
     """Fluid Stochastic Petri Net (FSPN) transition firing behavior.
@@ -92,7 +94,7 @@ class StochasticBehavior(TransitionBehavior):
             )
             
             if not use_stochastic and details.get('reason') == 'volume-based':
-                self.logger.warning(
+                self.logger.debug(
                     f"Stochastic transition '{transition.name}' connected to large volume "
                     f"places (min={details.get('min_volume'):.2f} fL). "
                     f"Consider using continuous transition type for better performance."
@@ -103,7 +105,7 @@ class StochasticBehavior(TransitionBehavior):
         self._negative_rate_log_interval = 100  # Log every 100 occurrences
         
         # Log creation with all details
-        self.logger.info(
+        self.logger.debug(
             f"Creating StochasticBehavior for transition '{transition.name}' (ID={transition.id}), "
             f"transition.rate={getattr(transition, 'rate', 'NOT SET')}, "
             f"transition.transition_type={getattr(transition, 'transition_type', 'NOT SET')}"
@@ -135,7 +137,7 @@ class StochasticBehavior(TransitionBehavior):
                 # Detect reversible reactions (formulas with subtraction)
                 formula_lower = rate_func_str.lower()
                 if ' - ' in rate_func_str or 'k_r' in formula_lower or 'kr_' in formula_lower:
-                    self.logger.info(
+                    self.logger.debug(
                         f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
                         f"τ-leaping will use Skellam distribution for net flux sampling. "
                         f"Formula: {rate_func_str[:80]}..."
@@ -230,7 +232,7 @@ class StochasticBehavior(TransitionBehavior):
             self.transition.is_environment_aware = len(signal_places) > 0
             
             if signal_places:
-                self.logger.info(
+                self.logger.debug(
                     f"Transition '{self.transition.name}' has {len(signal_places)} "
                     f"signal place(s): {signal_places} (quorum sensing / environmental sensing)"
                 )
@@ -553,7 +555,6 @@ class StochasticBehavior(TransitionBehavior):
         Returns:
             int: Maximum allowed burst size (can be very large if no constraints)
         """
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.utils.threshold_evaluator import ThresholdEvaluator
         
         max_allowed = float('inf')  # Start with no limit
@@ -562,8 +563,14 @@ class StochasticBehavior(TransitionBehavior):
         input_arcs = self.get_input_arcs()
         output_arcs = self.get_output_arcs()
         
-        # Find inhibitor arcs (Product → Transition)
-        inhibitor_arcs = [arc for arc in input_arcs if isinstance(arc, InhibitorArc)]
+        # Find inhibitor arcs (Product → Transition) using defensive pattern
+        inhibitor_arcs = []
+        for arc in input_arcs:
+            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
+                inhibitor_arcs.append(arc)
         
         for inh_arc in inhibitor_arcs:
             # The source of inhibitor arc is the product place
@@ -684,9 +691,14 @@ class StochasticBehavior(TransitionBehavior):
                 if source_place is None:
                     return False, f"missing-source-place-{arc.source_id}"
                 
+                # Check arc type using defensive pattern
+                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                arc_type = getattr(arc, 'arc_type', 'normal')
+                
                 # INHIBITOR ARC: Transition is DISABLED when place has too many tokens
                 # This implements negative feedback / product inhibition
-                if isinstance(arc, InhibitorArc):
+                # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+                if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
                     # Inhibitor arcs use INVERTED logic: disable when tokens >= threshold
                     # Evaluate threshold dynamically (supports formulas like "2.0 * (1 + ATP_pool/5000)**0.5")
                     evaluator = ThresholdEvaluator(self.model)
@@ -709,10 +721,17 @@ class StochasticBehavior(TransitionBehavior):
                 
                 # TEST ARC: Check presence only (weight), not burst requirements
                 # They don't consume tokens, so burst doesn't apply
-                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                arc_type = getattr(arc, 'arc_type', 'normal')
+                
+                logger.debug(f"  [BURST CALC] Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}, burst={burst}")
+                
+                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                     required = arc.weight  # Just check presence for catalysts
+                    logger.debug(f"    → Test/Inhibitor: checking weight={required} only")
                 else:
                     required = arc.weight * burst  # Normal arcs (including SignalFlowArcs) need burst tokens
+                    logger.debug(f"    → Normal: checking burst requirement={required}")
                 
                 if source_place.tokens < required:
                     return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
@@ -778,9 +797,20 @@ class StochasticBehavior(TransitionBehavior):
             # Phase 1: Consume tokens with burst multiplier (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip inhibitor arcs and test arcs (they don't consume)
+                    # Use defensive pattern: check kind, properties['kind'], and arc_type
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    
+                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
+                    
+                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
+                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
+                    if arc_type == 'test':
+                        logger.debug(f"    → SKIP consumption (test arc - catalyst)")
                         continue
+                    
+                    logger.debug(f"    → CONSUMING {firing_count * arc.weight} tokens")
                     
                     source_place = self._get_place(arc.source_id)
                     if source_place is None:
@@ -948,7 +978,7 @@ class StochasticBehavior(TransitionBehavior):
                 
                 if place:
                     self.assignment_rules[place.id] = species.assignment_rule
-                    self.logger.info(
+                    self.logger.debug(
                         f"Registered assignment rule for place '{place.name}' (ID={place.id}): "
                         f"{species.assignment_rule[:60]}..."
                     )
@@ -958,7 +988,7 @@ class StochasticBehavior(TransitionBehavior):
         self._rules_initialized = True
         
         if self.assignment_rules:
-            self.logger.info(
+            self.logger.debug(
                 f"Initialized {len(self.assignment_rules)} assignment rule(s) for "
                 f"runtime re-evaluation in stochastic mode"
             )

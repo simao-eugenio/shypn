@@ -195,6 +195,24 @@ class Arc(PetriNetObject):
         else:
             raise RuntimeError("Arc has no manager reference - cannot perform transformation")
     
+    def consumes_tokens(self) -> bool:
+        """Check if this arc consumes tokens during firing.
+        
+        Normal arcs consume tokens (substrates, reactants).
+        Test arcs do not consume (catalysts, enzymes).
+        
+        This method should be overridden by subclasses that don't consume tokens.
+        
+        Returns:
+            bool: True for normal arcs (consuming), False for test arcs (non-consuming)
+        """
+        # Default behavior: normal arcs consume tokens
+        # TestArc overrides this to return False
+        # Check arc_type property as fallback for when arc is not a TestArc instance
+        if hasattr(self, '_arc_type_override'):
+            return self._arc_type_override != 'test'
+        return self.arc_type != 'test'
+    
     def get_bounding_box(self):
         """Calculate bounding box for the arc.
         
