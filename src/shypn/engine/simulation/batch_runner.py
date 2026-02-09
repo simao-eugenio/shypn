@@ -197,7 +197,8 @@ class BatchSimulationRunner:
                     'place_data': place_data,
                     'transition_data': transition_data,
                     'stopped_reason': stopped_reason,
-                    'final_time': replicate_controller.time
+                    'final_time': replicate_controller.time,
+                    'validation_results': replicate_controller.data_collector.validation_results
                 }
                 results.append(result)
                 

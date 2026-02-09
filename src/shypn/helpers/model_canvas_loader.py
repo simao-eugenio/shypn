@@ -6034,6 +6034,10 @@ class ModelCanvasLoader:
         try:
             new_arc = convert_to_inhibitor(arc)
             manager.replace_arc(arc, new_arc)
+            
+            # Invalidate ModelAdapter cache if simulation is running
+            self._invalidate_simulation_cache(manager)
+            
             drawing_area.queue_draw()
         except ValueError as e:
             pass
@@ -6053,6 +6057,10 @@ class ModelCanvasLoader:
         
         new_arc = convert_to_normal(arc)
         manager.replace_arc(arc, new_arc)
+        
+        # Invalidate ModelAdapter cache if simulation is running
+        self._invalidate_simulation_cache(manager)
+        
         drawing_area.queue_draw()
     
     def _on_arc_convert_to_test(self, arc, manager, drawing_area):
@@ -6068,6 +6076,10 @@ class ModelCanvasLoader:
         try:
             new_arc = convert_to_test(arc)
             manager.replace_arc(arc, new_arc)
+            
+            # Invalidate ModelAdapter cache if simulation is running
+            self._invalidate_simulation_cache(manager)
+            
             drawing_area.queue_draw()
         except ValueError as e:
             pass
@@ -6393,6 +6405,76 @@ class ModelCanvasLoader:
             if candidate not in existing_names:
                 return candidate
             counter += 1
+    
+    def _invalidate_simulation_cache(self, manager):
+        """Force simulation reinitialization after arc transformations.
+        
+        When an arc is converted (e.g., Arc → TestArc), the SubnetSimulator's
+        subnet_model still holds references to the OLD arc objects. We must
+        force reinitialization so the subnet is rebuilt with new arc instances.
+        
+        For RUNNING simulations, we must STOP them completely because behavior
+        objects have cached references to old arc instances.
+        
+        Args:
+            manager: ModelCanvasManager instance
+        """
+        # Try to find active simulation and force reinitialization
+        try:
+            # Method 1: Check document controller's viability panel (subnet simulator)
+            if hasattr(manager, 'document_controller'):
+                doc_controller = manager.document_controller
+                # Viability panel has simulation controller
+                if hasattr(doc_controller, 'viability_panel') and doc_controller.viability_panel:
+                    viability_panel = doc_controller.viability_panel
+                    if hasattr(viability_panel, 'subnet_simulator') and viability_panel.subnet_simulator:
+                        simulator = viability_panel.subnet_simulator
+                        # If simulation is initialized, force complete reinitialization
+                        # This clears the old subnet and rebuilds with updated arc instances
+                        if simulator.is_initialized():
+                            # Clear old controller and subnet
+                            simulator.controller = None
+                            simulator.subnet_model = None
+                            # Rebuild subnet with new arc instances from main model
+                            simulator.initialize_simulation()
+            
+            # Method 2: Check overlay_manager's main simulation controller
+            if hasattr(manager, 'overlay_manager') and manager.overlay_manager:
+                overlay_manager = manager.overlay_manager
+                if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller:
+                    sim_controller = overlay_manager.simulation_controller
+                    
+                    # CRITICAL: If simulation is running, STOP it completely
+                    # Behavior objects have cached arc references that won't update
+                    was_running = False
+                    if hasattr(sim_controller, 'is_running') and sim_controller.is_running:
+                        was_running = True
+                        # Stop simulation completely
+                        if hasattr(sim_controller, 'stop'):
+                            sim_controller.stop()
+                    
+                    # Invalidate ModelAdapter caches to pick up new arc instances
+                    if hasattr(sim_controller, 'model_adapter') and sim_controller.model_adapter:
+                        sim_controller.model_adapter.invalidate_caches()
+                    # Clear behavior cache so behaviors are recreated with new arcs
+                    if hasattr(sim_controller, 'behavior_cache'):
+                        sim_controller.behavior_cache.clear()
+                    # Clear transition states (enablement times, scheduled times)
+                    if hasattr(sim_controller, 'transition_states'):
+                        sim_controller.transition_states.clear()
+                    
+                    # Force rebuild of all behavior objects with new arc references
+                    if hasattr(sim_controller, '_behavior_objects'):
+                        sim_controller._behavior_objects = {}
+                    
+                    # Log warning if simulation was stopped
+                    if was_running:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning("Simulation stopped due to arc transformation - please restart simulation to apply changes")
+        except Exception:
+            # Silently ignore if no active simulation found
+            pass
     
     def _show_error_dialog(self, message):
         """Show an error dialog to the user.

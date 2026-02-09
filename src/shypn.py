@@ -16,10 +16,16 @@ import sys
 import logging
 import warnings
 
-# Configure logging to suppress all messages except CRITICAL errors
-logging.basicConfig(level=logging.CRITICAL)
-# Disable logging for all shypn modules
-logging.getLogger('shypn').setLevel(logging.CRITICAL)
+# Configure logging to show only warnings and errors
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(levelname)s [%(name)s] %(message)s'
+)
+# Suppress matplotlib debug messages
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+# Suppress urllib3 debug messages
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 # Suppress matplotlib Axes3D import warning (harmless - system matplotlib visible in path)
 warnings.filterwarnings('ignore', message='Unable to import Axes3D')

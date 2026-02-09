@@ -21,7 +21,8 @@ except ImportError:
     GLib = None
 from shypn.engine import behavior_factory
 from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy, DEFAULT_POLICY, TYPE_PRIORITIES
-from shypn.engine.conservation_enforcer import ConservationEnforcer
+# DEPRECATED: Conservation enforcement - Petri nets naturally conserve mass/energy
+# from shypn.engine.conservation_enforcer import ConservationEnforcer
 
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
@@ -196,16 +197,20 @@ class SimulationController:
         # Token accounting auditor (conservation validation)
         self.auditor = None  # Initialized when enabled via settings
         
-        # Mass conservation enforcer (MATHEMATICAL NECESSITY)
-        # Petri nets with asymmetric stoichiometry (e.g., 2 reactants → 1 product)
-        # violate token conservation when firings are imbalanced. This is NOT a bug,
-        # but a fundamental property of discrete token semantics.
-        # Enforcement restores molar conservation per chemical reality.
-        self.conservation_enforcer = ConservationEnforcer(model)
+        # Thermodynamic validator manager (Feb 9, 2026)
+        from shypn.engine.simulation.validation import ValidatorManager
+        self.validator_manager = ValidatorManager()
         
-        # Auto-detection enabled by default (no UI configuration needed)
-        # Automatically detects closed cycles and enforces conservation
-        self.auto_conservation_enabled = True
+        # DEPRECATED: Mass conservation enforcer (Feb 9, 2026)
+        # Reason: Petri net semantics NATURALLY conserve mass/energy through
+        # token-based firing rules. Explicit enforcement was based on misunderstanding.
+        # Conservation is an inherent property of properly constructed Petri nets,
+        # not an external constraint requiring enforcement.
+        # See: archive/deprecated_conservation_enforcement/README.md
+        
+        # self.conservation_enforcer = ConservationEnforcer(model)
+        self.conservation_enforcer = None  # Deprecated
+        self.auto_conservation_enabled = False  # Deprecated
         
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
@@ -281,9 +286,9 @@ class SimulationController:
         if hasattr(self, 'buffered_settings'):
             self.buffered_settings.rollback()
         
-        # Reset conservation enforcer (clear groups and statistics)
-        if hasattr(self, 'conservation_enforcer'):
-            self.conservation_enforcer = ConservationEnforcer(self.model)
+        # DEPRECATED: Conservation enforcer no longer used
+        # if hasattr(self, 'conservation_enforcer'):
+        #     self.conservation_enforcer = ConservationEnforcer(self.model)
         
         logger.info(f"SimulationController reset complete - ready for new model")
     
@@ -971,14 +976,17 @@ class SimulationController:
                 expected_total=15.0  # mM
             )
         """
-        if self.conservation_enforcer:
-            self.conservation_enforcer.add_conservation_group(
-                name=name,
-                place_ids=place_ids,
-                expected_total=expected_total,
-                tolerance=tolerance,
-                auto_correct=True
-            )
+        # DEPRECATED: ConservationEnforcer no longer used
+        # Petri nets naturally conserve mass through token semantics
+        pass
+        # if self.conservation_enforcer:
+        #     self.conservation_enforcer.add_conservation_group(
+        #         name=name,
+        #         place_ids=place_ids,
+        #         expected_total=expected_total,
+        #         tolerance=tolerance,
+        #         auto_correct=True
+        #     )
     
     def _auto_detect_conservation_groups(self):
         """Auto-detect closed cycles and configure conservation enforcement.
@@ -998,87 +1006,92 @@ class SimulationController:
         - Group places that participate in cycles (have both inputs and outputs)
         - Configure conservation using current token totals
         """
-        if not self.model.places:
-            return
+        # DEPRECATED: Auto-detection of conservation groups no longer used
+        # Petri nets naturally conserve mass through token semantics
+        return
         
-        import logging
-        logger = logging.getLogger(__name__)
+        # Original implementation commented out:
+        # if not self.model.places:
+        #     return
+        
+        # import logging
+        # logger = logging.getLogger(__name__)
         
         # Build connectivity graph: place -> set of connected places (via transitions)
-        place_connections = {p.id: set() for p in self.model.places}
-        
-        for transition in self.model.transitions:
-            # Get input and output places for this transition
-            input_places = set()
-            output_places = set()
-            
-            for arc in self.model.arcs:
-                if arc.target_id == transition.id:
-                    input_places.add(arc.source_id)
-                elif arc.source_id == transition.id:
-                    output_places.add(arc.target_id)
-            
-            # Connect all input places to all output places (bidirectional cycle)
-            for inp in input_places:
-                for out in output_places:
-                    if inp != out:  # Avoid self-loops
-                        place_connections[inp].add(out)
-                        place_connections[out].add(inp)
-        
-        # Find strongly connected components (closed cycles)
-        # Use simple DFS-based approach to find maximal connected groups
-        visited = set()
-        conservation_groups = []
-        
-        def dfs(place_id, group):
-            """Depth-first search to find connected places."""
-            if place_id in visited:
-                return
-            visited.add(place_id)
-            group.add(place_id)
-            for connected in place_connections.get(place_id, []):
-                dfs(connected, group)
-        
-        # Find all maximal connected groups
-        for place in self.model.places:
-            if place.id not in visited and place_connections.get(place.id):
-                group = set()
-                dfs(place.id, group)
-                if len(group) >= 2:  # Only groups with 2+ places
-                    conservation_groups.append(group)
-        
-        # Configure conservation for detected groups
-        if conservation_groups:
-            logger.info(f"[AUTO-CONSERVATION] Detected {len(conservation_groups)} closed cycle(s)")
-            
-            for i, group in enumerate(conservation_groups):
-                place_ids = list(group)
-                
-                # Calculate current total tokens
-                total = sum(p.tokens for p in self.model.places if p.id in place_ids)
-                
-                # Only configure if total > 0 (avoid empty cycles)
-                if total > 0:
-                    group_name = f"auto_cycle_{i+1}"
-                    
-                    # Get place names for logging
-                    place_names = [p.name for p in self.model.places if p.id in place_ids]
-                    
-                    self.conservation_enforcer.add_conservation_group(
-                        name=group_name,
-                        place_ids=place_ids,
-                        expected_total=total,
-                        tolerance=1e-6,
-                        auto_correct=True
-                    )
-                    
-                    logger.info(
-                        f"  ✓ {group_name}: {len(place_ids)} places "
-                        f"({', '.join(place_names[:3])}{'...' if len(place_names) > 3 else ''}), "
-                        f"total={total:.3f}"
-                    )
-        else:
-            logger.info("[AUTO-CONSERVATION] No closed cycles detected (model may have sources/sinks)")
+        # place_connections = {p.id: set() for p in self.model.places}
+        #
+        # for transition in self.model.transitions:
+        #     # Get input and output places for this transition
+        #     input_places = set()
+        #     output_places = set()
+        #     
+        #     for arc in self.model.arcs:
+        #         if arc.target_id == transition.id:
+        #             input_places.add(arc.source_id)
+        #         elif arc.source_id == transition.id:
+        #             output_places.add(arc.target_id)
+        #     
+        #     # Connect all input places to all output places (bidirectional cycle)
+        #     for inp in input_places:
+        #         for out in output_places:
+        #             if inp != out:  # Avoid self-loops
+        #                 place_connections[inp].add(out)
+        #                 place_connections[out].add(inp)
+        # 
+        # # Find strongly connected components (closed cycles)
+        # # Use simple DFS-based approach to find maximal connected groups
+        # visited = set()
+        # conservation_groups = []
+        # 
+        # def dfs(place_id, group):
+        #     \"\"\"Depth-first search to find connected places.\"\"\"
+        #     if place_id in visited:
+        #         return
+        #     visited.add(place_id)
+        #     group.add(place_id)
+        #     for connected in place_connections.get(place_id, []):
+        #         dfs(connected, group)
+        # 
+        # # Find all maximal connected groups
+        # for place in self.model.places:
+        #     if place.id not in visited and place_connections.get(place.id):
+        #         group = set()
+        #         dfs(place.id, group)
+        #         if len(group) >= 2:  # Only groups with 2+ places
+        #             conservation_groups.append(group)
+        # 
+        # # Configure conservation for detected groups
+        # if conservation_groups:
+        #     logger.info(f\"[AUTO-CONSERVATION] Detected {len(conservation_groups)} closed cycle(s)\")
+        #     
+        #     for i, group in enumerate(conservation_groups):
+        #         place_ids = list(group)
+        #         
+        #         # Calculate current total tokens
+        #         total = sum(p.tokens for p in self.model.places if p.id in place_ids)
+        #         
+        #         # Only configure if total > 0 (avoid empty cycles)
+        #         if total > 0:
+        #             group_name = f\"auto_cycle_{i+1}\"
+        #             
+        #             # Get place names for logging
+        #             place_names = [p.name for p in self.model.places if p.id in place_ids]
+        #             
+        #             self.conservation_enforcer.add_conservation_group(
+        #                 name=group_name,
+        #                 place_ids=place_ids,
+        #                 expected_total=total,
+        #                 tolerance=1e-6,
+        #                 auto_correct=True
+        #             )
+        #             
+        #             logger.info(
+        #                 f\"  ✓ {group_name}: {len(place_ids)} places \"
+        #                 f\"({', '.join(place_names[:3])}{'...' if len(place_names) > 3 else ''}), \"
+        #                 f\"total={total:.3f}\"
+        #             )
+        # else:
+        #     logger.info(\"[AUTO-CONSERVATION] No closed cycles detected (model may have sources/sinks)\")
 
     def _notify_step_listeners(self):
         """Notify all registered step listeners."""
@@ -1139,10 +1152,11 @@ class SimulationController:
                 logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
         
         # Auto-detect conservation groups on first step (if not already configured)
-        if not hasattr(self, '_auto_conservation_checked'):
-            self._auto_conservation_checked = True
-            if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
-                self._auto_detect_conservation_groups()
+        # DISABLED: Conservation must emerge from arc connections, not artificial adjustments
+        # if not hasattr(self, '_auto_conservation_checked'):
+        #     self._auto_conservation_checked = True
+        #     if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
+        #         self._auto_detect_conservation_groups()
         
         # PHASE 1-2 DEBUG: Print transition types once
         if not hasattr(self, '_debug_transition_types_printed'):
@@ -1254,9 +1268,10 @@ class SimulationController:
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                pass
-                                # Skip test arcs - they check enablement but don't consume tokens
-                                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                                # Skip inhibitor arcs and test arcs (they don't consume)
+                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                                arc_type = getattr(arc, 'arc_type', 'normal')
+                                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
                                 source_place.set_tokens(source_place.tokens - arc.weight)
@@ -1268,7 +1283,8 @@ class SimulationController:
                         if not is_sink:
                             for arc in behavior.get_output_arcs():
                                 kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                                if kind != 'normal':
+                                arc_type = getattr(arc, 'arc_type', 'normal')
+                                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                                     continue
                                 target_place = self.model_adapter.places.get(arc.target_id)
                                 target_place.set_tokens(target_place.tokens + arc.weight)
@@ -1428,8 +1444,10 @@ class SimulationController:
                 structurally_enabled = True
                 input_arcs = behavior.get_input_arcs()
                 for arc in input_arcs:
-                    # Skip test/inhibitor arcs - they don't block firing
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip non-consuming arcs (test/inhibitor arcs)
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                         continue
                     source_place = arc.source
                     if source_place and source_place.tokens < arc.weight:
@@ -1544,27 +1562,36 @@ class SimulationController:
         if not tau_leaping_advanced_time:
             self.time += time_step
         
-        # === CONSERVATION ENFORCEMENT ===
-        # Apply mass conservation corrections before recording/notifications
-        # This corrects violations from firing imbalances in asymmetric stoichiometry
-        if self.conservation_enforcer and self.conservation_enforcer.conservation_groups:
-            violations = self.conservation_enforcer.verify_and_correct()
-            if violations and self.verbose:
-                # Log only first few violations to avoid spam
-                if not hasattr(self, '_conservation_violation_count'):
-                    self._conservation_violation_count = 0
-                if self._conservation_violation_count < 5:
-                    for v in violations:
-                        import logging
-                        logging.getLogger(__name__).info(
-                            f"Conservation correction '{v['group']}': "
-                            f"{v['error']:.6f} error ({v['percent']:.3f}%)"
-                        )
-                    self._conservation_violation_count += 1
+        # === CONSERVATION ENFORCEMENT DISABLED ===
+        # Conservation must emerge naturally from Petri net arc connections.
+        # Test arcs, inhibitor arcs, and other non-consuming arcs change the
+        # expected mass balance. Artificial token adjustments violate formalism.
+        # Tokens should only flow through place→transition→place connections.
+        # 
+        # if self.conservation_enforcer and self.conservation_enforcer.conservation_groups:
+        #     violations = self.conservation_enforcer.verify_and_correct()
+        #     if violations and self.verbose:
+        #         # Log only first few violations to avoid spam
+        #         if not hasattr(self, '_conservation_violation_count'):
+        #             self._conservation_violation_count = 0
+        #         if self._conservation_violation_count < 5:
+        #             for v in violations:
+        #                 import logging
+        #                 logging.getLogger(__name__).info(
+        #                     f"Conservation correction '{v['group']}': "
+        #                     f"{v['error']:.6f} error ({v['percent']:.3f}%)"
+        #                 )
+        #             self._conservation_violation_count += 1
         
-        # Record state after time advancement AND conservation correction
+        # Record state after time advancement
         if self.data_collector:
             self.data_collector.record_state(self.time)
+        
+        # Update thermodynamic validators
+        if self.validator_manager and len(self.validator_manager) > 0:
+            places_dict = {p.id: p for p in self.model.places}
+            transitions_dict = {t.id: t for t in self.model.transitions}
+            self.validator_manager.update(self.time, places_dict, transitions_dict)
         
         self._notify_step_listeners()
         
@@ -2233,12 +2260,15 @@ class SimulationController:
                     if hasattr(arc, 'threshold') and arc.threshold is not None:
                         tokens_needed = arc.threshold
                     
-                    # Check based on arc type
-                    if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
+                    # Check based on arc type using defensive pattern
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    
+                    if arc_type == 'inhibitor' or (kind != 'normal' and isinstance(arc, (InhibitorArc, CurvedInhibitorArc))):
                         # Inhibitor: INVERTED check (disabled when tokens >= threshold)
                         if place.tokens >= tokens_needed:
                             return False  # Inhibited by excess
-                    elif isinstance(arc, TestArc):
+                    elif arc_type == 'test' or (kind != 'normal' and isinstance(arc, TestArc)):
                         # Test arc: Check threshold but won't consume
                         if place.tokens < tokens_needed:
                             return False  # Catalyst not present
@@ -2372,8 +2402,10 @@ class SimulationController:
                         # Input arc (place → transition)
                         place = arc.source
                         
-                        # Skip arcs that don't consume tokens
-                        if isinstance(arc, (InhibitorArc, CurvedInhibitorArc, TestArc)):
+                        # Skip arcs that don't consume tokens using defensive pattern
+                        kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                        arc_type = getattr(arc, 'arc_type', 'normal')
+                        if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                             continue  # Inhibitor and test arcs NEVER consume tokens
                         
                         # CRITICAL: ALWAYS use weight for consumption (NOT threshold!)
@@ -2562,12 +2594,14 @@ class SimulationController:
             input_places = set()
             for arc in input_arcs:
                 if hasattr(arc, 'source_id'):
-                    # Check if this is a test arc (read-only, non-consuming)
-                    is_test_arc = hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens()
-                    if not is_test_arc:
-                        # Only consuming arcs create true conflicts (competitive coupling)
-                        input_places.add(arc.source_id)
-                    # Test arcs are regulatory coupling → transitions can fire in parallel
+                    # Skip non-consuming arcs (test arcs are read-only)
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                        # Test arcs don't create conflicts → weak independence theory
+                        continue
+                    # Only consuming arcs create true conflicts (competitive coupling)
+                    input_places.add(arc.source_id)
             
             # Map places to transitions
             for place_id in input_places:
@@ -2707,8 +2741,9 @@ class SimulationController:
         self._update_enablement_states()
         
         # Auto-detect and configure conservation groups (enabled by default)
-        if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
-            self._auto_detect_conservation_groups()
+        # DISABLED: Conservation must emerge from arc connections, not artificial adjustments
+        # if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
+        #     self._auto_detect_conservation_groups()
         
         # Verify stochastic transitions are properly scheduled
         stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
@@ -2802,6 +2837,16 @@ class SimulationController:
                 # Record final state before stopping collection (force=True to bypass interval check)
                 if self.data_collector and self.data_collector.is_collecting:
                     self.data_collector.record_state(self.time, force=True)
+                
+                # Finalize thermodynamic validation
+                if self.validator_manager and len(self.validator_manager) > 0:
+                    places_dict = {p.id: p for p in self.model.places}
+                    transitions_dict = {t.id: t for t in self.model.transitions}
+                    self.validator_manager.validate_all()
+                    
+                    # Store validation summary in data_collector for export
+                    if self.data_collector:
+                        self.data_collector.validation_results = self.validator_manager.get_summary()
                 
                 # Stop data collection
                 if self.data_collector:

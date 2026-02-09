@@ -64,6 +64,7 @@ class SignalFlowArc(Arc):
             
         Raises:
             ValueError: If neither source nor target is a signal place
+            ValueError: If weight is 0 (use TestArc for non-consuming)
         """
         super().__init__(source, target, id, name, weight)
         
@@ -72,6 +73,9 @@ class SignalFlowArc(Arc):
         
         # Validate that at least one endpoint is a signal place
         self._validate_signal_connection()
+        
+        # Validate weight is positive (formalism requires Ws ∈ ℝ⁺)
+        self._validate_positive_weight()
     
     def _validate_signal_connection(self):
         """Verify arc connects to at least one signal place.
@@ -96,6 +100,32 @@ class SignalFlowArc(Arc):
                 f"Target: {self.target.name} (is_signal_place={is_target_signal}). "
                 f"Use normal Arc for mass transfer or TestArc for catalytic read."
             )
+    
+    def _validate_positive_weight(self):
+        """Verify signal arc weight is positive per formalism (Ws ∈ ℝ⁺).
+        
+        Signal flow arcs MUST have positive weights according to the 13-tuple
+        Bio-PN formalism: Ws: Fs → ℝ⁺. Weight=0 violates formalism.
+        Use TestArc for non-consuming catalytic observation instead.
+        
+        Raises:
+            ValueError: If weight is 0 or negative
+        """
+        # Check if weight is numeric (not formula)
+        try:
+            numeric_weight = float(self.weight)
+            if numeric_weight <= 0:
+                raise ValueError(
+                    f"SignalFlowArc {self.id} has invalid weight={numeric_weight}. "
+                    f"Formalism requires Ws ∈ ℝ⁺ (positive reals). "
+                    f"For non-consuming catalysis (weight=0), use TestArc instead. "
+                    f"For consumptive regulation, use weight > 0."
+                )
+        except (TypeError, ValueError) as e:
+            # Weight is formula string - skip validation (will be checked at runtime)
+            if "invalid weight" in str(e):
+                raise  # Re-raise weight validation errors
+            pass
     
     def consumes_tokens(self) -> bool:
         """Check if arc consumes tokens from source place.

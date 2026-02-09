@@ -73,12 +73,9 @@ class PlotExporter:
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
                 
-                # Convert tokens (μM) to mM when unit is 'mM'
-                # Assumption: 1 token = 1 μM in the model
-                if unit == 'mM':
-                    converted_values = [v / 1000.0 for v in values]  # μM → mM conversion
-                else:
-                    converted_values = values
+                # Direct 1:1 conversion: 1 token = 1 mM
+                # No conversion needed - models use mM directly
+                converted_values = values
                 
                 # Plot
                 ax.plot(self.time_points, converted_values, 
@@ -200,12 +197,9 @@ class PlotExporter:
                 unit = self._get_place_unit(place_id)
                 color = self.colors[i % len(self.colors)]
                 
-                # Convert tokens (μM) to mM when unit is 'mM'
-                # Assumption: 1 token = 1 μM in the model
-                if unit == 'mM':
-                    converted_values = [v / 1000.0 for v in values]  # μM → mM conversion
-                else:
-                    converted_values = values
+                # Direct 1:1 conversion: 1 token = 1 mM
+                # No conversion needed - models use mM directly
+                converted_values = values
                 
                 ax1.plot(self.time_points, converted_values, 
                         color=color, linewidth=2, label=f"{place_name} ({unit})")

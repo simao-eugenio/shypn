@@ -43,6 +43,9 @@ class DataCollector:
         self.recording_time_interval = recording_time_interval
         self._last_recorded_time = None  # Track last recording time for time-based mode
         
+        # Thermodynamic validation results (populated at simulation end)
+        self.validation_results = None
+        
     def start_collection(self):
         """Initialize data structures and start collecting.
         
@@ -292,6 +295,7 @@ class DataCollector:
         - place_data: Dict mapping place_id to token counts
         - transition_data: Dict mapping transition_id to firing counts
         - model: Reference to DocumentModel
+        - validation_results: Dict of thermodynamic validation results (if available)
         
         Returns:
             Dict containing all collected trajectory data
@@ -300,7 +304,8 @@ class DataCollector:
             'time_points': self.time_points,
             'place_data': self.place_data,
             'transition_data': self.transition_data,
-            'model': self.model
+            'model': self.model,
+            'validation_results': self.validation_results
         }
     
     def export_csv(self, filepath: str, format: str = 'wide') -> bool:

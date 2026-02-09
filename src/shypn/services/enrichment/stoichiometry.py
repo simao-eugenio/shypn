@@ -528,9 +528,20 @@ class KEGGStoichiometryEnricher(BaseEnricher):
                     place, was_created = self._find_or_create_place(document, substrate, transition)
                     if place:
                         # Add input arc with unique ID
-                        # Use SignalFlowArc for signal places, regular Arc for normal places
+                        # FORMALISM-COMPLIANT: coefficient=0 → TestArc, signal place + coef>0 → SignalFlowArc
                         arc_id = document.document_controller.id_manager.generate_arc_id()
-                        if getattr(place, 'is_signal_place', False):
+                        if substrate.coefficient == 0:
+                            # Catalyst/cofactor: Use TestArc (non-consuming)
+                            from shypn.netobjs.test_arc import TestArc
+                            arc = TestArc(
+                                source=place,
+                                target=transition,
+                                id=arc_id,
+                                name=arc_id,
+                                weight=1.0  # Test arcs use weight=1 for threshold
+                            )
+                        elif getattr(place, 'is_signal_place', False):
+                            # Signal place with weight>0: Use SignalFlowArc
                             arc = SignalFlowArc(
                                 source=place,
                                 target=transition,
@@ -539,6 +550,7 @@ class KEGGStoichiometryEnricher(BaseEnricher):
                                 weight=substrate.coefficient
                             )
                         else:
+                            # Normal place: Use regular Arc
                             arc = Arc(
                                 source=place,
                                 target=transition,
@@ -559,9 +571,20 @@ class KEGGStoichiometryEnricher(BaseEnricher):
                     place, was_created = self._find_or_create_place(document, product, transition)
                     if place:
                         # Add output arc with unique ID
-                        # Use SignalFlowArc for signal places, regular Arc for normal places
+                        # FORMALISM-COMPLIANT: coefficient=0 → TestArc, signal place + coef>0 → SignalFlowArc
                         arc_id = document.document_controller.id_manager.generate_arc_id()
-                        if getattr(place, 'is_signal_place', False):
+                        if product.coefficient == 0:
+                            # Catalyst/cofactor: Use TestArc (non-consuming)
+                            from shypn.netobjs.test_arc import TestArc
+                            arc = TestArc(
+                                source=transition,
+                                target=place,
+                                id=arc_id,
+                                name=arc_id,
+                                weight=1.0  # Test arcs use weight=1 for threshold
+                            )
+                        elif getattr(place, 'is_signal_place', False):
+                            # Signal place with weight>0: Use SignalFlowArc
                             arc = SignalFlowArc(
                                 source=transition,
                                 target=place,
@@ -570,6 +593,7 @@ class KEGGStoichiometryEnricher(BaseEnricher):
                                 weight=product.coefficient
                             )
                         else:
+                            # Normal place: Use regular Arc
                             arc = Arc(
                                 source=transition,
                                 target=place,

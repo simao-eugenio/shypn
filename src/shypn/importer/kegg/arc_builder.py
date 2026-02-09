@@ -100,11 +100,20 @@ class StandardArcBuilder(ArcBuilder):
             # Use stoichiometry from substrate as arc weight
             weight = substrate.stoichiometry
             
-            # Auto-detect signal places and create SignalFlowArc if needed
-            if getattr(place, 'is_signal_place', False):
+            # FORMALISM-COMPLIANT ARC CREATION:
+            # - coefficient=0 means catalyst/cofactor (non-consuming) → use TestArc (Ft)
+            # - coefficient>0 for signal place → use SignalFlowArc (Fs) with Ws ∈ ℝ⁺
+            # - coefficient>0 for normal place → use Arc (F)
+            if weight == 0:
+                # Catalyst/cofactor: Use TestArc for non-consuming observation
+                from shypn.netobjs.test_arc import TestArc
+                arc = TestArc(place, transition, arc_id, "", weight=1.0)  # Test arcs use weight=1 for threshold
+            elif getattr(place, 'is_signal_place', False):
+                # Signal place with weight>0: Use SignalFlowArc (consumptive regulation)
                 from shypn.netobjs.signal_flow_arc import SignalFlowArc
                 arc = SignalFlowArc(place, transition, arc_id, "", weight=weight)
             else:
+                # Normal place: Use regular Arc (mass transfer)
                 arc = Arc(place, transition, arc_id, "", weight=weight)
             
             # Store KEGG metadata including stoichiometry
@@ -161,11 +170,20 @@ class StandardArcBuilder(ArcBuilder):
             # Use stoichiometry from product as arc weight
             weight = product.stoichiometry
             
-            # Auto-detect signal places and create SignalFlowArc if needed
-            if getattr(place, 'is_signal_place', False):
+            # FORMALISM-COMPLIANT ARC CREATION:
+            # - coefficient=0 means catalyst/cofactor (non-consuming) → use TestArc (Ft)
+            # - coefficient>0 for signal place → use SignalFlowArc (Fs) with Ws ∈ ℝ⁺
+            # - coefficient>0 for normal place → use Arc (F)
+            if weight == 0:
+                # Catalyst/cofactor: Use TestArc for non-consuming observation
+                from shypn.netobjs.test_arc import TestArc
+                arc = TestArc(transition, place, arc_id, "", weight=1.0)  # Test arcs use weight=1 for threshold
+            elif getattr(place, 'is_signal_place', False):
+                # Signal place with weight>0: Use SignalFlowArc (consumptive regulation)
                 from shypn.netobjs.signal_flow_arc import SignalFlowArc
                 arc = SignalFlowArc(transition, place, arc_id, "", weight=weight)
             else:
+                # Normal place: Use regular Arc (mass transfer)
                 arc = Arc(transition, place, arc_id, "", weight=weight)
             
             # Store KEGG metadata including stoichiometry

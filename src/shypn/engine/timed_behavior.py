@@ -21,8 +21,11 @@ Extracted from: legacy/shypnpy/core/petri.py:1972-2099
 """
 
 from typing import Dict, Tuple, List, Any, Optional
+import logging
 from .transition_behavior import TransitionBehavior
 from .spatial_utils import BoundaryValidator
+
+logger = logging.getLogger(__name__)
 
 class TimedBehavior(TransitionBehavior):
     """Time Petri Net (TPN) transition firing behavior.
@@ -206,10 +209,17 @@ class TimedBehavior(TransitionBehavior):
                 
                 # TEST ARC: Non-consuming arcs only check presence (weight)
                 # Consuming arcs (including SignalFlowArcs) must have sufficient tokens
-                if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                arc_type = getattr(arc, 'arc_type', 'normal')
+                
+                logger.debug(f"  [ENABLEMENT] Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
+                
+                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                     required = arc.weight  # Just check presence for test arcs
+                    logger.debug(f"    → Test/Inhibitor arc: only checking presence")
                 else:
                     required = arc.weight  # Normal and SignalFlowArcs need full weight
+                    logger.debug(f"    → Normal arc: will consume tokens")
                 
                 if source_place.tokens < required:
                     return (False, f'insufficient-tokens-P{arc.source_id}')
@@ -289,14 +299,27 @@ class TimedBehavior(TransitionBehavior):
             
             # Consume tokens from input places (skip if source transition)
             if not is_source:
+                logger.debug(f"[TIMED FIRE] Transition {self.transition.id}: Consuming input tokens...")
+                
                 for arc in input_arcs:
-                    # Skip test arcs - they check enablement but don't consume tokens
-                    if hasattr(arc, 'consumes_tokens') and not arc.consumes_tokens():
+                    # Skip inhibitor arcs and test arcs (they don't consume)
+                    # Use defensive pattern: check kind, properties['kind'], and arc_type
+                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    arc_type = getattr(arc, 'arc_type', 'normal')
+                    
+                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
+                    
+                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
+                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
+                    if arc_type == 'test':
+                        logger.debug(f"    → SKIP consumption (test arc - catalyst)")
                         continue
                     
-                    source_place = self._get_place(arc.source_id)
+                    source_place = arc.source
                     if source_place is None:
                         return (False, {'reason': 'missing-source-place', 'place_id': arc.source_id, 'timed_mode': True})
+                    
+                    logger.debug(f"    → CONSUMING tokens from {source_place.id}")
                     
                     if source_place.tokens < arc.weight:
                         return (False, {'reason': 'insufficient-tokens', 'place_id': arc.source_id, 'required': arc.weight, 'available': source_place.tokens, 'timed_mode': True})
