@@ -30,6 +30,7 @@ except Exception as e:
 # Import KEGG backend modules
 try:
     from shypn.importer.kegg import KEGGAPIClient, KGMLParser, PathwayConverter
+    from shypn.data.project_models import get_project_manager
 except ImportError as e:
     print(f'Warning: KEGG importer not available: {e}', file=sys.stderr)
     KEGGAPIClient = None
@@ -228,6 +229,15 @@ class KEGGImportPanel:
             )
         )
         
+        # Set initial directory to project's pathways folder if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            pathways_dir = os.path.join(project_manager.current_project.base_path, 'pathways')
+            if os.path.exists(pathways_dir):
+                dialog.set_current_folder(pathways_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
+        
         # Add file filters
         filter_kegg = Gtk.FileFilter()
         filter_kegg.set_name("KEGG Files")
@@ -239,6 +249,9 @@ class KEGGImportPanel:
         filter_all.set_name("All Files")
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
+        
+        # Focus on filename entry instead of search
+        dialog.set_current_name("")
         
         # Wayland-safe async approach
         result_container = [None]

@@ -22,6 +22,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 from shypn.ui.category_frame import CategoryFrame
+from shypn.data.project_models import get_project_manager
 
 
 class ExperimentAutomationCategory:
@@ -844,6 +845,20 @@ class ExperimentAutomationCategory:
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK
         )
+        
+        # Set initial directory to project experiments folder if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            experiments_dir = os.path.join(project_manager.current_project.base_path, 'experiments')
+            if not os.path.exists(experiments_dir):
+                try:
+                    os.makedirs(experiments_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(experiments_dir):
+                dialog.set_current_folder(experiments_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
         
         # Set default filename
         safe_name = name.replace(' ', '_').replace('/', '_')

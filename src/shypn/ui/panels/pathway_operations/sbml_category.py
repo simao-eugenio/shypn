@@ -871,6 +871,15 @@ class SBMLCategory(BasePathwayCategory):
             Gtk.STOCK_OPEN, Gtk.ResponseType.OK
         )
         
+        # Set initial directory to project's pathways folder if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            pathways_dir = os.path.join(project_manager.current_project.base_path, 'pathways')
+            if os.path.exists(pathways_dir):
+                dialog.set_current_folder(pathways_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
+        
         # Add file filters
         filter_sbml = Gtk.FileFilter()
         filter_sbml.set_name("SBML Files")
@@ -882,6 +891,9 @@ class SBMLCategory(BasePathwayCategory):
         filter_all.set_name("All Files")
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
+        
+        # Focus on filename entry instead of search
+        dialog.set_current_name("")
         
         # Wayland-safe async approach
         result_container = [None]

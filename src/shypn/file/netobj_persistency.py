@@ -27,6 +27,7 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib, Gdk
+    from shypn.data.project_models import get_project_manager
 except Exception as e:
     print(f'ERROR: GTK3 not available in netobj_persistency: {e}', file=sys.stderr)
     sys.exit(1)
@@ -343,9 +344,27 @@ class NetObjPersistency:
         filter_all.add_pattern('*')
         dialog.add_filter(filter_all)
         
-        # Set initial folder with fallback chain
+        # Set initial folder - prioritize project models directory if project is open
         folder_set = False
-        if self._last_directory and os.path.isdir(self._last_directory):
+        
+        # Try project models directory first
+        project_manager = get_project_manager()
+        if project_manager.current_project and not folder_set:
+            project_models_dir = os.path.join(project_manager.current_project.base_path, 'models')
+            if not os.path.exists(project_models_dir):
+                try:
+                    os.makedirs(project_models_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(project_models_dir):
+                try:
+                    dialog.set_current_folder(project_models_dir)
+                    folder_set = True
+                except Exception:
+                    pass
+        
+        # Fallback to last directory
+        if self._last_directory and os.path.isdir(self._last_directory) and not folder_set:
             try:
                 dialog.set_current_folder(self._last_directory)
                 folder_set = True
@@ -505,9 +524,27 @@ class NetObjPersistency:
         filter_all.add_pattern('*')
         dialog.add_filter(filter_all)
         
-        # Set initial folder with fallback chain
+        # Set initial folder - prioritize project models directory if project is open
         folder_set = False
-        if self._last_directory and os.path.isdir(self._last_directory):
+        
+        # Try project models directory first
+        project_manager = get_project_manager()
+        if project_manager.current_project and not folder_set:
+            project_models_dir = os.path.join(project_manager.current_project.base_path, 'models')
+            if not os.path.exists(project_models_dir):
+                try:
+                    os.makedirs(project_models_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(project_models_dir):
+                try:
+                    dialog.set_current_folder(project_models_dir)
+                    folder_set = True
+                except Exception:
+                    pass
+        
+        # Fallback to last directory
+        if self._last_directory and os.path.isdir(self._last_directory) and not folder_set:
             try:
                 dialog.set_current_folder(self._last_directory)
                 folder_set = True
@@ -532,6 +569,9 @@ class NetObjPersistency:
                 dialog.set_current_folder(os.getcwd())
             except Exception:
                 pass
+        
+        # Focus on filename entry instead of search
+        dialog.set_current_name("")
         
         # WAYLAND FIX: Use dialog.run() instead of nested Gtk.main()
         # Nested event loops cause Error 71 on Wayland

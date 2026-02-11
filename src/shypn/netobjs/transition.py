@@ -769,6 +769,24 @@ class Transition(PetriNetObject):
         if hasattr(self, 'properties') and self.properties:
             data["properties"] = self.properties
         
+        # Serialize quorum sensing / environment awareness (13-tuple Bio-PN formalism)
+        if hasattr(self, 'signal_places') and self.signal_places:
+            data["signal_places"] = self.signal_places
+        if hasattr(self, 'is_environment_aware'):
+            data["is_environment_aware"] = self.is_environment_aware
+        if hasattr(self, 'module_id') and self.module_id is not None:
+            data["module_id"] = self.module_id
+        
+        # Serialize adaptive transition parameters (volume-based mode selection)
+        # Saved at top level (like transition_type, priority, etc.)
+        # from_dict() checks both top level and properties dict for compatibility
+        if hasattr(self, 'adaptive_filter'):
+            data["adaptive_filter"] = self.adaptive_filter
+        if hasattr(self, 'volume_threshold'):
+            data["volume_threshold"] = self.volume_threshold
+        if hasattr(self, 'prefer_continuous'):
+            data["prefer_continuous"] = self.prefer_continuous
+        
         # Serialize kinetic metadata (new structured metadata)
         if self.kinetic_metadata is not None:
             data["kinetic_metadata"] = self.kinetic_metadata.to_dict()
@@ -863,6 +881,7 @@ class Transition(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Transition':
         """Create transition from dictionary (deserialization).
         
+        Supports both clean OOP format (flat structure) and legacy format (attrs nested).
         All IDs must be in correct string format with "T" prefix (e.g., "T1", "T35").
         
         Args:
@@ -874,6 +893,17 @@ class Transition(PetriNetObject):
         Raises:
             ValueError: If ID format is invalid
         """
+        # BACKWARD COMPATIBILITY: Check if old nested 'attrs' format
+        # If attrs exists, merge it with root level (attrs takes precedence for conflicts)
+        if 'attrs' in data:
+            # Legacy format detected - merge attrs into root level
+            attrs = data['attrs']
+            # Create merged dict: start with root, overlay attrs
+            merged = {**data, **attrs}
+            # Remove attrs key from merged dict to avoid recursion
+            merged.pop('attrs', None)
+            data = merged
+        
         # Validate ID format - must be string with "T" prefix
         raw_id = data.get("id")
         transition_id = str(raw_id)
@@ -977,6 +1007,25 @@ class Transition(PetriNetObject):
             transition.signal_places = data["signal_places"]
         if "is_environment_aware" in data:
             transition.is_environment_aware = data["is_environment_aware"]
+        if "module_id" in data:
+            transition.module_id = data["module_id"]
+        
+        # Restore adaptive transition parameters (volume-based mode selection)
+        # Check both top-level (new format) and properties dict (legacy)
+        if "adaptive_filter" in data:
+            transition.adaptive_filter = data["adaptive_filter"]
+        elif "properties" in data and "adaptive_filter" in data["properties"]:
+            transition.adaptive_filter = data["properties"]["adaptive_filter"]
+            
+        if "volume_threshold" in data:
+            transition.volume_threshold = data["volume_threshold"]
+        elif "properties" in data and "volume_threshold" in data["properties"]:
+            transition.volume_threshold = data["properties"]["volume_threshold"]
+            
+        if "prefer_continuous" in data:
+            transition.prefer_continuous = data["prefer_continuous"]
+        elif "properties" in data and "prefer_continuous" in data["properties"]:
+            transition.prefer_continuous = data["properties"]["prefer_continuous"]
         
         # Ensure continuous/adaptive transitions have rate_function (prevent missing rate errors)
         if transition.transition_type in ['continuous', 'adaptive']:

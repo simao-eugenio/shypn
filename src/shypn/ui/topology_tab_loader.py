@@ -26,6 +26,7 @@ from abc import ABC, abstractmethod
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from shypn.data.project_models import get_project_manager
 
 
 class TopologyTabLoader(ABC):
@@ -231,6 +232,20 @@ class TopologyTabLoader(ABC):
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK
         )
         
+        # Set initial directory to project exports folder if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            exports_dir = os.path.join(project_manager.current_project.base_path, 'exports')
+            if not os.path.exists(exports_dir):
+                try:
+                    os.makedirs(exports_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(exports_dir):
+                dialog.set_current_folder(exports_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
+        
         # Add file filters
         filter_text = Gtk.FileFilter()
         filter_text.set_name("Text files")
@@ -241,6 +256,9 @@ class TopologyTabLoader(ABC):
         filter_json.set_name("JSON files")
         filter_json.add_mime_type("application/json")
         dialog.add_filter(filter_json)
+        
+        # Set default filename and focus on filename entry
+        dialog.set_current_name("topology_analysis.txt")
         
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
