@@ -74,6 +74,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         self._setup_rate_sync()
         self._setup_topology_tab()
         self._setup_kinetics_tab()
+        self._setup_signal_dependencies_tab()  # Quorum sensing / 13-tuple Bio-PN formalism
     
     def _load_ui(self):
         """Load the Transition properties dialog UI from file."""
@@ -695,6 +696,9 @@ class TransitionPropDialogLoader(GObject.GObject):
             if is_sink_check:
                 self.transition_obj.is_sink = is_sink_check.get_active()
             
+            # Note: signal_places is auto-detected by the engine from rate function
+            # No manual save needed - it's updated during simulation/analysis
+            
             # Rate function - validate and save to both rate and properties['rate_function']
             # Backward compatible: try new name first, fall back to old name
             rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
@@ -1015,6 +1019,161 @@ class TransitionPropDialogLoader(GObject.GObject):
         except Exception:
             # Any other error - log but don't crash the dialog
             pass
+    
+    def _setup_signal_dependencies_tab(self):
+        """Setup signal dependencies tab for quorum sensing / environment-aware transitions.
+        
+        Displays auto-detected signal places (non-local dependencies from rate function).
+        Signal places are detected automatically by parsing the rate function and finding
+        place references without arc connections (13-tuple Bio-PN formalism: Ψ: T → 2^P).
+        """
+        # Skip if no model available
+        if not self.model:
+            return
+        
+        try:
+            # Get the notebook
+            notebook = self.builder.get_object('main_notebook')
+            if not notebook:
+                return
+            
+            # Create tab container
+            tab_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            tab_box.set_margin_top(15)
+            tab_box.set_margin_bottom(15)
+            tab_box.set_margin_left(15)
+            tab_box.set_margin_right(15)
+            
+            # Add description label
+            desc_label = Gtk.Label()
+            desc_label.set_markup(
+                "<b>Signal Dependencies (Quorum Sensing / Non-Local Sensing)</b>\n\n"
+                "Signal dependencies are <b>auto-detected</b> from the rate function.\n"
+                "A place is a signal dependency if:\n"
+                "  • Referenced in the rate function (e.g., <tt>[PlaceName]</tt>)\n"
+                "  • <b>NOT</b> connected via an arc (non-local sensing)\n\n"
+                "This implements the 13-tuple Bio-PN formalism (Ψ: T → 2<sup>P</sup>)."
+            )
+            desc_label.set_line_wrap(True)
+            desc_label.set_xalign(0)
+            tab_box.pack_start(desc_label, False, False, 5)
+            
+            # Add separator
+            separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+            tab_box.pack_start(separator, False, False, 5)
+            
+            # Get current signal dependencies (auto-detected by engine)
+            current_signals = getattr(self.transition_obj, 'signal_places', [])
+            is_env_aware = getattr(self.transition_obj, 'is_environment_aware', False)
+            
+            # Create info frame
+            info_frame = Gtk.Frame()
+            info_frame.set_label("Detection Status")
+            info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+            info_box.set_margin_top(10)
+            info_box.set_margin_bottom(10)
+            info_box.set_margin_left(10)
+            info_box.set_margin_right(10)
+            
+            # Environment aware status
+            status_label = Gtk.Label()
+            if is_env_aware:
+                status_label.set_markup(
+                    "🟢 <b>Environment-aware:</b> Yes\n"
+                    f"<b>Signal dependencies:</b> {len(current_signals)}"
+                )
+            else:
+                status_label.set_markup(
+                    "⚪ <b>Environment-aware:</b> No\n"
+                    "<b>Signal dependencies:</b> None detected"
+                )
+            status_label.set_xalign(0)
+            info_box.pack_start(status_label, False, False, 0)
+            
+            info_frame.add(info_box)
+            tab_box.pack_start(info_frame, False, False, 5)
+            
+            # Show detected signal places
+            if current_signals:
+                scrolled = Gtk.ScrolledWindow()
+                scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+                scrolled.set_min_content_height(150)
+                
+                listbox = Gtk.ListBox()
+                listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+                
+                # Add row for each detected signal place
+                for place_id in current_signals:
+                    # Find place object
+                    place = next((p for p in self.model.places if p.id == place_id), None)
+                    
+                    row = Gtk.ListBoxRow()
+                    row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+                    row_box.set_margin_top(5)
+                    row_box.set_margin_bottom(5)
+                    row_box.set_margin_left(10)
+                    row_box.set_margin_right(10)
+                    
+                    # Indicator
+                    indicator = Gtk.Label()
+                    indicator.set_markup("🔗")
+                    row_box.pack_start(indicator, False, False, 0)
+                    
+                    # Place info
+                    if place:
+                        place_label = Gtk.Label()
+                        place_label.set_markup(f"<b>{place.id}</b>: {place.name}")
+                        place_label.set_xalign(0)
+                        row_box.pack_start(place_label, True, True, 0)
+                    else:
+                        # Place not found (might be deleted)
+                        place_label = Gtk.Label()
+                        place_label.set_markup(f"<b>{place_id}</b>: <i>(not found in model)</i>")
+                        place_label.set_xalign(0)
+                        row_box.pack_start(place_label, True, True, 0)
+                    
+                    row.add(row_box)
+                    listbox.add(row)
+                
+                scrolled.add(listbox)
+                tab_box.pack_start(scrolled, True, True, 5)
+            else:
+                # No signals detected
+                no_signals_label = Gtk.Label()
+                no_signals_label.set_markup(
+                    "<i>No signal dependencies detected.\n\n"
+                    "Signal dependencies are detected when:\n"
+                    "  • The rate function references a place (e.g., <tt>k * [PlaceName]</tt>)\n"
+                    "  • That place is NOT connected via an arc\n\n"
+                    "Detection happens automatically during simulation.</i>"
+                )
+                no_signals_label.set_line_wrap(True)
+                no_signals_label.set_xalign(0)
+                tab_box.pack_start(no_signals_label, True, True, 20)
+            
+            # Add help/note
+            help_label = Gtk.Label()
+            help_label.set_markup(
+                "<small><b>Note:</b> Signal dependencies are detected and updated automatically by the simulation engine.\n"
+                "They persist through save/load cycles. To remove a signal dependency, remove the place reference\n"
+                "from the rate function or add an arc connection.</small>"
+            )
+            help_label.set_line_wrap(True)
+            help_label.set_xalign(0)
+            tab_box.pack_start(help_label, False, False, 5)
+            
+            # Create tab label
+            tab_label = Gtk.Label(label="Signal Dependencies")
+            
+            # Add tab to notebook
+            notebook.append_page(tab_box, tab_label)
+            tab_box.show_all()
+            
+        except Exception as e:
+            # Log error but don't crash the dialog
+            import traceback
+            print(f"Error setting up signal dependencies tab: {e}")
+            traceback.print_exc()
     
     def _setup_kinetics_tab(self):
         """Setup kinetics tab to display kinetic metadata and parameters.

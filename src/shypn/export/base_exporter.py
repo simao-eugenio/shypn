@@ -15,6 +15,7 @@ from typing import Dict, Optional, Tuple
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from shypn.data.project_models import get_project_manager
 
 
 class ExportError(Exception):
@@ -212,6 +213,20 @@ class BaseExporter(ABC):
         filter_all.set_name("All files")
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
+        
+        # Set initial directory to project base path if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            project_exports_dir = os.path.join(project_manager.current_project.base_path, 'exports')
+            if not os.path.exists(project_exports_dir):
+                try:
+                    os.makedirs(project_exports_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(project_exports_dir):
+                dialog.set_current_folder(project_exports_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
         
         # Set default location and filename
         if default_filename and os.path.isabs(default_filename):

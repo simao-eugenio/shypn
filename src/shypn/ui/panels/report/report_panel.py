@@ -26,6 +26,7 @@ from .parameters_category import DynamicAnalysesCategory
 from .topology_analyses_category import TopologyAnalysesCategory
 from .thermodynamic_validation_category import ThermodynamicValidationCategory
 from .export_toolbar import ExportToolbar
+from shypn.data.project_models import get_project_manager
 
 
 class ReportPanel(Gtk.Box):
@@ -654,6 +655,20 @@ class ReportPanel(Gtk.Box):
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK
         )
         dialog.set_current_name("report.html")
+        
+        # Set initial directory to project exports folder if project is open
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            exports_dir = os.path.join(project_manager.current_project.base_path, 'exports')
+            if not os.path.exists(exports_dir):
+                try:
+                    os.makedirs(exports_dir, exist_ok=True)
+                except Exception:
+                    pass
+            if os.path.isdir(exports_dir):
+                dialog.set_current_folder(exports_dir)
+            else:
+                dialog.set_current_folder(project_manager.current_project.base_path)
         
         response = dialog.run()
         if response == Gtk.ResponseType.OK:

@@ -606,6 +606,7 @@ class Place(PetriNetObject):
     def from_dict(cls, data: dict) -> 'Place':
         """Create place from dictionary (deserialization).
         
+        Supports both clean OOP format (flat structure) and legacy format (attrs nested).
         All IDs must be in correct string format with "P" prefix (e.g., "P1", "P101").
         
         Args:
@@ -617,6 +618,17 @@ class Place(PetriNetObject):
         Raises:
             ValueError: If ID format is invalid
         """
+        # BACKWARD COMPATIBILITY: Check if old nested 'attrs' format
+        # If attrs exists, merge it with root level (attrs takes precedence for conflicts)
+        if 'attrs' in data:
+            # Legacy format detected - merge attrs into root level
+            attrs = data['attrs']
+            # Create merged dict: start with root, overlay attrs
+            merged = {**data, **attrs}
+            # Remove attrs key from merged dict to avoid recursion
+            merged.pop('attrs', None)
+            data = merged
+        
         # Validate ID format - must be string with "P" prefix
         raw_id = data.get("id")
         place_id = str(raw_id)

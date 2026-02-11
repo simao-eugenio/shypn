@@ -925,6 +925,7 @@ class Arc(PetriNetObject):
     def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':
         """Create arc from dictionary (deserialization).
         
+        Supports both clean OOP format (flat structure) and legacy format (attrs nested).
         All IDs must be in correct string format with prefix (e.g., "P45", "T12", "A5").
         
         IMPORTANT: Checks arc_type to create TestArc or InhibitorArc instances
@@ -941,6 +942,17 @@ class Arc(PetriNetObject):
         Raises:
             ValueError: If source or target objects not found
         """
+        # BACKWARD COMPATIBILITY: Check if old nested 'attrs' format
+        # If attrs exists, merge it with root level (attrs takes precedence for conflicts)
+        if 'attrs' in data:
+            # Legacy format detected - merge attrs into root level
+            attrs = data['attrs']
+            # Create merged dict: start with root, overlay attrs
+            merged = {**data, **attrs}
+            # Remove attrs key from merged dict to avoid recursion
+            merged.pop('attrs', None)
+            data = merged
+        
         # Check arc type to determine which class to instantiate
         arc_type = data.get('arc_type', 'normal')
         

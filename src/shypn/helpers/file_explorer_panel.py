@@ -1831,6 +1831,9 @@ class FileExplorerPanel:
             filter_all.add_pattern("*")
             dialog.add_filter(filter_all)
             
+            # Focus on filename entry instead of search
+            dialog.set_current_name("")
+            
             # Show dialog and handle response
             response = dialog.run()
             
