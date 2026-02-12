@@ -1877,6 +1877,10 @@ class ModelCanvasLoader:
         # CRITICAL: Store drawing_area reference in controller so Report Panel can find its document
         simulation_controller._drawing_area = drawing_area
         
+        # Week 1 - Phase 4: Set document_id for EventBus scoped events
+        # Enables simulation.progress events to be isolated per document
+        simulation_controller.document_id = id(drawing_area)
+        
         # CRITICAL: Wire data_collector change callback to update analyses panel
         # This ensures analyses panel gets updated when controller.reset() creates new data_collector
         def on_data_collector_changed(new_data_collector):
@@ -2028,8 +2032,9 @@ class ModelCanvasLoader:
                 report_panel_loader._stack = self.left_dock_stack
                 report_panel_loader._stack_panel_name = 'report'
             
-            # DON'T call add_to_stack() - Report panel is manually managed per-document
-            # Each tab switch will manually pack_start() the appropriate panel
+            # Week 3 - Phase 4: EventBus handles panel visibility during tab switches
+            # Report panel subscribes to 'document.focused' events and manages its own show/hide
+            # Initial packing happens here; subsequent visibility controlled by EventBus
             
             # Wire controller and model to this document's Report Panel
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
