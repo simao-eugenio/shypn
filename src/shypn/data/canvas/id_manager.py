@@ -15,7 +15,7 @@ ID Format Convention:
 All IDs are strings, never integers. The numeric part is extracted when needed
 for counter management.
 
-PHASE 4 - LIFECYCLE INTEGRATION:
+LIFECYCLE INTEGRATION:
 This IDManager can optionally delegate to a global IDScopeManager for
 canvas-scoped ID generation. Set _lifecycle_scope_manager at module level
 to enable multi-canvas support with isolated ID sequences.
