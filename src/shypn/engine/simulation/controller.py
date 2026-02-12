@@ -231,6 +231,10 @@ class SimulationController:
         # Viability checking strategy (Phase 2.3.2 extraction)
         self._viability_checker = ViabilityChecker(self)
         
+        # Week 4 - Phase 4: Strategy Pattern for simulation algorithms
+        # Enables runtime switching between different execution strategies
+        self._execution_strategy = None  # HybridStrategy by default (set on first use)
+        
         # DEPRECATED: Mass conservation enforcer (Feb 9, 2026)
         # Reason: Petri net semantics NATURALLY conserve mass/energy through
         # token-based firing rules. Explicit enforcement was based on misunderstanding.
@@ -950,6 +954,110 @@ class SimulationController:
             bool: True if time >= duration
         """
         return self.settings.is_complete(self.time)
+    
+    # ========== Strategy Pattern Methods (Week 4 - Phase 4) ==========
+    
+    def get_strategy(self):
+        """Get current execution strategy.
+        
+        Returns:
+            SimulationStrategy: Current strategy, or None if using default logic
+        """
+        return self._execution_strategy
+    
+    def set_strategy(self, strategy):
+        """Set execution strategy for simulation.
+        
+        Enables runtime switching between different algorithms:
+        - GillespieStrategy: Exact SSA (slow but accurate)
+        - AdaptiveStrategy: Tau-leaping (fast approximation)
+        - HybridStrategy: Mixed deterministic/stochastic
+        - ContinuousStrategy: Pure ODE integration
+        
+        Args:
+            strategy: SimulationStrategy instance or None for default
+        
+        Example:
+            from shypn.engine.simulation.strategies import GillespieStrategy
+            controller.set_strategy(GillespieStrategy(controller))
+        """
+        self._execution_strategy = strategy
+    
+    def auto_select_strategy(self):
+        """Automatically select best strategy for current model.
+        
+        Selection logic:
+        1. Pure continuous model → ContinuousStrategy
+        2. Pure stochastic model → GillespieStrategy or AdaptiveStrategy
+        3. Mixed model → HybridStrategy
+        
+        Returns:
+            SimulationStrategy: Best strategy for this model
+        """
+        from shypn.engine.simulation.strategies import (
+            GillespieStrategy,
+            AdaptiveStrategy,
+            HybridStrategy,
+            ContinuousStrategy
+        )
+        
+        # Analyze model composition
+        has_continuous = False
+        has_stochastic = False
+        stochastic_count = 0
+        
+        for transition in self.model.transitions:
+            if hasattr(transition, 'transition_type'):
+                t_type = transition.transition_type
+                if t_type in ('continuous', 'timed'):
+                    has_continuous = True
+                elif t_type == 'stochastic':
+                    has_stochastic = True
+                    stochastic_count += 1
+        
+        # Select strategy based on model composition
+        if has_continuous and not has_stochastic:
+            # Pure continuous model
+            strategy = ContinuousStrategy(self)
+        elif has_stochastic and not has_continuous:
+            # Pure stochastic model
+            if stochastic_count < 100:
+                # Small model: Use exact Gillespie
+                strategy = GillespieStrategy(self)
+            else:
+                # Large model: Use adaptive tau-leaping
+                strategy = AdaptiveStrategy(self)
+        else:
+            # Mixed model or empty: Use hybrid strategy
+            strategy = HybridStrategy(self)
+        
+        self._execution_strategy = strategy
+        return strategy
+    
+    def list_available_strategies(self):
+        """Get list of all available execution strategies.
+        
+        Returns:
+            list: List of (name, description, can_execute) tuples
+        """
+        from shypn.engine.simulation.strategies import (
+            GillespieStrategy,
+            AdaptiveStrategy,
+            HybridStrategy,
+            ContinuousStrategy
+        )
+        
+        strategies = [
+            GillespieStrategy(self),
+            AdaptiveStrategy(self),
+            HybridStrategy(self),
+            ContinuousStrategy(self)
+        ]
+        
+        return [
+            (s.get_name(), s.get_description(), s.can_execute())
+            for s in strategies
+        ]
 
     def invalidate_behavior_cache(self, transition_id=None):
         """Invalidate behavior cache for a specific transition or all transitions.
