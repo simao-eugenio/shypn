@@ -17,6 +17,7 @@ from gi.repository import Gtk
 from .transitions_category import TransitionsCategory
 from .places_category import PlacesCategory
 from .plotting_category import PlottingCategory
+from shypn.events import EventBus
 
 
 class DynamicAnalysesPanel(Gtk.Box):
@@ -41,9 +42,6 @@ class DynamicAnalysesPanel(Gtk.Box):
         
         self.model = model
         self.data_collector = data_collector
-        
-        # Report panel callback (will be set by report panel)
-        self._report_refresh_callback = None
         
         # Context menu handler (will be set after categories are created)
         self.context_menu_handler = None
@@ -238,21 +236,19 @@ class DynamicAnalysesPanel(Gtk.Box):
         """
         return self
     
-    def set_report_refresh_callback(self, callback):
-        """Set callback to refresh report panel when analyses update.
-        
-        Args:
-            callback: Function to call when dynamic analyses update
-        """
-        self._report_refresh_callback = callback
-    
     def notify_report_panel(self):
-        """Notify report panel that dynamic analyses have been updated."""
-        if self._report_refresh_callback:
-            try:
-                self._report_refresh_callback()
-            except Exception as e:
-                print(f"Warning: Could not refresh report panel: {e}")
+        """Notify report panel that dynamic analyses have been updated via EventBus."""
+        # Get document ID for the current document
+        document_id = None
+        if self.model and hasattr(self.model, 'drawing_area'):
+            # model is ModelCanvasManager, get document_id from its drawing_area
+            document_id = id(self.model.drawing_area) if self.model.drawing_area else None
+        
+        # Emit simulation.updated event with document scoping
+        EventBus.emit('simulation.updated', {
+            'transitions_count': len(getattr(self.transitions_category.panel, 'selected_transitions', [])) if hasattr(self.transitions_category, 'panel') and self.transitions_category.panel else 0,
+            'places_count': len(getattr(self.places_category.panel, 'selected_places', [])) if hasattr(self.places_category, 'panel') and self.places_category.panel else 0
+        }, document_id=document_id)
     
     def generate_summary_for_report_panel(self):
         """Generate lightweight summary for Report Panel.
@@ -311,22 +307,6 @@ class DynamicAnalysesPanel(Gtk.Box):
             'statistics': statistics,
             'formatted_text': formatted_text
         }
-    
-    def set_report_refresh_callback(self, callback):
-        """Set callback to notify report panel of updates.
-        
-        Args:
-            callback: Function to call when dynamic analyses are updated
-        """
-        self._report_refresh_callback = callback
-    
-    def notify_report_panel(self):
-        """Notify report panel that dynamic analyses have been updated."""
-        if self._report_refresh_callback:
-            try:
-                self._report_refresh_callback()
-            except Exception as e:
-                print(f"Warning: Could not refresh report panel: {e}")
     
     def reset(self):
         """Reset all plot panels in this dynamic analyses panel.

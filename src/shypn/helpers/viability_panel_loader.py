@@ -14,6 +14,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 from shypn.ui.panels.viability import ViabilityPanel
+from shypn.events import EventBus
 
 
 class ViabilityPanelLoader:
@@ -28,13 +29,17 @@ class ViabilityPanelLoader:
     All panel logic is in the ViabilityPanel class.
     """
     
-    def __init__(self, model):
+    def __init__(self, model, document_id=None, drawing_area=None):
         """Initialize viability panel loader.
         
         Args:
             model: The ShypnModel instance (can be None)
+            document_id: Optional document ID for EventBus scoping
+            drawing_area: Optional drawing area reference
         """
         self.model = model
+        self.document_id = document_id
+        self.drawing_area = drawing_area
         self.model_canvas_loader = None  # Set externally
         self.parent_window = None
         self.parent_container = None
@@ -424,6 +429,62 @@ class ViabilityPanelLoader:
         self.parent_window = parent_window
         if not self.is_hanged:
             self.window.set_transient_for(parent_window)
+    
+    def initialize_eventbus(self):
+        """Subscribe to document.focused events for automatic tab switching.
+        
+        Call this after the loader is created and container is set.
+        """
+        EventBus.subscribe('document.focused', self._on_document_focused)
+    
+    def _on_document_focused(self, data):
+        """Handle document.focused events for automatic panel swapping.
+        
+        Args:
+            data: Event data containing drawing_area, canvas_manager, overlay_manager
+        """
+        event_document_id = data.get('_document_id')
+        
+        # Don't handle swapping if panel is floated
+        if not self.is_hanged:
+            return
+        
+        # Don't handle if no parent container
+        if not self.parent_container:
+            return
+        
+        # Check if this event is for our document
+        is_our_document = (event_document_id == self.document_id)
+        
+        if is_our_document:
+            # This is our document - show and refresh
+            # Ensure we're in the container
+            current_parent = self.widget.get_parent()
+            if current_parent != self.parent_container:
+                # Not in container, need to pack
+                if current_parent:
+                    current_parent.remove(self.widget)
+                self.parent_container.pack_start(self.widget, True, True, 0)
+            
+            # Update panel with new document's drawing_area
+            drawing_area = data.get('drawing_area')
+            if drawing_area and self.panel:
+                if hasattr(self.panel, 'set_drawing_area'):
+                    self.panel.set_drawing_area(drawing_area)
+            
+            # Show our widget
+            self.widget.show()
+        else:
+            # This is NOT our document - hide
+            self.widget.hide()
+    
+    def cleanup(self):
+        """Cleanup resources and unsubscribe from events."""
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('document.focused', self._on_document_focused)
+        # Clean up panel
+        if self.panel and hasattr(self.panel, 'cleanup'):
+            self.panel.cleanup()
 
 
 __all__ = ['ViabilityPanelLoader']

@@ -34,7 +34,7 @@ class ColorSchemaManager:
     # PLACE COLORS
     # ========================================================================
     PLACE_DEFAULT_BORDER = (0.0, 0.0, 0.0)  # Black - regular places
-    PLACE_SIGNAL_BORDER = (0.0, 0.4, 0.8)   # Blue - signal places (Ψ)
+    PLACE_SIGNAL_BORDER = (0.0, 0.0, 1.0)   # Blue - signal places (Ψ)
     PLACE_COMPARTMENT_BORDER = (0.5, 0.0, 0.5)  # Violet - compartment places
     PLACE_REGULATORY_BORDER = (0.0, 0.0, 0.0)   # Black - regulatory places (genes)
     

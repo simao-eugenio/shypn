@@ -101,7 +101,7 @@ class ParallelStochasticScheduler:
         
         # Extract competitive pairs (must be sequential)
         self._competitive_pairs = set()
-        for t1_id, t2_id, _ in classifications['competitive']:
+        for t1_id, t2_id, _ in classifications.get('competitive', []):
             self._competitive_pairs.add((t1_id, t2_id))
             self._competitive_pairs.add((t2_id, t1_id))  # Symmetric
         
@@ -146,7 +146,7 @@ class ParallelStochasticScheduler:
             dependency_graph[t.id] = set()
         
         # Add competitive dependencies (only true conflicts)
-        for t1_id, t2_id, _ in classifications['competitive']:
+        for t1_id, t2_id, _ in classifications.get('competitive', []):
             dependency_graph[t1_id].add(t2_id)
             dependency_graph[t2_id].add(t1_id)
         

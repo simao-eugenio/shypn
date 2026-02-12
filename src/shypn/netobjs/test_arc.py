@@ -144,7 +144,7 @@ class TestArc(Arc):
         
         # Visual styling for test arcs (distinguishable from normal arcs)
         # Blue color for test arcs (already set in __init__ via DEFAULT_COLOR)
-        self.width = 2.5  # Slightly thinner to indicate non-consumption
+        # Width is 3.0 (same as all arcs) - color distinguishes test arcs, not width
     
     @property
     def arc_type(self) -> str:

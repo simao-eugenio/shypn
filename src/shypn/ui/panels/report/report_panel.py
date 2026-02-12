@@ -27,6 +27,7 @@ from .topology_analyses_category import TopologyAnalysesCategory
 from .thermodynamic_validation_category import ThermodynamicValidationCategory
 from .export_toolbar import ExportToolbar
 from shypn.data.project_models import get_project_manager
+from shypn.events import EventBus
 
 
 class ReportPanel(Gtk.Box):
@@ -69,6 +70,15 @@ class ReportPanel(Gtk.Box):
         
         # Build UI
         self._build_ui()
+        
+        # Subscribe to pathway.imported events (global subscription)
+        EventBus.subscribe('pathway.imported', self._on_pathway_imported)
+        
+        # Subscribe to topology.analyzed events (global subscription)
+        EventBus.subscribe('topology.analyzed', self._on_topology_updated)
+        
+        # Subscribe to simulation.updated events (global subscription)
+        EventBus.subscribe('simulation.updated', self._on_dynamic_analyses_updated)
         
         # Initial refresh to show placeholder text for empty model
         self.refresh_all()
@@ -419,13 +429,13 @@ class ReportPanel(Gtk.Box):
             if isinstance(category, TopologyAnalysesCategory):
                 category.set_topology_panel(topology_panel)
                 break
-        
-        # Set callback so topology panel can notify us when analyses update
-        if hasattr(topology_panel, 'set_report_refresh_callback'):
-            topology_panel.set_report_refresh_callback(self._on_topology_updated)
     
-    def _on_topology_updated(self):
-        """Called by topology panel when analyses are updated."""
+    def _on_topology_updated(self, data):
+        """Called via EventBus when topology analyses are updated.
+        
+        Args:
+            data: Event data (currently minimal, could include analyzer names)
+        """
         # Refresh the topology analyses category
         for category in self.categories:
             if isinstance(category, TopologyAnalysesCategory):
@@ -445,13 +455,13 @@ class ReportPanel(Gtk.Box):
             if isinstance(category, DynamicAnalysesCategory):
                 category.set_dynamic_analyses_panel(dynamic_analyses_panel)
                 break
-        
-        # Set callback so dynamic analyses panel can notify us when data updates
-        if hasattr(dynamic_analyses_panel, 'set_report_refresh_callback'):
-            dynamic_analyses_panel.set_report_refresh_callback(self._on_dynamic_analyses_updated)
     
-    def _on_dynamic_analyses_updated(self):
-        """Called by dynamic analyses panel when monitoring data is updated."""
+    def _on_dynamic_analyses_updated(self, data):
+        """Called via EventBus when dynamic analyses data is updated.
+        
+        Args:
+            data: Event data containing transitions_count, places_count
+        """
         # Refresh the dynamic analyses category
         for category in self.categories:
             if isinstance(category, DynamicAnalysesCategory):
@@ -473,18 +483,20 @@ class ReportPanel(Gtk.Box):
                 category.set_pathway_operations_panel(pathway_operations_panel)
                 break
         
-        # Set callback so pathway operations panel can notify us when pathways are imported
-        if hasattr(pathway_operations_panel, 'set_report_refresh_callback'):
-            pathway_operations_panel.set_report_refresh_callback(self._on_pathway_imported)
-        
         # Set callback so thermodynamics validation can notify us when validation completes
         if hasattr(pathway_operations_panel, 'thermodynamics_category'):
             pathway_operations_panel.thermodynamics_category.set_report_panel_refresh_callback(
                 self._on_thermodynamics_validated
             )
     
-    def _on_pathway_imported(self):
-        """Called by pathway operations panel when new pathway is imported."""
+    def _on_pathway_imported(self, data):
+        """Called via EventBus when new pathway is imported.
+        
+        Args:
+            data: Event data containing 'source' ('kegg', 'sbml', 'bigg') and import details
+        """
+        source = data.get('source', 'unknown')
+        self.logger.debug(f"Received pathway.imported event (source={source})")
         # print("[REPORT] _on_pathway_imported() called")
         
         # Get current model canvas manager
@@ -835,6 +847,11 @@ class ReportPanel(Gtk.Box):
         
         Called by the loader when the panel is being destroyed.
         """
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('pathway.imported', self._on_pathway_imported)
+        EventBus.unsubscribe('topology.analyzed', self._on_topology_updated)
+        EventBus.unsubscribe('simulation.updated', self._on_dynamic_analyses_updated)
+        
         # Clean up any resources held by categories
         for category in self.categories:
             if hasattr(category, 'cleanup'):

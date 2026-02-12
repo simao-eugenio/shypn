@@ -30,6 +30,7 @@ from .pathway_operations.sabio_rk_category import SabioRKCategory
 from .pathway_operations.heuristic_parameters_category import HeuristicParametersCategory
 from .pathway_operations.enrichment_history_category import EnrichmentHistoryCategory
 from .pathway_operations.thermodynamics import ThermodynamicsCategory
+from shypn.events import EventBus
 
 
 class PathwayOperationsPanel(Gtk.Box):
@@ -79,9 +80,6 @@ class PathwayOperationsPanel(Gtk.Box):
         self.workspace_settings = workspace_settings
         self.parent_window = parent_window
         self.logger = logging.getLogger(self.__class__.__name__)
-        
-        # Callback for notifying Report panel when pathways are imported
-        self.report_refresh_callback = None
         
         # Create categories
         self.kegg_category = KEGGCategory(
@@ -195,39 +193,56 @@ class PathwayOperationsPanel(Gtk.Box):
         """Connect signals between categories for data flow.
         
         When KEGG or SBML complete an import, notify BRENDA so it can
-        suggest queries based on the imported data. Also notify Report panel.
+        suggest queries based on the imported data. Also emit pathway.imported event.
         """
         # KEGG → BRENDA data flow
         def on_kegg_import_complete(data):
             self.logger.info("KEGG import completed, notifying BRENDA category")
             data['source'] = 'kegg'
             self.brenda_category.receive_import_data(data)
-            # Notify Report panel if callback is set
-            if self.report_refresh_callback:
-                self.report_refresh_callback()
+            # Emit pathway.imported event for Report panel (and other subscribers)
+            self._emit_pathway_imported('kegg', data)
         
         # SBML → BRENDA data flow
         def on_sbml_import_complete(data):
             self.logger.info("SBML import completed, notifying BRENDA category")
             data['source'] = 'sbml'
             self.brenda_category.receive_import_data(data)
-            # Notify Report panel if callback is set
-            if self.report_refresh_callback:
-                self.report_refresh_callback()
+            # Emit pathway.imported event for Report panel (and other subscribers)
+            self._emit_pathway_imported('sbml', data)
         
         # BiGG → BRENDA data flow
         def on_bigg_import_complete(data):
             self.logger.info("BiGG import completed, notifying BRENDA category")
             data['source'] = 'bigg'
             self.brenda_category.receive_import_data(data)
-            # Notify Report panel if callback is set
-            if self.report_refresh_callback:
-                self.report_refresh_callback()
+            # Emit pathway.imported event for Report panel (and other subscribers)
+            self._emit_pathway_imported('bigg', data)
         
         # Connect the signals (categories emit these via _trigger_import_complete)
         self.kegg_category.import_complete_callback = on_kegg_import_complete
         self.sbml_category.import_complete_callback = on_sbml_import_complete
         self.bigg_category.import_complete_callback = on_bigg_import_complete
+    
+    def _emit_pathway_imported(self, source, data):
+        """Emit pathway.imported event with document scoping.
+        
+        Args:
+            source: Import source ('kegg', 'sbml', 'bigg')
+            data: Import data dictionary
+        """
+        # Get document ID for the current document
+        document_id = None
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_document_id'):
+            document_id = self.model_canvas.get_current_document_id()
+        
+        # Emit event with document scoping
+        EventBus.emit('pathway.imported', {
+            'source': source,
+            'data': data
+        }, document_id=document_id)
+        
+        self.logger.info(f"Emitted pathway.imported event (source={source}, document_id={document_id})")
     
     def set_project(self, project):
         """Set the current project for all categories.
@@ -280,18 +295,6 @@ class PathwayOperationsPanel(Gtk.Box):
             self.sbml_category.set_file_panel_loader(file_panel_loader)
         
         self.logger.info("File panel loader set for categories")
-    
-    def set_report_refresh_callback(self, callback):
-        """Set the callback to be invoked when pathway data is imported.
-        
-        This allows the Report panel to refresh its dynamic analyses category
-        when new KEGG or SBML data becomes available.
-        
-        Args:
-            callback: Function to call when pathway import completes
-        """
-        self.report_refresh_callback = callback
-        self.logger.info("Report refresh callback registered")
     
     def switch_to_category(self, category_name: str):
         """Switch to and expand a specific category.

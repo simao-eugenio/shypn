@@ -27,6 +27,7 @@ except Exception as e:
 
 from shypn.ui.panels.pathway_operations_panel import PathwayOperationsPanel
 from .base_panel_loader import PerDocumentPanelLoader
+from shypn.events import EventBus
 
 
 class PathwayPanelLoader(PerDocumentPanelLoader):
@@ -54,7 +55,7 @@ class PathwayPanelLoader(PerDocumentPanelLoader):
         widget: Root widget for packing into containers
     """
     
-    def __init__(self, model, parent_window=None, workspace_settings=None, project=None, canvas_loader=None):
+    def __init__(self, model, parent_window=None, workspace_settings=None, project=None, canvas_loader=None, document_id=None, drawing_area=None):
         """Initialize pathway panel loader for a document.
         
         Args:
@@ -63,10 +64,14 @@ class PathwayPanelLoader(PerDocumentPanelLoader):
             workspace_settings: Optional workspace settings
             project: Optional project reference
             canvas_loader: Optional ModelCanvasLoader for creating new tabs
+            document_id: Optional document ID for EventBus scoping
+            drawing_area: Optional drawing area reference
         """
         self.workspace_settings = workspace_settings
         self.project = project
         self.canvas_loader = canvas_loader
+        self.document_id = document_id
+        self.drawing_area = drawing_area
         
         # Initialize base class (calls _create_panel)
         super().__init__(model, parent_window)
@@ -194,6 +199,59 @@ class PathwayPanelLoader(PerDocumentPanelLoader):
         """
         # No-op: Tab switching handled by instance swapping
         pass
+    
+    def initialize(self):
+        """Initialize panel and subscribe to tab switching events."""
+        super().initialize()
+        # Subscribe to document.focused events for automatic tab switching
+        EventBus.subscribe('document.focused', self._on_document_focused)
+    
+    def _on_document_focused(self, data):
+        """Handle document.focused events for automatic panel swapping.
+        
+        Args:
+            data: Event data containing drawing_area, canvas_manager, overlay_manager
+        """
+        event_document_id = data.get('_document_id')
+        
+        # Don't handle swapping if panel is floated
+        if not self.is_hanged:
+            return
+        
+        # Don't handle if no parent container
+        if not self.parent_container:
+            return
+        
+        # Check if this event is for our document
+        is_our_document = (event_document_id == self.document_id)
+        
+        if is_our_document:
+            # This is our document - show and refresh
+            # Ensure we're in the container
+            current_parent = self.widget.get_parent()
+            if current_parent != self.parent_container:
+                # Not in container, need to pack
+                if current_parent:
+                    current_parent.remove(self.widget)
+                self.parent_container.pack_start(self.widget, True, True, 0)
+            
+            # Update panel with new document's model
+            canvas_manager = data.get('canvas_manager')
+            if canvas_manager:
+                self.refresh()
+            
+            # Show our widget
+            self.widget.show()
+        else:
+            # This is NOT our document - hide
+            self.widget.hide()
+    
+    def cleanup(self):
+        """Cleanup resources and unsubscribe from events."""
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('document.focused', self._on_document_focused)
+        # Call parent cleanup
+        super().cleanup()
     
     def add_to_stack(self, stack, container, name):
         """Add panel to GTK stack (legacy compatibility).

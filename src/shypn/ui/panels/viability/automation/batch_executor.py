@@ -143,8 +143,18 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                     errors.append(f"{error_count}/{len(results)} replicates failed")
                     execution_status = 'WARNING' if error_count < len(results) else 'FAILED'
                 
+                # Convert DocumentModel to dict format for metadata generator
+                # Metadata sections expect dict with 'places', 'transitions', 'arcs' keys
+                model_dict = model.to_dict() if hasattr(model, 'to_dict') else {
+                    'places': [p.to_dict() if hasattr(p, 'to_dict') else {} for p in getattr(model, 'places', [])],
+                    'transitions': [t.to_dict() if hasattr(t, 'to_dict') else {} for t in getattr(model, 'transitions', [])],
+                    'arcs': [a.to_dict() if hasattr(a, 'to_dict') else {} for a in getattr(model, 'arcs', [])],
+                    'formalism': 'Signal_Hierarchical_Petri_Net',
+                    'metadata': {}
+                }
+                
                 metadata_context = {
-                    'model': model,
+                    'model': model_dict,
                     'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
                     'n_replicates': replicates,
                     'experiment_index': args['snapshot_index'],
@@ -1030,8 +1040,18 @@ class BatchExecutor:
                     if deadlock_rate > 50:
                         warnings.append(f"High deadlock rate: {deadlock_rate:.1f}%")
             
+            # Convert DocumentModel to dict format for metadata generator
+            # Metadata sections expect dict with 'places', 'transitions', 'arcs' keys
+            model_dict = model.to_dict() if hasattr(model, 'to_dict') else {
+                'places': [p.to_dict() if hasattr(p, 'to_dict') else {} for p in getattr(model, 'places', [])],
+                'transitions': [t.to_dict() if hasattr(t, 'to_dict') else {} for t in getattr(model, 'transitions', [])],
+                'arcs': [a.to_dict() if hasattr(a, 'to_dict') else {} for a in getattr(model, 'arcs', [])],
+                'formalism': 'Signal_Hierarchical_Petri_Net',
+                'metadata': {}
+            }
+            
             metadata_context = {
-                'model': model,
+                'model': model_dict,
                 'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
                 'n_replicates': replicates,
                 'experiment_index': snapshot_index,

@@ -11,8 +11,10 @@ import os
 import sys
 import logging
 import json
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
+from shypn.events import EventBus
 
 
 class WorkspaceSettings:
@@ -87,6 +89,7 @@ class WorkspaceSettings:
             y: Window Y position (None = centered)
             maximized: Whether window is maximized
         """
+        old_window = self.settings.get("window", {}).copy()
         self.settings["window"] = {
             "width": width,
             "height": height,
@@ -95,6 +98,15 @@ class WorkspaceSettings:
             "maximized": maximized
         }
         self.save()
+        
+        # Emit event for window geometry change
+        EventBus.emit('settings.changed', {
+            'category': 'window',
+            'key': 'window.geometry',
+            'old_value': old_window,
+            'new_value': self.settings["window"],
+            'timestamp': time.time()
+        })
     
     def get_snap_to_grid(self) -> bool:
         """Get snap to grid setting.
@@ -111,10 +123,20 @@ class WorkspaceSettings:
         Args:
             enabled: Whether to enable snap to grid
         """
+        old_value = self.get_snap_to_grid()
         if "editor" not in self.settings:
             self.settings["editor"] = {}
         self.settings["editor"]["snap_to_grid"] = enabled
         self.save()
+        
+        # Emit event
+        EventBus.emit('settings.changed', {
+            'category': 'editor',
+            'key': 'editor.snap_to_grid',
+            'old_value': old_value,
+            'new_value': enabled,
+            'timestamp': time.time()
+        })
     
     def get_grid_spacing(self) -> float:
         """Get grid spacing setting.
@@ -131,10 +153,20 @@ class WorkspaceSettings:
         Args:
             spacing: Grid spacing in pixels
         """
+        old_value = self.get_grid_spacing()
         if "editor" not in self.settings:
             self.settings["editor"] = {}
         self.settings["editor"]["grid_spacing"] = spacing
         self.save()
+        
+        # Emit event
+        EventBus.emit('settings.changed', {
+            'category': 'editor',
+            'key': 'editor.grid_spacing',
+            'old_value': old_value,
+            'new_value': spacing,
+            'timestamp': time.time()
+        })
     
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Get a setting value by dot-notation key.
@@ -164,6 +196,7 @@ class WorkspaceSettings:
             key: Setting key in dot notation (e.g., "sbml_import.last_biomodels_id")
             value: Value to set
         """
+        old_value = self.get_setting(key)
         keys = key.split('.')
         target = self.settings
         
@@ -176,3 +209,14 @@ class WorkspaceSettings:
         # Set the final value
         target[keys[-1]] = value
         self.save()
+        
+        # Emit event
+        # Determine category from first part of key (e.g., "sbml_import" from "sbml_import.last_biomodels_id")
+        category = keys[0] if keys else 'unknown'
+        EventBus.emit('settings.changed', {
+            'category': category,
+            'key': key,
+            'old_value': old_value,
+            'new_value': value,
+            'timestamp': time.time()
+        })

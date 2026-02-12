@@ -108,10 +108,13 @@ class BatchSimulationRunner:
         # PERFORMANCE FIX: Create controller ONCE, reuse for all replicates
         # Creating 100 controllers = 100× behavior initialization overhead = 2× slowdown
         # verbose=False: No debug output
-        # recording_interval=100: Record every 100th step for batch efficiency (not real-time playback)
+        # RecordingConfig with step_based: Record every 100th step for batch efficiency
         # For 500s simulation with dt=0.01: 50k steps → 500 data points (vs 50k with interval=1)
         # This reduces memory overhead by 100× and speeds up batch execution by ~2×
-        replicate_controller = SimulationController(model, verbose=False, recording_interval=100)
+        from shypn.core.value_objects import RecordingConfig
+        
+        recording_config = RecordingConfig.step_based(interval=100, recorded_objects=recorded_objects)
+        replicate_controller = SimulationController(model, verbose=False, recording_config=recording_config)
         
         # Copy settings from original controller (only needs to happen once)
         replicate_controller.settings = deepcopy(settings)
@@ -122,7 +125,6 @@ class BatchSimulationRunner:
         
         # PERFORMANCE: Enable time-based recording for smoother data density
         # Record every 0.5 seconds of simulation time instead of every Nth step
-        # This gives consistent data resolution regardless of dt/tau values
         replicate_controller.data_collector.time_based_recording = True
         replicate_controller.data_collector.recording_time_interval = 0.5  # seconds
         

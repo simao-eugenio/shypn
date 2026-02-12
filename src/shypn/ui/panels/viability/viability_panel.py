@@ -21,6 +21,28 @@ COMPONENTS:
 - FixSystem: FixSequencer, FixApplier, FixPredictor
 - UI: SubnetView (multi-level), InvestigationView (single locality)
 
+╔════════════════════════════════════════════════════════════════════════════╗
+║ ARCHITECTURE NOTE: This class is intentionally large (2900+ lines)        ║
+║                                                                            ║
+║ REASON: Orchestrates complex viability analysis workflow with multiple    ║
+║         analysis types, batch execution, result browsing, and progress    ║
+║         tracking. Panel state management requires centralized control     ║
+║         due to pseudo-MDI architecture constraints.                       ║
+║                                                                            ║
+║ ⚠️  DO NOT SPLIT: Panel visibility/focus management from controller       ║
+║ ⚠️  DO NOT SPLIT: UI state from analysis orchestration                    ║
+║ ⚠️  DO NOT SPLIT: Progress tracking into separate class                   ║
+║                                                                            ║
+║ SAFE REFACTORINGS:                                                        ║
+║ ✅ Extract analysis algorithms (LocalityAnalyzer is stateless)             ║
+║ ✅ Extract batch coordination logic (BatchExecutor already exists)         ║
+║ ✅ Create value objects (AnalysisRequest, BatchConfig, ResultSet)          ║
+║ ✅ Emit events via EventBus ('analysis.started', 'analysis.completed')     ║
+║ ✅ Extract result rendering to pure functions                              ║
+║                                                                            ║
+║ SEE: doc/ADR-004-viability-panel-complexity.md (when created)             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
 Author: Simão Eugénio
 Date: November 12, 2025 (Refactored)
 """
@@ -43,6 +65,9 @@ from .experiment_manager import ExperimentManager
 from .subnet_simulator import SubnetSimulator
 from .ui.simulation_control_toolbar import SimulationControlToolbar
 from .ui.subnet_parameters_view import SubnetParametersView
+
+# Phase 2.2 Extracted Analyzers
+from .analyzers import ViabilityAnalyzer, AnalysisResult
 
 
 class ViabilityPanel(Gtk.Box):
@@ -109,6 +134,8 @@ class ViabilityPanel(Gtk.Box):
         
         # Don't call show_all() here - panel will be shown after being packed into container
         # (matches Report panel pattern)
+    
+    # ==================== UI Construction ====================
     
     def _build_header(self):
         """Build panel header."""
@@ -417,6 +444,8 @@ class ViabilityPanel(Gtk.Box):
     
     # TreeView creation methods moved to SubnetParametersView class
     # Keeping _create_suggestions_treeview here as it's for investigation view
+    
+    # ==================== Model and Canvas Access ====================
     
     def _get_current_model(self):
         """Get THIS panel's canvas manager (which contains the actual rendered objects).
@@ -969,6 +998,8 @@ class ViabilityPanel(Gtk.Box):
         if not self.selected_localities:
             self.diagnose_button.set_sensitive(False)
     
+    # ==================== Parameter Table Management ====================
+    
     def _refresh_subnet_parameters(self):
         """Refresh subnet parameters tables based on selected localities."""
         # Clear all stores
@@ -1365,8 +1396,13 @@ class ViabilityPanel(Gtk.Box):
         except ValueError:
             pass
     
+    # ==================== Analysis Pipeline Execution ====================
+    
     def _run_analysis_pipeline(self, transition):
         """Run the full analysis pipeline on a transition.
+        
+        DEPRECATED: Phase 2.2 extraction - Use ViabilityAnalyzer instead.
+        This method is kept for backward compatibility and will be removed in Phase 2.5.
         
         Args:
             transition: TransitionKnowledge object
@@ -1454,6 +1490,9 @@ class ViabilityPanel(Gtk.Box):
     def _generate_suggestions_from_issues(self, issues, transition):
         """Generate suggestions from issues.
         
+        DEPRECATED: Phase 2.2 extraction - Use ViabilityAnalyzer.analyze(generate_suggestions=True) instead.
+        This method is kept for backward compatibility and will be removed in Phase 2.5.
+        
         Args:
             issues: List of Issue objects
             transition: TransitionKnowledge object
@@ -1511,6 +1550,8 @@ class ViabilityPanel(Gtk.Box):
                 traceback.print_exc()
         
         return all_suggestions
+    
+    # ==================== Result Display and Visualization ====================
     
     def _show_investigation_view(self):
         """Show investigation results in UI."""
@@ -1835,6 +1876,8 @@ class ViabilityPanel(Gtk.Box):
         dialog.run()
         dialog.destroy()
     
+    # ==================== Knowledge Base Management ====================
+    
     def _get_kb(self):
         """Get THIS panel's knowledge base (not the currently visible tab).
         
@@ -1967,6 +2010,8 @@ class ViabilityPanel(Gtk.Box):
         if hasattr(transition, 'id'):
             self.investigate_transition(transition.id)
     
+    # ==================== Button Event Handlers ====================
+    
     def _on_diagnose_clicked(self, button):
         """Handle 'Diagnose Selected' button click.
         
@@ -1996,12 +2041,17 @@ class ViabilityPanel(Gtk.Box):
         total_issues = 0
         
         for transition in checked_transitions:
-            # Run analysis levels
-            issues = self._run_analysis_pipeline(transition)
-            total_issues += len(issues)
+            # Phase 2.2: Use extracted ViabilityAnalyzer
+            model = self._get_current_model()
+            kb = self._get_kb()
+            simulation = self._get_simulation()
             
-            # Generate suggestions from issues
-            suggestions = self._generate_suggestions_from_issues(issues, transition)
+            analyzer = ViabilityAnalyzer(model, kb=kb, simulation=simulation, data_cache=self.data_cache)
+            result = analyzer.analyze(transition, mode='standard', generate_suggestions=True)
+            
+            issues = result.issues
+            total_issues += len(issues)
+            suggestions = result.suggestions
             
             # Categorize suggestions
             for suggestion in suggestions:
@@ -2136,6 +2186,8 @@ class ViabilityPanel(Gtk.Box):
         # structural/biological/kinetic categories which have been removed.
         # Keeping stub for backward compatibility.
         pass
+    
+    # ==================== External Panel Integration ====================
     
     def add_object_for_analysis(self, obj):
         """Add object for analysis with visual highlight.
@@ -2283,6 +2335,8 @@ class ViabilityPanel(Gtk.Box):
         
         import logging
         logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Panel cleared")
+    
+    # ==================== Panel Refresh and State Management ====================
     
     def refresh_all(self):
         """Refresh all panel data to match current document.
@@ -2447,6 +2501,8 @@ class ViabilityPanel(Gtk.Box):
             False
         )
         self.diagnostics_textview.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
+    
+    # ==================== Simulation Control Integration ====================
     
     def _on_clear_diagnostics_log(self, button):
         """Clear diagnostics log."""
@@ -2797,6 +2853,8 @@ class ViabilityPanel(Gtk.Box):
         }
         plural_type = type_mapping.get(swept_param_type, swept_param_type)
         self.subnet_params_view.update_sweep_indicators(plural_type, swept_param_id)
+    
+    # ==================== Batch Sweep Operations ====================
     
     def _clear_sweep_indicators(self):
         """Reset all row backgrounds to white."""

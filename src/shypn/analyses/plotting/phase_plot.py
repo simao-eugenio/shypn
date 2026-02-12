@@ -128,8 +128,25 @@ class PhasePlot(BasePlot):
             data_arrays: List of 3 data arrays
         """
         # Check if we need to recreate axes with 3D projection
-        from mpl_toolkits.mplot3d import Axes3D
-        if not isinstance(self.axes, Axes3D):
+        is_3d = False
+        try:
+            from mpl_toolkits.mplot3d import Axes3D
+            is_3d = isinstance(self.axes, Axes3D)
+        except (ImportError, ModuleNotFoundError):
+            # Matplotlib 3D support not available - cannot create 3D plot
+            self.axes.clear()
+            self.axes.text(0.5, 0.5,
+                'Error: 3D plotting requires compatible matplotlib version\n\nMatplotlib 3D support is not available',
+                horizontalalignment='center',
+                verticalalignment='center',
+                transform=self.axes.transAxes,
+                fontsize=12,
+                color='red'
+            )
+            self.canvas.draw_idle()
+            return
+        
+        if not is_3d:
             # Clear all axes including colorbars
             for ax in self.figure.get_axes():
                 ax.clear()

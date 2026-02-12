@@ -4,6 +4,7 @@
 Collects place tokens and transition firing counts at each simulation step.
 """
 from typing import Dict, List, Tuple, Optional
+from shypn.core.value_objects import RecordingConfig
 
 
 class DataCollector:
@@ -17,30 +18,31 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model, controller=None, recording_interval: int = 1, time_based_recording: bool = True, recording_time_interval: float = 0.05, recorded_objects: Optional[set] = None):
+    def __init__(self, model, controller=None, config: RecordingConfig = None):
         """Initialize data collector.
+        
+        REFACTORED: Now uses RecordingConfig value object (reduced from 6 parameters to 2).
         
         Args:
             model: DocumentModel instance with places and transitions
             controller: Optional SimulationController for accessing behavior cache
-            recording_interval: Record state every Nth call to record_state (1=every step, 10=every 10th step)
-                              Only used if time_based_recording=False. Higher values reduce overhead for batch mode
-            time_based_recording: If True, record at fixed model-time intervals (guarantees consistent data density)
-            recording_time_interval: Model-time interval between recordings (default 0.05s = 20 Hz)
-            recorded_objects: Optional set of place/transition IDs to record. If None or empty, records ALL objects.
+            config: RecordingConfig with recording parameters (default: RecordingConfig.default())
         """
+        if config is None:
+            config = RecordingConfig.default()
+        
         self.model = model
         self.controller = controller  # For accessing behavior cache
-        self.recorded_objects = recorded_objects  # Store for filtering
+        self.recorded_objects = config.recorded_objects  # Store for filtering
         self.time_points: List[float] = []
         self.place_data: Dict[str, List[int]] = {}
         self.transition_data: Dict[str, List[int]] = {}  # Cumulative counts
         self.transition_rates: Dict[str, List[float]] = {}  # Instantaneous rates/propensities
         self.is_collecting: bool = False
-        self.recording_interval = recording_interval
+        self.recording_interval = config.recording_interval
         self._record_counter = 0  # Track calls to record_state
-        self.time_based_recording = time_based_recording
-        self.recording_time_interval = recording_time_interval
+        self.time_based_recording = config.time_based_recording
+        self.recording_time_interval = config.recording_time_interval
         self._last_recorded_time = None  # Track last recording time for time-based mode
         
         # Thermodynamic validation results (populated at simulation end)
