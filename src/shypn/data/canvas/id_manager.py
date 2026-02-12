@@ -19,9 +19,15 @@ LIFECYCLE INTEGRATION:
 This IDManager can optionally delegate to a global IDScopeManager for
 canvas-scoped ID generation. Set _lifecycle_scope_manager at module level
 to enable multi-canvas support with isolated ID sequences.
+
+LIFECYCLE HOOKS (Week 2 - Phase 4):
+IDManager can track object lifecycle and emit events for observers:
+- on_create: Called when object is created (for UndoManager, DataCollector)
+- on_modify: Called when object properties change (for dirty tracking)
+- on_delete: Called when object is deleted (for cleanup, reference removal)
 """
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable, Dict, Any
 from contextlib import contextmanager
 
 # Global reference to lifecycle ID scope manager (set by lifecycle system)
@@ -78,18 +84,38 @@ class IDManager:
     the entire application. It maintains separate counters for each object type
     and provides methods to generate new IDs and parse existing ones.
     
+    **Lifecycle Tracking (Week 2 - Phase 4):**
+    Optionally tracks object lifecycle and notifies observers when objects are
+    created, modified, or deleted. Enables automatic cleanup and synchronization.
+    
     Attributes:
         _next_place_id: Next available place counter
         _next_transition_id: Next available transition counter
         _next_arc_id: Next available arc counter
+        _lifecycle_enabled: Whether lifecycle tracking is enabled
+        _tracked_objects: Dict of object_id -> object for lifecycle tracking
+        _lifecycle_callbacks: Dict of event_type -> list of callbacks
     """
     
-    def __init__(self):
-        """Initialize ID manager with counters starting at 1."""
+    def __init__(self, enable_lifecycle: bool = False):
+        """Initialize ID manager with counters starting at 1.
+        
+        Args:
+            enable_lifecycle: Enable lifecycle tracking and event emissions
+        """
         self._next_place_id = 1
         self._next_transition_id = 1
         self._next_arc_id = 1
         self._next_module_id = 1  # Module counter for modular Bio-PN
+        
+        # Lifecycle tracking (Week 2 - Phase 4)
+        self._lifecycle_enabled = enable_lifecycle
+        self._tracked_objects: Dict[str, Any] = {}  # obj_id -> object
+        self._lifecycle_callbacks: Dict[str, list[Callable]] = {
+            'created': [],
+            'modified': [],
+            'deleted': []
+        }
     
     def generate_place_id(self) -> str:
         """Generate a new place ID.
@@ -298,4 +324,173 @@ class IDManager:
         self._next_place_id = place_id
         self._next_transition_id = transition_id
         self._next_arc_id = arc_id
-        self._next_module_id = module_id
+        self._next_module_id = module_id    
+    # ========== Lifecycle Hooks (Week 2 - Phase 4) ==========
+    
+    def register_object(
+        self, 
+        obj: Any, 
+        obj_type: str = 'unknown',
+        on_create: Optional[Callable] = None,
+        on_modify: Optional[Callable] = None,
+        on_delete: Optional[Callable] = None
+    ) -> None:
+        """Register object for lifecycle tracking.
+        
+        Enables automatic cleanup and observer notifications when objects
+        are created, modified, or deleted. UndoManager, DataCollector, and
+        OverlayManager can subscribe to these events.
+        
+        Args:
+            obj: Object to track (Place, Transition, Arc)
+            obj_type: Type identifier ('place', 'transition', 'arc')
+            on_create: Optional callback when object is created
+            on_modify: Optional callback when object is modified
+            on_delete: Optional callback when object is deleted
+        
+        Example:
+            id_manager.register_object(
+                place,
+                obj_type='place',
+                on_delete=lambda p: undo_manager.track_deletion(p)
+            )
+        """
+        if not self._lifecycle_enabled:
+            return
+        
+        obj_id = getattr(obj, 'id', str(id(obj)))
+        self._tracked_objects[obj_id] = obj
+        
+        # Emit lifecycle event for global observers
+        try:
+            from shypn.events import EventBus
+            EventBus.emit('lifecycle.object.created', {
+                'object': obj,
+                'object_id': obj_id,
+                'object_type': obj_type
+            })
+        except ImportError:
+            pass  # EventBus not available
+        
+        # Call custom callback if provided
+        if on_create:
+            try:
+                on_create(obj)
+            except Exception:
+                pass  # Don't break object creation if callback fails
+    
+    def notify_modified(self, obj: Any, property_name: str = None, old_value: Any = None, new_value: Any = None):
+        """Notify observers that object was modified.
+        
+        Args:
+            obj: Modified object
+            property_name: Name of modified property (e.g., 'tokens', 'rate_function')
+            old_value: Previous value (optional)
+            new_value: New value (optional)
+        
+        Example:
+            place.tokens = 50
+            id_manager.notify_modified(place, 'tokens', old_value=10, new_value=50)
+        """
+        if not self._lifecycle_enabled:
+            return
+        
+        obj_id = getattr(obj, 'id', str(id(obj)))
+        
+        # Emit lifecycle event
+        try:
+            from shypn.events import EventBus
+            EventBus.emit('lifecycle.object.modified', {
+                'object': obj,
+                'object_id': obj_id,
+                'property': property_name,
+                'old_value': old_value,
+                'new_value': new_value
+            })
+        except ImportError:
+            pass
+        
+        # Call registered callbacks
+        for callback in self._lifecycle_callbacks['modified']:
+            try:
+                callback(obj, property_name, old_value, new_value)
+            except Exception:
+                pass
+    
+    def notify_deleted(self, obj: Any, obj_type: str = 'unknown'):
+        """Notify observers that object was deleted.
+        
+        Triggers cleanup in UndoManager, removes references from DataCollector,
+        and unregisters from OverlayManager.
+        
+        Args:
+            obj: Deleted object
+            obj_type: Type identifier ('place', 'transition', 'arc')
+        
+        Example:
+            id_manager.notify_deleted(place, 'place')
+            # UndoManager records deletion, DataCollector removes from tracking
+        """
+        if not self._lifecycle_enabled:
+            return
+        
+        obj_id = getattr(obj, 'id', str(id(obj)))
+        
+        # Remove from tracking
+        if obj_id in self._tracked_objects:
+            del self._tracked_objects[obj_id]
+        
+        # Emit lifecycle event
+        try:
+            from shypn.events import EventBus
+            EventBus.emit('lifecycle.object.deleted', {
+                'object': obj,
+                'object_id': obj_id,
+                'object_type': obj_type
+            })
+        except ImportError:
+            pass
+        
+        # Call registered callbacks
+        for callback in self._lifecycle_callbacks['deleted']:
+            try:
+                callback(obj, obj_type)
+            except Exception:
+                pass
+    
+    def subscribe_lifecycle(self, event_type: str, callback: Callable):
+        """Subscribe to lifecycle events.
+        
+        Args:
+            event_type: 'created', 'modified', or 'deleted'
+            callback: Function to call when event occurs
+        
+        Example:
+            id_manager.subscribe_lifecycle(
+                'deleted',
+                lambda obj, obj_type: undo_manager.track_deletion(obj)
+            )
+        """
+        if event_type in self._lifecycle_callbacks:
+            self._lifecycle_callbacks[event_type].append(callback)
+    
+    def unsubscribe_lifecycle(self, event_type: str, callback: Callable):
+        """Unsubscribe from lifecycle events.
+        
+        Args:
+            event_type: 'created', 'modified', or 'deleted'
+            callback: Function to remove
+        """
+        if event_type in self._lifecycle_callbacks:
+            try:
+                self._lifecycle_callbacks[event_type].remove(callback)
+            except ValueError:
+                pass  # Callback not in list
+    
+    def get_tracked_objects(self) -> Dict[str, Any]:
+        """Get all currently tracked objects.
+        
+        Returns:
+            Dictionary of object_id -> object
+        """
+        return self._tracked_objects.copy()
