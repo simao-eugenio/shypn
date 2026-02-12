@@ -566,6 +566,14 @@ class TransitionBuilder:
         for key, value in self._metadata.items():
             transition.metadata[key] = value
         
+        # Lifecycle tracking (Week 2 - Phase 4)
+        # Register object with IDManager for lifecycle observation
+        if self._id_manager and hasattr(self._id_manager, 'register_object'):
+            try:
+                self._id_manager.register_object(transition, obj_type='transition')
+            except Exception:
+                pass  # Lifecycle tracking optional, don't break build
+        
         return transition
     
     def _validate(self):

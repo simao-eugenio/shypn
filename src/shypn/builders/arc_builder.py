@@ -576,6 +576,14 @@ class ArcBuilder:
         if self._metadata:
             arc.metadata.update(self._metadata)
         
+        # Lifecycle tracking (Week 2 - Phase 4)
+        # Register object with IDManager for lifecycle observation
+        if self._id_manager and hasattr(self._id_manager, 'register_object'):
+            try:
+                self._id_manager.register_object(arc, obj_type='arc')
+            except Exception:
+                pass  # Lifecycle tracking optional, don't break build
+        
         return arc
     
     # ========== Internal Helper Methods ==========

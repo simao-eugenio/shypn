@@ -315,6 +315,12 @@ def register_standard_events():
     
     EventBus.register_event('model.batch.started', 'Batch modification started')
     EventBus.register_event('model.batch.completed', 'Batch modification completed')
+    
+    # Lifecycle events (Week 2 - Phase 4)
+    # Enables automatic cleanup and observer pattern for object lifecycle
+    EventBus.register_event('lifecycle.object.created', 'Object created and registered in lifecycle')
+    EventBus.register_event('lifecycle.object.modified', 'Object modified after creation')
+    EventBus.register_event('lifecycle.object.deleted', 'Object deleted and unregistered from lifecycle')
 
 
 # Auto-register on module import
