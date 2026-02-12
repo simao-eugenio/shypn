@@ -387,12 +387,12 @@ class LeftPanelLoader:
             self.window.show_all()
     
     # ========================================================================
-    # PHASE 4: GtkStack Integration Methods
+    # GtkStack Integration Methods
     # New architecture: Panels live in GtkStack, controlled by Master Palette
     # ========================================================================
     
     def add_to_stack(self, stack, container, panel_name='files'):
-        """Add panel content to a GtkStack container (Phase 4: new architecture).
+        """Add panel content to a GtkStack container.
         
         WAYLAND FIX: Don't create window in stack mode - load content directly.
         
@@ -453,7 +453,7 @@ class LeftPanelLoader:
         
     
     def show_in_stack(self):
-        """Show this panel in the GtkStack (Phase 4: Master Palette control).
+        """Show this panel in the GtkStack (Master Palette control).
         
         Called by Master Palette when user activates the Files button.
         Makes the stack visible and sets this panel as the active child.
@@ -480,7 +480,7 @@ class LeftPanelLoader:
         
     
     def hide_in_stack(self):
-        """Hide this panel in the GtkStack (Phase 4: Master Palette control).
+        """Hide this panel in the GtkStack (Master Palette control).
         
         Called by Master Palette when user deactivates the Files button.
         Hides the content but keeps it in the stack for fast re-activation.

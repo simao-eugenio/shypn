@@ -61,10 +61,10 @@ except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
-# PHASE 4: Import simulation controller for state-based permissions
+# Import simulation controller for state-based permissions
 try:
     from shypn.engine.simulation.controller import SimulationController
-    # PHASE 4: Import IDManager lifecycle integration
+    # Import IDManager lifecycle integration
     from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
 except ImportError as e:
     print(f'ERROR: Cannot import SimulationController: {e}', file=sys.stderr)
@@ -129,7 +129,7 @@ class ModelCanvasLoader:
         # context switching when users navigate between tabs.
         # ═══════════════════════════════════════════════════════════════════
         
-        # PHASE 4: Simulation controllers - one per canvas
+        # Simulation controllers - one per canvas
         # Canvas-centric design: Controllers stored by drawing_area, not palette.
         # This ensures wiring survives SwissPalette refactoring.
         # Access pattern: drawing_area → controller → state_detector, interaction_guard
@@ -141,7 +141,7 @@ class ModelCanvasLoader:
             from shypn.canvas.lifecycle import enable_lifecycle_system
             self.lifecycle_manager, self.lifecycle_adapter = enable_lifecycle_system(self)
             
-            # PHASE 4: Connect global IDManager to lifecycle scoping
+            # Connect global IDManager to lifecycle scoping
             # This makes all ID generation canvas-scoped automatically
             if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
                 set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
@@ -2224,7 +2224,7 @@ class ModelCanvasLoader:
         swissknife_palette.connect('position-changed', self._on_swissknife_position_changed, swissknife_widget, drawing_area)
         
         # ============================================================
-        # PHASE 4: Create simulation controller for this canvas
+        # Create simulation controller for this canvas
         # ============================================================
         # Canvas-centric design: One controller per drawing_area
         # This wiring survives SwissPalette refactoring because:
@@ -2938,8 +2938,7 @@ class ModelCanvasLoader:
         
         # Drawing tools (place, transition, arc)
         if tool_id in ('place', 'transition', 'arc'):
-            pass
-            # PHASE 4: Check permission before activating structural tools
+            # Check permission before activating structural tools
             # This uses canvas-centric access pattern that survives SwissPalette refactoring
             controller = self.get_canvas_controller(drawing_area)
             if controller:
@@ -3222,8 +3221,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget.
         """
         if tool_name:
-            pass
-            # PHASE 4: Check permission before activating tools
+            # Check permission before activating tools
             # Canvas-centric access ensures this survives SwissPalette refactoring
             controller = self.get_canvas_controller(drawing_area)
             if controller:
@@ -4403,7 +4401,7 @@ class ModelCanvasLoader:
     def get_canvas_controller(self, drawing_area=None):
         """Get the simulation controller for a drawing area.
         
-        PHASE 4: Canvas-centric controller access.
+        Canvas-centric controller access.
         This method provides stable access to controllers that survives
         SwissPalette refactoring. Controllers are keyed by drawing_area,
         which is a stable reference that won't change during UI refactoring.
