@@ -589,9 +589,16 @@ class BasePlot(Gtk.Box):
         """Show empty state message."""
         self.axes.clear()
         
-        # Check if 3D axes
-        from mpl_toolkits.mplot3d import Axes3D
-        if isinstance(self.axes, Axes3D):
+        # Check if 3D axes (handle matplotlib version compatibility)
+        is_3d = False
+        try:
+            from mpl_toolkits.mplot3d import Axes3D
+            is_3d = isinstance(self.axes, Axes3D)
+        except (ImportError, ModuleNotFoundError):
+            # Matplotlib 3D support not available or incompatible version
+            pass
+        
+        if is_3d:
             # 3D axes require x, y, z, s arguments
             self.axes.text(0.5, 0.5, 0.5,
                 'No data to display\n\nAdd objects from Transitions or Places categories',
@@ -632,9 +639,16 @@ class BasePlot(Gtk.Box):
         # Re-get the primary axes reference after clearing
         self.axes = self.figure.get_axes()[0] if self.figure.get_axes() else self.figure.add_subplot(111)
         
-        # Check if 3D axes
-        from mpl_toolkits.mplot3d import Axes3D
-        if isinstance(self.axes, Axes3D):
+        # Check if 3D axes (handle matplotlib version compatibility)
+        is_3d = False
+        try:
+            from mpl_toolkits.mplot3d import Axes3D
+            is_3d = isinstance(self.axes, Axes3D)
+        except (ImportError, ModuleNotFoundError):
+            # Matplotlib 3D support not available or incompatible version
+            pass
+        
+        if is_3d:
             # 3D axes - set up basic structure
             self.axes.set_xlabel('X', fontsize=11)
             self.axes.set_ylabel('Y', fontsize=11)
@@ -668,9 +682,17 @@ class BasePlot(Gtk.Box):
         if len(obj_names) > 3:
             objects_text += f' + {len(obj_names) - 3} more'
         
-        # Check if 3D axes
-        from mpl_toolkits.mplot3d import Axes3D
-        if isinstance(self.axes, Axes3D):
+        # Check if 3D axes (handle matplotlib version compatibility)
+        is_3d = False
+        try:
+            from mpl_toolkits.mplot3d import Axes3D
+            is_3d = isinstance(self.axes, Axes3D)
+        except (ImportError, ModuleNotFoundError):
+            # Matplotlib 3D support not available or incompatible version
+            # Fall back to 2D rendering
+            pass
+        
+        if is_3d:
             # 3D axes require x, y, z, s arguments
             self.axes.text(0.5, 0.5, 0.5,
                 f'Waiting for simulation data\n\nSelected objects: {objects_text}\n\nRun simulation to see plots',

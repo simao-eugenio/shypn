@@ -192,6 +192,9 @@ class PlacePropDialogLoader(GObject.GObject):
 
     def _apply_changes(self):
         """Apply changes from dialog fields to Place object."""
+        # Track signal place status BEFORE changes
+        was_signal_place = getattr(self.place_obj, 'is_signal_place', False)
+        
         # Name (user-editable alias)
         name_entry = self.builder.get_object('name_entry')
         if name_entry and hasattr(self.place_obj, 'name'):
@@ -274,6 +277,41 @@ class PlacePropDialogLoader(GObject.GObject):
             else:
                 # Clear signal type when unchecked
                 self.place_obj.signal_type = None
+        
+        # AUTOMATIC ARC TRANSFORMATION: When place becomes signal place
+        # Convert all connected arcs to signal flow arcs (formalism requirement)
+        if not was_signal_place and self.place_obj.is_signal_place:
+            self._convert_connected_arcs_to_signal_flow()
+    
+    def _convert_connected_arcs_to_signal_flow(self):
+        """Convert all arcs connected to this place to signal flow arcs.
+        
+        Called automatically when a place becomes a signal place.
+        According to the formalism, signal places require signal flow arcs.
+        """
+        if not hasattr(self.place_obj, '_manager') or not self.place_obj._manager:
+            return  # No manager, can't access arcs
+        
+        manager = self.place_obj._manager
+        from shypn.utils.arc_transform import convert_to_signal_flow
+        
+        # Find all arcs connected to this place
+        connected_arcs = []
+        for arc in manager.arcs:
+            if arc.source == self.place_obj or arc.target == self.place_obj:
+                connected_arcs.append(arc)
+        
+        # Convert each arc to signal flow
+        for old_arc in connected_arcs:
+            try:
+                new_arc = convert_to_signal_flow(old_arc)
+                # Only replace if conversion created a different arc
+                if new_arc is not old_arc:
+                    manager.replace_arc(old_arc, new_arc)
+            except ValueError:
+                # Conversion failed (e.g., arc doesn't connect to signal place)
+                # This shouldn't happen since we're converting arcs connected to a signal place
+                pass
 
     def _setup_topology_tab(self):
         """Setup topology information tab using PlaceTopologyTabLoader.

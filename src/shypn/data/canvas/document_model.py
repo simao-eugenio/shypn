@@ -4,7 +4,9 @@ This module defines the DocumentModel class, which represents a complete
 Petri net model including places, transitions, arcs, modules, and metadata.
 """
 
+import time
 from typing import List, Dict, Optional, Any, Tuple
+from shypn.events import EventBus
 from shypn.netobjs import Place, Transition, Arc, PetriNetObject, Module
 from .id_manager import IDManager, suspend_lifecycle_delegation
 
@@ -1016,6 +1018,13 @@ class DocumentModel:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         
+        # Emit file.saved event
+        EventBus.emit('file.saved', {
+            'filepath': filepath,
+            'document': self,
+            'timestamp': time.time(),
+            'was_autosave': False  # Manual save
+        })
     
     @classmethod
     def load_from_file(cls, filepath: str) -> 'DocumentModel':
@@ -1037,5 +1046,12 @@ class DocumentModel:
             data = json.load(f)
         
         document = cls.from_dict(data)
+        
+        # Emit file.opened event
+        EventBus.emit('file.opened', {
+            'filepath': filepath,
+            'document': document,
+            'timestamp': time.time()
+        })
         
         return document

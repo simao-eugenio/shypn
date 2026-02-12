@@ -251,8 +251,41 @@ class TransitionBehavior(ABC):
                 f"Model.arcs must be dict or list, got {type(arcs_collection)}"
             )
         
-        # Use object reference comparison, not ID
-        return [arc for arc in arcs if arc.target == self.transition]
+        # Use ID comparison (primary) with object reference fallback
+        # Netobjects should be dereferenced via properties like source_id, target_id
+        transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
+        result = []
+        
+        # Use ID comparison (primary) with object reference fallback
+        # Netobjects should be dereferenced via properties like source_id, target_id
+        transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
+        result = []
+        
+        for arc in arcs:
+            # Primary: ID comparison via arc.target_id property
+            try:
+                if hasattr(arc, 'target_id') and arc.target_id == transition_id:
+                    result.append(arc)
+                    continue
+            except:
+                pass
+            
+            # Fallback: Object reference comparison
+            try:
+                if arc.target == self.transition:
+                    result.append(arc)
+                    continue
+            except:
+                pass
+                
+            # Last resort: String ID in target
+            try:
+                if isinstance(arc.target, str) and arc.target == transition_id:
+                    result.append(arc)
+            except:
+                pass
+        
+        return result
     
     def get_output_arcs(self) -> List:
         """Get all output arcs from this transition.
@@ -280,8 +313,41 @@ class TransitionBehavior(ABC):
                 f"Model.arcs must be dict or list, got {type(arcs_collection)}"
             )
         
-        # Use object reference comparison, not ID
-        return [arc for arc in arcs if arc.source == self.transition]
+        # Use ID comparison (primary) with object reference fallback
+        # Netobjects should be dereferenced via properties like source_id, target_id
+        transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
+        result = []
+        
+        # Use ID comparison (primary) with object reference fallback
+        # Netobjects should be dereferenced via properties like source_id, target_id
+        transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
+        result = []
+        
+        for arc in arcs:
+            # Primary: ID comparison via arc.source_id property
+            try:
+                if hasattr(arc, 'source_id') and arc.source_id == transition_id:
+                    result.append(arc)
+                    continue
+            except:
+                pass
+            
+            # Fallback: Object reference comparison
+            try:
+                if arc.source == self.transition:
+                    result.append(arc)
+                    continue
+            except:
+                pass
+                
+            # Last resort: String ID in source
+            try:
+                if isinstance(arc.source, str) and arc.source == transition_id:
+                    result.append(arc)
+            except:
+                pass
+        
+        return result
     
     def _get_place(self, place_id):
         """Get place object by ID.

@@ -79,26 +79,9 @@ class StochasticBehavior(TransitionBehavior):
         self.boundary_validator = BoundaryValidator(model)
         self.volume_selector = VolumeAdaptiveSelector(threshold_fL=1.0)
         
-        # Check if connected places suggest stochastic is appropriate
-        input_arcs = self.get_input_arcs()
-        output_arcs = self.get_output_arcs()
-        
-        input_places = [self._get_place(arc.source_id) for arc in input_arcs 
-                       if self._get_place(arc.source_id)]
-        output_places = [self._get_place(arc.target_id) for arc in output_arcs 
-                        if self._get_place(arc.target_id)]
-        
-        if input_places or output_places:
-            use_stochastic, details = self.volume_selector.analyze_transition(
-                input_places, output_places
-            )
-            
-            if not use_stochastic and details.get('reason') == 'volume-based':
-                self.logger.debug(
-                    f"Stochastic transition '{transition.name}' connected to large volume "
-                    f"places (min={details.get('min_volume'):.2f} fL). "
-                    f"Consider using continuous transition type for better performance."
-                )
+        # Defer arc-dependent volume checking until first use
+        # (model.arcs may not be loaded yet during deserialization)
+        self._volume_check_done = False
         
         # Rate limiting for negative rate warnings (avoid console spam)
         self._negative_rate_warnings = {}  # transition_name -> (count, last_logged_time)
@@ -199,6 +182,45 @@ class StochasticBehavior(TransitionBehavior):
         self.assignment_rules: Dict[int, str] = {}  # place_id -> formula
         self._compiled_rules: Dict[int, Any] = {}  # place_id -> compiled code
         self._rules_initialized = False
+    
+    def _check_volume_appropriateness(self):
+        """Check if connected places suggest stochastic is appropriate.
+        
+        Called lazily on first use to avoid accessing model.arcs during
+        deserialization when arcs haven't been loaded yet.
+        """
+        if self._volume_check_done:
+            return
+        
+        self._volume_check_done = True
+        
+        try:
+            input_arcs = self.get_input_arcs()
+            output_arcs = self.get_output_arcs()
+            
+            if not input_arcs and not output_arcs:
+                # No arcs yet - model still loading
+                return
+            
+            input_places = [self._get_place(arc.source_id) for arc in input_arcs 
+                           if self._get_place(arc.source_id)]
+            output_places = [self._get_place(arc.target_id) for arc in output_arcs 
+                            if self._get_place(arc.target_id)]
+            
+            if input_places or output_places:
+                use_stochastic, details = self.volume_selector.analyze_transition(
+                    input_places, output_places
+                )
+                
+                if not use_stochastic and details.get('reason') == 'volume-based':
+                    self.logger.debug(
+                        f"Stochastic transition '{self.transition.name}' connected to large volume "
+                        f"places (min={details.get('min_volume'):.2f} fL). "
+                        f"Consider using continuous transition type for better performance."
+                    )
+        except Exception as e:
+            # Don't fail if volume check fails
+            self.logger.debug(f"Volume appropriateness check failed for '{self.transition.name}': {e}")
     
     def _detect_signal_places(self):
         r"""Detect signal places (Ψ) for this transition's rate formula.
@@ -653,6 +675,9 @@ class StochasticBehavior(TransitionBehavior):
             - (False, "not-scheduled") if no scheduled fire time
             - (False, "too-early") if before scheduled time
         """
+        # Deferred volume check (only on first use after model fully loaded)
+        self._check_volume_appropriateness()
+        
         # Check if this is a source transition
         is_source = getattr(self.transition, 'is_source', False)
         

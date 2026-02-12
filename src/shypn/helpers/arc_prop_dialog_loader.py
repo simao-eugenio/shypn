@@ -295,17 +295,15 @@ class ArcPropDialogLoader(GObject.GObject):
     def _apply_changes(self):
         """Apply changes from dialog fields to Arc object.
         
-        Note: Arc type changes require transformation which creates a new arc object.
-        The caller should check if the arc object reference changed and update accordingly.
-        """
-        # Name (user-editable alias)
-        name_entry = self.builder.get_object('name_entry')
-        if name_entry and hasattr(self.arc_obj, 'name'):
-            new_name = name_entry.get_text().strip()
-            if new_name:  # Only update if non-empty
-                self.arc_obj.name = new_name
+        For arc type transformations, we follow the same pattern as context menu:
+        1. Check if type needs to change
+        2 If yes: transform arc (which creates new arc with correct class and color)
+        3. Replace old arc with new arc in model
+        4. Done - don't apply other properties (already copied by transformation)
         
-        # Check if arc type needs to change
+        If no type change: apply all property changes directly to existing arc.
+        """
+        # Check if arc type needs to change FIRST (before applying other properties)
         type_combo = self.builder.get_object('prop_arc_type_combo')
         if type_combo:
             new_type_index = type_combo.get_active()
@@ -314,102 +312,113 @@ class ArcPropDialogLoader(GObject.GObject):
             current_is_test = is_test(self.arc_obj)
             current_is_signal_flow = is_signal_flow(self.arc_obj)
             
+            # Type transformation needed?
+            type_changed = False
+            new_arc = None
+            
             if new_type_index == 0 and (current_is_inhibitor or current_is_test or current_is_signal_flow):
-                # Convert from Inhibitor/Test/SignalFlow to Normal
-                self.arc_obj = convert_to_normal(self.arc_obj)
-                self._replace_arc_in_model()
+                # Convert to Normal
+                new_arc = convert_to_normal(self.arc_obj)
+                type_changed = True
             elif new_type_index == 1 and not current_is_inhibitor:
-                # Convert from Normal/Test/SignalFlow to Inhibitor
+                # Convert to Inhibitor
                 try:
-                    self.arc_obj = convert_to_inhibitor(self.arc_obj)
-                    self._replace_arc_in_model()
+                    new_arc = convert_to_inhibitor(self.arc_obj)
+                    type_changed = True
                 except ValueError as e:
-                    # Show error dialog if conversion invalid (e.g., Transition → Place)
-                    error_dialog = Gtk.MessageDialog(
-                        transient_for=self.dialog,
-                        flags=0,
-                        message_type=Gtk.MessageType.ERROR,
-                        buttons=Gtk.ButtonsType.OK,
-                        text="Cannot convert to Inhibitor Arc"
-                    )
-                    error_dialog.format_secondary_text(str(e))
-                    error_dialog.run()
-                    error_dialog.destroy()
-                    return  # Don't apply other changes
+                    self._show_conversion_error("Cannot convert to Inhibitor Arc", str(e))
+                    return
             elif new_type_index == 2 and not current_is_test:
-                # Convert from Normal/Inhibitor/SignalFlow to Test
+                # Convert to Test
                 try:
-                    self.arc_obj = convert_to_test(self.arc_obj)
-                    self._replace_arc_in_model()
+                    new_arc = convert_to_test(self.arc_obj)
+                    type_changed = True
                 except ValueError as e:
-                    # Show error dialog if conversion invalid (e.g., Transition → Place)
-                    error_dialog = Gtk.MessageDialog(
-                        transient_for=self.dialog,
-                        flags=0,
-                        message_type=Gtk.MessageType.ERROR,
-                        buttons=Gtk.ButtonsType.OK,
-                        text="Cannot convert to Test Arc"
-                    )
-                    error_dialog.format_secondary_text(
-                        f"{e}\n\nTest arcs model catalysts/enzymes that enable reactions "
-                        "without being consumed. They must connect Place → Transition only."
-                    )
-                    error_dialog.run()
-                    error_dialog.destroy()
-                    return  # Don't apply other changes
+                    self._show_conversion_error("Cannot convert to Test Arc", 
+                        f"{e}\n\nTest arcs model catalysts/enzymes that enable reactions without being consumed. "
+                        "They must connect Place → Transition only.")
+                    return
             elif new_type_index == 3 and not current_is_signal_flow:
-                # Convert from Normal/Inhibitor/Test to Signal Flow
+                # Convert to Signal Flow
                 try:
-                    self.arc_obj = convert_to_signal_flow(self.arc_obj)
-                    self._replace_arc_in_model()
+                    new_arc = convert_to_signal_flow(self.arc_obj)
+                    type_changed = True
                 except ValueError as e:
-                    # Show error dialog if conversion invalid (must connect to signal place)
-                    error_dialog = Gtk.MessageDialog(
-                        transient_for=self.dialog,
-                        flags=0,
-                        message_type=Gtk.MessageType.ERROR,
-                        buttons=Gtk.ButtonsType.OK,
-                        text="Cannot convert to Signal Flow Arc"
-                    )
-                    error_dialog.format_secondary_text(
-                        f"{e}\n\nSignal flow arcs model information transfer in hierarchical control "
-                        "systems. At least one endpoint (source or target) must be a signal place."
-                    )
-                    error_dialog.run()
-                    error_dialog.destroy()
-                    return  # Don't apply other changes
+                    self._show_conversion_error("Cannot convert to Signal Flow Arc",
+                        f"{e}\n\nSignal flow arcs model information transfer in hierarchical control systems. "
+                        "At least one endpoint (source or target) must be a signal place.")
+                    return
+            
+            # If type changed, replace arc in model and done
+            if type_changed and new_arc:
+                old_arc = self.arc_obj
+                if hasattr(old_arc, '_manager') and old_arc._manager:
+                    old_arc._manager.replace_arc(old_arc, new_arc)
+                    self._invalidate_simulation_cache(old_arc._manager)
+                return  # Transformation complete - don't apply other changes
         
+        # No type change - apply all property changes to existing arc
+        
+        # Name
+        name_entry = self.builder.get_object('name_entry')
+        if name_entry and hasattr(self.arc_obj, 'name'):
+            new_name = name_entry.get_text().strip()
+            if new_name:
+                self.arc_obj.name = new_name
+        
+        # Label/description
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.arc_obj, 'label'):
             buffer = description_text.get_buffer()
             start, end = buffer.get_bounds()
             label_text = buffer.get_text(start, end, True).strip()
             self.arc_obj.label = label_text if label_text else None
+        
+        # Weight
         weight_entry = self.builder.get_object('prop_arc_weight_entry')
         if weight_entry and hasattr(self.arc_obj, 'weight'):
             try:
                 weight_text = weight_entry.get_text().strip()
                 weight_value = float(weight_text) if weight_text else 1.0
-                old_weight = self.arc_obj.weight
-                # Allow float weights, minimum 0.0 (no negative weights)
                 self.arc_obj.weight = max(0.0, weight_value)
             except ValueError:
                 pass
+        
+        # Width
         line_width_spin = self.builder.get_object('prop_arc_line_width_spin')
         if line_width_spin and hasattr(self.arc_obj, 'width'):
-            old_width = self.arc_obj.width
             self.arc_obj.width = float(line_width_spin.get_value())
+        
+        # Color
         if self.color_picker and hasattr(self.arc_obj, 'color'):
-            old_color = self.arc_obj.color
             selected_color = self.color_picker.get_selected_color()
             self.arc_obj.color = selected_color
+        
+        # Threshold
         threshold_textview = self.builder.get_object('prop_arc_threshold_entry')
         if threshold_textview and hasattr(self.arc_obj, 'threshold'):
             buffer = threshold_textview.get_buffer()
             start, end = buffer.get_bounds()
             threshold_text = buffer.get_text(start, end, True).strip()
-            old_threshold = self.arc_obj.threshold
             self.arc_obj.threshold = self._parse_threshold(threshold_text)
+    
+    def _show_conversion_error(self, title, message):
+        """Show error dialog for arc conversion failure.
+        
+        Args:
+            title: Dialog title
+            message: Error message
+        """
+        error_dialog = Gtk.MessageDialog(
+            transient_for=self.dialog,
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=title
+        )
+        error_dialog.format_secondary_text(message)
+        error_dialog.run()
+        error_dialog.destroy()
 
     def run(self):
         """Show the dialog and run it modally.

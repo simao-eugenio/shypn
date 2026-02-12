@@ -21,6 +21,7 @@ from shypn.ui.panels.topology.structural_category import StructuralCategory
 from shypn.ui.panels.topology.graph_network_category import GraphNetworkCategory
 from shypn.ui.panels.topology.behavioral_category import BehavioralCategory
 from shypn.ui.panels.topology.biological_category import BiologicalCategory
+from shypn.events import EventBus
 
 
 class TopologyPanel(Gtk.Box):
@@ -122,9 +123,6 @@ class TopologyPanel(Gtk.Box):
             self.behavioral_category,
             self.biological_category,
         ]
-        
-        # Report panel callback (will be set by report panel)
-        self._report_refresh_callback = None
         
         # Set parent panel reference for all categories (for report notifications)
         for category in self.categories:
@@ -249,25 +247,19 @@ class TopologyPanel(Gtk.Box):
         """
         return self
     
-    def set_report_refresh_callback(self, callback):
-        """Set callback to refresh report panel when analyses complete.
-        
-        Args:
-            callback: Function to call when topology analyses update
-        """
-        self._report_refresh_callback = callback
-    
     def notify_report_panel(self):
-        """Notify report panel that topology analyses have been updated."""
-        print(f"[TOPOLOGY_PANEL] notify_report_panel called, callback={self._report_refresh_callback is not None}")
-        if self._report_refresh_callback:
-            try:
-                print(f"[TOPOLOGY_PANEL] Calling report refresh callback...")
-                self._report_refresh_callback()
-                print(f"[TOPOLOGY_PANEL] Callback completed")
-            except Exception as e:
-                print(f"[TOPOLOGY_PANEL] Callback failed: {e}")
-                pass  # Silently ignore report panel refresh failures
+        """Notify report panel that topology analyses have been updated via EventBus."""
+        # Get document ID for the current document
+        document_id = None
+        if self.model_canvas and hasattr(self.model_canvas, 'get_current_document_id'):
+            document_id = self.model_canvas.get_current_document_id()
+        
+        # Emit topology.analyzed event with document scoping
+        EventBus.emit('topology.analyzed', {
+            'timestamp': None  # Could add timestamp if needed
+        }, document_id=document_id)
+        
+        print(f"[TOPOLOGY_PANEL] Emitted topology.analyzed event (document_id={document_id})")
 
     
     def get_all_results(self):

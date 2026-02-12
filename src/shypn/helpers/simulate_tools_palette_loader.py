@@ -1453,10 +1453,20 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             # Write CSV with time and recorded objects
             csv_path = os.path.join(results_dir, f'run_{replicate_id + 1:03d}.csv')
             with open(csv_path, 'w', newline='') as f:
+                # Convert DocumentModel to dict format for metadata generator
+                # Metadata sections expect dict with 'places', 'transitions', 'arcs' keys
+                model_dict = model.to_dict() if hasattr(model, 'to_dict') else {
+                    'places': [p.to_dict() if hasattr(p, 'to_dict') else {} for p in getattr(model, 'places', [])],
+                    'transitions': [t.to_dict() if hasattr(t, 'to_dict') else {} for t in getattr(model, 'transitions', [])],
+                    'arcs': [a.to_dict() if hasattr(a, 'to_dict') else {} for a in getattr(model, 'arcs', [])],
+                    'formalism': 'Signal_Hierarchical_Petri_Net',
+                    'metadata': {}
+                }
+                
                 # Generate metadata header for this replicate
                 context = {
                     'model_path': getattr(model, 'filepath', None),
-                    'model': model,
+                    'model': model_dict,
                     'n_replicates': n_replicates,
                     'recorded_objects': list(recorded_objects),
                     'simulation_config': {

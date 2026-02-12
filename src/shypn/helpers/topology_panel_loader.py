@@ -17,6 +17,7 @@ from gi.repository import Gtk
 
 from shypn.helpers.base_panel_loader import PerDocumentPanelLoader
 from shypn.ui.panels.topology import TopologyPanel
+from shypn.events import EventBus
 
 
 class TopologyPanelLoader(PerDocumentPanelLoader):
@@ -36,13 +37,17 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
     All panel logic is in the TopologyPanel class and its categories.
     """
     
-    def __init__(self, model, parent_window=None):
+    def __init__(self, model, parent_window=None, document_id=None, drawing_area=None):
         """Initialize per-document topology panel loader.
         
         Args:
             model: ModelCanvasManager instance (can be None)
             parent_window: Optional parent window for dialogs
+            document_id: Optional document ID for EventBus scoping
+            drawing_area: Optional drawing area reference
         """
+        self.document_id = document_id
+        self.drawing_area = drawing_area
         self.model_canvas_loader = None  # Set after creation
         
         # Initialize base class (creates panel via _create_panel)
@@ -167,12 +172,66 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         
         Called when the associated tab is closed.
         """
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('document.focused', self._on_document_focused)
+        
         # Clear all results
         if self.panel and hasattr(self.panel, 'clear_all_results'):
             self.panel.clear_all_results()
         
         # Call parent cleanup
         super().cleanup()
+    
+    def initialize(self):
+        """Initialize panel and subscribe to tab switching events."""
+        super().initialize()
+        # Subscribe to document.focused events for automatic tab switching
+        EventBus.subscribe('document.focused', self._on_document_focused)
+    
+    def _on_document_focused(self, data):
+        """Handle document.focused events for automatic panel swapping.
+        
+        Args:
+            data: Event data containing drawing_area, canvas_manager, overlay_manager
+        """
+        event_document_id = data.get('_document_id')
+        
+        # Don't handle swapping if panel is floated
+        if not self.is_hanged:
+            return
+        
+        # Don't handle if no parent container
+        if not self.parent_container:
+            return
+        
+        # Check if this event is for our document
+        is_our_document = (event_document_id == self.document_id)
+        
+        if is_our_document:
+            # This is our document - show and refresh
+            # Ensure we're in the container
+            current_parent = self.widget.get_parent()
+            if current_parent != self.parent_container:
+                # Not in container, need to pack
+                if current_parent:
+                    current_parent.remove(self.widget)
+                self.parent_container.pack_start(self.widget, True, True, 0)
+            
+            # Update panel with new document's model
+            canvas_manager = data.get('canvas_manager')
+            if canvas_manager:
+                self.refresh()
+            
+            # Trigger auto-running safe analyzers
+            drawing_area = data.get('drawing_area')
+            if drawing_area and hasattr(self, 'on_tab_switched'):
+                self.on_tab_switched(drawing_area)
+            
+            # Show our widget
+            self.widget.show()
+        else:
+            # This is NOT our document - hide
+            self.widget.hide()
 
 
 # === Factory Function ===

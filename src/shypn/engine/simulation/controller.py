@@ -2,7 +2,6 @@
 Simulation Controller for Petri Net Execution
 
 Manages the execution of Petri net simulations, including:
-    pass
 - Single-step execution
 - Continuous execution (run mode)
 - Stop/pause functionality
@@ -10,6 +9,28 @@ Manages the execution of Petri net simulations, including:
 
 Based on the legacy shypnpy simulation controller but adapted for
 the new architecture.
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ ARCHITECTURE NOTE: This class is intentionally large (3000+ lines)        ║
+║                                                                            ║
+║ REASON: Manages complex state machine for simulation execution.           ║
+║         State transitions, mode switching (stochastic/deterministic/      ║
+║         hybrid), validation, and UI synchronization MUST be centralized   ║
+║         to prevent race conditions and inconsistent state.                ║
+║                                                                            ║
+║ ⚠️  DO NOT SPLIT: State machine from controller                          ║
+║ ⚠️  DO NOT SPLIT: UI synchronization into different class                ║
+║ ⚠️  DO NOT SPLIT: Mode switching (stochastic/deterministic) separately   ║
+║                                                                            ║
+║ SAFE REFACTORINGS:                                                        ║
+║ ✅ Apply State Pattern (RunningState, PausedState, StoppedState)         ║
+║ ✅ Extract validation orchestration (stateless coordinator)               ║
+║ ✅ Create value objects (SimulationConfig, ValidationResults)             ║
+║ ✅ Command Pattern (StartCommand, PauseCommand, StepCommand)              ║
+║ ✅ Extract result formatting to pure functions                            ║
+║                                                                            ║
+║ SEE: doc/ADR-003-simulation-controller-complexity.md (when created)       ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 """
 import random
 from typing import Callable, List, Optional, Dict, Any
@@ -21,6 +42,8 @@ except ImportError:
     GLib = None
 from shypn.engine import behavior_factory
 from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy, DEFAULT_POLICY, TYPE_PRIORITIES
+from shypn.engine.simulation.executors import ContinuousExecutor
+from shypn.engine.simulation.checkers import ViabilityChecker
 # DEPRECATED: Conservation enforcement - Petri nets naturally conserve mass/energy
 # from shypn.engine.conservation_enforcer import ConservationEnforcer
 
@@ -109,6 +132,8 @@ class ModelAdapter:
         self._transitions_dict = None
         self._arcs_dict = None
 
+# ==================== Model Accessors (Property Proxies) ====================
+
 class SimulationController:
     """Controller for Petri net simulation execution.
     
@@ -127,17 +152,20 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, verbose: bool = True, recording_interval: int = 1, time_based_recording: bool = True):
+    def __init__(self, model, verbose: bool = True, recording_config: 'RecordingConfig' = None):
         """Initialize the simulation controller.
+        
+        REFACTORED: Now uses RecordingConfig value object (reduced from 4 parameters to 2).
         
         Args:
             model: ModelCanvasManager instance (has places, transitions, arcs lists)
             verbose: If True, print debug output (disable for batch mode performance)
-            recording_interval: Record data every Nth step (higher = less overhead for batch mode)
-                              Only used if time_based_recording=False
-            time_based_recording: If True, record at fixed model-time intervals (default: True)
-                                 Guarantees consistent data point density regardless of playback speed
+            recording_config: RecordingConfig for data collection (default: 20 Hz time-based, all objects)
         """
+        if recording_config is None:
+            from shypn.core.value_objects import RecordingConfig
+            recording_config = RecordingConfig.default()
+        
         self.model = model
         self.time = 0.0
         self.model_adapter = ModelAdapter(model, controller=self)
@@ -152,23 +180,14 @@ class SimulationController:
         self.verbose = verbose  # Control debug output
         
         # Data collection for simulation results
-        # Time-based recording (default): ensures consistent data density at all playback speeds
-        # recording_time_interval=0.05s means 20 data points per second of model time
         from shypn.engine.simulation.data_collector import DataCollector
         
         # Create settings first so we can access recorded_objects
         from shypn.engine.simulation.settings import SimulationSettings
         self.settings = SimulationSettings()
         
-        # Pass recorded_objects to DataCollector (if empty, will record all)
-        self.data_collector = DataCollector(
-            model, 
-            controller=self, 
-            recording_interval=recording_interval,
-            time_based_recording=time_based_recording,
-            recording_time_interval=0.05,  # 20 Hz sampling rate
-            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
-        )
+        # Create DataCollector with RecordingConfig
+        self.data_collector = DataCollector(model, controller=self, config=recording_config)
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -201,6 +220,12 @@ class SimulationController:
         from shypn.engine.simulation.validation import ValidatorManager
         self.validator_manager = ValidatorManager()
         
+        # Continuous execution strategy (Phase 2.3.1 extraction)
+        self._continuous_executor = ContinuousExecutor(self)
+        
+        # Viability checking strategy (Phase 2.3.2 extraction)
+        self._viability_checker = ViabilityChecker(self)
+        
         # DEPRECATED: Mass conservation enforcer (Feb 9, 2026)
         # Reason: Petri net semantics NATURALLY conserve mass/energy through
         # token-based firing rules. Explicit enforcement was based on misunderstanding.
@@ -215,6 +240,8 @@ class SimulationController:
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
+    
+    # ==================== Lifecycle Management ====================
     
     def reset(self):
         """Reset controller to initial state for new model load.
@@ -268,11 +295,12 @@ class SimulationController:
         
         # Reinitialize data collector with current model
         from shypn.engine.simulation.data_collector import DataCollector
-        self.data_collector = DataCollector(
-            self.model, 
-            controller=self,
+        from shypn.core.value_objects import RecordingConfig
+        
+        config = RecordingConfig(
             recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
         )
+        self.data_collector = DataCollector(self.model, controller=self, config=config)
         
         # CRITICAL: Notify any observers that data_collector changed
         # This ensures analyses panels get the new data_collector reference
@@ -693,6 +721,8 @@ class SimulationController:
         """Print token accounting report to console."""
         if self.auditor is not None:
             self.auditor.print_report()
+    
+    # ==================== Behavior Management ====================
 
     def _get_behavior(self, transition):
         """Get or create behavior instance for a transition.
@@ -919,6 +949,8 @@ class SimulationController:
                 del self.behavior_cache[transition_id]
             if transition_id in self.transition_states:
                 del self.transition_states[transition_id]
+    
+    # ==================== Observer Pattern (Step Listeners) ====================
 
     def add_step_listener(self, callback: Callable):
         """Register a callback to be notified on each simulation step.
@@ -1101,6 +1133,8 @@ class SimulationController:
             except Exception as e:
 
                 pass
+    
+    # ==================== Single-Step Execution (Hybrid Discrete + Continuous) ====================
 
     def step(self, time_step: float = None) -> bool:
         """Execute a single simulation step with hybrid (discrete + continuous) execution.
@@ -1612,21 +1646,22 @@ class SimulationController:
     def _find_enabled_transitions(self) -> List:
         """Find all transitions that are enabled (can fire).
         
+        REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
+        
         A transition is enabled if all its input places have enough tokens
         to satisfy the arc weights.
         
         Returns:
             List of enabled Transition objects
         """
-        enabled = []
-        transitions = self.model.transitions
-        for transition in transitions:
-            if self._is_transition_enabled(transition):
-                enabled.append(transition)
-        return enabled
+        return self._viability_checker.get_enabled_transitions()
+    
+    # ==================== Transition State Management ====================
 
     def _is_transition_enabled(self, transition) -> bool:
         """Check if a specific transition is enabled using behavior dispatch.
+        
+        REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
         
         Uses the transition's behavior to determine if it can fire based on
         locality (input places and arc weights only).
@@ -1637,9 +1672,7 @@ class SimulationController:
         Returns:
             bool: True if transition can fire, False otherwise
         """
-        behavior = self._get_behavior(transition)
-        can_fire, reason = behavior.can_fire()
-        return can_fire
+        return self._viability_checker.is_enabled(transition)
 
     def _fire_transition(self, transition):
         """Fire a transition using behavior dispatch.
@@ -2220,6 +2253,8 @@ class SimulationController:
         """
         Check if all transitions in set are currently enabled.
         
+        REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
+        
         Pre-flight validation before snapshot to avoid rollback overhead.
         
         Args:
@@ -2240,52 +2275,7 @@ class SimulationController:
             validate([T1, T2]) → False (P3 has 0 < 1 tokens)
             validate([T1]) → True (P1 has 2 >= 1 tokens)
         """
-        # Import arc types for proper handling
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
-        from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-        from shypn.netobjs.test_arc import TestArc
-        
-        for transition in transition_set:
-            pass
-            # Find input arcs for this transition
-            for arc in self.model.arcs:
-                if arc.target == transition:
-                    pass
-                    # This is an input arc (place → transition)
-                    place = arc.source
-                    
-                    # Get effective threshold for enablement check
-                    # Use threshold if set, otherwise fallback to weight
-                    tokens_needed = getattr(arc, 'weight', 1)
-                    if hasattr(arc, 'threshold') and arc.threshold is not None:
-                        tokens_needed = arc.threshold
-                    
-                    # Check based on arc type using defensive pattern
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    arc_type = getattr(arc, 'arc_type', 'normal')
-                    
-                    if arc_type == 'inhibitor' or (kind != 'normal' and isinstance(arc, (InhibitorArc, CurvedInhibitorArc))):
-                        # Inhibitor: INVERTED check (disabled when tokens >= threshold)
-                        if place.tokens >= tokens_needed:
-                            return False  # Inhibited by excess
-                    elif arc_type == 'test' or (kind != 'normal' and isinstance(arc, TestArc)):
-                        # Test arc: Check threshold but won't consume
-                        if place.tokens < tokens_needed:
-                            return False  # Catalyst not present
-                    else:
-                        # Normal: Standard check (disabled when tokens < threshold)
-                        if place.tokens < tokens_needed:
-                            return False  # Not enough tokens
-            
-            # Check guard condition (if any)
-            if hasattr(transition, 'guard') and transition.guard is not None:
-                try:
-                    if not transition.guard.evaluate():
-                        return False  # Guard prevents firing
-                except Exception:
-                    return False  # Guard evaluation failed
-        
-        return True  # All transitions can fire
+        return self._viability_checker.validate_all(transition_set)
 
     def _snapshot_marking(self) -> dict:
         """
@@ -2660,9 +2650,19 @@ class SimulationController:
                 selected.append(trans_tuple)
         
         return selected
+    
+    # ==================== Continuous Execution (Run Mode) ====================
+    # REFACTORED (Phase 2.3.1): Extracted to ContinuousExecutor strategy class
+    # Original implementation: ~250 lines
+    # New implementation: Thin delegation layer (maintains backward compatibility)
+    # Benefits: Strategy pattern for alternative executors (parallel, distributed)
+    #           Testable execution logic in isolation
+    #           Clear separation of concerns
 
     def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
+        
+        REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
         
         Runs the simulation continuously using GLib timeout callbacks.
         Can be stopped by calling stop().
@@ -2674,122 +2674,12 @@ class SimulationController:
         Returns:
             bool: True if started successfully, False if already running
         """
-        if not GLIB_AVAILABLE:
-            return False
-        if self._running:
-            return False
-        
-        # Use effective dt if not specified
-        if time_step is None:
-            time_step = self.get_effective_dt()
-        
-        # Calculate max_steps from duration if not specified
-        # For stochastic simulations using τ-leaping: Use much higher step limit
-        # because τ-leaping takes adaptive (often large) steps but still counts
-        # each step() call. We use 100× the normal estimate as a safety limit
-        # while relying primarily on time-based termination.
-        if max_steps is None:
-            estimated_steps = self.settings.estimate_step_count()
-            if estimated_steps is not None:
-                has_stochastic = any(t.transition_type == 'stochastic' for t in self.model.transitions)
-                if has_stochastic:
-                    # Stochastic: 100× safety limit (relies on time-based termination)
-                    max_steps = estimated_steps * 100
-                else:
-                    # Deterministic: Use normal step count
-                    max_steps = estimated_steps
-        
-        self._running = True
-        self._stop_requested = False
-        self._max_steps = max_steps
-        self._steps_executed = 0
-        self._time_step = time_step
-        
-        # Start data collection
-        if self.data_collector:
-            self.data_collector.start_collection()
-            # Record initial state
-            self.data_collector.record_state(self.time)
-        
-        # Calculate optimal step batching for smooth animation with time scale
-        # Target: Execute multiple steps per GUI update to maintain smooth visualization
-        # For small time steps (e.g., 0.002s), batch many steps together
-        # For large time steps (e.g., 1.0s), execute 1 step per GUI update
-        # Time scale: Controls playback speed (1.0 = real-time, 60.0 = 60x faster)
-        
-        gui_interval_s = 0.1  # Fixed 100ms GUI update interval (real-world playback time)
-        
-        # Calculate how much MODEL time should pass per GUI update
-        # time_scale = model_seconds / real_seconds
-        # Example: time_scale=60.0 means 60 seconds of model time per 1 second of real time
-        model_time_per_gui_update = gui_interval_s * self.settings.time_scale
-        
-        # Calculate how many simulation steps needed to cover that model time
-        # Example: model_time=6.0s, time_step=1.0s → 6 steps per GUI update
-        self._steps_per_callback = max(1, int(model_time_per_gui_update / time_step))
-        
-        # Safety cap: Prevent UI freeze on extreme time_scale values
-        # Cap at 1000 steps per GUI update (allows up to ~10000x speedup with dt=0.001)
-        if self._steps_per_callback > 1000:
-            effective_max_scale = 1000 * time_step / gui_interval_s
-            self._steps_per_callback = 1000
-        else:
-            self._steps_per_callback = min(self._steps_per_callback, 1000)
-        
-        # CRITICAL: Initialize all stochastic transitions before simulation starts
-        # This ensures they have valid scheduled firing times
-        self._update_enablement_states()
-        
-        # Auto-detect and configure conservation groups (enabled by default)
-        # DISABLED: Conservation must emerge from arc connections, not artificial adjustments
-        # if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
-        #     self._auto_detect_conservation_groups()
-        
-        # Verify stochastic transitions are properly scheduled
-        stochastic_transitions = [t for t in self.model.transitions if t.transition_type == 'stochastic']
-        if stochastic_transitions:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Initializing {len(stochastic_transitions)} stochastic transition(s)")
-            
-            for transition in stochastic_transitions:
-                behavior = self._get_behavior(transition)
-                state = self.transition_states.get(transition.id)
-                
-                # Log initialization status
-                if state and state.enablement_time is not None:
-                    scheduled_time = behavior.get_scheduled_fire_time() if hasattr(behavior, 'get_scheduled_fire_time') else None
-                    if scheduled_time is not None:
-                        logger.info(
-                            f"  ✓ {transition.name} (ID={transition.id}): enabled, "
-                            f"scheduled to fire at t={scheduled_time:.3f}"
-                        )
-                    else:
-                        logger.warning(
-                            f"  ⚠ {transition.name} (ID={transition.id}): enabled but NOT scheduled "
-                            f"(rate may be 0 or evaluation failed)"
-                        )
-                else:
-                    logger.info(
-                        f"  ○ {transition.name} (ID={transition.id}): not enabled "
-                        f"(insufficient tokens)"
-                    )
-        
-        for transition in self.model.transitions:
-            state = self.transition_states.get(transition.id)
-            behavior = self._get_behavior(transition)
-            if hasattr(behavior, 'get_timing_info'):
-                info = behavior.get_timing_info()
-            elif hasattr(behavior, 'get_stochastic_info'):
-                info = behavior.get_stochastic_info()
-            else:
-                pass  # No timing info available
-        
-        self._timeout_id = GLib.timeout_add(100, self._simulation_loop)
-        return True
+        return self._continuous_executor.run(time_step, max_steps)
 
     def _simulation_loop(self) -> bool:
         """Internal simulation loop callback.
+        
+        REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
         
         Executes multiple simulation steps per GUI update for smooth animation
         at all time scales. For very small time steps (e.g., 2ms), this batches
@@ -2798,87 +2688,12 @@ class SimulationController:
         Returns:
             bool: True to continue, False to stop the timeout
         """
-        DEBUG_LOOP = False
-        if DEBUG_LOOP:
-            pass
-        if self._stop_requested:
-            if DEBUG_LOOP:
-                pass
-            self._running = False
-            self._timeout_id = None
-            return False
-        
-        # Execute a batch of simulation steps for smooth animation
-        for _ in range(self._steps_per_callback):
-            pass
-            # Check stop conditions before each step in the batch
-            if self._stop_requested:
-                self._running = False
-                self._timeout_id = None
-                return False
-            if self._max_steps is not None and self._steps_executed >= self._max_steps:
-                import logging
-                logging.getLogger(__name__).info(f"[LOOP] Stopping: steps_executed={self._steps_executed} >= max_steps={self._max_steps}")
-                if DEBUG_LOOP:
-                    pass
-                self._running = False
-                self._timeout_id = None
-                return False
-            
-            # Execute one simulation step
-            success = self.step(self._time_step)
-            if not success:
-                import logging
-                logging.getLogger(__name__).info(f"[LOOP] step() returned False at time={self.time}, steps_executed={self._steps_executed}")
-                # Simulation completed (duration reached)
-                self._running = False
-                self._timeout_id = None
-                
-                # Record final state before stopping collection (force=True to bypass interval check)
-                if self.data_collector and self.data_collector.is_collecting:
-                    self.data_collector.record_state(self.time, force=True)
-                
-                # Finalize thermodynamic validation
-                if self.validator_manager and len(self.validator_manager) > 0:
-                    places_dict = {p.id: p for p in self.model.places}
-                    transitions_dict = {t.id: t for t in self.model.transitions}
-                    self.validator_manager.validate_all()
-                    
-                    # Store validation summary in data_collector for export
-                    if self.data_collector:
-                        self.data_collector.validation_results = self.validator_manager.get_summary()
-                
-                # Stop data collection
-                if self.data_collector:
-                    self.data_collector.stop_collection()
-                
-                # Token accounting report will be exported via Report Panel if user exports CSV
-                # No terminal output needed - keeps terminal clean
-                
-                # Notify completion callback (deferred to avoid blocking UI)
-                if self.on_simulation_complete:
-                    def deferred_callback():
-                        try:
-                            self.on_simulation_complete()
-                        except Exception as e:
-                            import logging
-                            logging.getLogger(__name__).exception(f"[ERROR] Exception in on_simulation_complete callback: {e}")
-                            import traceback
-                            traceback.print_exc()
-                        return False  # Don't repeat
-                    GLib.idle_add(deferred_callback)
-                
-                return False
-            self._steps_executed += 1
-            
-            if DEBUG_LOOP:
-                pass
-        
-        # All steps in batch completed, GUI will update before next callback
-        return True
+        return self._continuous_executor._simulation_loop()
 
     def stop(self):
         """Stop the continuous simulation.
+        
+        REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
         
         This requests the simulation to stop. The actual stop will occur
         after the current step completes.
@@ -2886,31 +2701,7 @@ class SimulationController:
         IMPORTANT: This clears enablement states so that when Run is pressed
         again, transitions start fresh with enablement time = current time.
         """
-        if not self._running:
-            return
-        self._stop_requested = True
-        
-        # Stop data collection
-        if self.data_collector:
-            self.data_collector.stop_collection()
-        
-        # Notify completion callback (deferred to avoid blocking)
-        if self.on_simulation_complete and GLIB_AVAILABLE:
-            def deferred_callback():
-                try:
-                    self.on_simulation_complete()
-                except Exception as e:
-                    import logging
-                    logging.getLogger(__name__).exception(f"Exception in on_simulation_complete callback: {e}")
-                return False  # Don't repeat
-            GLib.idle_add(deferred_callback)
-        
-        for state in self.transition_states.values():
-            state.enablement_time = None
-            state.scheduled_time = None
-        for behavior in self.behavior_cache.values():
-            if hasattr(behavior, 'clear_enablement'):
-                behavior.clear_enablement()
+        self._continuous_executor.stop()
 
     def reset(self):
         """Reset the simulation to initial marking.
@@ -3002,10 +2793,17 @@ class SimulationController:
         
         # Recreate data collector with new model
         from shypn.engine.simulation.data_collector import DataCollector
+        from shypn.core.value_objects import RecordingConfig
+        
+        # Create RecordingConfig from current settings
+        config = RecordingConfig(
+            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
+        )
+        
         self.data_collector = DataCollector(
             new_model, 
             controller=self,
-            recorded_objects=self.settings.recorded_objects if hasattr(self.settings, 'recorded_objects') else None
+            config=config
         )
         
         # CRITICAL: Notify any observers that data_collector changed

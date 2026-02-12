@@ -63,8 +63,9 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         adaptive_filter (str): Which places to check for volume (default 'inputs_only')
             - 'all': Check all input and output places
             - 'inputs_only': Check only input places (substrates drive propensity)
-            - 'spatial_only': Check only spatial signal places
-            - 'inputs_spatial': Check input places that are spatial signals
+            - 'spatial_only': Check only places with compartment_volume property
+            - 'inputs_spatial': Check input places with compartment_volume property
+        suppress_adaptive_warnings (bool): Suppress warnings about missing places/volumes (default False)
         
     State Management:
         - Continuous mode: No scheduling needed, fires based on rate
@@ -84,6 +85,10 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         >>> # Later, input volume=100 fL → Switches to continuous
         >>> behavior.integrate_step(...)  # Smooth ODE integration
     """
+    
+    # Class-level tracking to prevent duplicate warnings across all instances
+    _warned_no_places_transitions = set()
+    _warned_no_volumes_transitions = set()
     
     def __init__(self, transition, model):
         """Initialize adaptive hybrid behavior.
@@ -108,6 +113,9 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         # Options: 'all', 'inputs_only', 'spatial_only', 'inputs_spatial'
         self.place_filter = props.get('adaptive_filter', 'inputs_only')
         
+        # Warning suppression (useful for transitions that intentionally have no connected places)
+        self.suppress_warnings = props.get('suppress_adaptive_warnings', False)
+        
         # Create behavior delegates
         self.continuous_behavior = ContinuousBehavior(transition, model)
         self.stochastic_behavior = StochasticBehavior(transition, model)
@@ -118,6 +126,15 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         # Track current mode for mode change detection
         self._current_mode = None  # 'continuous' or 'stochastic'
         self._last_volume_check = None
+        
+        # Diagnostic counters (populated by _get_connected_places)
+        self._input_count = 0
+        self._output_count = 0
+        self._input_with_volume = 0
+        self._output_with_volume = 0
+        
+        # Deferred initialization flag (avoid accessing arcs during model loading)
+        self._initialized = False
         
         self.logger.info(
             f"Created AdaptiveHybridBehavior for '{transition.name}' "
@@ -130,26 +147,48 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         Filter strategies:
             'all': All input and output places (original behavior)
             'inputs_only': Only input places (substrates drive propensity)
-            'spatial_only': Only spatial signal places
-            'inputs_spatial': Input places that are spatial signals
+            'spatial_only': Only places with volume information
+            'inputs_spatial': Input places with volume information
         
         Returns:
             List of Place objects filtered by strategy
         """
+        # Check if arcs are loaded yet (avoid accessing during deserialization)
+        if not hasattr(self.model, 'arcs') or not self.model.arcs:
+            return []  # Silently return empty - model still loading
+        
+        # Mark as initialized on first successful arc access
+        self._initialized = True
+        
         all_input_places = []
         all_output_places = []
         
+        # Get arcs connected to this transition
+        input_arcs = self.get_input_arcs()
+        output_arcs = self.get_output_arcs()
+
+        
         # Collect input places
-        for arc in self.get_input_arcs():
-            place = self._get_place(arc.source_id)
+        # Input arcs: Place -> Transition, so arc.source is the Place
+        for arc in input_arcs:
+            # arc.source is already a Place object reference
+            place = arc.source
             if place and place not in all_input_places:
                 all_input_places.append(place)
         
         # Collect output places
-        for arc in self.get_output_arcs():
-            place = self._get_place(arc.target_id)
+        # Output arcs: Transition -> Place, so arc.target is the Place
+        for arc in output_arcs:
+            # arc.target is already a Place object reference
+            place = arc.target
             if place and place not in all_output_places:
                 all_output_places.append(place)
+        
+        # Store full counts for diagnostics
+        self._input_count = len(all_input_places)
+        self._output_count = len(all_output_places)
+        self._input_with_volume = sum(1 for p in all_input_places if self._has_volume_info(p))
+        self._output_with_volume = sum(1 for p in all_output_places if self._has_volume_info(p))
         
         # Apply filter strategy
         if self.place_filter == 'inputs_only':
@@ -157,7 +196,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             return all_input_places
         
         elif self.place_filter == 'spatial_only':
-            # Only check spatial signal places
+            # Only check places that are spatial signals (signal_type == SPATIAL)
+            # THEN check their volumes for mode selection
             all_places = all_input_places + all_output_places
             return [p for p in all_places if self._is_spatial_signal(p)]
         
@@ -177,8 +217,23 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                     unique_places.append(p)
             return unique_places
     
+    def _has_volume_info(self, place) -> bool:
+        """Check if place has volume information for adaptive mode selection.
+        
+        Args:
+            place: Place object
+        
+        Returns:
+            bool: True if place has compartment_volume property set
+        """
+        # Check for compartment_volume property (can be on ANY place)
+        if hasattr(place, 'compartment_volume'):
+            volume = getattr(place, 'compartment_volume', None)
+            return volume is not None and volume > 0
+        return False
+    
     def _is_spatial_signal(self, place) -> bool:
-        """Check if place is a spatial signal.
+        """Check if place is a spatial signal (legacy method, kept for compatibility).
         
         Args:
             place: Place object
@@ -208,11 +263,29 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         places = self._get_connected_places()
         
         if not places:
-            # No places connected - use preferred mode
-            self.logger.warning(
-                f"Adaptive transition '{self.transition.name}' has no connected places "
-                f"for volume checking (filter={self.place_filter})"
-            )
+            # No places matched filter - provide detailed diagnostic
+            # Suppress warnings during initialization (arcs may not be loaded yet)
+            if not self.suppress_warnings and self._initialized:
+                transition_key = self.transition.name
+                if transition_key not in AdaptiveHybridBehavior._warned_no_places_transitions:
+                    # Build diagnostic message
+                    if self._input_count == 0 and self._output_count == 0:
+                        detail = "Transition has NO connected input or output arcs."
+                    elif self.place_filter == 'inputs_only' and self._input_count == 0:
+                        detail = f"Transition has NO input arcs ({self._output_count} output arcs exist)."
+                    elif self.place_filter == 'inputs_spatial' and self._input_count > 0:
+                        detail = f"Transition has {self._input_count} input place(s) but NONE have 'compartment_volume' property. Set compartment_volume on input places."
+                    elif self.place_filter == 'spatial_only':
+                        total = self._input_count + self._output_count
+                        detail = f"Transition has {total} connected place(s) but NONE have 'compartment_volume' property. Set compartment_volume on places."
+                    else:
+                        detail = f"Filter '{self.place_filter}' matched no places (inputs={self._input_count}, outputs={self._output_count}, with_volume={self._input_with_volume + self._output_with_volume})."
+                    
+                    self.logger.warning(
+                        f"Adaptive transition '{self.transition.name}': {detail} "
+                        f"Defaulting to {'continuous' if self.prefer_continuous else 'stochastic'} mode."
+                    )
+                    AdaptiveHybridBehavior._warned_no_places_transitions.add(transition_key)
             return 'continuous' if self.prefer_continuous else 'stochastic'
         
         # Check volumes
@@ -222,13 +295,17 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         self._last_volume_check = details
         
-        # Warn if no volumes found (silent failure prevention)
+        # Warn if no volumes found (silent failure prevention - warn once per transition unless suppressed)
         if details.get('reason') == 'no-volumes-set':
-            self.logger.warning(
-                f"Adaptive transition '{self.transition.name}' has {len(places)} connected places "
-                f"but none have 'compartment_volume' property set. "
-                f"Defaulting to continuous mode. Set place.compartment_volume to enable adaptive behavior."
-            )
+            if not self.suppress_warnings:
+                transition_key = self.transition.name
+                if transition_key not in AdaptiveHybridBehavior._warned_no_volumes_transitions:
+                    self.logger.warning(
+                        f"Adaptive transition '{self.transition.name}' has {len(places)} connected places "
+                        f"but none have 'compartment_volume' property set. "
+                        f"Defaulting to continuous mode. Set place.compartment_volume to enable adaptive behavior."
+                    )
+                    AdaptiveHybridBehavior._warned_no_volumes_transitions.add(transition_key)
         
         mode = 'stochastic' if use_stochastic else 'continuous'
         

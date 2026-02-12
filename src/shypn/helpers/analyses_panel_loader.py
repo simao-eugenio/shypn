@@ -33,6 +33,7 @@ except Exception as e:
 
 from shypn.helpers.base_panel_loader import PerDocumentPanelLoader
 from shypn.ui.panels.dynamic_analyses import DynamicAnalysesPanel
+from shypn.events import EventBus
 
 
 class AnalysesPanelLoader(PerDocumentPanelLoader):
@@ -68,15 +69,19 @@ class AnalysesPanelLoader(PerDocumentPanelLoader):
         analyses_loader.refresh()
     """
     
-    def __init__(self, model, parent_window=None, data_collector=None):
+    def __init__(self, model, parent_window=None, data_collector=None, document_id=None, drawing_area=None):
         """Initialize analyses panel loader.
         
         Args:
             model: ModelCanvasManager instance for this document
             parent_window: Main application window (for dialogs, transient)
             data_collector: SimulationDataCollector for real-time plotting
+            document_id: Optional document ID for EventBus scoping
+            drawing_area: Optional drawing area reference
         """
         self.data_collector = data_collector
+        self.document_id = document_id
+        self.drawing_area = drawing_area
         super().__init__(model, parent_window)
     
     def _create_panel(self) -> Gtk.Widget:
@@ -188,6 +193,59 @@ class AnalysesPanelLoader(PerDocumentPanelLoader):
         the loader reference is available.
         """
         pass  # Context menu handler creation delegated to model_canvas_loader
+    
+    def initialize(self):
+        """Initialize panel and subscribe to tab switching events."""
+        super().initialize()
+        # Subscribe to document.focused events for automatic tab switching
+        EventBus.subscribe('document.focused', self._on_document_focused)
+    
+    def _on_document_focused(self, data):
+        """Handle document.focused events for automatic panel swapping.
+        
+        Args:
+            data: Event data containing drawing_area, canvas_manager, overlay_manager
+        """
+        event_document_id = data.get('_document_id')
+        
+        # Don't handle swapping if panel is floated
+        if not self.is_hanged:
+            return
+        
+        # Don't handle if no parent container
+        if not self.parent_container:
+            return
+        
+        # Check if this event is for our document
+        is_our_document = (event_document_id == self.document_id)
+        
+        if is_our_document:
+            # This is our document - show and refresh
+            # Ensure we're in the container
+            current_parent = self.widget.get_parent()
+            if current_parent != self.parent_container:
+                # Not in container, need to pack
+                if current_parent:
+                    current_parent.remove(self.widget)
+                self.parent_container.pack_start(self.widget, True, True, 0)
+            
+            # Update panel with new document's model
+            canvas_manager = data.get('canvas_manager')
+            if canvas_manager:
+                self.refresh()
+            
+            # Show our widget
+            self.widget.show()
+        else:
+            # This is NOT our document - hide
+            self.widget.hide()
+    
+    def cleanup(self):
+        """Cleanup resources and unsubscribe from events."""
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('document.focused', self._on_document_focused)
+        # Call parent cleanup
+        super().cleanup()
 
 
 def create_analyses_panel(model=None, parent_window=None, data_collector=None):

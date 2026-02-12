@@ -21,11 +21,33 @@ REFACTORING NOTE: This class now acts as a Facade, delegating to:
 - CoordinateTransform: coordinate conversions (service)
 - GridRenderer: grid drawing (service)
 - ArcGeometryService: arc geometry (service)
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ ARCHITECTURE NOTE: This class is intentionally large (2700+ lines)        ║
+║                                                                            ║
+║ REASON: SHYPN implements pseudo-MDI where GTK4/Wayland don't support it. ║
+║         Viewport, document, grid, and event state MUST stay synchronized  ║
+║         to maintain panel switching and focus management.                 ║
+║                                                                            ║
+║ ⚠️  DO NOT SPLIT: Viewport/document/grid into separate managers          ║
+║ ⚠️  DO NOT SPLIT: Event emission from state changes                      ║
+║ ⚠️  DO NOT SPLIT: Object lifecycle to separate class                     ║
+║                                                                            ║
+║ SAFE REFACTORINGS:                                                        ║
+║ ✅ Extract pure algorithms (geometry calculations, validations)           ║
+║ ✅ Create value objects (ViewportState, RenderContext, etc.)              ║
+║ ✅ Extract Wayland parent management to helper class                      ║
+║ ✅ Group related methods with section comments                            ║
+║                                                                            ║
+║ SEE: doc/ADR-002-model-canvas-manager-size.md (when created)              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 """
 import math
 import json
 import os
+import time
 from datetime import datetime
+from shypn.events import EventBus
 from shypn.netobjs import Place, Arc, Transition
 from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
 
@@ -396,11 +418,50 @@ class ModelCanvasManager:
     
     # ==================== Coordinate Transformations ====================
     
+    # Helper methods for coordinate transformations (PHASE 1 EXTRACTION)
+    
+    def _calculate_rotation_center(self):
+        """Calculate rotation center in world coordinates.
+        
+        The rotation center is the viewport center transformed to world space.
+        
+        Returns:
+            tuple: (center_world_x, center_world_y)
+        """
+        center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
+        center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
+        return center_world_x, center_world_y
+    
+    @staticmethod
+    def _apply_rotation_to_point(x, y, center_x, center_y, cos_angle, sin_angle):
+        """Apply rotation transformation to a point around a center.
+        
+        Args:
+            x, y: Point coordinates
+            center_x, center_y: Rotation center
+            cos_angle, sin_angle: Rotation angle (cosine and sine)
+            
+        Returns:
+            tuple: (rotated_x, rotated_y)
+        """
+        # Translate to origin
+        dx = x - center_x
+        dy = y - center_y
+        
+        # Rotate
+        rotated_dx = dx * cos_angle - dy * sin_angle
+        rotated_dy = dx * sin_angle + dy * cos_angle
+        
+        # Translate back
+        return rotated_dx + center_x, rotated_dy + center_y
+    
     def screen_to_world(self, screen_x, screen_y):
         """Convert screen coordinates to world (model) coordinates.
         
         Applies transformations in order: zoom/pan inverse, then rotation inverse.
         This matches the drawing pipeline: zoom/pan → rotation.
+        
+        REFACTORED: Now uses extracted helper methods for rotation calculations.
         
         Args:
             screen_x: X coordinate in screen space (pixels).
@@ -413,27 +474,12 @@ class ModelCanvasManager:
         pre_rot_x, pre_rot_y = coord_screen_to_world(screen_x, screen_y, self.zoom, self.pan_x, self.pan_y)
         
         # Step 2: Apply rotation inverse transformation (pre-rotation → world space)
-        # Rotation happens around viewport center in world coordinates
         rotation = self.transformation_manager.get_rotation()
         if rotation and rotation.angle_degrees != 0:
-            # Calculate rotation center in world space
-            center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
-            center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
-            
-            # Translate to origin, rotate inverse, translate back
-            dx = pre_rot_x - center_world_x
-            dy = pre_rot_y - center_world_y
-            
+            center_world_x, center_world_y = self._calculate_rotation_center()
             cos_a = math.cos(-rotation.angle_radians)  # Negative for inverse rotation
             sin_a = math.sin(-rotation.angle_radians)
-            
-            rotated_dx = dx * cos_a - dy * sin_a
-            rotated_dy = dx * sin_a + dy * cos_a
-            
-            world_x = rotated_dx + center_world_x
-            world_y = rotated_dy + center_world_y
-            
-            return world_x, world_y
+            return self._apply_rotation_to_point(pre_rot_x, pre_rot_y, center_world_x, center_world_y, cos_a, sin_a)
         else:
             return pre_rot_x, pre_rot_y
     
@@ -442,6 +488,8 @@ class ModelCanvasManager:
         
         Applies transformations in order: rotation, then zoom/pan.
         This matches the drawing pipeline: zoom/pan → rotation (applied in reverse).
+        
+        REFACTORED: Now uses extracted helper methods for rotation calculations.
         
         Args:
             world_x: X coordinate in world space.
@@ -453,22 +501,12 @@ class ModelCanvasManager:
         # Step 1: Apply rotation transformation (world → pre-screen space)
         rotation = self.transformation_manager.get_rotation()
         if rotation and rotation.angle_degrees != 0:
-            # Calculate rotation center in world space
-            center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
-            center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
-            
-            # Translate to origin, rotate, translate back
-            dx = world_x - center_world_x
-            dy = world_y - center_world_y
-            
+            center_world_x, center_world_y = self._calculate_rotation_center()
             cos_a = math.cos(rotation.angle_radians)
             sin_a = math.sin(rotation.angle_radians)
-            
-            rotated_dx = dx * cos_a - dy * sin_a
-            rotated_dy = dx * sin_a + dy * cos_a
-            
-            pre_screen_x = rotated_dx + center_world_x
-            pre_screen_y = rotated_dy + center_world_y
+            pre_screen_x, pre_screen_y = self._apply_rotation_to_point(
+                world_x, world_y, center_world_x, center_world_y, cos_a, sin_a
+            )
         else:
             pre_screen_x = world_x
             pre_screen_y = world_y
@@ -524,6 +562,18 @@ class ModelCanvasManager:
         self._notify_observers('created', place)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to show new place
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.place.created', {
+                'object': place,
+                'object_type': 'place',
+                'object_id': place.id,
+                'action': 'created',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
+        
         return place
     
     def add_transition(self, x, y, **kwargs):
@@ -542,6 +592,18 @@ class ModelCanvasManager:
         self._notify_observers('created', transition)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to show new transition
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.transition.created', {
+                'object': transition,
+                'object_type': 'transition',
+                'object_id': transition.id,
+                'action': 'created',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
+        
         return transition
     
     def add_arc(self, source, target, **kwargs):
@@ -565,6 +627,18 @@ class ModelCanvasManager:
         self._notify_observers('created', arc)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to show new arc
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.arc.created', {
+                'object': arc,
+                'object_type': 'arc',
+                'object_id': arc.id,
+                'action': 'created',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
+        
         return arc
     
     def remove_place(self, place):
@@ -580,6 +654,17 @@ class ModelCanvasManager:
         self._notify_observers('deleted', place)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.place.deleted', {
+                'object': place,
+                'object_type': 'place',
+                'object_id': place.id,
+                'action': 'deleted',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -594,6 +679,17 @@ class ModelCanvasManager:
         self._notify_observers('deleted', transition)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.transition.deleted', {
+                'object': transition,
+                'object_type': 'transition',
+                'object_id': transition.id,
+                'action': 'deleted',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -606,58 +702,43 @@ class ModelCanvasManager:
         self._notify_observers('deleted', arc)
         self.mark_dirty()  # Mark document as having unsaved changes
         self.mark_needs_redraw()  # Trigger canvas redraw to remove from view
+        
+        # Emit EventBus event
+        if self._drawing_area:
+            EventBus.emit('model.arc.deleted', {
+                'object': arc,
+                'object_type': 'arc',
+                'object_id': arc.id,
+                'action': 'deleted',
+                'timestamp': time.time(),
+                'batch_id': None
+            }, document_id=id(self._drawing_area))
     
-    def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
-        """Load objects into the model in bulk (for import/deserialize operations).
-        
-        This method ensures all objects are added through proper channels with
-        automatic observer notification, providing a UNIFIED PATH for both manual
-        creation and import/load operations.
-        
-        This eliminates the dual-path architecture problem where:
-        - Manual creation: objects added one-by-one via add_place/transition/arc()
-        - Import/load: objects bulk-assigned to manager.places/transitions/arcs lists
-        
-        Now ALL object loading uses this single method, ensuring:
-        - Consistent observer notifications
-        - Proper manager references (for arcs)
-        - Correct ID counter updates
-        - Single code path = consistent behavior
+    # ==================== Object Loading (Bulk Import/Deserialize) ====================
+    
+    def _load_modules(self, modules):
+        """Load modules into document controller.
         
         Args:
-            places: List of Place objects to add (default: None = no places)
-            transitions: List of Transition objects to add (default: None = no transitions)
-            arcs: List of Arc objects to add (default: None = no arcs)
-            modules: Dict of Module objects to add (default: None = no modules)
-        
-        Example:
-            # For imports/loads:
-            manager.load_objects(
-                places=document_model.places,
-                transitions=document_model.transitions,
-                arcs=document_model.arcs
-            )
+            modules: Dict of Module objects to add
         """
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
         
-        if places is None:
-            places = []
-        if transitions is None:
-            transitions = []
-        if arcs is None:
-            arcs = []
-        if modules is None:
-            modules = {}
-        
-        # Add modules to document_controller if it exists
         if modules and hasattr(self, 'document_controller'):
             if not hasattr(self.document_controller, 'modules'):
                 self.document_controller.modules = {}
             self.document_controller.modules.update(modules)
             logger.info(f"[LOAD_OBJECTS] Loaded {len(modules)} modules to document_controller")
+    
+    def _add_objects_with_notification(self, places, transitions, arcs):
+        """Add places, transitions, and arcs with observer notification.
         
+        Args:
+            places: List of Place objects
+            transitions: List of Transition objects
+            arcs: List of Arc objects
+        """
         # Add places with proper notification
         for place in places:
             self.places.append(place)
@@ -673,11 +754,21 @@ class ModelCanvasManager:
             self.arcs.append(arc)
             arc._manager = self  # Set manager reference for parallel detection
             self._notify_observers('created', arc)
+    
+    def _validate_and_clean_arcs(self, arcs):
+        """Validate arcs and remove corrupted ones, then auto-convert parallel arcs.
         
-        # SAFETY: Validate and remove corrupted arcs BEFORE auto-conversion
-        # Corrupted arcs can have invalid source/target references (e.g., None or pointing to other arcs)
-        # We must remove these BEFORE calling _auto_convert_parallel_arcs_to_curved
-        # which assumes valid source/target references
+        Args:
+            arcs: List of Arc objects to validate
+            
+        Returns:
+            List of valid arcs (corrupted arcs removed)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Validate and remove corrupted arcs BEFORE auto-conversion
+        # Corrupted arcs can have invalid source/target references
         validation = self.validate_arcs()
         if not validation['valid']:
             logger.warning(f"[ARC_VALIDATION] ⚠️ Detected {len(validation['corrupted_arcs'])} corrupted arc(s) after load")
@@ -685,18 +776,23 @@ class ModelCanvasManager:
                 logger.warning(f"[ARC_VALIDATION]   - {error}")
             removed = self.remove_corrupted_arcs()
             logger.info(f"[ARC_VALIDATION] ✅ Cleaned up {removed} corrupted arc(s)")
-            # Filter out removed arcs from the arcs list we'll process below
+            # Filter out removed arcs from the arcs list
             arcs = [arc for arc in arcs if arc in self.arcs]
         
         # Auto-convert loop arcs and parallel arcs to curved
-        # This ensures loaded models have proper curved rendering for loops and parallels
-        # Only process arcs that passed validation
         for arc in arcs:
             self._auto_convert_parallel_arcs_to_curved(arc)
         
+        return arcs
+    
+    def _register_object_ids(self, places, transitions, arcs):
+        """Register object IDs with IDManager to avoid collisions.
         
-        # Update ID counters to avoid collisions
-        # Register all existing IDs with the IDManager
+        Args:
+            places: List of Place objects
+            transitions: List of Transition objects
+            arcs: List of Arc objects
+        """
         # Ensure lifecycle scope is set to this canvas before registering
         try:
             if self._canvas_loader and hasattr(self._canvas_loader, 'lifecycle_manager') and self._drawing_area:
@@ -705,6 +801,7 @@ class ModelCanvasManager:
                 self._canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(self._drawing_area)}")
         except Exception:
             pass
+        
         if places:
             for p in self.places:
                 self.document_controller.id_manager.register_place_id(p.id)
@@ -716,34 +813,28 @@ class ModelCanvasManager:
         if arcs:
             for a in self.arcs:
                 self.document_controller.id_manager.register_arc_id(a.id)
+    
+    def _reset_places_to_initial_marking(self, places):
+        """Reset all places to their initial marking state.
         
-        # CRITICAL: Reset all places to their initial marking
-        # When loading (File Open, KEGG import, SBML import, etc), we want to start
-        # with the initial state, not the simulation state that may be in the data.
-        # This is especially important for test arcs (catalysts) which must have
-        # tokens=initial_marking to function correctly.
+        When loading (File Open, KEGG import, SBML import), start with initial state
+        rather than simulation state. Critical for test arcs (catalysts).
+        
+        Args:
+            places: List of Place objects to reset
+        """
         for place in places:
             if hasattr(place, 'initial_marking'):
                 place.tokens = place.initial_marking
+    
+    def _trigger_simulation_reset(self):
+        """Trigger simulation controller reset after loading objects.
         
-        # CRITICAL FIX: Trigger simulation controller reset after loading objects
-        # When a model is imported (KEGG, SBML) or loaded (File → Open), the
-        # simulation controller must be reset to clear stale state from any
-        # previous model. This is especially critical for auto-loaded imports.
-        # 
-        # Without this reset:
-        # - behavior_cache has old transition IDs → simulation fails
-        # - transition_states has deleted transitions → crashes
-        # - data_collector references wrong model → wrong data
-        # 
-        # ARCHITECTURE: Use Global Canvas State Lifecycle system for proper initialization
-        # The lifecycle_manager.sync_after_file_load() method properly initializes:
-        # - ID registration for all objects
-        # - TransitionState for all transitions (including source transitions)
-        # - Controller behavior cache
-        # - Step listeners for canvas redraw
-        #
-        # See: doc/CANVAS_LIFECYCLE_IMPLEMENTATION.md
+        Uses Global Canvas State Lifecycle system for proper initialization.
+        Clears stale state from previous model (behavior_cache, transition_states, etc).
+        """
+        import logging
+        logger = logging.getLogger(__name__)
         logger.info("[LOAD_OBJECTS] Requesting simulation reset via lifecycle_manager")
         
         # Try to use lifecycle manager first (proper architecture)
@@ -752,7 +843,6 @@ class ModelCanvasManager:
             if lifecycle_mgr and self._drawing_area:
                 try:
                     logger.info("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
-                    # sync_after_file_load expects file_path but works for imports too
                     lifecycle_mgr.sync_after_file_load(self._drawing_area, file_path=None)
                     logger.info("[LOAD_OBJECTS] ✅ Lifecycle manager sync complete")
                 except Exception as e:
@@ -766,15 +856,15 @@ class ModelCanvasManager:
         else:
             logger.info("[LOAD_OBJECTS] No canvas_loader reference, using direct reset")
             self._request_simulation_reset_direct()
+    
+    def _refresh_viability_panel(self):
+        """Refresh viability panel observer with updated KB after objects loaded.
         
-        # Mark document as dirty (unsaved changes) and trigger redraw
-        self.mark_dirty()  # Document dirty tracking for save state
-        self.mark_needs_redraw()  # Canvas redraw for rendering
+        The viability panel observer needs to re-scan the KB now that it has data.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # VIABILITY PANEL: Refresh observer with updated KB after objects loaded
-        # The viability panel's observer needs to re-scan the KB now that it has actual data.
-        # At panel creation, the KB was empty (0 places, 0 transitions), so no rules triggered.
-        # Now that objects are loaded, we can detect issues like missing firing rates.
         if self._canvas_loader and self._drawing_area:
             logger.info("[LOAD_OBJECTS] Refreshing viability panel with populated KB")
             try:
@@ -782,8 +872,8 @@ class ModelCanvasManager:
                 if overlay_mgr:
                     viability_loader = getattr(overlay_mgr, 'viability_panel_loader', None)
                     if viability_loader:
-                        panel = viability_loader.panel  # Correct attribute name
-                        panel.refresh_all()  # Re-feed observer and refresh categories
+                        panel = viability_loader.panel
+                        panel.refresh_all()
                         logger.info("[LOAD_OBJECTS] ✅ Viability panel refreshed")
                     else:
                         logger.info("[LOAD_OBJECTS] No viability_panel_loader found")
@@ -791,6 +881,53 @@ class ModelCanvasManager:
                     logger.info("[LOAD_OBJECTS] No overlay_manager found")
             except Exception as e:
                 logger.warning(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
+    
+    def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
+        """Load objects into the model in bulk (for import/deserialize operations).
+        
+        This method ensures all objects are added through proper channels with
+        automatic observer notification, providing a UNIFIED PATH for both manual
+        creation and import/load operations.
+        
+        REFACTORED: Now delegates to helper methods for better readability.
+        
+        Args:
+            places: List of Place objects to add (default: None = no places)
+            transitions: List of Transition objects to add (default: None = no transitions)
+            arcs: List of Arc objects to add (default: None = no arcs)
+            modules: Dict of Module objects to add (default: None = no modules)
+        
+        Example:
+            manager.load_objects(
+                places=document_model.places,
+                transitions=document_model.transitions,
+                arcs=document_model.arcs
+            )
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[LOAD_OBJECTS] Called with {len(places or [])} places, {len(transitions or [])} transitions, {len(arcs or [])} arcs")
+        
+        # Normalize input parameters
+        places = places or []
+        transitions = transitions or []
+        arcs = arcs or []
+        modules = modules or {}
+        
+        # Orchestrate loading workflow using extracted helper methods
+        self._load_modules(modules)
+        self._add_objects_with_notification(places, transitions, arcs)
+        arcs = self._validate_and_clean_arcs(arcs)
+        self._register_object_ids(places, transitions, arcs)
+        self._reset_places_to_initial_marking(places)
+        self._trigger_simulation_reset()
+        
+        # Mark document state
+        self.mark_dirty()
+        self.mark_needs_redraw()
+        
+        # Refresh dependent panels
+        self._refresh_viability_panel()
     
     def _request_simulation_reset_direct(self):
         """Request simulation controller reset DIRECTLY (not via idle callback).
@@ -803,37 +940,15 @@ class ModelCanvasManager:
             logger = logging.getLogger(__name__)
             logger.info("[RESET_DIRECT] Starting direct simulation reset")
             
-            # Use stored references (set by loader during manager creation)
-            canvas_loader = self._canvas_loader
-            drawing_area = self._drawing_area
-            
-            if not canvas_loader:
-                logger.warning("[RESET_DIRECT] ⚠️  No canvas_loader reference stored")
-                return
-            
-            if not drawing_area:
-                logger.warning("[RESET_DIRECT] ⚠️  No drawing_area reference stored")
+            # Validate stored references
+            canvas_loader, drawing_area = self._validate_stored_references(logger)
+            if not canvas_loader or not drawing_area:
                 return
             
             logger.info("[RESET_DIRECT] Found canvas_loader and drawing_area via stored references")
             
-            # Call _ensure_simulation_reset directly (synchronous)
-            if hasattr(canvas_loader, '_ensure_simulation_reset'):
-                logger.info("[RESET_DIRECT] Calling _ensure_simulation_reset()")
-                canvas_loader._ensure_simulation_reset(drawing_area)
-                
-                # After reset, initialize transition states
-                controller = canvas_loader.simulation_controllers.get(drawing_area)
-                if controller:
-                    logger.info(f"[RESET_DIRECT] Initializing transition states for {len(self.transitions)} transitions")
-                    self._initialize_transition_states(controller)
-                    logger.info(f"[RESET_DIRECT] ✅ Controller has {len(controller.step_listeners)} step listeners")
-                else:
-                    logger.warning("[RESET_DIRECT] ⚠️  Could not get controller")
-                    
-                logger.info("[RESET_DIRECT] ✅ Simulation controller reset and initialized")
-            else:
-                logger.warning("[RESET_DIRECT] ⚠️  _ensure_simulation_reset not found on canvas_loader")
+            # Execute reset and initialization
+            self._execute_simulation_reset(canvas_loader, drawing_area, logger)
                 
         except Exception as e:
             import logging
@@ -841,6 +956,150 @@ class ModelCanvasManager:
             logger.error(f"[RESET_DIRECT] ❌ Exception: {e}")
             import traceback
             traceback.print_exc()
+    
+    # Helper methods for _request_simulation_reset_direct (PHASE 1 EXTRACTION)
+    
+    def _validate_stored_references(self, logger):
+        """Validate stored canvas_loader and drawing_area references.
+        
+        Args:
+            logger: Logger instance.
+            
+        Returns:
+            tuple: (canvas_loader, drawing_area) or (None, None) if invalid.
+        """
+        canvas_loader = self._canvas_loader
+        drawing_area = self._drawing_area
+        
+        if not canvas_loader:
+            logger.warning("[RESET_DIRECT] ⚠️  No canvas_loader reference stored")
+            return None, None
+        
+        if not drawing_area:
+            logger.warning("[RESET_DIRECT] ⚠️  No drawing_area reference stored")
+            return None, None
+        
+        return canvas_loader, drawing_area
+    
+    def _execute_simulation_reset(self, canvas_loader, drawing_area, logger):
+        """Execute simulation reset and initialize transition states.
+        
+        Args:
+            canvas_loader: Canvas loader instance.
+            drawing_area: Drawing area instance.
+            logger: Logger instance.
+        """
+        if not hasattr(canvas_loader, '_ensure_simulation_reset'):
+            logger.warning("[RESET_DIRECT] ⚠️  _ensure_simulation_reset not found on canvas_loader")
+            return
+        
+        logger.info("[RESET_DIRECT] Calling _ensure_simulation_reset()")
+        canvas_loader._ensure_simulation_reset(drawing_area)
+        
+        # Initialize transition states after reset
+        controller = canvas_loader.simulation_controllers.get(drawing_area)
+        if controller:
+            logger.info(f"[RESET_DIRECT] Initializing transition states for {len(self.transitions)} transitions")
+            self._initialize_transition_states(controller)
+            logger.info(f"[RESET_DIRECT] ✅ Controller has {len(controller.step_listeners)} step listeners")
+        else:
+            logger.warning("[RESET_DIRECT] ⚠️  Could not get controller")
+        
+        logger.info("[RESET_DIRECT] ✅ Simulation controller reset and initialized")
+    
+    # Helper methods for _request_simulation_reset (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _find_canvas_loader(manager):
+        """Find the canvas_loader instance that owns this manager.
+        
+        Args:
+            manager: ModelCanvasManager instance
+            
+        Returns:
+            canvas_loader instance or None
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Import here to avoid circular dependency at module load time
+        from shypn.helpers import model_canvas_loader
+        
+        # Try singleton instance first
+        if hasattr(model_canvas_loader, '_instance'):
+            logger.info("[IDLE_RESET] Found canvas_loader via _instance")
+            return model_canvas_loader._instance
+        
+        # Fallback: try to find via manager attributes
+        for loader_attr in ['canvas_loader', '_canvas_loader']:
+            if hasattr(manager, loader_attr):
+                canvas_loader = getattr(manager, loader_attr)
+                logger.info(f"[IDLE_RESET] Found canvas_loader via {loader_attr}")
+                return canvas_loader
+        
+        logger.warning("[IDLE_RESET] ⚠️  Could not find canvas_loader")
+        return None
+    
+    @staticmethod
+    def _find_drawing_area(canvas_loader, manager):
+        """Find the drawing_area for this manager.
+        
+        Args:
+            canvas_loader: Canvas loader instance
+            manager: ModelCanvasManager instance
+            
+        Returns:
+            drawing_area widget or None
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if not hasattr(canvas_loader, 'canvas_managers'):
+            logger.warning("[IDLE_RESET] ⚠️  canvas_loader has no canvas_managers dict")
+            return None
+        
+        for da, mgr in canvas_loader.canvas_managers.items():
+            if mgr == manager:
+                logger.info("[IDLE_RESET] Found matching drawing_area")
+                return da
+        
+        logger.warning("[IDLE_RESET] ⚠️  Could not find drawing_area for this manager")
+        return None
+    
+    @staticmethod
+    def _perform_simulation_reset(canvas_loader, drawing_area, manager):
+        """Perform the simulation controller reset and transition initialization.
+        
+        Args:
+            canvas_loader: Canvas loader instance
+            drawing_area: GTK drawing area widget
+            manager: ModelCanvasManager instance
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if not hasattr(canvas_loader, '_ensure_simulation_reset'):
+            logger.warning("[IDLE_RESET] ⚠️  _ensure_simulation_reset not found")
+            return False
+        
+        # Call the reset method (handles controller reset + listener re-registration)
+        canvas_loader._ensure_simulation_reset(drawing_area)
+        
+        # CRITICAL: After reset, initialize transition states for all transitions
+        # This ensures source transitions and other transitions are immediately
+        # ready to fire without needing a manual "wakeup" action
+        controller = canvas_loader.simulation_controllers.get(drawing_area)
+        if controller:
+            manager._initialize_transition_states(controller)
+            logger.info(f"✅ Simulation controller reset and initialized after load_objects()")
+            logger.info(f"   Controller has {len(controller.step_listeners)} step listeners")
+            return True
+        else:
+            logger.warning("[IDLE_RESET] ⚠️  Could not get controller after reset")
+            return False
     
     def _request_simulation_reset(self):
         """Request simulation controller reset for this canvas.
@@ -853,91 +1112,23 @@ class ModelCanvasManager:
         1. Avoid circular dependency (manager → canvas_loader → controller → manager)
         2. Ensure reset happens after GTK main loop processes the object additions
         3. Give canvas time to stabilize before resetting controller
+        
+        REFACTORED: Now delegates to extracted helper methods for better readability.
         """
         try:
             import logging
             logger = logging.getLogger(__name__)
             logger.info("[REQUEST_RESET] _request_simulation_reset() called")
             
-            # Find the canvas_loader by traversing up from manager
-            # This is safe because manager is always created by canvas_loader
+            # Setup GLib and schedule idle callback
             import gi
             gi.require_version('GLib', '2.0')
             from gi.repository import GLib
             
             logger.info("[REQUEST_RESET] About to schedule idle callback with GLib.idle_add()")
             
-            def reset_on_idle():
-                """Reset controller on GTK idle (after canvas updates)."""
-                try:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.info("[IDLE_RESET] Idle callback triggered - starting reset")
-                    
-                    # Import here to avoid circular dependency at module load time
-                    from shypn.helpers import model_canvas_loader
-                    
-                    # Find the canvas_loader instance that owns this manager
-                    # The canvas_loader is the singleton that created all managers
-                    if hasattr(model_canvas_loader, '_instance'):
-                        canvas_loader = model_canvas_loader._instance
-                        logger.info("[IDLE_RESET] Found canvas_loader via _instance")
-                    else:
-                        # Fallback: try to find via canvas_managers dict
-                        # This works because managers are stored globally
-                        canvas_loader = None
-                        for loader_attr in ['canvas_loader', '_canvas_loader']:
-                            if hasattr(self, loader_attr):
-                                canvas_loader = getattr(self, loader_attr)
-                                logger.info(f"[IDLE_RESET] Found canvas_loader via {loader_attr}")
-                                break
-                    
-                    if canvas_loader:
-                        # Find the drawing_area for this manager
-                        drawing_area = None
-                        if hasattr(canvas_loader, 'canvas_managers'):
-                            for da, mgr in canvas_loader.canvas_managers.items():
-                                if mgr == self:
-                                    drawing_area = da
-                                    logger.info("[IDLE_RESET] Found matching drawing_area")
-                                    break
-                        
-                        if not drawing_area:
-                            logger.warning("[IDLE_RESET] ⚠️  Could not find drawing_area for this manager")
-                        
-                        if drawing_area and hasattr(canvas_loader, '_ensure_simulation_reset'):
-                            # Call the reset method (handles controller reset + listener re-registration)
-                            canvas_loader._ensure_simulation_reset(drawing_area)
-                            
-                            # CRITICAL: After reset, initialize transition states for all transitions
-                            # This ensures source transitions and other transitions are immediately
-                            # ready to fire without needing a manual "wakeup" action
-                            controller = canvas_loader.simulation_controllers.get(drawing_area)
-                            if controller:
-                                self._initialize_transition_states(controller)
-                                
-                                # Debug: Verify listeners are registered
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.info(f"✅ Simulation controller reset and initialized after load_objects()")
-                                logger.info(f"   Controller has {len(controller.step_listeners)} step listeners")
-                            
-                        else:
-                            import logging
-                            logger = logging.getLogger(__name__)
-                            logger.warning("⚠️  Could not find drawing_area or _ensure_simulation_reset for simulation reset")
-                    
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"❌ Failed to reset simulation after load: {e}")
-                    import traceback
-                    traceback.print_exc()
-                
-                return False  # Don't repeat
-            
-            # Schedule reset on idle (after GTK processes current events)
-            result = GLib.idle_add(reset_on_idle)
+            # Schedule reset on idle using extracted callback
+            result = GLib.idle_add(self._create_reset_callback())
             logger.info(f"[REQUEST_RESET] GLib.idle_add() returned: {result}")
             
         except Exception as e:
@@ -946,6 +1137,46 @@ class ModelCanvasManager:
             logger.error(f"[REQUEST_RESET] ❌ Exception in _request_simulation_reset: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _create_reset_callback(self):
+        """Create the idle callback function for simulation reset.
+        
+        Returns:
+            callable: Callback function for GLib.idle_add
+        """
+        def reset_on_idle():
+            """Reset controller on GTK idle (after canvas updates)."""
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("[IDLE_RESET] Idle callback triggered - starting reset")
+                
+                # Find canvas_loader and drawing_area
+                canvas_loader = self._find_canvas_loader(self)
+                if not canvas_loader:
+                    logger.warning("[IDLE_RESET] ⚠️  Could not find canvas_loader")
+                    return False
+                
+                drawing_area = self._find_drawing_area(canvas_loader, self)
+                if not drawing_area:
+                    logger.warning("[IDLE_RESET] ⚠️  Could not find drawing_area")
+                    return False
+                
+                # Perform reset
+                success = self._perform_simulation_reset(canvas_loader, drawing_area, self)
+                if not success:
+                    logger.warning("[IDLE_RESET] ⚠️  Reset failed")
+                
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"❌ Failed to reset simulation after load: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            return False  # Don't repeat
+        
+        return reset_on_idle
     
     def _initialize_transition_states(self, controller):
         """Initialize transition states for all transitions in the model.
@@ -960,53 +1191,24 @@ class ModelCanvasManager:
         try:
             import logging
             logger = logging.getLogger(__name__)
-            
             from shypn.engine.simulation.controller import TransitionState
             
-            # Removed debug print; using logger below
             logger.info(f"[INIT_STATES] Initializing transition states for {len(self.transitions)} transitions")
             
             source_count = 0
             for transition in self.transitions:
-                # Create transition state if not exists
+                # Ensure transition state exists
                 if transition.id not in controller.transition_states:
                     controller.transition_states[transition.id] = TransitionState()
                 
-                # Get behavior for this transition
                 behavior = controller._get_behavior(transition)
-                
-                # Check if this is a source transition
                 is_source = getattr(transition, 'is_source', False)
                 
                 if is_source:
                     source_count += 1
-                    # Source transitions are always enabled from the start
-                    state = controller.transition_states[transition.id]
-                    state.enablement_time = controller.time  # Enable at time 0
-                    if hasattr(behavior, 'set_enablement_time'):
-                        behavior.set_enablement_time(controller.time)
-                    # Removed debug print; using logger below
-                    logger.info(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+                    self._enable_source_transition(controller, transition, behavior, logger)
                 else:
-                    # Check if non-source transition is structurally enabled
-                    # (has enough input tokens to fire)
-                    input_arcs = behavior.get_input_arcs()
-                    locally_enabled = True
-                    
-                    for arc in input_arcs:
-                        source_place = behavior._get_place(arc.source_id)
-                        if source_place is None or source_place.tokens < arc.weight:
-                            locally_enabled = False
-                            break
-                    
-                    if locally_enabled:
-                        state = controller.transition_states[transition.id]
-                        state.enablement_time = controller.time
-                        if hasattr(behavior, 'set_enablement_time'):
-                            behavior.set_enablement_time(controller.time)
-                        logger.debug(f"  {transition.id}: Enabled at t=0 (has sufficient tokens)")
-                    else:
-                        logger.debug(f"  {transition.id}: Not enabled (insufficient tokens)")
+                    self._check_and_enable_transition(controller, transition, behavior, logger)
             
             logger.info(f"[INIT_STATES] ✅ Complete: {len(controller.transition_states)} transitions, {source_count} sources enabled")
             
@@ -1016,6 +1218,52 @@ class ModelCanvasManager:
             logger.error(f"Failed to initialize transition states: {e}")
             import traceback
             traceback.print_exc()
+    
+    # Helper methods for _initialize_transition_states (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _enable_source_transition(controller, transition, behavior, logger):
+        """Enable a source transition (no input arcs).
+        
+        Args:
+            controller: Simulation controller.
+            transition: Transition to enable.
+            behavior: Transition behavior.
+            logger: Logger instance.
+        """
+        state = controller.transition_states[transition.id]
+        state.enablement_time = controller.time
+        if hasattr(behavior, 'set_enablement_time'):
+            behavior.set_enablement_time(controller.time)
+        logger.info(f"[INIT_STATES] ✅ {transition.id}: Source transition enabled at t={controller.time}")
+    
+    @staticmethod
+    def _check_and_enable_transition(controller, transition, behavior, logger):
+        """Check and enable non-source transition if inputs are satisfied.
+        
+        Args:
+            controller: Simulation controller.
+            transition: Transition to check.
+            behavior: Transition behavior.
+            logger: Logger instance.
+        """
+        input_arcs = behavior.get_input_arcs()
+        locally_enabled = True
+        
+        for arc in input_arcs:
+            source_place = behavior._get_place(arc.source_id)
+            if source_place is None or source_place.tokens < arc.weight:
+                locally_enabled = False
+                break
+        
+        if locally_enabled:
+            state = controller.transition_states[transition.id]
+            state.enablement_time = controller.time
+            if hasattr(behavior, 'set_enablement_time'):
+                behavior.set_enablement_time(controller.time)
+            logger.debug(f"  {transition.id}: Enabled at t=0 (has sufficient tokens)")
+        else:
+            logger.debug(f"  {transition.id}: Not enabled (insufficient tokens)")
     
     def detect_parallel_arcs(self, arc):
         """Find arcs parallel to the given arc (same source/target or reversed).
@@ -1052,153 +1300,319 @@ class ModelCanvasManager:
     def _auto_convert_parallel_arcs_to_curved(self, new_arc):
         """Automatically convert parallel arcs and loop arcs to curved arcs.
         
-        When a new arc creates a parallel situation (same source/target or opposite),
-        or when it's a loop arc (source == target), convert all involved arcs to
-        curved arcs for better visualization.
-        
-        Parallel arcs MUST always be curved - never straight. Loops MUST be curved.
-        This prevents visual overlap and maintains clear distinction between different flows.
-        
-        For opposite direction arcs (A→B and B→A), BOTH are converted to curved
-        simultaneously with perpendicular offsets on opposite sides.
+        REFACTORED: Now delegates to helper methods for better readability.
         
         Args:
             new_arc: The newly added arc that may create parallels or be a loop
         """
-        from shypn.netobjs import CurvedArc, CurvedInhibitorArc, InhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        import math
-        
-        # SAFETY: Skip arcs with invalid source/target references
-        if not hasattr(new_arc, 'source') or new_arc.source is None:
-            return
-        if not hasattr(new_arc, 'target') or new_arc.target is None:
-            return
-        if not hasattr(new_arc.source, 'x') or not hasattr(new_arc.source, 'y'):
-            return
-        if not hasattr(new_arc.target, 'x') or not hasattr(new_arc.target, 'y'):
+        # SAFETY: Validate arc has valid source/target references
+        if not self._validate_arc_references(new_arc):
             return
         
         # Check if this is a loop arc (source == target)
         is_loop = (new_arc.source == new_arc.target)
         
+        # Detect parallel arcs
         parallels = self.detect_parallel_arcs(new_arc)
         
-        # Convert loop arcs or parallel arcs
-        if is_loop or parallels:
-            
-            # For loop arcs, just convert and apply offset
-            if is_loop:
-                if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-                    curved_arc = make_curved(new_arc)
-                    curved_arc.control_offset_x = 60.0
-                    curved_arc.control_offset_y = -60.0
-                    
-                    try:
-                        index = self.arcs.index(new_arc)
-                        self.arcs[index] = curved_arc
-                        curved_arc._manager = self
-                        curved_arc.on_changed = self._on_object_changed
-                    except ValueError:
-                        pass  # Already replaced
-                
-                self.mark_dirty()
-                return
-            
-            # For parallel arcs, check if we have an opposite-direction pair
-            opposite_arc = None
-            for parallel in parallels:
-                if parallel.source == new_arc.target and parallel.target == new_arc.source:
-                    opposite_arc = parallel
-                    break
-            
-            # If we have an opposite-direction pair, convert BOTH with perpendicular offsets
-            if opposite_arc is not None:
-                # Calculate perpendicular direction from new_arc direction
-                dx = new_arc.target.x - new_arc.source.x
-                dy = new_arc.target.y - new_arc.source.y
-                length = math.sqrt(dx*dx + dy*dy)
-                
-                if length > 1:
-                    # Normalize
-                    dx /= length
-                    dy /= length
-                    
-                    # Perpendicular vector (90° rotation)
-                    perp_x = -dy
-                    perp_y = dx
-                    
-                    # Offset distance
-                    offset_distance = 50.0
-                    
-                    # Convert and offset new_arc
-                    if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-                        curved_new = make_curved(new_arc)
-                        
-                        # Determine offset direction based on ID
-                        if new_arc.id < opposite_arc.id:
-                            curved_new.control_offset_x = perp_x * offset_distance
-                            curved_new.control_offset_y = perp_y * offset_distance
-                        else:
-                            curved_new.control_offset_x = -perp_x * offset_distance
-                            curved_new.control_offset_y = -perp_y * offset_distance
-                        
-                        try:
-                            index = self.arcs.index(new_arc)
-                            self.arcs[index] = curved_new
-                            curved_new._manager = self
-                            curved_new.on_changed = self._on_object_changed
-                        except ValueError:
-                            pass
-                    
-                    # Convert and offset opposite_arc
-                    if isinstance(opposite_arc, (Arc, InhibitorArc)) and not isinstance(opposite_arc, (CurvedArc, CurvedInhibitorArc)):
-                        curved_opposite = make_curved(opposite_arc)
-                        
-                        # Mirror offset
-                        if new_arc.id < opposite_arc.id:
-                            curved_opposite.control_offset_x = -perp_x * offset_distance
-                            curved_opposite.control_offset_y = -perp_y * offset_distance
-                        else:
-                            curved_opposite.control_offset_x = perp_x * offset_distance
-                            curved_opposite.control_offset_y = perp_y * offset_distance
-                        
-                        try:
-                            index = self.arcs.index(opposite_arc)
-                            self.arcs[index] = curved_opposite
-                            curved_opposite._manager = self
-                            curved_opposite.on_changed = self._on_object_changed
-                        except ValueError:
-                            pass
-            
-            else:
-                # No opposite pair, just convert parallels without special offsets
-                # (This handles same-direction parallels)
-                for parallel in parallels:
-                    if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
-                        curved_arc = make_curved(parallel)
-                        
-                        try:
-                            index = self.arcs.index(parallel)
-                            self.arcs[index] = curved_arc
-                            curved_arc._manager = self
-                            curved_arc.on_changed = self._on_object_changed
-                        except ValueError:
-                            pass
-                
-                # Convert new_arc too if it's not curved
-                if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-                    curved_new = make_curved(new_arc)
-                    try:
-                        index = self.arcs.index(new_arc)
-                        self.arcs[index] = curved_new
-                        curved_new._manager = self
-                        curved_new.on_changed = self._on_object_changed
-                    except ValueError:
-                        pass
-            
-            # Mark dirty to trigger redraw
+        # Convert loop arcs or parallel arcs using extracted helper methods
+        if is_loop:
+            self._convert_loop_arc(new_arc)
             self.mark_dirty()
+            return
+        
+        if parallels:
+            # Check for opposite-direction pair (A→B and B→A)
+            opposite_arc = self._find_opposite_direction_arc(new_arc, parallels)
+            
+            if opposite_arc:
+                # Convert pair with perpendicular offsets
+                self._convert_opposite_direction_pair(new_arc, opposite_arc)
+            else:
+                # Convert same-direction parallels without special offsets
+                self._convert_same_direction_parallels(new_arc, parallels)
+            
+            self.mark_dirty()
+    
+    def _validate_arc_references(self, arc):
+        """Validate arc has valid source/target references.
+        
+        Args:
+            arc: Arc to validate
+            
+        Returns:
+            bool: True if valid, False if invalid
+        """
+        if not hasattr(arc, 'source') or arc.source is None:
+            return False
+        if not hasattr(arc, 'target') or arc.target is None:
+            return False
+        if not hasattr(arc.source, 'x') or not hasattr(arc.source, 'y'):
+            return False
+        if not hasattr(arc.target, 'x') or not hasattr(arc.target, 'y'):
+            return False
+        return True
+    
+    def _convert_loop_arc(self, arc):
+        """Convert loop arc (source == target) to curved with fixed offset.
+        
+        Args:
+            arc: Loop arc to convert
+            
+        Returns:
+            bool: True if converted, False if already curved
+        """
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc
+        from shypn.utils.arc_transform import make_curved
+        
+        if isinstance(arc, Arc) and not isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
+            curved_arc = make_curved(arc)
+            curved_arc.control_offset_x = 60.0
+            curved_arc.control_offset_y = -60.0
+            self._replace_arc_in_list(arc, curved_arc)
+            return True
+        return False
+    
+    def _find_opposite_direction_arc(self, arc, parallels):
+        """Find arc going in opposite direction (A→B vs B→A).
+        
+        Args:
+            arc: Reference arc
+            parallels: List of parallel arcs
+            
+        Returns:
+            Arc or None: Opposite-direction arc if found
+        """
+        for parallel in parallels:
+            if parallel.source == arc.target and parallel.target == arc.source:
+                return parallel
+        return None
+    
+    def _calculate_perpendicular_offset(self, arc1, arc2, offset_distance=50.0):
+        """Calculate perpendicular offset for opposite-direction arc pair.
+        
+        Args:
+            arc1: First arc (A→B)
+            arc2: Second arc (B→A)
+            offset_distance: Distance to offset arcs
+            
+        Returns:
+            tuple: ((offset_x1, offset_y1), (offset_x2, offset_y2))
+        """
+        import math
+        
+        # Calculate direction vector
+        dx, dy, length = self._compute_direction_vector(arc1)
+        
+        if length <= 1:
+            return ((0, 0), (0, 0))
+        
+        # Normalize and compute perpendicular
+        dx, dy = self._normalize_vector(dx, dy, length)
+        perp_x, perp_y = self._compute_perpendicular_vector(dx, dy)
+        
+        # Determine offset directions
+        return self._compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance)
+    
+    # Helper methods for _calculate_perpendicular_offset (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _compute_direction_vector(arc):
+        """Compute direction vector between arc endpoints.
+        
+        Args:
+            arc: Arc to compute direction for.
+            
+        Returns:
+            tuple: (dx, dy, length)
+        """
+        import math
+        dx = arc.target.x - arc.source.x
+        dy = arc.target.y - arc.source.y
+        length = math.sqrt(dx*dx + dy*dy)
+        return dx, dy, length
+    
+    @staticmethod
+    def _normalize_vector(dx, dy, length):
+        """Normalize a vector to unit length.
+        
+        Args:
+            dx, dy: Vector components.
+            length: Vector length.
+            
+        Returns:
+            tuple: (normalized_dx, normalized_dy)
+        """
+        return dx / length, dy / length
+    
+    @staticmethod
+    def _compute_perpendicular_vector(dx, dy):
+        """Compute perpendicular vector (90° rotation).
+        
+        Args:
+            dx, dy: Normalized direction vector.
+            
+        Returns:
+            tuple: (perp_x, perp_y)
+        """
+        return -dy, dx
+    
+    @staticmethod
+    def _compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance):
+        """Compute offset pair based on arc IDs.
+        
+        Args:
+            arc1, arc2: Arcs to offset.
+            perp_x, perp_y: Perpendicular vector.
+            offset_distance: Offset distance.
+            
+        Returns:
+            tuple: ((offset1_x, offset1_y), (offset2_x, offset2_y))
+        """
+        if arc1.id < arc2.id:
+            offset1 = (perp_x * offset_distance, perp_y * offset_distance)
+            offset2 = (-perp_x * offset_distance, -perp_y * offset_distance)
+        else:
+            offset1 = (-perp_x * offset_distance, -perp_y * offset_distance)
+            offset2 = (perp_x * offset_distance, perp_y * offset_distance)
+        return (offset1, offset2)
+    
+    def _convert_opposite_direction_pair(self, new_arc, opposite_arc):
+        """Convert opposite-direction arc pair (A→B and B→A) with perpendicular offsets.
+        
+        Args:
+            new_arc: Newly added arc
+            opposite_arc: Existing arc in opposite direction
+        """
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
+        from shypn.utils.arc_transform import make_curved
+        
+        # Calculate offsets
+        (offset1, offset2) = self._calculate_perpendicular_offset(new_arc, opposite_arc)
+        
+        # Convert and offset new_arc
+        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+            curved_new = make_curved(new_arc)
+            curved_new.control_offset_x = offset1[0]
+            curved_new.control_offset_y = offset1[1]
+            self._replace_arc_in_list(new_arc, curved_new)
+        
+        # Convert and offset opposite_arc
+        if isinstance(opposite_arc, (Arc, InhibitorArc)) and not isinstance(opposite_arc, (CurvedArc, CurvedInhibitorArc)):
+            curved_opposite = make_curved(opposite_arc)
+            curved_opposite.control_offset_x = offset2[0]
+            curved_opposite.control_offset_y = offset2[1]
+            self._replace_arc_in_list(opposite_arc, curved_opposite)
+    
+    def _convert_same_direction_parallels(self, new_arc, parallels):
+        """Convert same-direction parallel arcs without special offsets.
+        
+        Args:
+            new_arc: Newly added arc
+            parallels: List of parallel arcs (same direction)
+        """
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
+        from shypn.utils.arc_transform import make_curved
+        
+        # Convert all parallels
+        for parallel in parallels:
+            if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
+                curved_arc = make_curved(parallel)
+                self._replace_arc_in_list(parallel, curved_arc)
+        
+        # Convert new_arc too if not curved
+        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
+            curved_new = make_curved(new_arc)
+            self._replace_arc_in_list(new_arc, curved_new)
+    
+    def _replace_arc_in_list(self, old_arc, new_arc):
+        """Replace arc in arcs list and set up manager references.
+        
+        Args:
+            old_arc: Arc to replace
+            new_arc: Replacement curved arc
+        """
+        try:
+            index = self.arcs.index(old_arc)
+            self.arcs[index] = new_arc
+            new_arc._manager = self
+            new_arc.on_changed = self._on_object_changed
+        except ValueError:
+            pass  # Already replaced
+    
+    # Helper methods for calculate_arc_offset (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _separate_parallel_arcs(arc, parallels):
+        """Separate parallel arcs into same-direction and opposite-direction groups.
+        
+        Args:
+            arc: The arc to check against
+            parallels: List of parallel arcs
+            
+        Returns:
+            Tuple of (same_direction_list, opposite_direction_list)
+        """
+        same_direction = []
+        opposite_direction = []
+        
+        for other in parallels:
+            if other.source == arc.source and other.target == arc.target:
+                same_direction.append(other)
+            elif other.source == arc.target and other.target == arc.source:
+                opposite_direction.append(other)
+        
+        return same_direction, opposite_direction
+    
+    @staticmethod
+    def _calculate_opposite_direction_offset(arc, opposite_arc):
+        """Calculate offset for two arcs in opposite directions (mirror symmetry).
+        
+        Args:
+            arc: The arc to calculate offset for
+            opposite_arc: The arc in the opposite direction
+            
+        Returns:
+            float: Offset distance (positive = counterclockwise, negative = clockwise)
+        """
+        # Use a deterministic rule: arc with lower ID gets positive offset
+        if arc.id < opposite_arc.id:
+            return 50.0  # Curve counterclockwise (increased from 25)
+        else:
+            return -50.0  # Curve clockwise (mirror, increased from -25)
+    
+    @staticmethod
+    def _calculate_same_direction_offset(arc, all_arcs):
+        """Calculate offset based on stable ordering of parallel arcs.
+        
+        Distributes arcs evenly around center (0):
+        - 2 arcs: offsets are +15, -15
+        - 3 arcs: offsets are +20, 0, -20
+        - 4 arcs: offsets are +30, +10, -10, -30
+        
+        Args:
+            arc: The arc to calculate offset for
+            all_arcs: List of all parallel arcs (including this arc)
+            
+        Returns:
+            float: Offset distance in pixels
+        """
+        total = len(all_arcs)
+        if total == 1:
+            return 0.0
+        
+        # Stable ordering by ID
+        all_arcs.sort(key=lambda a: a.id)
+        index = all_arcs.index(arc)
+        
+        if total == 2:
+            # Simple case: ±15 pixels
+            return 15.0 if index == 0 else -15.0
+        else:
+            # General case: distribute evenly with 10px spacing
+            spacing = 10.0
+            center = (total - 1) / 2.0
+            return (index - center) * spacing
     
     def calculate_arc_offset(self, arc, parallels):
         """Calculate offset for arc to avoid overlapping parallels.
@@ -1209,6 +1623,8 @@ class ModelCanvasManager:
         
         For opposite direction arcs (A→B, B→A), they curve in opposite
         directions to create mirror symmetry.
+        
+        REFACTORED: Now delegates to extracted helper methods for better readability.
         
         Args:
             arc: Arc to calculate offset for
@@ -1221,49 +1637,16 @@ class ModelCanvasManager:
         if not parallels:
             return 0.0  # No offset needed for single arc
         
-        # Separate same-direction and opposite-direction arcs
-        same_direction = []
-        opposite_direction = []
-        
-        for other in parallels:
-            if other.source == arc.source and other.target == arc.target:
-                same_direction.append(other)
-            elif other.source == arc.target and other.target == arc.source:
-                opposite_direction.append(other)
+        # Separate parallel arcs into same-direction and opposite-direction groups
+        same_direction, opposite_direction = self._separate_parallel_arcs(arc, parallels)
         
         # For opposite direction arcs (most common case: A→B, B→A)
         if len(opposite_direction) == 1 and len(same_direction) == 0:
-            # Two arcs in opposite directions - mirror each other
-            # Use a deterministic rule: arc with lower ID gets positive offset
-            other = opposite_direction[0]
-            if arc.id < other.id:
-                return 50.0  # Curve counterclockwise (increased from 25)
-            else:
-                return -50.0  # Curve clockwise (mirror, increased from -25)
+            return self._calculate_opposite_direction_offset(arc, opposite_direction[0])
         
         # For same-direction arcs or mixed cases, use stable ordering
         all_arcs = [arc] + parallels
-        all_arcs.sort(key=lambda a: a.id)  # Stable ordering by ID
-        
-        index = all_arcs.index(arc)
-        total = len(all_arcs)
-        
-        # Calculate offset based on number of parallel arcs
-        # For 2 arcs: offsets are +15, -15
-        # For 3 arcs: offsets are +20, 0, -20
-        # For 4 arcs: offsets are +30, +10, -10, -30
-        # Pattern: distribute evenly around center (0)
-        
-        if total == 1:
-            return 0.0
-        elif total == 2:
-            # Simple case: ±15 pixels
-            return 15.0 if index == 0 else -15.0
-        else:
-            # General case: distribute evenly with 10px spacing
-            spacing = 10.0
-            center = (total - 1) / 2.0
-            return (index - center) * spacing
+        return self._calculate_same_direction_offset(arc, all_arcs)
     
     def replace_arc(self, old_arc, new_arc):
         """Replace an arc with a different type (for arc transformations).
@@ -1470,97 +1853,114 @@ class ModelCanvasManager:
         self.viewport_controller.set_zoom(zoom_level, center_x, center_y)
         self._needs_redraw = True
     
+    def _apply_zoom_factor_with_bounds(self, factor):
+        """Apply zoom factor with bounds checking.
+        
+        Args:
+            factor: Multiplicative zoom factor
+            
+        Returns:
+            tuple: (new_zoom, zoom_changed) - new zoom level and whether it changed
+        """
+        new_zoom = self.zoom * factor
+        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
+        zoom_changed = (new_zoom != self.zoom)
+        return new_zoom, zoom_changed
+    
+    def _calculate_pan_for_zoom_without_rotation(self, world_x, world_y, center_x, center_y):
+        """Calculate pan adjustment for zoom at point (no rotation).
+        
+        Args:
+            world_x: World X coordinate to keep under cursor
+            world_y: World Y coordinate to keep under cursor
+            center_x: Screen X coordinate of zoom center
+            center_y: Screen Y coordinate of zoom center
+            
+        Returns:
+            tuple: (pan_x, pan_y) in world coordinates
+        """
+        # No rotation: simple formula
+        # world = screen/zoom - pan
+        # So: pan = screen/zoom - world
+        pan_x = (center_x / self.zoom) - world_x
+        pan_y = (center_y / self.zoom) - world_y
+        return pan_x, pan_y
+    
+    def _calculate_pan_for_zoom_with_rotation(self, world_x, world_y, center_x, center_y, rotation):
+        """Calculate pan adjustment for zoom at point (with rotation).
+        
+        Solves the equation: pan = c/zoom - world + R_inv((screen - c)/zoom)
+        where rotation center depends on pan (circular dependency).
+        
+        Args:
+            world_x: World X coordinate to keep under cursor
+            world_y: World Y coordinate to keep under cursor
+            center_x: Screen X coordinate of zoom center
+            center_y: Screen Y coordinate of zoom center
+            rotation: CanvasRotation object with angle_radians
+            
+        Returns:
+            tuple: (pan_x, pan_y) in world coordinates
+        """
+        import math
+        
+        cx = self.viewport_width / 2.0
+        cy = self.viewport_height / 2.0
+        
+        # (screen - c)/zoom
+        screen_offset_x = (center_x - cx) / self.zoom
+        screen_offset_y = (center_y - cy) / self.zoom
+        
+        # R_inv((screen - c)/zoom)
+        cos_a = math.cos(-rotation.angle_radians)
+        sin_a = math.sin(-rotation.angle_radians)
+        
+        rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
+        rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
+        
+        # pan = c/zoom - world + R_inv((screen - c)/zoom)
+        pan_x = (cx / self.zoom) - world_x + rotated_x
+        pan_y = (cy / self.zoom) - world_y + rotated_y
+        
+        return pan_x, pan_y
+    
     def zoom_at_point(self, factor, center_x, center_y):
         """Zoom by a factor at a specific point with rotation support.
         
-        CORRECTED APPROACH: The issue is that rotation center changes with zoom.
-        We need to work backwards from the desired world point position.
+        REFACTORED: Now delegates to helper methods for better readability.
         
         Args:
-            factor: Multiplicative zoom factor.
-            center_x: X coordinate of zoom center (screen space).
-            center_y: Y coordinate of zoom center (screen space).
+            factor: Multiplicative zoom factor
+            center_x: X coordinate of zoom center (screen space)
+            center_y: Y coordinate of zoom center (screen space)
         """
         # STEP 1: Get world coordinates of zoom center BEFORE zoom change
         world_x, world_y = self.screen_to_world(center_x, center_y)
         
         # STEP 2: Apply new zoom with bounds
-        new_zoom = self.zoom * factor
-        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
+        new_zoom, zoom_changed = self._apply_zoom_factor_with_bounds(factor)
         
-        # If zoom didn't change (hit bounds), nothing to do
-        if new_zoom == self.zoom:
-            return
+        if not zoom_changed:
+            return  # Zoom didn't change (hit bounds)
         
         # STEP 3: Update zoom
-        old_zoom = self.zoom
         self.zoom = new_zoom
         self.viewport_controller.zoom = new_zoom
         
-        # STEP 4: Calculate new pan
-        # We want screen_to_world(center_x, center_y) == (world_x, world_y)
-        # 
-        # WITHOUT rotation:
-        #   screen_to_world: world = screen/zoom - pan
-        #   So: pan = screen/zoom - world
-        #
-        # WITH rotation:
-        #   We need to solve this equation working backwards through the pipeline
-        
+        # STEP 4: Calculate new pan (with or without rotation)
         rotation = self.transformation_manager.get_rotation()
         if rotation and rotation.angle_degrees != 0:
-            # The equation we need to solve:
-            # 1. screen → pre_rot: pre_rot = screen/zoom - pan  (what we're solving for)
-            # 2. pre_rot → world: world = rotate_inverse(pre_rot - rot_center) + rot_center
-            #
-            # But rot_center = viewport_center/zoom - pan (depends on pan!)
-            #
-            # So we have circular dependency. Let's solve it algebraically:
-            # Let: cx = viewport_width/2, cy = viewport_height/2 (screen center)
-            # Let: rcx = cx/zoom - pan_x, rcy = cy/zoom - pan_y (rotation center in world)
-            #
-            # Step 1: pre_rot = screen/zoom - pan
-            # Step 2: world = R_inv(pre_rot - rot_center) + rot_center
-            #         where rot_center = (cx/zoom - pan_x, cy/zoom - pan_y)
-            #
-            # Expanding:
-            # world = R_inv((screen/zoom - pan) - (c/zoom - pan)) + (c/zoom - pan)
-            # world = R_inv(screen/zoom - c/zoom) + (c/zoom - pan)
-            # world = R_inv((screen - c)/zoom) + c/zoom - pan
-            #
-            # Solving for pan:
-            # pan = c/zoom - world + R_inv((screen - c)/zoom)
-            
-            cx = self.viewport_width / 2.0
-            cy = self.viewport_height / 2.0
-            
-            # (screen - c)/zoom
-            screen_offset_x = (center_x - cx) / self.zoom
-            screen_offset_y = (center_y - cy) / self.zoom
-            
-            # R_inv((screen - c)/zoom)
-            cos_a = math.cos(-rotation.angle_radians)
-            sin_a = math.sin(-rotation.angle_radians)
-            
-            rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
-            rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
-            
-            # pan = c/zoom - world + R_inv((screen - c)/zoom)
-            self.pan_x = (cx / self.zoom) - world_x + rotated_x
-            self.pan_y = (cy / self.zoom) - world_y + rotated_y
+            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_with_rotation(
+                world_x, world_y, center_x, center_y, rotation
+            )
         else:
-            # No rotation: simple formula
-            # world = screen/zoom - pan
-            # So: pan = screen/zoom - world
-            self.pan_x = (center_x / self.zoom) - world_x
-            self.pan_y = (center_y / self.zoom) - world_y
+            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_without_rotation(
+                world_x, world_y, center_x, center_y
+            )
         
-        # Clamp pan to maintain infinite canvas bounds
+        # STEP 5: Cleanup - clamp, save, redraw
         self.clamp_pan()
-        
-        # Save view state
         self.save_view_state_to_file()
-        
         self._needs_redraw = True
     
     def clamp_pan(self):
@@ -1637,34 +2037,62 @@ class ModelCanvasManager:
             return None
         
         # Start with place/transition bounds
+        min_x, max_x, min_y, max_y = self._get_object_bounds(all_objects)
+        
+        # Include arc endpoints and control points
+        for arc in self.arcs:
+            min_x, max_x, min_y, max_y = self._update_bounds_with_arc(arc, min_x, max_x, min_y, max_y)
+        
+        return (min_x, min_y, max_x, max_y)
+    
+    @staticmethod
+    def _get_object_bounds(all_objects):
+        """Calculate bounding box for places and transitions.
+        
+        Args:
+            all_objects: List of places and transitions.
+            
+        Returns:
+            tuple: (min_x, max_x, min_y, max_y)
+        """
         min_x = min(obj.x for obj in all_objects)
         max_x = max(obj.x for obj in all_objects)
         min_y = min(obj.y for obj in all_objects)
         max_y = max(obj.y for obj in all_objects)
+        return min_x, max_x, min_y, max_y
+    
+    @staticmethod
+    def _update_bounds_with_arc(arc, min_x, max_x, min_y, max_y):
+        """Update bounds to include arc endpoints and control points.
         
-        # Include arc control points (bezier curves can extend beyond nodes)
-        for arc in self.arcs:
-            # Include source and target points
-            if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
-                min_x = min(min_x, arc.source.x)
-                max_x = max(max_x, arc.source.x)
-                min_y = min(min_y, arc.source.y)
-                max_y = max(max_y, arc.source.y)
-            if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
-                min_x = min(min_x, arc.target.x)
-                max_x = max(max_x, arc.target.x)
-                min_y = min(min_y, arc.target.y)
-                max_y = max(max_y, arc.target.y)
+        Args:
+            arc: Arc to include in bounds.
+            min_x, max_x, min_y, max_y: Current bounds.
             
-            # Include control points if arc has bezier curves
-            if hasattr(arc, 'control_points') and arc.control_points:
-                for cp_x, cp_y in arc.control_points:
-                    min_x = min(min_x, cp_x)
-                    max_x = max(max_x, cp_x)
-                    min_y = min(min_y, cp_y)
-                    max_y = max(max_y, cp_y)
+        Returns:
+            tuple: Updated (min_x, max_x, min_y, max_y)
+        """
+        # Include source and target points
+        if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
+            min_x = min(min_x, arc.source.x)
+            max_x = max(max_x, arc.source.x)
+            min_y = min(min_y, arc.source.y)
+            max_y = max(max_y, arc.source.y)
+        if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
+            min_x = min(min_x, arc.target.x)
+            max_x = max(max_x, arc.target.x)
+            min_y = min(min_y, arc.target.y)
+            max_y = max(max_y, arc.target.y)
         
-        return (min_x, min_y, max_x, max_y)
+        # Include control points if arc has bezier curves
+        if hasattr(arc, 'control_points') and arc.control_points:
+            for cp_x, cp_y in arc.control_points:
+                min_x = min(min_x, cp_x)
+                max_x = max(max_x, cp_x)
+                min_y = min(min_y, cp_y)
+                max_y = max(max_y, cp_y)
+        
+        return min_x, max_x, min_y, max_y
     
     def center_view_on_content(self):
         """Center the viewport on all content.
@@ -1687,57 +2115,18 @@ class ModelCanvasManager:
         # Pan to center the content
         self.pan_to(center_x, center_y)
     
-    def fit_to_page(self, padding_percent=10, deferred=False, horizontal_offset_percent=0, vertical_offset_percent=0):
-        """Fit all content to viewport with optimal zoom and centering.
-        
-        Calculates bounding box of all objects, computes zoom level to fit
-        content in viewport with padding, and centers view on content.
-        
-        This is typically called after loading/importing models to ensure
-        all content is immediately visible to the user.
-        
-        Coordinate System: Graphical (screen) coordinates
-        - Origin at top-left
-        - X increases rightward
-        - Y increases downward
+    def _calculate_content_dimensions(self, bounds):
+        """Calculate content dimensions with padding for object sizes.
         
         Args:
-            padding_percent: Percentage of viewport to leave as margin (10% default).
-                           Use 15% for larger imported models (SBML/KEGG).
-            deferred: If True, defer execution until next draw (when viewport size is known).
-            horizontal_offset_percent: Percentage of viewport width to offset center horizontally.
-                                     Positive values shift content RIGHT (+X direction).
-                                     Typical: 20-30% when left panels visible, 0% when closed.
-            vertical_offset_percent: Percentage of viewport height to offset center vertically.
-                                   Positive values shift content DOWN (+Y direction).
-                                   Negative values shift content UP (-Y direction).
-                                   Typical: -10% to shift content up when bottom panels open.
-        
+            bounds: (min_x, min_y, max_x, max_y) bounding box
+            
         Returns:
-            bool: True if content was fitted, False if no content exists or deferred.
+            tuple: (content_width, content_height) in world coordinates
         """
-        # If deferred, just set the flag and return
-        if deferred:
-            self._fit_to_page_pending = True
-            self._fit_to_page_padding = padding_percent
-            self._fit_to_page_horizontal_offset = horizontal_offset_percent
-            self._fit_to_page_vertical_offset = vertical_offset_percent
-            return False
-        
-        bounds = self.get_content_bounds()
-        
-        if not bounds:
-            # No content - center on origin at default zoom
-            self.zoom = 1.0
-            self.viewport_controller.zoom = 1.0
-            self.pan_to(0.0, 0.0)
-            return False
-        
-        # Calculate content dimensions (add padding for object sizes)
         min_x, min_y, max_x, max_y = bounds
         
         # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
-        # This ensures object boundaries aren't clipped at edges
         content_width = max_x - min_x + 80
         content_height = max_y - min_y + 80
         
@@ -1747,9 +2136,20 @@ class ModelCanvasManager:
         if content_height < 80:
             content_height = 80
         
+        return content_width, content_height
+    
+    def _calculate_zoom_to_fit(self, content_width, content_height, padding_percent):
+        """Calculate optimal zoom level to fit content in viewport.
         
+        Args:
+            content_width: Width of content in world coordinates
+            content_height: Height of content in world coordinates
+            padding_percent: Percentage of viewport to leave as margin
+            
+        Returns:
+            float: Target zoom level (clamped to MIN_ZOOM..MAX_ZOOM)
+        """
         # Calculate available viewport space (with padding margin)
-        # Use viewport controller's dimensions (synchronized with actual widget size)
         padding_factor = 1.0 - (padding_percent / 100.0)
         available_width = self.viewport_controller.viewport_width * padding_factor
         available_height = self.viewport_controller.viewport_height * padding_factor
@@ -1760,44 +2160,121 @@ class ModelCanvasManager:
         target_zoom = min(zoom_x, zoom_y)  # Use smaller to fit both dimensions
         
         # Clamp to zoom limits
-        target_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
+        return max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
+    
+    def _apply_viewport_offsets(self, horizontal_offset_percent, vertical_offset_percent, target_zoom):
+        """Apply horizontal/vertical offsets to viewport pan.
         
+        Args:
+            horizontal_offset_percent: Percentage of viewport width to offset horizontally
+            vertical_offset_percent: Percentage of viewport height to offset vertically
+            target_zoom: Current zoom level
+        """
+        if horizontal_offset_percent == 0 and vertical_offset_percent == 0:
+            return
         
-        # Apply zoom
+        # Calculate offsets in world coordinates
+        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
+        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
+        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
+        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
+        
+        # Apply offsets to pan
+        self.viewport_controller.pan_x += horizontal_offset_world
+        self.viewport_controller.pan_y += vertical_offset_world
+    
+    def fit_to_page(self, padding_percent=10, deferred=False, horizontal_offset_percent=0, vertical_offset_percent=0):
+        """Fit all content to viewport with optimal zoom and centering.
+        
+        Calculates bounding box, computes zoom level to fit content with padding,
+        and centers view on content.
+        
+        REFACTORED: Now delegates to helper methods for better readability.
+        
+        Args:
+            padding_percent: Percentage of viewport to leave as margin (10% default)
+            deferred: If True, defer execution until next draw
+            horizontal_offset_percent: Percentage offset (+ = right, - = left)
+            vertical_offset_percent: Percentage offset (+ = down, - = up)
+            
+        Returns:
+            bool: True if content was fitted, False if no content or deferred
+        """
+        # Handle deferred execution
+        if deferred:
+            return self._defer_fit_to_page(padding_percent, horizontal_offset_percent, vertical_offset_percent)
+        
+        bounds = self.get_content_bounds()
+        
+        # Handle empty content
+        if not bounds:
+            return self._handle_empty_content()
+        
+        # Calculate and apply zoom/pan
+        content_width, content_height = self._calculate_content_dimensions(bounds)
+        target_zoom = self._calculate_zoom_to_fit(content_width, content_height, padding_percent)
+        self._apply_zoom_and_center(bounds, target_zoom)
+        
+        # Apply offsets if specified
+        self._apply_viewport_offsets(horizontal_offset_percent, vertical_offset_percent, target_zoom)
+        
+        # Finalize view state
+        self._finalize_view_state()
+        
+        return True
+    
+    # Helper methods for fit_to_page (PHASE 1 EXTRACTION)
+    
+    def _defer_fit_to_page(self, padding_percent, horizontal_offset_percent, vertical_offset_percent):
+        """Defer fit_to_page execution until next draw.
+        
+        Args:
+            padding_percent: Padding percentage to store.
+            horizontal_offset_percent: Horizontal offset to store.
+            vertical_offset_percent: Vertical offset to store.
+            
+        Returns:
+            bool: False (deferred)
+        """
+        self._fit_to_page_pending = True
+        self._fit_to_page_padding = padding_percent
+        self._fit_to_page_horizontal_offset = horizontal_offset_percent
+        self._fit_to_page_vertical_offset = vertical_offset_percent
+        return False
+    
+    def _handle_empty_content(self):
+        """Handle fit_to_page when no content exists.
+        
+        Returns:
+            bool: False (no content)
+        """
+        self.zoom = 1.0
+        self.viewport_controller.zoom = 1.0
+        self.pan_to(0.0, 0.0)
+        return False
+    
+    def _apply_zoom_and_center(self, bounds, target_zoom):
+        """Apply zoom and center viewport on content.
+        
+        Args:
+            bounds: Content bounding box (min_x, min_y, max_x, max_y).
+            target_zoom: Target zoom level.
+        """
         self.zoom = target_zoom
         self.viewport_controller.zoom = target_zoom
         
-        # Calculate content center point in world coordinates
-        # This is the geometric center of the bounding box
+        # Center on content
+        min_x, min_y, max_x, max_y = bounds
         content_center_x = (min_x + max_x) / 2.0
         content_center_y = (min_y + max_y) / 2.0
-        
-        # Use viewport controller's pan_to method for proper centering
-        # This handles the coordinate transformation correctly
         self.viewport_controller.pan_to(content_center_x, content_center_y)
-        
-        # Apply offsets if specified
-        if horizontal_offset_percent != 0 or vertical_offset_percent != 0:
-            # Calculate offsets in world coordinates
-            viewport_width_world = self.viewport_controller.viewport_width / target_zoom
-            viewport_height_world = self.viewport_controller.viewport_height / target_zoom
-            horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
-            vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
-            
-            # Apply offsets to pan
-            self.viewport_controller.pan_x += horizontal_offset_world
-            self.viewport_controller.pan_y += vertical_offset_world
-        
-        # Update local references
+    
+    def _finalize_view_state(self):
+        """Finalize view state after fit_to_page."""
         self.pan_x = self.viewport_controller.pan_x
         self.pan_y = self.viewport_controller.pan_y
-        
-        
-        # Save view state and trigger redraw (NO clamping - show content anywhere)
         self.save_view_state_to_file()
         self._needs_redraw = True
-        
-        return True
     
     # ==================== Grid Rendering ====================
     
@@ -2140,53 +2617,99 @@ class ModelCanvasManager:
         # Validate initial state
         return self.validate_initial_state()
     
+    # Helper methods for initial state validation (PHASE 1 EXTRACTION)
+    
+    def _validate_canvas_dimensions(self):
+        """Validate canvas dimensions are positive.
+        
+        Returns:
+            list: Error messages (empty if valid)
+        """
+        errors = []
+        if self.canvas_width <= 0:
+            errors.append(f"Invalid canvas width: {self.canvas_width}")
+        if self.canvas_height <= 0:
+            errors.append(f"Invalid canvas height: {self.canvas_height}")
+        return errors
+    
+    def _validate_zoom_state(self):
+        """Validate zoom is at default 100% and within bounds.
+        
+        Returns:
+            list: Error messages (empty if valid)
+        """
+        errors = []
+        if abs(self.zoom - 1.0) > 0.01:
+            errors.append(f"Initial zoom should be 100%, got {self.get_zoom_percentage()}")
+        if self.zoom < self.MIN_ZOOM or self.zoom > self.MAX_ZOOM:
+            errors.append(f"Zoom out of bounds: {self.zoom} (min: {self.MIN_ZOOM}, max: {self.MAX_ZOOM})")
+        return errors
+    
+    def _validate_grid_and_filename(self):
+        """Validate grid style and filename are valid.
+        
+        Returns:
+            list: Error messages (empty if valid)
+        """
+        errors = []
+        valid_styles = [self.GRID_STYLE_LINE, self.GRID_STYLE_DOT, self.GRID_STYLE_CROSS]
+        if self.grid_style not in valid_styles:
+            errors.append(f"Invalid grid style: {self.grid_style}")
+        if not self.filename or self.filename.strip() == "":
+            errors.append("Filename cannot be empty")
+        return errors
+    
     def validate_initial_state(self):
         """Validate the initial state of the document.
         
-        Checks:
-        - Canvas dimensions are valid (> 0)
-        - Zoom is at 100% (1.0)
-        - Pan is centered (will be set on first draw)
-        - Grid style is valid
+        Checks canvas dimensions, zoom, grid style, and filename.
+        
+        REFACTORED: Now delegates to extracted validation helpers.
         
         Returns:
             dict: {'valid': bool, 'errors': list of error messages}
         """
         errors = []
-        
-        # Check canvas dimensions
-        if self.canvas_width <= 0:
-            errors.append(f"Invalid canvas width: {self.canvas_width}")
-        if self.canvas_height <= 0:
-            errors.append(f"Invalid canvas height: {self.canvas_height}")
-        
-        # Check zoom is at 100%
-        if abs(self.zoom - 1.0) > 0.01:
-            errors.append(f"Initial zoom should be 100%, got {self.get_zoom_percentage()}")
-        
-        # Check zoom is within bounds
-        if self.zoom < self.MIN_ZOOM or self.zoom > self.MAX_ZOOM:
-            errors.append(f"Zoom out of bounds: {self.zoom} (min: {self.MIN_ZOOM}, max: {self.MAX_ZOOM})")
-        
-        # Check grid style is valid
-        valid_styles = [self.GRID_STYLE_LINE, self.GRID_STYLE_DOT, self.GRID_STYLE_CROSS]
-        if self.grid_style not in valid_styles:
-            errors.append(f"Invalid grid style: {self.grid_style}")
-        
-        # Check filename is valid
-        if not self.filename or self.filename.strip() == "":
-            errors.append("Filename cannot be empty")
+        errors.extend(self._validate_canvas_dimensions())
+        errors.extend(self._validate_zoom_state())
+        errors.extend(self._validate_grid_and_filename())
         
         return {
             'valid': len(errors) == 0,
             'errors': errors
         }
     
+    # Helper methods for arc validation (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _validate_arc_endpoint(arc, endpoint_name, endpoint, arc_label):
+        """Validate an arc endpoint (source or target).
+        
+        Args:
+            arc: Arc object being validated
+            endpoint_name: 'source' or 'target'
+            endpoint: The endpoint object to validate
+            arc_label: Human-readable arc label for error messages
+            
+        Returns:
+            tuple: (is_valid, error_message or None)
+        """
+        if not hasattr(arc, endpoint_name) or endpoint is None:
+            return False, f"{arc_label}: {endpoint_name} is None"
+        
+        if not hasattr(endpoint, 'x') or not hasattr(endpoint, 'y'):
+            endpoint_type = type(endpoint).__name__
+            return False, f"{arc_label}: {endpoint_name} ({endpoint_type}) has no x, y attributes"
+        
+        return True, None
+    
     def validate_arcs(self):
         """Validate all arcs and detect corrupted references.
         
         Checks that all arcs have valid source and target references
         (Place or Transition objects with x, y attributes).
+        
+        REFACTORED: Now uses extracted helper for endpoint validation.
         
         Returns:
             dict: {'valid': bool, 'corrupted_arcs': list, 'errors': list}
@@ -2197,21 +2720,20 @@ class ModelCanvasManager:
         for arc in self.arcs:
             arc_label = f"Arc {arc.id} ({arc.source_id} → {arc.target_id})"
             
-            # Check source
-            if not hasattr(arc, 'source') or arc.source is None:
-                errors.append(f"{arc_label}: source is None")
-                corrupted.append(arc)
-            elif not hasattr(arc.source, 'x') or not hasattr(arc.source, 'y'):
-                errors.append(f"{arc_label}: source ({type(arc.source).__name__}) has no x, y attributes")
+            # Validate source endpoint
+            source_valid, source_error = self._validate_arc_endpoint(
+                arc, 'source', arc.source, arc_label
+            )
+            if not source_valid:
+                errors.append(source_error)
                 corrupted.append(arc)
             
-            # Check target
-            if not hasattr(arc, 'target') or arc.target is None:
-                errors.append(f"{arc_label}: target is None")
-                if arc not in corrupted:
-                    corrupted.append(arc)
-            elif not hasattr(arc.target, 'x') or not hasattr(arc.target, 'y'):
-                errors.append(f"{arc_label}: target ({type(arc.target).__name__}) has no x, y attributes")
+            # Validate target endpoint
+            target_valid, target_error = self._validate_arc_endpoint(
+                arc, 'target', arc.target, arc_label
+            )
+            if not target_valid:
+                errors.append(target_error)
                 if arc not in corrupted:
                     corrupted.append(arc)
         
@@ -2221,11 +2743,46 @@ class ModelCanvasManager:
             'errors': errors
         }
     
+    @staticmethod
+    def _format_arc_label(arc):
+        """Format arc label for debugging/logging.
+        
+        Args:
+            arc: Arc object
+            
+        Returns:
+            str: Formatted arc label (e.g., "Arc P1→T1 (P1 → T1)")
+        """
+        arc_label = f"Arc {arc.id}"
+        if hasattr(arc, 'source_id'):
+            arc_label += f" ({arc.source_id}"
+        if hasattr(arc, 'target_id'):
+            arc_label += f" → {arc.target_id})"
+        else:
+            arc_label += " → ?)"
+        return arc_label
+    
+    def _remove_arc_from_list(self, arc):
+        """Remove an arc from the arcs list.
+        
+        Args:
+            arc: Arc to remove
+            
+        Returns:
+            bool: True if arc was removed, False if not found
+        """
+        if arc in self.arcs:
+            self.arcs.remove(arc)
+            return True
+        return False
+    
     def remove_corrupted_arcs(self):
         """Remove corrupted arcs from the model.
         
         Identifies and removes any arcs with invalid source/target references.
         This is a safety measure to prevent crashes from corrupted model data.
+        
+        REFACTORED: Now uses extracted helper methods for arc formatting and removal.
         
         Returns:
             int: Number of corrupted arcs removed
@@ -2240,19 +2797,10 @@ class ModelCanvasManager:
         
         for arc in corrupted:
             try:
-                arc_label = f"Arc {arc.id}"
-                if hasattr(arc, 'source_id'):
-                    arc_label += f" ({arc.source_id}"
-                if hasattr(arc, 'target_id'):
-                    arc_label += f" → {arc.target_id})"
-                else:
-                    arc_label += " → ?)"
-                
+                arc_label = self._format_arc_label(arc)
                 print(f"[ARC_CLEANUP] ⚠️ Removing corrupted arc: {arc_label}")
                 
-                # Remove from arcs list
-                if arc in self.arcs:
-                    self.arcs.remove(arc)
+                if self._remove_arc_from_list(arc):
                     removed_count += 1
                     
             except Exception as e:
@@ -2433,58 +2981,165 @@ class ModelCanvasManager:
     
     # ==================== End Per-Document State Management ====================
     
+    # Helper methods for color reset operations (PHASE 1 EXTRACTION)
+    
+    @staticmethod
+    def _should_preserve_transition_color(transition):
+        """Check if transition has semantic colors that should be preserved.
+        
+        Args:
+            transition: Transition object to check
+            
+        Returns:
+            bool: True if transition color is semantic (source/sink)
+        """
+        return transition.is_source or transition.is_sink
+    
+    @staticmethod
+    def _should_preserve_place_color(place):
+        """Check if place has semantic colors that should be preserved.
+        
+        Args:
+            place: Place object to check
+            
+        Returns:
+            bool: True if place color is semantic (compartment/signal/regulatory)
+        """
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        return ColorSchemaManager.is_semantic_place_color(place)
+    
+    @staticmethod
+    def _should_preserve_arc_color(arc):
+        """Check if arc has semantic colors that should be preserved.
+        
+        Args:
+            arc: Arc object to check
+            
+        Returns:
+            bool: True if arc color is semantic (boundary species, signal flow)
+        """
+        from shypn.netobjs.arc import Arc
+        # Any non-default color is considered semantic
+        return arc.color != Arc.DEFAULT_COLOR
+    
+    def _reset_transition_colors_to_default(self):
+        """Reset transition colors to defaults (preserving semantic colors)."""
+        from shypn.netobjs import Transition
+        
+        for transition in self.transitions:
+            if self._should_preserve_transition_color(transition):
+                continue
+            transition.border_color = Transition.DEFAULT_BORDER_COLOR
+            transition.fill_color = Transition.DEFAULT_COLOR
+    
+    def _reset_place_colors_to_default(self):
+        """Reset place colors to defaults (preserving semantic colors)."""
+        from shypn.netobjs import Place
+        
+        for place in self.places:
+            if self._should_preserve_place_color(place):
+                continue
+            place.border_color = Place.DEFAULT_BORDER_COLOR
+    
+    def _reset_arc_colors_to_default(self):
+        """Reset arc colors to defaults (preserving semantic colors)."""
+        from shypn.netobjs.arc import Arc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
+        for arc in self.arcs:
+            if self._should_preserve_arc_color(arc):
+                continue
+            # Reset to type-specific default
+            if isinstance(arc, SignalFlowArc):
+                arc.color = SignalFlowArc.DEFAULT_COLOR
+            else:
+                arc.color = Arc.DEFAULT_COLOR
+    
     def _reset_analysis_colors(self):
         """Reset all analysis-related colors to defaults before saving.
         
         When objects are selected in the Analyses panel, they get colored with
         plot colors for visualization. These colors are temporary and should NOT
-        be saved to the file. This method resets:
-        - Transition border and fill colors (except source/sink transitions)
-        - Place border colors (except compartment/signal places)
-        - Arc colors (except boundary species arcs)
+        be saved to the file.
         
-        IMPORTANT: We preserve colors that are part of the model semantics:
+        REFACTORED: Now delegates to helper methods for better testability.
+        
+        Preserves semantic colors:
         - Source/sink transitions keep their cyan colors
         - Compartment places keep their violet borders
         - Boundary species arcs keep their cyan colors
         """
-        from shypn.netobjs import Transition, Place
-        from shypn.netobjs.arc import Arc
-        
-        # Reset transition colors (but preserve source/sink)
-        for transition in self.transitions:
-            # Skip source/sink transitions - they have semantic colors
-            if transition.is_source or transition.is_sink:
-                continue
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-        
-        # Reset place colors (but preserve compartment/signal/regulatory places)
-        from shypn.utils.color_schema_manager import ColorSchemaManager
-        for place in self.places:
-            # Skip places with semantic colors (signal, compartment, regulatory)
-            if ColorSchemaManager.is_semantic_place_color(place):
-                continue
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-        
-        # Reset arc colors (but preserve boundary species arcs)
-        # Boundary species arcs are cyan (0.0, 0.5, 0.5)
-        # SignalFlowArcs are light gray (0.7, 0.7, 0.7)
-        # We assume any non-black arc is a semantic color and should be preserved
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        for arc in self.arcs:
-            # Skip arcs with semantic colors (non-black)
-            if arc.color != Arc.DEFAULT_COLOR:
-                continue
-            # Reset arc to its type-specific default color
-            if isinstance(arc, SignalFlowArc):
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                arc.color = Arc.DEFAULT_COLOR
+        # Reset colors using extracted helper methods
+        self._reset_transition_colors_to_default()
+        self._reset_place_colors_to_default()
+        self._reset_arc_colors_to_default()
         
         # Trigger redraw to show the reset colors
         self.mark_needs_redraw()
+    
+    def _store_and_reset_transition_colors(self):
+        """Store and reset transition colors (preserving semantic colors).
+        
+        Returns:
+            list: Original colors (or None for preserved transitions)
+        """
+        from shypn.netobjs import Transition
+        
+        original_colors = []
+        for transition in self.transitions:
+            if self._should_preserve_transition_color(transition):
+                original_colors.append(None)
+                continue
+            original_colors.append((transition.border_color, transition.fill_color))
+            transition.border_color = Transition.DEFAULT_BORDER_COLOR
+            transition.fill_color = Transition.DEFAULT_COLOR
+        
+        return original_colors
+    
+    def _store_and_reset_place_colors(self):
+        """Store and reset place colors (preserving semantic colors).
+        
+        Returns:
+            list: Original colors (or None for preserved places)
+        """
+        from shypn.netobjs import Place
+        
+        original_colors = []
+        for place in self.places:
+            if self._should_preserve_place_color(place):
+                original_colors.append(None)
+                continue
+            original_colors.append(place.border_color)
+            place.border_color = Place.DEFAULT_BORDER_COLOR
+        
+        return original_colors
+    
+    def _store_and_reset_arc_colors(self):
+        """Store and reset arc colors (preserving semantic colors).
+        
+        Returns:
+            list: Original colors (or None for preserved arcs)
+        """
+        from shypn.netobjs.arc import Arc
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        
+        original_colors = []
+        for arc in self.arcs:
+            # Check if arc has semantic color
+            if isinstance(arc, SignalFlowArc):
+                if arc.color != SignalFlowArc.DEFAULT_COLOR:
+                    original_colors.append(None)
+                    continue
+                original_colors.append(arc.color)
+                arc.color = SignalFlowArc.DEFAULT_COLOR
+            else:
+                if arc.color != Arc.DEFAULT_COLOR:
+                    original_colors.append(None)
+                    continue
+                original_colors.append(arc.color)
+                arc.color = Arc.DEFAULT_COLOR
+        
+        return original_colors
     
     def _reset_analysis_colors_for_save(self):
         """Temporarily reset analysis colors for save, then restore them.
@@ -2492,54 +3147,17 @@ class ModelCanvasManager:
         Returns the original colors so they can be restored after serialization.
         This allows saving with default colors without modifying the live canvas.
         
+        REFACTORED: Now delegates to helper methods for better testability.
+        
         Returns:
             dict: Original colors for transitions, places, and arcs
         """
-        from shypn.netobjs import Transition, Place
-        from shypn.netobjs.arc import Arc
-        
-        # Store original colors
+        # Store and reset colors using extracted helper methods
         original_colors = {
-            'transitions': [],
-            'places': [],
-            'arcs': []
+            'transitions': self._store_and_reset_transition_colors(),
+            'places': self._store_and_reset_place_colors(),
+            'arcs': self._store_and_reset_arc_colors()
         }
-        
-        # Reset transition colors (but preserve source/sink)
-        for transition in self.transitions:
-            if transition.is_source or transition.is_sink:
-                original_colors['transitions'].append(None)
-                continue
-            original_colors['transitions'].append((transition.border_color, transition.fill_color))
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-        
-        # Reset place colors (but preserve compartment/signal/regulatory places)
-        from shypn.utils.color_schema_manager import ColorSchemaManager
-        for place in self.places:
-            if ColorSchemaManager.is_semantic_place_color(place):
-                original_colors['places'].append(None)
-                continue
-            original_colors['places'].append(place.border_color)
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-        
-        # Reset arc colors (but preserve boundary species arcs and SignalFlowArcs)
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        for arc in self.arcs:
-            # Skip arcs with semantic colors (non-default)
-            if isinstance(arc, SignalFlowArc):
-                if arc.color != SignalFlowArc.DEFAULT_COLOR:
-                    original_colors['arcs'].append(None)
-                    continue
-                original_colors['arcs'].append(arc.color)
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                if arc.color != Arc.DEFAULT_COLOR:
-                    original_colors['arcs'].append(None)
-                    continue
-                original_colors['arcs'].append(arc.color)
-                arc.color = Arc.DEFAULT_COLOR
         
         return original_colors
     
@@ -2564,11 +3182,49 @@ class ModelCanvasManager:
             if original_colors['arcs'][i] is not None:
                 arc.color = original_colors['arcs'][i]
     
+    def _populate_document_objects(self, document):
+        """Populate DocumentModel with Petri net objects.
+        
+        Args:
+            document: DocumentModel to populate
+        """
+        document.places = list(self.places)
+        document.transitions = list(self.transitions)
+        document.arcs = list(self.arcs)
+        
+        # Copy modules if they exist
+        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
+            document.modules = dict(self.document_controller.modules)
+    
+    def _sync_id_counters(self, document):
+        """Sync ID counters from DocumentController to DocumentModel.
+        
+        Args:
+            document: DocumentModel to sync counters to
+        """
+        place_id, trans_id, arc_id, module_id = self.document_controller.id_manager.get_state()
+        document.id_manager.set_state(place_id, trans_id, arc_id, module_id)
+    
+    def _sync_view_state(self, document):
+        """Sync view state (zoom, pan, rotation) to DocumentModel.
+        
+        Args:
+            document: DocumentModel to sync view state to
+        """
+        document.view_state = {
+            "zoom": self.zoom,
+            "pan_x": self.pan_x,
+            "pan_y": self.pan_y,
+            "transformations": self.transformation_manager.to_dict()
+        }
+    
     def to_document_model(self):
         """Convert canvas manager's Petri net objects to a DocumentModel.
         
         This creates a DocumentModel instance that can be saved/loaded by
         the persistency manager.
+        
+        REFACTORED: Now delegates to extracted helper methods for document setup.
         
         Returns:
             DocumentModel: Document model containing all Petri net objects
@@ -2576,35 +3232,15 @@ class ModelCanvasManager:
         from shypn.data.canvas import DocumentModel
         
         # Reset analysis colors before serialization
-        # This ensures plot colors don't get saved to the file
         original_colors = self._reset_analysis_colors_for_save()
         
-        # Create document with direct references to canvas objects
-        # Note: We don't need to deep copy since DocumentModel.to_dict() will
-        # serialize the objects, and we're not modifying them during save anymore
+        # Create and populate document using extracted helpers
         document = DocumentModel()
-        document.places = list(self.places)
-        document.transitions = list(self.transitions)
-        document.arcs = list(self.arcs)
-        
-        # Copy modules if they exist in the document_controller
-        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
-            document.modules = dict(self.document_controller.modules)
-        
-        # Sync ID counters from DocumentController's IDManager to DocumentModel's IDManager
-        place_id, trans_id, arc_id, module_id = self.document_controller.id_manager.get_state()
-        document.id_manager.set_state(place_id, trans_id, arc_id, module_id)
-        
-        # Sync view state (zoom, pan, and transformations including rotation)
-        document.view_state = {
-            "zoom": self.zoom,
-            "pan_x": self.pan_x,
-            "pan_y": self.pan_y,
-            "transformations": self.transformation_manager.to_dict()
-        }
+        self._populate_document_objects(document)
+        self._sync_id_counters(document)
+        self._sync_view_state(document)
         
         # Restore analysis colors after serialization
-        # This restores plot colors to the canvas without saving them
         self._restore_analysis_colors(original_colors)
         
         return document

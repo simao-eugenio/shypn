@@ -16,20 +16,25 @@ except Exception as e:
     sys.exit(1)
 
 from shypn.ui.panels.report import ReportPanel
+from shypn.events import EventBus
 
 
 class ReportPanelLoader:
     """Loader for Report panel with float/detach support."""
     
-    def __init__(self, project=None, model_canvas_loader=None):
+    def __init__(self, project=None, model_canvas_loader=None, document_id=None, drawing_area=None):
         """Initialize the report panel loader.
         
         Args:
             project: Optional Project instance
             model_canvas_loader: Optional ModelCanvasLoader (for accessing get_current_model())
+            document_id: Optional document ID (id of drawing_area) for EventBus scoping
+            drawing_area: Optional drawing area reference for this document
         """
         self.project = project
         self.model_canvas_loader = model_canvas_loader
+        self.document_id = document_id
+        self.drawing_area = drawing_area
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # State management
@@ -80,6 +85,9 @@ class ReportPanelLoader:
         # Make sure panel widgets are ready to be shown (but don't show the window)
         # This ensures the panel content is visible when added to a container
         self.panel.show_all()
+        
+        # Subscribe to document.focused events for automatic tab switching
+        EventBus.subscribe('document.focused', self._on_document_focused)
         
         self.logger.info("Report panel loaded")
         
@@ -291,9 +299,80 @@ class ReportPanelLoader:
         
         self.logger.info("Model manager updated for Report Panel")
     
+    def _on_document_focused(self, data):
+        """Handle document.focused events for automatic panel swapping.
+        
+        Args:
+            data: Event data containing drawing_area, canvas_manager, overlay_manager
+        """
+        event_document_id = data.get('_document_id')
+        
+        # Don't handle swapping if panel is floated
+        if not self.is_hanged:
+            return
+        
+        # Don't handle if no parent container
+        if not self.parent_container:
+            return
+        
+        # Check if this event is for our document
+        is_our_document = (event_document_id == self.document_id)
+        
+        if is_our_document:
+            # This is our document - show and refresh
+            # Ensure we're in the container
+            current_parent = self.widget.get_parent()
+            if current_parent != self.parent_container:
+                # Not in container, need to pack
+                if current_parent:
+                    current_parent.remove(self.widget)
+                self.parent_container.pack_start(self.widget, True, True, 0)
+            
+            # Update panel with new document's model and controller
+            canvas_manager = data.get('canvas_manager')
+            overlay_manager = data.get('overlay_manager')
+            
+            if canvas_manager:
+                self.panel.set_model_canvas(canvas_manager)
+            
+            # Update controller if available
+            if overlay_manager and hasattr(overlay_manager, 'simulation_controller'):
+                controller = overlay_manager.simulation_controller
+                if hasattr(self.panel, 'set_controller'):
+                    self.panel.set_controller(controller)
+            
+            # Re-wire all panels from this document's overlay_manager
+            if overlay_manager:
+                # Wire Pathway Panel
+                if hasattr(overlay_manager, 'pathway_panel_loader'):
+                    pathway_loader = overlay_manager.pathway_panel_loader
+                    if pathway_loader and hasattr(pathway_loader, 'panel') and pathway_loader.panel:
+                        self.panel.set_pathway_operations_panel(pathway_loader.panel)
+                
+                # Wire Analyses Panel
+                if hasattr(overlay_manager, 'analyses_panel_loader'):
+                    analyses_loader = overlay_manager.analyses_panel_loader
+                    if analyses_loader and hasattr(analyses_loader, 'panel') and analyses_loader.panel:
+                        self.panel.set_dynamic_analyses_panel(analyses_loader.panel)
+                
+                # Wire Topology Panel
+                if hasattr(overlay_manager, 'topology_panel_loader'):
+                    topology_loader = overlay_manager.topology_panel_loader
+                    if topology_loader and hasattr(topology_loader, 'panel') and topology_loader.panel:
+                        self.panel.set_topology_panel(topology_loader.panel)
+            
+            # Show our widget
+            self.widget.show()
+        else:
+            # This is NOT our document - hide
+            self.widget.hide()
+    
     def cleanup(self):
         """Clean up resources."""
         self.logger.info("Cleaning up Report Panel loader")
+        
+        # Unsubscribe from EventBus
+        EventBus.unsubscribe('document.focused', self._on_document_focused)
         
         if self.panel and hasattr(self.panel, 'cleanup'):
             self.panel.cleanup()

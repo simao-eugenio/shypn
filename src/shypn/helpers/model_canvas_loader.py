@@ -19,6 +19,7 @@ Future extensions:
 import os
 import sys
 import math
+from typing import Optional
 try:
     import gi
     gi.require_version('Gtk', '3.0')
@@ -200,6 +201,80 @@ class ModelCanvasLoader:
             return self.canvas_managers.get(drawing_area)
         except Exception:
             return None
+    
+    def get_current_document_id(self) -> Optional[int]:
+        """Get the document ID for the currently active tab.
+        
+        Returns:
+            Document ID (id(drawing_area)) for the active tab, or None if no active tab.
+        
+        Example:
+            document_id = loader.get_current_document_id()
+            EventBus.emit('model.changed', data, document_id=document_id)
+        
+        Note:
+            The document ID is the Python object ID of the GtkDrawingArea widget.
+            This ID persists for the lifetime of the tab and is used by EventBus
+            to route events to the correct document.
+        """
+        try:
+            if not self.notebook:
+                return None
+            page_num = self.notebook.get_current_page()
+            if page_num < 0:
+                return None
+            page_widget = self.notebook.get_nth_page(page_num)
+            if page_widget is None:
+                return None
+            
+            drawing_area = self._get_drawing_area_from_page(page_widget)
+            if drawing_area is None:
+                return None
+            
+            return id(drawing_area)
+        except Exception:
+            return None
+    
+    def get_document_id_for_manager(self, manager) -> Optional[int]:
+        """Find the document ID for a given ModelCanvasManager.
+        
+        Args:
+            manager: ModelCanvasManager instance to find document ID for
+        
+        Returns:
+            Document ID (id(drawing_area)) or None if manager not found
+        
+        Example:
+            document_id = loader.get_document_id_for_manager(my_manager)
+            EventBus.subscribe('simulation.progress', handler, document_id=document_id)
+        """
+        for drawing_area, mgr in self.canvas_managers.items():
+            if mgr is manager:
+                return id(drawing_area)
+        return None
+    
+    def get_drawing_area_for_document_id(self, document_id: int):
+        """Reverse lookup: get drawing_area widget from document ID.
+        
+        Args:
+            document_id: Document ID (result of id(drawing_area))
+        
+        Returns:
+            GtkDrawingArea widget or None if not found
+        
+        Example:
+            drawing_area = loader.get_drawing_area_for_document_id(document_id)
+            manager = loader.canvas_managers.get(drawing_area)
+        
+        Note:
+            This is rarely needed - most code should use get_current_model_manager()
+            or get_current_document_id() instead. This is primarily for EventBus
+            internal use when routing events.
+        """
+        for drawing_area in self.canvas_managers.keys():
+            if id(drawing_area) == document_id:
+                return drawing_area
+        return None
 
     def load(self, create_initial_document=True):
         """Load the canvas UI and return the container.
@@ -452,6 +527,24 @@ class ModelCanvasLoader:
                 if hasattr(drawing_area, 'get_child'):
                     drawing_area = drawing_area.get_child()
         
+        # ============================================================
+        # EVENTBUS: Emit document.focused event for panel coordination
+        # ============================================================
+        # Emit event EARLY so panels can respond and handle their own updates
+        # This replaces manual panel swapping code with event-driven architecture
+        if drawing_area:
+            document_id = id(drawing_area)
+            canvas_manager = self.canvas_managers.get(drawing_area)
+            overlay_manager = self.overlay_managers.get(drawing_area)
+            
+            if canvas_manager and overlay_manager:
+                from shypn.events import EventBus
+                EventBus.emit('document.focused', {
+                    'drawing_area': drawing_area,
+                    'canvas_manager': canvas_manager,
+                    'overlay_manager': overlay_manager,
+                    'page_num': page_num
+                }, document_id=document_id)
         
         # ============================================================
         # GLOBAL-SYNC: Switch canvas context when tab changes
@@ -637,13 +730,36 @@ class ModelCanvasLoader:
                         swissknife.simulation_controller = current_controller
 
         # ============================================================
-        # Swap per-document Pathway Panel when tab changes
+        # EVENTBUS: Panel swapping now handled via document.focused events
         # ============================================================
-        # ═══════════════════════════════════════════════════════════════════
-        # CERTIFICATION: Tab Switch Preserves Pathway Panel State Per-Document
-        # ═══════════════════════════════════════════════════════════════════
-        # When switching tabs, the Pathway Operations Panel state is COMPLETELY ISOLATED
-        # per document. Each tab has its own independent PathwayPanelLoader instance
+        # Pathway, Viability, Analyses, Topology, and Report panels now subscribe to
+        # document.focused events and handle their own show/hide/refresh logic.
+        # See respective panel loaders' _on_document_focused() methods.
+        # This eliminates ~315 lines of manual panel swapping code.
+
+    def _on_tab_close_clicked(self, button, page_widget):
+        """Handle tab close button click.
+        
+        ═══════════════════════════════════════════════════════════════════
+        CERTIFICATION: Tab [X] Button → Complete File Close Operation
+        ═══════════════════════════════════════════════════════════════════
+        Clicking the [X] button on a tab triggers close_tab() which performs
+        ALL safety checks and cleanup equivalent to File→Close:
+        
+        1. Checks for unsaved changes (shows Save/Discard/Cancel dialog)
+        2. Performs complete lifecycle cleanup (destroys all components)
+        3. Removes all per-document state (managers, controllers, palettes)
+        4. Prevents data loss (user must explicitly confirm discard)
+        
+        See close_tab() method (line 659) for complete certification of
+        safety checks, cleanup operations, and equivalence to File→Close.
+        ═══════════════════════════════════════════════════════════════════
+        
+        Args:
+            button: The close button that was clicked.
+            page_widget: The page widget (overlay) to close.
+        """
+        page_num = self.notebook.page_num(page_widget)
         # with its own state, preventing cross-contamination between documents.
         #
         # ISOLATION MECHANISM:
@@ -906,100 +1022,11 @@ class ModelCanvasLoader:
                             topology_loader.on_tab_switched(drawing_area)
         
         # ============================================================
-        # Swap per-document Report Panel when tab changes
+        # EVENTBUS: Report Panel swapping now handled via document.focused events
         # ============================================================
-        # ═══════════════════════════════════════════════════════════════════
-        # CERTIFICATION: Tab Switch Preserves Report Panel State Per-Document
-        # ═══════════════════════════════════════════════════════════════════
-        # When switching tabs, the Report Panel state is COMPLETELY ISOLATED
-        # per document. Each tab has its own independent Report Panel instance
-        # with its own state, preventing cross-contamination between documents.
-        #
-        # ISOLATION MECHANISM:
-        # Each document has a separate ReportPanel instance stored in:
-        # overlay_managers[drawing_area].report_panel_loader.panel
-        #
-        # WHAT IS ISOLATED PER-DOCUMENT:
-        # 1. Model Structure: places, transitions, arcs counts and details
-        # 2. Dynamic Analyses: simulation data, parameters, controller state
-        # 3. Topology Analyses: invariants, siphons, traps analysis results
-        # 4. Thermodynamic Validation: compound mappings, dG data, alerts
-        # 5. Provenance: import source (KEGG, SBML, BiGG, BRENDA, etc.)
-        #
-        # TAB SWITCH REFRESH BEHAVIOR:
-        # When switching tabs, the panel instance is swapped entirely:
-        # 1. Hide all other report panels
-        # 2. Ensure current panel is in container
-        # 3. Update panel's model_canvas reference via set_model_canvas()
-        # 4. Update controller reference via set_controller()
-        # 5. Show current panel (lightweight operation)
-        #
-        # USER EXPERIENCE:
-        # ✓ Switch to Tab A → Report panel shows Tab A's model data
-        # ✓ Switch to Tab B → Report panel shows Tab B's model data
-        # ✓ Switch back to Tab A → Report panel shows Tab A's data again
-        # ✓ Each tab maintains independent report state
-        # ✓ No stale data from previous tabs
-        # ═══════════════════════════════════════════════════════════════════
-        if drawing_area and hasattr(self, 'report_panel_container') and self.report_panel_container:
-            if drawing_area in self.overlay_managers:
-                overlay_manager = self.overlay_managers[drawing_area]
-                if hasattr(overlay_manager, 'report_panel_loader'):
-                    report_loader = overlay_manager.report_panel_loader
-                    if report_loader and report_loader.panel:
-                        # OPTIMIZATION: Use show/hide instead of remove/pack
-                        # This avoids expensive GTK widget realization on every tab switch
-                        
-                        # Hide all other report panels
-                        for other_area, other_overlay in self.overlay_managers.items():
-                            if other_area != drawing_area and hasattr(other_overlay, 'report_panel_loader'):
-                                other_loader = other_overlay.report_panel_loader
-                                if other_loader and other_loader.widget:
-                                    other_loader.widget.hide()
-                        
-                        # Ensure current panel is in container
-                        current_parent = report_loader.widget.get_parent()
-                        if current_parent != self.report_panel_container:
-                            # Only pack if not already in container
-                            if current_parent:
-                                current_parent.remove(report_loader.widget)
-                            self.report_panel_container.pack_start(report_loader.widget, True, True, 0)
-                        
-                        # CRITICAL: Update model_canvas reference to current document's manager
-                        # This is what makes categories show data instead of "No model loaded"
-                        if drawing_area in self.canvas_managers:
-                            current_manager = self.canvas_managers[drawing_area]
-                            report_loader.panel.set_model_canvas(current_manager)
-                        
-                        # Update controller reference for simulation data
-                        if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller:
-                            controller = overlay_manager.simulation_controller
-                            if hasattr(report_loader.panel, 'set_controller'):
-                                report_loader.panel.set_controller(controller)
-                        
-                        # CRITICAL: Re-wire all panels to Report Panel on tab switch
-                        # This ensures Report Panel has current references to all data sources
-                        
-                        # Wire Pathway Panel
-                        if hasattr(overlay_manager, 'pathway_panel_loader'):
-                            pathway_loader = overlay_manager.pathway_panel_loader
-                            if pathway_loader and hasattr(pathway_loader, 'panel') and pathway_loader.panel:
-                                report_loader.panel.set_pathway_operations_panel(pathway_loader.panel)
-                        
-                        # Wire Analyses Panel
-                        if hasattr(overlay_manager, 'analyses_panel_loader'):
-                            analyses_loader = overlay_manager.analyses_panel_loader
-                            if analyses_loader and hasattr(analyses_loader, 'panel') and analyses_loader.panel:
-                                report_loader.panel.set_dynamic_analyses_panel(analyses_loader.panel)
-                        
-                        # Wire Topology Panel
-                        if hasattr(overlay_manager, 'topology_panel_loader'):
-                            topology_loader = overlay_manager.topology_panel_loader
-                            if topology_loader and hasattr(topology_loader, 'panel') and topology_loader.panel:
-                                report_loader.panel.set_topology_panel(topology_loader.panel)
-                        
-                        # Show current panel (lightweight operation)
-                        report_loader.widget.show()
+        # Report Panel loaders subscribe to document.focused events and handle
+        # their own show/hide/refresh logic automatically. No manual swapping needed.
+        # See: ReportPanelLoader._on_document_focused() for implementation
 
     def _on_tab_close_clicked(self, button, page_widget):
         """Handle tab close button click.
@@ -2338,7 +2365,13 @@ class ModelCanvasLoader:
             from shypn.helpers.report_panel_loader import ReportPanelLoader
             
             # Pass the ModelCanvasLoader (self) so Report Panel can access get_current_model()
-            report_panel_loader = ReportPanelLoader(project=None, model_canvas_loader=self)
+            # Also pass document_id and drawing_area for EventBus scoping
+            report_panel_loader = ReportPanelLoader(
+                project=None,
+                model_canvas_loader=self,
+                document_id=id(drawing_area),
+                drawing_area=drawing_area
+            )
             report_panel_loader.load()
             
             # Wire float/attach callbacks from main app (stored in model_canvas_loader)
@@ -2424,7 +2457,11 @@ class ModelCanvasLoader:
             from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
             
             # Create per-document viability panel (panel is created in __init__)
-            viability_panel_loader = ViabilityPanelLoader(model=None)
+            viability_panel_loader = ViabilityPanelLoader(
+                model=None,
+                document_id=id(drawing_area),
+                drawing_area=drawing_area
+            )
             
             # Wire model_canvas_loader so viability can access current model
             viability_panel_loader.set_model_canvas_loader(self)
@@ -2459,6 +2496,9 @@ class ModelCanvasLoader:
             
             # Store per-document instance
             self.overlay_managers[drawing_area].viability_panel_loader = viability_panel_loader
+            
+            # Subscribe to EventBus after container is set
+            viability_panel_loader.initialize_eventbus()
             
             # Attach panel to container initially
             if viability_panel_loader.panel and self.viability_panel_container:
@@ -2528,7 +2568,9 @@ class ModelCanvasLoader:
                 parent_window=getattr(self, 'main_window', None),
                 workspace_settings=self.workspace_settings,
                 project=getattr(self, 'project', None),
-                canvas_loader=self  # Pass ModelCanvasLoader for auto-load imports
+                canvas_loader=self,  # Pass ModelCanvasLoader for auto-load imports
+                document_id=id(drawing_area),
+                drawing_area=drawing_area
             )
             
             # Initialize the panel (calls _create_panel())
@@ -2585,7 +2627,9 @@ class ModelCanvasLoader:
                 analyses_panel_loader = AnalysesPanelLoader(
                     model=canvas_manager,
                     parent_window=getattr(self, 'main_window', None),
-                    data_collector=data_collector
+                    data_collector=data_collector,
+                    document_id=id(drawing_area),
+                    drawing_area=drawing_area
                 )
                 
                 # Initialize the panel (calls _create_panel())
@@ -2676,7 +2720,9 @@ class ModelCanvasLoader:
             # Create per-document topology loader
             topology_panel_loader = TopologyPanelLoader(
                 model=canvas_manager,
-                parent_window=getattr(self, 'main_window', None)
+                parent_window=getattr(self, 'main_window', None),
+                document_id=id(drawing_area),
+                drawing_area=drawing_area
             )
             topology_panel_loader.initialize()
             
