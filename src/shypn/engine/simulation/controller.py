@@ -44,6 +44,8 @@ from shypn.engine import behavior_factory
 from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy, DEFAULT_POLICY, TYPE_PRIORITIES
 from shypn.engine.simulation.executors import ContinuousExecutor
 from shypn.engine.simulation.checkers import ViabilityChecker
+# Week 1 - Phase 4: EventBus integration for progress events
+from shypn.events import EventBus
 # DEPRECATED: Conservation enforcement - Petri nets naturally conserve mass/energy
 # from shypn.engine.conservation_enforcer import ConservationEnforcer
 
@@ -178,6 +180,9 @@ class SimulationController:
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
+        
+        # Week 1 - Phase 4: Document ID for scoped event emissions
+        self.document_id: Optional[int] = None  # Set by ModelCanvasLoader
         
         # Data collection for simulation results
         from shypn.engine.simulation.data_collector import DataCollector
@@ -918,6 +923,26 @@ class SimulationController:
         """
         return self.settings.calculate_progress(self.time)
     
+    def _emit_progress_event(self):
+        """Emit simulation.progress event for UI updates.
+        
+        Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
+        Analyses panel and other observers subscribe to this event.
+        """
+        if self.document_id is None:
+            return  # No document context, skip event
+        
+        try:
+            progress = self.get_progress()
+            EventBus.emit('simulation.progress', {
+                'time': self.time,
+                'progress': progress,
+                'duration': self.settings.duration,
+                'is_complete': self.is_simulation_complete()
+            }, document_id=self.document_id)
+        except Exception:
+            pass  # Don't break simulation if event emission fails
+    
     def is_simulation_complete(self) -> bool:
         """Check if simulation has reached duration limit.
         
@@ -1595,6 +1620,9 @@ class SimulationController:
         # Skip if tau-leaping already advanced time (pure stochastic models)
         if not tau_leaping_advanced_time:
             self.time += time_step
+        
+        # Week 1 - Phase 4: Emit progress event for UI updates
+        self._emit_progress_event()
         
         # === CONSERVATION ENFORCEMENT DISABLED ===
         # Conservation must emerge naturally from Petri net arc connections.
