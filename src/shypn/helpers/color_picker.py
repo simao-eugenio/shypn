@@ -228,15 +228,20 @@ class ColorPickerRow(Gtk.ScrolledWindow):
         """
         self.current_color = color_rgb
         
-        # Update button relief
-        for button in self.color_buttons:
-            button.set_relief(Gtk.ReliefStyle.NONE)
+        # Update selected box reference
+        self.selected_box = None
         
-        # Find and highlight matching button
+        # Find and mark matching button as selected
         for i, color in enumerate(self.COLORS):
             if self._colors_match(color, color_rgb):
-                self.color_buttons[i].set_relief(Gtk.ReliefStyle.NORMAL)
+                self.selected_box = self.color_buttons[i]
                 break
+        
+        # Force redraw of all color buttons to update selection indicator
+        for box in self.color_buttons:
+            child = box.get_child()
+            if child:
+                child.queue_draw()
 
 
 def create_color_picker(current_color=None, button_size=32):
