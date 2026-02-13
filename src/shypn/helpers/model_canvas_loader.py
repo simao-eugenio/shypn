@@ -1421,7 +1421,8 @@ class ModelCanvasLoader:
                 drawing_area=drawing_area,
                 canvas_manager=manager
             )
-            overlay_manager.setup_overlays(parent_window=self.parent_window)
+            # WAYLAND FIX: Use main_window instead of parent_window (which is never set)
+            overlay_manager.setup_overlays(parent_window=getattr(self, 'main_window', None))
             
             # Store overlay manager for later access
             self.overlay_managers[drawing_area] = overlay_manager
@@ -5330,9 +5331,13 @@ class ModelCanvasLoader:
         if toplevel and isinstance(toplevel, Gtk.Window):
             pass
         
+        # WAYLAND FIX: Use main_window instead of parent_window (which is never set)
+        # main_window is set in shypn.py after ModelCanvasLoader initialization
+        parent_window = getattr(self, 'main_window', None)
+        
         dialog_loader = None
         if isinstance(obj, Place):
-            dialog_loader = create_place_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
+            dialog_loader = create_place_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager)
         elif isinstance(obj, Transition):
             data_collector = None
             if drawing_area in self.overlay_managers:
@@ -5357,9 +5362,9 @@ class ModelCanvasLoader:
             else:
                 pass
                 
-            dialog_loader = create_transition_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
+            dialog_loader = create_transition_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
         elif isinstance(obj, Arc):
-            dialog_loader = create_arc_prop_dialog(obj, parent_window=self.parent_window, persistency_manager=self.persistency, model=manager)
+            dialog_loader = create_arc_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager)
         else:
             return
         if isinstance(obj, Arc):
