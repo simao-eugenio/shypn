@@ -62,9 +62,11 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
     
     # Validate inhibitor arc direction (Place → Transition only)
     if is_inhibitor:
-        if isinstance(arc.source, Transition) and isinstance(arc.target, Place):
+        if not (isinstance(arc.source, Place) and isinstance(arc.target, Transition)):
+            source_type = type(arc.source).__name__
+            target_type = type(arc.target).__name__
             raise ValueError(
-                "Cannot convert to inhibitor arc: Transition → Place is forbidden. "
+                f"Cannot convert to inhibitor arc: {source_type} → {target_type} is forbidden. "
                 "Inhibitor arcs must connect Place → Transition only."
             )
     
@@ -96,14 +98,11 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
         weight=arc.weight
     )
     
-    # Copy all properties
-    # For semantic arc types (TestArc, SignalFlowArc), apply color schema
-    # For normal arcs, preserve the original color
-    if ColorSchemaManager.is_semantic_arc_color(new_arc):
-        ColorSchemaManager.reset_arc_color(new_arc)
-    else:
-        new_arc.color = arc.color
+    # Apply ColorSchemaManager to ensure each arc type gets its proper color
+    # This includes: InhibitorArc (black), TestArc (blue), SignalFlowArc (gray), Normal (black)
+    ColorSchemaManager.reset_arc_color(new_arc)
     
+    # Copy other properties (NOT color - already set by ColorSchemaManager)
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
     new_arc.control_points = arc.control_points
@@ -119,6 +118,13 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
         new_arc._manager = arc._manager
     if hasattr(arc, 'on_changed'):
         new_arc.on_changed = arc.on_changed
+    
+    # FLUSH cached type information that might interfere with successive transformations
+    # Clear any internal type caches on both old and new arc
+    if hasattr(arc, '_cached_arc_type'):
+        delattr(arc, '_cached_arc_type')
+    if hasattr(new_arc, '_cached_arc_type'):
+        delattr(new_arc, '_cached_arc_type')
     
     return new_arc
 
@@ -196,6 +202,12 @@ def convert_to_normal(arc):
     # Copy all properties (except color - now managed by ColorSchemaManager)
     new_arc.width = arc.width
     new_arc.threshold = arc.threshold
+    
+    # FLUSH cached type information
+    if hasattr(arc, '_cached_arc_type'):
+        delattr(arc, '_cached_arc_type')
+    if hasattr(new_arc, '_cached_arc_type'):
+        delattr(new_arc, '_cached_arc_type')
     new_arc.control_points = arc.control_points
     
     # Copy optional properties if they exist
@@ -323,10 +335,12 @@ def convert_to_test(arc):
     from shypn.netobjs.transition import Transition
     
     # Validate direction (Place → Transition only)
-    if isinstance(arc.source, Transition) and isinstance(arc.target, Place):
+    if not (isinstance(arc.source, Place) and isinstance(arc.target, Transition)):
+        source_type = type(arc.source).__name__
+        target_type = type(arc.target).__name__
         raise ValueError(
-            "Cannot convert to test arc: Transition → Place is forbidden. "
-            "Test arcs must connect Place → Transition only."
+            f"Cannot convert to test arc: {source_type} → {target_type} is forbidden. "
+            "Test arcs must connect Place → Transition only (catalyst semantics)."
         )
     
     # If already test arc, return it
@@ -361,6 +375,12 @@ def convert_to_test(arc):
         new_arc._manager = arc._manager
     if hasattr(arc, 'on_changed'):
         new_arc.on_changed = arc.on_changed
+    
+    # FLUSH cached type information
+    if hasattr(arc, '_cached_arc_type'):
+        delattr(arc, '_cached_arc_type')
+    if hasattr(new_arc, '_cached_arc_type'):
+        delattr(new_arc, '_cached_arc_type')
     
     return new_arc
 
@@ -452,5 +472,11 @@ def convert_to_signal_flow(arc):
         new_arc._manager = arc._manager
     if hasattr(arc, 'on_changed'):
         new_arc.on_changed = arc.on_changed
+    
+    # FLUSH cached type information
+    if hasattr(arc, '_cached_arc_type'):
+        delattr(arc, '_cached_arc_type')
+    if hasattr(new_arc, '_cached_arc_type'):
+        delattr(new_arc, '_cached_arc_type')
     
     return new_arc
