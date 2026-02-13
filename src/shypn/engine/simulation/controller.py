@@ -128,6 +128,22 @@ class ModelAdapter:
             return self._controller.time
         return 0.0
 
+    @property
+    def thermodynamic_settings(self):
+        """Get thermodynamic settings from canvas manager.
+        
+        Returns:
+            dict: Thermodynamic settings (T, pH, ionic_strength, etc.) or defaults
+        """
+        if hasattr(self.canvas_manager, 'thermodynamic_settings'):
+            return self.canvas_manager.thermodynamic_settings
+        # Return defaults if not available
+        return {
+            'temperature': 298.15,
+            'ph': 7.0,
+            'ionic_strength': 0.1
+        }
+
     def invalidate_caches(self):
         """Invalidate dict caches (call when model structure changes)."""
         self._places_dict = None
@@ -1435,10 +1451,10 @@ class SimulationController:
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                # Skip inhibitor arcs and test arcs (they don't consume)
-                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                                # Skip test arcs only (they don't consume - catalyst behavior)
+                                # Inhibitor arcs DO consume when transition fires (Living Systems semantics)
                                 arc_type = getattr(arc, 'arc_type', 'normal')
-                                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                                if arc_type == 'test':
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
                                 source_place.set_tokens(source_place.tokens - arc.weight)
@@ -1449,10 +1465,8 @@ class SimulationController:
                                   transition.properties.get('is_sink', False)
                         if not is_sink:
                             for arc in behavior.get_output_arcs():
-                                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                                arc_type = getattr(arc, 'arc_type', 'normal')
-                                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
-                                    continue
+                                # No need to skip any arc types for production
+                                # (test/inhibitor arcs can't be output arcs by definition)
                                 target_place = self.model_adapter.places.get(arc.target_id)
                                 target_place.set_tokens(target_place.tokens + arc.weight)
                                 produced_map[arc.target_id] = arc.weight
@@ -1611,10 +1625,10 @@ class SimulationController:
                 structurally_enabled = True
                 input_arcs = behavior.get_input_arcs()
                 for arc in input_arcs:
-                    # Skip non-consuming arcs (test/inhibitor arcs)
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    # Skip non-consuming arcs (test arcs only)
+                    # Inhibitor arcs DO consume, so check their tokens
                     arc_type = getattr(arc, 'arc_type', 'normal')
-                    if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                    if arc_type == 'test':
                         continue
                     source_place = arc.source
                     if source_place and source_place.tokens < arc.weight:
@@ -2528,11 +2542,11 @@ class SimulationController:
                         # Input arc (place → transition)
                         place = arc.source
                         
-                        # Skip arcs that don't consume tokens using defensive pattern
-                        kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                        # Skip arcs that don't consume tokens (test arcs only)
+                        # Inhibitor arcs DO consume tokens in SHPN (Living Systems semantics)
                         arc_type = getattr(arc, 'arc_type', 'normal')
-                        if kind != 'normal' or arc_type in ('inhibitor', 'test'):
-                            continue  # Inhibitor and test arcs NEVER consume tokens
+                        if arc_type == 'test':
+                            continue  # Test arcs are read arcs - catalyst behavior
                         
                         # CRITICAL: ALWAYS use weight for consumption (NOT threshold!)
                         # Threshold is for enablement only, weight is for token transfer
@@ -2637,17 +2651,62 @@ class SimulationController:
             selected = None
             for t in enabled_transitions:
                 pass
-                # Use transition rate if available, otherwise default to 1.0
-                # Handle legacy case where rate might be a string (should be rate_function)
-                try:
-                    rate_value = getattr(t, 'rate', 1.0)
-                    if isinstance(rate_value, str):
-                        # Legacy: rate was mistakenly set to rate_function string
-                        rate = 1.0  # Use default
+                # Evaluate rate dynamically for all transition types with rate_function
+                # - Continuous: uses evaluate_rate()
+                # - Stochastic/Adaptive: uses _evaluate_rate_at_enablement()
+                # - Others (timed/immediate): use scalar rate attribute
+                
+                if t.transition_type == 'continuous':
+                    # Continuous transitions: evaluate rate_function at current state
+                    behavior = self._get_behavior(t)
+                    if behavior and hasattr(behavior, 'evaluate_rate'):
+                        # Get all places for rate evaluation
+                        places_dict = {}
+                        if hasattr(self.model, 'places'):
+                            if isinstance(self.model.places, dict):
+                                places_dict = self.model.places
+                            elif isinstance(self.model.places, list):
+                                for place in self.model.places:
+                                    places_dict[place.id] = place
+                        # Evaluate actual rate at current state
+                        rate = abs(behavior.evaluate_rate(places_dict, self.time))
                     else:
-                        rate = float(rate_value) if rate_value else 1.0
-                except (ValueError, TypeError):
-                    rate = 1.0
+                        # Fallback to rate attribute
+                        rate = float(getattr(t, 'rate', 1.0))
+                
+                elif t.transition_type in ('stochastic', 'adaptive'):
+                    # Stochastic/Adaptive transitions: may have rate_function too!
+                    behavior = self._get_behavior(t)
+                    if behavior and hasattr(behavior, '_evaluate_rate_at_enablement'):
+                        try:
+                            # Evaluate rate_function at current time
+                            rate = abs(behavior._evaluate_rate_at_enablement(self.time))
+                        except Exception:
+                            # Fallback if evaluation fails
+                            rate = float(getattr(t, 'rate', 1.0))
+                    else:
+                        # No rate_function - use scalar rate
+                        try:
+                            rate_value = getattr(t, 'rate', 1.0)
+                            if isinstance(rate_value, str):
+                                # Legacy: rate was mistakenly set to rate_function string
+                                rate = 1.0  # Use default
+                            else:
+                                rate = float(rate_value) if rate_value else 1.0
+                        except (ValueError, TypeError):
+                            rate = 1.0
+                
+                else:
+                    # Timed/Immediate: use rate attribute (no rate_function support)
+                    try:
+                        rate_value = getattr(t, 'rate', 1.0)
+                        if isinstance(rate_value, str):
+                            # Legacy: rate was mistakenly set to rate_function string
+                            rate = 1.0  # Use default
+                        else:
+                            rate = float(rate_value) if rate_value else 1.0
+                    except (ValueError, TypeError):
+                        rate = 1.0
                 
                 if rate > 0:
                     delay = np.random.exponential(1.0 / rate)
@@ -2720,10 +2779,10 @@ class SimulationController:
             input_places = set()
             for arc in input_arcs:
                 if hasattr(arc, 'source_id'):
-                    # Skip non-consuming arcs (test arcs are read-only)
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    # Skip non-consuming arcs (test arcs are read-only catalysts)
+                    # Inhibitor arcs DO consume, so they DO create conflicts
                     arc_type = getattr(arc, 'arc_type', 'normal')
-                    if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                    if arc_type == 'test':
                         # Test arcs don't create conflicts → weak independence theory
                         continue
                     # Only consuming arcs create true conflicts (competitive coupling)
