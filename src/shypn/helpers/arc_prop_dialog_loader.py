@@ -185,6 +185,11 @@ class ArcPropDialogLoader(GObject.GObject):
         if id_entry and hasattr(self.arc_obj, 'id'):
             id_entry.set_text(str(self.arc_obj.id))
         
+        # Update color picker to reflect current arc color (CRITICAL for ColorSchemaManager)
+        # When arc is transformed, ColorSchemaManager sets semantic colors that must be preserved
+        if self.color_picker and hasattr(self.arc_obj, 'color'):
+            self.color_picker.set_selected_color(self.arc_obj.color)
+        
         description_text = self.builder.get_object('description_text')
         if description_text and hasattr(self.arc_obj, 'label'):
             buffer = description_text.get_buffer()
@@ -400,10 +405,15 @@ class ArcPropDialogLoader(GObject.GObject):
         if line_width_spin and hasattr(self.arc_obj, 'width'):
             self.arc_obj.width = float(line_width_spin.get_value())
         
-        # Color
+        # Color - ONLY apply if not a semantic arc type
+        # ColorSchemaManager maintains semantic colors for TestArc (blue) and SignalFlowArc (gray)
         if self.color_picker and hasattr(self.arc_obj, 'color'):
-            selected_color = self.color_picker.get_selected_color()
-            self.arc_obj.color = selected_color
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            
+            # Skip color application for semantic arc types (preserves ColorSchemaManager colors)
+            if not ColorSchemaManager.is_semantic_arc_color(self.arc_obj):
+                selected_color = self.color_picker.get_selected_color()
+                self.arc_obj.color = selected_color
         
         # Threshold
         threshold_textview = self.builder.get_object('prop_arc_threshold_entry')
