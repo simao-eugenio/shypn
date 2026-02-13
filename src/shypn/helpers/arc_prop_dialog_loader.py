@@ -289,6 +289,8 @@ class ArcPropDialogLoader(GObject.GObject):
             self._apply_changes()
             if self.persistency_manager:
                 self.persistency_manager.mark_dirty()
+            # IMPORTANT: Signal passes self (loader) so callback can access 
+            # self.arc_obj which is updated to new arc after transformations
             self.emit('properties-changed')
         # Don't destroy here - let explicit destroy() method handle it
 
@@ -355,6 +357,15 @@ class ArcPropDialogLoader(GObject.GObject):
                 if hasattr(old_arc, '_manager') and old_arc._manager:
                     old_arc._manager.replace_arc(old_arc, new_arc)
                     self._invalidate_simulation_cache(old_arc._manager)
+                
+                # CRITICAL FIX: Update dialog's arc reference to point to NEW arc
+                # This allows successive transformations (e.g., normal → test → inhibitor)
+                # without the dialog operating on stale/removed arc references
+                self.arc_obj = new_arc
+                
+                # Refresh dialog fields to show new arc's properties (color, type, etc.)
+                self._populate_fields()
+                
                 return  # Transformation complete - don't apply other changes
         
         # No type change - apply all property changes to existing arc
