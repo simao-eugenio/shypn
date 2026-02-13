@@ -1655,6 +1655,10 @@ class ModelCanvasLoader:
                     # to be updated when we reset/recreate the controller for a loaded model
                     overlay_manager = self.overlay_managers.get(drawing_area)
                     if overlay_manager:
+                        # CRITICAL: Update overlay_manager's controller reference
+                        # This ensures arc property dialog can find the correct controller
+                        overlay_manager.simulation_controller = controller
+                        
                         pass
                         swissknife = getattr(overlay_manager, 'swissknife_palette', None)
                         if swissknife:
@@ -1892,6 +1896,14 @@ class ModelCanvasLoader:
         simulation_controller._on_data_collector_changed = on_data_collector_changed
         
         self.simulation_controllers[drawing_area] = simulation_controller
+        
+        # CRITICAL FIX: Store controller reference in overlay_manager
+        # This allows arc property dialog's _invalidate_simulation_cache() to find
+        # the actual controller being used by Run button. Without this, dialog can't
+        # invalidate the ModelAdapter cache, causing test arcs to still consume tokens
+        # after transformation.
+        if drawing_area in self.overlay_managers:
+            self.overlay_managers[drawing_area].simulation_controller = simulation_controller
         
         # ============================================================
         # REPORT PANEL INTEGRATION: Wire controller to per-document Report Panel
@@ -5354,9 +5366,36 @@ class ModelCanvasLoader:
 
             pass
 
-        def on_properties_changed(_):
+        def on_properties_changed(loader):
+            # CRITICAL FIX: Use loader.arc_obj instead of closure obj
+            # After arc transformation, obj is stale (old arc removed from model)
+            # but loader.arc_obj is updated to point to the new arc
             if isinstance(obj, Arc):
-                pass
+                # Get current arc from dialog (might be transformed)
+                current_arc = loader.arc_obj if hasattr(loader, 'arc_obj') else obj
+                
+                # Clear behavior cache for ALL transitions connected to this arc
+                # This is critical when arc type changes (normal ↔ test ↔ inhibitor)
+                # because transition enablement/firing behavior depends on arc consumption
+                controller = self.get_canvas_controller(drawing_area)
+                if controller:
+                    # CRITICAL: Invalidate ModelAdapter arc cache
+                    # The ModelAdapter caches arcs in _arcs_dict, and when an arc is
+                    # transformed (Arc → TestArc), behaviors retrieve arcs from the
+                    # CACHED dictionary which contains the old Arc with wrong arc_type
+                    if hasattr(controller, 'model_adapter') and controller.model_adapter:
+                        controller.model_adapter.invalidate_caches()
+                    
+                    # Find all transitions connected to the arc's source or target
+                    arc_source = getattr(current_arc, 'source', None)
+                    arc_target = getattr(current_arc, 'target', None)
+                    
+                    # If arc connects to a transition, clear that transition's behavior
+                    from shypn.netobjs import Transition
+                    if isinstance(arc_source, Transition) and arc_source.id in controller.behavior_cache:
+                        del controller.behavior_cache[arc_source.id]
+                    if isinstance(arc_target, Transition) and arc_target.id in controller.behavior_cache:
+                        del controller.behavior_cache[arc_target.id]
             drawing_area.queue_draw()
             
             # MANAGER SYNCHRONIZATION FIX: Use canvas-centric controller access
@@ -5726,7 +5765,6 @@ class ModelCanvasLoader:
             
             drawing_area.queue_draw()
         except ValueError as e:
-            pass
             # Invalid transformation (e.g., Transition → Place)
             self._show_error_dialog(str(e))
             return
@@ -5768,7 +5806,6 @@ class ModelCanvasLoader:
             
             drawing_area.queue_draw()
         except ValueError as e:
-            pass
             # Invalid transformation (e.g., Transition → Place)
             self._show_error_dialog(str(e))
             return
@@ -6124,40 +6161,51 @@ class ModelCanvasLoader:
                             # Rebuild subnet with new arc instances from main model
                             simulator.initialize_simulation()
             
-            # Method 2: Check overlay_manager's main simulation controller
+            # Method 2: UNIFIED CONTROLLER INVALIDATION
+            # After Fix #2, overlay_manager.simulation_controller and canvas controller
+            # should be the SAME instance. Invalidate whichever one exists.
+            sim_controller = None
+            was_running = False
+            
+            # Try overlay_manager first
             if hasattr(manager, 'overlay_manager') and manager.overlay_manager:
                 overlay_manager = manager.overlay_manager
                 if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller:
                     sim_controller = overlay_manager.simulation_controller
-                    
-                    # CRITICAL: If simulation is running, STOP it completely
-                    # Behavior objects have cached arc references that won't update
-                    was_running = False
-                    if hasattr(sim_controller, 'is_running') and sim_controller.is_running:
-                        was_running = True
-                        # Stop simulation completely
-                        if hasattr(sim_controller, 'stop'):
-                            sim_controller.stop()
-                    
-                    # Invalidate ModelAdapter caches to pick up new arc instances
-                    if hasattr(sim_controller, 'model_adapter') and sim_controller.model_adapter:
-                        sim_controller.model_adapter.invalidate_caches()
-                    # Clear behavior cache so behaviors are recreated with new arcs
-                    if hasattr(sim_controller, 'behavior_cache'):
-                        sim_controller.behavior_cache.clear()
-                    # Clear transition states (enablement times, scheduled times)
-                    if hasattr(sim_controller, 'transition_states'):
-                        sim_controller.transition_states.clear()
-                    
-                    # Force rebuild of all behavior objects with new arc references
-                    if hasattr(sim_controller, '_behavior_objects'):
-                        sim_controller._behavior_objects = {}
-                    
-                    # Log warning if simulation was stopped
-                    if was_running:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning("Simulation stopped due to arc transformation - please restart simulation to apply changes")
+            
+            # Try canvas controller if overlay one not found
+            if not sim_controller and hasattr(manager, '_drawing_area') and manager._drawing_area:
+                sim_controller = self.get_canvas_controller(manager._drawing_area)
+            
+            # Now invalidate whichever controller we found
+            if sim_controller:
+                # CRITICAL: If simulation is running, STOP it completely
+                # Behavior objects have cached arc references that won't update
+                if hasattr(sim_controller, 'is_running') and sim_controller.is_running:
+                    was_running = True
+                    # Stop simulation completely
+                    if hasattr(sim_controller, 'stop'):
+                        sim_controller.stop()
+                
+                # Invalidate ModelAdapter caches to pick up new arc instances
+                if hasattr(sim_controller, 'model_adapter') and sim_controller.model_adapter:
+                    sim_controller.model_adapter.invalidate_caches()
+                # Clear behavior cache so behaviors are recreated with new arcs
+                if hasattr(sim_controller, 'behavior_cache'):
+                    sim_controller.behavior_cache.clear()
+                # Clear transition states (enablement times, scheduled times)
+                if hasattr(sim_controller, 'transition_states'):
+                    sim_controller.transition_states.clear()
+                
+                # Force rebuild of all behavior objects with new arc references
+                if hasattr(sim_controller, '_behavior_objects'):
+                    sim_controller._behavior_objects = {}
+                
+                # Log warning if simulation was stopped
+                if was_running:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning("Simulation stopped due to arc transformation - please restart simulation to apply changes")
         except Exception:
             # Silently ignore if no active simulation found
             pass
