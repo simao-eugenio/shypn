@@ -805,6 +805,407 @@ def ornstein_uhlenbeck(t: float, x_current: float, theta: float = 1.0,
 
 
 # =============================================================================
+# BIOPHYSICAL / THERMODYNAMIC FUNCTIONS
+# =============================================================================
+
+def celsius_to_kelvin(celsius: float) -> float:
+    """Convert Celsius to Kelvin.
+    
+    Formula: K = °C + 273.15
+    
+    Args:
+        celsius: Temperature in Celsius
+    
+    Returns:
+        Temperature in Kelvin
+    
+    Example:
+        T_kelvin = celsius_to_kelvin(37)  # 310.15 K
+    """
+    return celsius + 273.15
+
+
+def kelvin_to_celsius(kelvin: float) -> float:
+    """Convert Kelvin to Celsius.
+    
+    Formula: °C = K - 273.15
+    
+    Args:
+        kelvin: Temperature in Kelvin
+    
+    Returns:
+        Temperature in Celsius
+    
+    Example:
+        T_celsius = kelvin_to_celsius(310.15)  # 37°C
+    """
+    return kelvin - 273.15
+
+
+def arrhenius(T: float, Ea: float, A: float = 1.0, T0: float = 310.15, celsius: bool = False) -> float:
+    """Arrhenius equation for temperature-dependent reaction rates.
+    
+    Formula: k(T) = A * exp(-Ea / (R * T))
+    Relative form: k(T) / k(T0) = exp(-Ea/R * (1/T - 1/T0))
+    
+    Args:
+        T: Temperature (in Kelvin by default, or Celsius if celsius=True)
+        Ea: Activation energy in kJ/mol
+        A: Pre-exponential factor (default 1.0 for relative rates)
+        T0: Reference temperature (same units as T, default 310.15 K = 37°C)
+        celsius: If True, treat T and T0 as Celsius (default False=Kelvin)
+    
+    Returns:
+        Rate constant at temperature T
+    
+    Example:
+        # Using Kelvin (traditional thermodynamics)
+        rate = k_base * arrhenius(T=[Temperature], Ea=50, T0=310) * [Substrate]
+        
+        # Using Celsius (more intuitive for biology)
+        rate = k_base * arrhenius(T=37, Ea=50, T0=37, celsius=True) * [Substrate]
+        
+        # With Ea=50 kJ/mol at body temp reference:
+        # T=25°C → factor=0.77 (slower at room temp)
+        # T=37°C → factor=1.00 (reference, body temp)
+        # T=40°C → factor=1.14 (fever)
+    
+    Note:
+        R = 0.008314 kJ/(mol·K) is the gas constant
+        Typical enzyme Ea: 40-80 kJ/mol
+        Diffusion Ea: 10-30 kJ/mol
+        Q10 ≈ exp(Ea/R * 10/T^2) ≈ 2 for Ea~50 kJ/mol
+    """
+    R = 0.008314  # kJ/(mol·K)
+    
+    # Convert to Kelvin if needed
+    if celsius:
+        T = celsius_to_kelvin(T)
+        T0 = celsius_to_kelvin(T0)
+    
+    # Prevent division by zero
+    if T <= 0:
+        return 0.0
+    
+    # Relative rate (normalized to T0)
+    return A * np.exp(-Ea / R * (1.0/T - 1.0/T0))
+
+
+def nernst_potential(z: float, C_out: float, C_in: float, T: float = 310.15, celsius: bool = False) -> float:
+    """Nernst equation for equilibrium potential of an ion.
+    
+    Formula: E = (RT / zF) * ln(C_out / C_in)
+           ≈ (26.7 mV / z) * log10(C_out / C_in)  at 37°C
+    
+    Args:
+        z: Ion charge (e.g., +1 for Na+, -1 for Cl-, +2 for Ca2+)
+        C_out: Extracellular concentration (mM)
+        C_in: Intracellular concentration (mM)
+        T: Temperature (Kelvin by default, Celsius if celsius=True, default 310.15K = 37°C)
+        celsius: If True, treat T as Celsius (default False=Kelvin)
+    
+    Returns:
+        Equilibrium potential in millivolts (mV)
+    
+    Example:
+        # Calculate Na+ equilibrium potential at body temp
+        E_Na = nernst_potential(z=1, C_out=145, C_in=12)  # ≈ +67 mV
+        
+        # Using Celsius
+        E_Na = nernst_potential(z=1, C_out=145, C_in=12, T=37, celsius=True)
+        
+        # Use in driving force calculation
+        driving_force = [Membrane_potential] - nernst_potential(1, 145, 12)
+        rate = g_Na * driving_force * [Na_channel_open]
+    
+    Note:
+        R = 8.314 J/(mol·K), F = 96485 C/mol
+        At T=310K: RT/F ≈ 26.7 mV
+        Typical values:
+        - Na+: E_Na ≈ +67 mV
+        - K+:  E_K  ≈ -90 mV
+        - Ca2+: E_Ca ≈ +123 mV
+        - Cl-: E_Cl ≈ -60 mV
+    """
+    R = 8.314  # J/(mol·K)
+    F = 96485  # C/mol
+    
+    # Convert to Kelvin if needed
+    if celsius:
+        T = celsius_to_kelvin(T)
+    
+    if z == 0 or C_in <= 0 or C_out <= 0:
+        return 0.0
+    
+    # Nernst potential in mV
+    E = (R * T / (z * F)) * np.log(C_out / C_in) * 1000  # Convert V to mV
+    
+    return E
+
+
+def goldman_equation(P_Na: float, P_K: float, P_Cl: float,
+                    Na_out: float, Na_in: float,
+                    K_out: float, K_in: float,
+                    Cl_out: float, Cl_in: float,
+                    T: float = 310.15, celsius: bool = False) -> float:
+    """Goldman-Hodgkin-Katz equation for membrane potential.
+    
+    Calculates membrane potential from multiple ion gradients and permeabilities.
+    
+    Formula: V_m = (RT/F) * ln((P_Na[Na]_o + P_K[K]_o + P_Cl[Cl]_i) / 
+                                 (P_Na[Na]_i + P_K[K]_i + P_Cl[Cl]_o))
+    
+    Args:
+        P_Na, P_K, P_Cl: Relative permeabilities (typically P_K=1.0)
+        Na_out, Na_in: Sodium concentrations (mM)
+        K_out, K_in: Potassium concentrations (mM)
+        Cl_out, Cl_in: Chloride concentrations (mM)
+        T: Temperature (Kelvin by default, Celsius if celsius=True, default 310.15K)
+        celsius: If True, treat T as Celsius (default False=Kelvin)
+    
+    Returns:
+        Membrane potential in millivolts (mV)
+    
+    Example:
+        # Resting potential with typical permeabilities
+        V_m = goldman_equation(
+            P_Na=0.04, P_K=1.0, P_Cl=0.45,  # Relative permeabilities
+            Na_out=145, Na_in=12,
+            K_out=4, K_in=155,
+            Cl_out=110, Cl_in=4,
+            T=37, celsius=True  # Use Celsius
+        )  # ≈ -70 mV
+    """
+    R = 8.314
+    F = 96485
+    
+    # Convert to Kelvin if needed
+    if celsius:
+        T = celsius_to_kelvin(T)
+    
+    numerator = P_Na * Na_out + P_K * K_out + P_Cl * Cl_in
+    denominator = P_Na * Na_in + P_K * K_in + P_Cl * Cl_out
+    
+    if denominator <= 0:
+        return 0.0
+    
+    V_m = (R * T / F) * np.log(numerator / denominator) * 1000  # mV
+    
+    return V_m
+
+
+def ph_to_concentration(pH: float) -> float:
+    """Convert pH to H+ concentration.
+    
+    Formula: [H+] = 10^(-pH) mol/L
+    
+    Args:
+        pH: pH value (typically 0-14)
+    
+    Returns:
+        H+ concentration in molar (M)
+    
+    Example:
+        # Cytoplasmic pH 7.2
+        H_conc = ph_to_concentration(7.2)  # 6.31e-8 M = 63.1 nM
+        
+        # Use in rate function
+        rate = k_acid * ph_to_concentration([pH_cytoplasm]) * [Substrate]
+    """
+    return 10.0 ** (-pH)
+
+
+def concentration_to_ph(H_conc: float) -> float:
+    """Convert H+ concentration to pH.
+    
+    Formula: pH = -log10([H+])
+    
+    Args:
+        H_conc: H+ concentration in molar (M)
+    
+    Returns:
+        pH value
+    
+    Example:
+        # Calculate pH from proton marking
+        pH = concentration_to_ph([H+_cytoplasm] * 1e-9)  # If in nM
+    """
+    if H_conc <= 0:
+        return 14.0  # Maximum pH
+    
+    return -np.log10(H_conc)
+
+
+def henderson_hasselbalch(pH: float, pKa: float) -> float:
+    """Henderson-Hasselbalch equation for acid/base equilibrium.
+    
+    Calculates fraction in deprotonated form.
+    
+    Formula: α = 1 / (1 + 10^(pKa - pH))
+    
+    Args:
+        pH: Solution pH
+        pKa: Acid dissociation constant
+    
+    Returns:
+        Fraction deprotonated (0 to 1)
+    
+    Example:
+        # Drug ionization state (pKa = 7.4)
+        # At pH 7.4: 50% ionized
+        # At pH 6.4: 10% ionized (more protonated)
+        # At pH 8.4: 90% ionized (more deprotonated)
+        fraction_ionized = henderson_hasselbalch([pH_cytoplasm], pKa=7.4)
+        
+        # Ionized form has different permeability
+        rate_passive = k_neutral * (1 - fraction_ionized) * [Drug_ext]
+    """
+    return 1.0 / (1.0 + 10.0 ** (pKa - pH))
+
+
+def thermo_driving_force(delta_g: float, T: float = 310.15, celsius: bool = False) -> float:
+    """Thermodynamic driving force from Gibbs free energy.
+    
+    Calculates the factor by which forward rate exceeds reverse rate
+    at equilibrium.
+    
+    Formula: Γ = 1 - exp(ΔG / RT)
+    
+    When ΔG < 0 (exergonic): Γ > 0 (forward favored)
+    When ΔG > 0 (endergonic): Γ < 0 (reverse favored)
+    When ΔG = 0 (equilibrium): Γ = 0 (no net flux)
+    
+    Args:
+        delta_g: Gibbs free energy change in kJ/mol
+        T: Temperature (Kelvin by default, Celsius if celsius=True, default 310.15K)
+        celsius: If True, treat T as Celsius (default False=Kelvin)
+    
+    Returns:
+        Driving force factor (-∞ to 1)
+    
+    Example:
+        # ATP hydrolysis: ΔG ≈ -50 kJ/mol (very favorable)
+        # When [ATP]=5000 µM, [ADP]=1000 µM, [Pi]=1000 µM:
+        # ΔG' = -30.5 + RT*ln([ADP][Pi]/[ATP])
+        delta_g_actual = -30.5 + 8.314*310/1000 * log([ADP_pool]*[Pi_pool]/[ATP_pool])
+        drive = thermo_driving_force(delta_g_actual, T=37, celsius=True)
+        rate = k_base * drive * [Enzyme]
+        
+        # When ATP is high: ΔG very negative, drive ≈ 1.0
+        # When ATP is low: ΔG less negative, drive approaches 0
+    
+    Note:
+        R = 0.008314 kJ/(mol·K)
+        At T=310K (37°C): RT ≈ 2.58 kJ/mol
+        ΔG = -2.58 kJ/mol → 1.7× faster than reverse
+        ΔG = -5.16 kJ/mol → 7.4× faster (one order magnitude)
+    """
+    R = 0.008314  # kJ/(mol·K)
+    
+    # Convert to Kelvin if needed
+    if celsius:
+        T = celsius_to_kelvin(T)
+    
+    # Prevent overflow for very negative ΔG
+    exponent = delta_g / (R * T)
+    if exponent > 100:  # exp(100) ≈ 2.7e43, practically infinite
+        return 1.0
+    
+    return 1.0 - np.exp(exponent)
+
+
+def atp_gibbs_free_energy(ATP: float, ADP: float, Pi: float, 
+                          T: float = 310.15, pH: float = 7.0, celsius: bool = False) -> float:
+    """Calculate actual Gibbs free energy of ATP hydrolysis.
+    
+    ATP + H2O → ADP + Pi
+    
+    Formula: ΔG = ΔG°' + RT*ln([ADP][Pi] / [ATP])
+    
+    Args:
+        ATP: ATP concentration (µM)
+        ADP: ADP concentration (µM)
+        Pi: Inorganic phosphate concentration (µM)
+        T: Temperature (Kelvin by default, Celsius if celsius=True, default 310.15K)
+        pH: pH value (affects ΔG°')
+        celsius: If True, treat T as Celsius (default False=Kelvin)
+    
+    Returns:
+        ΔG in kJ/mol (negative = exergonic)
+    
+    Example:
+        # Cellular conditions using Celsius
+        delta_g = atp_gibbs_free_energy(
+            ATP=[ATP_pool], ADP=[ADP_pool], Pi=[Pi_pool],
+            T=37, pH=7.2, celsius=True
+        )  # Typically -50 to -55 kJ/mol
+        
+        # Use in P-gp efflux (consumes 4 ATP per drug)
+        delta_g_total = 4 * delta_g
+        drive = thermo_driving_force(delta_g_total, T=37, celsius=True)
+        rate = k_efflux * drive * [ATP_pool]**4 / (Km**4 + [ATP_pool]**4)
+    
+    Note:
+        ΔG°' ≈ -30.5 kJ/mol at pH 7.0, 25°C
+        Under cellular conditions: ΔG ≈ -50 to -55 kJ/mol
+        When ATP/ADP ratio drops (hypoxia): ΔG less negative
+    """
+    R = 0.008314  # kJ/(mol·K)
+    
+    # Convert to Kelvin if needed
+    if celsius:
+        T = celsius_to_kelvin(T)
+    
+    # Standard free energy (pH and temperature corrected)
+    # ΔG°' ≈ -30.5 kJ/mol at pH 7.0, 298K
+    delta_g_standard = -30.5
+    
+    # pH correction (roughly -5.7 kJ/mol per pH unit)
+    delta_g_standard += -5.7 * (pH - 7.0)
+    
+    # Prevent log of zero or negative concentrations
+    if ATP <= 0 or ADP <= 0 or Pi <= 0:
+        return delta_g_standard
+    
+    # Concentration correction (convert µM to M for proper thermodynamics)
+    ATP_M = ATP * 1e-6
+    ADP_M = ADP * 1e-6
+    Pi_M = Pi * 1e-6
+    
+    Q = (ADP_M * Pi_M) / ATP_M  # Reaction quotient
+    
+    delta_g = delta_g_standard + R * T * np.log(Q)
+    
+    return delta_g
+
+
+def electro_driving_force(V_m: float, z: float, E_ion: float) -> float:
+    """Electrochemical driving force for ion transport.
+    
+    Calculates the driving force as departure from equilibrium.
+    
+    Formula: Driving force = V_m - E_ion
+    
+    Args:
+        V_m: Membrane potential (mV)
+        z: Ion charge
+        E_ion: Nernst potential for the ion (mV)
+    
+    Returns:
+        Driving force in mV
+    
+    Example:
+        # Na+ influx driven by both concentration and voltage
+        E_Na = nernst_potential(1, 145, 12)  # +67 mV
+        drive = electro_driving_force([Membrane_potential], 1, E_Na)
+        # At V_m=-70 mV: drive = -70 - 67 = -137 mV (large inward drive)
+        
+        rate_Na_influx = g_Na * abs(drive) * [Na_channel_open]
+    """
+    return V_m - E_ion
+
+
+# =============================================================================
 # CATALOG DICTIONARY (for easy access)
 # =============================================================================
 
@@ -879,6 +1280,19 @@ FUNCTION_CATALOG = {
     'uniform_noise': uniform_noise,
     'poisson_noise': poisson_noise,
     'ornstein_uhlenbeck': ornstein_uhlenbeck,
+    
+    # Biophysical / Thermodynamic functions
+    'celsius_to_kelvin': celsius_to_kelvin,
+    'kelvin_to_celsius': kelvin_to_celsius,
+    'arrhenius': arrhenius,
+    'nernst_potential': nernst_potential,
+    'goldman_equation': goldman_equation,
+    'ph_to_concentration': ph_to_concentration,
+    'concentration_to_ph': concentration_to_ph,
+    'henderson_hasselbalch': henderson_hasselbalch,
+    'thermo_driving_force': thermo_driving_force,
+    'atp_gibbs_free_energy': atp_gibbs_free_energy,
+    'electro_driving_force': electro_driving_force,
 }
 
 

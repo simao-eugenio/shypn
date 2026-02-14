@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Arc Properties Dialog - Enhanced with Notebook and Topology Tab -->
+<!-- Arc Properties Dialog -->
 <interface>
   <requires lib="gtk+" version="3.20"/>
   
@@ -510,23 +510,6 @@
               <object class="GtkLabel">
                 <property name="visible">True</property>
                 <property name="label" translatable="yes">Visual</property>
-              </object>
-            </child>
-            
-            <!-- Topology Tab - Container for dynamic loading -->
-            <child>
-              <object class="GtkBox" id="topology_tab_container">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="orientation">vertical</property>
-                <!-- Content loaded dynamically by ArcTopologyTabLoader -->
-              </object>
-            </child>
-            
-            <child type="tab">
-              <object class="GtkLabel">
-                <property name="visible">True</property>
-                <property name="label" translatable="yes">Topology</property>
               </object>
             </child>
           </object>

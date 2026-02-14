@@ -280,6 +280,50 @@
                           </packing>
                         </child>
                         
+                        <!-- Compartment -->
+                        <child>
+                          <object class="GtkBox" id="compartment_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkLabel" id="compartment_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Compartment:</property>
+                                <property name="width-chars">12</property>
+                                <property name="xalign">1</property>
+                                <property name="tooltip-text">Biological compartment (e.g., cytoplasm, lysosome, mitochondria). Used for compartment-specific thermodynamic properties.</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="compartment_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="invisible-char">●</property>
+                                <property name="placeholder-text">cytoplasm, lysosome, mitochondria, etc.</property>
+                                <property name="tooltip-text">Specify compartment for context-aware thermodynamic calculations (pH, ionic strength). Leave empty to use document-level defaults.</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        
                         <child>
                           <object class="GtkBox" id="type_combo_box">
                             <property name="visible">True</property>
@@ -1350,26 +1394,6 @@
               </packing>
             </child>
             
-            <!-- Topology Tab - Container for dynamic loading -->
-            <child>
-              <object class="GtkBox" id="topology_tab_container">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="orientation">vertical</property>
-                <!-- Content loaded dynamically by TransitionTopologyTabLoader -->
-              </object>
-            </child>
-            <child type="tab">
-              <object class="GtkLabel" id="topology_tab_label">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="label" translatable="yes">Topology</property>
-              </object>
-              <packing>
-                <property name="tab-fill">False</property>
-              </packing>
-            </child>
-            
             <!-- Kinetics Tab - Display kinetic parameters -->
             <child>
               <object class="GtkScrolledWindow" id="kinetics_scrolled_window">
@@ -1497,9 +1521,476 @@
                         <property name="margin">20</property>
                       </object>
                       <packing>
-                        <property name="expand">True</property>
-                        <property name="fill">True</property>
+                        <property name="expand">False</property>
+                        <property name="fill">False</property>
                         <property name="position">2</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- BRENDA Database Integration -->
+                    <child>
+                      <object class="GtkFrame" id="brenda_frame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkBox" id="brenda_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="margin">10</property>
+                            <property name="spacing">10</property>
+                            
+                            <!-- Status row -->
+                            <child>
+                              <object class="GtkBox" id="brenda_status_box">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">10</property>
+                                
+                                <child>
+                                  <object class="GtkLabel" id="brenda_status_label">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label">Status: Not logged in</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                
+                                <child>
+                                  <object class="GtkButton" id="brenda_login_button">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="label">Login</property>
+                                    <property name="tooltip-text">Login to BRENDA database to fetch kinetic parameters</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                                
+                                <child>
+                                  <object class="GtkButton" id="brenda_logout_button">
+                                    <property name="visible">False</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="label">Logout</property>
+                                    <property name="tooltip-text">Logout from BRENDA database</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">2</property>
+                                  </packing>
+                                </child>
+                                
+                              </object>
+                            </child>
+                            
+                            <!-- EC Number input and Fetch button -->
+                            <child>
+                              <object class="GtkBox" id="brenda_fetch_box">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">10</property>
+                                
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label">EC Number:</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                
+                                <child>
+                                  <object class="GtkEntry" id="brenda_ec_entry">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="placeholder-text">e.g., 2.7.1.1</property>
+                                    <property name="tooltip-text">Enter EC number to fetch kinetic parameters from BRENDA</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                                
+                                <child>
+                                  <object class="GtkEntry" id="brenda_organism_entry">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="width-chars">20</property>
+                                    <property name="placeholder-text">Organism (optional)</property>
+                                    <property name="tooltip-text">Filter by organism (e.g., Homo sapiens, Escherichia coli)</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">2</property>
+                                  </packing>
+                                </child>
+                                
+                                <child>
+                                  <object class="GtkButton" id="brenda_fetch_button">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="label">Fetch from BRENDA</property>
+                                    <property name="sensitive">False</property>
+                                    <property name="tooltip-text">Fetch K_m, k_cat, and K_i values from BRENDA database (login required)</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">3</property>
+                                  </packing>
+                                </child>
+                                
+                              </object>
+                            </child>
+                            
+                            <!-- Help text with whitelist instructions -->
+                            <child>
+                              <object class="GtkLabel" id="brenda_help_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="xalign">0</property>
+                                <property name="label">&lt;small&gt;&lt;b&gt;BRENDA API Access:&lt;/b&gt; Fetches K_m, k_cat, and K_i automatically via SOAP API.
+
+&lt;b&gt;Getting API Access:&lt;/b&gt;
+1. Register at https://www.brenda-enzymes.org/
+2. Contact BRENDA support (info@brenda-enzymes.org) requesting API whitelist access
+3. Mention your research purpose and institution
+
+&lt;i&gt;Note: BRENDA restricts automated API access for security. If you get 403 errors, contact BRENDA to request whitelist approval.&lt;/i&gt;&lt;/small&gt;</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                                <property name="selectable">True</property>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">&lt;b&gt;BRENDA Database&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">3</property>
+                      </packing>
+                    </child>
+                    
+                    <!-- Manual Parameter Entry Section -->
+                    <child>
+                      <object class="GtkFrame" id="kinetics_manual_frame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkBox" id="kinetics_manual_box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="margin">10</property>
+                            <property name="spacing">15</property>
+                            
+                            <!-- Arrhenius Parameters -->
+                            <child>
+                              <object class="GtkFrame" id="arrhenius_frame">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label-xalign">0</property>
+                                <property name="shadow-type">etched-in</property>
+                                <child>
+                                  <object class="GtkGrid" id="arrhenius_grid">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="margin">8</property>
+                                    <property name="row-spacing">8</property>
+                                    <property name="column-spacing">10</property>
+                                    
+                                    <!-- Activation Energy -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">Activation Energy (kJ/mol):</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="activation_energy_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 50.0</property>
+                                        <property name="tooltip-text">Activation energy barrier for the reaction (kJ/mol). Typical range: 20-100 kJ/mol for enzyme reactions.</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    
+                                    <!-- Q10 Coefficient -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">Q10 Temperature Coefficient:</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="q10_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 2.0</property>
+                                        <property name="tooltip-text">Rate increase per 10°C temperature rise. Typical Q10 = 2-3 for biological reactions.</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">1</property>
+                                      </packing>
+                                    </child>
+                                    
+                                  </object>
+                                </child>
+                                <child type="label">
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label">&lt;b&gt;Arrhenius Parameters&lt;/b&gt;</property>
+                                    <property name="use-markup">True</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <!-- Michaelis-Menten Parameters -->
+                            <child>
+                              <object class="GtkFrame" id="michaelis_menten_frame">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label-xalign">0</property>
+                                <property name="shadow-type">etched-in</property>
+                                <child>
+                                  <object class="GtkGrid" id="mm_grid">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="margin">8</property>
+                                    <property name="row-spacing">8</property>
+                                    <property name="column-spacing">10</property>
+                                    
+                                    <!-- k_cat -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">k_cat (s⁻¹):</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="k_cat_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 100.0</property>
+                                        <property name="tooltip-text">Catalytic rate constant (turnover number). Number of substrate molecules converted per enzyme per second.</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    
+                                    <!-- K_m -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">K_m (mM):</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="k_m_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 0.5</property>
+                                        <property name="tooltip-text">Michaelis constant. Substrate concentration at half-maximum velocity.</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">1</property>
+                                      </packing>
+                                    </child>
+                                    
+                                    <!-- K_i -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">K_i (mM):</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">2</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="k_i_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 10.0</property>
+                                        <property name="tooltip-text">Inhibition constant. Inhibitor concentration for 50% inhibition.</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">2</property>
+                                      </packing>
+                                    </child>
+                                    
+                                  </object>
+                                </child>
+                                <child type="label">
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label">&lt;b&gt;Michaelis-Menten Parameters&lt;/b&gt;</property>
+                                    <property name="use-markup">True</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <!-- Cooperativity -->
+                            <child>
+                              <object class="GtkFrame" id="cooperativity_frame">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label-xalign">0</property>
+                                <property name="shadow-type">etched-in</property>
+                                <child>
+                                  <object class="GtkGrid" id="cooperativity_grid">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="margin">8</property>
+                                    <property name="row-spacing">8</property>
+                                    <property name="column-spacing">10</property>
+                                    
+                                    <!-- Hill Coefficient -->
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label">Hill Coefficient (n):</property>
+                                        <property name="xalign">0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="hill_coefficient_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="hexpand">True</property>
+                                        <property name="placeholder-text">e.g., 2.0</property>
+                                        <property name="tooltip-text">Hill coefficient for cooperative binding. n = 1 (no cooperativity), n &gt; 1 (positive cooperativity), n &lt; 1 (negative cooperativity).</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">1</property>
+                                        <property name="top-attach">0</property>
+                                      </packing>
+                                    </child>
+                                    
+                                  </object>
+                                </child>
+                                <child type="label">
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label">&lt;b&gt;Cooperativity&lt;/b&gt;</property>
+                                    <property name="use-markup">True</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <!-- Help Text -->
+                            <child>
+                              <object class="GtkLabel" id="kinetics_help_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="xalign">0</property>
+                                <property name="margin-top">10</property>
+                                <property name="label">&lt;small&gt;&lt;b&gt;Note:&lt;/b&gt; Manual parameter entries create high-confidence kinetic metadata. Leave fields empty to preserve existing SBML or database-derived values.&lt;/small&gt;</property>
+                                <property name="use-markup">True</property>
+                                <property name="wrap">True</property>
+                              </object>
+                            </child>
+                            
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">&lt;b&gt;Manual Parameter Entry&lt;/b&gt;</property>
+                            <property name="use-markup">True</property>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">4</property>
                       </packing>
                     </child>
                     

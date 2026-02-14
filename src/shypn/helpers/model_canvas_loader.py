@@ -5396,7 +5396,7 @@ class ModelCanvasLoader:
                     arc_target = getattr(current_arc, 'target', None)
                     
                     # If arc connects to a transition, clear that transition's behavior
-                    from shypn.netobjs import Transition
+                    # Note: Transition is imported at module level (line 45)
                     if isinstance(arc_source, Transition) and arc_source.id in controller.behavior_cache:
                         del controller.behavior_cache[arc_source.id]
                     if isinstance(arc_target, Transition) and arc_target.id in controller.behavior_cache:

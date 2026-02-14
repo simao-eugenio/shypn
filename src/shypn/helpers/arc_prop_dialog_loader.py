@@ -32,7 +32,7 @@ class ArcPropDialogLoader(GObject.GObject):
             parent_window: Parent window for modal dialog.
             ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
             persistency_manager: NetObjPersistency instance for marking document dirty
-            model: PetriNetModel instance for topology analysis (optional)
+            model: PetriNetModel instance (optional, for future use)
         """
         super().__init__()
         if ui_dir is None:
@@ -48,11 +48,9 @@ class ArcPropDialogLoader(GObject.GObject):
         self.builder = None
         self.dialog = None
         self.color_picker = None
-        self.topology_loader = None
         self._load_ui()
         self._setup_color_picker()
         self._populate_fields()
-        self._setup_topology_tab()
 
     def _load_ui(self):
         """Load the Arc properties dialog UI from file."""
@@ -493,67 +491,13 @@ class ArcPropDialogLoader(GObject.GObject):
             Gtk.Dialog: The dialog widget.
         """
         return self.dialog
-    
-    def _setup_topology_tab(self):
-        """Setup topology information tab using ArcTopologyTabLoader.
-        
-        Loads the topology tab from XML and populates it with analysis
-        for this arc (if model is available).
-        """
-        # Skip if no model available
-        if not self.model:
-            return
-        
-        try:
-            from shypn.ui.topology_tab_loader import ArcTopologyTabLoader
-            
-            # Create topology tab loader
-            self.topology_loader = ArcTopologyTabLoader(
-                model=self.model,
-                element_id=self.arc_obj.id
-            )
-            
-            # NOTE: Do NOT call populate() here - it can hang on large models!
-            # CycleAnalyzer uses nx.simple_cycles() which has exponential complexity.
-            # For complex models (e.g., Glycolysis with 60 nodes), this can freeze
-            # the application indefinitely.
-            # TODO: Implement lazy loading - populate when user switches to Topology tab
-            # self.topology_loader.populate()  # ❌ REMOVED - causes freeze
-            
-            # Get the topology widget
-            topology_widget = self.topology_loader.get_root_widget()
-            
-            # Get the topology tab container and add the widget
-            container = self.builder.get_object('topology_tab_container')
-            if container and topology_widget:
-                container.pack_start(topology_widget, True, True, 0)
-                topology_widget.show_all()
-                
-                # Show "Click to analyze" message in topology tab
-                if hasattr(self.topology_loader, 'arc_info_label'):
-                    self.topology_loader.arc_info_label.set_markup(
-                        "<i>Topology analysis available.\n"
-                        "Click 'Analyze' button to run analysis.</i>"
-                    )
-        
-        except ImportError:
-            # Topology module not available - silently skip
-            pass
-        except Exception:
-            # Any other error - log but don't crash the dialog
-            pass
-    
+
     def destroy(self):
         """Destroy dialog and clean up all widget references.
         
         This ensures proper cleanup to prevent orphaned widgets that can
         cause Wayland focus issues and application crashes.
         """
-        # Clean up topology loader first
-        if self.topology_loader:
-            self.topology_loader.destroy()
-            self.topology_loader = None
-        
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None
@@ -573,7 +517,7 @@ def create_arc_prop_dialog(arc_obj, parent_window=None, ui_dir: str=None, persis
         parent_window: Parent window for modal dialog.
         ui_dir: Directory containing UI files. Defaults to project ui/dialogs/.
         persistency_manager: NetObjPersistency instance for marking document dirty
-        model: PetriNetModel instance for topology analysis (optional)
+        model: PetriNetModel instance (optional, for future use)
     
     Returns:
         ArcPropDialogLoader: Configured dialog loader instance.

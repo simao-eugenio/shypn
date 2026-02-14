@@ -62,7 +62,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         self.dialog = None
         self.color_picker = None
         self.locality_widget = None
-        self.topology_loader = None
         
         # Load and setup
         self._load_ui()
@@ -72,7 +71,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         self._update_adaptive_visibility()  # Initial visibility for adaptive box
         self._setup_type_change_handler()
         self._setup_rate_sync()
-        self._setup_topology_tab()
         self._setup_kinetics_tab()
         self._setup_signal_dependencies_tab()  # Quorum sensing / 13-tuple Bio-PN formalism
     
@@ -139,6 +137,14 @@ class TransitionPropDialogLoader(GObject.GObject):
             label_entry.set_text(
                 str(self.transition_obj.label) if self.transition_obj.label else ''
             )
+        
+        # Compartment (optional - for thermodynamic context)
+        compartment_entry = self.builder.get_object('compartment_entry')
+        if compartment_entry:
+            compartment_value = ''
+            if hasattr(self.transition_obj, 'properties') and isinstance(self.transition_obj.properties, dict):
+                compartment_value = self.transition_obj.properties.get('compartment', '')
+            compartment_entry.set_text(str(compartment_value))
         
         # Transition type
         type_combo = self.builder.get_object('prop_transition_type_combo')
@@ -643,6 +649,21 @@ class TransitionPropDialogLoader(GObject.GObject):
                 new_label = label_entry.get_text().strip()
                 self.transition_obj.label = new_label if new_label else None
             
+            # Compartment (save to properties dict)
+            compartment_entry = self.builder.get_object('compartment_entry')
+            if compartment_entry:
+                # Ensure properties dict exists
+                if not hasattr(self.transition_obj, 'properties') or not isinstance(self.transition_obj.properties, dict):
+                    self.transition_obj.properties = {}
+                
+                compartment_text = compartment_entry.get_text().strip()
+                if compartment_text:
+                    # Save non-empty compartment
+                    self.transition_obj.properties['compartment'] = compartment_text
+                elif 'compartment' in self.transition_obj.properties:
+                    # Clear empty compartment from properties
+                    del self.transition_obj.properties['compartment']
+            
             # Transition type
             type_combo = self.builder.get_object('prop_transition_type_combo')
             if type_combo:
@@ -902,6 +923,9 @@ class TransitionPropDialogLoader(GObject.GObject):
                 except ValueError:
                     pass  # Keep current value if invalid
             
+            # Save kinetic parameters from manual entry fields
+            self._save_kinetic_entry_fields()
+            
             return True
             
         except ValueError as e:
@@ -969,57 +993,7 @@ class TransitionPropDialogLoader(GObject.GObject):
             Gtk.Dialog: The dialog widget
         """
         return self.dialog
-    
-    def _setup_topology_tab(self):
-        """Setup topology information tab using TransitionTopologyTabLoader.
-        
-        Loads the topology tab from XML and populates it with analysis
-        for this transition (if model is available).
-        """
-        # Skip if no model available
-        if not self.model:
-            return
-        
-        try:
-            from shypn.ui.topology_tab_loader import TransitionTopologyTabLoader
-            
-            # Create topology tab loader with parent_window for Wayland compatibility
-            self.topology_loader = TransitionTopologyTabLoader(
-                model=self.model,
-                element_id=self.transition_obj.id,
-                parent_window=self.parent_window  # Pass parent for dialog creation
-            )
-            
-            # NOTE: Do NOT call populate() here - it can hang on large models!
-            # CycleAnalyzer uses nx.simple_cycles() which has exponential complexity.
-            # For complex models (e.g., Glycolysis with 60 nodes), this can freeze
-            # the application indefinitely.
-            # TODO: Implement lazy loading - populate when user switches to Topology tab
-            # self.topology_loader.populate()  # ❌ REMOVED - causes freeze
-            
-            # Get the topology widget
-            topology_widget = self.topology_loader.get_root_widget()
-            
-            # Get the topology tab container and add the widget
-            container = self.builder.get_object('topology_tab_container')
-            if container and topology_widget:
-                container.pack_start(topology_widget, True, True, 0)
-                topology_widget.show_all()
-                
-                # Show "Click to analyze" message in topology tab
-                if hasattr(self.topology_loader, 'cycles_label'):
-                    self.topology_loader.cycles_label.set_markup(
-                        "<i>Topology analysis available.\n"
-                        "Click 'Analyze' button to run analysis.</i>"
-                    )
-        
-        except ImportError:
-            # Topology module not available - silently skip
-            pass
-        except Exception:
-            # Any other error - log but don't crash the dialog
-            pass
-    
+
     def _setup_signal_dependencies_tab(self):
         """Setup signal dependencies tab for quorum sensing / environment-aware transitions.
         
@@ -1183,7 +1157,28 @@ class TransitionPropDialogLoader(GObject.GObject):
         - Confidence level
         - Rate type (michaelis_menten, mass_action, etc.)
         - Parameters table (name, value, source)
+        - BRENDA authentication and fetching
         """
+        # Initialize BRENDA client
+        self.brenda_client = None
+        self.brenda_authenticated = False
+        
+        # Initialize BRENDA cache manager (for offline/cached data)
+        self.brenda_cache_manager = None
+        try:
+            from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
+            from shypn.crossfetch.cache.brenda_cache_manager import BRENDACacheManager
+            db = HeuristicDatabase()
+            self.brenda_cache_manager = BRENDACacheManager(db)
+            import logging
+            logging.getLogger(self.__class__.__name__).info("BRENDA cache available for kinetics tab")
+        except Exception as e:
+            import logging
+            logging.getLogger(self.__class__.__name__).warning(f"BRENDA cache unavailable: {e}")
+        
+        # Setup BRENDA button handlers
+        self._setup_brenda_handlers()
+        
         # Get widgets
         source_label = self.builder.get_object('kinetics_source_label')
         confidence_label = self.builder.get_object('kinetics_confidence_label')
@@ -1350,6 +1345,683 @@ class TransitionPropDialogLoader(GObject.GObject):
             column_source.set_expand(False)
             column_source.set_min_width(120)
             treeview.append_column(column_source)
+        
+        # Populate manual entry fields from kinetic_metadata.parameters
+        self._populate_kinetic_entry_fields()
+    
+    def _populate_kinetic_entry_fields(self):
+        """Populate manual kinetic parameter entry fields from kinetic_metadata.
+        
+        Reads from transition.kinetic_metadata.parameters dict and populates:
+        - activation_energy
+        - temperature_coefficient_Q10 (Q10)
+        - k_cat
+        - K_m (Michaelis constant)
+        - k_i (inhibition constant)
+        - hill_coefficient
+        """
+        # Get kinetic metadata
+        metadata = None
+        if hasattr(self.transition_obj, 'kinetic_metadata'):
+            metadata = self.transition_obj.kinetic_metadata
+        
+        # If no metadata, leave fields empty for new entries
+        if not metadata:
+            return
+        
+        # Get parameters dict
+        parameters = getattr(metadata, 'parameters', {})
+        if not parameters:
+            return
+        
+        # Populate Arrhenius parameters
+        activation_energy_entry = self.builder.get_object('activation_energy_entry')
+        if activation_energy_entry and 'activation_energy' in parameters:
+            value = parameters['activation_energy']
+            if isinstance(value, (int, float)):
+                activation_energy_entry.set_text(f"{value:.6g}")
+        
+        q10_entry = self.builder.get_object('q10_entry')
+        if q10_entry:
+            # Check for Q10 or temperature_coefficient_Q10
+            q10_value = parameters.get('Q10') or parameters.get('temperature_coefficient_Q10')
+            if q10_value and isinstance(q10_value, (int, float)):
+                q10_entry.set_text(f"{q10_value:.6g}")
+        
+        # Populate Michaelis-Menten parameters
+        k_cat_entry = self.builder.get_object('k_cat_entry')
+        if k_cat_entry and 'k_cat' in parameters:
+            value = parameters['k_cat']
+            if isinstance(value, (int, float)):
+                k_cat_entry.set_text(f"{value:.6g}")
+        
+        k_m_entry = self.builder.get_object('k_m_entry')
+        if k_m_entry:
+            # Check for K_m or Km (case variations)
+            km_value = parameters.get('K_m') or parameters.get('Km')
+            if km_value and isinstance(km_value, (int, float)):
+                k_m_entry.set_text(f"{km_value:.6g}")
+        
+        k_i_entry = self.builder.get_object('k_i_entry')
+        if k_i_entry:
+            # Check for K_i, Ki, k_i
+            ki_value = parameters.get('K_i') or parameters.get('Ki') or parameters.get('k_i')
+            if ki_value and isinstance(ki_value, (int, float)):
+                k_i_entry.set_text(f"{ki_value:.6g}")
+        
+        # Populate Hill coefficient
+        hill_entry = self.builder.get_object('hill_coefficient_entry')
+        if hill_entry and 'hill_coefficient' in parameters:
+            value = parameters['hill_coefficient']
+            if isinstance(value, (int, float)):
+                hill_entry.set_text(f"{value:.6g}")
+    
+    def _setup_brenda_handlers(self):
+        """Setup BRENDA login/logout/fetch button handlers."""
+        # Get widgets
+        login_button = self.builder.get_object('brenda_login_button')
+        logout_button = self.builder.get_object('brenda_logout_button')
+        fetch_button = self.builder.get_object('brenda_fetch_button')
+        
+        # Connect signals
+        if login_button:
+            login_button.connect('clicked', self._on_brenda_login_clicked)
+        
+        if logout_button:
+            logout_button.connect('clicked', self._on_brenda_logout_clicked)
+        
+        if fetch_button:
+            fetch_button.connect('clicked', self._on_brenda_fetch_clicked)
+    
+    def _on_brenda_login_clicked(self, button):
+        """Handle BRENDA login button click."""
+        # Import dialog
+        try:
+            from shypn.dialogs.brenda_login_dialog import show_brenda_login_dialog
+        except ImportError:
+            print("Error: BRENDA login dialog not available")
+            return
+        
+        # Show login dialog
+        credentials = show_brenda_login_dialog(parent=self.dialog)
+        
+        if not credentials:
+            return  # User cancelled
+        
+        email, password = credentials
+        
+        # Attempt authentication
+        try:
+            from shypn.data.brenda_soap_client import BRENDAAPIClient, ZEEP_AVAILABLE
+            
+            if not ZEEP_AVAILABLE:
+                error_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="ZEEP Library Not Available"
+                )
+                error_dialog.format_secondary_text(
+                    "The zeep library is required for BRENDA API access.\n\n"
+                    "Install with: pip install zeep"
+                )
+                error_dialog.run()
+                error_dialog.destroy()
+                return
+            
+            # Create client and authenticate
+            self.brenda_client = BRENDAAPIClient()
+            
+            # Show progress
+            status_label = self.builder.get_object('brenda_status_label')
+            if status_label:
+                status_label.set_text("Status: Authenticating...")
+            
+            # Authenticate
+            success = self.brenda_client.authenticate(email, password)
+            
+            if success:
+                self.brenda_authenticated = True
+                self._update_brenda_ui_state()
+                
+                # Show success message
+                info_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.INFO,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="BRENDA Login Successful"
+                )
+                info_dialog.format_secondary_text(
+                    f"Logged in as: {email}\n\n"
+                    "You can now fetch kinetic parameters from BRENDA."
+                )
+                info_dialog.run()
+                info_dialog.destroy()
+            else:
+                self.brenda_authenticated = False
+                self._update_brenda_ui_state()
+                
+                # Show error - likely 403 Forbidden (whitelist required)
+                error_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="BRENDA Authentication Failed"
+                )
+                error_dialog.format_secondary_text(
+                    "Could not authenticate with BRENDA (likely 403 Forbidden).\n\n"
+                    "BRENDA restricts SOAP API access for security.\n"
+                    "You must request whitelist approval:\n\n"
+                    "Email: info@brenda-enzymes.org\n"
+                    "Subject: 'Request for SOAP API Whitelist Access'\n"
+                    "Include: Your BRENDA email, research purpose, institution\n\n"
+                    "Check the terminal/log output for detailed instructions."
+                )
+                error_dialog.run()
+                error_dialog.destroy()
+        
+        except Exception as e:
+            self.brenda_authenticated = False
+            self._update_brenda_ui_state()
+            
+            error_msg = str(e)
+            
+            # Check if this is a 403 Forbidden error
+            if "403" in error_msg or "Forbidden" in error_msg:
+                error_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="BRENDA API Access Restricted (403 Forbidden)"
+                )
+                error_dialog.format_secondary_text(
+                    "BRENDA has blocked automated API access for your account/IP.\n\n"
+                    "This is normal - BRENDA requires whitelist approval for SOAP API access.\n\n"
+                    "To get access:\n"
+                    "• Email: info@brenda-enzymes.org\n"
+                    "• Subject: 'Request for SOAP API Whitelist Access'\n"
+                    "• Include your BRENDA email, research purpose, and institution\n\n"
+                    "BRENDA support typically responds within 1-2 business days.\n"
+                    "Periodic re-approval may be needed to maintain access.\n\n"
+                    "Check the terminal output for detailed instructions."
+                )
+            else:
+                error_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Login Error"
+                )
+                error_dialog.format_secondary_text(
+                    f"An error occurred during login:\n\n{error_msg}\n\n"
+                    "Check your internet connection and credentials."
+                )
+            
+            error_dialog.run()
+            error_dialog.destroy()
+    
+    def _on_brenda_logout_clicked(self, button):
+        """Handle BRENDA logout button click."""
+        self.brenda_client = None
+        self.brenda_authenticated = False
+        self._update_brenda_ui_state()
+    
+    def _on_brenda_fetch_clicked(self, button):
+        """Handle BRENDA fetch button click with cache support."""
+        # Get EC number and organism
+        ec_entry = self.builder.get_object('brenda_ec_entry')
+        organism_entry = self.builder.get_object('brenda_organism_entry')
+        
+        if not ec_entry:
+            return
+        
+        ec_number = ec_entry.get_text().strip()
+        if not ec_number:
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.dialog,
+                modal=True,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="EC Number Required"
+            )
+            error_dialog.format_secondary_text(
+                "Please enter an EC number to fetch kinetic parameters."
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+            return
+        
+        organism = organism_entry.get_text().strip() if organism_entry else None
+        
+        # Show progress
+        button.set_sensitive(False)
+        button.set_label("Checking cache...")
+        
+        # Try cache first (works even without API access)
+        km_stats = None
+        kcat_stats = None
+        ki_stats = None
+        used_cache = False
+        
+        if self.brenda_cache_manager:
+            try:
+                km_stats = self.brenda_cache_manager.get_cached_result(
+                    self.brenda_cache_manager.build_query_key(ec_number, 'Km', organism)
+                )
+                kcat_stats = self.brenda_cache_manager.get_cached_result(
+                    self.brenda_cache_manager.build_query_key(ec_number, 'Kcat', organism)
+                )
+                ki_stats = self.brenda_cache_manager.get_cached_result(
+                    self.brenda_cache_manager.build_query_key(ec_number, 'Ki', organism)
+                )
+                
+                if km_stats or kcat_stats or ki_stats:
+                    used_cache = True
+                    import logging
+                    logging.getLogger(self.__class__.__name__).info(
+                        f"Using cached BRENDA data for EC {ec_number}"
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(self.__class__.__name__).warning(f"Cache lookup failed: {e}")
+        
+        # Populate from cache if available
+        if used_cache:
+            if km_stats:
+                k_m_entry = self.builder.get_object('k_m_entry')
+                if k_m_entry:
+                    k_m_entry.set_text(f"{km_stats['mean_value']:.6g}")
+            
+            if kcat_stats:
+                k_cat_entry = self.builder.get_object('k_cat_entry')
+                if k_cat_entry:
+                    k_cat_entry.set_text(f"{kcat_stats['mean_value']:.6g}")
+            
+            if ki_stats:
+                k_i_entry = self.builder.get_object('k_i_entry')
+                if k_i_entry:
+                    k_i_entry.set_text(f"{ki_stats['mean_value']:.6g}")
+            
+            # Show cache results
+            button.set_sensitive(True)
+            button.set_label("Fetch from BRENDA")
+            
+            info_dialog = Gtk.MessageDialog(
+                transient_for=self.dialog,
+                modal=True,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="✓ Using Cached BRENDA Data"
+            )
+            
+            cache_info = "Using statistical mean values from cached BRENDA data:\n\n"
+            if km_stats:
+                cache_info += f"• K_m: {km_stats['mean_value']:.3f} (n={km_stats['count']} measurements)\n"
+            if kcat_stats:
+                cache_info += f"• k_cat: {kcat_stats['mean_value']:.3f} (n={kcat_stats['count']} measurements)\n"
+            if ki_stats:
+                cache_info += f"• K_i: {ki_stats['mean_value']:.3f} (n={ki_stats['count']} measurements)\n"
+            
+            # Add last updated timestamp if available
+            if km_stats and 'last_updated' in km_stats:
+                cache_info += f"\nCached: {km_stats['last_updated'][:10]}"  # Show date only
+            
+            cache_info += "\n\nNote: Using cached data - no API call needed."
+            info_dialog.format_secondary_text(cache_info)
+            info_dialog.run()
+            info_dialog.destroy()
+            return
+        
+        # Cache miss - query API if authenticated
+        if not self.brenda_authenticated or not self.brenda_client:
+            button.set_sensitive(True)
+            button.set_label("Fetch from BRENDA")
+            
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.dialog,
+                modal=True,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK,
+                text="No Cached Data & Not Logged In"
+            )
+            error_dialog.format_secondary_text(
+                f"No cached data found for EC {ec_number}.\n\n"
+                "Please login to BRENDA to fetch fresh data from the API."
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+            return
+        
+        button.set_label("Fetching from API...")
+        
+        try:
+            # Fetch K_m values
+            km_values = self.brenda_client.get_km_values(ec_number, organism=organism)
+            
+            # Fetch k_cat values
+            kcat_values = self.brenda_client.get_kcat_values(ec_number, organism=organism)
+            
+            # Fetch K_i values
+            ki_values = self.brenda_client.get_ki_values(ec_number, organism=organism)
+            
+            # Store results in cache for future use
+            if self.brenda_cache_manager:
+                try:
+                    all_results = []
+                    
+                    # Convert API response to cache format
+                    for km in km_values:
+                        all_results.append({
+                            'ec_number': ec_number,
+                            'parameter_type': 'Km',
+                            'value': km.get('value', 0.0),
+                            'unit': km.get('unit', 'mM'),
+                            'substrate': km.get('substrate', ''),
+                            'organism': km.get('organism', organism or ''),
+                            'literature': km.get('literature', ''),
+                            'commentary': km.get('commentary', ''),
+                            'quality': km.get('quality', 0.5)
+                        })
+                    
+                    for kcat in kcat_values:
+                        all_results.append({
+                            'ec_number': ec_number,
+                            'parameter_type': 'Kcat',
+                            'value': kcat.get('value', 0.0),
+                            'unit': kcat.get('unit', 's^-1'),
+                            'substrate': kcat.get('substrate', ''),
+                            'organism': kcat.get('organism', organism or ''),
+                            'literature': kcat.get('literature', ''),
+                            'commentary': kcat.get('commentary', ''),
+                            'quality': kcat.get('quality', 0.5)
+                        })
+                    
+                    for ki in ki_values:
+                        all_results.append({
+                            'ec_number': ec_number,
+                            'parameter_type': 'Ki',
+                            'value': ki.get('value', 0.0),
+                            'unit': ki.get('unit', 'mM'),
+                            'substrate': ki.get('substrate', ''),
+                            'organism': ki.get('organism', organism or ''),
+                            'literature': ki.get('literature', ''),
+                            'commentary': ki.get('commentary', ''),
+                            'quality': ki.get('quality', 0.5)
+                        })
+                    
+                    # Store in cache
+                    if all_results:
+                        inserted = self.brenda_cache_manager.store_raw_data_batch(all_results)
+                        import logging
+                        logging.getLogger(self.__class__.__name__).info(
+                            f"Cached {inserted} BRENDA results for EC {ec_number}"
+                        )
+                        
+                        # Calculate statistics for future cache hits
+                        from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
+                        db = HeuristicDatabase()
+                        if km_values:
+                            db.calculate_brenda_statistics(ec_number, 'Km', organism)
+                        if kcat_values:
+                            db.calculate_brenda_statistics(ec_number, 'Kcat', organism)
+                        if ki_values:
+                            db.calculate_brenda_statistics(ec_number, 'Ki', organism)
+                
+                except Exception as e:
+                    import logging
+                    logging.getLogger(self.__class__.__name__).warning(
+                        f"Failed to cache BRENDA results: {e}"
+                    )
+            
+            # Populate fields with first result (user can refine with organism filter)
+            if km_values and len(km_values) > 0:
+                k_m_entry = self.builder.get_object('k_m_entry')
+                if k_m_entry:
+                    # Use first K_m value
+                    k_m_entry.set_text(f"{km_values[0]['value']:.6g}")
+            
+            if kcat_values and len(kcat_values) > 0:
+                k_cat_entry = self.builder.get_object('k_cat_entry')
+                if k_cat_entry:
+                    k_cat_entry.set_text(f"{kcat_values[0]['value']:.6g}")
+            
+            if ki_values and len(ki_values) > 0:
+                k_i_entry = self.builder.get_object('k_i_entry')
+                if k_i_entry:
+                    k_i_entry.set_text(f"{ki_values[0]['value']:.6g}")
+            
+            # Show results summary
+            total_results = len(km_values) + len(kcat_values) + len(ki_values)
+            
+            if total_results > 0:
+                info_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.INFO,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="↻ BRENDA Data Retrieved from API"
+                )
+                cache_note = ""
+                if self.brenda_cache_manager:
+                    cache_note = "\n\n✓ Results have been cached for future use."
+                
+                info_dialog.format_secondary_text(
+                    f"Successfully fetched kinetic parameters:\n\n"
+                    f"• K_m values: {len(km_values)}\n"
+                    f"• k_cat values: {len(kcat_values)}\n"
+                    f"• K_i values: {len(ki_values)}\n\n"
+                    f"First values have been auto-filled. Refine with organism filter for specific data."
+                    f"{cache_note}"
+                )
+                info_dialog.run()
+                info_dialog.destroy()
+            else:
+                warning_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="No Data Found"
+                )
+                warning_dialog.format_secondary_text(
+                    f"No kinetic parameters found for EC {ec_number}\n\n"
+                    f"This may be because:\n"
+                    f"• The EC number is invalid or obsolete\n"
+                    f"• BRENDA has no data for this enzyme\n"
+                    f"• The organism filter excluded all results"
+                )
+                warning_dialog.run()
+                warning_dialog.destroy()
+        
+        except Exception as e:
+            error_dialog = Gtk.MessageDialog(
+                transient_for=self.dialog,
+                modal=True,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Fetch Error"
+            )
+            error_dialog.format_secondary_text(
+                f"An error occurred while fetching data:\n\n{str(e)}"
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+        
+        finally:
+            # Restore button
+            button.set_sensitive(True)
+            button.set_label("Fetch from BRENDA")
+    
+    def _update_brenda_ui_state(self):
+        """Update BRENDA UI widgets based on authentication state."""
+        # Get widgets
+        status_label = self.builder.get_object('brenda_status_label')
+        login_button = self.builder.get_object('brenda_login_button')
+        logout_button = self.builder.get_object('brenda_logout_button')
+        fetch_button = self.builder.get_object('brenda_fetch_button')
+        
+        if self.brenda_authenticated:
+            # Logged in state
+            if status_label:
+                email = self.brenda_client.credentials.email if self.brenda_client else "unknown"
+                status_label.set_markup(f"<b>Status: Logged in</b> ({email})")
+            
+            if login_button:
+                login_button.set_visible(False)
+            
+            if logout_button:
+                logout_button.set_visible(True)
+            
+            if fetch_button:
+                fetch_button.set_sensitive(True)
+        else:
+            # Logged out state
+            if status_label:
+                status_label.set_text("Status: Not logged in")
+            
+            if login_button:
+                login_button.set_visible(True)
+            
+            if logout_button:
+                logout_button.set_visible(False)
+            
+            if fetch_button:
+                fetch_button.set_sensitive(False)
+    
+    def _save_kinetic_entry_fields(self):
+        """Save kinetic parameters from manual entry fields to kinetic_metadata.
+        
+        Creates or updates ManualKineticMetadata with parameters from:
+        - activation_energy
+        - temperature_coefficient_Q10 (Q10)
+        - k_cat
+        - K_m
+        - k_i
+        - hill_coefficient
+        
+        Only saves non-empty fields. Creates ManualKineticMetadata if no 
+        metadata exists, or updates existing metadata's parameters dict.
+        """
+        # Import ManualKineticMetadata here to avoid circular imports
+        try:
+            from shypn.data.kinetics.kinetic_metadata import ManualKineticMetadata
+        except ImportError:
+            # Kinetics module not available, skip
+            return
+        
+        # Collect parameter values from entry widgets
+        parameters_to_save = {}
+        
+        # Arrhenius parameters
+        activation_energy_entry = self.builder.get_object('activation_energy_entry')
+        if activation_energy_entry:
+            value_text = activation_energy_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['activation_energy'] = value
+                except ValueError:
+                    pass  # Invalid number, skip
+        
+        q10_entry = self.builder.get_object('q10_entry')
+        if q10_entry:
+            value_text = q10_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['temperature_coefficient_Q10'] = value
+                    parameters_to_save['Q10'] = value  # Save both keys for compatibility
+                except ValueError:
+                    pass
+        
+        # Michaelis-Menten parameters
+        k_cat_entry = self.builder.get_object('k_cat_entry')
+        if k_cat_entry:
+            value_text = k_cat_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['k_cat'] = value
+                except ValueError:
+                    pass
+        
+        k_m_entry = self.builder.get_object('k_m_entry')
+        if k_m_entry:
+            value_text = k_m_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['K_m'] = value
+                    parameters_to_save['Km'] = value  # Save both keys for compatibility
+                except ValueError:
+                    pass
+        
+        k_i_entry = self.builder.get_object('k_i_entry')
+        if k_i_entry:
+            value_text = k_i_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['K_i'] = value
+                    parameters_to_save['Ki'] = value  # Save both keys for compatibility
+                except ValueError:
+                    pass
+        
+        # Hill coefficient
+        hill_entry = self.builder.get_object('hill_coefficient_entry')
+        if hill_entry:
+            value_text = hill_entry.get_text().strip()
+            if value_text:
+                try:
+                    value = float(value_text)
+                    parameters_to_save['hill_coefficient'] = value
+                except ValueError:
+                    pass
+        
+        # Only proceed if at least one parameter was entered
+        if not parameters_to_save:
+            return
+        
+        # Get or create kinetic_metadata
+        if not hasattr(self.transition_obj, 'kinetic_metadata') or self.transition_obj.kinetic_metadata is None:
+            # Create new ManualKineticMetadata
+            self.transition_obj.kinetic_metadata = ManualKineticMetadata(
+                rate_type='custom',
+                formula='',
+                parameters=parameters_to_save
+            )
+        else:
+            # Update existing metadata
+            # If it's not ManualKineticMetadata and not locked, convert it
+            metadata = self.transition_obj.kinetic_metadata
+            
+            # Check if metadata should be preserved (SBML, locked, etc.)
+            from shypn.data.kinetics.kinetic_metadata import KineticMetadata
+            if KineticMetadata.should_preserve(metadata):
+                # Don't overwrite - could warn user here
+                print(f"Warning: Kinetic metadata for transition {self.transition_obj.id} is locked or from SBML. Manual edits not saved.")
+                return
+            
+            # Safe to update - merge parameters
+            if not hasattr(metadata, 'parameters') or metadata.parameters is None:
+                metadata.parameters = {}
+            
+            metadata.parameters.update(parameters_to_save)
+            
+            # Mark as manually edited
+            metadata.manually_edited = True
+            
+            # If metadata wasn't already manual, upgrade its confidence
+            if metadata.source.value != 'manual':
+                from shypn.data.kinetics.kinetic_metadata import KineticSource, ConfidenceLevel
+                metadata.source = KineticSource.MANUAL
+                metadata.confidence = ConfidenceLevel.HIGH
+                metadata.confidence_score = 0.95
     
     def destroy(self):
         """Destroy dialog and clean up all widget references.
@@ -1357,11 +2029,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         This ensures proper cleanup to prevent orphaned widgets that can
         cause Wayland focus issues and application crashes.
         """
-        # Clean up topology loader first
-        if self.topology_loader:
-            self.topology_loader.destroy()
-            self.topology_loader = None
-        
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None

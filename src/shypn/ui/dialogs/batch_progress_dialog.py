@@ -54,8 +54,8 @@ class BatchProgressDialog(Gtk.Dialog):
         # Build UI
         self._build_ui()
         
-        # Show all widgets
-        self.show_all()
+        # Note: Don't call show_all() here - let caller control when to show
+        # Calling show_all() in __init__ can cause segfaults on some systems
     
     def _build_ui(self):
         """Build the dialog UI."""
