@@ -174,7 +174,7 @@ class CompoundDatabase:
         try:
             # Serialize pKa_values to JSON if it's a list
             pka_values = data.get('pKa_values')
-            if pka_values and isinstance(pka_values, list):
+            if isinstance(pka_values, list):
                 import json
                 pka_values = json.dumps(pka_values)
             

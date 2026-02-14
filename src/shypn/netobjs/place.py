@@ -90,6 +90,7 @@ class Place(PetriNetObject):
         self.compartment_volume: Optional[float] = None  # fL - scales stochasticity
         self.neighbor_compartments: List[str] = []  # Adjacent compartment IDs
         self.spatial_position: Optional[Tuple[float, float, float]] = None  # (x, y, z) in μm
+        self.compartment: Optional[str] = None  # Compartment name (e.g., "cytoplasm", "membrane", "extracellular")
         
         # Protected attributes - use properties/methods to access
         self._properties = {}  # Private: place-specific parameters (access via properties)
@@ -592,6 +593,10 @@ class Place(PetriNetObject):
             "spatial_position": list(self.spatial_position) if hasattr(self, 'spatial_position') and self.spatial_position else None,
         })
         
+        # Serialize compartment name (biological assignment: membrane/cytoplasm/extracellular)
+        if hasattr(self, 'compartment') and self.compartment is not None:
+            data["compartment"] = self.compartment
+        
         # Serialize metadata (KEGG IDs, ChEBI IDs, data sources, etc.)
         if hasattr(self, 'metadata') and self.metadata:
             data["metadata"] = self.metadata
@@ -739,6 +744,10 @@ class Place(PetriNetObject):
         
         # Load compartment volume
         place.compartment_volume = data.get("compartment_volume", None)
+        
+        # Load compartment name
+        if "compartment" in data:
+            place.compartment = data["compartment"]
         
         place.neighbor_compartments = data.get("neighbor_compartments", [])
         
