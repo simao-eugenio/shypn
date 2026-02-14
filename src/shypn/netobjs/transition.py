@@ -102,6 +102,10 @@ class Transition(PetriNetObject):
         # Module assignment (modular Bio-PN architecture)
         # Transitions belong to modules, enabling network partitioning
         self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
+        
+        # Compartment assignment (biological localization)
+        # Used for compartment-specific thermodynamic properties
+        self.compartment: Optional[str] = None  # Compartment name (e.g., "cytoplasm", "membrane", "extracellular")
     
     # ========== Property Decorators (OOP Pattern) ==========
     
@@ -776,6 +780,8 @@ class Transition(PetriNetObject):
             data["is_environment_aware"] = self.is_environment_aware
         if hasattr(self, 'module_id') and self.module_id is not None:
             data["module_id"] = self.module_id
+        if hasattr(self, 'compartment') and self.compartment is not None:
+            data["compartment"] = self.compartment
         
         # Serialize adaptive transition parameters (volume-based mode selection)
         # Saved at top level (like transition_type, priority, etc.)
@@ -1009,6 +1015,8 @@ class Transition(PetriNetObject):
             transition.is_environment_aware = data["is_environment_aware"]
         if "module_id" in data:
             transition.module_id = data["module_id"]
+        if "compartment" in data:
+            transition.compartment = data["compartment"]
         
         # Restore adaptive transition parameters (volume-based mode selection)
         # Check both top-level (new format) and properties dict (legacy)

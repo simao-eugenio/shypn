@@ -41,6 +41,9 @@ class PlaceDTO:
     compound_name: Optional[str] = None    # e.g., "D-Glucose"
     chebi_id: Optional[str] = None
     
+    # Compartment localization
+    compartment: Optional[str] = None      # e.g., "cytoplasm", "membrane", "extracellular"
+    
     @classmethod
     def from_object(cls, place_obj) -> 'PlaceDTO':
         """Create DTO from model Place object.
@@ -61,13 +64,19 @@ class PlaceDTO:
             compound_name = place_obj.metadata.get('compound_name')
             chebi_id = place_obj.metadata.get('chebi_id')
         
+        # Extract compartment if available
+        compartment = None
+        if hasattr(place_obj, 'compartment'):
+            compartment = place_obj.compartment
+        
         return cls(
             place_id=str(place_obj.id) if hasattr(place_obj, 'id') else str(place_obj),
             label=str(place_obj.label) if hasattr(place_obj, 'label') else '',
             initial_marking=int(place_obj.tokens) if hasattr(place_obj, 'tokens') else 0,
             compound_id=compound_id,
             compound_name=compound_name,
-            chebi_id=chebi_id
+            chebi_id=chebi_id,
+            compartment=compartment
         )
     
     @classmethod
@@ -86,7 +95,8 @@ class PlaceDTO:
             initial_marking=int(data.get('initial_marking', data.get('marking', 0))),
             compound_id=data.get('compound_id'),
             compound_name=data.get('compound_name'),
-            chebi_id=data.get('chebi_id')
+            chebi_id=data.get('chebi_id'),
+            compartment=data.get('compartment')
         )
 
 
@@ -107,6 +117,9 @@ class TransitionDTO:
     # Optional kinetics
     rate: Optional[float] = None           # For stochastic/timed transitions
     kinetic_law: Optional[str] = None      # e.g., "michaelis_menten(P1, vmax=10, km=5)"
+    
+    # Compartment localization
+    compartment: Optional[str] = None      # e.g., "cytoplasm", "membrane", "extracellular"
 
     @staticmethod
     def _safe_float(value) -> Optional[float]:
@@ -158,6 +171,11 @@ class TransitionDTO:
         if hasattr(transition_obj, 'rate'):
             rate = cls._safe_float(transition_obj.rate)
         
+        # Extract compartment if available
+        compartment = None
+        if hasattr(transition_obj, 'compartment'):
+            compartment = transition_obj.compartment
+        
         return cls(
             transition_id=str(transition_obj.id) if hasattr(transition_obj, 'id') else str(transition_obj),
             label=str(transition_obj.label) if hasattr(transition_obj, 'label') else '',
@@ -166,7 +184,8 @@ class TransitionDTO:
             reaction_name=reaction_name,
             ec_number=ec_number,
             rate=rate,
-            kinetic_law=kinetic_law
+            kinetic_law=kinetic_law,
+            compartment=compartment
         )
     
     @classmethod
@@ -187,7 +206,8 @@ class TransitionDTO:
             reaction_name=data.get('reaction_name'),
             ec_number=data.get('ec_number'),
             rate=cls._safe_float(data['rate']) if 'rate' in data else None,
-            kinetic_law=data.get('kinetic_law')
+            kinetic_law=data.get('kinetic_law'),
+            compartment=data.get('compartment')
         )
 
 

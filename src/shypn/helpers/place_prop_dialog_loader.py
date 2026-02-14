@@ -343,11 +343,17 @@ class PlacePropDialogLoader(GObject.GObject):
             current_index = boundary_map.get(self.place_obj.boundary_type, 0)
             boundary_combo.set_active(current_index)
         
-        # Module ID
+        # Module/Compartment ID (prioritize compartment attribute)
         module_entry = self.builder.get_object('module_id_entry')
-        if module_entry and hasattr(self.place_obj, 'module_id'):
-            if self.place_obj.module_id:
-                module_entry.set_text(self.place_obj.module_id)
+        if module_entry:
+            display_value = ''
+            # Check compartment first (preferred), then module_id (fallback)
+            if hasattr(self.place_obj, 'compartment') and self.place_obj.compartment:
+                display_value = self.place_obj.compartment
+            elif hasattr(self.place_obj, 'module_id') and self.place_obj.module_id:
+                display_value = self.place_obj.module_id
+            if display_value:
+                module_entry.set_text(display_value)
         
         # Gradient vector
         if hasattr(self.place_obj, 'gradient_vector') and self.place_obj.gradient_vector:
@@ -407,11 +413,16 @@ class PlacePropDialogLoader(GObject.GObject):
             selected_value = boundary_list[selected_index]
             self.place_obj.boundary_type = selected_value
         
-        # Module ID
+        # Module/Compartment ID (save to compartment attribute)
         module_entry = self.builder.get_object('module_id_entry')
         if module_entry:
             text = module_entry.get_text().strip()
-            self.place_obj.module_id = text if text else None
+            if text:
+                # Save to compartment attribute (primary location)
+                self.place_obj.compartment = text
+            else:
+                # Clear compartment if empty
+                self.place_obj.compartment = None
         
         # Gradient vector
         dx_entry = self.builder.get_object('gradient_vector_dx_entry')
@@ -1245,9 +1256,16 @@ class PlacePropDialogLoader(GObject.GObject):
                         if 'pKa_values' in row and row['pKa_values'].strip():
                             try:
                                 pka_str = row['pKa_values'].strip()
-                                data['pKa_values'] = [float(x.strip()) for x in pka_str.split(',') if x.strip()]
-                            except ValueError:
-                                errors.append(f"Row {row_num}: Invalid pKa_values")
+                                # Handle JSON array format: "[6.5, 4.0, 2.0]" or comma-separated: "6.5, 4.0, 2.0"
+                                if pka_str.startswith('[') and pka_str.endswith(']'):
+                                    # JSON array format
+                                    import json
+                                    data['pKa_values'] = json.loads(pka_str)
+                                else:
+                                    # Comma-separated format
+                                    data['pKa_values'] = [float(x.strip()) for x in pka_str.split(',') if x.strip()]
+                            except (ValueError, json.JSONDecodeError) as e:
+                                errors.append(f"Row {row_num}: Invalid pKa_values - {e}")
                         
                         # Cache the compound
                         db.cache_compound(data)

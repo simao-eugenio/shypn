@@ -142,7 +142,10 @@ class TransitionPropDialogLoader(GObject.GObject):
         compartment_entry = self.builder.get_object('compartment_entry')
         if compartment_entry:
             compartment_value = ''
-            if hasattr(self.transition_obj, 'properties') and isinstance(self.transition_obj.properties, dict):
+            # Check attribute first (preferred), then properties dict (legacy)
+            if hasattr(self.transition_obj, 'compartment') and self.transition_obj.compartment:
+                compartment_value = self.transition_obj.compartment
+            elif hasattr(self.transition_obj, 'properties') and isinstance(self.transition_obj.properties, dict):
                 compartment_value = self.transition_obj.properties.get('compartment', '')
             compartment_entry.set_text(str(compartment_value))
         
@@ -649,20 +652,16 @@ class TransitionPropDialogLoader(GObject.GObject):
                 new_label = label_entry.get_text().strip()
                 self.transition_obj.label = new_label if new_label else None
             
-            # Compartment (save to properties dict)
+            # Compartment (save as attribute)
             compartment_entry = self.builder.get_object('compartment_entry')
             if compartment_entry:
-                # Ensure properties dict exists
-                if not hasattr(self.transition_obj, 'properties') or not isinstance(self.transition_obj.properties, dict):
-                    self.transition_obj.properties = {}
-                
                 compartment_text = compartment_entry.get_text().strip()
                 if compartment_text:
-                    # Save non-empty compartment
-                    self.transition_obj.properties['compartment'] = compartment_text
-                elif 'compartment' in self.transition_obj.properties:
-                    # Clear empty compartment from properties
-                    del self.transition_obj.properties['compartment']
+                    # Save non-empty compartment to attribute
+                    self.transition_obj.compartment = compartment_text
+                else:
+                    # Clear empty compartment
+                    self.transition_obj.compartment = None
             
             # Transition type
             type_combo = self.builder.get_object('prop_transition_type_combo')
