@@ -234,6 +234,24 @@ class ContinuousBehavior(TransitionBehavior):
                 # Add all catalog functions to context
                 context.update(FUNCTION_CATALOG)
                 
+                # THERMODYNAMIC INTEGRATION: Add thermodynamic settings as special variables
+                # This allows rate_functions to use T, pH, etc. dynamically
+                if hasattr(self.model, 'thermodynamic_settings'):
+                    settings = self.model.thermodynamic_settings
+                    # Standard thermodynamic variables
+                    # NOTE: Internal storage is Kelvin, but users can use celsius=True in functions
+                    context['T'] = settings.get('temperature', 298.15)  # Kelvin
+                    context['Temperature'] = context['T']
+                    context['T_celsius'] = context['T'] - 273.15  # Celsius for convenience
+                    context['pH'] = settings.get('ph', 7.0)
+                    context['ionic_strength'] = settings.get('ionic_strength', 0.1)
+                    context['I'] = context['ionic_strength']  # Shorthand
+                    
+                    # Gas constant and physical constants
+                    context['R'] = 0.008314  # kJ/(mol·K)
+                    context['R_SI'] = 8.314  # J/(mol·K)
+                    context['F'] = 96485  # Faraday constant, C/mol
+                
                 # Add SBML parameters from kinetic_metadata (if available)
                 params = {}  # Initialize params dict
                 if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
@@ -276,6 +294,35 @@ class ContinuousBehavior(TransitionBehavior):
                     # Names are user-controlled aliases - use as-is WITHOUT prefix
                     if hasattr(place, 'name') and place.name:
                         context[place.name] = tokens_safe
+                
+                # DYNAMIC THERMODYNAMIC STATE: If thermodynamic places exist, they override settings
+                # This makes temperature, pH, etc. dynamic state variables (more realistic)
+                for place_id, place in places.items():
+                    if not hasattr(place, 'name'):
+                        continue
+                    place_name = place.name
+                    tokens = context.get(place_name, 0)
+                    
+                    # Temperature place overrides static setting
+                    # Support both Kelvin and Celsius units based on place name
+                    if 'temperature' in place_name.lower():
+                        # If place name suggests Celsius
+                        if 'celsius' in place_name.lower() or 'celcius' in place_name.lower():
+                            context['T_celsius'] = tokens
+                            context['T'] = tokens + 273.15  # Convert to Kelvin
+                            context['Temperature'] = context['T']
+                        # Otherwise assume Kelvin (standard for thermodynamics)
+                        else:
+                            context['T'] = tokens
+                            context['Temperature'] = tokens
+                            context['T_celsius'] = tokens - 273.15
+                    # pH places (could be pH_gradient, pH_cytoplasm, etc.)
+                    elif 'ph' in place_name.lower() and 'gradient' not in place_name.lower():
+                        context['pH'] = tokens
+                    # H+ concentration place (convert to pH)
+                    elif place_name.lower() in ['h+', 'h_plus', 'h+_concentration']:
+                        # User can use concentration_to_ph() function in rate_function
+                        pass
                 
                 # Evaluate expression safely (use preprocessed expression)
                 result = eval(expr_processed, {"__builtins__": {}}, context)

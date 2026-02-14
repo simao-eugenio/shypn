@@ -1273,31 +1273,37 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                     if hasattr(obj, 'on_changed') and obj.on_changed:
                         obj.on_changed()
         
-        # Get parent window for dialog
+        # Get parent window for dialog (with safety checks)
         parent_window = None
-        widget = self.simulate_tools_container
-        while widget:
-            if isinstance(widget, Gtk.Window):
-                parent_window = widget
-                break
-            widget = widget.get_parent()
+        try:
+            widget = self.simulate_tools_container
+            depth = 0  # Prevent infinite loops
+            while widget and depth < 20:
+                if isinstance(widget, Gtk.Window):
+                    # Verify window is valid and visible
+                    if widget.get_realized() and widget.get_visible():
+                        parent_window = widget
+                    break
+                widget = widget.get_parent()
+                depth += 1
+        except Exception as e:
+            print(f"⚠️ Warning: Could not find parent window: {e}")
         
-        # Create and show progress dialog
-        progress_dialog = BatchProgressDialog(parent_window, n_replicates)
-        
-        # Use present() instead of show() to properly handle parent hierarchy
-        # This ensures parent window is mapped before showing the dialog
-        if parent_window and parent_window.get_visible():
-            progress_dialog.present()
-        else:
-            progress_dialog.show()
+        # Create and show progress dialog (with error handling)
+        progress_dialog = None
+        try:
+            # Only pass parent if it's a valid, visible window
+            dialog_parent = parent_window if parent_window else None
+            progress_dialog = BatchProgressDialog(dialog_parent, n_replicates)
+            progress_dialog.show_all()
+        except Exception as e:
+            print(f"❌ Error creating batch progress dialog: {e}")
+            # Continue without dialog - batch will still run
+            import traceback
+            traceback.print_exc()
         
         # Disable buttons during batch execution (but preserve object selection/recording marks)
         self._update_button_states(running=True)
-        
-        # Force UI update to ensure button state is immediately visible
-        while Gtk.events_pending():
-            Gtk.main_iteration()
         
         # Keep recorded objects visually highlighted by NOT clearing selection
         # The selection shows which objects are being recorded in batch mode
@@ -1305,11 +1311,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Create batch runner
         batch_runner = BatchSimulationRunner()
         
-        # Set up cancel callback
-        def on_cancel():
-            batch_runner.cancel()
-        
-        progress_dialog.set_cancel_callback(on_cancel)
+        # Set up cancel callback (only if dialog was created)
+        if progress_dialog:
+            def on_cancel():
+                batch_runner.cancel()
+            
+            progress_dialog.set_cancel_callback(on_cancel)
         
         def run_batch_thread():
             """Background thread for batch execution."""
@@ -1317,13 +1324,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             start_time = time.time()
             
             try:
-                # Progress callback to update dialog
+                # Progress callback to update dialog (only if dialog exists)
                 def progress_callback(replicate_num, total, elapsed, eta_str):
                     """Update progress dialog from background thread."""
-                    GLib.idle_add(
-                        progress_dialog.update_progress,
-                        replicate_num, total, elapsed, eta_str
-                    )
+                    if progress_dialog:
+                        GLib.idle_add(
+                            progress_dialog.update_progress,
+                            replicate_num, total, elapsed, eta_str
+                        )
+                    else:
+                        # Print progress to console if no dialog
+                        print(f"Progress: {replicate_num}/{total} ({replicate_num*100//total}%) - {eta_str}")
                 
                 # Check cancellation callback
                 def cancellation_check():
@@ -1342,8 +1353,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 total_time = time.time() - start_time
                 successful = sum(1 for r in results if 'error' not in r)
                 
-                # Show completion in dialog
-                GLib.idle_add(progress_dialog.show_completion, successful, n_replicates, total_time)
+                # Show completion in dialog (or console)
+                if progress_dialog:
+                    GLib.idle_add(progress_dialog.show_completion, successful, n_replicates, total_time)
+                else:
+                    print(f"✓ Batch complete: {successful}/{n_replicates} successful in {total_time:.1f}s")
                 
                 # Auto-save results
                 try:
@@ -1361,8 +1375,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 import traceback
                 traceback.print_exc()
                 
-                # Show error in dialog
-                GLib.idle_add(progress_dialog.show_error, str(e))
+                # Show error in dialog (or console)
+                if progress_dialog:
+                    GLib.idle_add(progress_dialog.show_error, str(e))
+                else:
+                    print(f"❌ Batch failed: {e}")
                 
                 # Re-enable buttons
                 GLib.idle_add(self._update_button_states, False, False)

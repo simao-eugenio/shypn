@@ -3,6 +3,12 @@
 This module provides integration between the thermodynamics engine and
 the simulation framework, validating that kinetic rate constants are
 consistent with thermodynamic equilibrium constants.
+
+Architecture (Feb 2026 refactoring):
+- Uses ThermodynamicContext dataclass (single source of truth)
+- Place-aware: reads pH/T from spatial places dynamically
+- Compartment-aware: different conditions per compartment
+- Backward compatible: falls back to document settings
 """
 
 import logging
@@ -14,6 +20,7 @@ from shypn.thermodynamics.validators.equilibrium_validator import EquilibriumVal
 from shypn.thermodynamics.database.multi_source_provider import MultiSourceProvider
 from shypn.thermodynamics.compound_resolver import CompoundResolver
 from shypn.thermodynamics.models import ThermodynamicValidation
+from shypn.thermodynamics.context import ThermodynamicContext, ThermodynamicSource
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +65,8 @@ class ThermodynamicSimulationValidator:
         tolerance: float = None,
         enable_web: bool = False,
         emit_warnings: bool = True,
-        document = None
+        document = None,
+        use_dynamic_places: bool = True
     ):
         """Initialize thermodynamic validator.
         
@@ -68,25 +76,22 @@ class ThermodynamicSimulationValidator:
             enable_web: Enable eQuilibrator API access (default False for offline)
             emit_warnings: Emit Python warnings for violations (default True)
             document: DocumentModel to read settings from (optional)
+            use_dynamic_places: If True, read pH/T from spatial places (default True)
         """
-        # Store document reference
+        # Store document reference and dynamic places flag
         self.document = document
+        self.use_dynamic_places = use_dynamic_places
         
-        # Determine settings from document or use defaults
+        # Create default context from document settings
         if document is not None:
-            # Read from document settings
-            self.ph = document.get_thermodynamic_setting('ph', 7.0)
-            self.temperature = document.get_thermodynamic_setting('temperature', 298.15)
-            self.ionic_strength = document.get_thermodynamic_setting('ionic_strength', 0.1)
+            self.default_context = ThermodynamicContext.from_document_settings(document)
             if tolerance is None:
                 tolerance = document.get_thermodynamic_setting('tolerance', 0.5)
             if not document.get_thermodynamic_setting('enable_validation', True):
                 logger.info("Thermodynamic validation disabled in document settings")
         else:
-            # Use defaults
-            self.ph = 7.0
-            self.temperature = 298.15
-            self.ionic_strength = 0.1
+            # Use hard-coded defaults
+            self.default_context = ThermodynamicContext()
             if tolerance is None:
                 tolerance = 0.5
         
@@ -101,8 +106,61 @@ class ThermodynamicSimulationValidator:
         
         logger.info(
             f"ThermodynamicSimulationValidator initialized "
-            f"(tolerance={tolerance:.1%}, pH={self.ph:.1f}, T={self.temperature:.1f}K, web={enable_web})"
+            f"(tolerance={tolerance:.1%}, {self.default_context}, "
+            f"dynamic_places={use_dynamic_places}, web={enable_web})"
         )
+    
+    def get_context_for_transition(
+        self,
+        transition = None,
+        model = None,
+        compartment: Optional[str] = None,
+        ph: Optional[float] = None,
+        temperature: Optional[float] = None
+    ) -> ThermodynamicContext:
+        """Get thermodynamic context for a transition.
+        
+        Priority order:
+        1. Explicit pH/temperature arguments (backward compatibility)
+        2. Dynamic places (if use_dynamic_places=True and model provided)
+        3. Transition compartment property
+        4. Default context from document settings
+        
+        Args:
+            transition: Transition object (optional, for compartment lookup)
+            model: PetriNet or DocumentModel with places (optional)
+            compartment: Explicit compartment name (optional)
+            ph: Explicit pH value (optional, overrides all)
+            temperature: Explicit temperature value (optional, overrides all)
+        
+        Returns:
+            ThermodynamicContext: Context with appropriate pH/T values
+        """
+        # If explicit values provided, use them (backward compatibility)
+        if ph is not None or temperature is not None:
+            return self.default_context.copy_with_overrides(
+                ph=ph if ph is not None else self.default_context.ph,
+                temperature=temperature if temperature is not None else self.default_context.temperature,
+                source=ThermodynamicSource.CALCULATED
+            )
+        
+        # Determine compartment
+        if compartment is None and transition is not None:
+            # Try to get from transition properties
+            compartment = getattr(transition, 'compartment', None)
+            if compartment is None and hasattr(transition, 'properties'):
+                compartment = transition.properties.get('compartment')
+        
+        # If dynamic places enabled and model available, read from places
+        if self.use_dynamic_places and model is not None:
+            try:
+                return ThermodynamicContext.from_places(model, compartment=compartment)
+            except Exception as e:
+                logger.debug(f"Could not read from places: {e}, using default context")
+                return self.default_context
+        
+        # Fall back to default context
+        return self.default_context
     
     def validate_reversible_reaction(
         self,
@@ -111,6 +169,9 @@ class ThermodynamicSimulationValidator:
         k_reverse: float,
         reactants: Dict[str, int],
         products: Dict[str, int],
+        transition = None,
+        model = None,
+        compartment: Optional[str] = None,
         ph: float = None,
         temperature: float = None,
         suppress_warnings: bool = False
@@ -123,18 +184,31 @@ class ThermodynamicSimulationValidator:
             k_reverse: Reverse rate constant
             reactants: {compound_id: stoichiometry}
             products: {compound_id: stoichiometry}
-            ph: pH value (default None = use document or 7.0)
-            temperature: Temperature in K (default None = use document or 298.15)
+            transition: Transition object (optional, for place-aware lookup)
+            model: PetriNet/DocumentModel with places (optional)
+            compartment: Compartment name (optional)
+            ph: pH value (default None = use context)
+            temperature: Temperature in K (default None = use context)
             suppress_warnings: Skip warning emission for this call
             
         Returns:
             ThermodynamicValidation with validation results
         """
-        # Use document settings if not provided
-        if ph is None:
-            ph = self.ph
-        if temperature is None:
-            temperature = self.temperature
+        # Get thermodynamic context (place-aware!)
+        context = self.get_context_for_transition(
+            transition=transition,
+            model=model,
+            compartment=compartment,
+            ph=ph,
+            temperature=temperature
+        )
+        
+        # Log if using dynamic places
+        if context.source == ThermodynamicSource.PLACE and context.place_names:
+            logger.debug(
+                f"Validating {reaction_id} with dynamic context: {context} "
+                f"(places: {context.place_names})"
+            )
         
         # Validate the reaction - catch errors for missing data
         try:
@@ -143,9 +217,14 @@ class ThermodynamicSimulationValidator:
                 k_reverse=k_reverse,
                 reactants=reactants,
                 products=products,
-                ph=ph,
-                temperature=temperature,
-                metadata={"reaction_id": reaction_id}
+                ph=context.ph,
+                temperature=context.temperature,
+                metadata={
+                    "reaction_id": reaction_id,
+                    "compartment": context.compartment,
+                    "context_source": context.source.value,
+                    "place_names": context.place_names
+                }
             )
         except (ValueError, KeyError) as e:
             # Missing compound data or other error

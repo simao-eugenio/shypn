@@ -64,6 +64,11 @@ class DocumentController:
         
         # Change callback (set by parent to mark modified)
         self._on_change_callback = None
+        
+        # Session preference: Remember last used arc type for new arcs
+        # Updated when user transforms arcs (normal, test, inhibitor, signal_flow)
+        # This allows newly created arcs to inherit the type from last transformation
+        self._last_arc_type = 'normal'
     
     # ==================== Object Creation ====================
     
@@ -126,7 +131,9 @@ class DocumentController:
         arc_name = arc_id  # Name matches ID
         
         # Extract arc_type to determine which class to instantiate
-        arc_type = kwargs.pop('arc_type', 'normal')
+        # DEFAULT: Use last transformed arc type instead of always 'normal'
+        # This allows users to create multiple arcs of same type in succession
+        arc_type = kwargs.pop('arc_type', self._last_arc_type)
         
         # AUTO-DETECT signal_flow arc: if connecting to/from signal place and arc_type is 'normal'
         if arc_type == 'normal':
@@ -239,6 +246,10 @@ class DocumentController:
             # Ensure new arc has change callback
             if self._on_change_callback:
                 new_arc.on_changed = self._on_change_callback
+            
+            # REMEMBER last used arc type for new arc creation
+            # This allows users to create multiple arcs of same type
+            self._last_arc_type = new_arc.arc_type
             
             self.mark_modified()
         except ValueError:

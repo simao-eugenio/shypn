@@ -197,10 +197,23 @@ class BRENDAAPIClient:
             
             if "403" in error_msg or "Forbidden" in error_msg:
                 self.logger.error("❌ BRENDA server returned 403 Forbidden")
-                self.logger.error("💡 Possible causes:")
-                self.logger.error("   1. BRENDA may be blocking automated SOAP access temporarily")
-                self.logger.error("   2. Rate limiting - try again in a few minutes")
-                self.logger.error("   3. Check BRENDA service status at https://www.brenda-enzymes.org/")
+                self.logger.error("")
+                self.logger.error("📋 BRENDA restricts SOAP API access for security reasons.")
+                self.logger.error("   Users must request API whitelist approval from BRENDA support.")
+                self.logger.error("")
+                self.logger.error("✉️  How to get API access:")
+                self.logger.error("   1. Email BRENDA support: info@brenda-enzymes.org")
+                self.logger.error("   2. Subject: 'Request for SOAP API Whitelist Access'")
+                self.logger.error("   3. Include:")
+                self.logger.error("      • Your registered BRENDA email")
+                self.logger.error("      • Research purpose and institution")
+                self.logger.error("      • Confirm your IP address (if known)")
+                self.logger.error("")
+                self.logger.error("⏱️  BRENDA support typically responds within 1-2 business days.")
+                self.logger.error("   Periodic re-approval may be required to maintain access.")
+                self.logger.error("")
+                self.logger.error("🌐 Website access: https://www.brenda-enzymes.org/")
+                self.logger.error("   (Web interface remains available for manual queries)")
             else:
                 self.logger.error("💡 Check your internet connection and BRENDA service status")
             

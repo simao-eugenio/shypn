@@ -31,6 +31,13 @@ from .models import (
     ThermodynamicValidation
 )
 
+# Export context (NEW: place-aware thermodynamics)
+from .context import (
+    ThermodynamicContext,
+    PlaceThermodynamics,
+    ThermodynamicSource
+)
+
 # Export base classes
 from .base import (
     ThermodynamicCalculatorBase,
@@ -53,8 +60,7 @@ from .database import (
     CacheProvider,
     StaticDataProvider,
     MultiSourceProvider,
-    EquilibratorProvider,
-    MockEquilibratorProvider
+    EquilibratorProvider
 )
 
 __all__ = [
@@ -87,5 +93,4 @@ __all__ = [
     "StaticDataProvider",
     "MultiSourceProvider",
     "EquilibratorProvider",
-    "MockEquilibratorProvider",
 ]
