@@ -124,7 +124,10 @@ class ContinuousExecutor:
         
         # Calculate how many simulation steps needed to cover that model time
         # Example: model_time=6.0s, time_step=1.0s → 6 steps per GUI update
-        self.controller._steps_per_callback = max(1, int(model_time_per_gui_update / time_step))
+        # PERFORMANCE FIX: Limit batch size to prevent UI freeze
+        # Large batches (e.g., 10+ steps) block GTK event loop too long
+        calculated_steps = max(1, int(model_time_per_gui_update / time_step))
+        self.controller._steps_per_callback = min(calculated_steps, 3)  # Cap at 3 steps max
         
         # Safety cap: Prevent UI freeze on extreme time_scale values
         # Cap at 1000 steps per GUI update (allows up to ~10000x speedup with dt=0.001)
@@ -231,6 +234,15 @@ class ContinuousExecutor:
             
             # Execute one simulation step
             success = self.controller.step(self.controller._time_step)
+            
+            # CRITICAL: Yield to GTK event loop to keep UI responsive
+            # Process pending GUI events (mouse, keyboard, window updates)
+            # This prevents UI freeze during long-running simulations
+            if GLIB_AVAILABLE:
+                context = GLib.MainContext.default()
+                while context.pending():
+                    context.iteration(False)
+            
             if not success:
                 import logging
                 logging.getLogger(__name__).info(

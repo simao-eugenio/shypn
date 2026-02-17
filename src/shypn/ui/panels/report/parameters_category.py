@@ -559,8 +559,9 @@ class DynamicAnalysesCategory(BaseReportCategory):
                             if hasattr(captured_controller, 'get_accounting_report'):
                                 sim_data['accounting_report'] = captured_controller.get_accounting_report()
                             
-                            # Call auto-save
-                            self._auto_save_simulation(sim_data)
+                            # Auto-save DISABLED - was causing UI freeze
+                            # Results remain in Report Panel for manual export if needed
+                            # self._auto_save_simulation(sim_data)
                 except Exception as e:
                     print(f"Error during simulation auto-save: {e}")
                     import traceback
