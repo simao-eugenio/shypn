@@ -234,6 +234,9 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         model: DocumentModel with places, transitions, arcs
         baseline_params: Baseline parameter values dict
     """
+    # Import property path parser
+    from .property_path_parser import parse_property_path, apply_property_to_object
+    
     # DEBUG: File-based logging for worker process
     import os
     debug_log = os.path.expanduser("~/sweep_debug.log")
@@ -251,6 +254,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             place_markings = snapshot['place_markings']
             transition_rates = snapshot['transition_rates']
             arc_weights = snapshot['arc_weights']
+            property_overrides = snapshot.get('property_overrides', {})  # NEW
             swept_param = snapshot.get('swept_parameter')
             snap_name = snapshot.get('name', 'unknown')
             
@@ -258,6 +262,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             with open(debug_log, 'a') as f:
                 f.write(f"\n[WORKER] Processing snapshot (dict): {snap_name}\n")
                 f.write(f"[WORKER] swept_parameter: {swept_param}\n")
+                f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
                 f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
                 f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
         elif 'parameters' in snapshot:
@@ -265,6 +270,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             place_markings = {}
             transition_rates = {}
             arc_weights = {}
+            property_overrides = {}
             
             for param in snapshot['parameters']:
                 obj_type = param.get('obj_type')
@@ -290,6 +296,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         place_markings = snapshot.place_markings
         transition_rates = snapshot.transition_rates
         arc_weights = snapshot.arc_weights
+        property_overrides = getattr(snapshot, 'property_overrides', {})  # NEW
         swept_param = getattr(snapshot, 'swept_parameter', None)
         snap_name = getattr(snapshot, 'name', 'unknown')
         
@@ -297,13 +304,14 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         with open(debug_log, 'a') as f:
             f.write(f"\n[WORKER] Processing snapshot (object): {snap_name}\n")
             f.write(f"[WORKER] swept_parameter: {swept_param}\n")
+            f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
             f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
             f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
     else:
         # No valid snapshot format
         return
     
-    # Apply place markings
+    # Apply place markings (LEGACY - for backward compatibility)
     import os
     debug_log = os.path.expanduser("~/sweep_debug.log")
     
@@ -366,6 +374,41 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         arc = next((a for a in model.arcs if a.id == arc_id), None)
         if arc:
             arc.weight = float(weight)
+    
+    # NEW: Apply property overrides (takes precedence over legacy dicts)
+    # This enables explicit property paths like "T5.volume_threshold", "A3.threshold"
+    if property_overrides:
+        with open(debug_log, 'a') as f:
+            f.write(f"\n[WORKER] Applying {len(property_overrides)} property overrides:\n")
+        
+        for prop_path, value in property_overrides.items():
+            try:
+                # Parse property path
+                obj_id, prop_name = parse_property_path(prop_path)
+                
+                # Get object
+                if obj_id.startswith('P'):
+                    obj = next((p for p in model.places if p.id == obj_id), None)
+                elif obj_id.startswith('T'):
+                    obj = next((t for t in model.transitions if t.id == obj_id), None)
+                elif obj_id.startswith('A'):
+                    obj = next((a for a in model.arcs if a.id == obj_id), None)
+                else:
+                    obj = None
+                
+                # Apply property
+                if obj:
+                    success = apply_property_to_object(obj, prop_name, value)
+                    with open(debug_log, 'a') as f:
+                        status = "✓" if success else "✗"
+                        f.write(f"[WORKER] {status} {prop_path} = {value}\n")
+                else:
+                    with open(debug_log, 'a') as f:
+                        f.write(f"[WORKER] ✗ Object not found: {obj_id}\n")
+                        
+            except Exception as e:
+                with open(debug_log, 'a') as f:
+                    f.write(f"[WORKER] ✗ Error applying {prop_path}: {e}\n")
 
 
 class BatchExecutor:
