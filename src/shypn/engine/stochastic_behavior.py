@@ -164,10 +164,9 @@ class StochasticBehavior(TransitionBehavior):
         
         # Validation - use warnings instead of exceptions to avoid breaking initialization
         if self.rate <= 0:
-            self.logger.warning(
-                f"Stochastic transition '{transition.name}' has non-positive rate ({self.rate}). "
-                f"Using default rate 1.0. Please set rate property in transition dialog."
-            )
+            # Rate = 0 is valid for source transitions (signal production with no inputs)
+            # These use initial marking to control signal levels, not production rates.
+            # Silently default to 1.0 to prevent division by zero in rate calculations.
             self.rate = 1.0
         if self.max_burst < 1:
             self.logger.warning(f"Max burst must be >= 1, got {self.max_burst}. Using default 8.")
@@ -306,13 +305,7 @@ class StochasticBehavior(TransitionBehavior):
         """
         if not self.has_rate_function:
             # No formula - use constant rate
-            # Ensure we have a valid positive rate (should be validated in __init__)
-            if not hasattr(self, 'rate') or self.rate <= 0:
-                self.logger.warning(
-                    f"Stochastic transition '{self.transition.name}' has invalid rate "
-                    f"({getattr(self, 'rate', 'None')}). Using default rate 1.0"
-                )
-                return 1.0
+            # Rate is validated in __init__ and defaults to 1.0 if invalid
             return self.rate
         
         try:
@@ -589,6 +582,14 @@ class StochasticBehavior(TransitionBehavior):
         # Protect against u=0 which would cause log(0) = -inf
         if u <= 1e-10:
             u = 1e-10
+        
+        # Defensive: ensure lambda_rate > 0 to prevent division by zero
+        if lambda_rate <= 0:
+            self.logger.error(f"Transition {self.transition.name}: lambda_rate is {lambda_rate}, cannot compute delay")
+            self._scheduled_fire_time = None
+            self._sampled_burst = None
+            return
+            
         delay = -math.log(u) / lambda_rate
         
         self._scheduled_fire_time = time + delay
@@ -975,10 +976,13 @@ class StochasticBehavior(TransitionBehavior):
         """
         current_time = self._get_current_time()
         
+        # Defensive: prevent division by zero if rate is somehow 0
+        mean_delay = 1.0 / self.rate if self.rate > 0 else float('inf')
+        
         info = {
             'rate': self.rate,
             'max_burst': self.max_burst,
-            'mean_delay': 1.0 / self.rate,
+            'mean_delay': mean_delay,
             'enablement_time': self._enablement_time,
             'scheduled_fire_time': self._scheduled_fire_time,
             'sampled_burst': self._sampled_burst,

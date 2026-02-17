@@ -107,8 +107,16 @@ class JSONSimulationExporter:
         for place_id, values in self.place_data.items():
             place_name = place_id
             unit = 'mM'
-            initial_tokens = values[0] if values else 0
-            final_tokens = values[-1] if values else 0
+            
+            # Defensive: Extract scalar from potentially nested values
+            def extract_scalar(val):
+                """Extract scalar value from potentially nested structure."""
+                if isinstance(val, (list, tuple)):
+                    return float(val[0]) if val else 0.0
+                return float(val) if val is not None else 0.0
+            
+            initial_tokens = extract_scalar(values[0]) if values else 0.0
+            final_tokens = extract_scalar(values[-1]) if values else 0.0
             
             # Get place details from model
             if self.model and hasattr(self.model, 'places'):
@@ -121,11 +129,11 @@ class JSONSimulationExporter:
                         if hasattr(place, 'scale_factor') and place.scale_factor:
                             initial = initial_tokens / place.scale_factor
                             final = final_tokens / place.scale_factor
-                            converted_series = [v / place.scale_factor for v in values]
+                            converted_series = [extract_scalar(v) / place.scale_factor for v in values]
                         else:
                             initial = initial_tokens
                             final = final_tokens
-                            converted_series = values
+                            converted_series = [extract_scalar(v) for v in values]
                         
                         places[place_id] = {
                             'name': place_name,
@@ -140,9 +148,9 @@ class JSONSimulationExporter:
                 places[place_id] = {
                     'name': place_name,
                     'unit': unit,
-                    'initial': initial_tokens,
-                    'final': final_tokens,
-                    'time_series': values
+                    'initial': round(initial_tokens, 6),
+                    'final': round(final_tokens, 6),
+                    'time_series': [round(extract_scalar(v), 6) for v in values]
                 }
         
         return places
@@ -151,10 +159,17 @@ class JSONSimulationExporter:
         """Build transitions data section with rates."""
         transitions = {}
         
+        # Helper function to safely extract scalar
+        def extract_scalar(val):
+            """Extract scalar value from potentially nested structure."""
+            if isinstance(val, (list, tuple)):
+                return float(val[0]) if val else 0.0
+            return float(val) if val is not None else 0.0
+        
         for trans_id, values in self.transition_data.items():
             trans_name = trans_id
             rate = None
-            total_firings = values[-1] if values else 0
+            total_firings = extract_scalar(values[-1]) if values else 0
             
             # Get transition details from model
             if self.model and hasattr(self.model, 'transitions'):
@@ -164,21 +179,29 @@ class JSONSimulationExporter:
                         rate = getattr(trans, 'rate', None)
                         break
             
+            # JSON supports arbitrary precision integers, safe for large tau-leaping counts
             transitions[trans_id] = {
                 'name': trans_name,
                 'rate': rate,
                 'total_firings': int(total_firings),
-                'time_series': [int(v) for v in values]
+                'time_series': [int(extract_scalar(v)) for v in values]
             }
         
         return transitions
     
     def _calculate_statistics(self) -> dict:
         """Calculate overall simulation statistics."""
+        # Helper to extract scalar from potentially nested values
+        def extract_scalar(val):
+            """Extract scalar value from potentially nested structure."""
+            if isinstance(val, (list, tuple)):
+                return float(val[0]) if val else 0.0
+            return float(val) if val is not None else 0.0
+        
         total_firings = 0
         for values in self.transition_data.values():
             if values:
-                total_firings += values[-1]
+                total_firings += extract_scalar(values[-1])
         
         sim_time = self.time_points[-1] if self.time_points else 0
         
@@ -190,8 +213,10 @@ class JSONSimulationExporter:
                 if len(values) > 10:
                     last_10_percent = values[-len(values)//10:]
                     if len(last_10_percent) > 1:
-                        stddev = statistics.stdev(last_10_percent)
-                        mean = statistics.mean(last_10_percent)
+                        # Extract scalars for statistical analysis
+                        scalar_values = [extract_scalar(v) for v in last_10_percent]
+                        stddev = statistics.stdev(scalar_values)
+                        mean = statistics.mean(scalar_values)
                         if mean > 0 and (stddev / mean) < 0.01:  # <1% coefficient of variation
                             steady_state_reached = True
                             break

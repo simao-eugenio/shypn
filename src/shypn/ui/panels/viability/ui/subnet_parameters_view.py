@@ -106,10 +106,10 @@ class SubnetParametersView(Gtk.Box):
     def _create_places_treeview(self):
         """Create TreeView for editing place parameters.
         
-        Columns: ID, Name, Marking (editable), Type, Label, Background
+        Columns: ID, Name, Marking (editable), Type, Label, Background, BackgroundSet
         """
-        # Create ListStore: id, name, marking (int, editable), type, label, background
-        store = Gtk.ListStore(str, str, int, str, str, str)
+        # Create ListStore: id, name, marking (int, editable), type, label, background, background_set
+        store = Gtk.ListStore(str, str, int, str, str, str, bool)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -118,14 +118,18 @@ class SubnetParametersView(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id.add_attribute(renderer_id, 'cell-background', 5)
+        column_id.add_attribute(renderer_id, 'cell-background-set', 6)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=5)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name.add_attribute(renderer_name, 'cell-background', 5)
+        column_name.add_attribute(renderer_name, 'cell-background-set', 6)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -134,21 +138,27 @@ class SubnetParametersView(Gtk.Box):
         renderer_marking = Gtk.CellRendererText()
         renderer_marking.set_property("editable", True)
         renderer_marking.connect("edited", self._on_place_marking_edited_internal, store)
-        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2, background=5)
+        column_marking = Gtk.TreeViewColumn("Marking", renderer_marking, text=2)
+        column_marking.add_attribute(renderer_marking, 'cell-background', 5)
+        column_marking.add_attribute(renderer_marking, 'cell-background-set', 6)
         column_marking.set_resizable(True)
         column_marking.set_min_width(80)
         treeview.append_column(column_marking)
         
         # Column 3: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3, background=5)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=3)
+        column_type.add_attribute(renderer_type, 'cell-background', 5)
+        column_type.add_attribute(renderer_type, 'cell-background-set', 6)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 4: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4, background=5)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=4)
+        column_label.add_attribute(renderer_label, 'cell-background', 5)
+        column_label.add_attribute(renderer_label, 'cell-background-set', 6)
         column_label.set_resizable(True)
         column_label.set_expand(True)
         column_label.set_min_width(150)
@@ -162,10 +172,10 @@ class SubnetParametersView(Gtk.Box):
     def _create_transitions_treeview(self):
         """Create TreeView for editing transition parameters.
         
-        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background
+        Columns: ID, Name, Rate (editable), Formula (editable), Type, Label, Background, BackgroundSet
         """
-        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background
-        store = Gtk.ListStore(str, str, float, str, str, str, str)
+        # Create ListStore: id, name, rate (float, editable), formula (str, editable), type, label, background, background_set
+        store = Gtk.ListStore(str, str, float, str, str, str, str, bool)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -174,14 +184,18 @@ class SubnetParametersView(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=6)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id.add_attribute(renderer_id, 'cell-background', 6)
+        column_id.add_attribute(renderer_id, 'cell-background-set', 7)
         column_id.set_resizable(True)
         column_id.set_min_width(60)
         treeview.append_column(column_id)
         
         # Column 1: Name
         renderer_name = Gtk.CellRendererText()
-        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1, background=6)
+        column_name = Gtk.TreeViewColumn("Name", renderer_name, text=1)
+        column_name.add_attribute(renderer_name, 'cell-background', 6)
+        column_name.add_attribute(renderer_name, 'cell-background-set', 7)
         column_name.set_resizable(True)
         column_name.set_min_width(100)
         treeview.append_column(column_name)
@@ -190,7 +204,9 @@ class SubnetParametersView(Gtk.Box):
         renderer_rate = Gtk.CellRendererText()
         renderer_rate.set_property("editable", True)
         renderer_rate.connect("edited", self._on_transition_rate_edited_internal, store)
-        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2, background=6)
+        column_rate = Gtk.TreeViewColumn("Rate", renderer_rate, text=2)
+        column_rate.add_attribute(renderer_rate, 'cell-background', 6)
+        column_rate.add_attribute(renderer_rate, 'cell-background-set', 7)
         column_rate.set_resizable(True)
         column_rate.set_min_width(80)
         treeview.append_column(column_rate)
@@ -199,7 +215,9 @@ class SubnetParametersView(Gtk.Box):
         renderer_formula = Gtk.CellRendererText()
         renderer_formula.set_property("editable", True)
         renderer_formula.connect("edited", self._on_transition_formula_edited_internal, store)
-        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3, background=6)
+        column_formula = Gtk.TreeViewColumn("Formula", renderer_formula, text=3)
+        column_formula.add_attribute(renderer_formula, 'cell-background', 6)
+        column_formula.add_attribute(renderer_formula, 'cell-background-set', 7)
         column_formula.set_resizable(True)
         column_formula.set_expand(True)
         column_formula.set_min_width(200)
@@ -207,14 +225,18 @@ class SubnetParametersView(Gtk.Box):
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=6)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type.add_attribute(renderer_type, 'cell-background', 6)
+        column_type.add_attribute(renderer_type, 'cell-background-set', 7)
         column_type.set_resizable(True)
         column_type.set_min_width(100)
         treeview.append_column(column_type)
         
         # Column 5: Label
         renderer_label = Gtk.CellRendererText()
-        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5, background=6)
+        column_label = Gtk.TreeViewColumn("Label", renderer_label, text=5)
+        column_label.add_attribute(renderer_label, 'cell-background', 6)
+        column_label.add_attribute(renderer_label, 'cell-background-set', 7)
         column_label.set_resizable(True)
         column_label.set_min_width(150)
         treeview.append_column(column_label)
@@ -227,10 +249,10 @@ class SubnetParametersView(Gtk.Box):
     def _create_arcs_treeview(self):
         """Create TreeView for editing arc parameters.
         
-        Columns: ID, From, To, Weight (editable), Type, Background
+        Columns: ID, From, To, Weight (editable), Type, Background, BackgroundSet
         """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background
-        store = Gtk.ListStore(str, str, str, int, str, str)
+        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background, background_set
+        store = Gtk.ListStore(str, str, str, int, str, str, bool)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)
@@ -238,21 +260,27 @@ class SubnetParametersView(Gtk.Box):
         
         # Column 0: ID
         renderer_id = Gtk.CellRendererText()
-        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0, background=5)
+        column_id = Gtk.TreeViewColumn("ID", renderer_id, text=0)
+        column_id.add_attribute(renderer_id, 'cell-background', 5)
+        column_id.add_attribute(renderer_id, 'cell-background-set', 6)
         column_id.set_resizable(True)
         column_id.set_min_width(80)
         treeview.append_column(column_id)
         
         # Column 1: From
         renderer_from = Gtk.CellRendererText()
-        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1, background=5)
+        column_from = Gtk.TreeViewColumn("From", renderer_from, text=1)
+        column_from.add_attribute(renderer_from, 'cell-background', 5)
+        column_from.add_attribute(renderer_from, 'cell-background-set', 6)
         column_from.set_resizable(True)
         column_from.set_min_width(100)
         treeview.append_column(column_from)
         
         # Column 2: To
         renderer_to = Gtk.CellRendererText()
-        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2, background=5)
+        column_to = Gtk.TreeViewColumn("To", renderer_to, text=2)
+        column_to.add_attribute(renderer_to, 'cell-background', 5)
+        column_to.add_attribute(renderer_to, 'cell-background-set', 6)
         column_to.set_resizable(True)
         column_to.set_min_width(100)
         treeview.append_column(column_to)
@@ -261,14 +289,18 @@ class SubnetParametersView(Gtk.Box):
         renderer_weight = Gtk.CellRendererText()
         renderer_weight.set_property("editable", True)
         renderer_weight.connect("edited", self._on_arc_weight_edited_internal, store)
-        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3, background=5)
+        column_weight = Gtk.TreeViewColumn("Weight", renderer_weight, text=3)
+        column_weight.add_attribute(renderer_weight, 'cell-background', 5)
+        column_weight.add_attribute(renderer_weight, 'cell-background-set', 6)
         column_weight.set_resizable(True)
         column_weight.set_min_width(80)
         treeview.append_column(column_weight)
         
         # Column 4: Type
         renderer_type = Gtk.CellRendererText()
-        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4, background=5)
+        column_type = Gtk.TreeViewColumn("Type", renderer_type, text=4)
+        column_type.add_attribute(renderer_type, 'cell-background', 5)
+        column_type.add_attribute(renderer_type, 'cell-background-set', 6)
         column_type.set_resizable(True)
         column_type.set_min_width(120)
         treeview.append_column(column_type)
@@ -483,6 +515,7 @@ class SubnetParametersView(Gtk.Box):
             if param_id == swept_param_id:
                 # Highlight this row with light blue background
                 store.set_value(iter, bg_column, "#E3F2FD")
+                store.set_value(iter, bg_column + 1, True)  # Enable background
                 self.swept_rows[(swept_param_type, swept_param_id)] = iter
                 break
             iter = store.iter_next(iter)
@@ -492,19 +525,19 @@ class SubnetParametersView(Gtk.Box):
         # Clear places
         iter = self.places_store.get_iter_first()
         while iter:
-            self.places_store.set_value(iter, 5, "")
+            self.places_store.set_value(iter, 6, False)  # Disable background
             iter = self.places_store.iter_next(iter)
         
         # Clear transitions
         iter = self.transitions_store.get_iter_first()
         while iter:
-            self.transitions_store.set_value(iter, 6, "")
+            self.transitions_store.set_value(iter, 7, False)  # Disable background
             iter = self.transitions_store.iter_next(iter)
         
         # Clear arcs
         iter = self.arcs_store.get_iter_first()
         while iter:
-            self.arcs_store.set_value(iter, 5, "")
+            self.arcs_store.set_value(iter, 6, False)  # Disable background
             iter = self.arcs_store.iter_next(iter)
         
         self.swept_rows.clear()

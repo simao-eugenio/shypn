@@ -6,9 +6,15 @@ Displays kinetic parameters, enrichments, and simulation data.
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+import os
+import json
+from datetime import datetime
+from pathlib import Path
 
 from .base_category import BaseReportCategory
 from .widgets import SpeciesConcentrationTable, ReactionActivityTable
+from shypn.helpers.batch_results_saver import BatchResultsSaver
+from shypn.data.project_models import get_project_manager
 
 
 class DynamicAnalysesCategory(BaseReportCategory):
@@ -533,6 +539,32 @@ class DynamicAnalysesCategory(BaseReportCategory):
                                     if hasattr(overlay_manager, 'report_data'):
                                         overlay_manager.report_data.capture_simulation_results(captured_controller)
                                     break
+                
+                # Auto-save simulation data to project folder
+                try:
+                    # Get simulation data from controller's data_collector
+                    if hasattr(captured_controller, 'data_collector'):
+                        dc = captured_controller.data_collector
+                        if dc and dc.has_data():
+                            sim_data = {
+                                'time_points': dc.time_points,
+                                'place_data': dc.place_data,
+                                'transition_data': dc.transition_data,
+                                'model': captured_controller.model,
+                                'metadata': {},
+                                'accounting_report': None
+                            }
+                            
+                            # Get accounting report if available
+                            if hasattr(captured_controller, 'get_accounting_report'):
+                                sim_data['accounting_report'] = captured_controller.get_accounting_report()
+                            
+                            # Call auto-save
+                            self._auto_save_simulation(sim_data)
+                except Exception as e:
+                    print(f"Error during simulation auto-save: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
                 # Only refresh UI if this captured controller is still the active one
                 if self.controller is captured_controller:
@@ -1341,3 +1373,132 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # Clear reaction selected status
         if hasattr(self, 'reaction_selected_status'):
             self.reaction_selected_status.set_markup("<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>")
+    
+    def _auto_save_simulation(self, sim_data: dict):
+        """Auto-save simulation results to project folder.
+        
+        Args:
+            sim_data: Simulation data dict from _get_simulation_data()
+        """
+        try:
+            # Get project folder
+            project_folder = self._get_project_folder()
+            if not project_folder:
+                print("Warning: No project folder found, skipping auto-save")
+                return
+            
+            # Create subfolder for simulations
+            simulations_folder = os.path.join(project_folder, 'simulations')
+            os.makedirs(simulations_folder, exist_ok=True)
+            
+            # Generate timestamp-based folder name
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            model_name = "simulation"
+            if sim_data.get('model'):
+                model_name = getattr(sim_data['model'], 'name', 
+                                   getattr(sim_data['model'], 'id', 'simulation'))
+            
+            # Use short folder name: {model_name}_{timestamp}
+            folder_name = f"{model_name}_{timestamp}"
+            simulation_folder = os.path.join(simulations_folder, folder_name)
+            os.makedirs(simulation_folder, exist_ok=True)
+            
+            # Save simulation configuration
+            config = {
+                'model_name': model_name,
+                'timestamp': timestamp,
+                'metadata': sim_data.get('metadata', {}),
+                'simulation_type': 'report_panel'
+            }
+            
+            config_path = os.path.join(simulation_folder, 'config.json')
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=2)
+            
+            # Export time-series data (wide format CSV)
+            csv_path = os.path.join(simulation_folder, 'trajectories.csv')
+            from shypn.reporting.exporters import CSVSimulationExporter
+            accounting_data = sim_data.get('accounting_report')
+            exporter = CSVSimulationExporter(sim_data, sim_data.get('metadata', {}), accounting_data)
+            exporter.export_timeseries_wide(csv_path)
+            
+            # Export summary statistics
+            stats_path = os.path.join(simulation_folder, 'statistics.csv')
+            exporter.export_summary_statistics(stats_path)
+            
+            # Export full data as JSON
+            json_path = os.path.join(simulation_folder, 'simulation_data.json')
+            from shypn.reporting.exporters import JSONSimulationExporter
+            json_exporter = JSONSimulationExporter(sim_data, sim_data.get('metadata', {}), sim_data.get('model'))
+            json_exporter.export(
+                json_path,
+                include_metadata=True,
+                include_timeseries=True,
+                include_statistics=True
+            )
+            
+            # Save metadata.txt for human readability
+            metadata_path = os.path.join(simulation_folder, 'metadata.txt')
+            with open(metadata_path, 'w') as f:
+                f.write(f"Simulation Auto-Save\n")
+                f.write(f"{'=' * 50}\n\n")
+                f.write(f"Model: {model_name}\n")
+                f.write(f"Timestamp: {timestamp}\n")
+                f.write(f"Simulation Type: Report Panel\n\n")
+                
+                metadata_dict = sim_data.get('metadata', {})
+                if metadata_dict:
+                    f.write("Simulation Parameters:\n")
+                    for key, value in metadata_dict.items():
+                        f.write(f"  {key}: {value}\n")
+                
+                f.write(f"\nFiles Saved:\n")
+                f.write(f"  - trajectories.csv: Time-series data (wide format)\n")
+                f.write(f"  - statistics.csv: Summary statistics\n")
+                f.write(f"  - simulation_data.json: Full simulation data\n")
+                f.write(f"  - config.json: Simulation configuration\n")
+            
+            print(f"✓ Simulation auto-saved to: {simulation_folder}")
+            
+        except Exception as e:
+            print(f"Error in simulation auto-save: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _get_project_folder(self):
+        """Get the project folder for auto-saving.
+        
+        Returns:
+            str: Absolute path to project folder, or None if not found
+        """
+        try:
+            # Try 1: Get from project manager
+            project_manager = get_project_manager()
+            if project_manager and hasattr(project_manager, 'project') and project_manager.project:
+                project = project_manager.project
+                if hasattr(project, 'folder_path') and project.folder_path:
+                    return project.folder_path
+            
+            # Try 2: Get from model filepath
+            if self.controller and hasattr(self.controller, 'model'):
+                model = self.controller.model
+                if model and hasattr(model, 'filepath') and model.filepath:
+                    model_path = Path(model.filepath)
+                    if model_path.exists():
+                        # Go up to project root (assuming model is in project/models/ or similar)
+                        parent = model_path.parent
+                        while parent != parent.parent:
+                            if (parent / 'models').exists() or (parent / 'data').exists():
+                                return str(parent)
+                            parent = parent.parent
+            
+            # Try 3: Fallback to workspace folder
+            if 'SHYPN_WORKSPACE' in os.environ:
+                return os.environ['SHYPN_WORKSPACE']
+            
+            print("Warning: Could not determine project folder for auto-save")
+            return None
+            
+        except Exception as e:
+            print(f"Error getting project folder: {e}")
+            return None

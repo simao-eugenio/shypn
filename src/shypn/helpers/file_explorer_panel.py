@@ -116,19 +116,32 @@ class FileExplorerPanel:
         This is display logic - how data is presented.
         The TreeView widget itself is defined in XML.
         """
-        # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
-        self.store = Gtk.TreeStore(str, str, str, bool, bool, int, str)
+        # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background, background_set
+        # Added background_set (bool) column to prevent GTK warnings for empty color strings
+        self.store = Gtk.TreeStore(str, str, str, bool, bool, int, str, bool)
         self.tree_view.set_model(self.store)
         self._apply_tree_view_css()
+        
+        # Clear any existing columns (from XML or previous configuration)
+        for col in self.tree_view.get_columns():
+            self.tree_view.remove_column(col)
+        
         name_column = Gtk.TreeViewColumn()
         name_column.set_title('Name')
         name_column.set_expand(True)
         name_column.set_sort_column_id(1)
         name_column.set_resizable(True)
         icon_renderer = Gtk.CellRendererPixbuf()
+        # Set default background property to None to avoid empty string parsing
+        icon_renderer.set_property('cell-background-set', False)
         name_column.pack_start(icon_renderer, False)
         name_column.add_attribute(icon_renderer, 'icon-name', 0)
+        # Add background attributes to icon renderer to prevent GTK warnings
+        name_column.add_attribute(icon_renderer, 'cell-background', 6)
+        name_column.add_attribute(icon_renderer, 'cell-background-set', 7)
         text_renderer = Gtk.CellRendererText()
+        # Set default background property to None to avoid empty string parsing
+        text_renderer.set_property('cell-background-set', False)
         text_renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
         text_renderer.set_property('editable', False)
         text_renderer.connect('edited', self._on_cell_edited)
@@ -137,7 +150,8 @@ class FileExplorerPanel:
         name_column.add_attribute(text_renderer, 'text', 1)
         # Add styling attributes for projects (bold text, darker background)
         name_column.add_attribute(text_renderer, 'weight', 5)  # Font weight
-        name_column.add_attribute(text_renderer, 'background', 6)  # Background color
+        name_column.add_attribute(text_renderer, 'cell-background', 6)  # Background color
+        name_column.add_attribute(text_renderer, 'cell-background-set', 7)  # Only apply if True
         self.text_renderer = text_renderer
         self.tree_view.append_column(name_column)
         
@@ -503,7 +517,8 @@ class FileExplorerPanel:
         for entry in entries:
             is_project, display_name = self._check_if_project(entry['path'], entry['is_directory'], entry['name'])
             weight = 700 if is_project else 400  # Bold for projects
-            bg_color = '#e8e8e8' if is_project else None  # Darker background for projects
+            bg_color = '#e8e8e8' if is_project else 'white'  # Darker background for projects
+            bg_set = is_project  # Only set background for projects
             self.store.append(None, [
                 entry['icon_name'], 
                 display_name,  # Use display name (alias)
@@ -511,7 +526,8 @@ class FileExplorerPanel:
                 entry['is_directory'],
                 is_project,
                 weight,
-                bg_color
+                bg_color,
+                bg_set
             ])
     
     def _check_if_project(self, path: str, is_directory: bool, name: str):
@@ -576,12 +592,13 @@ class FileExplorerPanel:
                 icon = self.explorer._get_icon_name(name, True)
                 is_project, display_name = self._check_if_project(path, True, name)
                 weight = 700 if is_project else 400  # Bold for projects
-                bg_color = None  # No background color for directories
-                dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color])
+                bg_color = 'white'  # Background color (unused if bg_set=False)
+                bg_set = False  # No background color for directories
+                dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color, bg_set])
                 self._load_directory_tree(path, dir_iter)
             for name, path in files:
                 icon = self.explorer._get_icon_name(name, False)
-                self.store.append(parent_iter, [icon, name, path, False, False, 400, None])
+                self.store.append(parent_iter, [icon, name, path, False, False, 400, 'white', False])
         except PermissionError:
             if self.explorer.on_error:
                 self.explorer.on_error(f'Permission denied: {directory}')
@@ -938,7 +955,7 @@ class FileExplorerPanel:
         temp_name = 'new_file.shy'
         temp_path = os.path.join(parent_dir, temp_name)
         # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
-        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, False, False, 400, None])
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, False, False, 400, 'white', False])
         tree_path = self.store.get_path(new_iter)
         if parent_iter:
             self.tree_view.expand_to_path(tree_path)
@@ -961,7 +978,7 @@ class FileExplorerPanel:
         temp_name = 'New Folder'
         temp_path = os.path.join(parent_dir, temp_name)
         # TreeStore columns: icon, display_name, full_path, is_directory, is_project, weight, background
-        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, True, False, 400, None])
+        new_iter = self.store.append(parent_iter, [icon_name, temp_name, temp_path, True, False, 400, 'white', False])
         tree_path = self.store.get_path(new_iter)
         if parent_iter:
             self.tree_view.expand_to_path(tree_path)

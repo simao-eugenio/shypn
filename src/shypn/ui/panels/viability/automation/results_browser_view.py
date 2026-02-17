@@ -13,12 +13,14 @@ Date: January 22, 2026 (Refactored to BaseResultsView)
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+import os
 import matplotlib
 matplotlib.use('GTK3Agg')
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 from .base_results_view import BaseResultsView
+from shypn.data.project_models import get_project_manager
 
 
 class ResultsBrowserView(BaseResultsView):
@@ -1560,12 +1562,6 @@ class ResultsBrowserView(BaseResultsView):
             name (str): Experiment name
             result (dict): Results dictionary from BatchExecutor
         """
-        # Debug: Show what's in the result
-        has_metadata = 'metadata' in result
-        metadata_type = type(result.get('metadata')).__name__ if has_metadata else 'None'
-        print(f"📊 Adding result '{name}' - Keys: {list(result.keys())}")
-        print(f"   Metadata present: {has_metadata}, Type: {metadata_type}")
-        
         # Inject name into result data for display_result
         result_with_name = result.copy()
         result_with_name['name'] = name
@@ -1915,7 +1911,7 @@ class ResultsBrowserView(BaseResultsView):
         # Choose directory for batch export
         dialog = Gtk.FileChooserDialog(
             title="Choose Directory for Batch CSV Export",
-            parent=self.get_toplevel(),
+            transient_for=self.get_toplevel(),
             action=Gtk.FileChooserAction.SELECT_FOLDER
         )
         dialog.add_buttons(
@@ -1979,7 +1975,7 @@ class ResultsBrowserView(BaseResultsView):
         # Choose directory for batch export
         dialog = Gtk.FileChooserDialog(
             title="Choose Directory for Batch JSON Export",
-            parent=self.get_toplevel(),
+            transient_for=self.get_toplevel(),
             action=Gtk.FileChooserAction.SELECT_FOLDER
         )
         dialog.add_buttons(

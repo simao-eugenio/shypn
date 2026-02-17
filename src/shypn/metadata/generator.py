@@ -94,7 +94,9 @@ class SweepHeaderGenerator:
                 self.header.add_section(section)
             except Exception as e:
                 # Skip section if collection fails (may be optional)
-                print(f"Warning: Failed to collect {section_class.__name__}: {e}")
+                # Suppress verbose warnings for expected skips (e.g., ModelMetadata for snapshots)
+                if "skipped" not in str(e).lower():
+                    print(f"Warning: Failed to collect {section_class.__name__}: {e}")
         
         return self.header
     

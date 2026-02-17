@@ -24,14 +24,18 @@ class ModelMetadata(MetadataSection):
         Collect model metadata from context.
         
         Expected context keys:
-            - model_path: Path to .shy file
+            - model_path: Path to .shy file (None for experiment snapshots)
             - model: Loaded model dictionary
         """
         model_path = context.get('model_path')
         model = context.get('model')
         
-        if not model_path or not model:
-            raise ValueError("Context must contain 'model_path' and 'model'")
+        # Skip ModelMetadata for experiment snapshots (no source file)
+        if not model_path:
+            raise ValueError("ModelMetadata skipped: no source file (experiment snapshot)")
+        
+        if not model:
+            raise ValueError("Context must contain 'model'")
         
         # Basic identification
         path = Path(model_path)

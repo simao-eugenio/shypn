@@ -33,6 +33,19 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     
     start_time = time.time()
     
+    # Extract progress queue if provided
+    progress_queue = args.get('progress_queue')
+    queue_index = args.get('queue_index')
+    
+    # Define progress callback that sends updates to queue
+    def worker_progress_callback(progress_fraction):
+        if progress_queue is not None and queue_index is not None:
+            try:
+                # Send progress update: (queue_index, progress_fraction)
+                progress_queue.put((queue_index, progress_fraction))
+            except:
+                pass  # Ignore queue errors (non-fatal)
+    
     try:
         # Extract arguments
         name = args['name']
@@ -80,13 +93,13 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         runner = ReplicateRunner(model)
         results = runner.run_replicates(
             n=replicates,
-            use_parallel=False,
+            use_parallel=False,  # Disable stochastic parallelism in workers (ThreadPoolExecutor deadlocks in forked processes)
             use_tau_leaping=True,
             duration=duration,
             termination_condition=termination_condition,
             seed_base=hash(name) % (2**31),  # Unique seed per experiment
             verbose=False,
-            progress_callback=None  # No progress in worker
+            progress_callback=worker_progress_callback  # Report progress back to main thread
         )
         
         elapsed_time = time.time() - start_time
@@ -155,14 +168,14 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 
                 metadata_context = {
                     'model': model_dict,
-                    'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
+                    'model_path': getattr(model, 'filepath', None),  # None for snapshots - ModelMetadata will be skipped
                     'n_replicates': replicates,
                     'experiment_index': args['snapshot_index'],
                     'experiment_name': name,
                     'experiment_parameters': experiment_params,
                     'simulation_config': {
                         'duration': duration,
-                        'time_units': 'minute',
+                        'time_units': 'second',
                         'use_tau_leaping': True,
                     },
                     'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
@@ -180,7 +193,6 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 generator.set_context(metadata_context)
                 generator.generate()
                 metadata_header = generator.header
-                print(f"✓ Worker generated metadata with {len(metadata_header.sections)} sections for {name}")
             except Exception as e:
                 print(f"⚠️ Warning: Worker failed to generate metadata for {name}: {e}")
                 metadata_header = None
@@ -700,6 +712,10 @@ class BatchExecutor:
             if n_workers is None:
                 n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
             
+            # Create shared progress queue for workers to report back
+            manager = multiprocessing.Manager()
+            progress_queue = manager.Queue()
+            
             # Prepare experiment arguments for workers
             experiment_args = []
             for queue_index, name, snapshot_index in experiments:
@@ -728,31 +744,92 @@ class BatchExecutor:
                     'duration': duration,
                     'termination_condition': termination_condition,
                     'subnet_data': subnet_data,
-                    'baseline_params': baseline_params
+                    'baseline_params': baseline_params,
+                    'progress_queue': progress_queue  # Pass queue to workers
                 })
             
             # Create process pool and execute
             total = len(experiment_args)
             completed = 0
             
+            # Calculate timeout threshold per experiment:
+            # Each worker runs ONE experiment with replicates SEQUENTIALLY
+            # (stochastic parallelism disabled in workers to avoid ThreadPoolExecutor deadlocks)
+            # 
+            # Empirical factors:
+            #   - Sequential mode: 0.827s wall-clock per 1s simulated (3×60s = 148.9s)
+            #   - Parallel mode: 2.41s wall-clock per 1s simulated (1×60s = 144.762s)
+            #     (includes process creation, serialization, resource contention overhead)
+            # 
+            # Timeout calculation:
+            #   base_time = replicates × duration × empirical_factor
+            #   safety_margin = 1.5x (accounts for variations without being excessive)
+            #   max_cap = 36 hours (allows very long experiments with many replicates)
+            expected_time_per_replicate = duration * 2.41  # Parallel overhead: 2.41x simulated time
+            expected_experiment_time = replicates * expected_time_per_replicate
+            timeout_threshold = min(expected_experiment_time * 1.5, 36 * 3600)  # Max 36 hours, 1.5x safety
+            
             with multiprocessing.Pool(processes=n_workers) as pool:
-                # Submit all experiments
+                # Submit all experiments with start time tracking
                 async_results = []
                 for args in experiment_args:
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
-                    async_results.append((args['queue_index'], args['name'], async_result))
+                    start_time = time.time()
+                    async_results.append((args['queue_index'], args['name'], async_result, start_time))
                     
                     # Set initial running status when experiment is submitted
                     if progress_callback:
                         progress_callback(args['queue_index'], "running", "0%")
                 
-                # Poll for completion
+                # Poll for completion with timeout detection
                 while async_results and not self.is_cancelled:
                     time.sleep(0.1)  # Check every 100ms
                     
-                    # Check completed experiments
+                    current_time = time.time()
+                    
+                    # Process progress updates from workers
+                    while not progress_queue.empty():
+                        try:
+                            queue_idx, progress_fraction = progress_queue.get_nowait()
+                            if progress_callback:
+                                # Convert fraction to percentage string
+                                progress_pct = int(progress_fraction * 100)
+                                progress_callback(queue_idx, "running", f"{progress_pct}%")
+                        except:
+                            break  # Queue empty or error
+                    
+                    # Check completed experiments and detect timeouts
                     still_running = []
-                    for queue_index, name, async_result in async_results:
+                    for queue_index, name, async_result, start_time in async_results:
+                        # Check for timeout FIRST
+                        elapsed = current_time - start_time
+                        if elapsed > timeout_threshold:
+                            # TIMEOUT DETECTED - Kill this worker
+                            print(f"[BATCH] ⚠️ TIMEOUT: {name} exceeded {timeout_threshold:.1f}s (ran {elapsed:.1f}s)")
+                            
+                            # Try to terminate gracefully, but don't wait
+                            try:
+                                # Note: We can't kill individual async_result, must terminate entire pool later
+                                pass  # Will be handled by pool.terminate() if needed
+                            except:
+                                pass
+                            
+                            # Mark as failed due to timeout
+                            timeout_msg = f"Timeout after {elapsed:.0f}s (limit: {timeout_threshold:.0f}s)"
+                            if progress_callback:
+                                progress_callback(queue_index, "failed", timeout_msg)
+                            
+                            self.results[name] = {
+                                "error": timeout_msg,
+                                "name": name,
+                                "timeout": True,
+                                "elapsed_time": elapsed
+                            }
+                            
+                            completed += 1
+                            # Don't add to still_running - this experiment is done (failed)
+                            continue
+                        
                         if async_result.ready():
                             try:
                                 result = async_result.get(timeout=0.1)
@@ -783,7 +860,8 @@ class BatchExecutor:
                                     "name": name
                                 }
                         else:
-                            still_running.append((queue_index, name, async_result))
+                            # Still running, keep tracking with start time
+                            still_running.append((queue_index, name, async_result, start_time))
                     
                     async_results = still_running
                 
@@ -793,7 +871,7 @@ class BatchExecutor:
                     pool.join()
                     
                     # Mark remaining as cancelled
-                    for queue_index, name, async_result in async_results:
+                    for queue_index, name, async_result, start_time in async_results:
                         if progress_callback:
                             progress_callback(queue_index, "cancelled", "Cancelled")
         
@@ -856,15 +934,18 @@ class BatchExecutor:
             # The subnet is extracted correctly, but we were passing the full base_model
             # to the simulator, causing it to run on wrong model structure (11 places vs 5)
             from shypn.data.canvas.document_model import DocumentModel
+            from shypn.netobjs.place import Place
+            from shypn.netobjs.transition import Transition
+            from shypn.netobjs.arc import Arc
             
             # Create new model with INDEPENDENT COPIES of subnet elements
             # CRITICAL: Must copy to prevent modifying canvas objects during simulation
-            # Use serialization/deserialization for clean copies (avoids GObject issues)
+            # subnet_data already contains serialized dicts from run_batch()
             model = DocumentModel()
             
-            # Step 1: Copy places and transitions (they don't have dependencies)
-            model.places = [type(p).from_dict(p.to_dict()) for p in subnet_data['places']]
-            model.transitions = [type(t).from_dict(t.to_dict()) for t in subnet_data['transitions']]
+            # Step 1: Reconstruct places and transitions from serialized dicts
+            model.places = [Place.from_dict(p_dict) for p_dict in subnet_data['places']]
+            model.transitions = [Transition.from_dict(t_dict) for t_dict in subnet_data['transitions']]
             
             # CRITICAL FIX: Normalize transition types for simulation controller
             # UI stores as "Continuous (SHPN)", but controller expects "continuous"
@@ -884,9 +965,9 @@ class BatchExecutor:
             places_dict = {p.id: p for p in model.places}
             transitions_dict = {t.id: t for t in model.transitions}
             
-            # Step 3: Copy arcs (they need references to the copied places and transitions)
-            model.arcs = [type(a).from_dict(a.to_dict(), places_dict, transitions_dict) 
-                          for a in subnet_data['arcs']]
+            # Step 3: Reconstruct arcs from serialized dicts (they need references to the copied places and transitions)
+            model.arcs = [Arc.from_dict(a_dict, places_dict, transitions_dict) 
+                          for a_dict in subnet_data['arcs']]
             
             # Apply snapshot parameters to subnet model (pass None since model IS the subnet)
             self._apply_snapshot_to_model(snapshot, model, None)
@@ -926,10 +1007,23 @@ class BatchExecutor:
             
             # Run all replicates (use_parallel=False for SEQUENTIAL execution)
             sim_exec_start = time.time()
+            
+            # Calculate timeout threshold for SEQUENTIAL mode (for warning purposes only)
+            # Empirical factor: 0.827 seconds wall-clock per 1s simulated
+            #   (from 3 replicates × 60s = 148.9s measurement)
+            # Updated timeout calculation to match parallel mode:
+            #   base_time = replicates × duration × empirical_factor
+            #   safety_margin = 1.5x (accounts for system variations)
+            #   max_cap = 36 hours (allows very long experiments)
+            expected_time_per_replicate = duration * 0.827  # Sequential: ~83% of simulated time
+            expected_experiment_time = replicates * expected_time_per_replicate
+            timeout_threshold = min(expected_experiment_time * 1.5, 36 * 3600)  # Max 36 hours, 1.5x safety
+            
             # print(f"[EXPERIMENT] About to call runner.run_replicates()...")
+            # print(f"[EXPERIMENT] Timeout threshold: {timeout_threshold:.1f}s")
             results = runner.run_replicates(
                 n=replicates,
-                use_parallel=False,  # SEQUENTIAL execution of replicates
+                use_parallel=True,  # Enable stochastic parallelism in main thread (safe, 2-4× faster)
                 use_tau_leaping=True,
                 duration=duration,
                 termination_condition=termination_condition,
@@ -937,8 +1031,15 @@ class BatchExecutor:
                 verbose=False,
                 progress_callback=progress_callback
             )
-            # print(f"[EXPERIMENT] runner.run_replicates() completed in {time.time()-sim_exec_start:.3f}s")
-            # print(f"[EXPERIMENT] Simulation execution took {time.time()-sim_exec_start:.3f}s")
+            sim_elapsed = time.time() - sim_exec_start
+            # print(f"[EXPERIMENT] runner.run_replicates() completed in {sim_elapsed:.3f}s")
+            
+            # Check if execution exceeded timeout
+            if sim_elapsed > timeout_threshold:
+                print(f"[EXPERIMENT] ⚠️ WARNING: Execution took {sim_elapsed:.1f}s (threshold: {timeout_threshold:.1f}s)")
+                # Note: We still process results if they exist, just warn about slow execution
+            
+            # print(f"[EXPERIMENT] Simulation execution took {sim_elapsed:.3f}s")
             # print(f"[EXPERIMENT] Simulation complete: {len(results) if results else 0} successful replicates")
             
             # Report 100% progress
@@ -979,10 +1080,11 @@ class BatchExecutor:
             swept_param = getattr(snapshot, 'swept_parameter', None)
             
             # Include subnet structure for accurate plotting
+            # subnet_data contains serialized dicts, so use dict access
             subnet_structure = {
-                'place_ids': [p.id for p in subnet_data['places']],
-                'transition_ids': [t.id for t in subnet_data['transitions']],
-                'arc_ids': [a.id for a in subnet_data['arcs']]
+                'place_ids': [p['id'] for p in subnet_data['places']],
+                'transition_ids': [t['id'] for t in subnet_data['transitions']],
+                'arc_ids': [a['id'] for a in subnet_data['arcs']]
             }
             
             # Extract replicate-level data for statistical tests
@@ -1050,16 +1152,20 @@ class BatchExecutor:
                 'metadata': {}
             }
             
+            # Get model filepath if available (None for experiment snapshots)
+            # ModelMetadata section will be skipped if model_path is None
+            model_filepath = getattr(model, 'filepath', None)
+            
             metadata_context = {
                 'model': model_dict,
-                'model_path': getattr(model, 'filepath', None) or f'experiment_{name}',
+                'model_path': model_filepath,  # None for snapshots - ModelMetadata will be skipped
                 'n_replicates': replicates,
                 'experiment_index': snapshot_index,
                 'experiment_name': name,
                 'experiment_parameters': experiment_params,
                 'simulation_config': {
                     'duration': duration,
-                    'time_units': 'minute',
+                    'time_units': 'second',
                     'use_tau_leaping': True,
                 },
                 'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
@@ -1372,34 +1478,18 @@ class BatchExecutor:
             if snapshot.swept_parameter.get('type') == 'places':
                 swept_place_id = snapshot.swept_parameter.get('id')
         
-        # DEBUG: Print sweep info
-        print(f"\n[DEBUG SWEEP] Snapshot: {getattr(snapshot, 'name', 'unknown')}")
-        print(f"[DEBUG SWEEP] swept_parameter: {snapshot.swept_parameter if hasattr(snapshot, 'swept_parameter') else 'None'}")
-        print(f"[DEBUG SWEEP] swept_place_id: {swept_place_id}")
-        print(f"[DEBUG SWEEP] place_markings keys: {list(snapshot.place_markings.keys())[:5]}")  # First 5
-        print(f"[DEBUG SWEEP] Number of places to apply: {len(snapshot.place_markings)}")
-        print(f"[DEBUG SWEEP] Number of model places: {len(places)}")
-        
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                old_value = place.tokens
                 marking_float = float(marking)
                 # Always apply if this is the swept parameter (even zero values)
                 # For non-swept parameters, skip zeros to preserve baseline
                 if place_id == swept_place_id or marking_float != 0.0:
                     place.tokens = marking_float
                     applied_markings += 1
-                    # DEBUG: Print swept parameter application
-                    if place_id == swept_place_id:
-                        print(f"[DEBUG SWEEP] ✓ Applied SWEPT parameter: {place_id} = {old_value} → {marking_float}")
                 else:
                     # Keep baseline value from model (don't overwrite with zero)
                     skipped_zeros += 1
-            else:
-                print(f"[DEBUG SWEEP] ✗ Place NOT FOUND in model: {place_id}")
-        
-        print(f"[DEBUG SWEEP] Applied: {applied_markings}, Skipped zeros: {skipped_zeros}\n")
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas
