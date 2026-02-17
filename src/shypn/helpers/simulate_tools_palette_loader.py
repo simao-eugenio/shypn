@@ -1360,13 +1360,14 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 else:
                     print(f"✓ Batch complete: {successful}/{n_replicates} successful in {total_time:.1f}s")
                 
-                # Auto-save results
-                try:
-                    results_folder = self._save_batch_results(results, recorded_objects, n_replicates)
-                except Exception as save_error:
-                    print(f"⚠️ Failed to save results: {save_error}")
-                    import traceback
-                    traceback.print_exc()
+                # Auto-save DISABLED - was causing UI freeze
+                # Results remain in memory for manual export via Analyses panel if needed
+                # try:
+                #     results_folder = self._save_batch_results(results, recorded_objects, n_replicates)
+                # except Exception as save_error:
+                #     print(f"⚠️ Failed to save results: {save_error}")
+                #     import traceback
+                #     traceback.print_exc()
                 
                 # Re-enable buttons on main thread
                 GLib.idle_add(self._update_button_states, False, True)

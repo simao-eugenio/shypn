@@ -1309,6 +1309,14 @@ class SimulationController:
         Returns:
             bool: True if any transition fired/integrated, False if deadlocked/complete
         """
+        # DIAGNOSTIC: Log step entry (reduced verbosity)
+        if not hasattr(self, '_step_count'):
+            self._step_count = 0
+        self._step_count += 1
+        # Only log first step and every 1000 steps
+        if self._step_count == 1 or self._step_count % 1000 == 0:
+            print(f"🔍 [STEP {self._step_count}] t={self.time:.3f}s", flush=True)
+        
         # Use effective dt if not specified
         if time_step is None:
             time_step = self.get_effective_dt()
@@ -1533,9 +1541,6 @@ class SimulationController:
                         if mode == 'continuous':
                             continuous_transitions.append(t)
         
-        # DIAGNOSTIC: Log continuous phase
-        adaptive_in_continuous = [t.name for t in continuous_transitions if t.transition_type == 'adaptive']
-        
         continuous_enabled = []
         for transition in continuous_transitions:
             behavior = self._get_behavior(transition)
@@ -1586,11 +1591,6 @@ class SimulationController:
                             listener_obj.on_transition_fired(transition, self.time, details)
         
         # NOTE: Time advancement moved to AFTER stochastic phase (see below)
-        # to prevent double advancement when tau-leaping is used
-        
-        # Update enablement states at current time
-        self._update_enablement_states()
-        
         # Handle timed and stochastic transitions with PRIORITY RULE:
         # Timed (deterministic) has PRIORITY over Stochastic (probabilistic)
         # Only fire stochastic if NO timed transitions can fire
@@ -1621,9 +1621,8 @@ class SimulationController:
             enabled_stochastic = []
             for t in stochastic_transitions:
                 behavior = self._get_behavior(t)
-                # Check structural enabling: sufficient tokens for input arcs
-                structurally_enabled = True
                 input_arcs = behavior.get_input_arcs()
+                structurally_enabled = True
                 for arc in input_arcs:
                     # Skip non-consuming arcs (test arcs only)
                     # Inhibitor arcs DO consume, so check their tokens
@@ -1688,7 +1687,6 @@ class SimulationController:
                         if hasattr(t, 'transition_type')
                     )
                     
-                    # DIAGNOSTIC: Log hybrid detection
                     if is_pure_stochastic:
                         # Pure stochastic: tau-leaping controls time stepping
                         # Temporarily disable time advancement in tau-leaping (we'll handle it)
@@ -1750,12 +1748,6 @@ class SimulationController:
         # Conservation must emerge naturally from Petri net arc connections.
         # Test arcs, inhibitor arcs, and other non-consuming arcs change the
         # expected mass balance. Artificial token adjustments violate formalism.
-        # Tokens should only flow through place→transition→place connections.
-        # 
-        # if self.conservation_enforcer and self.conservation_enforcer.conservation_groups:
-        #     violations = self.conservation_enforcer.verify_and_correct()
-        #     if violations and self.verbose:
-        #         # Log only first few violations to avoid spam
         #         if not hasattr(self, '_conservation_violation_count'):
         #             self._conservation_violation_count = 0
         #         if self._conservation_violation_count < 5:
@@ -1791,6 +1783,7 @@ class SimulationController:
         # 
         # Previous logic would return False when no transitions could fire,
         # causing premature simulation termination with only 1-2 data points
+        
         return True
 
     def _find_enabled_transitions(self) -> List:
@@ -1802,14 +1795,6 @@ class SimulationController:
         to satisfy the arc weights.
         
         Returns:
-            List of enabled Transition objects
-        """
-        return self._viability_checker.get_enabled_transitions()
-    
-    # ==================== Transition State Management ====================
-
-    def _is_transition_enabled(self, transition) -> bool:
-        """Check if a specific transition is enabled using behavior dispatch.
         
         REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
         
