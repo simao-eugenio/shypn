@@ -213,8 +213,19 @@ class ExperimentAutomationCategory:
                     # Column 0 = ID (internal), Column 1 = Name (display)
                     transition_id = store.get_value(iter, 0)
                     transition_name = store.get_value(iter, 1)
+                    # Column 4 = transition type (immediate, stochastic, continuous, adaptive, timed)
+                    try:
+                        transition_type = store.get_value(iter, 4)
+                    except:
+                        transition_type = 'stochastic'  # Fallback
+                    
                     if transition_id and transition_name:
-                        params.append((transition_name, transition_id))
+                        # Transition properties: rate (always), volume_threshold (if adaptive)
+                        params.append((f"{transition_name} (Rate)", f"{transition_id}.rate"))
+                        
+                        if transition_type == 'adaptive':
+                            params.append((f"{transition_name} (Volume Threshold)", f"{transition_id}.volume_threshold"))
+                    
                     iter = store.iter_next(iter)
         
         elif param_type == 'places':
@@ -227,7 +238,8 @@ class ExperimentAutomationCategory:
                     place_id = store.get_value(iter, 0)
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
-                        params.append((place_name, place_id))
+                        # Places: Only initial_marking property
+                        params.append((f"{place_name}", f"{place_id}.initial_marking"))
                     iter = store.iter_next(iter)
         
         elif param_type == 'arcs':
@@ -240,12 +252,23 @@ class ExperimentAutomationCategory:
                     arc_id = store.get_value(iter, 0)
                     source_id = store.get_value(iter, 1)
                     target_id = store.get_value(iter, 2)
+                    # Column 6 = arc_type (normal, inhibitor, test)
+                    try:
+                        arc_type = store.get_value(iter, 6)
+                    except:
+                        arc_type = 'normal'
                     
                     # Construct display name from source/target names (lookup if needed)
                     # For now, use IDs for arcs since they don't have independent names
                     if arc_id:
                         arc_name = f"{source_id}→{target_id}"
-                        params.append((arc_name, arc_id))
+                        
+                        # Arc properties: weight (always), threshold (if inhibitor/test)
+                        params.append((f"{arc_name} (Weight)", f"{arc_id}.weight"))
+                        
+                        if arc_type in ['inhibitor', 'test']:
+                            params.append((f"{arc_name} (Threshold)", f"{arc_id}.threshold"))
+                    
                     iter = store.iter_next(iter)
         
         # Update sweep builder with actual parameters (name/ID pairs)

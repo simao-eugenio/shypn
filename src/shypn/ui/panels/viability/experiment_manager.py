@@ -37,6 +37,11 @@ class ExperimentSnapshot:
         self.is_stale = False         # True if tables modified after capture
         self.swept_parameter = None   # {type: 'places'|'transitions'|'arcs', id: str, name: str} or None
         
+        # New: Generic property overrides (property path → value)
+        # Takes precedence over legacy dicts (place_markings, transition_rates, arc_weights)
+        # Format: {"P1.initial_marking": 100.0, "T5.volume_threshold": 1.0, "A3.threshold": 50.0}
+        self.property_overrides = {}  # {property_path: value}
+        
     def capture_from_treeviews(self, places_store, transitions_store, arcs_store):
         """Read current parameter values from existing TreeViews.
         
@@ -118,7 +123,8 @@ class ExperimentSnapshot:
             'arc_weights': self.arc_weights,
             'transition_rates': self.transition_rates,
             'timestamp': self.timestamp,
-            'notes': self.notes
+            'notes': self.notes,
+            'property_overrides': self.property_overrides  # New: generic property storage
         }
     
     @classmethod
@@ -137,6 +143,7 @@ class ExperimentSnapshot:
         snapshot.transition_rates = data.get('transition_rates', {})
         snapshot.timestamp = data.get('timestamp', datetime.now().isoformat())
         snapshot.notes = data.get('notes', '')
+        snapshot.property_overrides = data.get('property_overrides', {})  # New: load property overrides
         return snapshot
     
     def __repr__(self):
