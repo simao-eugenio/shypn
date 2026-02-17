@@ -220,9 +220,10 @@ class ExperimentAutomationCategory:
                         transition_type = 'stochastic'  # Fallback
                     
                     if transition_id and transition_name:
-                        # Transition properties: rate (always), volume_threshold (if adaptive)
+                        # Add rate property for all transitions
                         params.append((f"{transition_name} (Rate)", f"{transition_id}.rate"))
                         
+                        # Add volume_threshold property only for adaptive transitions
                         if transition_type == 'adaptive':
                             params.append((f"{transition_name} (Volume Threshold)", f"{transition_id}.volume_threshold"))
                     
