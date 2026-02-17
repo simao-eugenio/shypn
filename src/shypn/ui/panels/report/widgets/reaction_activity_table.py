@@ -5,7 +5,7 @@ Displays transition (reaction) metrics in a sortable table with 7 columns.
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GObject
 from typing import List
 
 
@@ -30,15 +30,16 @@ class ReactionActivityTable(Gtk.ScrolledWindow):
         self.set_vexpand(True)
         
         # Create tree view with columns
+        # Use TYPE_INT64 for firing counts to handle tau-leaping large values (> int32 max)
         self.store = Gtk.ListStore(
-            str,   # 0: Transition ID
-            str,   # 1: Transition Name
-            str,   # 2: Type (stochastic/continuous)
-            int,   # 3: Firing Count
-            float, # 4: Average Rate
-            int,   # 5: Total Flux
-            float, # 6: Contribution %
-            str    # 7: Status
+            str,                # 0: Transition ID
+            str,                # 1: Transition Name
+            str,                # 2: Type (stochastic/continuous)
+            GObject.TYPE_INT64, # 3: Firing Count (large values in tau-leaping)
+            float,              # 4: Average Rate
+            GObject.TYPE_INT64, # 5: Total Flux (large values in tau-leaping)
+            float,              # 6: Contribution %
+            str                 # 7: Status
         )
         
         self.tree_view = Gtk.TreeView(model=self.store)

@@ -20,9 +20,14 @@ Date: December 7, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+import os
+import json
+from datetime import datetime
+from pathlib import Path
 
 from shypn.ui.category_frame import CategoryFrame
 from shypn.data.project_models import get_project_manager
+from shypn.helpers.batch_results_saver import BatchResultsSaver
 
 
 class ExperimentAutomationCategory:
@@ -91,32 +96,6 @@ class ExperimentAutomationCategory:
         self.content_box.set_margin_end(12)
         self.content_box.set_margin_top(6)
         self.content_box.set_margin_bottom(6)
-        
-        # === STAGE 3: QUICK RUN BUTTON ===
-        # Add Quick Run button at top for easy single-experiment execution
-        quick_run_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        quick_run_box.set_margin_bottom(8)
-        
-        self.quick_run_button = Gtk.Button(label="⚡ Quick Run (Current Baseline)")
-        self.quick_run_button.set_tooltip_text(
-            "Run single experiment with current baseline parameters\n"
-            "Faster alternative to manual toolbar for quick tests"
-        )
-        self.quick_run_button.get_style_context().add_class("suggested-action")
-        self.quick_run_button.connect("clicked", self._on_quick_run)
-        quick_run_box.pack_start(self.quick_run_button, False, False, 0)
-        
-        # Status label for quick run
-        self.quick_run_status = Gtk.Label(label="")
-        self.quick_run_status.set_halign(Gtk.Align.START)
-        quick_run_box.pack_start(self.quick_run_status, True, True, 0)
-        
-        self.content_box.pack_start(quick_run_box, False, False, 0)
-        
-        # Separator after quick run
-        sep_quick = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep_quick.set_margin_bottom(8)
-        self.content_box.pack_start(sep_quick, False, False, 0)
         
         # Build sweep builder content (Phase 2)
         self._build_placeholder_content()
@@ -220,171 +199,65 @@ class ExperimentAutomationCategory:
         if not self.parent_panel or not self.sweep_builder:
             return
         
-        # In factorial mode, load ALL parameter types at once
-        # In single mode, load only the selected type
-        if self.sweep_builder.design_mode == 'factorial':
-            # Collect all parameters from all types
-            all_params = []
-            
-            # Get transitions
+        # Both single and factorial modes use the selected parameter type
+        # This allows users to filter by transitions/places/arcs in both modes
+        param_type = self.sweep_builder.type_combo.get_active_id()
+        params = []
+        
+        if param_type == 'transitions':
+            # Get from transitions_store (TreeView data)
             if hasattr(self.parent_panel, 'transitions_store'):
                 store = self.parent_panel.transitions_store
                 iter = store.get_iter_first()
                 while iter:
+                    # Column 0 = ID (internal), Column 1 = Name (display)
                     transition_id = store.get_value(iter, 0)
                     transition_name = store.get_value(iter, 1)
                     if transition_id and transition_name:
-                        all_params.append((f"T: {transition_name}", transition_id))
+                        params.append((transition_name, transition_id))
                     iter = store.iter_next(iter)
-            
-            # Get places
+        
+        elif param_type == 'places':
+            # Get from places_store
             if hasattr(self.parent_panel, 'places_store'):
                 store = self.parent_panel.places_store
                 iter = store.get_iter_first()
                 while iter:
+                    # Column 0 = ID (internal), Column 1 = Name (display)
                     place_id = store.get_value(iter, 0)
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
-                        all_params.append((f"P: {place_name}", place_id))
+                        params.append((place_name, place_id))
                     iter = store.iter_next(iter)
-            
-            # Get arcs
+        
+        elif param_type == 'arcs':
+            # Get from arcs_store
             if hasattr(self.parent_panel, 'arcs_store'):
                 store = self.parent_panel.arcs_store
                 iter = store.get_iter_first()
                 while iter:
+                    # Column 0 = arc ID, Columns 1,2 = source/target IDs
                     arc_id = store.get_value(iter, 0)
                     source_id = store.get_value(iter, 1)
                     target_id = store.get_value(iter, 2)
+                    
+                    # Construct display name from source/target names (lookup if needed)
+                    # For now, use IDs for arcs since they don't have independent names
                     if arc_id:
                         arc_name = f"{source_id}→{target_id}"
-                        all_params.append((f"A: {arc_name}", arc_id))
+                        params.append((arc_name, arc_id))
                     iter = store.iter_next(iter)
-            
-            # Update factorial dropdown with all parameters
-            self.sweep_builder.set_available_parameters('all', all_params)
-            
+        
+        # Update sweep builder with actual parameters (name/ID pairs)
+        # This works for both single and factorial design modes
+        if params:
+            self.sweep_builder.set_available_parameters(param_type, params)
         else:
-            # Single parameter mode - use selected type only
-            param_type = self.sweep_builder.type_combo.get_active_id()
-            params = []
-            
-            if param_type == 'transitions':
-                # Get from transitions_store (TreeView data)
-                if hasattr(self.parent_panel, 'transitions_store'):
-                    store = self.parent_panel.transitions_store
-                    iter = store.get_iter_first()
-                    while iter:
-                        # Column 0 = ID (internal), Column 1 = Name (display)
-                        transition_id = store.get_value(iter, 0)
-                        transition_name = store.get_value(iter, 1)
-                        if transition_id and transition_name:
-                            params.append((transition_name, transition_id))
-                        iter = store.iter_next(iter)
-            
-            elif param_type == 'places':
-                # Get from places_store
-                if hasattr(self.parent_panel, 'places_store'):
-                    store = self.parent_panel.places_store
-                    iter = store.get_iter_first()
-                    while iter:
-                        # Column 0 = ID (internal), Column 1 = Name (display)
-                        place_id = store.get_value(iter, 0)
-                        place_name = store.get_value(iter, 1)
-                        if place_id and place_name:
-                            params.append((place_name, place_id))
-                        iter = store.iter_next(iter)
-            
-            elif param_type == 'arcs':
-                # Get from arcs_store
-                if hasattr(self.parent_panel, 'arcs_store'):
-                    store = self.parent_panel.arcs_store
-                    iter = store.get_iter_first()
-                    while iter:
-                        # Column 0 = arc ID, Columns 1,2 = source/target IDs
-                        arc_id = store.get_value(iter, 0)
-                        source_id = store.get_value(iter, 1)
-                        target_id = store.get_value(iter, 2)
-                        
-                        # Construct display name from source/target names (lookup if needed)
-                        # For now, use IDs for arcs since they don't have independent names
-                        if arc_id:
-                            arc_name = f"{source_id}→{target_id}"
-                            params.append((arc_name, arc_id))
-                        iter = store.iter_next(iter)
-            
-            # Update sweep builder with actual parameters (name/ID pairs)
-            if params:
-                self.sweep_builder.set_available_parameters(param_type, params)
-            else:
-                # Show helpful message if no subnet loaded
-                self.sweep_builder.set_available_parameters(param_type, [])
-                if hasattr(self.sweep_builder, 'name_combo'):
-                    self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
-                    self.sweep_builder.name_combo.set_active(0)
-    
-    def _on_quick_run(self, button):
-        """Handle Quick Run button - run single experiment with current baseline.
-        
-        Stage 3 feature: Provides fast single-experiment execution without
-        needing to use manual simulation toolbar. Creates one experiment
-        from current baseline and executes immediately.
-        
-        Respects locality selection: Only checked localities are included.
-        """
-        # Update status
-        self.quick_run_status.set_markup("<i>Running...</i>")
-        
-        # Check prerequisites
-        if not self.parent_panel or not hasattr(self.parent_panel, 'selected_localities'):
-            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
-            return
-        
-        if not self.parent_panel.selected_localities:
-            self.quick_run_status.set_markup("<span foreground='red'>✗ No subnet loaded</span>")
-            return
-        
-        # Check which localities are CHECKED (enabled) - only use those for Quick Run
-        enabled_localities = {}
-        for transition_id, data in self.parent_panel.selected_localities.items():
-            checkbox = data.get('checkbox')
-            if checkbox and checkbox.get_active():  # Only include checked localities
-                enabled_localities[transition_id] = data
-        
-        if not enabled_localities:
-            self.quick_run_status.set_markup("<span foreground='red'>✗ No localities checked</span>")
-            return
-        
-        # Ensure baseline exists
-        if len(self.experiment_manager.snapshots) == 0:
-            if self.parent_panel and hasattr(self.parent_panel, 'places_store'):
-                baseline = self.experiment_manager.add_snapshot("Baseline")
-                baseline.capture_from_treeviews(
-                    self.parent_panel.places_store,
-                    self.parent_panel.transitions_store,
-                    self.parent_panel.arcs_store
-                )
-        
-        # Create single experiment from baseline
-        baseline = self.experiment_manager.get_active_snapshot()
-        
-        # Get snapshot index for current baseline
-        snapshot_index = self.experiment_manager.active_index
-        
-        # Add single experiment to queue (don't clear - let user see it)
-        # add_experiment expects (name, snapshot_index) not a dict
-        self.queue_view.add_experiment("Quick Run", snapshot_index)
-        
-        # Ensure queue is visible
-        self.queue_view.show_all()
-        
-        # Run immediately
-        pending = self.queue_view.get_pending_experiments()
-        if pending:
-            self._on_queue_run(pending)
-            self.quick_run_status.set_markup("<span foreground='green'>✓ Running 1 experiment</span>")
-        else:
-            self.quick_run_status.set_markup("<span foreground='red'>✗ Failed to queue</span>")
+            # Show helpful message if no subnet loaded
+            self.sweep_builder.set_available_parameters(param_type, [])
+            if hasattr(self.sweep_builder, 'name_combo'):
+                self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
+                self.sweep_builder.name_combo.set_active(0)
     
     def _on_sweep_generate(self, config):
         """Handle parameter sweep generation (single or factorial).
@@ -583,10 +456,10 @@ class ExperimentAutomationCategory:
                 if text:
                     duration = float(text)
                     if duration <= 0:
-                        print(f"[WARNING] Duration is {duration}, using default 60.0")
+                        print(f"[WARNING] Duration is {duration}s, using default 60.0s")
                         duration = 60.0
             except Exception as e:
-                print(f"[WARNING] Failed to read duration: {e}, using default: {duration}")
+                print(f"[WARNING] Failed to read duration: {e}, using default: {duration}s")
         
         if hasattr(self.sweep_builder, 'termination_combo'):
             try:
@@ -599,6 +472,24 @@ class ExperimentAutomationCategory:
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
             use_parallel = self.queue_view.parallel_checkbox.get_active()
+        
+        # Calculate expected timeout based on execution mode and replicate count
+        # Sequential: 0.827s per simulated second (3×60s = 148.9s measurement)
+        # Parallel: 2.41s per simulated second (1×60s = 144.762s measurement)
+        #   - Parallel overhead: process creation, serialization, resource contention
+        # 
+        # IMPORTANT: Replicates run SEQUENTIALLY within each experiment (even in parallel batch mode)
+        # to avoid ThreadPoolExecutor deadlocks in forked processes.
+        # 
+        # Timeout calculation:
+        #   base_time = replicates × duration × empirical_factor
+        #   safety_margin = 1.5x (accounts for system variations without being excessive)
+        #   max_cap = 36 hours (allows very long experiments with many replicates)
+        empirical_factor = 2.41 if use_parallel else 0.827
+        base_timeout = replicates * duration * empirical_factor
+        safety_timeout = base_timeout * 1.5  # 1.5x safety margin
+        max_cap = 36 * 3600  # Maximum 36 hours
+        expected_timeout = min(safety_timeout, max_cap)
         
         # Clear pending updates tracking
         self._pending_updates.clear()
@@ -739,6 +630,9 @@ class ExperimentAutomationCategory:
     def _on_experiment_result(self, name: str, result: dict):
         """Handle individual experiment result (called as each experiment completes).
         
+        PHASE 3: Now includes auto-save functionality for experiment reproducibility.
+        Saves to: {project}/experiments/results/experiment_{name}_{timestamp}/
+        
         This allows incremental display of results without waiting for entire batch.
         Called from main thread via GLib.idle_add.
         
@@ -747,6 +641,7 @@ class ExperimentAutomationCategory:
             result: Result dictionary with statistics
         """
         
+        # Add to results browser (existing functionality)
         if self.results_browser:
             try:
                 self.results_browser.add_result(name, result)
@@ -754,6 +649,141 @@ class ExperimentAutomationCategory:
                 print(f"[ERROR] Failed to add result for '{name}': {e}")
                 import traceback
                 traceback.print_exc()
+        
+        # NEW: Auto-save experiment results (Phase 3 normalization)
+        try:
+            self._auto_save_experiment(name, result)
+        except Exception as e:
+            print(f"[WARNING] Failed to auto-save experiment '{name}': {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _auto_save_experiment(self, name: str, result: dict):
+        """Auto-save experiment results to disk (Phase 3 normalization).
+        
+        Saves to: {project}/experiments/results/experiment_{name}_{timestamp}/
+        
+        Creates:
+        - config.json: Experiment configuration and metadata
+        - statistics.json: Statistical summaries across replicates
+        - replicates.json: Per-replicate data (if available)
+        - metadata.txt: Human-readable metadata header
+        
+        Args:
+            name: Experiment name
+            result: Result dictionary with statistics and metadata
+        """
+        # Determine project folder
+        project_folder = self._get_project_folder()
+        if not project_folder:
+            print(f"[AUTO-SAVE] Warning: No project folder detected, skipping auto-save for '{name}'")
+            return
+        
+        # Create saver with experiments/results subfolder
+        saver = BatchResultsSaver(
+            base_path=project_folder,
+            subfolder='experiments/results',
+            batch_prefix='experiment'
+        )
+        
+        # Create timestamped folder
+        safe_name = name.replace(' ', '_').replace('/', '_')
+        batch_path = saver.create_batch_folder(name_suffix=safe_name)
+        
+        # Save configuration
+        config = {
+            'timestamp': saver.timestamp,
+            'experiment_name': name,
+            'snapshot_index': result.get('snapshot_index'),
+            'n_replicates': result.get('n_replicates', 0),
+            'duration': result.get('duration', 0),
+            'swept_parameter': result.get('swept_parameter'),
+            'subnet_structure': result.get('subnet_structure')
+        }
+        
+        config_path = batch_path / 'config.json'
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        # Save statistics
+        statistics = result.get('statistics', {})
+        stats_path = batch_path / 'statistics.json'
+        with open(stats_path, 'w') as f:
+            json.dump(statistics, f, indent=2)
+        
+        # Save per-replicate data if available
+        replicate_data = result.get('replicate_data', [])
+        if replicate_data:
+            replicates_path = batch_path / 'replicates.json'
+            with open(replicates_path, 'w') as f:
+                json.dump(replicate_data, f, indent=2)
+        
+        # Save trajectory summary
+        trajectory_summary = result.get('trajectory_summary', [])
+        if trajectory_summary:
+            summary_path = batch_path / 'trajectory_summary.json'
+            with open(summary_path, 'w') as f:
+                json.dump(trajectory_summary, f, indent=2)
+        
+        # Save metadata header if available
+        metadata = result.get('metadata')
+        if metadata:
+            try:
+                # Convert metadata header to text
+                if hasattr(metadata, 'to_header_text'):
+                    header_text = metadata.to_header_text()
+                elif hasattr(metadata, 'sections'):
+                    # Manual conversion from sections
+                    lines = []
+                    lines.append("# " + "="*76)
+                    lines.append("# SHYPN EXPERIMENT METADATA")
+                    lines.append(f"# Generated: {datetime.now().isoformat()}Z")
+                    lines.append("# " + "="*76)
+                    lines.append("#")
+                    for section in metadata.sections:
+                        lines.append(f"# [{section.name}]")
+                        for key, value in section.data.items():
+                            lines.append(f"# {key}: {value}")
+                        lines.append("#")
+                    header_text = "\n".join(lines)
+                else:
+                    header_text = f"# Metadata: {str(metadata)}\n"
+                
+                metadata_path = batch_path / 'metadata.txt'
+                with open(metadata_path, 'w') as f:
+                    f.write(header_text)
+            except Exception as e:
+                print(f"[AUTO-SAVE] Warning: Failed to save metadata: {e}")
+    
+    def _get_project_folder(self) -> str:
+        """Get current project folder path for auto-save.
+        
+        Uses event-driven architecture: parent_panel.model is updated via
+        document.focused events, avoiding tight coupling with model_canvas.
+        
+        Returns:
+            Project folder path, or None if not in a project
+         """
+        # Try to get from project manager
+        project_manager = get_project_manager()
+        if project_manager.current_project:
+            return project_manager.current_project.base_path
+        
+        # Try to get from parent panel's model (updated via EventBus)
+        if self.parent_panel and hasattr(self.parent_panel, 'model'):
+            model = self.parent_panel.model
+            if model and hasattr(model, 'filepath') and model.filepath:
+                # Extract project folder from model path
+                model_path = Path(model.filepath)
+                # Look for 'projects' folder in path
+                parts = model_path.parts
+                if 'projects' in parts:
+                    projects_idx = parts.index('projects')
+                    if projects_idx + 1 < len(parts):
+                        # Return path up to and including project name
+                        return str(Path(*parts[:projects_idx + 2]))
+        
+        return None
     
     def _on_batch_complete(self, cancelled=False):
         """Handle batch execution completion.

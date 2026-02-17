@@ -136,6 +136,7 @@ dev/
 # User workspace (except Biochemical-Examples)
 workspace/projects/My_Project/
 workspace/projects/thesis/
+workspace/projects/gata/
 workspace/projects/*.json
 !workspace/projects/Biochemical-Examples/
 

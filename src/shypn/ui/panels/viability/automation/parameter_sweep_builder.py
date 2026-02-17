@@ -273,11 +273,11 @@ class ParameterSweepBuilder(Gtk.Box):
         self.replicates_entry.set_width_chars(8)
         sim_box.attach(self.replicates_entry, 1, 0, 1, 1)
         
-        sim_box.attach(Gtk.Label(label="Duration:", xalign=0), 2, 0, 1, 1)
+        sim_box.attach(Gtk.Label(label="Duration (s):", xalign=0), 2, 0, 1, 1)
         self.duration_entry = Gtk.Entry()
         self.duration_entry.set_text("60.0")
         self.duration_entry.set_width_chars(8)
-        self.duration_entry.set_tooltip_text("Maximum simulation time (can stop earlier if condition met)")
+        self.duration_entry.set_tooltip_text("Maximum simulation time in seconds (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
         
         # === STAGE 3: METHOD SELECTOR ===
@@ -401,13 +401,13 @@ class ParameterSweepBuilder(Gtk.Box):
                 self.parent_category.refresh_parameters()
         else:
             self.design_mode = 'factorial'
-            self.type_box.hide()  # Hide type selector in factorial mode (shows all types)
+            self.type_box.show()  # Keep type selector visible in factorial mode
             self.single_param_box.hide()
             # Unset no_show_all flag to allow showing
             self.factorial_box.set_no_show_all(False)
             self.factorial_box.show_all()  # show_all() to display all children
             
-            # Trigger parameter refresh to load ALL parameters in factorial mode
+            # Trigger parameter refresh to load selected type parameters in factorial mode
             if hasattr(self, 'parent_category') and self.parent_category:
                 self.parent_category.refresh_parameters()
     
@@ -612,7 +612,7 @@ class ParameterSweepBuilder(Gtk.Box):
             traceback.print_exc()
     
     def _on_preview_clicked(self, button):
-        """Preview experiment count based on current configuration."""
+        """Preview experiment count and estimated execution time."""
         try:
             # Check factorial design requirements
             if self.design_mode == 'factorial' and len(self.factorial_list) < 2:
@@ -626,9 +626,15 @@ class ParameterSweepBuilder(Gtk.Box):
             count = len(values)
             
             if count > 0:
-                self.preview_label.set_markup(
-                    f"<b>Preview:</b> {count} experiments will be generated"
-                )
+                # Calculate estimated execution time
+                time_estimate = self._calculate_time_estimate(count)
+                
+                # Format the preview message
+                preview_msg = f"<b>Preview:</b> {count} experiments will be generated"
+                if time_estimate:
+                    preview_msg += f" | <b>Estimated time:</b> {time_estimate}"
+                
+                self.preview_label.set_markup(preview_msg)
                 self.generate_button.set_sensitive(True)
             else:
                 self.preview_label.set_markup(
@@ -641,6 +647,67 @@ class ParameterSweepBuilder(Gtk.Box):
                 f"<span foreground='red'>Error: {str(e)}</span>"
             )
             self.generate_button.set_sensitive(False)
+    
+    def _calculate_time_estimate(self, experiment_count):
+        """Calculate estimated execution time for experiments.
+        
+        Args:
+            experiment_count: Number of experiments to run
+            
+        Returns:
+            str: Formatted time estimate (e.g., "2h 15m") or None if cannot calculate
+        """
+        try:
+            # Get replicates and duration
+            replicates = int(self.replicates_entry.get_text().strip() or "3")
+            duration = float(self.duration_entry.get_text().strip() or "60.0")
+            
+            # Get parallel execution setting from parent category's queue view
+            use_parallel = False
+            if (hasattr(self, 'parent_category') and self.parent_category and 
+                hasattr(self.parent_category, 'queue_view') and self.parent_category.queue_view):
+                queue_view = self.parent_category.queue_view
+                if hasattr(queue_view, 'parallel_checkbox'):
+                    use_parallel = queue_view.parallel_checkbox.get_active()
+            
+            # Use same empirical factors as in experiment_automation_category.py
+            # Sequential: 0.827s per simulated second
+            # Parallel: 2.41s per simulated second (includes multiprocessing overhead)
+            empirical_factor = 2.41 if use_parallel else 0.827
+            
+            # Calculate time per experiment (replicates run sequentially within each experiment)
+            time_per_experiment = replicates * duration * empirical_factor
+            
+            # Calculate total time based on execution mode
+            if use_parallel:
+                # Parallel mode: all experiments run simultaneously (limited by CPU cores)
+                # Estimate assumes sufficient cores; otherwise time will be proportionally higher
+                total_seconds = time_per_experiment
+            else:
+                # Sequential mode: experiments run one after another
+                total_seconds = time_per_experiment * experiment_count
+            
+            # Format the time estimate
+            hours = int(total_seconds // 3600)
+            minutes = int((total_seconds % 3600) // 60)
+            seconds = int(total_seconds % 60)
+            
+            if hours > 0:
+                if minutes > 0:
+                    return f"{hours}h {minutes}m"
+                else:
+                    return f"{hours}h"
+            elif minutes > 0:
+                if seconds > 30:  # Round up if > 30 seconds
+                    minutes += 1
+                return f"{minutes}m"
+            else:
+                return f"{seconds}s"
+            
+        except Exception as e:
+            # If we can't calculate, just return None (preview will show without time)
+            print(f"[DEBUG] Could not calculate time estimate: {e}")
+            return None
     
     def _on_generate_clicked(self, button):
         """Generate experiment snapshots."""
@@ -752,18 +819,59 @@ class ParameterSweepBuilder(Gtk.Box):
         """Compute parameter values based on selected mode.
         
         Returns:
-            list: List of parameter values to test
+            list: List of parameter values (single mode) or combinations (factorial mode)
         """
-        # Get config from TreeView for single parameter mode
-        if len(self.single_list) == 0:
+        if self.design_mode == 'factorial':
+            # For factorial design, return all combinations
+            if len(self.factorial_list) < 2:
+                print(f"[DEBUG] Factorial mode but only {len(self.factorial_list)} parameters in list")
+                return []
+            
+            print(f"[DEBUG] Computing factorial with {len(self.factorial_list)} parameters")
+            
+            # Collect all parameters and their values
+            all_param_values = []
+            try:
+                for i, row in enumerate(self.factorial_list):
+                    param_name = row[0]
+                    range_config = row[3]
+                    print(f"[DEBUG] Parameter {i}: {param_name}, config mode: {range_config.get('mode')}")
+                    
+                    values = self._compute_parameter_values_from_config(range_config)
+                    print(f"[DEBUG] Parameter {i} ({param_name}) produced {len(values)} values: {values[:5] if len(values) > 5 else values}")
+                    
+                    if not values:
+                        print(f"[DEBUG] Parameter {param_name} has no values!")
+                        return []  # If any parameter has no values, can't create combinations
+                    all_param_values.append(values)
+            except Exception as e:
+                print(f"[ERROR] Error computing parameter values: {e}")
+                import traceback
+                traceback.print_exc()
+                return []
+            
+            # Generate factorial combinations
+            import itertools
+            combinations = list(itertools.product(*all_param_values))
+            print(f"[DEBUG] Generated {len(combinations)} combinations")
+            return combinations
+        else:
+            # Single parameter mode - get config from TreeView
+            if len(self.single_list) == 0:
+                return []
+            
+            tree_iter = self.single_list.get_iter_first()
+            if tree_iter:
+                range_config = self.single_list.get_value(tree_iter, 3)
+                try:
+                    return self._compute_parameter_values_from_config(range_config)
+                except Exception as e:
+                    print(f"Error computing parameter values: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    return []
+            
             return []
-        
-        tree_iter = self.single_list.get_iter_first()
-        if tree_iter:
-            range_config = self.single_list.get_value(tree_iter, 3)
-            return self._compute_parameter_values_from_config(range_config)
-        
-        return []
     
 
     def _on_single_edit_range_clicked(self, button):

@@ -1076,7 +1076,8 @@ class ViabilityPanel(Gtk.Box):
                 marking,
                 place_type,
                 label,
-                "#FFFFFF"  # Background color
+                "white",  # Background color (unused when background_set=False)
+                False  # Background set (False = no background)
             ])
         
         # Populate Transitions table
@@ -1109,7 +1110,8 @@ class ViabilityPanel(Gtk.Box):
                     formula,
                     trans_type,
                     label,
-                    "#FFFFFF"  # Background color
+                    "white",  # Background color (unused when background_set=False)
+                    False  # Background set (False = no background)
                 ])
                 
                 # Detect formula-referenced places NOW that we have the formula
@@ -1192,7 +1194,8 @@ class ViabilityPanel(Gtk.Box):
                 target_id,
                 weight,
                 arc_type,
-                "#FFFFFF"  # Background color
+                "white",  # Background color (unused when background_set=False)
+                False  # Background set (False = no background)
             ])
         
         # Notify automation category that subnet parameters are updated

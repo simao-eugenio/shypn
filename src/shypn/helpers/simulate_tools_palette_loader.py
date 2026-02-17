@@ -30,6 +30,7 @@ from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
 from shypn.metadata import SweepHeaderGenerator
+from shypn.helpers.batch_results_saver import save_swiss_palette_batch
 
 class SimulateToolsPaletteLoader(GObject.GObject):
     """Loader for simulation tools palette - manages [R][P][S][T][⚙] button panel.
@@ -1389,7 +1390,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         batch_thread.start()
     
     def _save_batch_results(self, results: list, recorded_objects: set, n_replicates: int) -> str:
-        """Save batch simulation results to CSV files and JSON metadata.
+        """Save batch simulation results using unified BatchResultsSaver.
+        
+        REFACTORED: Now uses shared batch_results_saver module for consistent
+        saving across Swiss Palette and Viability Panel experiments.
         
         Args:
             results: List of result dictionaries from batch runner
@@ -1397,189 +1401,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             n_replicates: Total number of replicates
             
         Returns:
-            str: Path to results folder, or None if save failed
+            str: Path to results folder
         """
-        import os
-        import json
-        import csv
-        from datetime import datetime
-        import numpy as np
-        
-        # Use user-specified batch output folder if set
-        model = self.simulation.model
-        project_folder = None
-        
-        if hasattr(model, 'simulation_settings') and model.simulation_settings:
-            settings = model.simulation_settings
-            if hasattr(settings, 'batch_output_folder') and settings.batch_output_folder:
-                # User chose a specific folder - use it
-                project_folder = settings.batch_output_folder
-        
-        # Fallback: determine from document path
-        if not project_folder:
-            if hasattr(model, 'filepath') and model.filepath:
-                # Document has been saved - use its directory
-                model_path = model.filepath
-                # Navigate up to find project root (assumes workspace/projects/{project}/models/model.shy)
-                path_parts = model_path.split(os.sep)
-                if 'projects' in path_parts:
-                    projects_idx = path_parts.index('projects')
-                    if projects_idx + 1 < len(path_parts):
-                        # Project name is after 'projects'
-                        project_folder = os.sep.join(path_parts[:projects_idx + 2])
-        
-        if not project_folder:
-            # Final fallback: use workspace/results/
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            repo_root = os.path.normpath(os.path.join(current_dir, '..', '..', '..'))
-            project_folder = os.path.join(repo_root, 'workspace')
-        
-        # Create results folder with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results_dir = os.path.join(project_folder, 'results', f'batch_{timestamp}')
-        os.makedirs(results_dir, exist_ok=True)
-        
-        # Save configuration
-        config = {
-            'timestamp': timestamp,
-            'n_replicates': n_replicates,
-            'recorded_objects': list(recorded_objects),
-            'settings': {
-                'duration': self.simulation.settings.duration,
-                'time_units': str(self.simulation.settings.time_units),
-                'dt_auto': self.simulation.settings.dt_auto,
-                'use_tau_leaping': self.simulation.settings.use_tau_leaping,
-                'tau_epsilon': self.simulation.settings.tau_epsilon
-            }
-        }
-        
-        with open(os.path.join(results_dir, 'config.json'), 'w') as f:
-            json.dump(config, f, indent=2)
-        
-        # Save individual replicate CSVs
-        csv_count = 0
-        for result in results:
-            if 'error' in result:
-                continue  # Skip failed replicates
-            
-            replicate_id = result['replicate_id']
-            time_points = result['time_points']
-            place_data = result.get('place_data', {})
-            transition_data = result.get('transition_data', {})
-            
-            # Write CSV with time and recorded objects
-            csv_path = os.path.join(results_dir, f'run_{replicate_id + 1:03d}.csv')
-            with open(csv_path, 'w', newline='') as f:
-                # Convert DocumentModel to dict format for metadata generator
-                # Metadata sections expect dict with 'places', 'transitions', 'arcs' keys
-                model_dict = model.to_dict() if hasattr(model, 'to_dict') else {
-                    'places': [p.to_dict() if hasattr(p, 'to_dict') else {} for p in getattr(model, 'places', [])],
-                    'transitions': [t.to_dict() if hasattr(t, 'to_dict') else {} for t in getattr(model, 'transitions', [])],
-                    'arcs': [a.to_dict() if hasattr(a, 'to_dict') else {} for a in getattr(model, 'arcs', [])],
-                    'formalism': 'Signal_Hierarchical_Petri_Net',
-                    'metadata': {}
-                }
-                
-                # Generate metadata header for this replicate
-                context = {
-                    'model_path': getattr(model, 'filepath', None),
-                    'model': model_dict,
-                    'n_replicates': n_replicates,
-                    'recorded_objects': list(recorded_objects),
-                    'simulation_config': {
-                        'duration': self.simulation.settings.duration,
-                        'time_units': str(self.simulation.settings.time_units),
-                        'use_tau_leaping': self.simulation.settings.use_tau_leaping,
-                    },
-                    'current_replicate': replicate_id + 1,
-                    'total_replicates': n_replicates,
-                    'phase': 'Batch_Mode'
-                }
-                
-                generator = SweepHeaderGenerator()
-                generator.set_context(context)
-                generator.generate()
-                header_text = generator.to_header_text()
-                
-                # Write metadata header
-                f.write(header_text)
-                
-                writer = csv.writer(f)
-                
-                # Header row (column names)
-                header = ['time'] + sorted(place_data.keys()) + sorted(transition_data.keys())
-                writer.writerow(header)
-                
-                # Data rows
-                for i, t in enumerate(time_points):
-                    row = [t]
-                    # Add place values - extract value from (time, tokens) tuples
-                    for obj_id in sorted(place_data.keys()):
-                        if i < len(place_data[obj_id]):
-                            _, tokens = place_data[obj_id][i]  # Extract tokens from tuple
-                            row.append(tokens)
-                        else:
-                            row.append('')
-                    # Add transition values - extract value from (time, count) tuples
-                    for obj_id in sorted(transition_data.keys()):
-                        if i < len(transition_data[obj_id]):
-                            _, count = transition_data[obj_id][i]  # Extract count from tuple
-                            row.append(count)
-                        else:
-                            row.append('')
-                    writer.writerow(row)
-            csv_count += 1
-        
-        # Calculate and save summary statistics
-        successful_results = [r for r in results if 'error' not in r]
-        if successful_results:
-            summary = {
-                'timestamp': timestamp,
-                'successful_replicates': len(successful_results),
-                'total_replicates': n_replicates,
-                'statistics': {}
-            }
-            
-            # Calculate stats for each recorded object
-            for obj_id in recorded_objects:
-                obj_trajectories = []
-                
-                # Collect trajectories from all replicates
-                for result in successful_results:
-                    if obj_id in result.get('place_data', {}):
-                        # Extract just the values from (time, tokens) tuples
-                        traj_tuples = result['place_data'][obj_id]
-                        traj_values = [tokens for time, tokens in traj_tuples]
-                        obj_trajectories.append(traj_values)
-                    elif obj_id in result.get('transition_data', {}):
-                        # Extract just the values from (time, count) tuples
-                        traj_tuples = result['transition_data'][obj_id]
-                        traj_values = [count for time, count in traj_tuples]
-                        obj_trajectories.append(traj_values)
-                
-                if obj_trajectories:
-                    # Filter out empty trajectories
-                    obj_trajectories = [traj for traj in obj_trajectories if len(traj) > 0]
-                    
-                    if obj_trajectories:  # Check again after filtering
-                        # Convert to numpy array (pad to same length if needed)
-                        max_len = max(len(traj) for traj in obj_trajectories)
-                        padded = np.array([
-                            traj + [traj[-1]] * (max_len - len(traj))
-                            for traj in obj_trajectories
-                        ])
-                        
-                        summary['statistics'][obj_id] = {
-                            'mean': np.mean(padded, axis=0).tolist(),
-                            'std': np.std(padded, axis=0).tolist(),
-                            'min': np.min(padded, axis=0).tolist(),
-                            'max': np.max(padded, axis=0).tolist(),
-                            'final_mean': float(np.mean(padded[:, -1])),
-                            'final_std': float(np.std(padded[:, -1]))
-                        }
-            
-            with open(os.path.join(results_dir, 'summary.json'), 'w') as f:
-                json.dump(summary, f, indent=2)
+        # Use unified batch saver (Phase 1 normalization)
+        results_dir = save_swiss_palette_batch(
+            results=results,
+            recorded_objects=recorded_objects,
+            n_replicates=n_replicates,
+            simulation_settings=self.simulation.settings,
+            model=self.simulation.model,
+            project_folder=None  # Auto-detect from model
+        )
         
         return results_dir
 
