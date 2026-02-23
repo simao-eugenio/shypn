@@ -441,23 +441,16 @@ class ExperimentAutomationCategory:
             snapshot.transition_rates = base_snapshot.transition_rates.copy()
             snapshot.notes = base_snapshot.notes
             
-            # Apply parameter modifications for this combination
+            # Apply parameter modifications for this combination.
+            # All parameters are expressed as object.property paths and routed
+            # through property_overrides so apply_property_to_object resolves
+            # them uniformly.  Bare IDs (no dot) are also valid: the parser
+            # defaults them to their canonical property (initial_marking for
+            # places, rate for transitions, weight for arcs).
             for i, param in enumerate(parameters):
-                param_type = param['type']
                 param_id = param['id']
                 value = combo[i]
-                
-                # param_id may be a dotted property path (e.g. 'P1.initial_marking')
-                # which is handled by property_overrides / apply_property_to_object.
-                # Bare IDs (e.g. 'P1') go into the direct token/rate/weight dicts.
-                if '.' in param_id:
-                    snapshot.property_overrides[param_id] = value
-                elif param_type == 'places':
-                    snapshot.place_markings[param_id] = value
-                elif param_type == 'transitions':
-                    snapshot.transition_rates[param_id] = value
-                elif param_type == 'arcs':
-                    snapshot.arc_weights[param_id] = value
+                snapshot.property_overrides[param_id] = value
             
             count += 1
         
