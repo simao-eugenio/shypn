@@ -37,9 +37,10 @@ Please be respectful and constructive in all interactions with the community.
    pre-commit install
    ```
 
-4. **Read architecture documentation** (REQUIRED before contributing):
-   - `ARCHITECTURE_ENHANCEMENTS_RECON.md` - Understand the A+ architecture
-   - `QUALITY_ACTION_PLAN_REVISED.md` - Quality improvement guidelines
+4. **Review architecture guidelines**:
+   - SHYpn has A+ grade architecture with 26+ passing architecture tests
+   - Protected zones below must not be modified without review
+   - Safe refactoring zones are marked for improvement
 
 ## Architecture Protection Zones
 
@@ -231,13 +232,13 @@ def test_with_mock_eventbus():
 
 ## Pull Request Process
 
-### Before Submitting
+## Before Submitting
 
 1. ✅ All tests pass (including 26+ architecture tests)
 2. ✅ Pre-commit hooks pass
 3. ✅ No changes to protected files (unless approved)
 4. ✅ Documentation updated (if needed)
-5. ✅ CHANGELOG.md updated (for user-facing changes)
+5. ✅ Code follows style guidelines and is well-documented
 
 ### PR Template
 
@@ -285,16 +286,16 @@ Please report security vulnerabilities to the maintainers directly, not in publi
 
 ### Known Security Work
 
-The following security issues are being addressed (see QUALITY_ACTION_PLAN_REVISED.md):
-- 18 `eval()` calls (tracked for replacement)
+Security improvements are tracked in the local development environment. Known areas:
+- Formula evaluation patterns (eval() usage)
 - Exception handling improvements
 
 ## Getting Help
 
-- **Architecture questions**: Read `ARCHITECTURE_ENHANCEMENTS_RECON.md`
-- **Quality questions**: Read `QUALITY_ACTION_PLAN_REVISED.md`
-- **Bug reports**: Create GitHub issue
+- **Architecture questions**: Review the architecture protection zones above
+- **Bug reports**: Create GitHub issue with reproducible example
 - **Feature requests**: Create GitHub issue with [Feature Request] tag
+- **Development questions**: Check local `doc/` directory after cloning
 
 ## License
 
