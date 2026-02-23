@@ -106,6 +106,9 @@ legacy/
 # ===== GitHub Visibility Control =====
 # Hide development materials from public GitHub (keep locally)
 
+# Benchmark results (performance testing artifacts)
+benchmark_results/
+
 # Documentation (papers, thesis, internal docs)
 doc/
 
