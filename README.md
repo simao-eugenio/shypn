@@ -100,20 +100,17 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 ## Documentation
 
 📚 **[Quick Start Guide](QUICKSTART.md)** - Get started in minutes  
-📚 **[Installation Guide](INSTALL.md)** - Detailed installation instructions  
-📚 **[User Documentation](doc/README.md)** - Comprehensive guides and tutorials
+📚 **[Installation Guide](INSTALL.md)** - Detailed installation instructions
 
-**Key Documentation:**
-- **[Object Identity Architecture](doc/OBJECT_IDENTITY_RECONNAISSANCE.md)** - ID/Name/Label system and rate formula rules
-- **[Assignment Rules Options 2 & 3](doc/ASSIGNMENT_RULES_OPTIONS_2_3_IMPLEMENTATION.md)** - Smart SBML import handling (v0.5.0)
-- **[Thermodynamic Validation](doc/thermodynamics_simulation_integration.md)** - Gibbs free energy integration (v0.4.0)
-- **[Skellam Distribution](doc/SKELLAM_IMPLEMENTATION.md)** - Reversible reaction handling (v0.3.0)
-- **[τ-Leaping Engine](doc/tau_leaping/)** - Approximate stochastic simulation
-- **[Programmatic Model Editing](doc/PROGRAMMATIC_MODEL_EDITING.md)** - DTO-based parameter editing (v0.5.0)
-- **[Event-Driven Cache Invalidation](doc/EVENT_DRIVEN_CACHE_INVALIDATION.md)** - Repository pattern with EventBus (v0.5.0)
-- **[Model Independence](doc/MODEL_INDEPENDENCE.md)** - Model-agnostic editing tools (v0.5.0)
+**Core Features Documentation:**
+- **Signal Hierarchy Theory** - Mathematical framework for hierarchical preemption (see papers below)
+- **Weak Independence** - Efficient simulation through dependency analysis (arXiv:2512.17106)
+- **Thermodynamic Validation** - Gibbs free energy integration (v0.4.0)
+- **SBML Import Options** - Enhanced hybrid mode and stochastic assignment rules (v0.5.0)
+- **τ-Leaping Engine** - Skellam distribution for reversible reactions (v0.3.0)
 
-For development documentation, architecture details, and API reference, see the local `doc/` directory after cloning.
+**Development Documentation:**  
+Comprehensive development guides, architecture documentation, API reference, test suite, and utility scripts are available in the local source repository (`doc/`, `tests/`, `scripts/` directories) but excluded from public GitHub.
 
 ## Project Structure
 
@@ -125,28 +122,27 @@ shypn/
 │   ├── ui/             # GTK user interface components
 │   ├── thermodynamics/ # Gibbs free energy validation (v0.4.0)
 │   ├── repositories/   # Repository pattern with caching (v0.5.0)
-│   └── core/           # Core Petri net objects and behaviors
-├── cli/                # Command-line interface tools
+│   ├── analyses/       # Topology, viability, and pathway analysis
+│   └── export/         # Model export (SBML, SNOOPY, reports)
 ├── ui/                 # GTK UI definitions (XML)
-├── tools/              # Model editing utilities (DTO-based) (v0.5.0)
-├── scripts/            # Analysis and debugging scripts (v0.5.0)
-├── tests/              # Test suite (pytest) - 292+ tests (v0.5.0)
-├── doc/                # Documentation and guides
 ├── workspace/          # User workspace and example projects
-│   ├── projects/       # User projects (GATA1/PU.1, etc.)
 │   └── Biochemical-Examples/  # Demo models (22 examples)
 ├── QUICKSTART.md       # Quick start guide
 ├── INSTALL.md          # Installation instructions
+├── CONTRIBUTING.md     # Contribution guidelines
+├── CITATION.cff        # Citation metadata
 └── LICENSE             # MIT License
 ```
 
-**Note:** Development documentation, test suite, and utility scripts are available in the source repository but excluded from the public distribution.
+**Development Resources (Local Only):**
+- `doc/` - Architecture documentation, implementation guides, API reference (350+ documents)
+- `tests/` - Test suite with 292+ tests (pytest)
+- `scripts/` - Analysis and debugging scripts
+- `tools/` - Model editing utilities (DTO-based)
+- `dev/` - Development testbed and experiments
+- `archive/` - Historical code and documentation
 
-**Recent Organization (February 2026):**
-- ✅ Analysis scripts moved to `scripts/` (7 new files)
-- ✅ Test files organized in `tests/` (292+ tests)
-- ✅ Model editing tools in `tools/` (DTO-based editor)
-- ✅ Documentation consolidated in `doc/` (350+ documents)
+These development directories are git-ignored for public distribution but available when cloning the repository.
 
 ## Requirements
 
@@ -209,7 +205,7 @@ Bioinformatics and Computational Systems Biology
 
 ## Contributing
 
-Contributions are welcome! Please see the [development documentation](doc/README.md) for guidelines.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Version
 
@@ -231,5 +227,3 @@ Current version: **v2.6.0** (February 2026)
 - V. fischeri quorum sensing model with 133-fold bistability
 - Signal saturation cascade analysis
 - Comprehensive directory cleanup (1.6GB freed)
-
-See [doc/CHANGELOG.md](doc/CHANGELOG.md) for complete version history.
