@@ -28,6 +28,7 @@ import logging
 from .transition_behavior import TransitionBehavior
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
+from shypn.utils.safe_eval import safe_eval_numeric
 from .spatial_utils import BoundaryValidator, VolumeAdaptiveSelector
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class StochasticBehavior(TransitionBehavior):
         
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
-        self.volume_selector = VolumeAdaptiveSelector(threshold_fL=1.0)
+        self.volume_selector = VolumeAdaptiveSelector(threshold_molecules=100.0)
         
         # Defer arc-dependent volume checking until first use
         # (model.arcs may not be loaded yet during deserialization)
@@ -86,6 +87,9 @@ class StochasticBehavior(TransitionBehavior):
         # Rate limiting for negative rate warnings (avoid console spam)
         self._negative_rate_warnings = {}  # transition_name -> (count, last_logged_time)
         self._negative_rate_log_interval = 100  # Log every 100 occurrences
+        
+        # Track if this is a reversible formula (handled by Skellam in tau-leaping)
+        self.is_reversible_formula = False
         
         # Log creation with all details
         self.logger.debug(
@@ -120,6 +124,7 @@ class StochasticBehavior(TransitionBehavior):
                 # Detect reversible reactions (formulas with subtraction)
                 formula_lower = rate_func_str.lower()
                 if ' - ' in rate_func_str or 'k_r' in formula_lower or 'kr_' in formula_lower:
+                    self.is_reversible_formula = True
                     self.logger.debug(
                         f"Stochastic transition '{transition.name}' has reversible formula (subtraction). "
                         f"τ-leaping will use Skellam distribution for net flux sampling. "
@@ -407,9 +412,9 @@ class StochasticBehavior(TransitionBehavior):
             import re
             expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', self.rate_function_expr)
             
-            # Evaluate formula
-            result = eval(expr_processed, {"__builtins__": {}}, context)
-            rate = float(result)
+            # Evaluate formula safely (replaces eval() for security)
+            result = safe_eval_numeric(expr_processed, context, allow_math=True)
+            rate = result
             
             # Handle zero/negative rates gracefully for τ-leaping
             # When substrates are depleted, rate can legitimately become 0
@@ -418,6 +423,23 @@ class StochasticBehavior(TransitionBehavior):
             if rate <= 0:
                 # Only log warning if rate is significantly negative (formula error)
                 if rate < -1e-6:
+                    # Reversible formulas: Negative rates are EXPECTED and handled by Skellam
+                    if self.is_reversible_formula:
+                        # Do NOT spam warnings for reversible reactions
+                        # Skellam distribution correctly handles negative net rates
+                        # Only log once to inform user this is working as intended
+                        transition_name = self.transition.name
+                        if transition_name not in self._negative_rate_warnings:
+                            self._negative_rate_warnings[transition_name] = [0, None]
+                            self.logger.debug(
+                                f"Reversible transition '{transition_name}' evaluated to negative rate "
+                                f"{rate:.6f} (net reverse direction). This is expected behavior - "
+                                f"τ-leaping uses Skellam distribution to handle bidirectional flux correctly. "
+                                f"Expression: {self.rate_function_expr}"
+                            )
+                        return 0.0  # Clamped for SSA, but Skellam will use signed rate in tau-leaping
+                    
+                    # Non-reversible formulas: Negative rates indicate modeling error
                     # Rate-limit warnings to avoid console spam
                     transition_name = self.transition.name
                     if transition_name not in self._negative_rate_warnings:
@@ -471,8 +493,8 @@ class StochasticBehavior(TransitionBehavior):
                             actual_names = [name for name in function_catalog.FUNCTION_CATALOG.keys() 
                                           if name.lower() in close_matches]
                             print(f"   💡 Did you mean: {', '.join(actual_names)}?")
-                except Exception:
-                    pass  # Silently skip suggestion if import fails
+                except (ImportError, AttributeError, KeyError) as e:
+                    logger.debug(f"Skipping function suggestion: {e}")
             
             raise RuntimeError(
                 f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {e}\n"
@@ -949,7 +971,7 @@ class StochasticBehavior(TransitionBehavior):
                 'time': current_time
             }
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError, ZeroDivisionError) as e:
             return False, {
                 'reason': f'stochastic-error: {str(e)}',
                 'stochastic_mode': True,
@@ -1144,11 +1166,11 @@ class StochasticBehavior(TransitionBehavior):
         try:
             # Use precompiled code if available
             if place_id in self._compiled_rules:
-                result = eval(self._compiled_rules[place_id], {"__builtins__": {}}, context)
+                result = safe_eval_numeric(self._compiled_rules[place_id], context, allow_math=True)
             else:
-                result = eval(formula, {"__builtins__": {}}, context)
+                result = safe_eval_numeric(formula, context, allow_math=True)
             
-            return float(result)
+            return result
         except Exception as e:
             place = self.model.get_object_by_id(place_id)
             place_name = place.name if place else f"ID={place_id}"

@@ -80,7 +80,10 @@ class LayoutAlgorithm(ABC):
             cycles = list(nx.simple_cycles(graph))
             metrics['has_cycles'] = len(cycles) > 0
             metrics['longest_cycle'] = max([len(c) for c in cycles]) if cycles else 0
-        except:
+        except (nx.NetworkXError, ValueError, AttributeError) as e:
+            # Cycle detection can fail for certain graph structures
+            import logging
+            logging.getLogger(__name__).debug(f"Cycle detection failed: {e}")
             metrics['has_cycles'] = False
             metrics['longest_cycle'] = 0
         
@@ -248,7 +251,10 @@ class LayoutAlgorithm(ABC):
             
             # Return longest cycle
             return max(cycles, key=len)
-        except:
+        except (nx.NetworkXError, ValueError, AttributeError) as e:
+            # Cycle detection can fail
+            import logging
+            logging.getLogger(__name__).debug(f"Find longest cycle failed: {e}")
             return None
     
     def scale_positions(

@@ -125,7 +125,7 @@ class PlacesCategory(BaseDynamicCategory):
     def refresh(self):
         """Refresh place plots."""
         if self.panel:
-            self.panel.refresh()
+            self.panel.update_plot(force_full_redraw=True)
     
     def add_place(self, place):
         """Add place to plot.

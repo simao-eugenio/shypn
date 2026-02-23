@@ -139,7 +139,7 @@ class TransitionsCategory(BaseDynamicCategory):
     def refresh(self):
         """Refresh transition plots."""
         if self.panel:
-            self.panel.refresh()
+            self.panel.update_plot(force_full_redraw=True)
     
     def add_transition(self, transition):
         """Add transition to plot.

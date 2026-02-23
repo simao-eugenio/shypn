@@ -190,7 +190,7 @@ class KineticsEnricher(EnricherBase):
                     update_existing,
                     result
                 )
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 result.add_error(f"Failed to apply kinetics for {reaction_id}: {e}")
         
         # Set success based on whether we modified anything

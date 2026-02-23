@@ -109,6 +109,9 @@ See `workspace/projects/Biochemical-Examples/README.md` for the complete catalog
 - **[Thermodynamic Validation](doc/thermodynamics_simulation_integration.md)** - Gibbs free energy integration (v0.4.0)
 - **[Skellam Distribution](doc/SKELLAM_IMPLEMENTATION.md)** - Reversible reaction handling (v0.3.0)
 - **[τ-Leaping Engine](doc/tau_leaping/)** - Approximate stochastic simulation
+- **[Programmatic Model Editing](doc/PROGRAMMATIC_MODEL_EDITING.md)** - DTO-based parameter editing (v0.5.0)
+- **[Event-Driven Cache Invalidation](doc/EVENT_DRIVEN_CACHE_INVALIDATION.md)** - Repository pattern with EventBus (v0.5.0)
+- **[Model Independence](doc/MODEL_INDEPENDENCE.md)** - Model-agnostic editing tools (v0.5.0)
 
 For development documentation, architecture details, and API reference, see the local `doc/` directory after cloning.
 
@@ -121,20 +124,29 @@ shypn/
 │   ├── data/           # Data models and pathway structures
 │   ├── ui/             # GTK user interface components
 │   ├── thermodynamics/ # Gibbs free energy validation (v0.4.0)
+│   ├── repositories/   # Repository pattern with caching (v0.5.0)
 │   └── core/           # Core Petri net objects and behaviors
 ├── cli/                # Command-line interface tools
 ├── ui/                 # GTK UI definitions (XML)
-├── scripts/            # Utility scripts and demos
-├── tests/              # Test suite (pytest)
+├── tools/              # Model editing utilities (DTO-based) (v0.5.0)
+├── scripts/            # Analysis and debugging scripts (v0.5.0)
+├── tests/              # Test suite (pytest) - 292+ tests (v0.5.0)
 ├── doc/                # Documentation and guides
 ├── workspace/          # User workspace and example projects
-│   └── projects/Biochemical-Examples/  # Demo models
+│   ├── projects/       # User projects (GATA1/PU.1, etc.)
+│   └── Biochemical-Examples/  # Demo models (22 examples)
 ├── QUICKSTART.md       # Quick start guide
 ├── INSTALL.md          # Installation instructions
 └── LICENSE             # MIT License
 ```
 
 **Note:** Development documentation, test suite, and utility scripts are available in the source repository but excluded from the public distribution.
+
+**Recent Organization (February 2026):**
+- ✅ Analysis scripts moved to `scripts/` (7 new files)
+- ✅ Test files organized in `tests/` (292+ tests)
+- ✅ Model editing tools in `tools/` (DTO-based editor)
+- ✅ Documentation consolidated in `doc/` (350+ documents)
 
 ## Requirements
 
@@ -201,9 +213,9 @@ Contributions are welcome! Please see the [development documentation](doc/README
 
 ## Version
 
-Current version: **v0.5.0** (January 2026)
+Current version: **v2.6.0** (February 2026)
 
-**Recent Updates (v0.5.0):**
+**Recent Updates (v2.6.0 - February 2026):**
 - ✅ **Option 2: Enhanced Hybrid Mode** - Smart dependency tracking for assignment rules
 - ✅ **Option 3: Stochastic with Runtime Re-evaluation** - Full stochastic mode support for SBML assignment rules
 - ✅ **Assignment Rule Infrastructure** - Formula compilation, caching, and temporal evaluation

@@ -220,6 +220,46 @@ class DynamicAnalysesPanel(Gtk.Box):
         for category in self.categories:
             category.set_data_collector(data_collector)
     
+    def on_settings_changed(self, simulation_settings=None):
+        """Handle simulation settings changes.
+        
+        Updates plot x-axis limits when duration changes, refreshes
+        displays for time step changes, etc.
+        
+        Args:
+            simulation_settings: SimulationSettings instance (optional)
+        """
+        # Update plot limits based on new duration
+        if simulation_settings:
+            duration = simulation_settings.get_duration_seconds()
+            
+            # Update transition plots
+            if hasattr(self, 'transitions_category') and self.transitions_category:
+                if hasattr(self.transitions_category, 'panel') and self.transitions_category.panel:
+                    panel = self.transitions_category.panel
+                    if hasattr(panel, 'axes') and panel.axes:
+                        # Update x-axis limit to match new duration
+                        current_xlim = panel.axes.get_xlim()
+                        if duration > 0:
+                            panel.axes.set_xlim(0, duration)
+                            panel.canvas.draw_idle()
+            
+            # Update place plots
+            if hasattr(self, 'places_category') and self.places_category:
+                if hasattr(self.places_category, 'panel') and self.places_category.panel:
+                    panel = self.places_category.panel
+                    if hasattr(panel, 'axes') and panel.axes:
+                        # Update x-axis limit to match new duration
+                        current_xlim = panel.axes.get_xlim()
+                        if duration > 0:
+                            panel.axes.set_xlim(0, duration)
+                            panel.canvas.draw_idle()
+        
+        # Refresh all categories to update displays
+        for category in self.categories:
+            if hasattr(category, 'refresh'):
+                category.refresh()
+    
     def refresh(self):
         """Refresh all categories.
         
@@ -319,5 +359,5 @@ class DynamicAnalysesPanel(Gtk.Box):
                 try:
                     category_panel.clear_plot()
                 except Exception as e:
-                    pass
+                    self.logger.debug(f"Could not clear plot in category {category_panel.__class__.__name__}: {e}")
 

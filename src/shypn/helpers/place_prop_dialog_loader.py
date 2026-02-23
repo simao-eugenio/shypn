@@ -214,9 +214,17 @@ class PlacePropDialogLoader(GObject.GObject):
                         tokens_value = float(tokens_text)
                     else:
                         tokens_value = int(tokens_text)
+                    # CRITICAL: Only update current tokens, NOT initial_marking
+                    # initial_marking is static design-time data (loaded from file)
+                    # tokens is transient runtime data (current state)
+                    # When setting initial state, initial_marking should be set explicitly elsewhere
                     self.place_obj.tokens = max(0, tokens_value)
+                    # ALSO update initial_marking so this becomes the new baseline
+                    # This makes sense semantically: user editing tokens in properties
+                    # is setting the "initial state" for this place
                     self.place_obj.initial_marking = self.place_obj.tokens
             except ValueError as e:
+                self.logger.debug(f"Invalid tokens value: {e}")
                 pass
         radius_entry = self.builder.get_object('prop_place_radius_entry')
         if radius_entry and hasattr(self.place_obj, 'radius'):
@@ -226,6 +234,7 @@ class PlacePropDialogLoader(GObject.GObject):
                     radius_value = float(radius_text)
                     self.place_obj.radius = max(1.0, radius_value)
             except ValueError as e:
+                self.logger.debug(f"Invalid radius value: {e}")
                 pass
         capacity_entry = self.builder.get_object('prop_place_capacity_entry')
         if capacity_entry and hasattr(self.place_obj, 'capacity'):
@@ -238,6 +247,7 @@ class PlacePropDialogLoader(GObject.GObject):
                         capacity_value = int(capacity_text)
                         self.place_obj.capacity = max(1, capacity_value)
             except ValueError as e:
+                self.logger.debug(f"Invalid capacity value: {e}")
                 pass
         width_entry = self.builder.get_object('prop_place_width_entry')
         if width_entry and hasattr(self.place_obj, 'border_width'):
@@ -247,6 +257,7 @@ class PlacePropDialogLoader(GObject.GObject):
                     width_value = float(width_text)
                     self.place_obj.border_width = max(0.5, width_value)
             except ValueError as e:
+                self.logger.debug(f"Invalid border width value: {e}")
                 pass
         if self.color_picker and hasattr(self.place_obj, 'border_color'):
             selected_color = self.color_picker.get_selected_color()

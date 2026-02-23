@@ -212,10 +212,15 @@ ANALYZER_METADATA = {
 }
 
 # Quick lookups for backward compatibility
-SAFE_FOR_AUTO_RUN = {
-    name for name, meta in ANALYZER_METADATA.items() 
-    if meta.get('safe_for_auto_run', False)
-}
+# DISABLED: Auto-run causes lag/freeze on model load (14 analyzers running simultaneously)
+# Users can manually run analyzers when needed via "Run All" button or individual expanders
+SAFE_FOR_AUTO_RUN = set()  # Empty set = no auto-run
+
+# Keep original definition commented for reference:
+# SAFE_FOR_AUTO_RUN = {
+#     name for name, meta in ANALYZER_METADATA.items() 
+#     if meta.get('safe_for_auto_run', False)
+# }
 
 DANGEROUS_ANALYZERS = {
     name: {
@@ -995,7 +1000,7 @@ class BaseTopologyCategory:
                 kb.update_boundedness(bounds)
             
         except Exception as e:
-            pass  # Silently ignore KB update failures
+            self.logger.debug(f"Could not update knowledge base with boundedness results: {e}")
         
         return False  # Don't repeat
     

@@ -6,13 +6,20 @@ Provides transaction-safe wrapper for SimulationSettings with:
 - Atomic commits
 - Validation before apply
 - Rollback support
+- Atomic disk persistence (settings survive interrupted sessions)
 """
 
+import os
+import json
 import threading
+import logging
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 from shypn.engine.simulation.settings import SimulationSettings
 from shypn.utils.time_utils import TimeUnits, TimeValidator
 from .base import ValidationError, ChangeListener
+
+logger = logging.getLogger(__name__)
 
 
 class BufferedSimulationSettings:
@@ -50,11 +57,12 @@ class BufferedSimulationSettings:
         is atomic - either all changes apply or none do.
     """
     
-    def __init__(self, live_settings: SimulationSettings):
+    def __init__(self, live_settings: SimulationSettings, model=None):
         """Initialize buffered settings.
         
         Args:
             live_settings: The actual SimulationSettings used by simulation engine
+            model: Optional DocumentModel (for persistence filepath)
         """
         self._live = live_settings
         self._buffer: Optional[SimulationSettings] = None
@@ -64,6 +72,12 @@ class BufferedSimulationSettings:
         
         # Track changes for notification
         self._pending_changes: Dict[str, tuple[Any, Any]] = {}
+        
+        # Model reference for persistence (weak coupling - only needs filepath)
+        self._model = model
+        
+        # Load persisted settings if available
+        self._load_from_disk()
     
     # ========== Properties ==========
     
@@ -154,7 +168,10 @@ class BufferedSimulationSettings:
                 # Step 4: Notify listeners of successful commit
                 self._notify_commit()
                 
-                # Step 5: Clear buffer
+                # Step 5: Persist to disk atomically
+                self._save_to_disk()
+                
+                # Step 6: Clear buffer
                 self._buffer = None
                 self._dirty = False
                 self._pending_changes.clear()
@@ -339,16 +356,16 @@ class BufferedSimulationSettings:
         for listener in self._listeners:
             try:
                 listener.on_changes_committed(self._pending_changes.copy())
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Commit listener notification failed: {e}")
     
     def _notify_rollback(self):
         """Notify listeners that changes were rolled back."""
         for listener in self._listeners:
             try:
                 listener.on_changes_rolled_back(self._pending_changes.copy())
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Rollback listener notification failed: {e}")
     
     # ========== String Representation ==========
     
@@ -375,3 +392,120 @@ class BufferedSimulationSettings:
             return f"Pending changes: {', '.join(changes)}"
         
         return "Buffer dirty but no specific changes tracked"
+    
+    # ========== Persistence ==========
+    
+    def _get_settings_filepath(self) -> Optional[str]:
+        """Get the filepath for persisting settings.
+        
+        Settings are saved as .settings_{model_name}.json next to the model file,
+        similar to how view state is saved. For unsaved models, uses ~/.config/shypn/
+        
+        Returns:
+            str: Settings file path, or None if cannot determine
+        """
+        if not self._model:
+            return None
+        
+        # Check if model has filepath attribute
+        if not hasattr(self._model, 'filepath') or not self._model.filepath:
+            # Unsaved model - use config directory
+            config_dir = os.path.join(Path.home(), '.config', 'shypn')
+            os.makedirs(config_dir, exist_ok=True)
+            return os.path.join(config_dir, 'default_settings.json')
+        
+        # Model has filepath - save settings next to it
+        model_dir = os.path.dirname(self._model.filepath)
+        basename = os.path.basename(self._model.filepath)
+        
+        # Remove .shy extension if present
+        if basename.endswith('.shy'):
+            basename = basename[:-4]
+        
+        return os.path.join(model_dir, f".settings_{basename}.json")
+    
+    def _save_to_disk(self):
+        """Atomically save settings to disk.
+        
+        Uses atomic write pattern (write to temp file, then rename) to ensure
+        settings are never corrupted, even if process is interrupted.
+        
+        IMPORTANT: Excludes transient session parameters (playback speed) that
+        should not persist across sessions. Only model-intrinsic parameters are saved.
+        """
+        filepath = self._get_settings_filepath()
+        if not filepath:
+            return  # No filepath available (model not saved yet)
+        
+        try:
+            # Serialize settings to dict (includes all parameters)
+            settings_dict = self._live.to_dict()
+            
+            # EXCLUDE transient session parameters that should not persist:
+            # - time_scale: Playback speed is a UI control for current exploration,
+            #   not a model property. Always defaults to 1.0x on load.
+            transient_params = ['time_scale']
+            for param in transient_params:
+                settings_dict.pop(param, None)
+            
+            # Write to temp file first (atomic write pattern)
+            temp_filepath = filepath + '.tmp'
+            with open(temp_filepath, 'w', encoding='utf-8') as f:
+                json.dump(settings_dict, f, indent=2)
+            
+            # Atomic rename (replaces old file atomically on POSIX systems)
+            os.replace(temp_filepath, filepath)
+            
+            logger.debug(f"Settings persisted to {filepath} (transient params excluded)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to persist settings: {e}")
+            # Clean up temp file if it exists
+            try:
+                temp_filepath = filepath + '.tmp'
+                if os.path.exists(temp_filepath):
+                    os.remove(temp_filepath)
+            except:
+                pass
+    
+    def _load_from_disk(self):
+        """Load persisted settings from disk if available.
+        
+        Called during initialization to restore settings from previous session.
+        Silently fails if file doesn't exist (uses defaults).
+        
+        IMPORTANT: Transient session parameters (playback speed) are NOT restored
+        and remain at their defaults. This prevents confusion from forgotten high-speed
+        settings from previous sessions.
+        """
+        filepath = self._get_settings_filepath()
+        if not filepath or not os.path.exists(filepath):
+            return  # No persisted settings
+        
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                settings_dict = json.load(f)
+            
+            # Ensure time_scale is NOT in the loaded dict (always use default 1.0x)
+            # This prevents playback speed from persisting across sessions
+            settings_dict.pop('time_scale', None)
+            
+            # Restore settings from dict (time_scale will use SimulationSettings default)
+            loaded_settings = SimulationSettings.from_dict(settings_dict)
+            
+            # Copy loaded values to live settings (EXCEPT time_scale which stays at 1.0)
+            self._live.time_units = loaded_settings.time_units
+            self._live.duration = loaded_settings.duration
+            self._live.dt_auto = loaded_settings.dt_auto
+            self._live.dt_manual = loaded_settings.dt_manual
+            # time_scale NOT restored - remains at default 1.0x
+            self._live.tau_epsilon = loaded_settings.tau_epsilon
+            self._live.critical_threshold = loaded_settings.critical_threshold
+            self._live.max_tau = loaded_settings.max_tau
+            self._live.min_tau = loaded_settings.min_tau
+            self._live.use_parallel_stochastic = loaded_settings.use_parallel_stochastic
+            
+            logger.debug(f"Settings loaded from {filepath} (time_scale remains at default {self._live.time_scale}x)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to load persisted settings: {e}. Using defaults.")

@@ -77,6 +77,6 @@ class UndoManager:
 		if self._state_cb:
 			try:
 				self._state_cb(self.can_undo(), self.can_redo())
-			except Exception:
-				pass
+			except (TypeError, AttributeError, RuntimeError) as e:
+				logger.debug(f"Undo state callback failed: {e}")
 

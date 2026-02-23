@@ -44,9 +44,8 @@ class DocumentModel:
             "pan_y": 0.0
         }
         
-        # Simulation settings (for batch mode and recording configuration)
-        from shypn.engine.simulation.settings import SimulationSettings
-        self.simulation_settings = SimulationSettings()
+        # REMOVED: simulation_settings (moved to controller, session-specific)
+        # Simulation parameters like duration, dt, batch mode should NOT be model-dependent
         
         # Thermodynamic settings (pH, temperature, validation parameters)
         self.thermodynamic_settings = self._get_default_thermodynamic_settings()

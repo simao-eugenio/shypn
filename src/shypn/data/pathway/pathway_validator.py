@@ -382,7 +382,7 @@ class PathwayValidator:
         for validator in validators:
             try:
                 validator.validate(result)
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 self.logger.error(f"Validator {validator.__class__.__name__} failed: {e}")
                 result.add_error(f"Validator error: {e}")
         

@@ -16,6 +16,7 @@ from shypn.repositories.base_repository import (
     EntityNotFoundError,
     RepositoryIOError
 )
+from shypn.events.event_bus import EventBus
 
 
 class ModelQuery:
@@ -268,8 +269,58 @@ class ModelRepository(CachedRepository[DocumentModel]):
         
         if not self._workspace_path.is_dir():
             raise ValueError(f"Workspace path is not a directory: {workspace_path}")
+        
+        # Subscribe to file.saved event for automatic cache invalidation
+        EventBus.subscribe('file.saved', self._on_file_saved)
+    
+    def _on_file_saved(self, event_data: Dict[str, Any]) -> None:
+        """Handle file.saved event to invalidate cache for externally modified models.
+        
+        Args:
+            event_data: Event data containing 'filepath', 'document', 'timestamp'
+        """
+        filepath = event_data.get('filepath')
+        if not filepath:
+            return
+        
+        # Convert filepath to model_id
+        file_path = Path(filepath)
+        
+        # Only process .shy files in our workspace
+        if file_path.suffix != '.shy':
+            return
+        
+        # Check if this file is in our workspace
+        try:
+            relative = file_path.relative_to(self._workspace_path)
+            model_id = file_path.stem
+        except (ValueError, Exception):
+            # File is not in our workspace, ignore
+            return
+        
+        # Invalidate cache for this model_id if it exists
+        if model_id in self._cache:
+            print(f"🔄 Model '{model_id}' was saved - invalidating cache")
+            self._cache.pop(model_id, None)
+            if model_id in self._access_order:
+                self._access_order.remove(model_id)
     
     # ===== Public API =====
+    
+    def get_by_id(self, entity_id: str) -> Optional[DocumentModel]:
+        """Get model by ID (with event-driven cache invalidation).
+        
+        Cache is automatically invalidated when files are saved via EventBus.
+        No file system polling - pure event-driven architecture.
+        
+        Args:
+            entity_id: Model ID (filename without .shy extension)
+        
+        Returns:
+            DocumentModel if found, None otherwise
+        """
+        # Use parent's caching logic - cache invalidation happens via events
+        return super().get_by_id(entity_id)
     
     def get_by_name(self, name: str) -> Optional[DocumentModel]:
         """Get model by name (searches metadata).
@@ -350,7 +401,7 @@ class ModelRepository(CachedRepository[DocumentModel]):
     # ===== CachedRepository Implementation =====
     
     def save(self, entity: DocumentModel) -> bool:
-        """Save model (override to handle metadata['id']).
+        """Save model (override to handle metadata['id'] and update mtime tracking).
         
         Args:
             entity: DocumentModel to save
@@ -374,6 +425,23 @@ class ModelRepository(CachedRepository[DocumentModel]):
             self._add_to_cache(entity_id, entity)
         
         return success
+    
+    def delete(self, entity_id: str) -> bool:
+        """Delete model.
+        
+        Args:
+            entity_id: Model ID to delete
+        
+        Returns:
+            True if deletion succeeded, False otherwise
+        """
+        # Use parent delete (handles storage and cache)
+        return super().delete(entity_id)
+    
+    def clear_cache(self):
+        """Clear all cached models."""
+        super().clear_cache()
+        print("✅ Model cache cleared (event-driven invalidation active)")
     
     def _load_from_storage(self, entity_id: str) -> Optional[DocumentModel]:
         """Load model from .shy file.

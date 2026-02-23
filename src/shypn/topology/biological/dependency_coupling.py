@@ -135,7 +135,7 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
                 errors=[str(e)],
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Unexpected error: {str(e)}"],

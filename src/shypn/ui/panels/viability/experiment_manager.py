@@ -11,6 +11,7 @@ Date: November 13, 2025
 
 import json
 from datetime import datetime
+from .automation.property_path_parser import parse_property_path
 
 
 class ExperimentSnapshot:
@@ -390,6 +391,10 @@ class ExperimentManager:
                 # Create default snapshot if none exists
                 base_snapshot = self.add_snapshot("Baseline")
         
+        # Parse parameter_id to extract object_id (e.g., "P1.initial_marking" -> "P1")
+        # This handles both explicit paths ("P1.initial_marking") and implicit ("P1")
+        object_id, property_name = parse_property_path(parameter_id)
+        
         # Validate parameter exists in base snapshot (use ID for lookup)
         if parameter_type == 'places':
             param_dict = base_snapshot.place_markings
@@ -400,13 +405,13 @@ class ExperimentManager:
         else:
             raise ValueError(f"Invalid parameter_type: {parameter_type}")
         
-        # Check if parameter ID exists in baseline snapshot
-        if parameter_id not in param_dict:
+        # Check if object_id exists in baseline snapshot
+        if object_id not in param_dict:
             raise ValueError(f"Parameter ID '{parameter_id}' (name: '{parameter_name}') not found in {parameter_type}")
 
         
         # Get baseline value to check if it's a formula
-        baseline_value = param_dict[parameter_id]
+        baseline_value = param_dict[object_id]
         
         # Generate snapshots for each value
         created_count = 0
@@ -431,15 +436,15 @@ class ExperimentManager:
                 'value': value
             }
             
-            # Modify the swept parameter using ID (internal key)
+            # Modify the swept parameter using object_id (internal key)
             # For transitions with formulas, preserve the formula structure
             if parameter_type == 'places':
-                snapshot.place_markings[parameter_id] = value
+                snapshot.place_markings[object_id] = value
             elif parameter_type == 'transitions':
                 # Use formula modification helper for transitions
-                snapshot.transition_rates[parameter_id] = self._modify_rate_formula(baseline_value, value)
+                snapshot.transition_rates[object_id] = self._modify_rate_formula(baseline_value, value)
             elif parameter_type == 'arcs':
-                snapshot.arc_weights[parameter_id] = value
+                snapshot.arc_weights[object_id] = value
             
             # Add to snapshots
             self.snapshots.append(snapshot)

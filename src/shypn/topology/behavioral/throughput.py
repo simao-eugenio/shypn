@@ -202,7 +202,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             logger.error(f"Throughput analysis failed: {e}", exc_info=True)
             return AnalysisResult(
                 success=False,

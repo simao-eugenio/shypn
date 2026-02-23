@@ -640,7 +640,7 @@ class TopologyAnalysesCategory(BaseReportCategory):
                     'biological': self._get_biological_data(summary.get('statistics', {}))
                 }
             }
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError, RuntimeError) as e:
             return {
                 'title': 'Topological Analyses',
                 'has_data': False,
@@ -760,7 +760,7 @@ class TopologyAnalysesCategory(BaseReportCategory):
         
         try:
             summary = self.topology_panel.generate_summary_for_report_panel()
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError, RuntimeError) as e:
             return {
                 'category': 'Topological Analysis',
                 'status': 'error',

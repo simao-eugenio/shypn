@@ -354,7 +354,10 @@ class PathAnalyzer(TopologyAnalyzer):
                 largest_cc = max(nx.strongly_connected_components(graph), key=len)
                 subgraph = graph.subgraph(largest_cc)
                 diameter = nx.diameter(subgraph) if len(largest_cc) > 1 else 0
-        except:
+        except (nx.NetworkXError, ValueError) as e:
+            # Diameter calculation can fail for certain graph structures
+            import logging
+            logging.getLogger(__name__).debug(f"Diameter calculation failed: {e}")
             diameter = 0
         
         # Calculate average shortest path length
@@ -363,7 +366,10 @@ class PathAnalyzer(TopologyAnalyzer):
                 avg_path_length = nx.average_shortest_path_length(graph)
             else:
                 avg_path_length = 0
-        except:
+        except (nx.NetworkXError, ValueError) as e:
+            # Path length calculation can fail
+            import logging
+            logging.getLogger(__name__).debug(f"Average path length calculation failed: {e}")
             avg_path_length = 0
         
         summary = f"Network diameter: {diameter}\n"

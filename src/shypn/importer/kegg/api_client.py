@@ -57,7 +57,7 @@ class KEGGAPIClient:
             return None
         except URLError as e:
             return None
-        except Exception as e:
+        except (TimeoutError, ConnectionError) as e:
             return None
     
     def fetch_kgml(self, pathway_id: str) -> Optional[str]:

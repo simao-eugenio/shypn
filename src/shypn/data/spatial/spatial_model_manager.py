@@ -203,7 +203,7 @@ class SpatialModelManager(ModelCanvasManager):
                             f"{len(tile_data['places'])} places, "
                             f"{len(tile_data['transitions'])} transitions, "
                             f"{len(tile_data['arcs'])} arcs")
-            except Exception as e:
+            except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
                 logger.error(f"Failed to load tile {tile_coord}: {e}")
                 return
         
@@ -413,7 +413,7 @@ class SpatialModelManager(ModelCanvasManager):
                 try:
                     tile_data = self.serializer.load_tile(tile_path)
                     self.cache.put(tile_coord, tile_data)
-                except Exception as e:
+                except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
                     logger.warning(f"Failed to preload tile {tile_coord}: {e}")
     
     def load_all_tiles(self):

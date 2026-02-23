@@ -19,6 +19,7 @@ Future extensions:
 import os
 import sys
 import math
+import logging
 from typing import Optional
 try:
     import gi
@@ -80,6 +81,8 @@ class ModelCanvasLoader:
         Args:
             ui_path: Optional path to model_canvas.ui. If None, uses default location.
         """
+        self.logger = logging.getLogger(__name__)
+        
         if ui_path is None:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
@@ -411,8 +414,8 @@ class ModelCanvasLoader:
             try:
                 if self.pathway_panel_loader and hasattr(self.pathway_panel_loader, 'set_model_canvas'):
                     self.pathway_panel_loader.set_model_canvas(self)
-            except Exception:
-                pass
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Failed to notify pathway panel of model canvas: {e}")
         
         return self.container
 
@@ -448,15 +451,15 @@ class ModelCanvasLoader:
                     if self.lifecycle_adapter:
                         try:
                             self.lifecycle_adapter.switch_to_canvas(drawing_area)
-                        except Exception:
-                            pass
+                        except (AttributeError, TypeError, RuntimeError) as e:
+                            self.logger.debug(f"Failed to switch lifecycle adapter to canvas: {e}")
                     try:
                         if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
                             from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
                             set_lifecycle_scope_manager(self.lifecycle_manager.id_manager)
                             self.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
-                    except Exception:
-                        pass
+                    except (AttributeError, TypeError, RuntimeError) as e:
+                        self.logger.debug(f"Failed to set lifecycle ID scope on page add: {e}")
 
                 self._first_page_initialized = True
         except Exception:
@@ -587,6 +590,7 @@ class ModelCanvasLoader:
             try:
                 self.lifecycle_adapter.switch_to_canvas(drawing_area)
             except Exception as e:
+                self.logger.debug(f"Failed to switch canvas context: {e}")
                 pass  # Failed to switch canvas context
         
         if self.persistency:
@@ -954,6 +958,7 @@ class ModelCanvasLoader:
             try:
                 self.lifecycle_adapter.destroy_canvas(drawing_area)
             except Exception as e:
+                self.logger.debug(f"Failed to destroy canvas in lifecycle: {e}")
                 pass  # Failed to destroy canvas in lifecycle
         
         if drawing_area and drawing_area in self.canvas_managers:
@@ -1240,8 +1245,8 @@ class ModelCanvasLoader:
             if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
                 scope_name = f"canvas_{id(drawing)}"
                 self.lifecycle_manager.id_manager.set_scope(scope_name)
-        except Exception:
-            pass
+        except (AttributeError, TypeError, RuntimeError) as e:
+            self.logger.debug(f"Failed to set lifecycle ID scope early for new canvas: {e}")
         
         # Setup canvas manager BEFORE switching tabs
         # This ensures the canvas is fully initialized before receiving focus/events
@@ -1304,8 +1309,8 @@ class ModelCanvasLoader:
             if self.lifecycle_manager and hasattr(self.lifecycle_manager, 'id_manager'):
                 scope_name = f"canvas_{id(drawing_area)}"
                 self.lifecycle_manager.id_manager.set_scope(scope_name)
-        except Exception:
-            pass
+        except (AttributeError, TypeError, RuntimeError) as e:
+            self.logger.debug(f"Failed to set lifecycle ID scope before manager init: {e}")
         manager = ModelCanvasManager(canvas_width=2000, canvas_height=2000, filename=filename)
 
         # Per-document UndoManager initialization (lifecycle-integrated)
@@ -1313,8 +1318,8 @@ class ModelCanvasLoader:
             from shypn.edit.undo_manager import UndoManager
             if not hasattr(manager, 'undo_manager'):
                 manager.undo_manager = UndoManager()
-        except Exception:
-            pass
+        except (ImportError, AttributeError) as e:
+            self.logger.debug(f"Failed to initialize UndoManager for canvas: {e}")
         self.canvas_managers[drawing_area] = manager
         
         # Store references back to loader and drawing area for simulation reset
@@ -1368,6 +1373,7 @@ class ModelCanvasLoader:
                 # Update tab label using existing method
                 self._update_tab_label(page_widget, display_name, is_modified=is_dirty)
             except Exception as e:
+                self.logger.debug(f"Tab label update during widget setup failed: {e}")
                 pass
                 # Silently ignore errors during widget setup
                 # (e.g., if called before widget hierarchy is complete)
@@ -1382,6 +1388,7 @@ class ModelCanvasLoader:
                 if dpi and dpi > 0:
                     manager.set_screen_dpi(dpi)
         except Exception as e:
+            self.logger.debug(f"Screen DPI detection failed: {e}")
             pass
         
         # Only load view state for non-temporary filenames
@@ -1400,7 +1407,7 @@ class ModelCanvasLoader:
             # Make KB accessible from canvas manager
             manager.knowledge_base = kb
         except Exception as e:
-            pass
+            self.logger.debug(f"Could not create knowledge base for canvas: {e}")
 
         def on_draw_wrapper(widget, cr):
             allocation = widget.get_allocation()
@@ -1726,7 +1733,7 @@ class ModelCanvasLoader:
                                                     
                                                     controller.on_simulation_complete = combined_callback
                                             except Exception as e:
-                                                pass
+                                                self.logger.debug(f"Could not set viability panel simulation callback: {e}")
                                 else:
                                     pass
                             else:
@@ -1773,7 +1780,7 @@ class ModelCanvasLoader:
                     if hasattr(controller, 'model_adapter') and controller.model_adapter:
                         controller.model_adapter.invalidate_caches()
         except Exception as e:
-            pass
+            self.logger.error(f"Failed to invalidate model adapter caches: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1993,7 +2000,7 @@ class ModelCanvasLoader:
                     swissknife_palette
                 )
             except Exception as e:
-                pass  # Failed to register canvas, continuing with legacy management
+                self.logger.debug(f"Failed to register canvas with lifecycle adapter: {e}")
         
         # Store reference for mode switching
         if drawing_area not in self.overlay_managers:
@@ -2077,7 +2084,10 @@ class ModelCanvasLoader:
                     analyses_loader = self.overlay_managers[drawing_area].analyses_panel_loader
                     if analyses_loader and hasattr(analyses_loader, 'panel') and analyses_loader.panel:
                         print(f"[REPORT_INIT] Wiring Analyses Panel to Report Panel")
+                        print(f"[REPORT_INIT] analyses_loader.panel = {analyses_loader.panel}")
+                        print(f"[REPORT_INIT] report_panel_loader.panel = {report_panel_loader.panel}")
                         report_panel_loader.panel.set_dynamic_analyses_panel(analyses_loader.panel)
+                        print(f"[REPORT_INIT] Wiring complete")
                 
                 # Connect per-document Topology Panel for topology analysis data
                 if hasattr(self.overlay_managers[drawing_area], 'topology_panel_loader'):
@@ -2838,7 +2848,7 @@ class ModelCanvasLoader:
                 try:
                     overlay_manager.analyses_panel_loader.panel.reset()
                 except Exception as e:
-                    pass
+                    self.logger.debug(f"Could not reset analyses panel for canvas: {e}")
 
     def _on_simulation_settings_changed(self, palette, drawing_area):
         """Handle simulation settings change.
@@ -2847,8 +2857,32 @@ class ModelCanvasLoader:
             palette: SimulateToolsPaletteLoader that emitted the signal
             drawing_area: GtkDrawingArea widget
         """
-        # Settings changed - may need to update visualization
-        # Currently just redraw the canvas
+        # Settings changed - update all per-document components
+        
+        # Get simulation settings from palette
+        simulation_settings = None
+        if hasattr(palette, 'simulation') and palette.simulation:
+            simulation_settings = palette.simulation.settings
+        
+        # Forward to analyses panel (updates plot x-axis for duration changes)
+        if drawing_area in self.overlay_managers:
+            overlay_manager = self.overlay_managers[drawing_area]
+            
+            # Update Dynamic Analyses Panel
+            if hasattr(overlay_manager, 'analyses_panel_loader'):
+                analyses_loader = overlay_manager.analyses_panel_loader
+                if analyses_loader and hasattr(analyses_loader, 'panel') and analyses_loader.panel:
+                    if hasattr(analyses_loader.panel, 'on_settings_changed'):
+                        analyses_loader.panel.on_settings_changed(simulation_settings)
+            
+            # Update Report Panel (may need to refresh displays)
+            if hasattr(overlay_manager, 'report_panel_loader'):
+                report_loader = overlay_manager.report_panel_loader
+                if report_loader and hasattr(report_loader, 'panel') and report_loader.panel:
+                    if hasattr(report_loader.panel, 'refresh'):
+                        report_loader.panel.refresh()
+        
+        # Redraw canvas
         drawing_area.queue_draw()
 
     def _on_edit_button_toggled(self, edit_palette, show, drawing_area):
@@ -2908,8 +2942,8 @@ class ModelCanvasLoader:
         try:
             if hasattr(drawing_area, 'add_events'):
                 drawing_area.add_events(required_mask)
-        except Exception:
-            pass
+        except (TypeError, AttributeError) as e:
+            self.logger.debug(f"Failed to add GTK event masks to drawing area: {e}")
         drawing_area.set_can_focus(True)
         drawing_area.connect('button-press-event', self._on_button_press, manager)
         drawing_area.connect('button-release-event', self._on_button_release, manager)
@@ -2950,8 +2984,8 @@ class ModelCanvasLoader:
                 try:
                     if hasattr(scrolled, 'add_events'):
                         scrolled.add_events(required_mask)
-                except Exception:
-                    pass
+                except (TypeError, AttributeError) as e:
+                    self.logger.debug(f"Failed to add GTK event masks to scrolled window: {e}")
                 scrolled.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
                 scrolled.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
                 scrolled.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
@@ -2969,8 +3003,8 @@ class ModelCanvasLoader:
                 try:
                     if hasattr(viewport, 'add_events'):
                         viewport.add_events(required_mask)
-                except Exception:
-                    pass
+                except (TypeError, AttributeError) as e:
+                    self.logger.debug(f"Failed to add GTK event masks to viewport: {e}")
 
                 # Wrapper lambdas forward events to the drawing_area handlers
                 viewport.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
@@ -2978,8 +3012,8 @@ class ModelCanvasLoader:
                 viewport.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
                 viewport.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
                 viewport.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
-        except Exception:
-            pass
+        except (TypeError, AttributeError) as e:
+            self.logger.debug(f"Failed to wire GTK events for canvas widgets: {e}")
 
     def _mark_interaction(self, widget):
         """Mark user interaction timestamp (lightweight tracking).
@@ -4191,7 +4225,7 @@ class ModelCanvasLoader:
                 drawing_area.queue_draw()
                 return True
             except Exception as e:
-                pass
+                self.logger.debug(f"Lifecycle manager reset failed: {e}")
         
         # Legacy fallback: Manual cleanup
         try:
@@ -4213,7 +4247,7 @@ class ModelCanvasLoader:
                 drawing_area.queue_draw()
                 return True
         except Exception as e:
-            pass
+            self.logger.debug(f"Manual canvas reset failed: {e}")
             return False
         
         return False
@@ -4267,7 +4301,7 @@ class ModelCanvasLoader:
                         info['next_transition_id'] = scope_data.get('transition', 0) + 1
                         info['next_arc_id'] = scope_data.get('arc', 0) + 1
             except Exception as e:
-                pass
+                self.logger.debug(f"Could not retrieve ID scope data: {e}")
         
         # Get element count from canvas manager
         manager = self.get_canvas_manager(drawing_area)
@@ -5127,8 +5161,8 @@ class ModelCanvasLoader:
                     from shypn.edit.undo_operations import DeleteOperation
                     snapshots = _inline_capture(manager, [obj])
                     manager.undo_manager.push(DeleteOperation(snapshots))
-                except Exception:
-                    pass
+                except (ImportError, AttributeError, TypeError) as e:
+                    self.logger.debug(f"Failed to push undo operation for object deletion: {e}")
 
         # Perform deletion using facade methods to ensure cascade + observers
         if isinstance(obj, Place):
@@ -5242,8 +5276,8 @@ class ModelCanvasLoader:
                 for _ in range(10):  # Process multiple times
                     while GLib.MainContext.default().pending():
                         GLib.MainContext.default().iteration(False)
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                self.logger.debug(f"Failed to cleanup context menu on Wayland: {e}")
             self._active_context_menu = None
         
         # Give Wayland a moment to fully process menu destruction

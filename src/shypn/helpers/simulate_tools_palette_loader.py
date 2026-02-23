@@ -94,6 +94,16 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.progress_bar = None
         self.time_display_label = None
         self.token_accounting_check = None
+        
+        # Progress display throttling (prevent unstable updates)
+        self._last_progress_update_time = 0.0
+        self._progress_update_interval = 0.1  # Update every 100ms max
+        
+        # Time display smoothing (prevent discrete jumping)
+        self._last_displayed_time = 0.0
+        self._target_simulation_time = 0.0
+        self._smooth_time_enabled = True
+        
         self._load_ui()
         
         # Initialize simulation controller AFTER UI is loaded
@@ -126,7 +136,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Recreate BufferedSimulationSettings with new controller's settings
         if controller is not None:
             # Create new BufferedSimulationSettings pointing to new controller's settings
-            self.buffered_settings = BufferedSimulationSettings(controller.settings)
+            # Pass model's document for settings persistence (settings saved next to .shy file)
+            document_model = getattr(controller.model, 'document', None) or getattr(controller.model, '_document_model', None)
+            self.buffered_settings = BufferedSimulationSettings(controller.settings, model=document_model)
             
             # Sync UI with new controller's settings
             self._sync_settings_to_ui()
@@ -303,7 +315,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             set_label_colors(self.settings_revealer)
             
         except Exception as e:
-            pass  # Silently ignore color setting errors
+            self.logger.debug(f"Could not set label colors in settings panel: {e}")
     
     def _load_settings_css(self):
         """Load CSS styling for settings panel.
@@ -378,12 +390,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if self.batch_output_chooser:
             self.batch_output_chooser.set_sensitive(is_enabled)
         
-        # Atomically save to model's simulation_settings
+        # Save to controller settings (session-specific, not saved to model file)
         if self.simulation:
-            model = self.simulation.model
-            if hasattr(model, 'simulation_settings'):
-                model.simulation_settings.batch_mode_enabled = is_enabled
-                print(f"✓ Batch mode {'enabled' if is_enabled else 'disabled'}")
+            self.simulation.settings.batch_mode_enabled = is_enabled
+            print(f"✓ Batch mode {'enabled' if is_enabled else 'disabled'}")
     
     def _on_batch_replicates_changed(self, spin_button):
         """Handle batch replicates spinner change with atomic persistence.
@@ -393,12 +403,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """
         value = int(spin_button.get_value())
         
-        # Atomically save to model's simulation_settings
+        # Save to controller settings (session-specific)
         if self.simulation:
-            model = self.simulation.model
-            if hasattr(model, 'simulation_settings'):
-                model.simulation_settings.batch_replicates = value
-                print(f"✓ Batch replicates set to {value}")
+            self.simulation.settings.batch_replicates = value
+            print(f"✓ Batch replicates set to {value}")
     
     def _on_batch_output_changed(self, file_chooser):
         """Handle batch output folder change with atomic persistence.
@@ -408,11 +416,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """
         folder = file_chooser.get_filename()
         
-        # Atomically save to model's simulation_settings
+        # Save to controller settings (session-specific)
         if self.simulation and folder:
-            model = self.simulation.model
-            if hasattr(model, 'simulation_settings'):
-                model.simulation_settings.batch_output_folder = folder
+            self.simulation.settings.batch_output_folder = folder
     
     def _on_speed_changed(self, spin):
         """Handle playback speed spinner change (atomic).
@@ -429,24 +435,15 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.buffered_settings.mark_dirty()
         
         # Commit atomically
+        # With atomic settings awareness, the executor is notified immediately
+        # and will recalculate batching on the next loop iteration (≤100ms)
+        # No need to restart simulation - changes take effect dynamically!
         if self.buffered_settings.commit():
-            # Restart simulation if it was running
-            was_running = self.simulation.is_running()
-            if was_running:
-                self.simulation.stop()
-                time_step = self.simulation.get_effective_dt()
-                started = self.simulation.run(time_step=time_step)
-                
-                # Update button states to reflect restarted simulation
-                if started and self.simulation.is_running():
-                    self._update_button_states(running=True)
-                else:
-                    self._update_button_states(running=False)
-            
+            # Emit signal for UI components that observe settings
             self.emit('settings-changed')
         else:
             # Validation failed - restore previous value
-            self.time_scale_spin.set_value(self.simulation.settings.time_scale)
+            spin.set_value(self.simulation.settings.time_scale)
     
     def _on_dt_mode_changed(self, radio_button):
         """Handle time step mode change (Auto/Manual) - atomic.
@@ -758,27 +755,25 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.parallel_stochastic_check.set_active(settings.use_parallel_stochastic)
             self.parallel_stochastic_check.set_sensitive(settings.use_tau_leaping)
         
-        # Update batch mode controls (sync from manager.simulation_settings)
-        model = self.simulation.model
-        if hasattr(model, 'simulation_settings'):
-            batch_settings = model.simulation_settings
-            
-            if self.batch_mode_enabled_check:
-                self.batch_mode_enabled_check.set_active(batch_settings.batch_mode_enabled)
-            
-            if self.batch_replicates_spin:
-                self.batch_replicates_spin.set_value(batch_settings.batch_replicates)
-                self.batch_replicates_spin.set_sensitive(batch_settings.batch_mode_enabled)
-            
-            if self.batch_output_chooser and batch_settings.batch_output_folder:
-                self.batch_output_chooser.set_filename(batch_settings.batch_output_folder)
-                self.batch_output_chooser.set_sensitive(batch_settings.batch_mode_enabled)
-            
-            if self.batch_replicates_label:
-                self.batch_replicates_label.set_sensitive(batch_settings.batch_mode_enabled)
-            
-            if self.batch_output_label:
-                self.batch_output_label.set_sensitive(batch_settings.batch_mode_enabled)
+        # Update batch mode controls (session-specific from controller.settings)
+        batch_settings = self.simulation.settings
+        
+        if self.batch_mode_enabled_check:
+            self.batch_mode_enabled_check.set_active(batch_settings.batch_mode_enabled)
+        
+        if self.batch_replicates_spin:
+            self.batch_replicates_spin.set_value(batch_settings.batch_replicates)
+            self.batch_replicates_spin.set_sensitive(batch_settings.batch_mode_enabled)
+        
+        if self.batch_output_chooser and batch_settings.batch_output_folder:
+            self.batch_output_chooser.set_filename(batch_settings.batch_output_folder)
+            self.batch_output_chooser.set_sensitive(batch_settings.batch_mode_enabled)
+        
+        if self.batch_replicates_label:
+            self.batch_replicates_label.set_sensitive(batch_settings.batch_mode_enabled)
+        
+        if self.batch_output_label:
+            self.batch_output_label.set_sensitive(batch_settings.batch_mode_enabled)
     
     def _hide_settings_panel(self):
         """Hide the settings panel with animation.
@@ -805,6 +800,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # DO NOT OVERWRITE: self.simulation.data_collector = self.data_collector
         self.simulation.add_step_listener(self._on_simulation_step)
         self.simulation.add_step_listener(self.data_collector.on_simulation_step)
+        
+        # Subscribe to simulation.completed event for final progress update
+        from shypn.events import EventBus
+        if hasattr(self._model, 'drawing_area') and self._model.drawing_area:
+            document_id = id(self._model.drawing_area)
+            EventBus.subscribe('simulation.completed', self._on_simulation_completed, document_id=document_id)
         
         # Apply default UI values to simulation settings
         self._apply_ui_defaults_to_settings()
@@ -856,14 +857,39 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         """Callback from SimulationController after each step.
         
         Emits 'step-executed' signal for canvas redraw.
-        Updates progress bar and time display.
+        Updates progress bar and time display (throttled to prevent flickering).
         
         Args:
             controller: The SimulationController instance
             time: Current simulation time
         """
         self.emit('step-executed', time)
+        
+        # Throttle progress updates to prevent unstable display
+        # Only update if enough real-time has elapsed (100ms)
+        import time as time_module
+        current_real_time = time_module.time()
+        
+        if (current_real_time - self._last_progress_update_time) >= self._progress_update_interval:
+            self._update_progress_display()
+            self._last_progress_update_time = current_real_time
+    
+    def _on_simulation_completed(self, event_data):
+        """Callback when simulation completes (reaches duration or stops).
+        
+        Forces immediate progress display update to show final state.
+        
+        Args:
+            event_data: Event data from EventBus (contains controller, time_points, etc.)
+        """
+        # Disable smoothing to show exact final time
+        self._smooth_time_enabled = False
+        
+        # Force immediate progress update to show 100% or final time
         self._update_progress_display()
+        
+        # Update button states to completed state
+        self._update_button_states(running=False, completed=True)
 
     def _apply_styling(self):
         """Apply custom CSS styling to the simulation tools palette."""
@@ -1119,20 +1145,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         else:
             self.simulation.disable_token_accounting()
         
-        # Check if batch mode is enabled in document model
-        model = self.simulation.model
-        batch_enabled = False
-        recorded_objects = set()
-        n_replicates = 100
-        
-        if hasattr(model, 'simulation_settings'):
-            settings = model.simulation_settings
-            batch_enabled = getattr(settings, 'batch_mode_enabled', False)
-            n_replicates = getattr(settings, 'batch_replicates', 100)
-            recorded_objects = getattr(settings, 'recorded_objects', set())
-            
-        else:
-            print(f"⚠️ No simulation_settings found on model")
+        # Check if batch mode is enabled in controller settings
+        settings = self.simulation.settings
+        batch_enabled = settings.batch_mode_enabled
+        n_replicates = settings.batch_replicates
+        recorded_objects = settings.recorded_objects
         
         if batch_enabled:
             print(f"🚀 Starting batch mode with {n_replicates} replicates")
@@ -1140,6 +1157,9 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self._run_batch_mode(n_replicates, recorded_objects)
         else:
             # Normal mode - single simulation
+            # Enable smoothing for continuous runs
+            self._smooth_time_enabled = True
+            
             started = self.simulation.run()
             
             # Update button states based on actual simulation state
@@ -1162,8 +1182,14 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Hide settings panel if open
         self._hide_settings_panel()
         
+        # Disable smoothing for manual stepping (show exact time)
+        self._smooth_time_enabled = False
+        
         # Use effective dt from settings (no hardcoded time_step)
         success = self.simulation.step()
+        
+        # Force immediate progress update (no throttling for manual steps)
+        self._update_progress_display()
         
         # If step failed or simulation completed, update button states
         if not success or self.simulation.is_simulation_complete():
@@ -1177,7 +1203,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Hide settings panel if open
         self._hide_settings_panel()
         
+        # Disable smoothing to show exact stop time
+        self._smooth_time_enabled = False
+        
         self.simulation.stop()
+        
+        # Force immediate progress update to show final state
+        self._update_progress_display()
         
         # Update button states for stopped/paused simulation
         self._update_button_states(running=False)
@@ -1189,6 +1221,11 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Hide settings panel if open
         self._hide_settings_panel()
+        
+        # Reset smoothing state
+        self._last_displayed_time = 0.0
+        self._target_simulation_time = 0.0
+        self._smooth_time_enabled = True
         
         self.simulation.reset()
         
@@ -1458,27 +1495,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             if not isinstance(parent, Gtk.Window):
                 parent = None
             
-            # Synchronize batch mode settings from manager to controller before showing dialog
-            model = self.simulation.model
-            if hasattr(model, 'simulation_settings'):
-                manager_settings = model.simulation_settings
-                # Copy batch settings to controller settings before dialog
-                self.simulation.settings.batch_mode_enabled = manager_settings.batch_mode_enabled
-                self.simulation.settings.batch_replicates = manager_settings.batch_replicates
-                self.simulation.settings.batch_output_folder = manager_settings.batch_output_folder
-                # Note: recorded_objects is stored only in manager_settings
+            # Settings dialog works directly with controller.settings (session-specific)
+            # No synchronization needed - single source of truth
             
             # Show dialog and apply settings
             if show_simulation_settings_dialog(self.simulation.settings, parent):
                 # Settings updated successfully
-                
-                # Synchronize batch mode settings back to manager
-                if hasattr(model, 'simulation_settings'):
-                    manager_settings = model.simulation_settings
-                    manager_settings.batch_mode_enabled = self.simulation.settings.batch_mode_enabled
-                    manager_settings.batch_replicates = self.simulation.settings.batch_replicates
-                    manager_settings.batch_output_folder = self.simulation.settings.batch_output_folder
-                    # recorded_objects stays in manager_settings (managed via context menu)
                 
                 # Update duration display to reflect any changes
                 self._update_duration_display()
@@ -1596,7 +1618,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                     break
     
     def _update_progress_display(self):
-        """Update progress bar and time display label."""
+        """Update progress bar and time display label with smoothing."""
         if not self.progress_bar or not self.time_display_label:
             return
         
@@ -1604,6 +1626,21 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             return
         
         settings = self.simulation.settings
+        
+        # Update target time for smoothing
+        self._target_simulation_time = self.simulation.time
+        
+        # Smooth time display: interpolate between last and current
+        # This prevents discrete jumping in fast simulations
+        if self._smooth_time_enabled and self.simulation.is_running():
+            # Interpolate: move 40% of the way from last to target
+            # This creates smooth visual progression
+            display_time = self._last_displayed_time + 0.4 * (self._target_simulation_time - self._last_displayed_time)
+            self._last_displayed_time = display_time
+        else:
+            # Not running or smoothing disabled: show exact time
+            display_time = self.simulation.time
+            self._last_displayed_time = display_time
         
         # Update progress bar
         if settings.duration:
@@ -1619,7 +1656,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if settings.duration:
             duration_seconds = settings.get_duration_seconds()
             text, _ = TimeFormatter.format_progress(
-                self.simulation.time,
+                display_time,
                 duration_seconds,
                 settings.time_units
             )
@@ -1634,7 +1671,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         else:
             # No duration set, just show current time
             time_text = TimeFormatter.format(
-                self.simulation.time,
+                display_time,
                 TimeUnits.SECONDS,
                 include_unit=True
             )

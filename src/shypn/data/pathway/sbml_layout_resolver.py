@@ -154,7 +154,7 @@ class SBMLLayoutResolver:
         except ImportError:
             self.logger.warning("libsbml not available, cannot read Layout extension")
             return None
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError) as e:
             self.logger.warning(f"Error reading SBML Layout extension: {e}", exc_info=True)
             return None
     
@@ -178,7 +178,7 @@ class SBMLLayoutResolver:
             kegg_pathway = parse_kgml(kgml_data)
             self.logger.info(f"Fetched KEGG pathway with {len(kegg_pathway.entries)} entries")
         
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError, AttributeError) as e:
             self.logger.warning(f"Failed to fetch KEGG pathway: {e}")
             return None
         
@@ -283,7 +283,7 @@ class SBMLLayoutResolver:
             
             return pathways
         
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError) as e:
             self.logger.debug(f"Failed to query pathways for {kegg_id}: {e}")
             return []
     

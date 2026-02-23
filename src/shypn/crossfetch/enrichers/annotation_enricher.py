@@ -221,7 +221,7 @@ class AnnotationEnricher(EnricherBase):
                     conflict_strategy,
                     result
                 )
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 result.add_error(f"Failed to apply annotations for {object_id}: {e}")
         
         # Set success
@@ -300,7 +300,7 @@ class AnnotationEnricher(EnricherBase):
                     if self.keep_provenance:
                         self._add_provenance(obj, field_name, sources)
             
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 result.add_warning(f"Failed to merge field {field_name} for {object_id}: {e}")
     
     def _merge_field(

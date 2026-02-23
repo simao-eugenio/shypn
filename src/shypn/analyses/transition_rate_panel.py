@@ -147,7 +147,18 @@ class TransitionRatePanel(AnalysisPlotPanel):
             if locality and locality.is_valid:
                 self.add_locality_places(obj, locality)
             
-            # Notify Report panel of selection change (if callback is set)
+            # Emit EventBus event for transition selection (for Report panel integration)
+            from shypn.events import EventBus
+            document_id = id(self._model_manager.drawing_area) if hasattr(self._model_manager, 'drawing_area') and self._model_manager.drawing_area else None
+            EventBus.emit('transition.selected', {
+                'transition': obj,
+                'locality': locality,
+                'transition_id': obj.id,
+                'transition_name': getattr(obj, 'name', obj.id),
+                'locality_valid': locality.is_valid if locality else False
+            }, document_id=document_id)
+            
+            # DEPRECATED: Old callback mechanism (kept for backward compatibility)
             if self.on_selection_changed_callback:
                 self.on_selection_changed_callback(obj, locality)
     

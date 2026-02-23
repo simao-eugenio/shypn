@@ -154,6 +154,18 @@ class AnalysesPanelLoader(PerDocumentPanelLoader):
         if self.panel and hasattr(self.panel, 'set_data_collector'):
             self.panel.set_data_collector(data_collector)
     
+    def on_settings_changed(self, simulation_settings=None):
+        """Forward settings changes to the panel.
+        
+        Called when simulation settings change (duration, time step, etc.)
+        to update plot displays and refresh visualizations.
+        
+        Args:
+            simulation_settings: SimulationSettings instance (optional)
+        """
+        if self.panel and hasattr(self.panel, 'on_settings_changed'):
+            self.panel.on_settings_changed(simulation_settings)
+    
     def set_context_menu_handler(self, handler):
         """Set the context menu handler for right-click analysis.
         

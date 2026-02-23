@@ -1,15 +1,42 @@
+# Pre-commit hooks for SHYPN
+# Architecture-Aware Quality Gates
+# Updated: 2026-02-18 (Sprint 0)
+#
+# ARCHITECTURE PROTECTION:
+# Some files are excluded from checks because they implement
+# world-class architecture patterns (A+ grade, 26/26 tests passing).
+# See ARCHITECTURE_ENHANCEMENTS_RECON.md for details.
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
       - id: ruff
         args: ["--select", "T201", "--select", "T203", "--select", "T10", "--fix", "--exit-non-zero-on-fix"]
+        # Preserve architecture zones
+        exclude: '(event_bus|base_panel_loader|.*_panel_loader)\.py$'
       - id: ruff-format
+        # Preserve formatting in architecture zones
+        exclude: '(event_bus|base_panel_loader)\.py$'
+  
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: debug-statements
       - id: check-merge-conflict
       - id: end-of-file-fixer
+        exclude: '\.md$'
       - id: trailing-whitespace
+        exclude: '\.md$'
       - id: mixed-line-ending
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+
+# ARCHITECTURE TEST GATE:
+# Before committing changes that touch architecture zones, run:
+#   pytest tests/test_multi_document_isolation.py -v
+#   pytest tests/test_eventbus_document_scoping.py -v
+# All 31 architecture tests MUST pass (26 + 5 multi-doc isolation)

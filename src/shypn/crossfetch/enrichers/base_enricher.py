@@ -193,7 +193,7 @@ class EnricherBase(ABC):
             try:
                 self._apply_change(pathway, change.rollback_dict())
                 result.add_change(change)
-            except Exception as e:
+            except (AttributeError, KeyError, ValueError, TypeError) as e:
                 result.success = False
                 result.add_error(f"Failed to rollback {change.object_id}: {e}")
         

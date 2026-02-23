@@ -405,7 +405,7 @@ class KEGGStoichiometryEnricher(BaseEnricher):
             if e.code == 404:
                 raise ValueError(f"Reaction {normalized_id} not found in KEGG")
             raise
-        except Exception as e:
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
             raise ValueError(f"Failed to fetch {normalized_id}: {str(e)}")
     
     def _parse_kegg_reaction(self, reaction_id: str, text: str) -> ReactionStoichiometry:

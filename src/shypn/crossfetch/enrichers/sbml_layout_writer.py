@@ -104,7 +104,7 @@ class SBMLLayoutWriter:
             
             return True
             
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError, ImportError) as e:
             self.logger.error(f"Failed to write layout: {e}", exc_info=True)
             return False
     

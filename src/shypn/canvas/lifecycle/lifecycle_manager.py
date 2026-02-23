@@ -180,7 +180,10 @@ class CanvasLifecycleManager:
         elif hasattr(palette, 'registry') and hasattr(palette.registry, 'get_widget_palette_instance'):
             try:
                 simulate_tools = palette.registry.get_widget_palette_instance('simulate')
-            except:
+            except (AttributeError, KeyError, TypeError) as e:
+                # Widget palette retrieval failed
+                import logging
+                logging.getLogger(__name__).debug(f"Cannot get simulate widget palette: {e}")
                 pass
         
         if simulate_tools:

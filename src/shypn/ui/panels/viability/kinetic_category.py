@@ -87,7 +87,8 @@ class KineticCategory(BaseViabilityCategory):
             
             return stats
             
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError, ZeroDivisionError) as e:
+            logger.debug(f"Kinetic stats computation failed: {e}")
             return stats
     
     def _build_content(self):

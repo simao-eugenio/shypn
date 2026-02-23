@@ -529,8 +529,8 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
                 try:
                     file_path.unlink()
                     deleted_count += 1
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to delete trajectory file {file_path}: {e}")
         
         # Clean batch results
         for file_path in self._batch_path.glob('*.json.gz'):
@@ -538,8 +538,8 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
                 try:
                     file_path.unlink()
                     deleted_count += 1
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to delete batch result file {file_path}: {e}")
         
         return deleted_count
     

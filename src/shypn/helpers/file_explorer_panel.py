@@ -287,6 +287,7 @@ class FileExplorerPanel:
             drag_context.finish(True, True, time)
             
         except Exception as e:
+            self.logger.error(f"File drag-and-drop move failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -314,7 +315,7 @@ class FileExplorerPanel:
             style_context = self.tree_view.get_style_context()
             style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         except Exception as e:
-
+            self.logger.debug(f"TreeView CSS styling failed: {e}")
             pass
 
     def _setup_context_menu(self):
@@ -555,7 +556,10 @@ class FileExplorerPanel:
             project = Project.load(project_file)
             if project and project.name:
                 return True, project.name  # Use project's display name
-        except:
+        except (OSError, ValueError, AttributeError, ImportError) as e:
+            # Project file parsing failed, fall through to folder name
+            import logging
+            logging.getLogger(__name__).debug(f"Cannot load project display name: {e}")
             pass
         
         # Fallback: it's a project but couldn't read name, use folder name
@@ -830,8 +834,8 @@ class FileExplorerPanel:
                 self.clipboard_path = None
                 self.clipboard_operation = None
             self._load_current_directory()
-        except Exception as e:
-            pass
+        except (OSError, IOError, PermissionError) as e:
+            self.logger.error(f"Failed to paste {source} to {dest}: {e}")
 
     def _on_duplicate_clicked(self, button):
         """Handle 'Duplicate' context menu button."""
@@ -852,8 +856,8 @@ class FileExplorerPanel:
             else:
                 shutil.copy2(source, dest)
             self._load_current_directory()
-        except Exception as e:
-            pass
+        except (OSError, IOError, PermissionError) as e:
+            self.logger.error(f"Failed to duplicate {source} to {dest}: {e}")
 
     def _on_rename_clicked(self, menu_item):
         """Handle 'Rename' context menu item - inline editing.
@@ -1188,6 +1192,7 @@ class FileExplorerPanel:
                 self.clipboard_operation = None
             self._load_current_directory()
         except Exception as e:
+            self.logger.error(f"Paste action failed: {e}")
             pass
 
     def _on_duplicate_action(self, action, parameter):
@@ -1210,6 +1215,7 @@ class FileExplorerPanel:
                 shutil.copy2(source, dest)
             self._load_current_directory()
         except Exception as e:
+            self.logger.error(f"Duplicate action failed: {e}")
             pass
 
     def _on_rename_action(self, action, parameter):
@@ -1670,6 +1676,7 @@ class FileExplorerPanel:
                 
                 
         except Exception as e:
+            self.logger.error(f"Save document failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -1785,6 +1792,7 @@ class FileExplorerPanel:
             
             
         except Exception as e:
+            self.logger.error(f"Save document as failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -1939,8 +1947,8 @@ class FileExplorerPanel:
                 from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
                 set_lifecycle_scope_manager(self.canvas_loader.lifecycle_manager.id_manager)
                 self.canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(drawing_area)}")
-        except Exception:
-            pass
+        except (AttributeError, TypeError, RuntimeError) as e:
+            self.logger.debug(f"Failed to set lifecycle scope in file explorer canvas switch: {e}")
         
         if manager:
             # ===== UNIFIED OBJECT LOADING =====

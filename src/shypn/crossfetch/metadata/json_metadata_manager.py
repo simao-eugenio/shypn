@@ -88,7 +88,8 @@ class JSONMetadataManager(BaseMetadataManager):
             self.logger.error(f"Invalid JSON in metadata file: {e}")
             return None
         
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            from shypn.exceptions import ImportExportError
             self.logger.error(f"Failed to read metadata file: {e}")
             return None
     
@@ -121,7 +122,8 @@ class JSONMetadataManager(BaseMetadataManager):
             self.logger.debug(f"Updated metadata file: {self.metadata_file}")
             return True
         
-        except Exception as e:
+        except (OSError, IOError, PermissionError, json.JSONDecodeError) as e:
+            from shypn.exceptions import ImportExportError
             self.logger.error(f"Failed to update metadata file: {e}")
             return False
     

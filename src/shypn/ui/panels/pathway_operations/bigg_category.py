@@ -1404,7 +1404,10 @@ class BiGGCategory(BasePathwayCategory):
             try:
                 if widget and not widget.is_destroyed():
                     widget.disconnect(handler_id)
-            except:
+            except (AttributeError, TypeError) as e:
+                # Widget already destroyed or invalid
+                import logging
+                logging.getLogger(__name__).debug(f"Signal disconnect failed: {e}")
                 pass
         self._signal_handlers.clear()
         
@@ -1422,5 +1425,8 @@ class BiGGCategory(BasePathwayCategory):
         """Ensure cleanup on garbage collection."""
         try:
             self.cleanup()
-        except:
+        except (AttributeError, TypeError) as e:
+            # Cleanup failed during garbage collection
+            import logging
+            logging.getLogger(__name__).debug(f"Cleanup in __del__ failed: {e}")
             pass

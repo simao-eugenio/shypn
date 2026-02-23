@@ -117,7 +117,7 @@ class ProjectFileHandler(FileSystemEventHandler):
             
             self.logger.info(f"Auto-discovered pathway: {pathway_doc.name} from {filename}")
             
-        except Exception as e:
+        except (OSError, IOError, ValueError, AttributeError) as e:
             self.logger.error(f"Failed to auto-discover {filename}: {e}")
     
     def _handle_pathway_file_deleted(self, file_path: Path):
@@ -193,7 +193,7 @@ class ProjectFileHandler(FileSystemEventHandler):
             pathway_name = pathway.title or pathway_id
             organism = pathway.org or self._infer_organism(pathway_id)
             
-        except Exception as e:
+        except (ValueError, AttributeError, OSError) as e:
             self.logger.warning(f"Could not parse KGML {filename}: {e}")
             pathway_name = pathway_id
             organism = self._infer_organism(pathway_id)
@@ -232,7 +232,7 @@ class ProjectFileHandler(FileSystemEventHandler):
             
             model_name = pathway_data.metadata.get('name', model_id)
             
-        except Exception as e:
+        except (ValueError, AttributeError, OSError) as e:
             self.logger.warning(f"Could not parse SBML {filename}: {e}")
             model_name = model_id
         

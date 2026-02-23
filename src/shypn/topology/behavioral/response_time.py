@@ -214,7 +214,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             logger.error(f"Response time analysis failed: {e}", exc_info=True)
             return AnalysisResult(
                 success=False,

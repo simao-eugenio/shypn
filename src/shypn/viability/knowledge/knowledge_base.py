@@ -659,10 +659,6 @@ class ModelKnowledgeBase:
             if arc.target_id == transition_id and arc.arc_type == "place_to_transition"
         ]
         
-        # Debug: Show what we found
-        if transition_id in ['T5', 'T6', 'T35', 'T36']:  # Sample transitions
-            for arc in input_arcs:
-        
         return input_arcs
     
     def get_output_arcs_for_transition(self, transition_id: str) -> List[ArcKnowledge]:

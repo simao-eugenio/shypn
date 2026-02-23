@@ -411,7 +411,10 @@ class ParameterTracker:
                         import json
                         try:
                             record['parameters'] = json.loads(record['parameters'])
-                        except:
+                        except (json.JSONDecodeError, ValueError) as e:
+                            # JSON parsing failed, leave as string
+                            import logging
+                            logging.getLogger(__name__).debug(f"Parameter JSON parsing failed: {e}")
                             pass
                     results.append(record)
                 

@@ -264,7 +264,10 @@ class LeapSelector:
                 try:
                     propensity = behavior._evaluate_rate_at_enablement(current_time)
                     propensities.append(propensity)
-                except:
+                except (AttributeError, ValueError, TypeError) as e:
+                    # Behavior rate evaluation failed, skip this transition
+                    import logging
+                    logging.getLogger(__name__).debug(f"Rate evaluation failed for transition: {e}")
                     pass
         
         return self._calculate_tau_simplified(propensities, model)

@@ -112,7 +112,7 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
             
             return result
             
-        except Exception as e:
+        except (ValueError, np.linalg.LinAlgError, AttributeError) as e:
             raise TopologyAnalysisError(
                 f"Stoichiometry analysis failed: {str(e)}"
             )
@@ -222,9 +222,9 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
                                     'num_places': len(coefficients),
                                 })
         
-        except Exception as e:
+        except (np.linalg.LinAlgError, ValueError) as e:
             # If SVD fails, return empty list
-            pass
+            self.logger.debug(f"SVD computation failed for conservation laws: {e}")
         
         return conservation_laws
     

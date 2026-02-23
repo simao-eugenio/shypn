@@ -170,7 +170,7 @@ class CoordinateEnricher(EnricherBase):
                 }
             )
             
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError, ImportError) as e:
             self.logger.error(f"Failed to apply coordinate enrichment: {e}", exc_info=True)
             return EnrichmentResult(
                 success=False,
@@ -224,7 +224,7 @@ class CoordinateEnricher(EnricherBase):
             model = self._get_model_from_pathway(pathway)
             if not model:
                 return False, ["Pathway does not contain valid SBML model"]
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError) as e:
             return False, [f"Failed to access pathway model: {str(e)}"]
         
         is_valid = len(warnings) < len(species_data + reaction_data) * 0.5

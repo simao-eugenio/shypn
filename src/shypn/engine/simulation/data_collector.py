@@ -5,6 +5,7 @@ Collects place tokens and transition firing counts at each simulation step.
 """
 from typing import Dict, List, Tuple, Optional
 from shypn.core.value_objects import RecordingConfig
+from shypn.utils.safe_eval import safe_eval_numeric
 
 
 class DataCollector:
@@ -135,6 +136,7 @@ class DataCollector:
                         behavior = behavior_factory.create_behavior(transition, self.model)
                         self.controller.behavior_cache[transition.id] = behavior
                     except Exception as e:
+                        self.logger.debug(f"Behavior creation failed for transition {transition.id}: {e}")
                         pass
             
             if behavior:
@@ -164,7 +166,8 @@ class DataCollector:
                                     # Also add place names as variables
                                     for p in self.model.places:
                                         eval_context[p.name] = p.tokens
-                                    rate = float(eval(rate_value, {"__builtins__": {}}, eval_context))
+                                    # Safely evaluate rate formula (replaces eval() for security)
+                                    rate = safe_eval_numeric(rate_value, eval_context, default_on_error=0.0)
                                 except Exception as eval_err:
                                     rate = 0.0
                             else:

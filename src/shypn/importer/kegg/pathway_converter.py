@@ -622,7 +622,7 @@ class StandardConversionStrategy(ConversionStrategy):
                 # Pass cache to reaction mapper
                 self.reaction_mapper.set_ec_cache(ec_cache)
                 logger.info(f"Pre-fetched EC numbers for {len(ec_cache)} reactions")
-            except Exception as e:
+            except (ConnectionError, TimeoutError, ValueError, AttributeError) as e:
                 logger.warning(f"Failed to pre-fetch EC numbers: {e}")
                 logger.info("Will fall back to fetching EC numbers individually")
         
@@ -1057,7 +1057,7 @@ class StandardConversionStrategy(ConversionStrategy):
                     f"(confidence={params.confidence_score:.2f})"
                 )
                     
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 enhancement_stats['failed'] += 1
                 logger.warning(
                     f"Failed to enhance {transition.name}: {e}",
@@ -1646,7 +1646,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                 f"Signal classification not available: {e}. "
                 f"Install signal classification package to enable this feature."
             )
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError) as e:
             import logging
             logger = logging.getLogger("KEGGConverter")
             logger.error(f"Signal classification failed: {e}")
@@ -1658,7 +1658,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
     # This enables preemption mechanism and layer-aware analysis
     try:
         _infer_signal_hierarchy_layers(document)
-    except Exception as e:
+    except (AttributeError, ValueError, KeyError) as e:
         logger.warning(f"Signal hierarchy layer inference failed: {e}")
     
     return document

@@ -124,7 +124,7 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
                 },
                 metadata={'elapsed_time': elapsed_time, 'analyzer_name': self.name}
             )
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             elapsed_time = self._end_timer(start_time)
             raise TopologyAnalysisError(
                 f"Signal hierarchy analysis failed: {str(e)}"

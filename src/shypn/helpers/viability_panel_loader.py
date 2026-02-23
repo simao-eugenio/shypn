@@ -59,8 +59,8 @@ class ViabilityPanelLoader:
         # Set window type hint to keep it visible
         try:
             self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-        except Exception:
-            pass  # Wayland may not support this
+        except (TypeError, AttributeError, RuntimeError) as e:
+            self.logger.debug(f"GTK window type hint not supported on this compositor: {e}")
         
         # Create the viability panel
         self.panel = ViabilityPanel(
@@ -169,8 +169,8 @@ class ViabilityPanelLoader:
         if current_parent and current_parent is not container:
             try:
                 current_parent.remove(self.widget)
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                self.logger.debug(f"Failed to remove viability widget from parent: {e}")
         if self.widget.get_parent() != container:
             container.pack_start(self.widget, True, True, 0)
         
@@ -368,8 +368,8 @@ class ViabilityPanelLoader:
         # Raise window to ensure visibility
         try:
             self.window.present()
-        except Exception:
-            pass  # Some window managers may not support this
+        except (TypeError, AttributeError, RuntimeError) as e:
+            self.logger.debug(f"GTK window.present() not supported by window manager: {e}")
     
     def _on_float_toggled(self, button):
         """Internal callback when float toggle button is clicked."""
@@ -388,8 +388,8 @@ class ViabilityPanelLoader:
         # Hide the floating window and reattach to dock container if available
         try:
             self.window.hide()
-        except Exception:
-            pass
+        except (TypeError, AttributeError, RuntimeError) as e:
+            self.logger.debug(f"Failed to hide floating viability window: {e}")
 
         if self.parent_container:
             self.hang_on(self.parent_container)
@@ -431,11 +431,12 @@ class ViabilityPanelLoader:
             self.window.set_transient_for(parent_window)
     
     def initialize_eventbus(self):
-        """Subscribe to document.focused events for automatic tab switching.
+        """Subscribe to document events for automatic tab switching and parameter refresh.
         
         Call this after the loader is created and container is set.
         """
         EventBus.subscribe('document.focused', self._on_document_focused)
+        EventBus.subscribe('file.saved', self._on_file_saved)
     
     def _on_document_focused(self, data):
         """Handle document.focused events for automatic panel swapping.
@@ -471,6 +472,12 @@ class ViabilityPanelLoader:
             if drawing_area and self.panel:
                 if hasattr(self.panel, 'set_drawing_area'):
                     self.panel.set_drawing_area(drawing_area)
+                
+                # CRITICAL: Refresh subnet parameters from current model when panel becomes visible
+                # This ensures TreeViews reflect any parameter changes made in the main canvas
+                # since localities were first added. Without this, experiments use stale values.
+                if hasattr(self.panel, '_refresh_subnet_parameters'):
+                    self.panel._refresh_subnet_parameters()
             
             # Show our widget
             self.widget.show()
@@ -478,10 +485,28 @@ class ViabilityPanelLoader:
             # This is NOT our document - hide
             self.widget.hide()
     
+    def _on_file_saved(self, data):
+        """Handle file.saved events to refresh subnet parameters after model changes.
+        
+        Args:
+            data: Event data containing filepath, document, timestamp
+        """
+        # Check if this save is for our document's file
+        # (we can't directly match document_id since save events don't include it)
+        # Instead, refresh whenever ANY file is saved if our panel is visible
+        if self.panel and self.widget.get_visible():
+            if hasattr(self.panel, '_refresh_subnet_parameters'):
+                import logging
+                logging.getLogger(__name__).debug(
+                    "[VIABILITY] Refreshing subnet parameters after file save"
+                )
+                self.panel._refresh_subnet_parameters()
+    
     def cleanup(self):
         """Cleanup resources and unsubscribe from events."""
         # Unsubscribe from EventBus
         EventBus.unsubscribe('document.focused', self._on_document_focused)
+        EventBus.unsubscribe('file.saved', self._on_file_saved)
         # Clean up panel
         if self.panel and hasattr(self.panel, 'cleanup'):
             self.panel.cleanup()

@@ -192,7 +192,6 @@ class ReportPanel(Gtk.Box):
         # print("[REPORT_PANEL] ModelsCategory added to container")
         
         # DYNAMIC ANALYSES (from Pathway Operations Panel - enrichments)
-        # print("[REPORT_PANEL] Creating DynamicAnalysesCategory...")
         dynamic = DynamicAnalysesCategory(
             name='Dynamic Analyses',
             parent_panel=self
@@ -202,7 +201,6 @@ class ReportPanel(Gtk.Box):
         # print(f"[REPORT_PANEL] DynamicAnalysesCategory widget: {widget}, visible={widget.get_visible()}")
         widget.show_all()
         container.pack_start(widget, False, False, 0)
-        # print("[REPORT_PANEL] DynamicAnalysesCategory added to container")
         
         # TOPOLOGY ANALYSES (from Analyses Panel)
         # print("[REPORT_PANEL] Creating TopologyAnalysesCategory...")
@@ -451,7 +449,7 @@ class ReportPanel(Gtk.Box):
         self.dynamic_analyses_panel = dynamic_analyses_panel
         
         # Update dynamic analyses category with the panel reference
-        for category in self.categories:
+        for i, category in enumerate(self.categories):
             if isinstance(category, DynamicAnalysesCategory):
                 category.set_dynamic_analyses_panel(dynamic_analyses_panel)
                 break
@@ -675,8 +673,8 @@ class ReportPanel(Gtk.Box):
             if not os.path.exists(exports_dir):
                 try:
                     os.makedirs(exports_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    self.logger.debug(f"Failed to create exports directory {exports_dir}: {e}")
             if os.path.isdir(exports_dir):
                 dialog.set_current_folder(exports_dir)
             else:

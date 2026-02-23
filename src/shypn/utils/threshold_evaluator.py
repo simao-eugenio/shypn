@@ -32,6 +32,8 @@ from typing import Dict, Any, Union, Callable
 import math
 import re
 
+from shypn.utils.safe_eval import safe_eval_numeric, safe_eval_function
+
 
 class ThresholdEvaluator:
     """Evaluate dynamic thresholds for arc enablement.
@@ -195,9 +197,9 @@ class ThresholdEvaluator:
         eval_context['t'] = eval_context['time']
         
         try:
-            # Evaluate expression with restricted builtins
-            result = eval(expr, {"__builtins__": {}}, eval_context)
-            return float(result)
+            # Evaluate expression safely (replaces eval() for security)
+            result = safe_eval_numeric(expr, eval_context, allow_math=True)
+            return result
         
         except NameError as e:
             # Provide helpful error message with available names
@@ -308,20 +310,9 @@ class ThresholdEvaluator:
             args['t'] = args['time']
         
         try:
-            # Evaluate lambda function
-            # Build safe context with math module
-            safe_context = {
-                'math': math,
-                'min': min,
-                'max': max,
-                'abs': abs,
-            }
-            
-            func = eval(formula, {"__builtins__": {}}, safe_context)
-            
-            # Call function with resolved arguments
-            result = func(**args)
-            return float(result)
+            # Evaluate lambda function safely (replaces eval() for security)
+            result = safe_eval_function(formula, args)
+            return result
         
         except TypeError as e:
             raise RuntimeError(

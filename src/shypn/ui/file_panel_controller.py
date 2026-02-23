@@ -495,6 +495,7 @@ class FilePanelController:
             try:
                 projects_path.mkdir(parents=True, exist_ok=True)
             except Exception as e:
+                self.logger.error(f"Failed to create projects directory: {e}")
                 pass
                 return
         

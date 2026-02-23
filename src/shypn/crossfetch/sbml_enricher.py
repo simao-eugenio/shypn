@@ -196,7 +196,7 @@ class SBMLEnricher:
             logger.warning(f"BioModels fetch did not return SBML for {pathway_id}")
             return None
             
-        except Exception as e:
+        except (urllib.error.HTTPError, urllib.error.URLError, requests.exceptions.RequestException, AttributeError, KeyError) as e:
             logger.error(f"Failed to fetch SBML from BioModels: {e}")
             return None
     
@@ -260,7 +260,10 @@ class SBMLEnricher:
                 mplugin = model.getPlugin('layout')
                 if mplugin and mplugin.getNumLayouts() > 0:
                     has_layout = True
-            except:
+            except (AttributeError, RuntimeError) as e:
+                # Layout plugin not available or SBML operation failed
+                import logging
+                logging.getLogger(__name__).debug(f"Layout plugin check failed: {e}")
                 pass
             
             if not has_layout:
@@ -314,7 +317,7 @@ class SBMLEnricher:
                 external_data[result.data_type] = result.data
                 logger.info(f"Fetched {result.data_type} from {result.source}")
             
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, AttributeError, KeyError, ValueError) as e:
             logger.error(f"Failed to fetch external data: {e}", exc_info=True)
         
         return external_data
@@ -612,7 +615,7 @@ class SBMLEnricher:
                         pathways.append(pathway_id)
             
             return pathways
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError, AttributeError) as e:
             logger.debug(f"Failed to query pathways for {compound_id}: {e}")
             return []
     
@@ -647,7 +650,7 @@ class SBMLEnricher:
                         pathways.append(pathway_id)
             
             return pathways
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError, AttributeError) as e:
             logger.debug(f"Failed to query pathways for {reaction_id}: {e}")
             return []
     
@@ -710,5 +713,5 @@ class SBMLEnricher:
             else:
                 logger.error(f"Failed to merge coordinates: {result.message}")
                 
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError, ImportError) as e:
             logger.error(f"Failed to merge coordinate data: {e}", exc_info=True)

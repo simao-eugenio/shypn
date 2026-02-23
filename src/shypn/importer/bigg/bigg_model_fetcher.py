@@ -64,7 +64,7 @@ class BiGGModelFetcher(BaseBiGGService):
                 api_version = data.get('api_version', 'unknown')
                 self.logger.info(f"BiGG API accessible, version: {api_version}")
                 return True
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
             self.logger.error(f"BiGG API validation failed: {e}")
             return False
     
@@ -105,7 +105,7 @@ class BiGGModelFetcher(BaseBiGGService):
             self.logger.info(f"Fetched {len(models)} BiGG models")
             return models
             
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
             self._handle_http_error(e, "fetch models")
             return []
     
@@ -164,7 +164,7 @@ class BiGGModelFetcher(BaseBiGGService):
             self.logger.debug(f"Retrieved details for {model_id}")
             return data
             
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
             self.logger.error(f"Failed to get details for model '{model_id}': {e}")
             return None
     

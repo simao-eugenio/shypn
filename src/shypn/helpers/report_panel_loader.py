@@ -299,6 +299,17 @@ class ReportPanelLoader:
         
         self.logger.info("Model manager updated for Report Panel")
     
+    def on_settings_changed(self, simulation_settings=None):
+        """Handle simulation settings changes.
+        
+        Called when simulation parameters change to refresh report displays.
+        
+        Args:
+            simulation_settings: SimulationSettings instance (optional)
+        """
+        if self.panel and hasattr(self.panel, 'refresh'):
+            self.panel.refresh()
+    
     def _on_document_focused(self, data):
         """Handle document.focused events for automatic panel swapping.
         

@@ -219,7 +219,7 @@ class SiphonAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Siphon analysis failed: {str(e)}"],

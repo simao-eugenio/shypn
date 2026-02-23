@@ -203,7 +203,7 @@ class StandardReactionMapper(ReactionMapper):
                 
                 if ec_numbers:
                     logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
-            except Exception as e:
+            except (ConnectionError, TimeoutError, ValueError) as e:
                 logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         # Get biological name for the transition (pass transition_id for fallback)
@@ -271,7 +271,7 @@ class StandardReactionMapper(ReactionMapper):
                 ec_numbers = fetcher.fetch_ec_numbers(reaction.name)
                 if ec_numbers:
                     logger.debug(f"Fetched EC numbers for {reaction.name}: {ec_numbers}")
-            except Exception as e:
+            except (ConnectionError, TimeoutError, ValueError) as e:
                 logger.warning(f"Failed to fetch EC numbers for {reaction.name}: {e}")
         
         # Forward transition

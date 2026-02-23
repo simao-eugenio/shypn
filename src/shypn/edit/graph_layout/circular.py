@@ -294,7 +294,10 @@ class CircularLayout(LayoutAlgorithm):
         # Find all cycles
         try:
             all_cycles = list(nx.simple_cycles(graph))
-        except:
+        except (nx.NetworkXError, ValueError, AttributeError) as e:
+            # Cycle detection can fail for certain graph types
+            import logging
+            logging.getLogger(__name__).debug(f"Cycle detection failed: {e}")
             all_cycles = []
         
         if not all_cycles:

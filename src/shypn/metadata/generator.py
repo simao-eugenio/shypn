@@ -321,7 +321,10 @@ class MinimalHeaderLoader:
         elif 'T' in value_str and value_str.endswith('Z'):
             try:
                 value = datetime.fromisoformat(value_str[:-1])
-            except:
+            except (ValueError, TypeError) as e:
+                # Invalid datetime format, keep as string
+                import logging
+                logging.getLogger(__name__).debug(f"Failed to parse datetime '{value_str}': {e}")
                 pass
         
         section.add_field(key, value)

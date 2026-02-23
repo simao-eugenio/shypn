@@ -8,6 +8,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 import os
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -35,11 +36,13 @@ class DynamicAnalysesCategory(BaseReportCategory):
             name: Category name to display in header
             parent_panel: Parent ReportPanel instance
         """
+        self.logger = logging.getLogger(__name__)
         self.title = name
         self.parent_panel = parent_panel
         self.controller = None
         self.model_canvas = None
         self.project = None
+        self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         # Track which controllers have callbacks registered to avoid re-registration
         self._registered_controllers = set()
         # Track pending idle_add refresh to prevent stale updates
@@ -49,6 +52,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
         # Track selected reaction for auto-refresh after simulation
         self._selected_transition = None
         self._selected_locality = None
+        
+        # Subscribe to EventBus events for decoupling from other panels
+        from shypn.events import EventBus
+        EventBus.subscribe('transition.selected', self._on_transition_selected)
+        EventBus.subscribe('simulation.completed', self._on_simulation_completed)
         
         # Create category frame
         from shypn.ui.category_frame import CategoryFrame
@@ -468,6 +476,41 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         return "\n".join(text)
     
+    def _on_transition_selected(self, data):
+        """Handle transition.selected event from EventBus.
+        
+        Args:
+            data: Event data containing transition, locality, etc.
+        """
+        self.logger.debug(f"Received transition.selected event for {data.get('transition_id')}")
+        
+        transition = data.get('transition')
+        locality = data.get('locality')
+        
+        if transition and locality:
+            self.set_selected_reaction(transition, locality)
+    
+    def _on_simulation_completed(self, data):
+        """Handle simulation.completed event from EventBus.
+        
+        Args:
+            data: Event data containing simulation results, controller, etc.
+        """
+        self.logger.debug("Received simulation.completed event")
+        
+        # Trigger refresh to update tables with new simulation data
+        # The _refresh_simulation_data method will call _populate_reaction_selected_table
+        if self.controller:
+            # Increment generation to ensure only latest refresh completes
+            self._refresh_generation += 1
+            callback_generation = self._refresh_generation
+            
+            # Schedule refresh via idle_add to avoid blocking
+            from gi.repository import GLib
+            if self._pending_refresh_id:
+                GLib.source_remove(self._pending_refresh_id)
+            self._pending_refresh_id = GLib.idle_add(lambda: self._refresh_and_clear_pending(callback_generation))
+    
     def set_dynamic_analyses_panel(self, panel):
         """Set reference to Dynamic Analyses Panel for data integration.
         
@@ -578,7 +621,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     try:
                         existing_callback()
                     except Exception as e:
-                        pass  # Silently ignore errors in chained callbacks
+                        self.logger.debug(f"Error in chained simulation callback: {e}")
             
             # Set the combined callback on this controller
             controller.on_simulation_complete = on_complete
@@ -718,6 +761,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self._update_summary(duration, sim_data)
             # print("[DEBUG_TABLES] _update_summary completed successfully")
         except Exception as e:
+            self.logger.error(f"Failed to update summary: {e}")
             pass
             # print(f"[DEBUG_TABLES] ⚠️  Error updating summary: {e}")
             import traceback
@@ -784,6 +828,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
                 # print(f"[DEBUG_TABLES] ⚠️  Controller changed after species analysis, aborting")
                 return
         except Exception as e:
+            self.logger.error(f"Species analysis failed: {e}")
             pass
             # print(f"[DEBUG_TABLES] ❌ Error analyzing species: {e}")
             import traceback
@@ -805,6 +850,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.reaction_table.populate(reaction_metrics)
             # print("[DEBUG_TABLES] Reaction table populated")
         except Exception as e:
+            self.logger.error(f"Reaction analysis failed: {e}")
             pass
             # print(f"[DEBUG_TABLES] ❌ Error analyzing reactions: {e}")
             import traceback
@@ -851,8 +897,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
         try:
             self._populate_reaction_selected_table()
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            self.logger.error(f"Failed to populate reaction selected table: {e}", exc_info=True)
         
         # Force a redraw of the parent widget to ensure visibility
         if hasattr(self, 'category_frame') and self.category_frame:
@@ -962,8 +1007,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.summary_label.show()  # Ensure label is visible
             
         except Exception as e:
-            pass
-            # If summary update fails, don't block table population
+            self.logger.error(f"Failed to update activity summary: {e}")
             import traceback
             traceback.print_exc()
             self.summary_label.set_markup("<i>Error generating summary</i>")
@@ -976,6 +1020,13 @@ class DynamicAnalysesCategory(BaseReportCategory):
             CategoryFrame: The category widget to add to parent container
         """
         return self.category_frame
+    
+    def cleanup(self):
+        """Cleanup resources and unsubscribe from EventBus events."""
+        from shypn.events import EventBus
+        EventBus.unsubscribe('transition.selected', self._on_transition_selected)
+        EventBus.unsubscribe('simulation.completed', self._on_simulation_completed)
+        self.logger.debug("DynamicAnalysesCategory cleanup complete")
     
     def set_project(self, project):
         """Set project reference.
@@ -1054,88 +1105,43 @@ class DynamicAnalysesCategory(BaseReportCategory):
         self._populate_reaction_selected_table()
     
     def _populate_reaction_selected_table(self):
-        """Populate the Reaction Selected table with transition from Analyses panel.
+        """Populate the Reaction Selected table with stored transition/locality from EventBus.
         
-        Instead of storing selection separately, we query the TransitionRatePanel
-        (Analyses panel) to get the currently selected transition, just like it
-        does for plotting. This ensures consistency with the Global Canvas State Lifecycle.
+        Uses the transition and locality stored by set_selected_reaction (called from EventBus
+        event handler). This ensures loose coupling via EventBus architecture.
         
         This method can be called:
-        1. When transition is selected (via set_selected_reaction callback)
+        1. When transition is selected (via set_selected_reaction from EventBus)
         2. When simulation completes (via _refresh_simulation_data)
-        3. When switching tabs (via refresh) - will check Analyses panel state
+        3. When switching tabs (via refresh) - uses stored selection
         """
-        # Get the PER-DOCUMENT TransitionRatePanel from analyses_panel_loader
-        # NOT from right_panel_loader (which is global)
-        transition_panel = None
-        if hasattr(self, 'parent_panel') and self.parent_panel:
-            model_canvas_loader = getattr(self.parent_panel, 'model_canvas_loader', None)
-            
-            if model_canvas_loader and hasattr(model_canvas_loader, 'overlay_managers') and self.controller:
-                # Find the drawing_area for the current controller
-                for drawing_area, overlay_manager in model_canvas_loader.overlay_managers.items():
-                    if hasattr(overlay_manager, 'simulation_controller') and overlay_manager.simulation_controller is self.controller:
-                        # Get the per-document analyses panel
-                        if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
-                            analyses_panel_loader = overlay_manager.analyses_panel_loader
-                            if hasattr(analyses_panel_loader, 'panel') and analyses_panel_loader.panel:
-                                analyses_panel = analyses_panel_loader.panel
-                                # Get the transitions category panel
-                                if hasattr(analyses_panel, 'transitions_category') and analyses_panel.transitions_category:
-                                    transition_panel = analyses_panel.transitions_category.panel
-                        break
+        self.logger.debug("_populate_reaction_selected_table: Starting")
         
-        if not transition_panel:
-            # DON'T clear the table! Just show message
+        # Use stored transition and locality from EventBus event (set via _on_transition_selected)
+        transition = getattr(self, '_selected_transition', None)
+        locality = getattr(self, '_selected_locality', None)
+        
+        if not transition or not locality:
+            # No selection stored yet
+            self.logger.debug("_populate_reaction_selected_table: No stored transition/locality")
             self.reaction_selected_status.set_markup(
                 "<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>"
             )
             self.reaction_selected_status.show()
             return
         
-        # Check if there are any selected transitions in the Analyses panel
-        if not hasattr(transition_panel, 'selected_objects') or not transition_panel.selected_objects:
-            # DON'T clear the table! Just show message
+        if not locality.is_valid:
+            # Invalid locality
+            self.logger.debug("_populate_reaction_selected_table: Locality is invalid")
             self.reaction_selected_status.set_markup(
-                "<i>No reactions selected. Select one or more reactions from Analyses panel to see locality simulation data.</i>"
+                "<i>Selected transition has no valid locality (need input → transition → output).</i>"
             )
             self.reaction_selected_status.show()
             return
         
-        # Use ALL selected transitions (multi-selection support)
-        selected_transitions = list(transition_panel.selected_objects)
-        
-        # Detect locality for each transition
-        from shypn.diagnostic import LocalityDetector
-        detector = None
-        if hasattr(transition_panel, '_model_manager') and transition_panel._model_manager:
-            detector = LocalityDetector(transition_panel._model_manager)
-        
-        if not detector:
-            self.reaction_selected_status.set_markup(
-                "<i>Cannot detect localities: no model manager available.</i>"
-            )
-            self.reaction_selected_status.show()
-            return
-        
-        # Build list of (transition, locality) pairs for valid localities
-        valid_selections = []
-        invalid_count = 0
-        for transition in selected_transitions:
-            locality = detector.get_locality_for_transition(transition)
-            if locality and locality.is_valid:
-                valid_selections.append((transition, locality))
-            else:
-                invalid_count += 1
-        
-        if not valid_selections:
-            # All selected transitions lack valid locality
-            self.reaction_selected_status.set_markup(
-                f"<i>None of the {len(selected_transitions)} selected transition(s) have valid localities (need input → transition → output).</i>"
-            )
-            self.reaction_selected_status.show()
-            return
-        
+        # Build list of (transition, locality) pairs (single selection for now)
+        valid_selections = [(transition, locality)]
+        self.logger.debug(f"_populate_reaction_selected_table: Using stored transition {transition.id}")
         
         # Get simulation data from THIS document's report_data
         # Search through overlay_managers to find which drawing_area has the current controller
@@ -1151,9 +1157,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
                                 report_data = overlay_manager.report_data
                                 break
                             else:
+                                self.logger.debug("_populate_reaction_selected_table: overlay_manager has no report_data")
                                 break
         
         if not report_data:
+            self.logger.debug("_populate_reaction_selected_table: No report_data found")
             self.reaction_selected_store.clear()
             self.reaction_selected_status.set_markup(
                 "<i>No simulation data available.</i>"
@@ -1161,7 +1169,8 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.reaction_selected_status.show()
             return
         
-        if not report_data or not report_data.has_simulation_data():
+        if not report_data.has_simulation_data():
+            self.logger.debug("_populate_reaction_selected_table: report_data has no simulation data")
             self.reaction_selected_store.clear()
             self.reaction_selected_status.set_markup(
                 f"<i>No simulation data for selected reaction(s). Run a simulation first.</i>"
@@ -1169,6 +1178,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.reaction_selected_status.show()
             return
         
+        self.logger.debug("_populate_reaction_selected_table: Successfully passed all checks, populating table")
         
         # Get stored simulation data
         sim_data = report_data.last_simulation_data
@@ -1282,30 +1292,19 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     ])
                     total_output_places += 1
         
-        # Update status based on number of reactions
-        num_selected = len(valid_selections)
-        if num_selected == 1:
-            # Single reaction: show specific details
-            transition, locality = valid_selections[0]
-            num_inputs = len(locality.input_places)
-            num_outputs = len(locality.output_places)
-            status_text = (
-                f"<i>Summary for <b>{transition.id}</b>: "
-                f"1 transition, {num_inputs} input place(s), {num_outputs} output place(s)</i>"
-            )
-        else:
-            # Multiple reactions: show aggregate summary
-            status_text = (
-                f"<i>Summary for <b>{num_selected} reactions</b>: "
-                f"{total_transitions} transition(s), {total_input_places} input place(s), {total_output_places} output place(s)</i>"
-            )
-        
-        # Add note if some selections were invalid
-        if invalid_count > 0:
-            status_text = status_text.replace("</i>", f" ({invalid_count} invalid)</i>")
+        # Update status for the selected reaction (single selection)
+        transition, locality = valid_selections[0]
+        num_inputs = len(locality.input_places)
+        num_outputs = len(locality.output_places)
+        status_text = (
+            f"<i>Summary for <b>{transition.id}</b>: "
+            f"1 transition, {num_inputs} input place(s), {num_outputs} output place(s)</i>"
+        )
         
         self.reaction_selected_status.set_markup(status_text)
         self.reaction_selected_status.show()
+        
+        self.logger.debug(f"_populate_reaction_selected_table: Completed successfully. Populated {len(valid_selections)} reactions, {total_transitions} transitions, {total_input_places} inputs, {total_output_places} outputs")
     
     def add_experiment_result(self, name, result):
         """Add an experiment result to the report.

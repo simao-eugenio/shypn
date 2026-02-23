@@ -400,7 +400,7 @@ class FilePanelV3Loader(FilePanelBase):
                 pass
             
         except Exception as e:
-            pass
+            self.logger.error(f"Failed to trigger project created callback: {e}")
             import traceback
             traceback.print_exc()
         

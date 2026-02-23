@@ -15,6 +15,8 @@ Legacy extractor classes moved to extractors/ subpackage for modularity.
 from typing import Optional, Dict, List
 from pathlib import Path
 import logging
+import math
+from shypn.utils.safe_eval import safe_eval_numeric
 
 try:
     import libsbml
@@ -57,16 +59,6 @@ class SBMLParser:
     - Minimal logic in parser (delegates to extractors)
     - Extensible (add new extractors without modifying parser)
     - Clear separation of concerns
-    
-    Example:
-        parser = SBMLParser()
-        pathway = parser.parse_file('glycolysis.sbml')
-    """
-    """
-    Main SBML parser class.
-    
-    Coordinates the extraction of pathway data from SBML files.
-    Uses specialized extractor classes for different element types.
     
     Example:
         parser = SBMLParser()
@@ -495,7 +487,8 @@ class SBMLParser:
                     }
                     safe_context.update(context)
                     
-                    value = eval(formula, safe_context)
+                    # Safely evaluate assignment rule (replaces eval() for security)
+                    value = safe_eval_numeric(formula, safe_context, allow_math=True)
                     
                     # Update context and species/parameter
                     context[variable] = value
@@ -516,7 +509,8 @@ class SBMLParser:
                     made_progress = True
                     
                 except Exception as e:
-                    # Can't evaluate yet (may depend on other rules)
+                    # Can't evaluate yet (may depend on other rules not yet evaluated)
+                    # This is expected during iterative evaluation - silently skip
                     pass
             
             if not made_progress:
@@ -637,9 +631,8 @@ class SBMLParser:
                 try:
                     notes_str = str(notes) if not isinstance(notes, str) else notes
                     metadata['notes'] = notes_str[:500]  # Truncate to 500 chars
-                except Exception as e:
-                    self.logger.warning(f"Could not process notes: {e}")
-                    metadata['notes'] = "Notes unavailable"
+                except (ValueError, TypeError) as e:
+                    self.logger.debug(f"Failed to process SBML notes: {e}")
         
         return metadata
     

@@ -239,6 +239,7 @@ class ViabilityObserver:
             if sim_data.get('dead_transitions'):
                 dt_list = sim_data.get('dead_transitions', [])
                 for i, dt in enumerate(dt_list[:3]):
+                    pass  # TODO: Implement dead transition handling
             
             self.knowledge['simulation_state'].update(sim_data)
             
@@ -392,7 +393,10 @@ class ViabilityObserver:
                         issues = rule.action(self.knowledge)
                         if issues:
                             suggestions.extend(issues)
-                except:
+                except (AttributeError, KeyError, ValueError) as e:
+                    # Rule evaluation failed, skip to next rule
+                    import logging
+                    logging.getLogger(__name__).debug(f"Rule evaluation failed: {e}")
                     continue
         return suggestions
     
@@ -599,6 +603,7 @@ class ViabilityObserver:
             all_suggestions['diagnosis'].append(suggestion)
         
         for cat, suggs in all_suggestions.items():
+            pass  # TODO: Implement suggestion processing
         
         return all_suggestions
     

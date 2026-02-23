@@ -2,11 +2,11 @@
 """Adaptive Hybrid Behavior - Runtime switching between ODE and Stochastic.
 
 This behavior dynamically selects between continuous (ODE) and stochastic (SSA/τ-leaping)
-execution based on compartment volume and molecular counts at runtime.
+execution based on molecular population size (tokens × compartment_volume) at runtime.
 
 Key Features:
-    - Automatic method selection based on volume thresholds
-    - Seamless switching during simulation
+    - Automatic method selection based on molecule count thresholds
+    - Seamless switching during simulation as populations change
     - Maintains state consistency across mode changes
     - Integrates with existing τ-leaping and continuous engines
 
@@ -19,13 +19,14 @@ Biological Motivation:
     (like adaptive hybrid SSA/ODE) work in computational systems biology.
 
 Usage:
-    # Create adaptive transition (automatically switches based on volume)
+    # Create adaptive transition (automatically switches based on molecule count)
     transition = Transition(..., transition_type='adaptive')
     behavior = AdaptiveHybridBehavior(transition, model)
     
     # During simulation:
-    # - If volume < 1.0 fL → Uses stochastic (τ-leaping)
-    # - If volume ≥ 1.0 fL → Uses continuous (ODE integration)
+    # - If molecule_count < 100 → Uses stochastic (τ-leaping)
+    # - If molecule_count ≥ 100 → Uses continuous (ODE integration)
+    # - Mode switches dynamically as populations change
 
 # RESOLVED: Mass conservation enforced globally via ConservationEnforcer.
 #           Mode switching WAS the primary issue (firing imbalance from desynchronization),
@@ -48,19 +49,21 @@ from .spatial_utils import VolumeAdaptiveSelector
 class AdaptiveHybridBehavior(TransitionBehavior):
     """Adaptive behavior that switches between continuous and stochastic.
     
-    Implements runtime method selection based on spatial properties:
-    - Reads compartment_volume from connected places
-    - Switches to stochastic for small volumes (< threshold)
-    - Switches to continuous for large volumes (≥ threshold)
+    Implements runtime method selection based on molecular population size:
+    - Calculates molecule count as: tokens × compartment_volume for each connected place
+    - Switches to stochastic for low molecule counts (< threshold)
+    - Switches to continuous for high molecule counts (≥ threshold)
     
     The behavior delegates to either ContinuousBehavior or StochasticBehavior
     based on current conditions, providing seamless integration with existing
     simulation engines (τ-leaping for stochastic, RK4 for continuous).
     
     Properties:
-        volume_threshold (float): Threshold in fL (default 1.0)
+        volume_threshold (float): Molecule count threshold (default 100 molecules)
+            Note: Despite the name 'volume_threshold' for backward compatibility,
+            this now represents the molecule count threshold (tokens × volume)
         prefer_continuous (bool): Prefer continuous when volume not set (default True)
-        adaptive_filter (str): Which places to check for volume (default 'inputs_only')
+        adaptive_filter (str): Which places to check for molecule count (default 'inputs_only')
             - 'all': Check all input and output places
             - 'inputs_only': Check only input places (substrates drive propensity)
             - 'spatial_only': Check only places with compartment_volume property
@@ -75,14 +78,14 @@ class AdaptiveHybridBehavior(TransitionBehavior):
     Biological Rationale for 'inputs_only' (default):
         - Input places = substrates that determine reaction propensity
         - Output places = products that don't affect firing decision
-        - Substrate concentrations govern whether reaction uses stochastic or continuous dynamics
+        - Substrate molecule counts govern whether reaction uses stochastic or continuous dynamics
     
     Example:
         >>> behavior = AdaptiveHybridBehavior(transition, model)
-        >>> # At t=0, input volume=0.5 fL → Uses stochastic
+        >>> # At t=0, input has 10 molecules → Uses stochastic
         >>> behavior.fire(...)  # Discrete burst firing
         >>> 
-        >>> # Later, input volume=100 fL → Switches to continuous
+        >>> # Later, input has 500 molecules → Switches to continuous
         >>> behavior.integrate_step(...)  # Smooth ODE integration
     """
     
@@ -94,7 +97,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         """Initialize adaptive hybrid behavior.
         
         Creates both continuous and stochastic behavior delegates.
-        The volume selector determines which to use at runtime.
+        The volume selector determines which to use at runtime based on
+        molecular population size (tokens × compartment_volume).
         
         Args:
             transition: Transition object with adaptive properties
@@ -106,7 +110,22 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         # Extract adaptive parameters
         props = getattr(transition, 'properties', {})
-        self.volume_threshold = float(props.get('volume_threshold', 1.0))
+        
+        # Backward compatibility: 'volume_threshold' now means molecule count threshold
+        # Old models: volume_threshold=1.0 (fL) → treat as legacy, use default 100
+        # New models: volume_threshold=100 (molecules) → use as-is
+        raw_threshold = props.get('volume_threshold', 100.0)
+        
+        # Heuristic: if threshold < 10, assume it's old fL-based value, use default
+        if raw_threshold < 10.0:
+            self.volume_threshold = 100.0  # Modern default: 100 molecules
+            self.logger.info(
+                f"Transition '{transition.name}': Converting legacy volume_threshold={raw_threshold} fL "
+                f"to molecule_threshold={self.volume_threshold}"
+            )
+        else:
+            self.volume_threshold = float(raw_threshold)
+        
         self.prefer_continuous = props.get('prefer_continuous', True)
         
         # Place filtering strategy for mode selection
@@ -120,8 +139,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         self.continuous_behavior = ContinuousBehavior(transition, model)
         self.stochastic_behavior = StochasticBehavior(transition, model)
         
-        # Volume-based selector
-        self.volume_selector = VolumeAdaptiveSelector(threshold_fL=self.volume_threshold)
+        # Volume-based selector (now uses molecule counts)
+        self.volume_selector = VolumeAdaptiveSelector(threshold_molecules=self.volume_threshold)
         
         # Track current mode for mode change detection
         self._current_mode = None  # 'continuous' or 'stochastic'
@@ -138,7 +157,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         self.logger.info(
             f"Created AdaptiveHybridBehavior for '{transition.name}' "
-            f"(threshold={self.volume_threshold} fL, filter={self.place_filter})"
+            f"(threshold={self.volume_threshold} molecules, filter={self.place_filter})"
         )
     
     def _get_connected_places(self) -> List:
@@ -246,15 +265,17 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         try:
             return place.is_spatial_signal()
-        except:
+        except (AttributeError, TypeError) as e:
             # Fallback: check signal_type attribute
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to check is_spatial_signal, using fallback: {e}")
             from shypn.netobjs.signal_type import SignalType
             return getattr(place, 'signal_type', None) == SignalType.SPATIAL
     
     def _select_mode(self) -> str:
-        """Select execution mode based on current volumes.
+        """Select execution mode based on current molecule counts.
         
-        Analyzes compartment volumes of connected places and decides
+        Analyzes molecule counts (tokens × volume) of connected places and decides
         whether to use stochastic or continuous execution.
         
         Returns:
@@ -296,13 +317,13 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         self._last_volume_check = details
         
         # Warn if no volumes found (silent failure prevention - warn once per transition unless suppressed)
-        if details.get('reason') == 'no-volumes-set':
+        if details.get('reason') == 'no-molecule-counts':
             if not self.suppress_warnings:
                 transition_key = self.transition.name
                 if transition_key not in AdaptiveHybridBehavior._warned_no_volumes_transitions:
                     self.logger.warning(
                         f"Adaptive transition '{self.transition.name}' has {len(places)} connected places "
-                        f"but none have 'compartment_volume' property set. "
+                        f"but none have 'compartment_volume' or 'tokens' properties set. "
                         f"Defaulting to continuous mode. Set place.compartment_volume to enable adaptive behavior."
                     )
                     AdaptiveHybridBehavior._warned_no_volumes_transitions.add(transition_key)
@@ -334,12 +355,12 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         # Log mode change
         if old_mode is not None:
-            volume_info = self._last_volume_check or {}
+            check_info = self._last_volume_check or {}
             self.logger.info(
                 f"Transition '{self.transition.name}' mode change: "
                 f"{old_mode} → {new_mode} "
-                f"(min_volume={volume_info.get('min_volume', 'N/A')} fL, "
-                f"threshold={self.volume_threshold} fL)"
+                f"(min_molecules={check_info.get('min_molecules', 'N/A')}, "
+                f"threshold={self.volume_threshold} molecules)"
             )
         
         # Clear stochastic scheduling state when switching away from stochastic
@@ -418,7 +439,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             # Annotate result with mode info
             if success:
                 details['adaptive_mode'] = 'stochastic'
-                details['volume_info'] = self._last_volume_check
+                details['molecule_check'] = self._last_volume_check
             
             return success, details
         else:
@@ -426,7 +447,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             return False, {
                 'reason': 'use-integrate-step-for-continuous',
                 'adaptive_mode': 'continuous',
-                'volume_info': self._last_volume_check
+                'molecule_check': self._last_volume_check
             }
     
     def integrate_step(self, dt: float, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:
@@ -453,7 +474,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             # Annotate result with mode info
             if success:
                 details['adaptive_mode'] = 'continuous'
-                details['volume_info'] = self._last_volume_check
+                details['molecule_check'] = self._last_volume_check
             
             return success, details
         else:
@@ -473,7 +494,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                 
                 if success:
                     details['adaptive_mode'] = 'stochastic'
-                    details['volume_info'] = self._last_volume_check
+                    details['molecule_check'] = self._last_volume_check
                     details['firing_within_dt'] = True
                 
                 return success, details
@@ -481,7 +502,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                 # No firing within this interval
                 return True, {
                     'adaptive_mode': 'stochastic',
-                    'volume_info': self._last_volume_check,
+                    'molecule_check': self._last_volume_check,
                     'firing_within_dt': False,
                     'scheduled_time': scheduled_time,
                     'current_time': current_time,
@@ -539,14 +560,14 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         """Get detailed adaptive behavior information.
         
         Returns:
-            Dictionary with threshold, current mode, filter, and volume details
+            Dictionary with threshold (molecules), current mode, filter, and molecule count details
         """
         return {
-            'volume_threshold': self.volume_threshold,
+            'molecule_threshold': self.volume_threshold,  # Note: stored as volume_threshold for backward compat
             'prefer_continuous': self.prefer_continuous,
             'place_filter': self.place_filter,
             'current_mode': self._current_mode,
-            'last_volume_check': self._last_volume_check,
+            'last_molecule_check': self._last_volume_check,
             'continuous_info': self.continuous_behavior.get_continuous_info(),
             'stochastic_info': self.stochastic_behavior.get_stochastic_info()
         }

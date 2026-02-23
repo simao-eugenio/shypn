@@ -635,310 +635,338 @@ class TransitionPropDialogLoader(GObject.GObject):
     def _apply_changes(self):
         """Apply changes from dialog fields to Transition object.
         
+        REFACTORED (Sprint 2): Extracted helper methods to reduce complexity.
+        Original complexity: 60 → New complexity: <15
+        
         Returns:
             bool: True if successful, False if validation failed
         """
         try:
-            # Name (user-editable alias)
-            name_entry = self.builder.get_object('name_entry')
-            if name_entry and hasattr(self.transition_obj, 'name'):
-                new_name = name_entry.get_text().strip()
-                if new_name:  # Only update if non-empty
-                    self.transition_obj.name = new_name
+            # Apply properties in logical groups
+            self._apply_basic_properties()
+            self._apply_adaptive_properties()
+            self._apply_firing_and_priority()
+            self._apply_flags()
             
-            # Label
-            label_entry = self.builder.get_object('transition_label_entry')
-            if label_entry:
-                new_label = label_entry.get_text().strip()
-                self.transition_obj.label = new_label if new_label else None
+            # Rate functions require validation
+            if not self._apply_rate_functions():
+                return False  # Validation failed
             
-            # Compartment (save as attribute)
-            compartment_entry = self.builder.get_object('compartment_entry')
-            if compartment_entry:
-                compartment_text = compartment_entry.get_text().strip()
-                if compartment_text:
-                    # Save non-empty compartment to attribute
-                    self.transition_obj.compartment = compartment_text
-                else:
-                    # Clear empty compartment
-                    self.transition_obj.compartment = None
+            # Guard requires validation
+            if not self._apply_guard():
+                return False  # Validation failed
             
-            # Transition type
-            type_combo = self.builder.get_object('prop_transition_type_combo')
-            if type_combo:
-                type_list = ['immediate', 'timed', 'stochastic', 'continuous', 'adaptive']
-                self.transition_obj.transition_type = type_list[type_combo.get_active()]
-            
-            # Adaptive properties (save to properties dict)
-            if self.transition_obj.transition_type == 'adaptive':
-                if not hasattr(self.transition_obj, 'properties') or not isinstance(self.transition_obj.properties, dict):
-                    self.transition_obj.properties = {}
-                
-                # Save adaptive filter
-                adaptive_filter_combo = self.builder.get_object('adaptive_filter_combo')
-                if adaptive_filter_combo:
-                    filter_list = ['inputs_only', 'outputs_only', 'all_places']
-                    self.transition_obj.properties['adaptive_filter'] = filter_list[adaptive_filter_combo.get_active()]
-                
-                # Save volume threshold
-                volume_threshold_spin = self.builder.get_object('volume_threshold_spin')
-                if volume_threshold_spin:
-                    self.transition_obj.properties['volume_threshold'] = volume_threshold_spin.get_value()
-            
-            # Firing policy (replaces priority spinner)
-            firing_policy_combo = self.builder.get_object('firing_policy_combo')
-            if firing_policy_combo:
-                # Policy list order matches combobox: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority
-                policy_list = [
-                    'random',
-                    'earliest',
-                    'latest',
-                    'priority',
-                    'race',
-                    'age',
-                    'preemptive-priority'
-                ]
-                policy_index = firing_policy_combo.get_active()
-                if policy_index >= 0:
-                    self.transition_obj.firing_policy = policy_list[policy_index]
-            
-            # Priority value (numeric)
-            priority_value_spin = self.builder.get_object('priority_value_spin')
-            if priority_value_spin:
-                self.transition_obj.priority = int(priority_value_spin.get_value())
-            
-            # Source/Sink
-            is_source_check = self.builder.get_object('is_source_check')
-            if is_source_check:
-                self.transition_obj.is_source = is_source_check.get_active()
-            
-            is_sink_check = self.builder.get_object('is_sink_check')
-            if is_sink_check:
-                self.transition_obj.is_sink = is_sink_check.get_active()
-            
-            # Note: signal_places is auto-detected by the engine from rate function
-            # No manual save needed - it's updated during simulation/analysis
-            
-            # Rate function - validate and save to both rate and properties['rate_function']
-            # Backward compatible: try new name first, fall back to old name
-            rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
-            reversible_check = self.builder.get_object('reversible_check')
-            
-            # Check if using directional rates
-            if reversible_check and reversible_check.get_active():
-                # Save directional rates: rate_function is forward, rate_reverse is reverse
-                # Backward compatible: try new name first, fall back to old name
-                rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
-                rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
-                
-                # Forward rate from main rate field
-                if rate_textview:
-                    buffer = rate_textview.get_buffer()
-                    start, end = buffer.get_bounds()
-                    rate_fwd_text = buffer.get_text(start, end, True).strip()
-                    if rate_fwd_text:
-                        # Validate
-                        is_valid, error_msg = self._validate_rate_function_runtime(rate_fwd_text)
-                        if not is_valid:
-                            self._show_error_dialog("Invalid Forward Rate", error_msg)
-                            return False
-                        self.transition_obj.rate_forward = rate_fwd_text
-                    else:
-                        # No forward rate - set default "1" for continuous/adaptive transitions
-                        if self.transition_obj.transition_type in ['continuous', 'adaptive']:
-                            self.transition_obj.rate_forward = "1"
-                        else:
-                            # Clear forward rate from properties dict
-                            if 'rate_forward' in self.transition_obj.properties:
-                                del self.transition_obj.properties['rate_forward']
-                
-                # Reverse rate from reverse field
-                if rate_reverse_textview:
-                    buffer = rate_reverse_textview.get_buffer()
-                    start, end = buffer.get_bounds()
-                    rate_rev_text = buffer.get_text(start, end, True).strip()
-                    if rate_rev_text:
-                        # Validate
-                        is_valid, error_msg = self._validate_rate_function_runtime(rate_rev_text)
-                        if not is_valid:
-                            self._show_error_dialog("Invalid Reverse Rate", error_msg)
-                            return False
-                        self.transition_obj.rate_reverse = rate_rev_text
-                    else:
-                        # No reverse rate - set default "1" for continuous/adaptive transitions
-                        if self.transition_obj.transition_type in ['continuous', 'adaptive']:
-                            self.transition_obj.rate_reverse = "1"
-                        else:
-                            # Clear reverse rate from properties dict
-                            if 'rate_reverse' in self.transition_obj.properties:
-                                del self.transition_obj.properties['rate_reverse']
-                
-                # Clear regular rate and properties when using directional
-                # Don't use set_rate(None) as it raises error for continuous transitions
-                # Just clear the rate attribute directly
-                self.transition_obj.rate = None
-                if hasattr(self.transition_obj, 'properties'):
-                    if 'rate_function' in self.transition_obj.properties:
-                        del self.transition_obj.properties['rate_function']
-                    if 'rate_function_display' in self.transition_obj.properties:
-                        del self.transition_obj.properties['rate_function_display']
-            
-            elif rate_textview:
-                # Use regular rate function
-                # Clear directional rates from properties dict
-                if hasattr(self.transition_obj, 'properties'):
-                    if 'rate_forward' in self.transition_obj.properties:
-                        del self.transition_obj.properties['rate_forward']
-                    if 'rate_reverse' in self.transition_obj.properties:
-                        del self.transition_obj.properties['rate_reverse']
-                
-                buffer = rate_textview.get_buffer()
-                start, end = buffer.get_bounds()
-                rate_text = buffer.get_text(start, end, True).strip()
-                
-                if rate_text:
-                    # Comprehensive validation (syntax + runtime)
-                    is_valid, error_msg = self._validate_rate_function_runtime(rate_text)
-                    
-                    if not is_valid:
-                        self._show_error_dialog("Invalid Rate Function", error_msg)
-                        return False  # Validation failed, don't apply changes
-                    
-                    # PHASE 2 REFACTORING: Always use rate_function (unified approach)
-                    # Save to properties dict - this is the canonical field for ALL rates
-                    if not hasattr(self.transition_obj, 'properties'):
-                        self.transition_obj.properties = {}
-                    
-                    # Store as both display and computational versions
-                    self.transition_obj.properties['rate_function_display'] = rate_text
-                    self.transition_obj.properties['rate_function'] = rate_text
-                    
-                    # Clear deprecated rate field (no longer used)
-                    self.transition_obj.rate = None
-                else:
-                    # No rate specified - set default value of "1" for continuous/adaptive transitions
-                    # to prevent missing rate_function errors
-                    if self.transition_obj.transition_type in ['continuous', 'adaptive']:
-                        # Set default rate function
-                        if not hasattr(self.transition_obj, 'properties'):
-                            self.transition_obj.properties = {}
-                        self.transition_obj.properties['rate_function_display'] = "1"
-                        self.transition_obj.properties['rate_function'] = "1"
-                        self.transition_obj.rate = None
-                    else:
-                        # For other transition types, clear rate_function
-                        if hasattr(self.transition_obj, 'properties'):
-                            if 'rate_function' in self.transition_obj.properties:
-                                del self.transition_obj.properties['rate_function']
-                            if 'rate_function_display' in self.transition_obj.properties:
-                                del self.transition_obj.properties['rate_function_display']
-                        self.transition_obj.set_rate(None)
-            
-            # Guard - validate and apply
-            guard_textview = self.builder.get_object('guard_textview')
-            if guard_textview:
-                buffer = guard_textview.get_buffer()
-                start, end = buffer.get_bounds()
-                guard_text = buffer.get_text(start, end, True).strip()
-                
-                if guard_text:
-                    # Validate the guard expression before applying (same validation as rate)
-                    is_valid, error_msg = self._validate_rate_function_runtime(guard_text)
-                    
-                    if not is_valid:
-                        # Show error dialog and refuse to apply
-                        error_dialog = Gtk.MessageDialog(
-                            transient_for=self.dialog,
-                            modal=True,
-                            message_type=Gtk.MessageType.ERROR,
-                            buttons=Gtk.ButtonsType.OK,
-                            text="Invalid Guard Expression"
-                        )
-                        error_dialog.format_secondary_text(
-                            f"The guard expression cannot be applied:\n\n{error_msg}\n\n"
-                            f"Please correct the expression before applying."
-                        )
-                        error_dialog.run()
-                        error_dialog.destroy()
-                        return False  # Validation failed, don't apply changes
-                
-                self.transition_obj.set_guard(guard_text if guard_text else None)
-            
-            # Timing parameters (for Timed transitions)
-            earliest_time_spin = self.builder.get_object('earliest_time_spin')
-            if earliest_time_spin:
-                earliest_value = earliest_time_spin.get_value()
-                self.transition_obj.earliest_time = earliest_value
-                # Also save to properties for backward compatibility
-                if not hasattr(self.transition_obj, 'properties'):
-                    self.transition_obj.properties = {}
-                self.transition_obj.properties['earliest_time'] = earliest_value
-            
-            latest_time_spin = self.builder.get_object('latest_time_spin')
-            if latest_time_spin:
-                latest_value = latest_time_spin.get_value()
-                self.transition_obj.latest_time = latest_value
-                # Also save to properties for backward compatibility
-                if not hasattr(self.transition_obj, 'properties'):
-                    self.transition_obj.properties = {}
-                self.transition_obj.properties['latest_time'] = latest_value
-            
-            # Color from picker
-            if self.color_picker:
-                selected_color = self.color_picker.get_selected_color()
-                self.transition_obj.border_color = selected_color
-                self.transition_obj.fill_color = selected_color
-            
-            # Line Width
-            width_entry = self.builder.get_object('prop_transition_width_entry')
-            if width_entry and hasattr(self.transition_obj, 'border_width'):
-                try:
-                    width_text = width_entry.get_text().strip()
-                    if width_text:
-                        width_value = float(width_text)
-                        self.transition_obj.border_width = max(0.5, width_value)
-                except ValueError:
-                    pass  # Keep current value if invalid
-            
-            # Rectangle Width
-            rect_width_entry = self.builder.get_object('rect_width_entry')
-            if rect_width_entry and hasattr(self.transition_obj, 'width'):
-                try:
-                    width_text = rect_width_entry.get_text().strip()
-                    if width_text:
-                        width_value = float(width_text)
-                        self.transition_obj.width = max(1.0, width_value)
-                except ValueError:
-                    pass  # Keep current value if invalid
-            
-            # Rectangle Height
-            rect_height_entry = self.builder.get_object('rect_height_entry')
-            if rect_height_entry and hasattr(self.transition_obj, 'height'):
-                try:
-                    height_text = rect_height_entry.get_text().strip()
-                    if height_text:
-                        height_value = float(height_text)
-                        self.transition_obj.height = max(1.0, height_value)
-                except ValueError:
-                    pass  # Keep current value if invalid
-            
-            # Save kinetic parameters from manual entry fields
+            self._apply_timing_parameters()
+            self._apply_visual_properties()
             self._save_kinetic_entry_fields()
             
             return True
             
         except ValueError as e:
-            # Show error dialog
-            error_dialog = Gtk.MessageDialog(
-                transient_for=self.dialog,
-                message_type=Gtk.MessageType.ERROR,
-                buttons=Gtk.ButtonsType.OK,
-                text="Validation Error"
-            )
-            error_dialog.format_secondary_text(str(e))
-            error_dialog.run()
-            error_dialog.destroy()
+            self._show_error_dialog("Validation Error", str(e))
             return False
+
+    def _apply_basic_properties(self):
+        """Apply basic transition properties: name, label, compartment, type."""
+        # Name (user-editable alias)
+        name_entry = self.builder.get_object('name_entry')
+        if name_entry and hasattr(self.transition_obj, 'name'):
+            new_name = name_entry.get_text().strip()
+            if new_name:
+                self.transition_obj.name = new_name
+        
+        # Label
+        label_entry = self.builder.get_object('transition_label_entry')
+        if label_entry:
+            new_label = label_entry.get_text().strip()
+            self.transition_obj.label = new_label if new_label else None
+        
+        # Compartment
+        compartment_entry = self.builder.get_object('compartment_entry')
+        if compartment_entry:
+            compartment_text = compartment_entry.get_text().strip()
+            self.transition_obj.compartment = compartment_text if compartment_text else None
+        
+        # Transition type
+        type_combo = self.builder.get_object('prop_transition_type_combo')
+        if type_combo:
+            type_list = ['immediate', 'timed', 'stochastic', 'continuous', 'adaptive']
+            self.transition_obj.transition_type = type_list[type_combo.get_active()]
+
+    def _apply_adaptive_properties(self):
+        """Apply adaptive transition specific properties."""
+        if self.transition_obj.transition_type == 'adaptive':
+            if not hasattr(self.transition_obj, 'properties') or not isinstance(self.transition_obj.properties, dict):
+                self.transition_obj.properties = {}
+            
+            # Adaptive filter
+            adaptive_filter_combo = self.builder.get_object('adaptive_filter_combo')
+            if adaptive_filter_combo:
+                filter_list = ['inputs_only', 'outputs_only', 'all_places']
+                self.transition_obj.properties['adaptive_filter'] = filter_list[adaptive_filter_combo.get_active()]
+            
+            # Volume threshold
+            volume_threshold_spin = self.builder.get_object('volume_threshold_spin')
+            if volume_threshold_spin:
+                self.transition_obj.properties['volume_threshold'] = volume_threshold_spin.get_value()
+
+    def _apply_firing_and_priority(self):
+        """Apply firing policy and priority settings."""
+        # Firing policy
+        firing_policy_combo = self.builder.get_object('firing_policy_combo')
+        if firing_policy_combo:
+            policy_list = [
+                'random', 'earliest', 'latest', 'priority',
+                'race', 'age', 'preemptive-priority'
+            ]
+            policy_index = firing_policy_combo.get_active()
+            if policy_index >= 0:
+                self.transition_obj.firing_policy = policy_list[policy_index]
+        
+        # Priority value
+        priority_value_spin = self.builder.get_object('priority_value_spin')
+        if priority_value_spin:
+            self.transition_obj.priority = int(priority_value_spin.get_value())
+
+    def _apply_flags(self):
+        """Apply boolean flags: is_source, is_sink."""
+        is_source_check = self.builder.get_object('is_source_check')
+        if is_source_check:
+            self.transition_obj.is_source = is_source_check.get_active()
+        
+        is_sink_check = self.builder.get_object('is_sink_check')
+        if is_sink_check:
+            self.transition_obj.is_sink = is_sink_check.get_active()
+
+    def _apply_rate_functions(self) -> bool:
+        """Apply rate functions with validation.
+        
+        Returns:
+            bool: True if successful, False if validation failed
+        """
+        rate_textview = self.builder.get_object('rate_function') or self.builder.get_object('rate_textview')
+        reversible_check = self.builder.get_object('reversible_check')
+        
+        # Check if using directional rates (reversible)
+        if reversible_check and reversible_check.get_active():
+            return self._apply_directional_rates(rate_textview)
+        elif rate_textview:
+            return self._apply_regular_rate(rate_textview)
+        
+        return True
+
+    def _apply_directional_rates(self, rate_textview) -> bool:
+        """Apply forward and reverse rate functions for reversible transitions.
+        
+        Returns:
+            bool: True if successful, False if validation failed
+        """
+        rate_reverse_textview = self.builder.get_object('rate_reverse_textview')
+        
+        # Forward rate
+        if rate_textview:
+            buffer = rate_textview.get_buffer()
+            start, end = buffer.get_bounds()
+            rate_fwd_text = buffer.get_text(start, end, True).strip()
+            
+            if rate_fwd_text:
+                is_valid, error_msg = self._validate_rate_function_runtime(rate_fwd_text)
+                if not is_valid:
+                    self._show_error_dialog("Invalid Forward Rate", error_msg)
+                    return False
+                self.transition_obj.rate_forward = rate_fwd_text
+            else:
+                # Default for continuous/adaptive
+                if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                    self.transition_obj.rate_forward = "1"
+                elif 'rate_forward' in self.transition_obj.properties:
+                    del self.transition_obj.properties['rate_forward']
+        
+        # Reverse rate
+        if rate_reverse_textview:
+            buffer = rate_reverse_textview.get_buffer()
+            start, end = buffer.get_bounds()
+            rate_rev_text = buffer.get_text(start, end, True).strip()
+            
+            if rate_rev_text:
+                is_valid, error_msg = self._validate_rate_function_runtime(rate_rev_text)
+                if not is_valid:
+                    self._show_error_dialog("Invalid Reverse Rate", error_msg)
+                    return False
+                self.transition_obj.rate_reverse = rate_rev_text
+            else:
+                # Default for continuous/adaptive
+                if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                    self.transition_obj.rate_reverse = "1"
+                elif 'rate_reverse' in self.transition_obj.properties:
+                    del self.transition_obj.properties['rate_reverse']
+        
+        # Clear regular rate when using directional
+        self.transition_obj.rate = None
+        if hasattr(self.transition_obj, 'properties'):
+            for key in ['rate_function', 'rate_function_display']:
+                if key in self.transition_obj.properties:
+                    del self.transition_obj.properties[key]
+        
+        return True
+
+    def _apply_regular_rate(self, rate_textview) -> bool:
+        """Apply regular (non-directional) rate function.
+        
+        Returns:
+            bool: True if successful, False if validation failed
+        """
+        # Clear directional rates
+        if hasattr(self.transition_obj, 'properties'):
+            for key in ['rate_forward', 'rate_reverse']:
+                if key in self.transition_obj.properties:
+                    del self.transition_obj.properties[key]
+        
+        buffer = rate_textview.get_buffer()
+        start, end = buffer.get_bounds()
+        rate_text = buffer.get_text(start, end, True).strip()
+        
+        if rate_text:
+            # Validate
+            is_valid, error_msg = self._validate_rate_function_runtime(rate_text)
+            if not is_valid:
+                self._show_error_dialog("Invalid Rate Function", error_msg)
+                return False
+            
+            # Save to properties
+            if not hasattr(self.transition_obj, 'properties'):
+                self.transition_obj.properties = {}
+            
+            self.transition_obj.properties['rate_function_display'] = rate_text
+            self.transition_obj.properties['rate_function'] = rate_text
+            self.transition_obj.rate = None
+        else:
+            # No rate - set default for continuous/adaptive
+            if self.transition_obj.transition_type in ['continuous', 'adaptive']:
+                if not hasattr(self.transition_obj, 'properties'):
+                    self.transition_obj.properties = {}
+                self.transition_obj.properties['rate_function_display'] = "1"
+                self.transition_obj.properties['rate_function'] = "1"
+                self.transition_obj.rate = None
+            else:
+                # Clear rate_function for other types
+                if hasattr(self.transition_obj, 'properties'):
+                    for key in ['rate_function', 'rate_function_display']:
+                        if key in self.transition_obj.properties:
+                            del self.transition_obj.properties[key]
+                self.transition_obj.set_rate(None)
+        
+        return True
+
+    def _apply_guard(self) -> bool:
+        """Apply guard expression with validation.
+        
+        Returns:
+            bool: True if successful, False if validation failed
+        """
+        guard_textview = self.builder.get_object('guard_textview')
+        if not guard_textview:
+            return True
+        
+        buffer = guard_textview.get_buffer()
+        start, end = buffer.get_bounds()
+        guard_text = buffer.get_text(start, end, True).strip()
+        
+        if guard_text:
+            # Validate guard expression
+            is_valid, error_msg = self._validate_rate_function_runtime(guard_text)
+            if not is_valid:
+                error_dialog = Gtk.MessageDialog(
+                    transient_for=self.dialog,
+                    modal=True,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Invalid Guard Expression"
+                )
+                error_dialog.format_secondary_text(
+                    f"The guard expression cannot be applied:\n\n{error_msg}\n\n"
+                    f"Please correct the expression before applying."
+                )
+                error_dialog.run()
+                error_dialog.destroy()
+                return False
+        
+        self.transition_obj.set_guard(guard_text if guard_text else None)
+        return True
+
+    def _apply_timing_parameters(self):
+        """Apply timing parameters for timed transitions."""
+        # Earliest time
+        earliest_time_spin = self.builder.get_object('earliest_time_spin')
+        if earliest_time_spin:
+            earliest_value = earliest_time_spin.get_value()
+            self.transition_obj.earliest_time = earliest_value
+            if not hasattr(self.transition_obj, 'properties'):
+                self.transition_obj.properties = {}
+            self.transition_obj.properties['earliest_time'] = earliest_value
+        
+        # Latest time
+        latest_time_spin = self.builder.get_object('latest_time_spin')
+        if latest_time_spin:
+            latest_value = latest_time_spin.get_value()
+            self.transition_obj.latest_time = latest_value
+            if not hasattr(self.transition_obj, 'properties'):
+                self.transition_obj.properties = {}
+            self.transition_obj.properties['latest_time'] = latest_value
+
+    def _apply_visual_properties(self):
+        """Apply visual properties: color, border width, rectangle dimensions."""
+        # Color
+        if self.color_picker:
+            selected_color = self.color_picker.get_selected_color()
+            self.transition_obj.border_color = selected_color
+            self.transition_obj.fill_color = selected_color
+        
+        # Line width
+        width_entry = self.builder.get_object('prop_transition_width_entry')
+        if width_entry and hasattr(self.transition_obj, 'border_width'):
+            try:
+                width_text = width_entry.get_text().strip()
+                if width_text:
+                    width_value = float(width_text)
+                    self.transition_obj.border_width = max(0.5, width_value)
+            except ValueError:
+                pass
+        
+        # Rectangle width
+        rect_width_entry = self.builder.get_object('rect_width_entry')
+        if rect_width_entry and hasattr(self.transition_obj, 'width'):
+            try:
+                width_text = rect_width_entry.get_text().strip()
+                if width_text:
+                    width_value = float(width_text)
+                    self.transition_obj.width = max(1.0, width_value)
+            except ValueError:
+                pass
+        
+        # Rectangle height
+        rect_height_entry = self.builder.get_object('rect_height_entry')
+        if rect_height_entry and hasattr(self.transition_obj, 'height'):
+            try:
+                height_text = rect_height_entry.get_text().strip()
+                if height_text:
+                    height_value = float(height_text)
+                    self.transition_obj.height = max(1.0, height_value)
+            except ValueError:
+                pass
+
+    def _show_error_dialog(self, title: str, message: str):
+        """Show an error dialog with given title and message."""
+        error_dialog = Gtk.MessageDialog(
+            transient_for=self.dialog,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=title
+        )
+        error_dialog.format_secondary_text(message)
+        error_dialog.run()
+        error_dialog.destroy()
+
     
     def run(self):
         """Show the dialog and run it modally.

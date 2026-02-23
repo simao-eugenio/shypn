@@ -202,7 +202,7 @@ class InteractionEnricher(EnricherBase):
                     default_arc_type,
                     result
                 )
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 result.add_error(f"Failed to apply interaction {interaction.get('id', 'unknown')}: {e}")
         
         # Set success based on whether we modified anything

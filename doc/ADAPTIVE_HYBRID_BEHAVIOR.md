@@ -2,7 +2,7 @@
 
 ## Overview
 
-**AdaptiveHybridBehavior** automatically selects between continuous (ODE) and stochastic (τ-leaping/SSA) execution based on compartment volume and molecular counts **at runtime**.
+**AdaptiveHybridBehavior** automatically selects between continuous (ODE) and stochastic (τ-leaping/SSA) execution based on **molecular population size** (tokens × compartment_volume) **at runtime**.
 
 ## Biological Motivation
 
@@ -22,9 +22,12 @@ behavior = AdaptiveHybridBehavior(transition, model)
 
 # Every simulation step:
 places = behavior._get_connected_places()
-min_volume = min(p.compartment_volume for p in places)
 
-if min_volume < 1.0:  # fL threshold
+# Calculate molecule count for each place
+molecule_counts = [p.tokens * p.compartment_volume for p in places]
+min_molecules = min(molecule_counts)
+
+if min_molecules < 100:  # molecule threshold
     mode = 'stochastic'  # → Delegates to StochasticBehavior
 else:
     mode = 'continuous'  # → Delegates to ContinuousBehavior
@@ -51,17 +54,18 @@ continuous_behavior.integrate_step(dt, ...)  # Smooth ODE integration
 ### Mode Switching
 
 When mode changes at runtime:
-1. Detects volume change
+1. Detects molecule count change (as tokens change)
 2. Logs mode transition
 3. Clears stochastic scheduling state if switching away
 4. Seamlessly continues with new method
 
 ```python
-# Simulation running with volume=0.5 fL
+# Simulation running with 50 molecules (10 mM × 5 fL)
 # → Uses stochastic (discrete events)
 
-# ... molecular count increases ...
-place.compartment_volume = 50.0  # fL
+# ... reaction produces more molecules ...
+place.tokens = 500  # 500 mM concentration
+# molecule_count = 500 × 5 fL = 2500 molecules
 
 # Next step automatically switches
 # → Uses continuous (smooth ODE)
@@ -74,7 +78,7 @@ place.compartment_volume = 50.0  # fL
 ```python
 transition = Transition(..., transition_type='adaptive')
 transition.properties = {
-    'volume_threshold': 1.0,  # fL
+    'volume_threshold': 100,  # Molecule count threshold (not fL!)
     'prefer_continuous': True,
     'rate_function': '5.0 * P1',
     'max_burst': 8  # For stochastic mode
@@ -86,9 +90,9 @@ transition.properties = {
 ```python
 info = behavior.get_adaptive_info()
 # {
-#   'volume_threshold': 1.0,
+#   'molecule_threshold': 100,
 #   'current_mode': 'stochastic',  # or 'continuous'
-#   'last_volume_check': {...},
+#   'last_molecule_check': {...},
 #   'continuous_info': {...},
 #   'stochastic_info': {...}
 # }

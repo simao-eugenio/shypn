@@ -153,8 +153,8 @@ class LayoutSettingsLoader(GObject.GObject):
                 screen, css_provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
-        except Exception:
-            pass
+        except (GLib.Error, OSError, TypeError) as e:
+            self.logger.debug(f"Failed to load CSS theme from {css_path}: {e}")
     
     def _on_layer_spacing_changed(self, entry):
         """Handle layer spacing entry change - auto-emit signal."""

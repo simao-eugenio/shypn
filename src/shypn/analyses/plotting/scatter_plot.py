@@ -91,7 +91,10 @@ class ScatterPlot(BasePlot):
             try:
                 cbar = self.figure.colorbar(scatter, ax=self.axes)
                 cbar.set_label('Time index', rotation=270, labelpad=15)
-            except:
+            except (ValueError, RuntimeError, AttributeError) as e:
+                # Colorbar creation can fail with certain data configurations
+                import logging
+                logging.getLogger(__name__).debug(f"Colorbar creation failed: {e}")
                 pass  # Colorbar creation failed, skip it
         
         # Configure axes
@@ -103,7 +106,10 @@ class ScatterPlot(BasePlot):
         # Tight layout
         try:
             self.figure.tight_layout()
-        except:
+        except (ValueError, RuntimeError) as e:
+            # tight_layout can fail with colorbar
+            import logging
+            logging.getLogger(__name__).debug(f"Tight layout failed: {e}")
             pass  # tight_layout can fail with colorbar, skip if it does
     
     def _get_plot_title(self) -> str:

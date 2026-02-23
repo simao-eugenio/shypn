@@ -341,7 +341,7 @@ class TimedBehavior(TransitionBehavior):
             self._record_event(consumed=consumed_map, produced=produced_map, mode='logical', transition_type='timed', elapsed_time=elapsed, timing_window=[self.earliest, self.latest])
             
             return (True, {'consumed': consumed_map, 'produced': produced_map, 'timed_mode': True, 'discrete_firing': True, 'transition_type': 'timed', 'elapsed_time': elapsed, 'timing_window': [self.earliest, self.latest], 'time': current_time})
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return (False, {'reason': f'timed-error: {str(e)}', 'timed_mode': True, 'error_type': type(e).__name__})
 
     def get_type_name(self) -> str:

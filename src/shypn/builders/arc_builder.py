@@ -581,8 +581,11 @@ class ArcBuilder:
         if self._id_manager and hasattr(self._id_manager, 'register_object'):
             try:
                 self._id_manager.register_object(arc, obj_type='arc')
-            except Exception:
-                pass  # Lifecycle tracking optional, don't break build
+            except (AttributeError, TypeError, RuntimeError) as e:
+                # Lifecycle tracking optional, don't break build
+                from shypn.utils.logging import get_logger
+                logger = get_logger(__name__)
+                logger.debug(f"Failed to register arc with lifecycle ID manager: {e}")
         
         return arc
     
@@ -714,8 +717,10 @@ class ArcBuilder:
         try:
             from shypn.data.canvas.id_manager import IDManager
             return IDManager.get_instance().generate_arc_id()
-        except:
-            # Fallback if IDManager not available
+        except (ImportError, AttributeError, RuntimeError) as e:
+            # Fallback if IDManager not available or fails
+            import logging
+            logging.getLogger(__name__).debug(f"IDManager unavailable, using fallback ID generation: {e}")
             source_id = getattr(source, 'id', str(source))
             target_id = getattr(target, 'id', str(target))
             return f"A_{source_id}_to_{target_id}"

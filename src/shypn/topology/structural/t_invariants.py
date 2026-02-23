@@ -271,7 +271,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         # Compute null space
         try:
             null_space = linalg.null_space(matrix, rcond=1e-10)
-        except Exception as e:
+        except (np.linalg.LinAlgError, ValueError, AttributeError) as e:
             raise TopologyAnalysisError(f"Failed to compute null space: {e}")
         
         if null_space.shape[1] == 0:

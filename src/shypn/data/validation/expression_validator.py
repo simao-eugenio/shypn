@@ -7,6 +7,7 @@ for transition rates, guards, and other mathematical properties.
 import ast
 import json
 from typing import Tuple, Any, Dict, Optional
+from shypn.utils.safe_eval import safe_eval_numeric
 
 
 class ExpressionValidator:
@@ -86,7 +87,7 @@ class ExpressionValidator:
             return (False, f"Syntax error: {e.msg} at position {e.offset}", None)
         except ValueError as e:
             return (False, f"Invalid expression: {str(e)}", None)
-        except Exception as e:
+        except (TypeError, AttributeError, NameError) as e:
             return (False, f"Error: {str(e)}", None)
     
     @staticmethod
@@ -116,9 +117,8 @@ class ExpressionValidator:
             state = {}
         
         try:
-            # Safe evaluation with restricted builtins
-            safe_builtins = {name: __builtins__[name] for name in ExpressionValidator.ALLOWED_FUNCTIONS}
-            result = eval(expr, {"__builtins__": safe_builtins}, state)
+            # Safe evaluation with secure expression evaluator
+            result = safe_eval_numeric(str(expr), state or {}, allow_math=True)
             
             if isinstance(result, (int, float)):
                 return f"≈ {result:.3f}"
@@ -132,7 +132,7 @@ class ExpressionValidator:
         except NameError as e:
             # Missing variable in state
             return f"[Needs: {str(e).split(chr(39))[1]}]"
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, IndexError) as e:
             return f"[Error: {str(e)[:30]}]"
     
     @staticmethod
@@ -256,7 +256,7 @@ class SafeExpressionVisitor(ast.NodeVisitor):
             return super().generic_visit(node)
         except ValueError:
             raise  # Re-raise our validation errors
-        except Exception as e:
+        except (AttributeError, TypeError, KeyError) as e:
             raise ValueError(f"Invalid expression structure: {str(e)}")
 
 
