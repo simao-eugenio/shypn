@@ -79,10 +79,15 @@ class FileExplorerPanel:
         self.project = None
         # Active project name (set via EventBus project.opened / project.closed)
         self._active_project_name: Optional[str] = None
+        # Open Editors tracking: filepath → {dirty, dirty_dot, name_label, row}
+        self._open_files: dict = {}
+        # Currently focused file (used to correlate model.changed → dirty flag)
+        self._focused_filepath: Optional[str] = None
         self._get_widgets()
         self._configure_tree_view()
         self._setup_context_menu()
         self._connect_signals()
+        self._build_open_editors_section()
         self._subscribe_event_bus()
         self._load_current_directory()
 
@@ -417,8 +422,208 @@ class FileExplorerPanel:
         selection = self.tree_view.get_selection()
         selection.connect('changed', self._on_tree_selection_changed)
 
+    # ------------------------------------------------------------------
+    # Open Editors Section (Phase 3)
+    # ------------------------------------------------------------------
+
+    def _build_open_editors_section(self):
+        """Build the Open Editors collapsible section and insert it above the file tree.
+
+        The widget is injected programmatically into the parent GtkBox so that
+        no UI XML changes are required. It sits immediately above the scrolled
+        file tree.
+        """
+        try:
+            parent = self.scrolled_window.get_parent()
+            if parent is None:
+                return
+
+            # --- Header label (expander title) ---
+            header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            section_label = Gtk.Label()
+            section_label.set_markup('<small><b>OPEN EDITORS</b></small>')
+            section_label.set_halign(Gtk.Align.START)
+            header_box.pack_start(section_label, False, False, 0)
+
+            self._open_editors_count_label = Gtk.Label(label='')
+            self._open_editors_count_label.get_style_context().add_class('dim-label')
+            header_box.pack_start(self._open_editors_count_label, False, False, 0)
+            header_box.show_all()
+
+            # --- Expander ---
+            self.open_editors_expander = Gtk.Expander()
+            self.open_editors_expander.set_label_widget(header_box)
+            self.open_editors_expander.set_expanded(True)
+            self.open_editors_expander.set_margin_start(4)
+            self.open_editors_expander.set_margin_end(4)
+            self.open_editors_expander.set_margin_top(2)
+            self.open_editors_expander.set_margin_bottom(2)
+
+            # --- ListBox inside expander ---
+            self._open_editors_listbox = Gtk.ListBox()
+            self._open_editors_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            self._open_editors_listbox.set_activate_on_single_click(True)
+            self._open_editors_listbox.connect('row-activated', self._on_open_editor_row_activated)
+
+            # Wrap listbox in a box for margins
+            list_wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            list_wrapper.pack_start(self._open_editors_listbox, False, False, 0)
+            self.open_editors_expander.add(list_wrapper)
+
+            # --- Insert above scrolled_window ---
+            children = parent.get_children()
+            scroll_pos = children.index(self.scrolled_window) if self.scrolled_window in children else -1
+
+            parent.pack_start(self.open_editors_expander, False, False, 0)
+            if scroll_pos >= 0:
+                parent.reorder_child(self.open_editors_expander, scroll_pos)
+
+            self.open_editors_expander.show_all()
+
+        except Exception:
+            # Never crash if Open Editors section fails to build
+            self.open_editors_expander = None
+            self._open_editors_listbox = None
+            self._open_editors_count_label = None
+
+    def _oe_update_count(self):
+        """Update the count badge on the Open Editors expander header."""
+        try:
+            n = len(self._open_files)
+            if self._open_editors_count_label:
+                text = f'({n})' if n > 0 else ''
+                self._open_editors_count_label.set_text(text)
+        except Exception:
+            pass
+
+    def _oe_add_file(self, filepath: str):
+        """Add a file to the Open Editors list (no-op if already present).
+
+        Args:
+            filepath: Absolute path of the opened file
+        """
+        if not filepath or filepath in self._open_files:
+            return
+        if not self._open_editors_listbox:
+            return
+
+        basename = os.path.basename(filepath)
+
+        row = Gtk.ListBoxRow()
+        row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        row_box.set_margin_start(6)
+        row_box.set_margin_end(2)
+        row_box.set_margin_top(2)
+        row_box.set_margin_bottom(2)
+
+        # Dirty indicator dot
+        dirty_dot = Gtk.Label(label='  ')
+        dirty_dot.set_width_chars(2)
+        row_box.pack_start(dirty_dot, False, False, 0)
+
+        # Filename label
+        name_label = Gtk.Label(label=basename)
+        name_label.set_halign(Gtk.Align.START)
+        name_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        name_label.set_max_width_chars(22)
+        name_label.set_tooltip_text(filepath)
+        row_box.pack_start(name_label, True, True, 0)
+
+        # Close button
+        close_btn = Gtk.Button(label='✕')
+        close_btn.get_style_context().add_class('flat')
+        close_btn.set_relief(Gtk.ReliefStyle.NONE)
+        close_btn.set_focus_on_click(False)
+        close_btn.set_tooltip_text('Close')
+        close_btn.connect('clicked', self._on_open_editor_close_clicked, filepath)
+        row_box.pack_end(close_btn, False, False, 0)
+
+        row.add(row_box)
+        row.set_tooltip_text(filepath)
+        row.show_all()
+
+        self._open_editors_listbox.add(row)
+        self._open_files[filepath] = {
+            'dirty': False,
+            'dirty_dot': dirty_dot,
+            'name_label': name_label,
+            'row': row,
+        }
+        self._oe_update_count()
+
+    def _oe_remove_file(self, filepath: str):
+        """Remove a file from the Open Editors list.
+
+        Args:
+            filepath: Absolute path to remove
+        """
+        entry = self._open_files.pop(filepath, None)
+        if entry and self._open_editors_listbox:
+            row = entry['row']
+            self._open_editors_listbox.remove(row)
+        if self._focused_filepath == filepath:
+            self._focused_filepath = None
+        self._oe_update_count()
+
+    def _oe_set_dirty(self, filepath: str, dirty: bool):
+        """Set or clear the dirty indicator for a file.
+
+        Args:
+            filepath: Absolute path of the file
+            dirty: True to show dirty dot, False to clear it
+        """
+        entry = self._open_files.get(filepath)
+        if not entry:
+            return
+        entry['dirty'] = dirty
+        dot = entry['dirty_dot']
+        dot.set_markup('<span color="#e06c00">●</span>' if dirty else '  ')
+
+    def _oe_set_focused(self, filepath: str):
+        """Bold the focused row and un-bold all others.
+
+        Args:
+            filepath: Absolute path of the newly focused file
+        """
+        for fp, entry in self._open_files.items():
+            lbl = entry['name_label']
+            if fp == filepath:
+                lbl.set_markup(f'<b>{GLib.markup_escape_text(os.path.basename(fp))}</b>')
+            else:
+                lbl.set_text(os.path.basename(fp))
+        self._focused_filepath = filepath
+
+    def _on_open_editor_row_activated(self, listbox, row):
+        """Navigate to file when Open Editors row is clicked."""
+        # Find which filepath corresponds to this row
+        for fp, entry in self._open_files.items():
+            if entry['row'] is row:
+                if self.on_file_open_requested:
+                    self.on_file_open_requested(fp)
+                else:
+                    self._open_file_from_path(fp)
+                break
+
+    def _on_open_editor_close_clicked(self, btn, filepath):
+        """Handle ✕ close button on Open Editors row.
+
+        Removes the entry from the list (does not save/discard — that is the
+        canvas loader's responsibility). Emits file.closed so other listeners
+        can react.
+        """
+        try:
+            from shypn.events.event_bus import EventBus
+            EventBus.get_instance().emit('file.closed', {'filepath': filepath})
+        except Exception:
+            pass
+        GLib.idle_add(self._oe_remove_file, filepath)
+
+    # ------------------------------------------------------------------
+    # EventBus subscriptions
+    # ------------------------------------------------------------------
+
     def _subscribe_event_bus(self):
-        """Subscribe to relevant EventBus events (project lifecycle).
+        """Subscribe to relevant EventBus events (project lifecycle + open editors).
 
         Called once after _connect_signals(). Failures are swallowed so that
         the panel remains usable even when EventBus is unavailable.
@@ -428,6 +633,10 @@ class FileExplorerPanel:
             bus = EventBus.get_instance()
             bus.subscribe('project.opened', self._on_project_opened_event)
             bus.subscribe('project.closed', self._on_project_closed_event)
+            bus.subscribe('file.opened', self._on_file_opened_event)
+            bus.subscribe('file.saved', self._on_file_saved_event)
+            bus.subscribe('model.changed', self._on_model_changed_event)
+            bus.subscribe('document.focused', self._on_document_focused_event)
         except Exception:
             pass
 
@@ -458,6 +667,66 @@ class FileExplorerPanel:
             # Restore plain path text
             plain_path = self.explorer.current_path if self.explorer else ''
             GLib.idle_add(self.current_file_entry.set_text, plain_path)
+
+    def _on_file_opened_event(self, event_data: dict):
+        """React to file.opened EventBus event — add entry to Open Editors.
+
+        Args:
+            event_data: dict with keys 'filepath', 'document', 'timestamp'
+        """
+        filepath = (event_data or {}).get('filepath', '')
+        if filepath:
+            GLib.idle_add(self._oe_add_file, filepath)
+            GLib.idle_add(self._oe_set_focused, filepath)
+
+    def _on_file_saved_event(self, event_data: dict):
+        """React to file.saved EventBus event — clear dirty indicator.
+
+        Also adds the entry if the file was saved under a new path (Save As).
+
+        Args:
+            event_data: dict with keys 'filepath', 'document', 'timestamp'
+        """
+        filepath = (event_data or {}).get('filepath', '')
+        if not filepath:
+            return
+
+        def _update():
+            self._oe_add_file(filepath)   # no-op if already present
+            self._oe_set_dirty(filepath, False)
+
+        GLib.idle_add(_update)
+
+    def _on_model_changed_event(self, event_data: dict):
+        """React to model.changed EventBus event — mark focused file as dirty.
+
+        model.changed carries a document_id scope but not a filepath. We use
+        the focused filepath as the best available correlation (the user can
+        only be actively editing the focused document).
+
+        Args:
+            event_data: arbitrary model change payload
+        """
+        if self._focused_filepath:
+            GLib.idle_add(self._oe_set_dirty, self._focused_filepath, True)
+
+    def _on_document_focused_event(self, event_data: dict):
+        """React to document.focused EventBus event — update focused row.
+
+        Obtains the filepath via the canvas_manager attached to drawing_area.
+
+        Args:
+            event_data: dict with keys 'drawing_area', 'canvas_manager', etc.
+        """
+        try:
+            canvas_manager = (event_data or {}).get('canvas_manager')
+            if canvas_manager and hasattr(canvas_manager, 'get_filepath'):
+                fp = canvas_manager.get_filepath()
+                if fp:
+                    GLib.idle_add(self._oe_add_file, fp)
+                    GLib.idle_add(self._oe_set_focused, fp)
+        except Exception:
+            pass
 
     def _get_expanded_paths(self):
         """Get list of currently expanded directory paths in tree view.
