@@ -270,12 +270,13 @@ class FilePanelLoader:
     def _init_file_explorer(self):
         """Initialize file explorer controller."""
         try:
-            workspace_boundary = os.path.join(self.repo_root, 'workspace')
-            # Start at workspace root, not subdirectory
+            from shypn.data.project_models import get_project_manager
+            projects_root = get_project_manager().projects_root
+            # Root at workspace/projects/ — canonical project store; cannot go above
             self.file_explorer = FileExplorerPanel(
                 self.builder,
-                base_path=workspace_boundary,  # Changed from self.base_path to workspace_boundary
-                root_boundary=workspace_boundary
+                base_path=projects_root,
+                root_boundary=projects_root
             )
             
             # Enhance context menu with VS Code-style operations

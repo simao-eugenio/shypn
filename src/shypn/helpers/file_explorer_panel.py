@@ -77,10 +77,13 @@ class FileExplorerPanel:
         self.parent_window: Optional[Gtk.Window] = None
         # Project reference for saving imported models to project/models/
         self.project = None
+        # Active project name (set via EventBus project.opened / project.closed)
+        self._active_project_name: Optional[str] = None
         self._get_widgets()
         self._configure_tree_view()
         self._setup_context_menu()
         self._connect_signals()
+        self._subscribe_event_bus()
         self._load_current_directory()
 
     def _get_widgets(self):
@@ -413,6 +416,48 @@ class FileExplorerPanel:
         # Connect to selection changes to update current file display
         selection = self.tree_view.get_selection()
         selection.connect('changed', self._on_tree_selection_changed)
+
+    def _subscribe_event_bus(self):
+        """Subscribe to relevant EventBus events (project lifecycle).
+
+        Called once after _connect_signals(). Failures are swallowed so that
+        the panel remains usable even when EventBus is unavailable.
+        """
+        try:
+            from shypn.events.event_bus import EventBus
+            bus = EventBus.get_instance()
+            bus.subscribe('project.opened', self._on_project_opened_event)
+            bus.subscribe('project.closed', self._on_project_closed_event)
+        except Exception:
+            pass
+
+    def _on_project_opened_event(self, event_data: dict):
+        """React to project.opened EventBus event.
+
+        Updates the breadcrumb/path bar to show the active project name and
+        stores it for use by file operation defaults.
+
+        Args:
+            event_data: dict with keys 'project', 'base_path', 'name'
+        """
+        name = event_data.get('name', '') if event_data else ''
+        self._active_project_name = name or None
+        if self.current_file_entry and name:
+            GLib.idle_add(self.current_file_entry.set_text, f'[■ {name}]')
+
+    def _on_project_closed_event(self, event_data: dict):
+        """React to project.closed EventBus event.
+
+        Clears the active project badge from the path bar.
+
+        Args:
+            event_data: dict with key 'project_id'
+        """
+        self._active_project_name = None
+        if self.current_file_entry:
+            # Restore plain path text
+            plain_path = self.explorer.current_path if self.explorer else ''
+            GLib.idle_add(self.current_file_entry.set_text, plain_path)
 
     def _get_expanded_paths(self):
         """Get list of currently expanded directory paths in tree view.
