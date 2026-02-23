@@ -52,17 +52,17 @@ class LeftPanelLoader:
             repo_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
             ui_path = os.path.join(repo_root, 'ui', 'panels', 'left_panel.ui')
             
-            # If base_path not provided, start at workspace/ to show examples/, projects/, cache/
-            # This prevents users from accessing application code (src/, tests/, ui/)
+            # If base_path not provided, start at workspace/projects/ — the project root.
+            # Users navigate project folders from here; cannot go above this boundary.
             if base_path is None:
-                base_path = os.path.join(repo_root, 'workspace')
+                base_path = os.path.join(repo_root, 'workspace', 'projects')
                 # Ensure base_path exists
                 if not os.path.exists(base_path):
                     try:
                         os.makedirs(base_path)
                     except Exception as e:
-                        # Fallback to repo root if workspace creation fails
-                        base_path = repo_root
+                        # Fallback to workspace root if projects dir creation fails
+                        base_path = os.path.join(repo_root, 'workspace')
         
         self.ui_path = ui_path
         self.base_path = base_path
@@ -116,16 +116,16 @@ class LeftPanelLoader:
         else:
             self.float_button = None
         
-        # Initialize the file explorer controller
-        # This connects the FileExplorer API to the UI widgets defined in XML
-        # Set root_boundary to workspace/ so users can only access examples/, projects/, cache/
-        # This prevents accidental corruption of application code (src/, tests/, ui/)
+        # Initialize the file explorer controller.
+        # Root boundary is workspace/projects/ — the canonical project store.
+        # Users can navigate into any project folder but not above this level.
         try:
-            workspace_boundary = os.path.join(self.repo_root, 'workspace')
+            from shypn.data.project_models import get_project_manager
+            projects_root = get_project_manager().projects_root
             self.file_explorer = FileExplorerPanel(
-                self.builder, 
-                base_path=self.base_path,  # Start in workspace/
-                root_boundary=workspace_boundary  # Cannot navigate above workspace/
+                self.builder,
+                base_path=projects_root,        # Always start at projects root
+                root_boundary=projects_root     # Cannot navigate above projects root
             )
         except Exception as e:
             self.logger.debug(f"Could not initialize file explorer panel: {e}")
@@ -191,12 +191,13 @@ class LeftPanelLoader:
     def _on_project_closed(self):
         """Handle project closed event.
 
-        When a project is closed, navigate back to workspace root.
+        When a project is closed, navigate back to projects root so the user
+        can pick another project.
         """
         if self.file_explorer:
-            # Navigate to workspace root (safe user directory)
-            workspace_root = os.path.join(self.repo_root, 'workspace')
-            self.file_explorer.navigate_to(workspace_root)
+            from shypn.data.project_models import get_project_manager
+            projects_root = get_project_manager().projects_root
+            self.file_explorer.navigate_to(projects_root)
     
     # ===============================
     # Float/Attach (Dock) Behavior

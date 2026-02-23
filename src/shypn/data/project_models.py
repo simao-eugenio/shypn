@@ -828,6 +828,18 @@ class ProjectManager:
         # Add to recent projects
         self.add_to_recent(project.id)
         
+        # Set as current project
+        self.current_project = project
+        try:
+            from shypn.events.event_bus import EventBus
+            EventBus.get_instance().emit('project.opened', {
+                'project': project,
+                'base_path': project.base_path,
+                'name': project.name
+            })
+        except Exception:
+            pass
+        
         return project
     
     def open_project(self, project_id: str) -> Optional[Project]:
@@ -853,6 +865,15 @@ class ProjectManager:
             project = Project.load(project_file)
             self.current_project = project
             self.add_to_recent(project_id)
+            try:
+                from shypn.events.event_bus import EventBus
+                EventBus.get_instance().emit('project.opened', {
+                    'project': project,
+                    'base_path': project.base_path,
+                    'name': project.name
+                })
+            except Exception:
+                pass
             return project
         except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
@@ -882,6 +903,15 @@ class ProjectManager:
                 self.save_index()
             
             self.add_to_recent(project.id)
+            try:
+                from shypn.events.event_bus import EventBus
+                EventBus.get_instance().emit('project.opened', {
+                    'project': project,
+                    'base_path': project.base_path,
+                    'name': project.name
+                })
+            except Exception:
+                pass
             return project
         except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
@@ -898,7 +928,13 @@ class ProjectManager:
             except (OSError, IOError, PermissionError) as e:
                 logger.debug(f"Save error when closing project: {e}")
         
+        _closed_id = self.current_project.id if self.current_project else None
         self.current_project = None
+        try:
+            from shypn.events.event_bus import EventBus
+            EventBus.get_instance().emit('project.closed', {'project_id': _closed_id})
+        except Exception:
+            pass
     
     def add_to_recent(self, project_id: str):
         """Add project to recent projects list (moves to front)."""
