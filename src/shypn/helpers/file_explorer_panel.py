@@ -879,22 +879,66 @@ class FileExplorerPanel:
         # Fallback: it's a project but couldn't read name, use folder name
         return True, name
 
+    # Standard project subfolder order for pinning (Phase 4)
+    _PROJECT_PINNED_FOLDERS = ['models', 'pathways', 'experiments', 'exports']
+    # Internal project marker files — never shown in tree
+    _PROJECT_HIDDEN_FILES = {'.project.shy', 'project_state.json',
+                             'project_index.json', 'recent.json'}
+
+    def _get_active_project(self):
+        """Return the active Project from ProjectManager, falling back to self.project.
+
+        Phase 5 helper: ensures file dialogs always see the authoritative project
+        rather than a stale self.project reference set via the old set_project().
+
+        Returns:
+            Project instance or None
+        """
+        try:
+            from shypn.data.project_models import get_project_manager
+            pm = get_project_manager()
+            if pm.current_project:
+                return pm.current_project
+        except Exception:
+            pass
+        return self.project  # legacy fallback
+
     def _load_directory_tree(self, directory: str, parent_iter):
         """Load directory contents recursively in tree mode.
-        
+
+        Phase 4 enhancements when at a project root:
+        - Standard folders (models/ pathways/ experiments/ exports/) are pinned
+          at the top in declaration order, always shown even when empty.
+        - .project.shy and other internal files are hidden regardless of
+          the show_hidden setting.
+
         Args:
             directory: Directory path to load
             parent_iter: Parent TreeIter (None for root)
         """
         try:
             items = os.listdir(directory)
+        except PermissionError:
+            if self.explorer.on_error:
+                self.explorer.on_error(f'Permission denied: {directory}')
+            return
+        except Exception as e:
+            if self.explorer.on_error:
+                self.explorer.on_error(f'Error reading directory: {str(e)}')
+            return
+
+        try:
+            # Determine if this directory is a project root (Phase 4)
+            is_project_root = os.path.exists(os.path.join(directory, '.project.shy'))
+
             directories = []
             files = []
             for item in items:
-                # Skip hidden files (starting with .) and project state files
-                if not self.explorer.show_hidden and item.startswith('.'):
+                # Always hide internal project/system files
+                if item in self._PROJECT_HIDDEN_FILES:
                     continue
-                if item in ('project_state.json', 'project_index.json', 'recent.json'):
+                # Hide dotfiles unless show_hidden is on
+                if not self.explorer.show_hidden and item.startswith('.'):
                     continue
                 full_path = os.path.join(directory, item)
                 try:
@@ -904,22 +948,49 @@ class FileExplorerPanel:
                         files.append((item, full_path))
                 except (PermissionError, OSError):
                     continue
+
             directories.sort(key=lambda x: x[0].lower())
             files.sort(key=lambda x: x[0].lower())
+
+            # Phase 4: pin standard folders at top when inside a project root
+            if is_project_root:
+                dir_names = {n.lower(): (n, p) for n, p in directories}
+                pinned = []
+                rest = list(directories)  # will drop pinned ones
+                for std in self._PROJECT_PINNED_FOLDERS:
+                    if std in dir_names:
+                        entry = dir_names[std]
+                        pinned.append(entry)
+                        rest = [d for d in rest if d[0].lower() != std]
+                    else:
+                        # Folder doesn't exist yet — create a greyed placeholder
+                        ghost_path = os.path.join(directory, std)
+                        pinned.append((std, ghost_path))
+                directories = pinned + rest
+
             for name, path in directories:
-                icon = self.explorer._get_icon_name(name, True)
+                # Ghost folders (don't exist on disk yet) — shown dimmed
+                ghost = not os.path.exists(path)
+                icon = 'folder-open-symbolic' if not ghost else 'folder-new-symbolic'
                 is_project, display_name = self._check_if_project(path, True, name)
-                weight = 700 if is_project else 400  # Bold for projects
-                bg_color = 'white'  # Background color (unused if bg_set=False)
-                bg_set = False  # No background color for directories
-                dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color, bg_set])
-                self._load_directory_tree(path, dir_iter)
+                weight = 700 if is_project else 400
+                bg_color = 'white'
+                bg_set = False
+                if ghost:
+                    display_name = f'{name}/'  # trailing slash hint for empty ghost
+                dir_iter = self.store.append(
+                    parent_iter,
+                    [icon, display_name, path, True, is_project, weight, bg_color, bg_set]
+                )
+                if not ghost:
+                    self._load_directory_tree(path, dir_iter)
+
             for name, path in files:
                 icon = self.explorer._get_icon_name(name, False)
-                self.store.append(parent_iter, [icon, name, path, False, False, 400, 'white', False])
-        except PermissionError:
-            if self.explorer.on_error:
-                self.explorer.on_error(f'Permission denied: {directory}')
+                self.store.append(
+                    parent_iter,
+                    [icon, name, path, False, False, 400, 'white', False]
+                )
         except Exception as e:
             if self.explorer.on_error:
                 self.explorer.on_error(f'Error reading directory: {str(e)}')
@@ -2072,16 +2143,12 @@ class FileExplorerPanel:
             document = manager.to_document_model()
             
             
-            # Determine initial directory: project/models/ if project is open, otherwise workspace
-            if self.project:
-                pass
-            
-            if self.project and hasattr(self.project, 'base_path'):
-                # Start in project/models/ directory
-                initial_dir = os.path.join(self.project.base_path, 'models')
+            # Determine initial directory — Phase 5: prefer active project models/
+            active_project = self._get_active_project()
+            if active_project and hasattr(active_project, 'base_path'):
+                initial_dir = os.path.join(active_project.base_path, 'models')
                 os.makedirs(initial_dir, exist_ok=True)
             else:
-                # Start in workspace directory
                 initial_dir = self.explorer.current_path
             
             # Determine default filename
@@ -2187,14 +2254,14 @@ class FileExplorerPanel:
                 Gtk.STOCK_OPEN, Gtk.ResponseType.OK
             )
             
-            # Set starting directory
-            if self.project:
-                # If project is open, start in project/models/
-                models_dir = os.path.join(self.project.base_path, 'models')
+            # Set starting directory — Phase 5: prefer active project models/
+            active_project = self._get_active_project()
+            if active_project:
+                models_dir = os.path.join(active_project.base_path, 'models')
                 if os.path.exists(models_dir):
                     dialog.set_current_folder(models_dir)
                 else:
-                    dialog.set_current_folder(self.project.base_path)
+                    dialog.set_current_folder(active_project.base_path)
             else:
                 # Otherwise use current directory in file tree
                 current_path = self.get_current_path()
@@ -2204,11 +2271,12 @@ class FileExplorerPanel:
                     else:
                         dialog.set_current_folder(current_path)
                 else:
-                    # Default to workspace root
-                    workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'workspace')
-                    workspace_path = os.path.normpath(workspace_path)
-                    if os.path.exists(workspace_path):
-                        dialog.set_current_folder(workspace_path)
+                    # Fallback: projects root
+                    try:
+                        from shypn.data.project_models import get_project_manager
+                        dialog.set_current_folder(get_project_manager().projects_root)
+                    except Exception:
+                        pass
             
             # Add file filter for .shy files
             filter_shy = Gtk.FileFilter()
