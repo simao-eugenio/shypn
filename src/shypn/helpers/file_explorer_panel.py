@@ -666,11 +666,63 @@ class FileExplorerPanel:
 
     def _on_path_changed(self, new_path: str):
         """Callback when path changes in API (Model).
-        
+
+        Also triggers auto project activation/deactivation when navigation
+        crosses project boundaries (Phase 2 of explorer refactor).
+
         Args:
             new_path: New current path
         """
         GLib.idle_add(self._load_current_directory)
+        GLib.idle_add(self._sync_project_state, new_path)
+
+    def _sync_project_state(self, new_path: str):
+        """Synchronise ProjectManager state when navigation crosses project boundaries.
+
+        Rules:
+        - Navigating INTO a directory that contains .project.shy → open that project
+          (auto-activates without any dialog, analogous to VS Code opening a workspace folder)
+        - Navigating OUT of (above) the current project's base_path → close the project
+        - Navigating around WITHIN the current project → no change
+
+        Called via GLib.idle_add from _on_path_changed so it runs on the main loop
+        after the tree has refreshed.
+
+        Args:
+            new_path: The directory we just navigated to
+        """
+        try:
+            from shypn.data.project_models import get_project_manager
+            manager = get_project_manager()
+
+            project_file = os.path.join(new_path, '.project.shy')
+            if os.path.exists(project_file):
+                # We are at a project root directory
+                current_base = (
+                    os.path.normpath(manager.current_project.base_path)
+                    if manager.current_project else None
+                )
+                nav_norm = os.path.normpath(new_path)
+                if current_base != nav_norm:
+                    # Different project (or no project) — activate this one
+                    manager.open_project_by_path(project_file)
+                return False
+
+            # Not at a project root — check whether we left the current project
+            if manager.current_project:
+                current_base = os.path.normpath(manager.current_project.base_path)
+                nav_norm = os.path.normpath(new_path)
+                inside_project = (
+                    nav_norm == current_base
+                    or nav_norm.startswith(current_base + os.sep)
+                )
+                if not inside_project:
+                    manager.close_current_project(save=True)
+
+        except Exception:
+            pass  # Navigation must never crash due to project logic
+
+        return False  # Remove idle callback
 
     def _on_error(self, error_message: str):
         """Callback when error occurs in API (Model).
