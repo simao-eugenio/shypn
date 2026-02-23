@@ -447,8 +447,12 @@ class ExperimentAutomationCategory:
                 param_id = param['id']
                 value = combo[i]
                 
-                # Update the appropriate parameter storage
-                if param_type == 'places':
+                # param_id may be a dotted property path (e.g. 'P1.initial_marking')
+                # which is handled by property_overrides / apply_property_to_object.
+                # Bare IDs (e.g. 'P1') go into the direct token/rate/weight dicts.
+                if '.' in param_id:
+                    snapshot.property_overrides[param_id] = value
+                elif param_type == 'places':
                     snapshot.place_markings[param_id] = value
                 elif param_type == 'transitions':
                     snapshot.transition_rates[param_id] = value
