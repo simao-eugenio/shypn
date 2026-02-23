@@ -327,7 +327,8 @@ class BiochemicalPatternDetector:
                         },
                         affected_elements=[trans_id]
                     ))
-            except Exception as e:
+            except (AttributeError, KeyError, ValueError, TypeError) as e:
+                logger.debug(f"Pattern detection failed for {trans_id}: {e}")
                 continue
         
         return patterns

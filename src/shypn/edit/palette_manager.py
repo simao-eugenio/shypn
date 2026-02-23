@@ -306,4 +306,4 @@ class PaletteManager:
             )
             
         except Exception as e:
-            pass
+            self.logger.debug(f"Could not apply CSS styling: {e}")

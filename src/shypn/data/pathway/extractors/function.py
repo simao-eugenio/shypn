@@ -116,7 +116,7 @@ class FunctionDefinitionExtractor(BaseExtractor[Dict[str, FunctionDefinition]]):
                 function = self._extract_function(func_def)
                 functions[function.id] = function
                 self.logger.debug(f"  Extracted: {function}")
-            except Exception as e:
+            except (AttributeError, ValueError, TypeError) as e:
                 self.logger.warning(
                     f"Failed to extract function {func_def.getId()}: {e}"
                 )

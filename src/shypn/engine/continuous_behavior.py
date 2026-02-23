@@ -28,6 +28,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 """
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
+from shypn.utils.safe_eval import safe_eval_numeric, preprocess_expression
 import logging
 import math
 import numpy as np
@@ -85,7 +86,7 @@ class ContinuousBehavior(TransitionBehavior):
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
         self.gradient_modulator = GradientModulator()
-        self.volume_selector = VolumeAdaptiveSelector(threshold_fL=1.0)
+        self.volume_selector = VolumeAdaptiveSelector(threshold_molecules=100.0)
         
         # Extract continuous parameters
         props = getattr(transition, 'properties', {})
@@ -324,9 +325,9 @@ class ContinuousBehavior(TransitionBehavior):
                         # User can use concentration_to_ph() function in rate_function
                         pass
                 
-                # Evaluate expression safely (use preprocessed expression)
-                result = eval(expr_processed, {"__builtins__": {}}, context)
-                return float(result)
+                # Evaluate expression safely (replaces eval() for security)
+                result = safe_eval_numeric(expr_processed, context, allow_math=True)
+                return result
             except Exception as e:
                 # Check if this is first error for this transition
                 if not self._rate_function_failed:
@@ -363,8 +364,8 @@ class ContinuousBehavior(TransitionBehavior):
                                     actual_names = [name for name in function_catalog.FUNCTION_CATALOG.keys() 
                                                   if name.lower() in close_matches]
                                     print(f"   💡 Did you mean: {', '.join(actual_names)}?")
-                        except Exception:
-                            pass  # Silently skip suggestion if import fails
+                        except (ImportError, AttributeError, KeyError) as e:
+                            logger.debug(f"Skipping function suggestion: {e}")
                     
                     print(f"\n   Fix the rate expression before running simulation.\n")
                 
@@ -878,7 +879,7 @@ class ContinuousBehavior(TransitionBehavior):
                 'reverse_direction': reverse_direction
             }
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError, ZeroDivisionError) as e:
             return False, {
                 'reason': f'continuous-error: {str(e)}',
                 'continuous_mode': True,

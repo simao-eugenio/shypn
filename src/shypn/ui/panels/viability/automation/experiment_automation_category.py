@@ -216,7 +216,10 @@ class ExperimentAutomationCategory:
                     # Column 4 = transition type (immediate, stochastic, continuous, adaptive, timed)
                     try:
                         transition_type = store.get_value(iter, 4)
-                    except:
+                    except (ValueError, TypeError) as e:
+                        # Transition type column not available
+                        import logging
+                        logging.getLogger(__name__).debug(f"Transition type read failed: {e}")
                         transition_type = 'stochastic'  # Fallback
                     
                     if transition_id and transition_name:
@@ -256,7 +259,10 @@ class ExperimentAutomationCategory:
                     # Column 6 = arc_type (normal, inhibitor, test)
                     try:
                         arc_type = store.get_value(iter, 6)
-                    except:
+                    except (ValueError, TypeError) as e:
+                        # Arc type column not available
+                        import logging
+                        logging.getLogger(__name__).debug(f"Arc type read failed: {e}")
                         arc_type = 'normal'
                     
                     # Construct display name from source/target names (lookup if needed)
@@ -312,6 +318,12 @@ class ExperimentAutomationCategory:
             if not self.parent_panel.selected_localities:
                 self._show_error("No subnet loaded. Please right-click a transition and select 'Add to Viability Analysis' first.")
                 return
+        
+        # CRITICAL FIX: Refresh subnet parameters from current model before generating experiments
+        # This ensures TreeViews reflect any parameter changes made in the main canvas
+        # since localities were first added. Without this, experiments use stale parameter values.
+        if self.parent_panel and hasattr(self.parent_panel, '_refresh_subnet_parameters'):
+            self.parent_panel._refresh_subnet_parameters()
         
         # Check if there's at least one snapshot (baseline)
         if len(self.experiment_manager.snapshots) == 0:
@@ -907,8 +919,8 @@ class ExperimentAutomationCategory:
             if not os.path.exists(experiments_dir):
                 try:
                     os.makedirs(experiments_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    self.logger.debug(f"Failed to create experiments directory {experiments_dir}: {e}")
             if os.path.isdir(experiments_dir):
                 dialog.set_current_folder(experiments_dir)
             else:

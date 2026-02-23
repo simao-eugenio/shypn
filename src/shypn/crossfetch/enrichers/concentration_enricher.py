@@ -229,7 +229,7 @@ class ConcentrationEnricher(EnricherBase):
                 
                 result.add_change(change)
                 
-            except Exception as e:
+            except (AttributeError, ValueError, TypeError) as e:
                 result.add_error(f"Failed to apply concentration for {species_id}: {e}")
         
         # Set success based on whether we modified anything

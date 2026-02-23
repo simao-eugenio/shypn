@@ -150,9 +150,8 @@ class ModelCanvasManager:
         # Flag to track if document was imported (needs "Save As" on first save)
         self._is_imported = False
         
-        # Simulation settings (for batch mode and recording configuration)
-        from shypn.engine.simulation.settings import SimulationSettings
-        self.simulation_settings = SimulationSettings()
+        # REMOVED: simulation_settings (moved to controller, session-specific)
+        # Simulation parameters like duration, dt, batch mode should NOT be model-dependent
         
         # Document model for storing metadata and settings
         # This provides a persistent model for thermodynamic settings, compound mappings, etc.
@@ -799,8 +798,8 @@ class ModelCanvasManager:
                 from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
                 set_lifecycle_scope_manager(self._canvas_loader.lifecycle_manager.id_manager)
                 self._canvas_loader.lifecycle_manager.id_manager.set_scope(f"canvas_{id(self._drawing_area)}")
-        except Exception:
-            pass
+        except (AttributeError, TypeError, RuntimeError) as e:
+            self.logger.debug(f"Failed to set lifecycle ID scope in canvas manager: {e}")
         
         if places:
             for p in self.places:
@@ -845,7 +844,7 @@ class ModelCanvasManager:
                     logger.info("[LOAD_OBJECTS] Using lifecycle_manager.sync_after_file_load()")
                     lifecycle_mgr.sync_after_file_load(self._drawing_area, file_path=None)
                     logger.info("[LOAD_OBJECTS] ✅ Lifecycle manager sync complete")
-                except Exception as e:
+                except (AttributeError, TypeError, RuntimeError) as e:
                     logger.warning(f"[LOAD_OBJECTS] Lifecycle manager sync failed: {e}, falling back")
                     logger.info("[LOAD_OBJECTS] Calling _request_simulation_reset_direct() as fallback")
                     self._request_simulation_reset_direct()
@@ -879,7 +878,7 @@ class ModelCanvasManager:
                         logger.info("[LOAD_OBJECTS] No viability_panel_loader found")
                 else:
                     logger.info("[LOAD_OBJECTS] No overlay_manager found")
-            except Exception as e:
+            except (AttributeError, TypeError, RuntimeError) as e:
                 logger.warning(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
     
     def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
@@ -2941,6 +2940,10 @@ class ModelCanvasManager:
         import os
         self.filepath = filepath
         
+        # Sync filepath with document model for settings persistence
+        if hasattr(self, '_document_model') and self._document_model:
+            self._document_model.filepath = filepath
+        
         # Update viewport controller's model filepath for view state persistence
         if hasattr(self, 'viewport_controller'):
             self.viewport_controller.model_filepath = filepath
@@ -3322,7 +3325,8 @@ class ModelCanvasManager:
             with open(filepath, 'w') as f:
                 json.dump(view_state, f, indent=2)
             return True
-        except Exception as e:
+        except (OSError, IOError, PermissionError, TypeError) as e:
+            logger.debug(f"Failed to save view state: {e}")
             return False
     
     def load_view_state_from_file(self, filepath=None):

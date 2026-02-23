@@ -854,7 +854,7 @@ class ProjectManager:
             self.current_project = project
             self.add_to_recent(project_id)
             return project
-        except Exception as e:
+        except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
     
     def open_project_by_path(self, project_file: str) -> Optional[Project]:
@@ -883,7 +883,7 @@ class ProjectManager:
             
             self.add_to_recent(project.id)
             return project
-        except Exception as e:
+        except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
     
     def close_current_project(self, save: bool = True):
@@ -895,8 +895,8 @@ class ProjectManager:
         if self.current_project and save:
             try:
                 self.current_project.save()
-            except Exception as e:
-                pass  # Silently ignore save errors when closing
+            except (OSError, IOError, PermissionError) as e:
+                logger.debug(f"Save error when closing project: {e}")
         
         self.current_project = None
     

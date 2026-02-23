@@ -356,7 +356,7 @@ class PathwayPostProcessor:
         for processor in processors:
             try:
                 processor.process(processed)
-            except Exception as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 self.logger.error(
                     f"{processor.__class__.__name__} failed: {e}",
                     exc_info=True

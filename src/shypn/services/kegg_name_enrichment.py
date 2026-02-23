@@ -342,7 +342,7 @@ class KEGGNameEnricher:
             
             return None
             
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError, AttributeError) as e:
             return None
     
     def _fetch_reaction_name(self, reaction_id: str) -> Optional[str]:
@@ -405,7 +405,7 @@ class KEGGNameEnricher:
             
             return None
             
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError, AttributeError) as e:
             return None
 
 

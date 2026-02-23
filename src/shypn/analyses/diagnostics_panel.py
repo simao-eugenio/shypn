@@ -612,8 +612,8 @@ class DiagnosticsPanel:
             
             if not found_any and len(transitions) > 0:
                 pass  # No activity found yet
-        except Exception:
-            pass
+        except (AttributeError, TypeError, KeyError) as e:
+            self.logger.debug(f"Failed to search for transition activity in diagnostics panel: {e}")
     
     def clear(self):
         """Clear diagnostics display."""

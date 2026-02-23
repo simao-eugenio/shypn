@@ -15,6 +15,7 @@ Architecture:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, List, Any, Optional
+from shypn.utils.safe_eval import safe_eval_bool
 
 
 class TransitionBehavior(ABC):
@@ -267,7 +268,8 @@ class TransitionBehavior(ABC):
                 if hasattr(arc, 'target_id') and arc.target_id == transition_id:
                     result.append(arc)
                     continue
-            except:
+            except (AttributeError, TypeError):
+                # Arc structure doesn't support ID access
                 pass
             
             # Fallback: Object reference comparison
@@ -275,14 +277,16 @@ class TransitionBehavior(ABC):
                 if arc.target == self.transition:
                     result.append(arc)
                     continue
-            except:
+            except (AttributeError, TypeError):
+                # Arc doesn't have target reference
                 pass
                 
             # Last resort: String ID in target
             try:
                 if isinstance(arc.target, str) and arc.target == transition_id:
                     result.append(arc)
-            except:
+            except (AttributeError, TypeError):
+                # Arc target is not comparable
                 pass
         
         return result
@@ -329,7 +333,8 @@ class TransitionBehavior(ABC):
                 if hasattr(arc, 'source_id') and arc.source_id == transition_id:
                     result.append(arc)
                     continue
-            except:
+            except (AttributeError, TypeError):
+                # Arc structure doesn't support ID access
                 pass
             
             # Fallback: Object reference comparison
@@ -337,14 +342,16 @@ class TransitionBehavior(ABC):
                 if arc.source == self.transition:
                     result.append(arc)
                     continue
-            except:
+            except (AttributeError, TypeError):
+                # Arc doesn't have source reference
                 pass
                 
             # Last resort: String ID in source
             try:
                 if isinstance(arc.source, str) and arc.source == transition_id:
                     result.append(arc)
-            except:
+            except (AttributeError, TypeError):
+                # Arc source is not comparable
                 pass
         
         return result
@@ -490,9 +497,8 @@ class TransitionBehavior(ABC):
                             # Numeric ID needs P prefix (e.g., 1 → P1)
                             context[f'P{place_id}'] = place.tokens
                 
-                # Evaluate expression safely
-                result = eval(guard_expr, {"__builtins__": {}}, context)
-                passes = bool(result)
+                # Evaluate expression safely (replaces eval() for security)
+                passes = safe_eval_bool(guard_expr, context, default_on_error=False)
                 return passes, f"guard-expr-{passes}"
             except Exception as e:
                 # Guard evaluation error - fail safe (don't fire)

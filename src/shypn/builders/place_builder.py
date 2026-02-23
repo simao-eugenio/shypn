@@ -626,8 +626,11 @@ class PlaceBuilder:
         if self._id_manager and hasattr(self._id_manager, 'register_object'):
             try:
                 self._id_manager.register_object(place, obj_type='place')
-            except Exception:
-                pass  # Lifecycle tracking optional, don't break build
+            except (AttributeError, TypeError, RuntimeError) as e:
+                # Lifecycle tracking optional, don't break build
+                from shypn.utils.logging import get_logger
+                logger = get_logger(__name__)
+                logger.debug(f"Failed to register place with lifecycle ID manager: {e}")
         
         return place
     

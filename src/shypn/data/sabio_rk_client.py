@@ -131,8 +131,11 @@ class SabioRKClient:
             
             return result
             
-        except Exception as e:
-            self.logger.error(f"[SABIO-RK] Error querying EC {ec_number}: {e}")
+        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as e:
+            self.logger.error(f"[SABIO-RK] Network error querying EC {ec_number}: {e}")
+            return None
+        except requests.RequestException as e:
+            self.logger.error(f"[SABIO-RK] Request error querying EC {ec_number}: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -169,8 +172,8 @@ class SabioRKClient:
         except requests.exceptions.Timeout:
             self.logger.error("[SABIO-RK] Timeout getting result count")
             return None
-        except Exception as e:
-            self.logger.error(f"[SABIO-RK] Error getting count: {e}")
+        except requests.RequestException as e:
+            self.logger.error(f"[SABIO-RK] Request error getting count: {e}")
             return None
     
     def _fetch_sbml(self, query: str, identifier: str, timeout: int) -> Optional[Dict[str, Any]]:

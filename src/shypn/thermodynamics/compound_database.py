@@ -126,10 +126,15 @@ class CompoundDatabase:
                     try:
                         import json
                         data['pKa_values'] = json.loads(data['pKa_values'])
-                    except:
-                        # Fallback: comma-separated
+                    except (json.JSONDecodeError, ValueError, TypeError) as e:
+                        # Fallback: comma-separated values
+                        logger.debug(f"Failed to parse pKa JSON for {compound_id}, trying CSV format: {e}")
                         pka_str = data['pKa_values']
-                        data['pKa_values'] = [float(x.strip()) for x in pka_str.split(',') if x.strip()]
+                        try:
+                            data['pKa_values'] = [float(x.strip()) for x in pka_str.split(',') if x.strip()]
+                        except (ValueError, AttributeError) as e2:
+                            logger.warning(f"Failed to parse pKa values for {compound_id}: {e2}")
+                            data['pKa_values'] = []
                 
                 logger.debug(f"Found compound {compound_id} in local cache")
                 return data
@@ -274,7 +279,8 @@ class CompoundDatabase:
                     try:
                         import json
                         compound['pKa_values'] = json.loads(compound['pKa_values'])
-                    except:
+                    except (json.JSONDecodeError, ValueError, TypeError) as e:
+                        logger.debug(f"Failed to parse pKa JSON for {compound.get('compound_id')}: {e}")
                         compound['pKa_values'] = []
                 else:
                     compound['pKa_values'] = []

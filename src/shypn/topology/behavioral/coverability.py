@@ -230,7 +230,7 @@ class CoverabilityAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError, MemoryError) as e:
             logger.error(f"Coverability analysis failed: {e}", exc_info=True)
             return AnalysisResult(
                 success=False,

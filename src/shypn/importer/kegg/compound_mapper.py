@@ -144,8 +144,8 @@ class StandardCompoundMapper(CompoundMapper):
                         if short_names:
                             name = min(short_names, key=len)
                     return name
-            except Exception:
-                pass  # Fall back to other methods
+            except (KeyError, AttributeError, IndexError) as e:
+                self.logger.debug(f"Failed to get compound name from identity service for {compound_id}: {e}")
         
         # 2. Check for common abbreviation (ATP, not C00002)
         if compound_id in self.COMMON_ABBREVIATIONS:

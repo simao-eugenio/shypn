@@ -126,8 +126,8 @@ class BRENDAAPIClient:
         # Set restrictive permissions (Unix only)
         try:
             config_path.chmod(0o600)
-        except Exception:
-            pass
+        except (OSError, PermissionError, NotImplementedError) as e:
+            self.logger.debug(f"Failed to set restrictive permissions on BRENDA config file: {e}")
         
         self.credentials = BRENDACredentials(email=email, password=password)
         self.logger.info(f"Saved BRENDA credentials to {config_path}")
@@ -191,6 +191,12 @@ class BRENDAAPIClient:
             self._authenticated = True
             return True
             
+        except SOAPFault as e:
+            self.logger.error(f"BRENDA SOAP Fault: {e}")
+            return False
+        except (ConnectionError, TimeoutError) as e:
+            self.logger.error(f"Network error connecting to BRENDA: {e}")
+            return False
         except Exception as e:
             error_msg = str(e)
             self.logger.error(f"Failed to authenticate with BRENDA: {type(e).__name__}: {error_msg}")

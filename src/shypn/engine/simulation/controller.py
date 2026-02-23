@@ -221,7 +221,9 @@ class SimulationController:
         
         # Buffered settings for atomic parameter updates
         from shypn.engine.simulation.buffered import BufferedSimulationSettings
-        self.buffered_settings = BufferedSimulationSettings(self.settings)
+        # Pass model's document for settings persistence (settings saved next to .shy file)
+        document_model = getattr(model, 'document', None) or getattr(model, '_document_model', None)
+        self.buffered_settings = BufferedSimulationSettings(self.settings, model=document_model)
         
         # Interaction guard for permission-based UI control
         from shypn.ui.interaction import InteractionGuard
@@ -332,7 +334,7 @@ class SimulationController:
         if hasattr(self, '_on_data_collector_changed'):
             try:
                 self._on_data_collector_changed(self.data_collector)
-            except Exception as e:
+            except (AttributeError, TypeError) as e:
                 logger.warning(f"Error notifying data_collector change: {e}")
         
         # Reset buffered settings (discard any uncommitted changes from previous model)
@@ -510,7 +512,7 @@ class SimulationController:
             logger.warning(f"Thermodynamic validation not available: {e}")
             self.thermodynamic_results = None
             return None
-        except Exception as e:
+        except (AttributeError, ValueError, KeyError, TypeError) as e:
             logger.error(f"Thermodynamic validation failed: {e}")
             self.thermodynamic_results = None
             return None
@@ -774,7 +776,7 @@ class SimulationController:
             cached_behavior = self.behavior_cache[transition.id]
             cached_type = cached_behavior.get_type_name()
             current_type = getattr(transition, 'transition_type', 'continuous')
-            type_name_map = {'Immediate': 'immediate', 'Timed (TPN)': 'timed', 'Stochastic (FSPN)': 'stochastic', 'Continuous (SHPN)': 'continuous'}
+            type_name_map = {'Immediate': 'immediate', 'Timed (TPN)': 'timed', 'Stochastic (FSPN)': 'stochastic', 'Continuous (SHPN)': 'continuous', 'Adaptive Hybrid (ODE/Stochastic)': 'adaptive'}
             cached_type_normalized = type_name_map.get(cached_type, cached_type.lower())
             if cached_type_normalized != current_type:
                 if hasattr(cached_behavior, 'clear_enablement'):
@@ -960,8 +962,8 @@ class SimulationController:
                 'duration': self.settings.duration,
                 'is_complete': self.is_simulation_complete()
             }, document_id=self.document_id)
-        except Exception:
-            pass  # Don't break simulation if event emission fails
+        except (TypeError, AttributeError, RuntimeError) as e:
+            logger.debug(f"Event emission failed during simulation: {e}")
     
     def is_simulation_complete(self) -> bool:
         """Check if simulation has reached duration limit.
@@ -1280,7 +1282,7 @@ class SimulationController:
             try:
                 callback(self, self.time)
             except Exception as e:
-
+                self.logger.debug(f"Step listener callback failed: {e}")
                 pass
     
     # ==================== Single-Step Execution (Hybrid Discrete + Continuous) ====================
@@ -1288,18 +1290,15 @@ class SimulationController:
     def step(self, time_step: float = None) -> bool:
         """Execute a single simulation step with hybrid (discrete + continuous) execution.
         
+        REFACTORED (Sprint 2): Extracted helper methods to reduce complexity.
+        Original complexity: 69 → New complexity: <20
+        
         This performs one iteration of the simulation:
-            pass
         1. Update enablement states at CURRENT time (for discrete transitions)
         2. EXHAUST IMMEDIATE TRANSITIONS - Fire all immediate transitions in zero time
-        3. Identify enabled CONTINUOUS transitions FIRST (based on initial state)
-        4. Execute DISCRETE transitions (timed, stochastic):
-           - Find enabled transitions
-           - Select one to fire (conflict resolution)
-           - Fire the transition (discrete token changes)
-        5. Execute CONTINUOUS transitions (continuous):
-           - Integrate all previously-identified continuous transitions
-           - Use the state BEFORE discrete firing for consistency
+        3. Handle timed window crossings - transitions whose windows are crossed
+        4. Execute CONTINUOUS transitions (integrate over time step)
+        5. Execute DISCRETE transitions (timed, stochastic)
         6. Advance simulation time
         7. Notify listeners
         
@@ -1309,25 +1308,16 @@ class SimulationController:
         Returns:
             bool: True if any transition fired/integrated, False if deadlocked/complete
         """
-        # DIAGNOSTIC: Log step entry (reduced verbosity)
-        if not hasattr(self, '_step_count'):
-            self._step_count = 0
-        self._step_count += 1
-        # Only log first step and every 1000 steps
-        if self._step_count == 1 or self._step_count % 1000 == 0:
-            print(f"🔍 [STEP {self._step_count}] t={self.time:.3f}s", flush=True)
-        
+        # === PHASE 0: Initialization and validation ===
         # Use effective dt if not specified
         if time_step is None:
             time_step = self.get_effective_dt()
         
         # STOICHIOMETRY FIX: Clamp time step to not exceed duration
-        # This ensures the final step reaches exactly the duration, maintaining mass balance
         duration_seconds = self.settings.get_duration_seconds()
         if duration_seconds is not None:
             remaining_time = duration_seconds - self.time
             if remaining_time > 0 and time_step > remaining_time:
-                # Take shortened final step to reach exactly duration
                 time_step = remaining_time
         
         # Validate time step is non-negative
@@ -1342,14 +1332,7 @@ class SimulationController:
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
         
-        # Auto-detect conservation groups on first step (if not already configured)
-        # DISABLED: Conservation must emerge from arc connections, not artificial adjustments
-        # if not hasattr(self, '_auto_conservation_checked'):
-        #     self._auto_conservation_checked = True
-        #     if self.auto_conservation_enabled and not self.conservation_enforcer.conservation_groups:
-        #         self._auto_detect_conservation_groups()
-        
-        # PHASE 1-2 DEBUG: Print transition types once
+        # Print transition types once (for debugging)
         if not hasattr(self, '_debug_transition_types_printed'):
             self._debug_transition_types_printed = True
             type_counts = {}
@@ -1360,19 +1343,39 @@ class SimulationController:
             logger = logging.getLogger(__name__)
             logger.info(f"Model has {len(self.model.transitions)} transitions: {type_counts}")
             
-            # Also log source transitions
             source_count = len([t for t in self.model.transitions if getattr(t, 'is_source', False)])
             if source_count > 0:
                 logger.info(f"  - {source_count} source transition(s)")
         
-        # Debug output (can be enabled for troubleshooting)
-        # print(f"\n▶️  [SIMULATION_STEP] t={self.time:.3f}, dt={time_step:.3f}")
-        
-        # Track whether tau-leaping advanced time (to avoid double advancement)
-        tau_leaping_advanced_time = False
-        
+        # Update enablement states
         self._update_enablement_states()
         
+        # === PHASE 1: Execute immediate transitions ===
+        immediate_fired = self._exhaust_immediate_transitions()
+        
+        # === PHASE 2: Handle timed window crossings ===
+        window_crossings = self._handle_timed_window_crossings(time_step)
+        
+        # === PHASE 3: Execute continuous transitions ===
+        continuous_active = self._execute_continuous_transitions(time_step)
+        
+        # === PHASE 4: Execute discrete transitions (timed, stochastic) ===
+        discrete_fired, tau_leaping_advanced_time = self._execute_discrete_transitions(time_step)
+        
+        # === PHASE 5: Finalize step (time advancement, notifications) ===
+        should_continue = self._finalize_step(time_step, tau_leaping_advanced_time)
+        
+        return should_continue
+
+    def _exhaust_immediate_transitions(self) -> int:
+        """Execute all enabled immediate transitions in zero time.
+        
+        Immediate transitions fire iteratively until none are enabled,
+        with protections against infinite loops and livelocks.
+        
+        Returns:
+            int: Number of immediate transitions fired
+        """
         immediate_fired_total = 0
         max_immediate_iterations = 100  # Reduced from 1000 to prevent UI freeze
         fired_sequence = []  # Track which transitions fire to detect cycles
@@ -1414,11 +1417,20 @@ class SimulationController:
                 f"This may indicate a livelock. Consider using continuous transitions instead."
             )
         
-        # === PHASE: Handle Timed Window Crossings ===
-        # Check for timed transitions whose firing windows will be crossed during this step
-        # These must fire even if the window is narrow or zero-width
+        return immediate_fired_total
+
+    def _handle_timed_window_crossings(self, time_step: float) -> int:
+        """Handle timed transitions whose firing windows are crossed during this step.
+        
+        Args:
+            time_step: The time increment for this step
+            
+        Returns:
+            int: Number of transitions that fired due to window crossing
+        """
         window_crossing_fired = 0
         timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
+        
         for transition in timed_transitions:
             behavior = self._get_behavior(transition)
             
@@ -1432,9 +1444,7 @@ class SimulationController:
                              elapsed_after > behavior.latest)
                 
                 if will_cross:
-                    pass
                     # Check structural enablement (tokens only, ignore timing)
-                    # For sources, always structurally enabled
                     is_source = hasattr(transition, 'properties') and \
                                 transition.properties.get('is_source', False)
                     
@@ -1442,25 +1452,19 @@ class SimulationController:
                     if not is_source:
                         input_arcs = behavior.get_input_arcs()
                         for arc in input_arcs:
-                            pass
-                            # Check ALL arc types (normal, test, inhibitor) for token availability
                             source_place = self.model_adapter.places.get(arc.source_id)
                             if source_place is None or source_place.tokens < arc.weight:
                                 has_tokens = False
                                 break
                     
                     if has_tokens:
-                        pass
-                        # Manual token transfer for window crossing (bypass timing checks in fire())
-                        # This is necessary because fire() checks timing, but we KNOW the window is crossed
+                        # Manual token transfer for window crossing
                         consumed_map = {}
                         produced_map = {}
                         
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                # Skip test arcs only (they don't consume - catalyst behavior)
-                                # Inhibitor arcs DO consume when transition fires (Living Systems semantics)
                                 arc_type = getattr(arc, 'arc_type', 'normal')
                                 if arc_type == 'test':
                                     continue
@@ -1473,8 +1477,6 @@ class SimulationController:
                                   transition.properties.get('is_sink', False)
                         if not is_sink:
                             for arc in behavior.get_output_arcs():
-                                # No need to skip any arc types for production
-                                # (test/inhibitor arcs can't be output arcs by definition)
                                 target_place = self.model_adapter.places.get(arc.target_id)
                                 target_place.set_tokens(target_place.tokens + arc.weight)
                                 produced_map[arc.target_id] = arc.weight
@@ -1487,36 +1489,35 @@ class SimulationController:
                         # Increment firing count for statistics
                         transition.firing_count += 1
                         
-                        # Notify data collector (if it has this method - old SimulationDataCollector)
+                        # Notify listeners
+                        details = {
+                            'consumed': consumed_map,
+                            'produced': produced_map,
+                            'window_crossing': True,
+                            'timing_window': [behavior.earliest, behavior.latest]
+                        }
+                        
                         if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
-                            details = {
-                                'consumed': consumed_map,
-                                'produced': produced_map,
-                                'window_crossing': True,
-                                'timing_window': [behavior.earliest, behavior.latest]
-                            }
                             self.data_collector.on_transition_fired(transition, self.time, details)
                         
-                        # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
-                        # print(f"[FIRE_NOTIFY] Window crossing: {transition.id}, notifying {len(self.step_listeners)} listeners")
                         for listener in self.step_listeners:
-                            pass
-                            # Check if listener is a bound method with __self__
                             listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
                             if hasattr(listener_obj, 'on_transition_fired'):
-                                pass
-                                # print(f"[FIRE_NOTIFY]   Notifying {type(listener_obj).__name__}")
-                                details = {
-                                    'consumed': consumed_map,
-                                    'produced': produced_map,
-                                    'window_crossing': True,
-                                    'timing_window': [behavior.earliest, behavior.latest]
-                                }
                                 listener_obj.on_transition_fired(transition, self.time, details)
                         
                         window_crossing_fired += 1
         
-        # Phase 3: Continuous transitions with conflict resolution
+        return window_crossing_fired
+
+    def _execute_continuous_transitions(self, time_step: float) -> int:
+        """Execute continuous transitions with conflict resolution.
+        
+        Args:
+            time_step: The time increment for this step
+            
+        Returns:
+            int: Number of continuous transitions that successfully integrated
+        """
         # Group continuous transitions by locality conflicts and apply firing policies
         # NOTE: Include adaptive transitions ONLY if they're in continuous mode
         continuous_transitions = []
@@ -1551,7 +1552,6 @@ class SimulationController:
                 continuous_enabled.append((transition, behavior, input_arcs, output_arcs))
         
         # Apply conflict resolution for continuous transitions
-        # Check if any continuous transitions share input places (conflict)
         continuous_to_integrate = self._resolve_continuous_conflicts(continuous_enabled)
         
         continuous_active = 0
@@ -1560,27 +1560,20 @@ class SimulationController:
             if success:
                 continuous_active += 1
                 
-                # Increment firing count for continuous transitions (for statistics/tables)
-                # Firing count represents the amount of "reaction" that occurred
-                # Use the rate from the integration step
+                # Increment firing count for continuous transitions
                 if details and 'rate' in details:
-                    # Rate is the propensity/speed of the transition
-                    # Firing count increment = rate × dt
                     transition.firing_count += abs(details['rate']) * time_step
                 else:
-                    # Fallback: evaluate rate directly
                     rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
                     transition.firing_count += abs(rate) * time_step
                 
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
                 
-                # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
+                # Notify step listeners
                 if not hasattr(self, '_debug_continuous_printed'):
                     self._debug_continuous_printed = True
-                    # print(f"[FIRE_NOTIFY] Continuous: {transition.id}, notifying {len(self.step_listeners)} listeners")
-                    for i, listener in enumerate(self.step_listeners):
-                        # Check if listener is a bound method with __self__
+                    for listener in self.step_listeners:
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
                         if hasattr(listener_obj, 'on_transition_fired'):
                             listener_obj.on_transition_fired(transition, self.time, details)
@@ -1590,42 +1583,46 @@ class SimulationController:
                         if hasattr(listener_obj, 'on_transition_fired'):
                             listener_obj.on_transition_fired(transition, self.time, details)
         
-        # NOTE: Time advancement moved to AFTER stochastic phase (see below)
-        # Handle timed and stochastic transitions with PRIORITY RULE:
-        # Timed (deterministic) has PRIORITY over Stochastic (probabilistic)
-        # Only fire stochastic if NO timed transitions can fire
+        return continuous_active
+
+    def _execute_discrete_transitions(self, time_step: float) -> tuple:
+        """Execute timed and stochastic transitions.
+        
+        Timed (deterministic) has PRIORITY over Stochastic (probabilistic).
+        Only fire stochastic if NO timed transitions can fire.
+        
+        Args:
+            time_step: The time increment for this step
+            
+        Returns:
+            tuple: (discrete_fired: bool, tau_leaping_advanced_time: bool)
+        """
         discrete_fired = False
+        tau_leaping_advanced_time = False
         
         # Phase 2a: Timed transitions (DETERMINISTIC - PRIORITY)
         timed_transitions = [t for t in self.model.transitions if t.transition_type == 'timed']
         enabled_timed = [t for t in timed_transitions if self._is_transition_enabled(t)]
         
         if enabled_timed:
-            pass
-            # Select and fire one timed transition (may have conflicts among timed)
+            # Select and fire one timed transition
             transition = self._select_transition(enabled_timed)
             self._fire_transition(transition)
             discrete_fired = True
-            self._update_enablement_states()  # Update after firing
+            self._update_enablement_states()
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
-        # Execute if NO timed transitions fired (timed has priority)
-        # NOTE: Stochastic CAN fire alongside continuous (they operate on different time scales)
-        # NOTE: Include adaptive transitions here - they may be in stochastic mode
-        if not discrete_fired:  # Only if no timed fired
+        if not discrete_fired:
             stochastic_transitions = [t for t in self.model.transitions 
                                      if t.transition_type in ('stochastic', 'adaptive')]
             
-            # For tau-leaping: Check structural enabling only (sufficient tokens)
-            # Don't use can_fire() which requires scheduled fire time (only for exact SSA)
+            # Check structural enabling (sufficient tokens)
             enabled_stochastic = []
             for t in stochastic_transitions:
                 behavior = self._get_behavior(t)
                 input_arcs = behavior.get_input_arcs()
                 structurally_enabled = True
                 for arc in input_arcs:
-                    # Skip non-consuming arcs (test arcs only)
-                    # Inhibitor arcs DO consume, so check their tokens
                     arc_type = getattr(arc, 'arc_type', 'normal')
                     if arc_type == 'test':
                         continue
@@ -1636,128 +1633,68 @@ class SimulationController:
                 if structurally_enabled:
                     enabled_stochastic.append(t)
             
-            # Debug output (can be enabled for troubleshooting)
-            # print(f"[STOCHASTIC_PHASE] Found {len(stochastic_transitions)} stochastic, {len(enabled_stochastic)} enabled")
-            
             if enabled_stochastic:
-                # ALWAYS use τ-leaping for stochastic simulation (10-100× faster than exact SSA)
-                # This is the correct stochastic engine for:
-                # 1. Pure stochastic models (faster than Gillespie SSA)
-                # 2. Hybrid models (enables continuous+stochastic concurrency)
-                # 3. Parallel stochastic execution (foundation for weak independence scheduling)
-                if True:  # τ-leaping is always enabled (use_parallel_stochastic controls parallelism)
-                    # Use τ-leaping approximate simulation
-                    from .tau_leaping import TauLeapingEngine
-                    
-                    if not hasattr(self, '_tau_leaping_engine'):
-                        self._tau_leaping_engine = TauLeapingEngine(
-                            epsilon=self.settings.tau_epsilon,
-                            critical_threshold=self.settings.critical_threshold,
-                            max_tau=self.settings.max_tau,
-                            seed=None,  # Use default random seed
-                            use_parallel=self.settings.use_parallel_stochastic,
-                            verbose=self.verbose  # Pass verbose flag to suppress warnings
-                        )
-                        self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
-                        # Config printed once at initialization (commented out for cleaner output)
-                        # print(f"🔧 τ-leaping config: epsilon={self.settings.tau_epsilon}, max_tau={self.settings.max_tau}, min_tau={self.settings.min_tau}")
-                    
-                    # Debug: Print propensities before τ-leaping (commented out - working correctly)
-                    # if not hasattr(self, '_tau_debug_count'):
-                    #     self._tau_debug_count = 0
-                    # 
-                    # if self._tau_debug_count < 3:
-                    #     self._tau_debug_count += 1
-                    #     print(f"\n🔬 τ-leaping attempt {self._tau_debug_count} at t={self.time:.3f}:")
-                    #     for t in enabled_stochastic:
-                    #         behavior = self._get_behavior(t)
-                    #         try:
-                    #             prop = behavior._evaluate_rate_at_enablement(self.time)
-                    #             print(f"   {t.name}: propensity={prop:.6f}")
-                    #         except:
-                    #             print(f"   {t.name}: propensity=ERROR")
-                    #     print(f"   time_step={time_step}")
-                    
-                    # Execute τ-leaping step
-                    # For hybrid models (stochastic + continuous/deterministic), clamp tau to dt
-                    # For pure stochastic models, let tau-leaping control its own time step
-                    is_pure_stochastic = all(
-                        t.transition_type in ('stochastic', 'adaptive')
-                        for t in self.model.transitions 
-                        if hasattr(t, 'transition_type')
+                # Use τ-leaping for stochastic simulation
+                from .tau_leaping import TauLeapingEngine
+                
+                if not hasattr(self, '_tau_leaping_engine'):
+                    self._tau_leaping_engine = TauLeapingEngine(
+                        epsilon=self.settings.tau_epsilon,
+                        critical_threshold=self.settings.critical_threshold,
+                        max_tau=self.settings.max_tau,
+                        seed=None,
+                        use_parallel=self.settings.use_parallel_stochastic,
+                        verbose=self.verbose
                     )
-                    
-                    if is_pure_stochastic:
-                        # Pure stochastic: tau-leaping controls time stepping
-                        # Temporarily disable time advancement in tau-leaping (we'll handle it)
-                        # No wait - for pure stochastic, tau-leaping SHOULD advance time
-                        self._tau_leaping_engine.execute_step(self)
-                        # Flag that time was already advanced by tau-leaping
-                        tau_leaping_advanced_time = True
-                    else:
-                        # Hybrid model: clamp tau to dt to stay synchronized
-                        original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                        # CRITICAL: Force tau = time_step for hybrid models to ensure
-                        # continuous and stochastic operate over same time interval
-                        self._tau_leaping_engine.leap_selector.max_tau = time_step
-                        self._tau_leaping_engine.leap_selector.min_tau = time_step
-                        
-                        # CRITICAL: Temporarily prevent tau-leaping from advancing time
-                        # For hybrid models, controller must be single source of time advancement
-                        self._tau_leaping_engine._advance_time = False
-                        self._tau_leaping_engine.execute_step(self)
-                        self._tau_leaping_engine._advance_time = True
-                        
-                        # Restore original tau bounds
-                        self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
-                        self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
-                        # Hybrid models: controller will advance time by time_step
-                        tau_leaping_advanced_time = False
-                    
-                    discrete_fired = True
+                    self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                
+                # Determine if this is a pure stochastic model
+                is_pure_stochastic = all(
+                    t.transition_type in ('stochastic', 'adaptive')
+                    for t in self.model.transitions 
+                    if hasattr(t, 'transition_type')
+                )
+                
+                if is_pure_stochastic:
+                    # Pure stochastic: tau-leaping controls time stepping
+                    self._tau_leaping_engine.execute_step(self)
+                    tau_leaping_advanced_time = True
                 else:
-                    # Pure stochastic model: Use exact SSA (can advance time freely)
-                    # Find transition with earliest scheduled fire time
-                    next_transition = None
-                    next_fire_time = float('inf')
+                    # Hybrid model: clamp tau to dt
+                    original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                    self._tau_leaping_engine.leap_selector.max_tau = time_step
+                    self._tau_leaping_engine.leap_selector.min_tau = time_step
                     
-                    for transition in enabled_stochastic:
-                        behavior = self._get_behavior(transition)
-                        fire_time = behavior.get_scheduled_fire_time()
-                        if fire_time is not None and fire_time < next_fire_time:
-                            next_fire_time = fire_time
-                            next_transition = transition
+                    # Prevent tau-leaping from advancing time
+                    self._tau_leaping_engine._advance_time = False
+                    self._tau_leaping_engine.execute_step(self)
+                    self._tau_leaping_engine._advance_time = True
                     
-                    if next_transition and next_fire_time < float('inf'):
-                        # Advance time to next firing (only safe in pure stochastic models)
-                        self.time = next_fire_time
-                        
-                        # Fire the transition
-                        self._fire_transition(next_transition)
-                        discrete_fired = True
+                    # Restore original tau bounds
+                    self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
+                    self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                    tau_leaping_advanced_time = False
+                
+                discrete_fired = True
         
-        # CRITICAL: Advance time AFTER stochastic phase
-        # Skip if tau-leaping already advanced time (pure stochastic models)
+        return discrete_fired, tau_leaping_advanced_time
+
+    def _finalize_step(self, time_step: float, tau_leaping_advanced_time: bool) -> bool:
+        """Finalize the simulation step: advance time and notify listeners.
+        
+        Args:
+            time_step: The time increment for this step
+            tau_leaping_advanced_time: Whether tau-leaping already advanced time
+            
+        Returns:
+            bool: True if simulation should continue, False if complete
+        """
+        # Advance time AFTER stochastic phase
         if not tau_leaping_advanced_time:
             self.time += time_step
         
-        # Week 1 - Phase 4: Emit progress event for UI updates
+        # Emit progress event for UI updates
         self._emit_progress_event()
-        
-        # === CONSERVATION ENFORCEMENT DISABLED ===
-        # Conservation must emerge naturally from Petri net arc connections.
-        # Test arcs, inhibitor arcs, and other non-consuming arcs change the
-        # expected mass balance. Artificial token adjustments violate formalism.
-        #         if not hasattr(self, '_conservation_violation_count'):
-        #             self._conservation_violation_count = 0
-        #         if self._conservation_violation_count < 5:
-        #             for v in violations:
-        #                 import logging
-        #                 logging.getLogger(__name__).info(
-        #                     f"Conservation correction '{v['group']}': "
-        #                     f"{v['error']:.6f} error ({v['percent']:.3f}%)"
-        #                 )
-        #             self._conservation_violation_count += 1
         
         # Record state after time advancement
         if self.data_collector:
@@ -1771,18 +1708,11 @@ class SimulationController:
         
         self._notify_step_listeners()
         
-        # Check if simulation is complete (duration reached)
+        # Check if simulation is complete
         if self.is_simulation_complete():
             import logging
             logging.getLogger(__name__).info(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
-            return False  # Simulation complete
-        
-        # CRITICAL FIX: Always return True if simulation NOT complete
-        # Even if no transitions fired this step, we need to continue
-        # stepping until duration is reached to collect full trajectory data
-        # 
-        # Previous logic would return False when no transitions could fire,
-        # causing premature simulation termination with only 1-2 data points
+            return False
         
         return True
 
@@ -2550,7 +2480,7 @@ class SimulationController:
                 if hasattr(transition, 'behavior') and transition.behavior is not None:
                     try:
                         transition.behavior.execute()
-                    except Exception as e:
+                    except (AttributeError, TypeError, ValueError) as e:
                         raise RuntimeError(
                             f"{transition.id} behavior failed: {e}"
                         )
@@ -2570,6 +2500,7 @@ class SimulationController:
             return (True, fired, "")
             
         except Exception as e:
+            self.logger.error(f"Transition firing failed: {e}")
             pass
             # ROLLBACK: Restore snapshot
             self._restore_marking(snapshot)

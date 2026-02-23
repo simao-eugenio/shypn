@@ -206,7 +206,7 @@ class TrapAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Trap analysis failed: {str(e)}"],

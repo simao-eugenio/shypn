@@ -239,8 +239,8 @@ class TopologyTabLoader(ABC):
             if not os.path.exists(exports_dir):
                 try:
                     os.makedirs(exports_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    self.logger.debug(f"Failed to create exports directory {exports_dir}: {e}")
             if os.path.isdir(exports_dir):
                 dialog.set_current_folder(exports_dir)
             else:

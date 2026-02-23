@@ -230,8 +230,8 @@ class ExportToolbar(Gtk.Box):
                     models_path = Path(models_dir)
                     models_path.mkdir(parents=True, exist_ok=True)
                     return str(models_path)
-        except Exception:
-            pass
+        except (OSError, PermissionError, AttributeError) as e:
+            self.logger.debug(f"Failed to create or access models directory: {e}")
         
         # Fallback to workspace/projects/
         try:

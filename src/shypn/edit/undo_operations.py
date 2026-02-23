@@ -142,8 +142,8 @@ class DeleteOperation:
 		for obj in created_nodes + created_arcs:
 			try:
 				manager._notify_observers('created', obj)
-			except Exception:
-				pass
+			except (TypeError, AttributeError, RuntimeError) as e:
+				logger.debug(f"Observer notification failed for {obj.id}: {e}")
 
 		# Mark dirty & redraw
 		manager.mark_dirty()

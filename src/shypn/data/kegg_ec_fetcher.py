@@ -63,7 +63,7 @@ class KEGGECFetcher:
         if use_persistent_cache:
             try:
                 self.persistent_cache = PersistentECCache()
-            except Exception as e:
+            except (OSError, PermissionError, IOError, ValueError) as e:
                 logger.warning(f"Failed to initialize persistent cache: {e}")
                 self.persistent_cache = None
         
@@ -145,7 +145,7 @@ class KEGGECFetcher:
         except requests.exceptions.RequestException as e:
             logger.warning(f"KEGG API error for {reaction_id}: {e}")
             return []
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, IndexError, TypeError) as e:
             logger.error(f"Unexpected error fetching EC for {reaction_id}: {e}")
             return []
     
@@ -231,7 +231,7 @@ class KEGGECFetcher:
         except requests.exceptions.RequestException as e:
             logger.warning(f"KEGG API error fetching name for {reaction_id}: {e}")
             return None
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, IndexError, TypeError) as e:
             logger.error(f"Unexpected error fetching name for {reaction_id}: {e}")
             return None
     
@@ -403,7 +403,7 @@ class KEGGECFetcher:
                         if progress_callback:
                             progress_callback(completed, total)
                             
-                    except Exception as e:
+                    except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError) as e:
                         logger.warning(f"Failed to fetch EC for {reaction_id}: {e}")
                         results[reaction_id] = []
                         completed += 1

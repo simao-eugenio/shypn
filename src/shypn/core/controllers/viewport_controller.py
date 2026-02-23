@@ -353,8 +353,8 @@ class ViewportController:
             os.makedirs(os.path.dirname(state_file), exist_ok=True)
             with open(state_file, 'w') as f:
                 json.dump(view_state, f, indent=2)
-        except Exception as e:
-            pass  # Silently ignore save errors
+        except (OSError, IOError, PermissionError, TypeError) as e:
+            logger.debug(f"Failed to save view state: {e}")
     
     def load_view_state_from_file(self):
         """Load view state (pan and zoom) from file.
@@ -395,7 +395,8 @@ class ViewportController:
             
             self._needs_redraw = True
             return True
-        except Exception as e:
+        except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.debug(f"Failed to load view state: {e}")
             return False
     
     # ==================== Redraw Management ====================

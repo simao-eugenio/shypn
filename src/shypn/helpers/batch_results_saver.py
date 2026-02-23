@@ -503,7 +503,7 @@ def save_swiss_palette_batch(
     """
     # Auto-detect project folder if not provided
     if not project_folder:
-        project_folder = _detect_project_folder(model)
+        project_folder = _detect_project_folder(model, simulation_settings)
     
     # Convert settings object to dict
     settings_dict = {
@@ -527,20 +527,20 @@ def save_swiss_palette_batch(
     return str(batch_path)
 
 
-def _detect_project_folder(model: Any) -> str:
+def _detect_project_folder(model: Any, simulation_settings: Any) -> str:
     """Detect project folder from model filepath.
     
     Args:
         model: DocumentModel instance
+        simulation_settings: SimulationSettings instance from controller (session-specific)
     
     Returns:
         Project folder path
     """
-    # Check model simulation_settings for batch_output_folder
-    if hasattr(model, 'simulation_settings') and model.simulation_settings:
-        settings = model.simulation_settings
-        if hasattr(settings, 'batch_output_folder') and settings.batch_output_folder:
-            return settings.batch_output_folder
+    # Check simulation_settings for batch_output_folder (session-specific, not model-dependent)
+    if simulation_settings and hasattr(simulation_settings, 'batch_output_folder'):
+        if simulation_settings.batch_output_folder:
+            return simulation_settings.batch_output_folder
     
     # Try to detect from model filepath
     if hasattr(model, 'filepath') and model.filepath:

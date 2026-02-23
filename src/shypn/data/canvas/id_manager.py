@@ -130,8 +130,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 return _lifecycle_scope_manager.generate_place_id()
-            except Exception:
-                pass  # Fallback to local counter
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager ID generation failed, using fallback: {e}")
         
         place_id = f"P{self._next_place_id}"
         self._next_place_id += 1
@@ -150,8 +150,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 return _lifecycle_scope_manager.generate_transition_id()
-            except Exception:
-                pass  # Fallback to local counter
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager transition ID generation failed, using fallback: {e}")
         
         transition_id = f"T{self._next_transition_id}"
         self._next_transition_id += 1
@@ -170,8 +170,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 return _lifecycle_scope_manager.generate_arc_id()
-            except Exception:
-                pass  # Fallback to local counter
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager arc ID generation failed, using fallback: {e}")
         
         arc_id = f"A{self._next_arc_id}"
         self._next_arc_id += 1
@@ -203,8 +203,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 _lifecycle_scope_manager.register_place_id(str(place_id))
-            except Exception:
-                pass  # Continue with local registration
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager place ID registration failed: {e}")
         
         numeric_id = self.extract_numeric_id(place_id, 'P')
         if numeric_id >= self._next_place_id:
@@ -223,8 +223,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 _lifecycle_scope_manager.register_transition_id(str(transition_id))
-            except Exception:
-                pass  # Continue with local registration
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager transition ID registration failed: {e}")
         
         numeric_id = self.extract_numeric_id(transition_id, 'T')
         if numeric_id >= self._next_transition_id:
@@ -243,8 +243,8 @@ class IDManager:
         if _lifecycle_scope_manager is not None:
             try:
                 _lifecycle_scope_manager.register_arc_id(str(arc_id))
-            except Exception:
-                pass  # Continue with local registration
+            except (AttributeError, TypeError, RuntimeError) as e:
+                logger.debug(f"Lifecycle scope manager arc ID registration failed: {e}")
         
         numeric_id = self.extract_numeric_id(arc_id, 'A')
         if numeric_id >= self._next_arc_id:
@@ -376,8 +376,8 @@ class IDManager:
         if on_create:
             try:
                 on_create(obj)
-            except Exception:
-                pass  # Don't break object creation if callback fails
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Object creation callback failed: {e}")
     
     def notify_modified(self, obj: Any, property_name: str = None, old_value: Any = None, new_value: Any = None):
         """Notify observers that object was modified.
@@ -414,8 +414,8 @@ class IDManager:
         for callback in self._lifecycle_callbacks['modified']:
             try:
                 callback(obj, property_name, old_value, new_value)
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Object modification callback failed: {e}")
     
     def notify_deleted(self, obj: Any, obj_type: str = 'unknown'):
         """Notify observers that object was deleted.
@@ -455,8 +455,8 @@ class IDManager:
         for callback in self._lifecycle_callbacks['deleted']:
             try:
                 callback(obj, obj_type)
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Object deletion callback failed: {e}")
     
     def subscribe_lifecycle(self, event_type: str, callback: Callable):
         """Subscribe to lifecycle events.

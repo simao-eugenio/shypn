@@ -142,8 +142,8 @@ class FilePanelLoader:
                     Gdk.EventMask.STRUCTURE_MASK |
                     Gdk.EventMask.PROPERTY_CHANGE_MASK
                 )
-            except Exception:
-                pass  # Wayland-specific issue, not critical
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Failed to set event mask (Wayland): {e}")
         
         return self.window
     
@@ -285,6 +285,7 @@ class FilePanelLoader:
             self._setup_keyboard_shortcuts()
             
         except Exception as e:
+            self.logger.error(f"File explorer initialization failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -387,7 +388,10 @@ class FilePanelLoader:
                 from shypn.data.project_models import Project
                 project = Project.load(project_file)
                 project_name = project.name if project and project.name else folder_name
-            except:
+            except (OSError, ValueError, AttributeError, ImportError) as e:
+                # Project file parsing failed, use folder name
+                import logging
+                logging.getLogger(__name__).debug(f"Cannot load project name: {e}")
                 project_name = folder_name
             
             # Show confirmation dialog
@@ -478,8 +482,8 @@ class FilePanelLoader:
             # Use xdg-open to open the parent directory
             parent_dir = os.path.dirname(path) if os.path.isfile(path) else path
             subprocess.Popen(['xdg-open', parent_dir])
-        except Exception:
-            pass
+        except (OSError, FileNotFoundError, subprocess.SubprocessError) as e:
+            logger.debug(f"Failed to open directory in file manager: {e}")
     
     def _setup_keyboard_shortcuts(self):
         """Setup keyboard shortcuts for file operations (F2=Rename, Del=Delete, etc.)."""
@@ -586,6 +590,7 @@ class FilePanelLoader:
                 # These will be called from context menu actions instead
                 
         except Exception as e:
+            self.logger.debug(f"Project button setup failed: {e}")
             pass
     
     # Button handlers for Files category
@@ -969,6 +974,7 @@ class FilePanelLoader:
                 self.project_info_store.append(['Transitions', str(transitions)])
                 self.project_info_store.append(['Arcs', str(arcs)])
             except Exception as e:
+                self.logger.debug(f"Failed to update project statistics: {e}")
                 pass
     
     def _on_project_opened_from_file_panel(self, project_path):
@@ -996,9 +1002,11 @@ class FilePanelLoader:
                 if self.file_explorer and hasattr(self.file_explorer, '_load_current_directory'):
                     self.file_explorer._load_current_directory()
             else:
+                self.logger.warning("Project.load returned None")
                 pass
                 
         except Exception as e:
+            self.logger.error(f"Project opening from file panel failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -1064,7 +1072,7 @@ class FilePanelLoader:
                 self.project_controller._on_project_created(project)
                 
         except Exception as e:
-            pass
+            self.logger.error(f"Failed to trigger project controller callback: {e}")
             import traceback
             traceback.print_exc()
 

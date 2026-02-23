@@ -234,7 +234,10 @@ class TimingConflictDetector:
                     delay = float(rate) if isinstance(rate, (int, float)) else 1.0
                     earliest = delay
                     latest = delay
-                except:
+                except (ValueError, TypeError) as e:
+                    # Rate parsing failed, use default timing
+                    import logging
+                    logging.getLogger(__name__).debug(f"Rate parsing failed: {e}")
                     earliest = 1.0
                     latest = 1.0
             else:

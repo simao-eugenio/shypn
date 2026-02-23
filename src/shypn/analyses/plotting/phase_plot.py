@@ -104,7 +104,10 @@ class PhasePlot(BasePlot):
             try:
                 cbar = self.figure.colorbar(points, ax=self.axes)
                 cbar.set_label('Time index', rotation=270, labelpad=15)
-            except:
+            except (ValueError, RuntimeError, AttributeError) as e:
+                # Colorbar creation can fail with certain data ranges or axis configurations
+                import logging
+                logging.getLogger(__name__).debug(f"Colorbar creation failed: {e}")
                 pass  # Colorbar creation failed, skip it
         
         # Configure axes
@@ -118,7 +121,10 @@ class PhasePlot(BasePlot):
         # Tight layout
         try:
             self.figure.tight_layout()
-        except:
+        except (ValueError, RuntimeError) as e:
+            # tight_layout can fail with colorbar or complex layouts
+            import logging
+            logging.getLogger(__name__).debug(f"Tight layout failed: {e}")
             pass  # tight_layout can fail with colorbar, skip if it does
     
     def _create_3d_phase(self, data_arrays):
@@ -192,7 +198,10 @@ class PhasePlot(BasePlot):
             try:
                 cbar = self.figure.colorbar(points, ax=self.axes, shrink=0.5)
                 cbar.set_label('Time index', rotation=270, labelpad=15)
-            except:
+            except (ValueError, RuntimeError, AttributeError) as e:
+                # Colorbar creation can fail with 3D axes or certain configurations
+                import logging
+                logging.getLogger(__name__).debug(f"3D colorbar creation failed: {e}")
                 pass  # Colorbar creation failed, skip it
         
         # Configure axes
@@ -206,7 +215,10 @@ class PhasePlot(BasePlot):
         # Tight layout
         try:
             self.figure.tight_layout()
-        except:
+        except (ValueError, RuntimeError) as e:
+            # tight_layout often fails with 3D plots and colorbars
+            import logging
+            logging.getLogger(__name__).debug(f"3D tight layout failed: {e}")
             pass  # tight_layout can fail with colorbar, skip if it does
     
     def _get_plot_title(self) -> str:

@@ -177,7 +177,7 @@ class DeadlockAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Deadlock analysis failed: {str(e)}"],

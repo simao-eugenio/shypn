@@ -186,6 +186,7 @@ class BasePalette(GObject.GObject, ABC, metaclass=GObjectABCMeta):
                 )
                 
         except Exception as e:
+            self.logger.debug(f"Palette CSS loading failed: {e}")
             pass
     
     # ==================== Public API ====================

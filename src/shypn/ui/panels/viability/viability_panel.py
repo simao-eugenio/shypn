@@ -53,6 +53,7 @@ gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, GLib, Pango
 import re
 
+from shypn.utils.safe_eval import safe_eval_numeric
 from .data.data_puller import DataPuller
 from .data.data_cache import CachedDataPuller, DataCache
 from .subnet_builder import SubnetBuilder
@@ -474,7 +475,8 @@ class ViabilityPanel(Gtk.Box):
                     self.drawing_area = drawing_area
                 else:
                     return None
-            except:
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Cannot access model_canvas document: {e}")
                 return None
         
         drawing_area = self.drawing_area
@@ -487,7 +489,9 @@ class ViabilityPanel(Gtk.Box):
                 manager = self.model_canvas.canvas_managers.get(drawing_area)
                 if manager:
                     return manager
-        except:
+        except (AttributeError, TypeError, KeyError) as e:
+            # Canvas manager not available or invalid drawing_area
+            self.logger.debug(f"Cannot access canvas manager: {e}")
             pass
         
         return None
@@ -513,7 +517,8 @@ class ViabilityPanel(Gtk.Box):
                     self.drawing_area = drawing_area
                 else:
                     return None
-            except:
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Cannot access model_canvas document in fallback: {e}")
                 return None
         
         drawing_area = self.drawing_area
@@ -522,7 +527,9 @@ class ViabilityPanel(Gtk.Box):
             # Get canvas manager for THIS panel's document
             if hasattr(self.model_canvas, 'canvas_managers'):
                 return self.model_canvas.canvas_managers.get(self.drawing_area)
-        except:
+        except (AttributeError, TypeError, KeyError) as e:
+            # Canvas manager not available
+            self.logger.debug(f"Cannot access canvas manager in fallback: {e}")
             pass
         
         return None
@@ -1062,14 +1069,25 @@ class ViabilityPanel(Gtk.Box):
             all_arc_ids.update(a.id for a in locality.output_arcs)
             all_arc_ids.update(a.id for a in locality.catalyst_arcs)  # Include test arcs (non-consuming)
         
+        # SPECIAL CASE: If no localities selected, show entire model
+        show_all_places = len(self.selected_localities) == 0
+        
         # Populate Places table
         for place in model.places:
-            if place.id not in all_place_ids:
+            # If localities selected: only show places in those localities
+            # If no localities: show all places (entire model)
+            if not show_all_places and place.id not in all_place_ids:
                 continue
             place_obj = place
             place_type = "Source" if hasattr(place_obj, 'is_source') and place_obj.is_source else "Normal"
             label = place_obj.label if hasattr(place_obj, 'label') else ""
-            marking = place_obj.tokens if hasattr(place_obj, 'tokens') else 0
+            # CRITICAL: Use initial_marking (static baseline) not tokens (transient state)
+            # tokens may be mid-simulation or stale; initial_marking is the design-time value
+            # This ensures viability experiments use the correct baseline parameters
+            marking = place_obj.initial_marking if hasattr(place_obj, 'initial_marking') else (
+                place_obj.tokens if hasattr(place_obj, 'tokens') else 0
+            )
+            
             self.places_store.append([
                 place_obj.id,
                 place_obj.name if hasattr(place_obj, 'name') else place_obj.id,
@@ -1465,6 +1483,7 @@ class ViabilityPanel(Gtk.Box):
             locality_issues = locality_analyzer.analyze(context)
             all_issues.extend(locality_issues)
         except Exception as e:
+            self.logger.debug(f"Locality analysis failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -1477,6 +1496,7 @@ class ViabilityPanel(Gtk.Box):
             boundary_issues = boundary_analyzer.analyze(context)
             all_issues.extend(boundary_issues)
         except Exception as e:
+            self.logger.debug(f"Boundary analysis failed: {e}")
             pass
             import traceback
             traceback.print_exc()
@@ -1902,7 +1922,8 @@ class ViabilityPanel(Gtk.Box):
                     self.drawing_area = drawing_area
                 else:
                     return None
-            except:
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Cannot access model_canvas document for KB: {e}")
                 return None
         
         drawing_area = self.drawing_area
@@ -1911,7 +1932,9 @@ class ViabilityPanel(Gtk.Box):
             # Get KB for THIS panel's document
             if hasattr(self.model_canvas, 'knowledge_bases'):
                 return self.model_canvas.knowledge_bases.get(self.drawing_area)
-        except:
+        except (AttributeError, TypeError, KeyError) as e:
+            # Knowledge base not available
+            self.logger.debug(f"Cannot access knowledge base: {e}")
             pass
         
         return None
@@ -2513,6 +2536,9 @@ class ViabilityPanel(Gtk.Box):
     
     def _on_run_simulation(self, button):
         """Run simulation to completion."""
+        # Refresh subnet parameters from current model to ensure simulation uses latest values
+        self._refresh_subnet_parameters()
+        
         # 1. Initialize simulator
         if not self.subnet_simulator.initialize_simulation():
             self._append_diagnostics_log("✗ Failed to initialize simulation (no subnet selected)")
@@ -2551,6 +2577,9 @@ class ViabilityPanel(Gtk.Box):
         """Execute single firing event."""
         # 1. Initialize if needed
         if not self.subnet_simulator.is_initialized():
+            # Refresh subnet parameters from current model before initializing
+            self._refresh_subnet_parameters()
+            
             if not self.subnet_simulator.initialize_simulation():
                 self._append_diagnostics_log("✗ Failed to initialize (no subnet selected)")
                 return
@@ -2718,6 +2747,9 @@ class ViabilityPanel(Gtk.Box):
     
     def _on_add_experiment(self, button):
         """Create new experiment snapshot."""
+        # Refresh subnet parameters from current model to ensure TreeViews are up-to-date
+        self._refresh_subnet_parameters()
+        
         snapshot = self.experiment_manager.add_snapshot()
         
         # Capture current TreeView values
@@ -2996,10 +3028,11 @@ class ViabilityPanel(Gtk.Box):
                     if hasattr(place, 'name') and place.name:
                         context[place.name] = place.tokens
                 
-                # Safely evaluate the formula
-                evaluated_value = eval(current_value, {"__builtins__": {}}, context)
-            except:
+                # Safely evaluate the formula (replaces eval() for security)
+                evaluated_value = safe_eval_numeric(current_value, context, default_on_error=1.0)
+            except (ValueError, TypeError, AttributeError) as e:
                 # If evaluation fails, try to extract numeric coefficient
+                self.logger.debug(f"Formula evaluation failed, extracting coefficient: {e}")
                 import re
                 match = re.match(r'^([\d.]+)', current_value.strip())
                 if match:

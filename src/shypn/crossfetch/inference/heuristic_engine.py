@@ -413,7 +413,7 @@ class TransitionTypeDetector:
             # Mixed or unclear substrate composition → Let other stages decide
             return None
             
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
             logger.debug(f"Substrate analysis failed for {transition.id}: {e}")
             return None
 

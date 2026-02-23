@@ -145,7 +145,7 @@ class AnnotationExtractor(BaseExtractor[Dict[str, Annotation]]):
                         database = base_db
                 
                 return (database.lower(), db_id)
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
             self.logger.warning(f"Failed to parse URI: {uri} - {e}")
         
         return None

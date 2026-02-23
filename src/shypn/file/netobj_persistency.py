@@ -104,6 +104,7 @@ class NetObjPersistency:
             try:
                 os.makedirs(self.models_directory)
             except Exception as e:
+                self.logger.warning(f"Cannot create models directory {self.models_directory}: {e}")
                 pass
         self._last_directory: Optional[str] = self.models_directory
         
@@ -235,9 +236,11 @@ class NetObjPersistency:
                 self.on_file_saved(self.current_filepath)
             self._show_success_dialog('File saved successfully', f'Saved to:\n{self.current_filepath}')
             return True
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            from shypn.exceptions import ImportExportError
             import traceback
             traceback.print_exc()
+            self.logger.error(f"File save failed: {e}")
             self._show_error_dialog('Error saving file', str(e))
             return False
 
@@ -261,9 +264,11 @@ class NetObjPersistency:
                 self.on_file_loaded(filepath, document)
             self._show_success_dialog('File loaded successfully', f'Loaded from:\n{filepath}\n\n' + f'Places: {len(document.places)}\n' + f'Transitions: {len(document.transitions)}\n' + f'Arcs: {len(document.arcs)}')
             return (document, filepath)
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            from shypn.exceptions import ImportExportError
             import traceback
             traceback.print_exc()
+            self.logger.error(f"File load failed: {e}")
             self._show_error_dialog('Error loading file', str(e))
             return (None, None)
 
@@ -354,50 +359,52 @@ class NetObjPersistency:
             if not os.path.exists(project_models_dir):
                 try:
                     os.makedirs(project_models_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to create project models directory: {e}")
             if os.path.isdir(project_models_dir):
                 try:
                     dialog.set_current_folder(project_models_dir)
                     folder_set = True
-                except Exception:
-                    pass
+                except (TypeError, AttributeError, RuntimeError) as e:
+                    logger.debug(f"Failed to set dialog folder to project models: {e}")
         
         # Fallback to last directory
         if self._last_directory and os.path.isdir(self._last_directory) and not folder_set:
             try:
                 dialog.set_current_folder(self._last_directory)
                 folder_set = True
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Failed to set dialog folder to last directory: {e}")
         
         if not folder_set:
             if not os.path.exists(self.models_directory):
                 try:
                     os.makedirs(self.models_directory, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to create models directory: {e}")
             if os.path.isdir(self.models_directory):
                 try:
                     dialog.set_current_folder(self.models_directory)
                     folder_set = True
-                except Exception:
-                    pass
+                except (TypeError, AttributeError, RuntimeError) as e:
+                    logger.debug(f"Failed to set dialog folder to models directory: {e}")
         
         if not folder_set:
             try:
                 dialog.set_current_folder(os.getcwd())
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError, OSError) as e:
+                logger.debug(f"Failed to set dialog folder to current directory: {e}")
         
         # Set filename or name
         if self.current_filepath and os.path.isfile(self.current_filepath):
             try:
                 dialog.set_filename(self.current_filepath)
-            except Exception:
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Failed to set filename: {e}")
                 try:
                     dialog.set_current_name(os.path.basename(self.current_filepath))
-                except Exception:
+                except (TypeError, AttributeError, RuntimeError) as e:
+                    logger.debug(f"Failed to set current name: {e}")
                     dialog.set_current_name('default.shy')
         else:
             if self.current_filepath:
@@ -534,41 +541,41 @@ class NetObjPersistency:
             if not os.path.exists(project_models_dir):
                 try:
                     os.makedirs(project_models_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to create project models directory for open: {e}")
             if os.path.isdir(project_models_dir):
                 try:
                     dialog.set_current_folder(project_models_dir)
                     folder_set = True
-                except Exception:
-                    pass
+                except (TypeError, AttributeError, RuntimeError) as e:
+                    logger.debug(f"Failed to set open dialog folder to project models: {e}")
         
         # Fallback to last directory
         if self._last_directory and os.path.isdir(self._last_directory) and not folder_set:
             try:
                 dialog.set_current_folder(self._last_directory)
                 folder_set = True
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError) as e:
+                logger.debug(f"Failed to set open dialog folder to last directory: {e}")
         
         if not folder_set:
             if not os.path.exists(self.models_directory):
                 try:
                     os.makedirs(self.models_directory, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Failed to create models directory for open: {e}")
             if os.path.isdir(self.models_directory):
                 try:
                     dialog.set_current_folder(self.models_directory)
                     folder_set = True
-                except Exception:
-                    pass
+                except (TypeError, AttributeError, RuntimeError) as e:
+                    logger.debug(f"Failed to set open dialog folder to models directory: {e}")
         
         if not folder_set:
             try:
                 dialog.set_current_folder(os.getcwd())
-            except Exception:
-                pass
+            except (TypeError, AttributeError, RuntimeError, OSError) as e:
+                logger.debug(f"Failed to set open dialog folder to current directory: {e}")
         
         # Focus on filename entry instead of search
         dialog.set_current_name("")

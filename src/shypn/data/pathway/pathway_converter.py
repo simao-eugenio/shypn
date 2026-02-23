@@ -754,7 +754,7 @@ class ReactionConverter(BaseConverter):
                 f"    Rate function: '{rate_func}'"
             )
             
-        except Exception as e:
+        except (ValueError, KeyError, ZeroDivisionError) as e:
             # Fallback on any error
             transition.transition_type = "continuous"
             transition.rate = 1.0

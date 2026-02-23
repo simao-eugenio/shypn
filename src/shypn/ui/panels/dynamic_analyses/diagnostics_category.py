@@ -99,7 +99,10 @@ class DiagnosticsCategory(BaseDynamicCategory):
             import pango
             font_desc = pango.FontDescription('Monospace 9')
             textview.modify_font(font_desc)
-        except:
+        except (ImportError, AttributeError) as e:
+            # Pango font setting failed, use default font
+            import logging
+            logging.getLogger(__name__).debug(f"Monospace font setting failed: {e}")
             pass
         
         scrolled.add(textview)

@@ -327,7 +327,7 @@ class ValidationSection(ThermodynamicsSectionBase):
                             'is_valid': validation.is_valid,
                             'message': validation.message
                         })
-                    except Exception as e:
+                    except (AttributeError, KeyError, ValueError, TypeError, RuntimeError) as e:
                         logger.warning(f"Validation failed for {transition.id}: {e}")
                 
                 GLib.idle_add(self._on_validation_complete, results)

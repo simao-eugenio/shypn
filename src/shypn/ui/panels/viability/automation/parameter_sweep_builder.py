@@ -14,6 +14,7 @@ Date: December 7, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from shypn.utils.safe_eval import safe_eval_numeric
 
 
 class ParameterSweepBuilder(Gtk.Box):
@@ -590,13 +591,15 @@ class ParameterSweepBuilder(Gtk.Box):
                             if hasattr(place, 'name') and place.name:
                                 context[place.name] = place.tokens
                         
-                        # Safely evaluate the formula
-                        evaluated_value = eval(current_value, {"__builtins__": {}}, context)
-                    except:
+                        # Safely evaluate the formula (replaces eval() for security)
+                        evaluated_value = safe_eval_numeric(current_value, context, default_on_error=1.0)
+                    except (ValueError, TypeError, AttributeError) as e:
                         # If evaluation fails, try to parse as float
+                        import logging
+                        logging.getLogger(__name__).debug(f"Formula evaluation failed: {e}")
                         try:
                             evaluated_value = float(current_value)
-                        except:
+                        except (ValueError, TypeError):
                             evaluated_value = 1.0
                 
                 # Trigger prefill with evaluated value (but skip the combo updates)
@@ -607,7 +610,7 @@ class ParameterSweepBuilder(Gtk.Box):
                 self._apply_prediction(singular_type, evaluated_value)
                 
         except Exception as e:
-            pass  # Silent fail - user can manually adjust values
+            self.logger.debug(f"Failed to apply prediction for {param_type}: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1242,7 +1245,10 @@ class ParameterSweepBuilder(Gtk.Box):
         try:
             values = self._compute_parameter_values()
             return len(values)
-        except:
+        except (ValueError, AttributeError, KeyError) as e:
+            # Parameter value computation failed
+            import logging
+            logging.getLogger(__name__).debug(f"Experiment count calculation failed: {e}")
             return 0
     
     def _apply_prediction(self, param_type, numeric_value):
@@ -1355,11 +1361,14 @@ class ParameterSweepBuilder(Gtk.Box):
                     self.preview_label.set_markup(
                         f"<span foreground='blue'>Ready: {count} experiments will be generated</span>"
                     )
-            except:
+            except (ValueError, AttributeError) as e:
+                # Preview update failed, not critical
+                import logging
+                logging.getLogger(__name__).debug(f"Preview update failed: {e}")
                 pass
                 
         except Exception as e:
-            pass  # Silent fail - user can manually adjust values
+            self.logger.debug(f"Failed to update preview after value changes: {e}")
     
     def prefill_parameter(self, param_type, param_id, param_name, current_value):
         """Pre-fill sweep builder with parameter from right-click context menu.

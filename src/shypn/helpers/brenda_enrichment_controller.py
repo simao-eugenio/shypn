@@ -217,7 +217,7 @@ class BRENDAEnrichmentController:
                                 transition.metadata['ec_numbers'] = ec_numbers
                                 transition.metadata['ec_number'] = ec_numbers[0]
                         except Exception as e:
-                            pass
+                            self.logger.debug(f"Could not store EC number in transition metadata: {e}")
                 
                 transitions.append(transition_info)
         
@@ -304,7 +304,8 @@ class BRENDAEnrichmentController:
             else:
                 return None
         
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError, AttributeError) as e:
+            logger.debug(f"Failed to fetch BRENDA data: {e}")
             return None
     
     # ========================================================================
@@ -338,7 +339,8 @@ class BRENDAEnrichmentController:
                 return None
             else:
                 return None
-        except Exception as e:
+        except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.debug(f"Failed to load BRENDA file {file_path}: {e}")
             return None
     
     # ========================================================================
@@ -446,7 +448,7 @@ class BRENDAEnrichmentController:
                 override = parameters.get('_override_rate_function', False)
                 self._generate_rate_function_from_parameters(transition_obj, parameters, override=override)
             except Exception as e:
-                pass
+                self.logger.error(f"Failed to generate rate function from BRENDA parameters: {e}")
                 import traceback
                 traceback.print_exc()
             

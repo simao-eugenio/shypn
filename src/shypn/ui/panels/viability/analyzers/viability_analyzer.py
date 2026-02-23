@@ -167,7 +167,8 @@ class ViabilityAnalyzer:
             from shypn.diagnostic import LocalityDetector
             locality_detector = LocalityDetector(self.model)
             return locality_detector.get_locality_for_transition(transition_obj)
-        except Exception as e:
+        except (ImportError, AttributeError, KeyError) as e:
+            logger.debug(f"Failed to detect locality for transition: {e}")
             return None
     
     def _build_context(self, transition, transition_obj, locality) -> Dict[str, Any]:
@@ -191,8 +192,8 @@ class ViabilityAnalyzer:
         if cached_puller and hasattr(cached_puller, 'get_simulation_data'):
             try:
                 sim_data = cached_puller.get_simulation_data()
-            except Exception:
-                pass
+            except (AttributeError, TypeError, KeyError) as e:
+                self.logger.debug(f"Failed to get simulation data from cached puller: {e}")
         
         return {
             'transition': transition,
@@ -241,6 +242,7 @@ class ViabilityAnalyzer:
             locality_issues = self.locality_analyzer.analyze(context)
             issues.extend(locality_issues)
         except Exception as e:
+            self.logger.debug(f"Locality analysis failed: {e}")
             pass
         
         # Level 3: Boundary Analysis
@@ -248,6 +250,7 @@ class ViabilityAnalyzer:
             boundary_issues = self.boundary_analyzer.analyze(context)
             issues.extend(boundary_issues)
         except Exception as e:
+            self.logger.debug(f"Boundary analysis failed: {e}")
             pass
         
         # Level 4: Conservation Analysis
@@ -255,6 +258,7 @@ class ViabilityAnalyzer:
             conservation_issues = self.conservation_analyzer.analyze(context)
             issues.extend(conservation_issues)
         except Exception as e:
+            self.logger.debug(f"Conservation analysis failed: {e}")
             pass
         
         return issues
@@ -275,6 +279,7 @@ class ViabilityAnalyzer:
             locality_issues = self.locality_analyzer.analyze(context)
             issues.extend(locality_issues)
         except Exception as e:
+            self.logger.debug(f"Deep locality analysis failed: {e}")
             pass
         
         # Level 2: Dependency Analysis (requires subnet context)
@@ -282,6 +287,7 @@ class ViabilityAnalyzer:
             dependency_issues = self.dependency_analyzer.analyze(context)
             issues.extend(dependency_issues)
         except Exception as e:
+            self.logger.debug(f"Dependency analysis failed: {e}")
             pass
         
         # Level 3: Boundary Analysis
@@ -289,6 +295,7 @@ class ViabilityAnalyzer:
             boundary_issues = self.boundary_analyzer.analyze(context)
             issues.extend(boundary_issues)
         except Exception as e:
+            self.logger.debug(f"Deep boundary analysis failed: {e}")
             pass
         
         # Level 4: Conservation Analysis
@@ -296,6 +303,7 @@ class ViabilityAnalyzer:
             conservation_issues = self.conservation_analyzer.analyze(context)
             issues.extend(conservation_issues)
         except Exception as e:
+            self.logger.debug(f"Deep conservation analysis failed: {e}")
             pass
         
         return issues

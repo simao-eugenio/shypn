@@ -389,8 +389,8 @@ class PerDocumentPanelLoader(ABC):
             # Set window type hint to keep it visible (utility windows stay on top)
             try:
                 self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-            except Exception:
-                pass  # Wayland may not support this
+            except (TypeError, AttributeError, RuntimeError) as e:
+                self.logger.debug(f"GTK window type hint not supported on this compositor: {e}")
         
         # Remove from container
         if hasattr(self, 'parent_container') and self.parent_container:
@@ -426,8 +426,8 @@ class PerDocumentPanelLoader(ABC):
         # Raise window to ensure visibility (works on X11 and some compositors)
         try:
             self.window.present()
-        except Exception:
-            pass  # Some window managers may not support this
+        except (TypeError, AttributeError, RuntimeError) as e:
+            self.logger.debug(f"GTK window.present() not supported by window manager: {e}")
         
         # Notify callback
         if hasattr(self, 'on_float_callback') and callable(self.on_float_callback):

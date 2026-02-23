@@ -148,7 +148,7 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
                 errors=[str(e)],
                 metadata={'analyzer': self.name}
             )
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Unexpected error: {str(e)}"],

@@ -250,7 +250,7 @@ class EditableField:
             try:
                 if not self.validator(value):
                     return False, "Custom validation failed"
-            except Exception as e:
+            except (TypeError, ValueError, AttributeError) as e:
                 return False, f"Validation error: {str(e)}"
         
         return True, None

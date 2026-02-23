@@ -155,7 +155,7 @@ class PInvariantAnalyzer(TopologyAnalyzer):
             
             return result
         
-        except Exception as e:
+        except (ValueError, np.linalg.LinAlgError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"P-invariant analysis failed: {str(e)}"],

@@ -140,7 +140,7 @@ class TransientForHelper:
             dialog.present()
             logger.debug("[TransientForHelper] Dialog presented successfully")
             return True
-        except Exception as e:
+        except (TypeError, AttributeError, RuntimeError) as e:
             logger.error(f"[TransientForHelper] Error presenting dialog: {e}", exc_info=True)
             # Fallback: present without transient parent
             dialog.present()
@@ -256,6 +256,6 @@ class TransientForHelper:
             dialog.set_transient_for(parent)
             logger.debug("[TransientForHelper] set_transient_for completed safely")
             return True
-        except Exception as e:
+        except (TypeError, AttributeError, RuntimeError) as e:
             logger.error(f"[TransientForHelper] Error in set_transient_for: {e}", exc_info=True)
             return False

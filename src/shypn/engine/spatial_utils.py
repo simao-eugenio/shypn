@@ -245,31 +245,33 @@ class GradientModulator:
 
 
 class VolumeAdaptiveSelector:
-    """Selects transition type based on compartment volume.
+    """Selects transition type based on molecular population size.
     
-    Uses compartment_volume to decide if stochastic or continuous semantics
-    are more appropriate. Small volumes require stochastic (discrete) dynamics,
-    large volumes can use continuous (ODE) integration.
+    Uses molecule count (tokens × compartment_volume) to decide if stochastic
+    or continuous semantics are more appropriate. Low molecule counts require
+    stochastic (discrete) dynamics, high counts can use continuous (ODE) integration.
     
-    Threshold (default): 1.0 fL (femtoliter)
-    - Volume < threshold → Use stochastic
-    - Volume ≥ threshold → Use continuous
+    Threshold (default): 100 molecules
+    - Molecule count < threshold → Use stochastic
+    - Molecule count ≥ threshold → Use continuous
     
     Usage:
-        selector = VolumeAdaptiveSelector(threshold_fL=1.0)
+        selector = VolumeAdaptiveSelector(threshold_molecules=100)
         should_stochastic = selector.should_use_stochastic(place)
     """
     
-    def __init__(self, threshold_fL: float = 1.0):
-        """Initialize selector with volume threshold.
+    def __init__(self, threshold_molecules: float = 100.0):
+        """Initialize selector with molecule count threshold.
         
         Args:
-            threshold_fL: Volume threshold in femtoliters (default 1.0 fL)
+            threshold_molecules: Molecule count threshold (default 100 molecules)
         """
-        self.threshold_fL = threshold_fL
+        self.threshold_molecules = threshold_molecules
     
     def should_use_stochastic(self, place) -> bool:
-        """Check if place volume suggests stochastic dynamics.
+        """Check if place molecule count suggests stochastic dynamics.
+        
+        Calculates molecule count as: tokens × compartment_volume
         
         Args:
             place: Place object
@@ -277,11 +279,17 @@ class VolumeAdaptiveSelector:
         Returns:
             True if should use stochastic, False for continuous
         """
-        # Check compartment volume
+        # Need both tokens and volume to calculate molecule count
         if not hasattr(place, 'compartment_volume') or place.compartment_volume is None:
             return False  # No volume set - default to continuous
         
-        return place.compartment_volume < self.threshold_fL
+        if not hasattr(place, 'tokens'):
+            return False  # No tokens - default to continuous
+        
+        # Calculate molecule count (concentration × volume)
+        molecule_count = place.tokens * place.compartment_volume
+        
+        return molecule_count < self.threshold_molecules
     
     def analyze_transition(
         self,
@@ -290,6 +298,9 @@ class VolumeAdaptiveSelector:
     ) -> Tuple[bool, Dict[str, Any]]:
         """Analyze all connected places and recommend transition type.
         
+        Calculates molecule counts as: tokens × compartment_volume for each place
+        and uses the minimum to determine the mode.
+        
         Args:
             input_places: List of input Place objects
             output_places: List of output Place objects
@@ -297,33 +308,46 @@ class VolumeAdaptiveSelector:
         Returns:
             Tuple of (use_stochastic: bool, details: dict)
         """
-        # Collect volumes from all places
-        volumes = []
+        # Collect molecule counts from all places
+        molecule_counts = []
+        place_details = []
         
         for place in input_places + output_places:
-            # Check compartment volume
-            if hasattr(place, 'compartment_volume') and place.compartment_volume is not None:
-                volumes.append(place.compartment_volume)
+            # Need both volume and tokens
+            if not (hasattr(place, 'compartment_volume') and place.compartment_volume is not None):
+                continue
+            if not hasattr(place, 'tokens'):
+                continue
+            
+            # Calculate molecule count (concentration × volume)
+            molecule_count = place.tokens * place.compartment_volume
+            molecule_counts.append(molecule_count)
+            place_details.append({
+                'name': getattr(place, 'name', 'unknown'),
+                'tokens': place.tokens,
+                'volume': place.compartment_volume,
+                'molecules': molecule_count
+            })
         
-        if not volumes:
-            # No volumes set - default to continuous
+        if not molecule_counts:
+            # No valid places - default to continuous
             return False, {
                 'recommendation': 'continuous',
-                'reason': 'no-volumes-set',
-                'volumes': []
+                'reason': 'no-molecule-counts',
+                'places': place_details
             }
         
-        # Use minimum volume (most restrictive)
-        min_volume = min(volumes)
+        # Use minimum molecule count (most restrictive)
+        min_molecules = min(molecule_counts)
         
-        use_stochastic = min_volume < self.threshold_fL
+        use_stochastic = min_molecules < self.threshold_molecules
         
         return use_stochastic, {
             'recommendation': 'stochastic' if use_stochastic else 'continuous',
-            'reason': 'volume-based',
-            'min_volume': min_volume,
-            'threshold': self.threshold_fL,
-            'volumes': volumes
+            'reason': 'molecule-count-based',
+            'min_molecules': min_molecules,
+            'threshold': self.threshold_molecules,
+            'places': place_details
         }
 
 

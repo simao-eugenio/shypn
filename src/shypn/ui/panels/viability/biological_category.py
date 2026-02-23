@@ -87,12 +87,16 @@ class BiologicalCategory(BaseViabilityCategory):
                             stats['active_places'] += 1
                         else:
                             stats['inactive_places'].append(place_id)
-                except:
+                except (AttributeError, KeyError, ValueError) as e:
+                    # Place history analysis failed, skip this place
+                    import logging
+                    logging.getLogger(__name__).debug(f"Place history analysis failed: {e}")
                     pass
             
             return stats
             
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
+            logger.debug(f"Biological stats computation failed: {e}")
             return stats
     
     def _build_content(self):

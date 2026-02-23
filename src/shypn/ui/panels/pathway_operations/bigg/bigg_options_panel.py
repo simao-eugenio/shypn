@@ -111,7 +111,10 @@ class BiGGOptionsPanel(Gtk.Box):
             try:
                 if widget and not widget.is_destroyed():
                     widget.disconnect(handler_id)
-            except:
+            except (AttributeError, TypeError) as e:
+                # Widget already destroyed or invalid
+                import logging
+                logging.getLogger(__name__).debug(f"Signal disconnect failed: {e}")
                 pass
         self._signal_handlers.clear()
         self.logger.debug("BiGGOptionsPanel cleaned up")

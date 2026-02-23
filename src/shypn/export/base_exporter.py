@@ -129,7 +129,7 @@ class BaseExporter(ABC):
             
         except ExportError:
             raise
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError, OSError, IOError) as e:
             raise ExportError(f"Export failed: {e}") from e
     
     def calculate_bounds(self, manager) -> Optional[Dict[str, float]]:
@@ -221,8 +221,10 @@ class BaseExporter(ABC):
             if not os.path.exists(project_exports_dir):
                 try:
                     os.makedirs(project_exports_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except (OSError, PermissionError) as e:
+                    from shypn.utils.logging import get_logger
+                    logger = get_logger(__name__)
+                    logger.debug(f"Failed to create exports directory {project_exports_dir}: {e}")
             if os.path.isdir(project_exports_dir):
                 dialog.set_current_folder(project_exports_dir)
             else:

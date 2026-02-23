@@ -13,7 +13,7 @@ Date: 2026-01-06
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 
 from shypn.helpers.base_panel_loader import PerDocumentPanelLoader
 from shypn.ui.panels.topology import TopologyPanel
@@ -124,11 +124,24 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         
         # Auto-run SAFE analyzers only (P-Invariants, T-Invariants, etc.)
         # Dangerous analyzers (Siphons, Traps, Reachability) require manual expansion
+        # DEFER to idle to avoid blocking tab switch
         if drawing_area and self.model_canvas_loader:
-            manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
-            if manager and not (hasattr(manager, 'is_empty') and manager.is_empty()):
-                if self.panel:
-                    self.panel.auto_run_all_analyzers()
+            GLib.idle_add(self._deferred_auto_run, drawing_area)
+    
+    def _deferred_auto_run(self, drawing_area):
+        """Deferred auto-run of analyzers - doesn't block tab switch.
+        
+        Args:
+            drawing_area: The newly active drawing area
+        
+        Returns:
+            False: Don't repeat the idle callback
+        """
+        manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
+        if manager and not (hasattr(manager, 'is_empty') and manager.is_empty()):
+            if self.panel:
+                self.panel.auto_run_all_analyzers()
+        return False  # Don't repeat
     
     def on_file_opened(self, drawing_area):
         """Handle file open event.
@@ -141,11 +154,9 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
             self.panel.refresh()
         
         # Auto-run SAFE analyzers only
+        # DEFER to idle to avoid blocking file open completion
         if drawing_area and self.model_canvas_loader:
-            manager = self.model_canvas_loader.get_canvas_manager(drawing_area)
-            if manager and not (hasattr(manager, 'is_empty') and manager.is_empty()):
-                if self.panel:
-                    self.panel.auto_run_all_analyzers()
+            GLib.idle_add(self._deferred_auto_run, drawing_area)
     
     def on_pathway_imported(self, drawing_area):
         """Handle pathway import event.
@@ -156,6 +167,11 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         # Refresh all categories
         if self.panel:
             self.panel.refresh()
+        
+        # Auto-run SAFE analyzers only
+        # DEFER to idle to avoid blocking import completion
+        if drawing_area and self.model_canvas_loader:
+            GLib.idle_add(self._deferred_auto_run, drawing_area)
     
     def on_tab_closed(self, drawing_area):
         """Handle tab close event - clear analyzer results.

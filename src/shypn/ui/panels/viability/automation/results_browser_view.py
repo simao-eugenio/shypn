@@ -1933,9 +1933,6 @@ class ResultsBrowserView(BaseResultsView):
             else:
                 dialog.set_current_folder(project_manager.current_project.base_path)
         
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
-        
         response = dialog.run()
         directory = dialog.get_filename()
         dialog.destroy()
@@ -1996,9 +1993,6 @@ class ResultsBrowserView(BaseResultsView):
                 dialog.set_current_folder(experiments_dir)
             else:
                 dialog.set_current_folder(project_manager.current_project.base_path)
-        
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
         
         response = dialog.run()
         directory = dialog.get_filename()
@@ -2616,8 +2610,8 @@ class ResultsBrowserView(BaseResultsView):
             try:
                 self.figure.subplots_adjust(left=0.08, right=0.95, top=0.92, 
                                            bottom=0.08, hspace=0.4, wspace=0.3)
-            except Exception:
-                pass  # Suppress all layout errors
+            except (ValueError, AttributeError) as layout_err:
+                self.logger.debug(f"Failed to adjust matplotlib subplots layout: {layout_err}")
         
         self.canvas.draw()
     

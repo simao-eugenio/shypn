@@ -654,18 +654,11 @@ class PetriNetBuilder:
         self._metadata.update(kwargs)
         return self
     
-    def with_simulation_settings(self, **kwargs) -> 'PetriNetBuilder':
-        """Set simulation settings.
-        
-        Args:
-            **kwargs: Simulation setting key-value pairs
-        
-        Returns:
-            Self for method chaining
-        """
-        for key, value in kwargs.items():
-            setattr(self._model.simulation_settings, key, value)
-        return self
+    # REMOVED: with_simulation_settings() - Simulation parameters are session-specific,
+    # set on controller.settings, not saved in model. This method would have required
+    # model.simulation_settings which was removed to fix architecture. If you need to
+    # set simulation parameters in tests, do so on the SimulationController.settings
+    # after creating the model and controller.
     
     # ========== Build ==========
     

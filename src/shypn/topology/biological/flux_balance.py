@@ -93,7 +93,7 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
             
             return result
             
-        except Exception as e:
+        except (ValueError, np.linalg.LinAlgError, AttributeError) as e:
             raise TopologyAnalysisError(
                 f"Flux balance analysis failed: {str(e)}"
             )

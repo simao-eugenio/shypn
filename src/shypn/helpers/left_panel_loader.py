@@ -128,7 +128,7 @@ class LeftPanelLoader:
                 root_boundary=workspace_boundary  # Cannot navigate above workspace/
             )
         except Exception as e:
-            pass  # Continue anyway - panel will work without file explorer
+            self.logger.debug(f"Could not initialize file explorer panel: {e}")
         
         # Initialize project actions controller (handles all project management)
         # CRITICAL: Don't set parent_window here - it will be set when panel attaches/floats

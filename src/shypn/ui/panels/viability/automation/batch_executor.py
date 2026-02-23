@@ -43,7 +43,10 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
             try:
                 # Send progress update: (queue_index, progress_fraction)
                 progress_queue.put((queue_index, progress_fraction))
-            except:
+            except (OSError, ValueError) as e:
+                # Queue communication error (non-fatal)
+                import logging
+                logging.getLogger(__name__).debug(f"Progress queue error: {e}")
                 pass  # Ignore queue errors (non-fatal)
     
     try:
@@ -838,7 +841,10 @@ class BatchExecutor:
                                 # Convert fraction to percentage string
                                 progress_pct = int(progress_fraction * 100)
                                 progress_callback(queue_idx, "running", f"{progress_pct}%")
-                        except:
+                        except (OSError, ValueError) as e:
+                            # Queue empty or communication error
+                            import logging
+                            logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
                             break  # Queue empty or error
                     
                     # Check completed experiments and detect timeouts
@@ -854,7 +860,10 @@ class BatchExecutor:
                             try:
                                 # Note: We can't kill individual async_result, must terminate entire pool later
                                 pass  # Will be handled by pool.terminate() if needed
-                            except:
+                            except (AttributeError, OSError) as e:
+                                # Worker termination failed (non-fatal)
+                                import logging
+                                logging.getLogger(__name__).debug(f"Worker termination attempt failed: {e}")
                                 pass
                             
                             # Mark as failed due to timeout

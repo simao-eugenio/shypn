@@ -187,8 +187,7 @@ class BaseDynamicCategory:
             try:
                 self.panel.clear_plot()
             except Exception as e:
-                pass
-                # print(f"Warning: Could not clear plot in {self.panel.__class__.__name__}: {e}")
+                self.logger.debug(f"Could not clear plot in {self.panel.__class__.__name__}: {e}")
     
     def _get_current_drawing_area(self):
         """Get the current drawing area from model.

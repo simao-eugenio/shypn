@@ -200,11 +200,15 @@ class MenuActions:
 				if manager.undo_manager.undo(manager):
 					try:
 						da.queue_draw()
-					except Exception:
-						pass
-		except Exception:
+					except (TypeError, AttributeError) as e:
+						from shypn.utils.logging import get_logger
+						logger = get_logger(__name__)
+						logger.debug(f"Failed to queue draw after undo: {e}")
+		except (AttributeError, TypeError) as e:
 			# Keep menu action resilient
-			pass
+			from shypn.utils.logging import get_logger
+			logger = get_logger(__name__)
+			logger.debug(f"Undo menu action failed: {e}")
 	
 	def on_edit_redo(self, action, param):
 		"""Redo the last undone action for the active document."""
@@ -219,11 +223,15 @@ class MenuActions:
 				if manager.undo_manager.redo(manager):
 					try:
 						da.queue_draw()
-					except Exception:
-						pass
-		except Exception:
+					except (TypeError, AttributeError) as e:
+						from shypn.utils.logging import get_logger
+						logger = get_logger(__name__)
+						logger.debug(f"Failed to queue draw after redo: {e}")
+		except (AttributeError, TypeError) as e:
 			# Keep menu action resilient
-			pass
+			from shypn.utils.logging import get_logger
+			logger = get_logger(__name__)
+			logger.debug(f"Redo menu action failed: {e}")
 	
 	def on_edit_cut(self, action, param):
 		"""Cut the selected content."""

@@ -163,8 +163,8 @@ class BRENDACategory(BasePathwayCategory):
                 self.model_canvas_manager = current
                 if self.brenda_controller:
                     self.brenda_controller.set_model_canvas(self.model_canvas_manager)
-        except Exception:
-            pass
+        except (AttributeError, TypeError) as e:
+            self.logger.debug(f"Failed to update model canvas reference in BRENDA category: {e}")
 
     def set_model_canvas(self, model_canvas):
         """Set or update the active model canvas / loader.

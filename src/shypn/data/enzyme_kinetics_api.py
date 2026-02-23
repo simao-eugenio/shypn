@@ -306,7 +306,10 @@ class EnzymeKineticsAPI:
                 else:
                     return f"{age.seconds // 60}m"
             return "unknown"
-        except:
+        except (ValueError, TypeError, AttributeError) as e:
+            # Cache timestamp parsing failed
+            import logging
+            logging.getLogger(__name__).debug(f"Cache age calculation failed: {e}")
             return "unknown"
     
     def _save_to_cache(

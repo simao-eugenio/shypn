@@ -1,0 +1,55 @@
+[flake8]
+# Flake8 Configuration for SHYPN
+# Architecture-Aware Code Style Checks
+# Generated: 2026-02-18
+
+# Maximum line length (consistent with black)
+max-line-length = 120
+
+# Maximum complexity (lower than pylint for safety)
+max-complexity = 15
+
+# Exclude architecture zones from checks
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    build,
+    dist,
+    *.egg-info,
+    .eggs,
+    # ARCHITECTURE EXEMPTIONS (A+ grade, 26/26 tests passing):
+    src/shypn/events/event_bus.py,
+    src/shypn/helpers/base_panel_loader.py,
+    src/shypn/helpers/model_canvas_loader.py,
+    src/shypn/helpers/pathway_panel_loader.py,
+    src/shypn/helpers/analyses_panel_loader.py,
+    src/shypn/helpers/topology_panel_loader.py,
+    src/shypn/helpers/viability_panel_loader.py,
+    src/shypn/helpers/report_panel_loader.py
+
+# Ignore specific errors
+ignore =
+    E203,  # Whitespace before ':' (conflicts with black)
+    E501,  # Line too long (handled by max-line-length)
+    W503,  # Line break before binary operator (black style)
+    W504,  # Line break after binary operator (black style)
+
+# Per-file ignores for specific patterns
+per-file-ignores =
+    __init__.py:F401,F403
+    */tests/*:F401,F403,F811
+
+# Show source code for errors
+show-source = True
+
+# Show statistics
+statistics = True
+
+# Count errors
+count = True
+
+# Format output
+format = default

@@ -739,7 +739,10 @@ class AnalysisPlotPanel(Gtk.Box):
         # (this method is only called from _full_redraw now)
         try:
             self.figure.tight_layout()
-        except:
+        except (ValueError, RuntimeError) as e:
+            # tight_layout can fail with complex plots
+            import logging
+            logging.getLogger(__name__).debug(f"Tight layout failed: {e}")
             pass  # Ignore tight_layout errors
 
     def _get_color(self, index: int) -> str:

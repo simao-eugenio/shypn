@@ -70,7 +70,10 @@ class RightPanelLoader:
         try:
             from gi.repository import Gdk
             self.window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-        except:
+        except (ImportError, AttributeError) as e:
+            # Window type hint not critical if it fails
+            import logging
+            logging.getLogger(__name__).debug(f"Window type hint failed: {e}")
             pass  # Not critical if type hint fails
         
         # Create main container (replaces right_panel_content from UI)

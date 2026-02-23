@@ -185,6 +185,7 @@ class LocalityRuntimeAnalyzer:
                     }
                     events.append(event)
                 except Exception as e:
+                    self.logger.debug(f"Failed to parse transition event data: {e}")
                     continue
             
             return events
@@ -312,7 +313,7 @@ class LocalityRuntimeAnalyzer:
             
             return (True, f"All preconditions satisfied (type: {transition_type})")
             
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
             return (False, f"Error checking preconditions: {str(e)}")
     
     def _get_logical_time(self) -> float:

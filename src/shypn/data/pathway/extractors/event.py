@@ -115,7 +115,7 @@ class EventExtractor(BaseExtractor[List[Event]]):
                 assignments=assignments
             )
             
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError) as e:
             self.logger.error(f"Failed to extract event: {e}")
             self.add_error(f"Event extraction error: {e}")
             return None

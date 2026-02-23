@@ -734,8 +734,8 @@ class ModelsCategory(BaseReportCategory):
             try:
                 from shypn.crossfetch.database.heuristic_db import HeuristicDatabase
                 heuristic_db = HeuristicDatabase()
-            except Exception as e:
-                pass
+            except (ImportError, AttributeError) as e:
+                self.logger.debug(f"Heuristic database not available: {e}")
             
             # Track stats
             transitions_with_kinetics = 0
@@ -932,7 +932,10 @@ class ModelsCategory(BaseReportCategory):
                     dt = datetime.fromisoformat(model.created_date.replace('Z', '+00:00'))
                     date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
                     overview_lines.append(f"Created: {date_str}")
-                except:
+                except (ValueError, AttributeError) as e:
+                    # Date parsing failed, use raw string
+                    import logging
+                    logging.getLogger(__name__).debug(f"Created date parsing failed: {e}")
                     overview_lines.append(f"Created: {model.created_date}")
             
             # Last modified (if available)
@@ -941,7 +944,10 @@ class ModelsCategory(BaseReportCategory):
                     dt = datetime.fromisoformat(model.modified_date.replace('Z', '+00:00'))
                     date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
                     overview_lines.append(f"Modified: {date_str}")
-                except:
+                except (ValueError, AttributeError) as e:
+                    # Date parsing failed, use raw string
+                    import logging
+                    logging.getLogger(__name__).debug(f"Modified date parsing failed: {e}")
                     overview_lines.append(f"Modified: {model.modified_date}")
             
             # Description (if available)
@@ -1056,7 +1062,10 @@ class ModelsCategory(BaseReportCategory):
                         dt = datetime.fromisoformat(pathway_doc.imported_date.replace('Z', '+00:00'))
                         date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
                         provenance_lines.append(f"Imported: {date_str}")
-                    except:
+                    except (ValueError, AttributeError) as e:
+                        # Import date parsing failed
+                        import logging
+                        logging.getLogger(__name__).debug(f"Import date parsing failed: {e}")
                         provenance_lines.append(f"Imported: {pathway_doc.imported_date}")
                 
                 # Original file
@@ -1095,7 +1104,10 @@ class ModelsCategory(BaseReportCategory):
                         dt = datetime.fromisoformat(imported.replace('Z', '+00:00'))
                         date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
                         provenance_lines.append(f"Imported: {date_str}")
-                    except:
+                    except (ValueError, AttributeError) as e:
+                        # Import date parsing failed
+                        import logging
+                        logging.getLogger(__name__).debug(f"Generic import date parsing failed: {e}")
                         provenance_lines.append(f"Imported: {imported}")
                 
                 # Original file
@@ -1258,6 +1270,9 @@ class ModelsCategory(BaseReportCategory):
     def _populate_reactions_table(self, model):
         """Populate reactions table with current model data.
         
+        REFACTORED (Sprint 2): Extracted helper methods to reduce complexity.
+        Original complexity: 55 → New complexity: <15
+        
         New structure: #, ID, Name, Type, EC Number, Vmax, Km, Kcat, Ki, Rate Function, Reversible
         
         Args:
@@ -1272,213 +1287,242 @@ class ModelsCategory(BaseReportCategory):
             if not transition:
                 continue
             
-            # Extract data
+            # Extract basic data
             trans_id = transition.id if hasattr(transition, 'id') else f"T{i}"
             name = transition.label if hasattr(transition, 'label') and transition.label else trans_id
+            trans_type = transition.transition_type if hasattr(transition, 'transition_type') else "unknown"
             
-            # Type
-            trans_type = "unknown"
-            if hasattr(transition, 'transition_type'):
-                trans_type = transition.transition_type
+            # Extract complex data using helper methods
+            ec_number = self._extract_ec_number(transition, name)
+            vmax, vmax_source, km, km_source, kcat, kcat_source, ki, ki_source = \
+                self._extract_kinetic_parameters(transition)
+            rate_function = self._extract_rate_function(transition, trans_type)
+            reversible = self._extract_reversible_status(transition)
             
-            # EC Number - Multi-priority extraction
-            ec_number = "-"
-            
-            # Priority 1: Extract from reaction_code (e.g., "EC:1.1.1.1")
-            if hasattr(transition, 'reaction_code') and transition.reaction_code:
-                reaction_code = transition.reaction_code
-                if reaction_code.startswith('EC:'):
-                    ec_number = reaction_code.replace('EC:', '')
-                elif reaction_code.startswith('ec:'):
-                    ec_number = reaction_code.replace('ec:', '')
-                elif not reaction_code.startswith('R'):
-                    # If it's not a KEGG R number, assume it's an EC number
-                    ec_number = reaction_code
-            
-            # Priority 2: Extract from KEGG reaction ID (R00XXX -> EC via API/metadata)
-            if ec_number == "-":
-                kegg_reaction_id = None
-                
-                # Check metadata first
-                if hasattr(transition, 'metadata') and transition.metadata:
-                    kegg_reaction_id = transition.metadata.get('kegg_reaction_id',
-                                      transition.metadata.get('reaction_id', ''))
-                
-                # Check reaction_code if it starts with R
-                if not kegg_reaction_id and hasattr(transition, 'reaction_code') and transition.reaction_code:
-                    if transition.reaction_code.startswith('R') or transition.reaction_code.startswith('rn:R'):
-                        kegg_reaction_id = transition.reaction_code
-                
-                # Check label (transition name) if it starts with R - KEGG models often use R codes as labels
-                if not kegg_reaction_id and name and (name.startswith('R') or name.startswith('rn:R')):
-                    kegg_reaction_id = name
-                # Check label (transition name) if it starts with R - KEGG models often use R codes as labels
-                if not kegg_reaction_id and name and (name.startswith('R') or name.startswith('rn:R')):
-                    kegg_reaction_id = name
-                
-                # Clean KEGG format and fetch EC
-                if kegg_reaction_id:
-                    kegg_reaction_id = kegg_reaction_id.replace('rn:', '').strip()
-                    
-                    # If we have KEGG reaction ID, actively fetch from KEGG API
-                    # This is the same pattern used in BRENDA enrichment controller
-                    if kegg_reaction_id.startswith('R'):
-                        # First check if EC already in metadata (from previous fetch)
-                        if hasattr(transition, 'metadata') and transition.metadata:
-                            ec_val = transition.metadata.get('ec_number',
-                                    transition.metadata.get('ec_numbers', []))
-                            if isinstance(ec_val, list) and ec_val:
-                                ec_number = ec_val[0]
-                            elif ec_val and ec_val != '-':
-                                ec_number = str(ec_val)
-                        
-                        # If still not found, actively fetch from KEGG API
-                        if ec_number == "-":
-                            try:
-                                ec_numbers = self.kegg_ec_fetcher.fetch_ec_numbers(kegg_reaction_id)
-                                if ec_numbers and len(ec_numbers) > 0:
-                                    ec_number = ec_numbers[0]
-                                    # Store in metadata for future use
-                                    if not hasattr(transition, 'metadata'):
-                                        transition.metadata = {}
-                                    if not transition.metadata:
-                                        transition.metadata = {}
-                                    transition.metadata['ec_number'] = ec_number
-                            except Exception as e:
-                                pass  # Silently fail - EC number will remain "-"
-            
-            # Priority 3: Fallback to metadata ec_number directly
-            if ec_number == "-" and hasattr(transition, 'metadata') and transition.metadata:
-                ec_val = transition.metadata.get('ec_number',
-                         transition.metadata.get('ec_numbers', []))
-                if isinstance(ec_val, list) and ec_val:
-                    ec_number = ec_val[0]
-                elif ec_val and ec_val != '-':
-                    ec_number = str(ec_val)
-            
-            # Extract individual kinetic parameters
-            vmax = 0.0
-            vmax_source = "unknown"
-            km = 0.0
-            km_source = "unknown"
-            kcat = 0.0
-            kcat_source = "unknown"
-            ki = 0.0
-            ki_source = "unknown"
-            
-            if hasattr(transition, 'metadata') and transition.metadata:
-                # Check direct metadata (BRENDA/SABIO-RK enrichment)
-                if 'vmax' in transition.metadata:
-                    vmax = float(transition.metadata['vmax'])
-                    vmax_source = transition.metadata.get('vmax_source',
-                                 transition.metadata.get('data_source', 'unknown'))
-                
-                if 'km' in transition.metadata:
-                    km = float(transition.metadata['km'])
-                    km_source = transition.metadata.get('km_source', 
-                               transition.metadata.get('data_source', 'unknown'))
-                
-                if 'kcat' in transition.metadata:
-                    kcat = float(transition.metadata['kcat'])
-                    kcat_source = transition.metadata.get('kcat_source',
-                                 transition.metadata.get('data_source', 'unknown'))
-                
-                if 'ki' in transition.metadata:
-                    ki = float(transition.metadata['ki'])
-                    ki_source = transition.metadata.get('ki_source',
-                               transition.metadata.get('data_source', 'unknown'))
-                
-                # Check kinetic_parameters dict (SBML/KEGG import)
-                params = transition.metadata.get('kinetic_parameters', {})
-                if params and isinstance(params, dict):
-                    if vmax == 0.0:
-                        vmax_val = params.get('Vmax', params.get('vmax', params.get('V_max', 0.0)))
-                        if vmax_val:
-                            vmax = float(vmax_val)
-                            vmax_source = transition.metadata.get('data_source', 'kegg_import')
-                    
-                    if km == 0.0:
-                        km_val = params.get('Km', params.get('km', params.get('KM', 0.0)))
-                        if km_val:
-                            km = float(km_val)
-                            km_source = transition.metadata.get('data_source', 'kegg_import')
-                    
-                    if kcat == 0.0:
-                        kcat_val = params.get('Kcat', params.get('kcat', params.get('k_cat', 0.0)))
-                        if kcat_val:
-                            kcat = float(kcat_val)
-                            kcat_source = transition.metadata.get('data_source', 'kegg_import')
-                    
-                    if ki == 0.0:
-                        ki_val = params.get('Ki', params.get('ki', params.get('KI', 0.0)))
-                        if ki_val:
-                            ki = float(ki_val)
-                            ki_source = transition.metadata.get('data_source', 'kegg_import')
-                
-                # Check estimated_parameters dict (KEGG heuristic estimator)
-                estimated_params = transition.metadata.get('estimated_parameters', {})
-                if estimated_params and isinstance(estimated_params, dict):
-                    if vmax == 0.0:
-                        vmax_val = estimated_params.get('vmax', 0.0)
-                        if vmax_val:
-                            vmax = float(vmax_val)
-                            vmax_source = 'kegg_heuristic'
-                    
-                    if km == 0.0:
-                        km_val = estimated_params.get('km', 0.0)
-                        if km_val:
-                            km = float(km_val)
-                            km_source = 'kegg_heuristic'
-            
-            # Rate Function - Extract as-is from transition properties
-            rate_function = "-"
-            
-            # Priority 1: Check transition.properties['rate_function']
-            if hasattr(transition, 'properties') and transition.properties:
-                if isinstance(transition.properties, dict):
-                    rate_function = transition.properties.get('rate_function', '-')
-            
-            # Priority 2: Check transition.rate_function directly
-            if rate_function == "-" and hasattr(transition, 'rate_function'):
-                if transition.rate_function:
-                    rate_function = transition.rate_function
-            
-            # Priority 3: Check metadata
-            if rate_function == "-" and hasattr(transition, 'metadata') and transition.metadata:
-                rate_function = transition.metadata.get('rate_function',
-                               transition.metadata.get('kinetic_formula',
-                               transition.metadata.get('kinetic_law', '-')))
-            
-            # Priority 4: For stochastic transitions, default to "mass_action"
-            # Stochastic transitions inherently use mass action kinetics
-            if rate_function == "-" and trans_type == 'stochastic':
-                rate_function = "mass_action"
-            
-            # Reversible
-            reversible = "Unknown"
-            if hasattr(transition, 'metadata') and transition.metadata:
-                rev_val = transition.metadata.get('reversible')
-                if rev_val is not None:
-                    reversible = "Yes" if rev_val else "No"
-            
-            # Add row to table (new column order)
+            # Add row to table
             self.reactions_store.append([
-                i,                # 0: index
-                trans_id,         # 1: Petri Net ID
-                name,             # 2: Biological Name
-                trans_type,       # 3: Type
-                ec_number,        # 4: EC Number
-                vmax,             # 5: Vmax
-                vmax_source,      # 6: Vmax source
-                km,               # 7: Km
-                km_source,        # 8: Km source
-                kcat,             # 9: Kcat
-                kcat_source,      # 10: Kcat source
-                ki,               # 11: Ki
-                ki_source,        # 12: Ki source
-                rate_function,    # 13: Rate Function
-                reversible        # 14: Reversible
+                i, trans_id, name, trans_type, ec_number,
+                vmax, vmax_source, km, km_source,
+                kcat, kcat_source, ki, ki_source,
+                rate_function, reversible
             ])
+
+    def _extract_ec_number(self, transition, name: str) -> str:
+        """Extract EC number from transition with multi-priority fallback.
+        
+        Priority order:
+        1. reaction_code (e.g., "EC:1.1.1.1")
+        2. KEGG reaction ID (fetch from API)
+        3. metadata ec_number field
+        
+        Returns:
+            str: EC number or "-" if not found
+        """
+        ec_number = "-"
+        
+        # Priority 1: Extract from reaction_code
+        if hasattr(transition, 'reaction_code') and transition.reaction_code:
+            reaction_code = transition.reaction_code
+            if reaction_code.startswith('EC:'):
+                ec_number = reaction_code.replace('EC:', '')
+            elif reaction_code.startswith('ec:'):
+                ec_number = reaction_code.replace('ec:', '')
+            elif not reaction_code.startswith('R'):
+                ec_number = reaction_code
+        
+        # Priority 2: Extract from KEGG reaction ID
+        if ec_number == "-":
+            kegg_reaction_id = self._get_kegg_reaction_id(transition, name)
+            if kegg_reaction_id and kegg_reaction_id.startswith('R'):
+                ec_number = self._fetch_ec_from_kegg(transition, kegg_reaction_id)
+        
+        # Priority 3: Fallback to metadata ec_number
+        if ec_number == "-" and hasattr(transition, 'metadata') and transition.metadata:
+            ec_val = transition.metadata.get('ec_number', transition.metadata.get('ec_numbers', []))
+            if isinstance(ec_val, list) and ec_val:
+                ec_number = ec_val[0]
+            elif ec_val and ec_val != '-':
+                ec_number = str(ec_val)
+        
+        return ec_number
+
+    def _get_kegg_reaction_id(self, transition, name: str) -> str:
+        """Get KEGG reaction ID from various sources."""
+        kegg_reaction_id = None
+        
+        # Check metadata
+        if hasattr(transition, 'metadata') and transition.metadata:
+            kegg_reaction_id = transition.metadata.get('kegg_reaction_id',
+                              transition.metadata.get('reaction_id', ''))
+        
+        # Check reaction_code
+        if not kegg_reaction_id and hasattr(transition, 'reaction_code') and transition.reaction_code:
+            if transition.reaction_code.startswith('R') or transition.reaction_code.startswith('rn:R'):
+                kegg_reaction_id = transition.reaction_code
+        
+        # Check label
+        if not kegg_reaction_id and name and (name.startswith('R') or name.startswith('rn:R')):
+            kegg_reaction_id = name
+        
+        if kegg_reaction_id:
+            kegg_reaction_id = kegg_reaction_id.replace('rn:', '').strip()
+        
+        return kegg_reaction_id
+
+    def _fetch_ec_from_kegg(self, transition, kegg_reaction_id: str) -> str:
+        """Fetch EC number from KEGG API for given reaction ID."""
+        ec_number = "-"
+        
+        # First check if EC already in metadata
+        if hasattr(transition, 'metadata') and transition.metadata:
+            ec_val = transition.metadata.get('ec_number', transition.metadata.get('ec_numbers', []))
+            if isinstance(ec_val, list) and ec_val:
+                ec_number = ec_val[0]
+            elif ec_val and ec_val != '-':
+                ec_number = str(ec_val)
+        
+        # Fetch from API if not found
+        if ec_number == "-":
+            try:
+                ec_numbers = self.kegg_ec_fetcher.fetch_ec_numbers(kegg_reaction_id)
+                if ec_numbers and len(ec_numbers) > 0:
+                    ec_number = ec_numbers[0]
+                    # Store in metadata
+                    if not hasattr(transition, 'metadata'):
+                        transition.metadata = {}
+                    if not transition.metadata:
+                        transition.metadata = {}
+                    transition.metadata['ec_number'] = ec_number
+            except (KeyError, AttributeError, IndexError) as e:
+                self.logger.debug(f"Failed to extract EC number from KEGG compound_names for transition {transition.id}: {e}")
+        
+        return ec_number
+
+    def _extract_kinetic_parameters(self, transition) -> tuple:
+        """Extract kinetic parameters with multi-source fallback.
+        
+        Returns:
+            tuple: (vmax, vmax_source, km, km_source, kcat, kcat_source, ki, ki_source)
+        """
+        vmax, vmax_source = 0.0, "unknown"
+        km, km_source = 0.0, "unknown"
+        kcat, kcat_source = 0.0, "unknown"
+        ki, ki_source = 0.0, "unknown"
+        
+        if not (hasattr(transition, 'metadata') and transition.metadata):
+            return vmax, vmax_source, km, km_source, kcat, kcat_source, ki, ki_source
+        
+        metadata = transition.metadata
+        
+        # Direct metadata (BRENDA/SABIO-RK enrichment)
+        if 'vmax' in metadata:
+            vmax = float(metadata['vmax'])
+            vmax_source = metadata.get('vmax_source', metadata.get('data_source', 'unknown'))
+        
+        if 'km' in metadata:
+            km = float(metadata['km'])
+            km_source = metadata.get('km_source', metadata.get('data_source', 'unknown'))
+        
+        if 'kcat' in metadata:
+            kcat = float(metadata['kcat'])
+            kcat_source = metadata.get('kcat_source', metadata.get('data_source', 'unknown'))
+        
+        if 'ki' in metadata:
+            ki = float(metadata['ki'])
+            ki_source = metadata.get('ki_source', metadata.get('data_source', 'unknown'))
+        
+        # kinetic_parameters dict (SBML/KEGG import)
+        params = metadata.get('kinetic_parameters', {})
+        if params and isinstance(params, dict):
+            if vmax == 0.0:
+                vmax_val = params.get('Vmax', params.get('vmax', params.get('V_max', 0.0)))
+                if vmax_val:
+                    vmax = float(vmax_val)
+                    vmax_source = metadata.get('data_source', 'kegg_import')
+            
+            if km == 0.0:
+                km_val = params.get('Km', params.get('km', params.get('KM', 0.0)))
+                if km_val:
+                    km = float(km_val)
+                    km_source = metadata.get('data_source', 'kegg_import')
+            
+            if kcat == 0.0:
+                kcat_val = params.get('Kcat', params.get('kcat', params.get('k_cat', 0.0)))
+                if kcat_val:
+                    kcat = float(kcat_val)
+                    kcat_source = metadata.get('data_source', 'kegg_import')
+            
+            if ki == 0.0:
+                ki_val = params.get('Ki', params.get('ki', params.get('KI', 0.0)))
+                if ki_val:
+                    ki = float(ki_val)
+                    ki_source = metadata.get('data_source', 'kegg_import')
+        
+        # estimated_parameters dict (KEGG heuristic estimator)
+        estimated_params = metadata.get('estimated_parameters', {})
+        if estimated_params and isinstance(estimated_params, dict):
+            if vmax == 0.0:
+                vmax_val = estimated_params.get('vmax', 0.0)
+                if vmax_val:
+                    vmax = float(vmax_val)
+                    vmax_source = 'kegg_heuristic'
+            
+            if km == 0.0:
+                km_val = estimated_params.get('km', 0.0)
+                if km_val:
+                    km = float(km_val)
+                    km_source = 'kegg_heuristic'
+        
+        return vmax, vmax_source, km, km_source, kcat, kcat_source, ki, ki_source
+
+    def _extract_rate_function(self, transition, trans_type: str) -> str:
+        """Extract rate function with priority fallback.
+        
+        Priority order:
+        1. transition.properties['rate_function']
+        2. transition.rate_function attribute
+        3. metadata rate_function/kinetic_formula/kinetic_law
+        4. Default "mass_action" for stochastic transitions
+        
+        Returns:
+            str: Rate function or "-" if not found
+        """
+        rate_function = "-"
+        
+        # Priority 1: properties dict
+        if hasattr(transition, 'properties') and transition.properties:
+            if isinstance(transition.properties, dict):
+                rate_function = transition.properties.get('rate_function', '-')
+        
+        # Priority 2: direct attribute
+        if rate_function == "-" and hasattr(transition, 'rate_function'):
+            if transition.rate_function:
+                rate_function = transition.rate_function
+        
+        # Priority 3: metadata
+        if rate_function == "-" and hasattr(transition, 'metadata') and transition.metadata:
+            rate_function = transition.metadata.get('rate_function',
+                           transition.metadata.get('kinetic_formula',
+                           transition.metadata.get('kinetic_law', '-')))
+        
+        # Priority 4: default for stochastic
+        if rate_function == "-" and trans_type == 'stochastic':
+            rate_function = "mass_action"
+        
+        return rate_function
+
+    def _extract_reversible_status(self, transition) -> str:
+        """Extract reversible status from metadata.
+        
+        Returns:
+            str: "Yes", "No", or "Unknown"
+        """
+        reversible = "Unknown"
+        if hasattr(transition, 'metadata') and transition.metadata:
+            rev_val = transition.metadata.get('reversible')
+            if rev_val is not None:
+                reversible = "Yes" if rev_val else "No"
+        return reversible
     
     def _populate_locality_table(self):
         """Populate locality table with selected transition + locality places.

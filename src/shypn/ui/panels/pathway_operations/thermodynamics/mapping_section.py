@@ -166,7 +166,7 @@ class MappingSection(ThermodynamicsSectionBase):
         # Re-run mapper to get confidence scores
         try:
             self.current_mappings, self.current_confidences = self.mapper_service.map_all_places(self.document)
-        except Exception as e:
+        except (AttributeError, KeyError, ValueError, TypeError, RuntimeError) as e:
             logger.error(f"Failed to run mapper: {e}")
             self.current_mappings = mappings
             self.current_confidences = {pid: 0.0 for pid in mappings}

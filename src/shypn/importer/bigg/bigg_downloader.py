@@ -43,7 +43,7 @@ class BiGGDownloader(BaseBiGGService):
             try:
                 self.cache_dir.mkdir(parents=True, exist_ok=True)
                 return True
-            except Exception as e:
+            except (OSError, IOError, PermissionError) as e:
                 self.logger.error(f"Cannot create cache directory: {e}")
                 return False
         
@@ -90,7 +90,7 @@ class BiGGDownloader(BaseBiGGService):
             try:
                 cache_file.write_text(sbml_xml, encoding='utf-8')
                 self.logger.debug(f"Cached SBML for '{model_id}'")
-            except Exception as e:
+            except (OSError, IOError, PermissionError) as e:
                 self.logger.warning(f"Failed to cache SBML: {e}")
                 # Still continue, just won't be cached
             

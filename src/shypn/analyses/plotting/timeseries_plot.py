@@ -130,7 +130,10 @@ class TimeSeriesPlot(BasePlot):
         # Tight layout
         try:
             self.figure.tight_layout()
-        except:
+        except (ValueError, RuntimeError) as e:
+            # tight_layout can fail with secondary axes
+            import logging
+            logging.getLogger(__name__).debug(f"Tight layout failed: {e}")
             pass
     
     def _get_plot_title(self) -> str:

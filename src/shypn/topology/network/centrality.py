@@ -296,7 +296,10 @@ class CentralityAnalyzer(TopologyAnalyzer):
             # Fallback to eigenvector_centrality_numpy if available
             try:
                 all_eigenvector = nx.eigenvector_centrality_numpy(undirected_graph, weight=weight)
-            except:
+            except (AttributeError, ImportError, ValueError) as e:
+                # Numpy centrality not available or also failed
+                import logging
+                logging.getLogger(__name__).debug(f"Eigenvector centrality fallback failed: {e}")
                 # If still fails, return zeros
                 all_eigenvector = {node: 0.0 for node in undirected_graph.nodes()}
         

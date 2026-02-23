@@ -159,7 +159,7 @@ class FairnessAnalyzer(TopologyAnalyzer):
                 }
             )
             
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return AnalysisResult(
                 success=False,
                 errors=[f"Fairness analysis failed: {str(e)}"],

@@ -252,7 +252,10 @@ class Place(PetriNetObject):
         try:
             # Try to use Arial (legacy style)
             cr.select_font_face("Arial", 0, 0)  # Arial, Normal, Normal
-        except:
+        except (AttributeError, RuntimeError) as e:
+            # Arial font not available, use fallback
+            import logging
+            logging.getLogger(__name__).debug(f"Arial font not available: {e}")
             cr.select_font_face("Sans", 0, 0)  # Fallback to Sans
         
         # Font size compensated for zoom (14pt constant screen size)
@@ -573,8 +576,14 @@ class Place(PetriNetObject):
             "x": self.x,
             "y": self.y,
             "radius": self.radius,
-            "marking": self.tokens,  # Use 'marking' for compatibility
-            "initial_marking": self.initial_marking,  # Store initial marking for reset
+            # CRITICAL DISTINCTION:
+            # - initial_marking: Static design-time baseline (used for simulation reset)
+            # - marking/tokens: Transient runtime state (may be mid-simulation)
+            # For file persistence, we save initial_marking as the canonical baseline
+            # and also save current tokens for recovery of in-progress states
+            "marking": self.initial_marking,  # Use initial_marking as canonical baseline
+            "tokens": self.tokens,  # Also save current transient state for recovery
+            "initial_marking": self.initial_marking,  # Explicit field for clarity
             "capacity": "Infinity" if self.capacity == float('inf') else self.capacity,  # Normalize infinity to string for JSON
             "border_color": list(self.border_color),
             "border_width": self.border_width,
@@ -655,14 +664,22 @@ class Place(PetriNetObject):
             label=str(data.get("label", ""))
         )
         
-        # Restore optional properties
-        if "marking" in data:
-            place.tokens = data["marking"]
+        # Restore optional properties with CLEAR SEPARATION of static vs transient data
+        # Priority: initial_marking (design-time) > marking (legacy compatibility) > tokens (transient)
         if "initial_marking" in data:
+            # Modern format: initial_marking is the authoritative baseline
             place.initial_marking = data["initial_marking"]
+            # Set tokens from saved transient state if available, else use initial_marking
+            place.tokens = data.get("tokens", place.initial_marking)
+        elif "marking" in data:
+            # Legacy format: marking was used for both (ambiguous)
+            # Assume marking is the baseline and use it for both
+            place.initial_marking = data["marking"]
+            place.tokens = data["marking"]
         else:
-            # If no initial_marking stored, use current marking as initial
-            place.initial_marking = place.tokens
+            # No marking data found - use defaults
+            place.initial_marking = 0
+            place.tokens = 0
         
         # Restore catalyst flag (for hierarchical layout)
         place.is_catalyst = data.get("is_catalyst", False)
@@ -742,8 +759,10 @@ class Place(PetriNetObject):
         gradient = data.get("gradient_vector", None)
         place.gradient_vector = tuple(gradient) if gradient else None
         
-        # Load compartment volume
+        # Load compartment volume (check both top-level and properties dict)
         place.compartment_volume = data.get("compartment_volume", None)
+        if place.compartment_volume is None and "properties" in data:
+            place.compartment_volume = data["properties"].get("compartment_volume", None)
         
         # Load compartment name
         if "compartment" in data:

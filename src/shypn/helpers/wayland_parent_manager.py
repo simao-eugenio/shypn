@@ -115,7 +115,7 @@ class WaylandParentManager:
                 parent.disconnect(unmap_id)
                 parent.disconnect(realize_id)
                 parent.disconnect(unrealize_id)
-            except Exception as e:
+            except (TypeError, AttributeError, RuntimeError) as e:
                 logger.warning(f"[WaylandParentManager] Error disconnecting signals: {e}")
         
         # Clean up state

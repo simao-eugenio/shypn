@@ -90,7 +90,7 @@ class UnitExtractor(BaseExtractor[Dict[str, UnitDefinition]]):
                 si_conversion_factor=conversion_factor
             )
             
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError) as e:
             self.logger.error(f"Failed to extract unit definition '{sbml_unit_def.getId()}': {e}")
             self.add_error(f"Unit extraction error: {e}")
             return None
