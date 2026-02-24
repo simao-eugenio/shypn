@@ -692,108 +692,98 @@ class ExperimentAutomationCategory:
             traceback.print_exc()
     
     def _auto_save_experiment(self, name: str, result: dict):
-        """Auto-save experiment results to disk (Phase 3 normalization).
-        
+        """Auto-save experiment results to disk — all CSV format for easy analysis.
+
         Saves to: {project}/experiments/results/experiment_{name}_{timestamp}/
-        
+
         Creates:
-        - config.json: Experiment configuration and metadata
-        - statistics.json: Statistical summaries across replicates
-        - replicates.json: Per-replicate data (if available)
-        - metadata.txt: Human-readable metadata header
-        
+        - results.csv   : Mean + std trajectories per species over time
+        - replicates.csv: Per-replicate outcomes (deadlock, duration, timing)
+        - config.csv    : Experiment metadata as key-value pairs
+
+        All files use CSV so analysis scripts can use pandas.read_csv() directly
+        without any JSON parsing.
+
         Args:
             name: Experiment name
             result: Result dictionary with statistics and metadata
         """
+        import csv as csv_mod
+
         # Determine project folder
         project_folder = self._get_project_folder()
         if not project_folder:
             print(f"[AUTO-SAVE] Warning: No project folder detected, skipping auto-save for '{name}'")
             return
-        
+
         # Create saver with experiments/results subfolder
         saver = BatchResultsSaver(
             base_path=project_folder,
             subfolder='experiments/results',
             batch_prefix='experiment'
         )
-        
+
         # Create timestamped folder
         safe_name = name.replace(' ', '_').replace('/', '_')
         batch_path = saver.create_batch_folder(name_suffix=safe_name)
-        
-        # Save configuration
-        config = {
-            'timestamp': saver.timestamp,
-            'experiment_name': name,
-            'snapshot_index': result.get('snapshot_index'),
-            'n_replicates': result.get('n_replicates', 0),
-            'duration': result.get('duration', 0),
-            'swept_parameter': result.get('swept_parameter'),
-            'subnet_structure': result.get('subnet_structure')
-        }
-        
-        config_path = batch_path / 'config.json'
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
-        
-        # Save statistics
-        statistics = result.get('statistics', {})
-        stats_path = batch_path / 'statistics.json'
-        with open(stats_path, 'w') as f:
-            json.dump(statistics, f, indent=2)
-        
-        # Save per-replicate data if available
-        replicate_data = result.get('replicate_data', [])
-        if replicate_data:
-            replicates_path = batch_path / 'replicates.json'
-            with open(replicates_path, 'w') as f:
-                json.dump(replicate_data, f, indent=2)
-        
-        # Save trajectory summary
-        trajectory_summary = result.get('trajectory_summary', [])
-        if trajectory_summary:
-            summary_path = batch_path / 'trajectory_summary.json'
-            with open(summary_path, 'w') as f:
-                json.dump(trajectory_summary, f, indent=2)
-        
-        # Save metadata header if available
-        metadata = result.get('metadata')
-        if metadata:
-            try:
-                # Convert metadata header to text
-                if hasattr(metadata, 'to_header_text'):
-                    header_text = metadata.to_header_text()
-                elif hasattr(metadata, 'sections'):
-                    # Manual conversion from sections
-                    lines = []
-                    lines.append("# " + "="*76)
-                    lines.append("# SHYPN EXPERIMENT METADATA")
-                    lines.append(f"# Generated: {datetime.now().isoformat()}Z")
-                    lines.append("# " + "="*76)
-                    lines.append("#")
-                    for section in metadata.sections:
-                        lines.append(f"# [{section.name}]")
-                        for key, value in section.data.items():
-                            lines.append(f"# {key}: {value}")
-                        lines.append("#")
-                    header_text = "\n".join(lines)
-                else:
-                    header_text = f"# Metadata: {str(metadata)}\n"
-                
-                metadata_path = batch_path / 'metadata.txt'
-                with open(metadata_path, 'w') as f:
-                    f.write(header_text)
-            except Exception as e:
-                print(f"[AUTO-SAVE] Warning: Failed to save metadata: {e}")
 
-        # Save CSV — same data as manual export, auto-generated alongside JSON files
+        # ── results.csv ── mean + std trajectories (same as manual export)
         try:
-            csv_path = batch_path / 'results.csv'
-            self._export_csv(str(csv_path), name, result)
+            self._export_csv(str(batch_path / 'results.csv'), name, result)
         except Exception as e:
-            print(f"[AUTO-SAVE] Warning: Failed to save CSV: {e}")
+            print(f"[AUTO-SAVE] Warning: Failed to save results.csv: {e}")
+
+        # ── replicates.csv ── per-replicate outcomes
+        try:
+            replicate_data = result.get('replicate_data', [])
+            trajectory_summary = result.get('trajectory_summary', [])
+
+            # Merge replicate_data and trajectory_summary by index
+            n = max(len(replicate_data), len(trajectory_summary))
+            with open(batch_path / 'replicates.csv', 'w', newline='') as f:
+                writer = csv_mod.writer(f)
+                writer.writerow(['replicate_id', 'seed', 'n_timepoints', 'final_time',
+                                  'deadlocked', 'sim_duration', 'elapsed_time_s'])
+                for i in range(n):
+                    rep = replicate_data[i] if i < len(replicate_data) else {}
+                    traj = trajectory_summary[i] if i < len(trajectory_summary) else {}
+                    writer.writerow([
+                        traj.get('replicate_id', i),
+                        traj.get('seed', ''),
+                        traj.get('n_timepoints', ''),
+                        traj.get('final_time', ''),
+                        rep.get('deadlocked', ''),
+                        rep.get('duration', ''),
+                        rep.get('elapsed_time', '')
+                    ])
+        except Exception as e:
+            print(f"[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}")
+
+        # ── config.csv ── experiment metadata as key-value pairs
+        try:
+            swept = result.get('swept_parameter') or {}
+            subnet = result.get('subnet_structure') or {}
+            stats = result.get('statistics', {})
+            rows = [
+                ('timestamp', saver.timestamp),
+                ('experiment_name', name),
+                ('snapshot_index', result.get('snapshot_index', '')),
+                ('n_replicates', result.get('n_replicates', 0)),
+                ('execution_time_s', result.get('duration', '')),
+                ('n_replicates_stats', stats.get('n_replicates', '')),
+                ('swept_param_type', swept.get('type', '')),
+                ('swept_param_id', swept.get('id', '')),
+                ('swept_param_name', swept.get('name', '')),
+                ('swept_param_value', swept.get('value', '')),
+                ('subnet_places', ','.join(subnet.get('place_ids', []))),
+                ('subnet_transitions', ','.join(subnet.get('transition_ids', []))),
+            ]
+            with open(batch_path / 'config.csv', 'w', newline='') as f:
+                writer = csv_mod.writer(f)
+                writer.writerow(['key', 'value'])
+                writer.writerows(rows)
+        except Exception as e:
+            print(f"[AUTO-SAVE] Warning: Failed to save config.csv: {e}")
 
     def _get_project_folder(self) -> str:
         """Get current project folder path for auto-save.
