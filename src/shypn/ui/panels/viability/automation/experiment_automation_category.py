@@ -741,6 +741,12 @@ class ExperimentAutomationCategory:
             # Merge replicate_data and trajectory_summary by index
             n = max(len(replicate_data), len(trajectory_summary))
             with open(batch_path / 'replicates.csv', 'w', newline='') as f:
+                _metadata = result.get('metadata')
+                if _metadata is not None:
+                    try:
+                        f.write(_metadata.to_header_text())
+                    except Exception as e:
+                        print(f"[AUTO-SAVE] Warning: Failed to write header protocol to replicates.csv: {e}")
                 writer = csv_mod.writer(f)
                 writer.writerow(['replicate_id', 'seed', 'n_timepoints', 'final_time',
                                   'deadlocked', 'sim_duration', 'elapsed_time_s'])
@@ -779,6 +785,12 @@ class ExperimentAutomationCategory:
                 ('subnet_transitions', ','.join(subnet.get('transition_ids', []))),
             ]
             with open(batch_path / 'config.csv', 'w', newline='') as f:
+                _metadata = result.get('metadata')
+                if _metadata is not None:
+                    try:
+                        f.write(_metadata.to_header_text())
+                    except Exception as e:
+                        print(f"[AUTO-SAVE] Warning: Failed to write header protocol to config.csv: {e}")
                 writer = csv_mod.writer(f)
                 writer.writerow(['key', 'value'])
                 writer.writerows(rows)
@@ -944,7 +956,12 @@ class ExperimentAutomationCategory:
                 self._show_error(f"Export failed: {str(e)}")
     
     def _export_csv(self, filepath, name, result):
-        """Export results to CSV.
+        """Export results to CSV with Header Protocol preamble.
+        
+        The file begins with '# '-prefixed comment lines (Header Protocol v1.0)
+        carrying model provenance, sweep configuration, temporal metadata, etc.
+        Readers can skip them with pandas.read_csv(..., comment='#') or parse
+        them with MinimalHeaderLoader.
         
         Args:
             filepath: Output file path
@@ -954,6 +971,15 @@ class ExperimentAutomationCategory:
         import csv
         
         with open(filepath, 'w', newline='') as f:
+            # ── Header Protocol ────────────────────────────────────────────
+            metadata = result.get('metadata')
+            if metadata is not None:
+                try:
+                    f.write(metadata.to_header_text())
+                except Exception as e:
+                    print(f"[CSV] Warning: Failed to write header protocol: {e}")
+            # ───────────────────────────────────────────────────────────────
+
             writer = csv.writer(f)
             
             # Write metadata header
