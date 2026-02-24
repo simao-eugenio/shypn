@@ -20,7 +20,6 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, GLib, Pango
 from .base_pathway_category import BasePathwayCategory
-from shypn.deprecation import deprecated
 from shypn.data.project_models import get_project_manager
 # Import KEGG backend modules
 try:
@@ -1349,45 +1348,6 @@ class KEGGCategory(BasePathwayCategory):
             import traceback
             traceback.print_exc()
             self._show_status(f"❌ Failed to save files: {save_error}", error=True)
-    def _check_enrichment_candidates(self):
-        """[DEPRECATED] Check how many items can be enriched and update status label.
-        DEPRECATED as of 2026-01-01: This method is no longer used.
-        The "Enrich Names" button has been removed because name enrichment
-        is now handled automatically via the cross-reference database.
-        """
-        self.logger.warning("_check_enrichment_candidates called but is deprecated")
-        return  # Early return
-        # [DEPRECATED CODE BELOW - KEPT FOR REFERENCE ONLY]
-        if not self.current_pathway_doc:
-            return
-        import re
-        # Count places with KEGG compound codes
-        compound_pattern = re.compile(r'^C\d{5}$')
-        places_to_enrich = [
-            p for p in self.current_pathway_doc.places
-            if compound_pattern.match(p.name) and
-               hasattr(p, 'metadata') and p.metadata and
-               p.metadata.get('data_source') == 'kegg_import'
-        ]
-        # Count transitions with KEGG reaction codes
-        reaction_pattern = re.compile(r'^R\d{5}$')
-        transitions_to_enrich = [
-            t for t in self.current_pathway_doc.transitions
-            if reaction_pattern.match(t.name) and
-               hasattr(t, 'metadata') and t.metadata and
-               t.metadata.get('data_source') == 'kegg_import'
-        ]
-        total = len(places_to_enrich) + len(transitions_to_enrich)
-        if total > 0:
-            est_time = total * 1.5  # ~1.5s per item
-            self.enrich_status_label.set_markup(
-                f'<span size="small">{total} items can be enriched '
-                f'(~{est_time:.0f}s)</span>'
-            )
-        else:
-            self.enrich_status_label.set_markup(
-                '<span size="small">No KEGG codes to enrich</span>'
-            )
     def _check_stoich_enrichment_candidates(self):
         """Check how many reactions can be enriched with stoichiometry."""
         # Get document from canvas (where loaded models are)
@@ -1436,124 +1396,6 @@ class KEGGCategory(BasePathwayCategory):
                 '<span size="small">No reactions to enrich</span>'
             )
     
-    @deprecated(
-        deprecated_in="2.5.0",
-        removed_in="3.0.0",
-        replacement="thermodynamics cross-reference database",
-        reason="Name enrichment now handled automatically via xref database with instant lookups"
-    )
-    def _on_enrich_names_clicked(self, button):
-        """[DEPRECATED] Handle enrichment button click.
-        DEPRECATED as of 2026-01-01: This method is no longer used.
-        Name enrichment is now handled automatically via the cross-reference
-        database (thermodynamics/database/xref/) which provides instant lookups
-        without slow KEGG API calls.
-        Historical implementation kept for reference but should not be called.
-        Fetches biological names from KEGG API to replace codes (C#####, R#####).
-        """
-        self.logger.warning(
-            "_on_enrich_names_clicked called but is deprecated. "
-            "Use cross-reference database for name resolution."
-        )
-        return  # Early return - do not execute deprecated functionality
-        # [DEPRECATED CODE BELOW - KEPT FOR REFERENCE ONLY]
-        if not self.current_pathway_doc:
-            self._show_error("No imported model available. Import a pathway first.")
-            return
-        # Import enrichment service
-        try:
-            from shypn.services import enrich_kegg_names
-        except ImportError as e:
-            self._show_error(f"Enrichment service not available: {e}")
-            return
-        # Disable button during enrichment
-        self.enrich_button.set_sensitive(False)
-        self.enrich_status_label.set_text("Enriching...")
-        def enrich_in_thread():
-            """Run enrichment in background thread."""
-            try:
-                # Progress callback to update UI
-                def progress(current, total, message):
-                    GLib.idle_add(
-                        self.enrich_status_label.set_text,
-                        f"[{current}/{total}] {message[:30]}..."
-                    )
-                # Run enrichment
-                result = enrich_kegg_names(
-                    self.current_pathway_doc,
-                    progress_callback=progress
-                )
-                return result
-            except Exception as e:
-                self.logger.error(f"Enrichment failed: {e}")
-                import traceback
-                traceback.print_exc()
-                raise
-        # Run in background with callbacks
-        self._run_in_thread(
-            enrich_in_thread,
-            on_complete=self._on_enrichment_complete,
-            on_error=self._on_enrichment_error
-        )
-    def _on_enrichment_complete(self, result):
-        """Called when enrichment completes successfully.
-        Args:
-            result: EnrichmentResult object
-        """
-        self.logger.info(
-            f"Enrichment complete: {result.places_enriched} places, "
-            f"{result.transitions_enriched} transitions in {result.duration_seconds:.1f}s"
-        )
-        # Re-enable button
-        self.enrich_button.set_sensitive(True)
-        # Update status
-        total_enriched = result.places_enriched + result.transitions_enriched
-        total_failed = result.places_failed + result.transitions_failed
-        if total_enriched > 0:
-            self.enrich_status_label.set_markup(
-                f'<span size="small">✅ Enriched {total_enriched} items '
-                f'in {result.duration_seconds:.0f}s</span>'
-            )
-            # Update main status
-            self._show_status(
-                f"✅ Name enrichment complete!\n"
-                f"Enriched: {result.places_enriched} places, {result.transitions_enriched} transitions\n"
-                f"Failed: {result.places_failed} places, {result.transitions_failed} transitions\n"
-                f"Duration: {result.duration_seconds:.1f}s\n"
-                f"💡 Model updated in memory. Save to persist changes."
-            )
-            # Trigger canvas redraw if model is loaded
-            canvas_manager = self._get_canvas_manager()
-            if canvas_manager:
-                try:
-                    if hasattr(canvas_manager, 'mark_needs_redraw'):
-                        canvas_manager.mark_needs_redraw()
-                        canvas_manager.mark_dirty()  # Mark as needing save
-                        self.logger.info("Canvas redrawn after enrichment")
-                        # Update metadata inspector with enrichment info
-                        self._update_metadata_after_enrichment(canvas_manager, result)
-                except Exception as e:
-                    self.logger.warning(f"Could not redraw canvas: {e}")
-        else:
-            self.enrich_status_label.set_markup(
-                '<span size="small">No items were enriched</span>'
-            )
-            self._show_status("No KEGG codes found to enrich")
-        return False  # Don't repeat
-    def _on_enrichment_error(self, error):
-        """Called when enrichment encounters an error.
-        Args:
-            error: Exception object
-        """
-        self.logger.error(f"Enrichment error: {error}")
-        # Re-enable button
-        self.enrich_button.set_sensitive(True)
-        # Update status
-        self.enrich_status_label.set_markup(
-            '<span size="small">❌ Enrichment failed</span>'
-        )
-        self._show_error(f"Enrichment failed: {error}")
-        return False  # Don't repeat
     def _on_enrich_stoichiometry_clicked(self, button):
         """Handle stoichiometry enrichment button click.
         Adds missing cofactors (ATP, NADH, etc.) to transitions by querying
