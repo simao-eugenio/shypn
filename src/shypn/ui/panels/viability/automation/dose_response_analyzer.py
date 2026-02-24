@@ -176,15 +176,20 @@ class DoseResponseAnalyzer:
             ])
         
         try:
-            # Perform curve fitting
-            popt, pcov = curve_fit(
-                self.hill_equation,
-                log_doses,
-                self.responses,
-                p0=initial_guess,
-                bounds=bounds,
-                maxfev=10000
-            )
+            # Perform curve fitting (suppress covariance-estimation warning;
+            # inf entries in pcov are handled gracefully below)
+            import warnings
+            from scipy.optimize import OptimizeWarning
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", OptimizeWarning)
+                popt, pcov = curve_fit(
+                    self.hill_equation,
+                    log_doses,
+                    self.responses,
+                    p0=initial_guess,
+                    bounds=bounds,
+                    maxfev=10000
+                )
             
             # Extract parameters
             self.bottom, self.top, self.log_ic50, self.hill_slope = popt
