@@ -737,9 +737,11 @@ class FileExplorerPanel:
             GLib.idle_add(self._oe_remove_file, filepath)
 
     def _on_file_saved_event(self, event_data: dict):
-        """React to file.saved EventBus event — clear dirty indicator.
+        """React to file.saved EventBus event — clear dirty indicator and refresh tree.
 
-        Also adds the entry if the file was saved under a new path (Save As).
+        Also adds the entry if the file was saved under a new path (Save As),
+        and triggers a targeted tree refresh so the new file appears immediately
+        without requiring a manual refresh or full page reload.
 
         Args:
             event_data: dict with keys 'filepath', 'document', 'timestamp'
@@ -751,6 +753,9 @@ class FileExplorerPanel:
         def _update():
             self._oe_add_file(filepath)   # no-op if already present
             self._oe_set_dirty(filepath, False)
+            # Targeted tree refresh: ensure new file appears (covers Save As)
+            parent_dir = os.path.dirname(filepath)
+            self._refresh_dir_in_tree(parent_dir)
 
         GLib.idle_add(_update)
 
@@ -1070,6 +1075,90 @@ class FileExplorerPanel:
             self.forward_button.set_sensitive(self.explorer.can_go_forward())
         if self.up_button:
             self.up_button.set_sensitive(self.explorer.can_go_up())
+
+    # ------------------------------------------------------------------
+    # Targeted tree refresh (Phase 4)
+    # ------------------------------------------------------------------
+
+    def _refresh_dir_in_tree(self, directory: str):
+        """Refresh entries for a specific directory without a full tree reload.
+
+        Rules:
+        - If directory == current root → call _load_current_directory() (unavoidable
+          but scoped; skips all other expanded directories).
+        - If directory is an expanded subdirectory in hierarchical view → remove
+          its children from the store and reload from disk in-place.
+        - If directory isn't visible in the tree at all → no-op.
+
+        Args:
+            directory: Absolute path of the directory whose contents changed
+        """
+        if not directory:
+            return False
+        current = self.explorer.current_path
+        if not current:
+            return False
+
+        dir_norm = os.path.normpath(directory)
+        current_norm = os.path.normpath(current)
+
+        if dir_norm == current_norm:
+            # Root-level change — full reload of current directory only
+            self._load_current_directory()
+            return False
+
+        if self.hierarchical_view:
+            parent_iter = self._find_store_iter_for_path(directory)
+            if parent_iter is not None:
+                self._refresh_subtree(parent_iter, directory)
+
+        return False
+
+    def _find_store_iter_for_path(self, path: str):
+        """Return the GtkTreeIter whose path column matches the given filesystem path.
+
+        Args:
+            path: Absolute filesystem path to search for
+
+        Returns:
+            GtkTreeIter or None if not found in the current store
+        """
+        path_norm = os.path.normpath(path)
+
+        def _search(tree_iter):
+            while tree_iter:
+                row_path = self.store.get_value(tree_iter, 2)  # column 2 = full path
+                if os.path.normpath(row_path) == path_norm:
+                    return tree_iter
+                child = self.store.iter_children(tree_iter)
+                if child:
+                    result = _search(child)
+                    if result is not None:
+                        return result
+                tree_iter = self.store.iter_next(tree_iter)
+            return None
+
+        return _search(self.store.get_iter_first())
+
+    def _refresh_subtree(self, parent_iter, directory: str):
+        """Remove all children of parent_iter and reload them from disk.
+
+        Args:
+            parent_iter: GtkTreeIter for the directory row to refresh
+            directory: Filesystem path corresponding to parent_iter
+        """
+        # Remove existing children
+        child = self.store.iter_children(parent_iter)
+        while child:
+            # iter_children/iter_next become invalid after remove; always re-check
+            self.store.remove(child)
+            child = self.store.iter_children(parent_iter)
+
+        # Reload from disk into the now-empty parent row
+        try:
+            self._load_directory_tree(directory, parent_iter)
+        except Exception:
+            pass
 
     def _on_path_changed(self, new_path: str):
         """Callback when path changes in API (Model).
