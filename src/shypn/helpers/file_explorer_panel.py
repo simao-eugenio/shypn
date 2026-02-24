@@ -943,7 +943,17 @@ class FileExplorerPanel:
 
         try:
             # Determine if this directory is a project root (Phase 4)
-            is_project_root = os.path.exists(os.path.join(directory, '.project.shy'))
+            # Guard: the projects container directory is never a project root itself
+            _shy_file_present = os.path.exists(os.path.join(directory, '.project.shy'))
+            if _shy_file_present:
+                try:
+                    from shypn.data.project_models import get_project_manager as _get_pm
+                    _pr = _get_pm().projects_root
+                    if _pr and os.path.normpath(directory) == os.path.normpath(_pr):
+                        _shy_file_present = False
+                except Exception:
+                    pass
+            is_project_root = _shy_file_present
 
             directories = []
             files = []
@@ -1051,6 +1061,11 @@ class FileExplorerPanel:
 
             project_file = os.path.join(new_path, '.project.shy')
             if os.path.exists(project_file):
+                # Guard: never treat the projects container directory as a project
+                if hasattr(manager, 'projects_root') and manager.projects_root:
+                    if os.path.normpath(new_path) == os.path.normpath(manager.projects_root):
+                        return False
+
                 # We are at a project root directory
                 current_base = (
                     os.path.normpath(manager.current_project.base_path)
