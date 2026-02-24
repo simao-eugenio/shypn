@@ -17,6 +17,33 @@ from typing import Tuple, Optional, Any
 logger = logging.getLogger(__name__)
 
 
+def resolve_object(model: Any, obj_id: str) -> Optional[Any]:
+    """Resolve a model object by its ID using the P/T/A prefix convention.
+
+    Centralises the type-switch that would otherwise be duplicated in every
+    consumer (batch worker, sweep builders, validators).
+
+    Args:
+        model: DocumentModel instance exposing .places, .transitions, .arcs
+        obj_id: Object identifier e.g. 'P1', 'T5', 'A3'
+
+    Returns:
+        Matching Place / Transition / Arc, or None if not found.
+
+    Examples:
+        >>> place = resolve_object(model, 'P1')
+        >>> trans = resolve_object(model, 'T5')
+    """
+    if obj_id.startswith('P'):
+        return next((p for p in model.places if p.id == obj_id), None)
+    elif obj_id.startswith('T'):
+        return next((t for t in model.transitions if t.id == obj_id), None)
+    elif obj_id.startswith('A'):
+        return next((a for a in model.arcs if a.id == obj_id), None)
+    logger.warning(f"resolve_object: unknown ID prefix for '{obj_id}'")
+    return None
+
+
 def parse_property_path(param_id: str) -> Tuple[str, str]:
     """Parse parameter ID into object ID and property name.
     

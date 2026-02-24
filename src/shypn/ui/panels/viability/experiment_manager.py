@@ -423,11 +423,13 @@ class ExperimentManager:
             
             # Create new snapshot
             snapshot = ExperimentSnapshot(name)
+            # Copy full baseline state from base snapshot (legacy dicts + property_overrides)
             snapshot.place_markings = base_snapshot.place_markings.copy()
             snapshot.arc_weights = base_snapshot.arc_weights.copy()
             snapshot.transition_rates = base_snapshot.transition_rates.copy()
+            snapshot.property_overrides = getattr(base_snapshot, 'property_overrides', {}).copy()
             snapshot.notes = f"Sweep: {parameter_name} (ID: {parameter_id}) = {value}"
-            
+
             # Store swept parameter info
             snapshot.swept_parameter = {
                 'type': parameter_type,
@@ -435,16 +437,17 @@ class ExperimentManager:
                 'name': parameter_name,
                 'value': value
             }
-            
-            # Modify the swept parameter using object_id (internal key)
-            # For transitions with formulas, preserve the formula structure
-            if parameter_type == 'places':
-                snapshot.place_markings[object_id] = value
-            elif parameter_type == 'transitions':
-                # Use formula modification helper for transitions
-                snapshot.transition_rates[object_id] = self._modify_rate_formula(baseline_value, value)
-            elif parameter_type == 'arcs':
-                snapshot.arc_weights[object_id] = value
+
+            # All swept values go through property_overrides so that
+            # apply_property_to_object handles validation and normalisation
+            # uniformly (initial_marking→tokens alias, adaptive checks, etc.).
+            # The canonical path is always "object_id.property_name".
+            canonical_path = f"{object_id}.{property_name}"
+            if parameter_type == 'transitions':
+                # Preserve formula structure for rate expressions
+                snapshot.property_overrides[canonical_path] = self._modify_rate_formula(baseline_value, value)
+            else:
+                snapshot.property_overrides[canonical_path] = value
             
             # Add to snapshots
             self.snapshots.append(snapshot)
