@@ -201,3 +201,4 @@ doc/**/*.pdf
 !workspace/projects/Biochemical-Examples/2*_*/manuscript/*.pdf
 !workspace/projects/Biochemical-Examples/2*_*/figures/*.pdf
 !workspace/projects/Biochemical-Examples/2*_*/scripts/*.pdf
+.backup_pre_refactor
