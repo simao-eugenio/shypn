@@ -341,9 +341,6 @@ class SBMLImportPanel:
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
         
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
-        
         # WAYLAND FIX: Use async signal-based approach instead of blocking run()
         # This avoids Error 71 (Protocol error) on Wayland
         result_container = [None]  # Mutable container for result
