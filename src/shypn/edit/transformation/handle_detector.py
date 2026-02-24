@@ -179,7 +179,7 @@ class HandleDetector:
                 parallels = arc._manager.detect_parallel_arcs(arc)
                 if parallels:
                     parallel_offset = arc._manager.calculate_arc_offset(arc, parallels)
-            except (AttributeError, Exception):
+            except Exception:
                 pass
         
         # Apply parallel arc offset perpendicular to arc direction

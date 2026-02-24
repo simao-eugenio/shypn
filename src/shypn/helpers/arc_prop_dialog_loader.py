@@ -6,11 +6,14 @@ Loads and manages the Arc properties dialog UI.
 import os
 import json
 import ast
+import logging
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 from shypn.helpers.color_picker import setup_color_picker_in_dialog
 from shypn.utils.arc_transform import is_inhibitor, is_test, is_signal_flow, convert_to_inhibitor, convert_to_normal, convert_to_test, convert_to_signal_flow
+
+logger = logging.getLogger(__name__)
 
 class ArcPropDialogLoader(GObject.GObject):
     """Loader for Arc properties dialog.
@@ -169,7 +172,7 @@ class ArcPropDialogLoader(GObject.GObject):
                         sim_controller.transition_states.clear()
         except Exception:
             # Silently ignore if no active simulation found
-            pass
+            logger.debug("Simulation state reset after arc property change failed", exc_info=True)
 
     def _populate_fields(self):
         """Populate dialog fields with current Arc properties."""

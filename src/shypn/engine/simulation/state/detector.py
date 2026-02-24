@@ -5,8 +5,11 @@ Detects current simulation state and provides context-aware queries.
 Replaces explicit mode checking with state-based decisions.
 """
 
+import logging
 from typing import Optional, List
 from .base import SimulationState, StateProvider, StateChangeObserver
+
+logger = logging.getLogger(__name__)
 
 
 class SimulationStateDetector:
@@ -229,7 +232,7 @@ class SimulationStateDetector:
                 observer.on_state_changed(old_state, new_state)
             except Exception:
                 # Don't let observer errors break state updates
-                pass
+                logger.warning("Observer %s raised exception during state change", observer, exc_info=True)
     
     # ========== String Representation ==========
     

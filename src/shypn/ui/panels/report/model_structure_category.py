@@ -851,7 +851,7 @@ class ModelsCategory(BaseReportCategory):
                         
                         except Exception as e:
                             # Database query failed, skip
-                            pass
+                            self.logger.debug("Heuristic DB kinetics query failed: %s", e)
                 
                 # Update Knowledge Base if we found kinetic parameters
                 if kinetic_params:

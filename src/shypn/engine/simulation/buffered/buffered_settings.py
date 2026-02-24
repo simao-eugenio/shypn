@@ -465,8 +465,8 @@ class BufferedSimulationSettings:
                 temp_filepath = filepath + '.tmp'
                 if os.path.exists(temp_filepath):
                     os.remove(temp_filepath)
-            except:
-                pass
+            except OSError:
+                pass  # Best-effort cleanup; ignore if temp file cannot be removed
     
     def _load_from_disk(self):
         """Load persisted settings from disk if available.

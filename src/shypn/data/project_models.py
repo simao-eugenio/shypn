@@ -10,12 +10,15 @@ Classes:
     ModelDocument: Represents an individual Petri net model within a project
 """
 
+import logging
 import os
 import json
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from .pathway_document import PathwayDocument
 from .enrichment_document import EnrichmentDocument
@@ -838,7 +841,7 @@ class ProjectManager:
                 'name': project.name
             })
         except Exception:
-            pass
+            logger.debug("EventBus emit 'project.opened' failed", exc_info=True)
         
         return project
     
@@ -873,7 +876,7 @@ class ProjectManager:
                     'name': project.name
                 })
             except Exception:
-                pass
+                logger.debug("EventBus emit 'project.opened' failed", exc_info=True)
             return project
         except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
@@ -911,7 +914,7 @@ class ProjectManager:
                     'name': project.name
                 })
             except Exception:
-                pass
+                logger.debug("EventBus emit 'project.opened' failed", exc_info=True)
             return project
         except (OSError, IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             return None
@@ -934,7 +937,7 @@ class ProjectManager:
             from shypn.events.event_bus import EventBus
             EventBus.get_instance().emit('project.closed', {'project_id': _closed_id})
         except Exception:
-            pass
+            logger.debug("EventBus emit 'project.closed' failed", exc_info=True)
     
     def add_to_recent(self, project_id: str):
         """Add project to recent projects list (moves to front)."""

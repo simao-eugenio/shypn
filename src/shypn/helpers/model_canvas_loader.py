@@ -181,7 +181,7 @@ class ModelCanvasLoader:
             from shypn.events import EventBus
             EventBus.subscribe('editor.close_requested', self._on_editor_close_requested)
         except Exception:
-            pass
+            self.logger.debug("EventBus subscribe for 'editor.close_requested' failed", exc_info=True)
 
     def _on_editor_close_requested(self, event_data: dict):
         """Close the canvas tab matching the filepath in event_data.
@@ -203,7 +203,7 @@ class ModelCanvasLoader:
                         GLib.idle_add(self.close_tab, page_num)
                         return
         except Exception:
-            pass
+            self.logger.debug("_on_editor_close_requested failed", exc_info=True)
 
     # ------------------------------------------------------------------
     # Public helpers for per-document access
@@ -494,7 +494,7 @@ class ModelCanvasLoader:
                 self._first_page_initialized = True
         except Exception:
             # Defensive: never raise from GTK signal handlers
-            pass
+            self.logger.debug("GTK page-added signal handler failed", exc_info=True)
 
     def _wire_data_collector_for_page(self, page):
         """Wire the data collector to the right panel for a given page.
@@ -1001,7 +1001,7 @@ class ModelCanvasLoader:
                 if _fp:
                     EventBus.emit('file.closed', {'filepath': _fp, 'timestamp': time.time()})
             except Exception:
-                pass
+                self.logger.debug("EventBus emit 'file.closed' failed", exc_info=True)
             del self.canvas_managers[drawing_area]
         if drawing_area and drawing_area in self.simulation_controllers:
             del self.simulation_controllers[drawing_area]
@@ -3522,7 +3522,7 @@ class ModelCanvasLoader:
                             snapshots = self._capture_delete_snapshots_inline(manager, selected)
                             manager.undo_manager.push(DeleteOperation(snapshots))
                         except Exception:
-                            pass
+                            self.logger.debug("Undo snapshot capture failed for delete (keyboard)", exc_info=True)
                 # Delete all selected objects (cascade-aware)
                 for obj in list(selected):
                     self._delete_object(manager, obj)
@@ -4517,7 +4517,7 @@ class ModelCanvasLoader:
                 'timestamp': time.time()
             })
         except Exception:
-            pass
+            self.logger.debug("EventBus emit '%s' failed", event_name, exc_info=True)
 
 
     def _on_dirty_state_changed(self, is_dirty):
@@ -5927,7 +5927,7 @@ class ModelCanvasLoader:
                         snapshots = self._capture_delete_snapshots_inline(manager, selected)
                         manager.undo_manager.push(DeleteOperation(snapshots))
                     except Exception:
-                        pass
+                        self.logger.debug("Undo snapshot capture failed for delete (context menu)", exc_info=True)
             for obj in list(selected):
                 self._delete_object(manager, obj)
             widget.queue_draw()
@@ -6300,7 +6300,7 @@ class ModelCanvasLoader:
                     logger.warning("Simulation stopped due to arc transformation - please restart simulation to apply changes")
         except Exception:
             # Silently ignore if no active simulation found
-            pass
+            self.logger.debug("Simulation stop after arc transformation failed", exc_info=True)
     
     def _show_error_dialog(self, message):
         """Show an error dialog to the user.
