@@ -109,6 +109,7 @@ class ParametrizationState(MetadataSection):
         
         # Document critical place initial conditions
         critical_places = context.get('critical_places', [])
+        property_overrides = context.get('property_overrides', {})
         
         self.add_field('', '# Critical pool initial conditions', '')
         
@@ -117,7 +118,8 @@ class ParametrizationState(MetadataSection):
             
             if place_id in critical_places or not critical_places:
                 name = place.get('name', place_id)
-                marking = place.get('initial_marking', 0)
+                # Use override value if present (actual swept value), else model baseline
+                marking = property_overrides.get(place_id, place.get('initial_marking', 0))
                 units = 'µM'  # Could be context-specific
                 
                 self.add_field(
