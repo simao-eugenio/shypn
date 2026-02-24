@@ -46,8 +46,6 @@ from shypn.engine.simulation.executors import ContinuousExecutor
 from shypn.engine.simulation.checkers import ViabilityChecker
 # Week 1 - Phase 4: EventBus integration for progress events
 from shypn.events import EventBus
-# DEPRECATED: Conservation enforcement - Petri nets naturally conserve mass/energy
-# from shypn.engine.conservation_enforcer import ConservationEnforcer
 
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
@@ -253,17 +251,6 @@ class SimulationController:
         # Enables runtime switching between different execution strategies
         self._execution_strategy = None  # HybridStrategy by default (set on first use)
         
-        # DEPRECATED: Mass conservation enforcer (Feb 9, 2026)
-        # Reason: Petri net semantics NATURALLY conserve mass/energy through
-        # token-based firing rules. Explicit enforcement was based on misunderstanding.
-        # Conservation is an inherent property of properly constructed Petri nets,
-        # not an external constraint requiring enforcement.
-        # See: archive/deprecated_conservation_enforcement/README.md
-        
-        # self.conservation_enforcer = ConservationEnforcer(model)
-        self.conservation_enforcer = None  # Deprecated
-        self.auto_conservation_enabled = False  # Deprecated
-        
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
@@ -340,10 +327,6 @@ class SimulationController:
         # Reset buffered settings (discard any uncommitted changes from previous model)
         if hasattr(self, 'buffered_settings'):
             self.buffered_settings.rollback()
-        
-        # DEPRECATED: Conservation enforcer no longer used
-        # if hasattr(self, 'conservation_enforcer'):
-        #     self.conservation_enforcer = ConservationEnforcer(self.model)
         
         logger.info(f"SimulationController reset complete - ready for new model")
     
@@ -1122,160 +1105,6 @@ class SimulationController:
         if callback in self.step_listeners:
             self.step_listeners.remove(callback)
     
-    def configure_conservation(
-        self, 
-        name: str, 
-        place_ids: List[str], 
-        expected_total: Optional[float] = None,
-        tolerance: float = 1e-6
-    ):
-        """Configure mass conservation enforcement for a group of places.
-        
-        This addresses a fundamental limitation of Petri net formalism:
-        reactions with asymmetric stoichiometry (e.g., 2 reactants → 1 product)
-        create/destroy tokens when firings are imbalanced. This is mathematically
-        proven, not a bug.
-        
-        Example:
-            ATP synthesis: ADP + Pi → ATP (consumes 2 tokens, produces 1)
-            ATP hydrolysis: ATP → ADP + Pi (consumes 1 token, produces 2)
-            
-            If synthesis fires 195× and hydrolysis fires 190×:
-            Net token change = 195×(-1) + 190×(+1) = -5 tokens LOST
-            
-            Conservation enforcement corrects this by proportionally adjusting
-            tokens to maintain the expected total (chemical reality).
-        
-        Args:
-            name: Human-readable group name (e.g., "energy_cycle")
-            place_ids: List of place IDs that should conserve mass
-            expected_total: Expected sum (if None, uses current sum)
-            tolerance: Allowable error before correction (default 1e-6)
-        
-        Example:
-            controller.configure_conservation(
-                name='energy_cycle',
-                place_ids=['ATP_pool', 'ADP_pool', 'Pi_pool'],
-                expected_total=15.0  # mM
-            )
-        """
-        # DEPRECATED: ConservationEnforcer no longer used
-        # Petri nets naturally conserve mass through token semantics
-        pass
-        # if self.conservation_enforcer:
-        #     self.conservation_enforcer.add_conservation_group(
-        #         name=name,
-        #         place_ids=place_ids,
-        #         expected_total=expected_total,
-        #         tolerance=tolerance,
-        #         auto_correct=True
-        #     )
-    
-    def _auto_detect_conservation_groups(self):
-        """Auto-detect closed cycles and configure conservation enforcement.
-        
-        Analyzes model structure to identify places that form closed cycles
-        (no external sources/sinks) and automatically configures conservation
-        groups to maintain mass balance.
-        
-        Called automatically at simulation start if auto_conservation_enabled=True.
-        Skipped if conservation groups already manually configured.
-        
-        STRATEGY: Detect strongly connected components in the place-transition
-        bipartite graph. Places in closed cycles should conserve total tokens.
-        
-        For simplicity, we use a heuristic:
-        - Find all places connected through transitions (bidirectional flow)
-        - Group places that participate in cycles (have both inputs and outputs)
-        - Configure conservation using current token totals
-        """
-        # DEPRECATED: Auto-detection of conservation groups no longer used
-        # Petri nets naturally conserve mass through token semantics
-        return
-        
-        # Original implementation commented out:
-        # if not self.model.places:
-        #     return
-        
-        # import logging
-        # logger = logging.getLogger(__name__)
-        
-        # Build connectivity graph: place -> set of connected places (via transitions)
-        # place_connections = {p.id: set() for p in self.model.places}
-        #
-        # for transition in self.model.transitions:
-        #     # Get input and output places for this transition
-        #     input_places = set()
-        #     output_places = set()
-        #     
-        #     for arc in self.model.arcs:
-        #         if arc.target_id == transition.id:
-        #             input_places.add(arc.source_id)
-        #         elif arc.source_id == transition.id:
-        #             output_places.add(arc.target_id)
-        #     
-        #     # Connect all input places to all output places (bidirectional cycle)
-        #     for inp in input_places:
-        #         for out in output_places:
-        #             if inp != out:  # Avoid self-loops
-        #                 place_connections[inp].add(out)
-        #                 place_connections[out].add(inp)
-        # 
-        # # Find strongly connected components (closed cycles)
-        # # Use simple DFS-based approach to find maximal connected groups
-        # visited = set()
-        # conservation_groups = []
-        # 
-        # def dfs(place_id, group):
-        #     \"\"\"Depth-first search to find connected places.\"\"\"
-        #     if place_id in visited:
-        #         return
-        #     visited.add(place_id)
-        #     group.add(place_id)
-        #     for connected in place_connections.get(place_id, []):
-        #         dfs(connected, group)
-        # 
-        # # Find all maximal connected groups
-        # for place in self.model.places:
-        #     if place.id not in visited and place_connections.get(place.id):
-        #         group = set()
-        #         dfs(place.id, group)
-        #         if len(group) >= 2:  # Only groups with 2+ places
-        #             conservation_groups.append(group)
-        # 
-        # # Configure conservation for detected groups
-        # if conservation_groups:
-        #     logger.info(f\"[AUTO-CONSERVATION] Detected {len(conservation_groups)} closed cycle(s)\")
-        #     
-        #     for i, group in enumerate(conservation_groups):
-        #         place_ids = list(group)
-        #         
-        #         # Calculate current total tokens
-        #         total = sum(p.tokens for p in self.model.places if p.id in place_ids)
-        #         
-        #         # Only configure if total > 0 (avoid empty cycles)
-        #         if total > 0:
-        #             group_name = f\"auto_cycle_{i+1}\"
-        #             
-        #             # Get place names for logging
-        #             place_names = [p.name for p in self.model.places if p.id in place_ids]
-        #             
-        #             self.conservation_enforcer.add_conservation_group(
-        #                 name=group_name,
-        #                 place_ids=place_ids,
-        #                 expected_total=total,
-        #                 tolerance=1e-6,
-        #                 auto_correct=True
-        #             )
-        #             
-        #             logger.info(
-        #                 f\"  ✓ {group_name}: {len(place_ids)} places \"
-        #                 f\"({', '.join(place_names[:3])}{'...' if len(place_names) > 3 else ''}), \"
-        #                 f\"total={total:.3f}\"
-        #             )
-        # else:
-        #     logger.info(\"[AUTO-CONSERVATION] No closed cycles detected (model may have sources/sinks)\")
-
     def _notify_step_listeners(self):
         """Notify all registered step listeners."""
         for callback in self.step_listeners:

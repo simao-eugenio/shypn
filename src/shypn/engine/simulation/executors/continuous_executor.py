@@ -129,11 +129,6 @@ class ContinuousExecutor(ChangeListener):
         # This ensures they have valid scheduled firing times
         self.controller._update_enablement_states()
         
-        # Auto-detect and configure conservation groups (enabled by default)
-        # DISABLED: Conservation must emerge from arc connections, not artificial adjustments
-        # if self.controller.auto_conservation_enabled and not self.controller.conservation_enforcer.conservation_groups:
-        #     self.controller._auto_detect_conservation_groups()
-        
         # Verify stochastic transitions are properly scheduled
         stochastic_transitions = [
             t for t in self.controller.model.transitions 
