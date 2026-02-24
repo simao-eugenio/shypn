@@ -128,6 +128,9 @@ class FileExplorerPanel:
         # Added background_set (bool) column to prevent GTK warnings for empty color strings
         self.store = Gtk.TreeStore(str, str, str, bool, bool, int, str, bool)
         self.tree_view.set_model(self.store)
+        self.tree_view.set_show_expanders(False)
+        # Restore per-level indentation that set_show_expanders(False) removes
+        self.tree_view.set_level_indentation(16)
         self._apply_tree_view_css()
         
         # Clear any existing columns (from XML or previous configuration)
@@ -317,7 +320,7 @@ class FileExplorerPanel:
     def _apply_tree_view_css(self):
         """Apply CSS styling to improve TreeView appearance."""
         css_provider = Gtk.CssProvider()
-        css = b'\n        /* File explorer TreeView styling */\n        treeview {\n            background-color: #fafafa;\n            color: #2e3436;\n        }\n        \n        /* Row styling */\n        treeview.view {\n            padding: 2px;\n        }\n        \n        /* Selected row */\n        treeview.view:selected {\n            background-color: #4a90d9;\n            color: #ffffff;\n        }\n        \n        /* Hover effect */\n        treeview.view:hover {\n            background-color: #e8e8e8;\n        }\n        \n        /* Selected and focused */\n        treeview.view:selected:focus {\n            background-color: #2a76c6;\n            color: #ffffff;\n        }\n        \n        /* Cell padding and spacing */\n        treeview.view cell {\n            padding-top: 4px;\n            padding-bottom: 4px;\n            padding-left: 6px;\n            padding-right: 6px;\n        }\n        \n        /* Header styling */\n        treeview header button {\n            background-color: #e8e8e8;\n            border: 1px solid #d0d0d0;\n            padding: 4px 8px;\n            font-weight: bold;\n        }\n        \n        /* Separator lines */\n        treeview.view.separator {\n            min-height: 2px;\n            color: #d0d0d0;\n        }\n        \n        /* Expander arrow for tree hierarchy */\n        treeview.view.expander {\n            color: #5a5a5a;\n        }\n        \n        treeview.view.expander:hover {\n            color: #2a76c6;\n        }\n        '
+        css = b'\n        /* File explorer TreeView styling */\n        treeview {\n            background-color: #fafafa;\n            color: #2e3436;\n        }\n        \n        /* Row styling */\n        treeview.view {\n            padding: 2px;\n        }\n        \n        /* Selected row */\n        treeview.view:selected {\n            background-color: #4a90d9;\n            color: #ffffff;\n        }\n        \n        /* Hover effect */\n        treeview.view:hover {\n            background-color: #e8e8e8;\n        }\n        \n        /* Selected and focused */\n        treeview.view:selected:focus {\n            background-color: #2a76c6;\n            color: #ffffff;\n        }\n        \n        /* Cell padding and spacing */\n        treeview.view cell {\n            padding-top: 4px;\n            padding-bottom: 4px;\n            padding-left: 6px;\n            padding-right: 6px;\n        }\n        \n        /* Header styling */\n        treeview header button {\n            background-color: #e8e8e8;\n            border: 1px solid #d0d0d0;\n            padding: 4px 8px;\n            font-weight: bold;\n        }\n        \n        /* Separator lines */\n        treeview.view.separator {\n            min-height: 2px;\n            color: #d0d0d0;\n        }\n        \n        /* Expander node hidden via set_show_expanders(False).\n           Zero out allocated space to prevent vertical line artefacts. */\n        treeview expander {\n            min-width: 0;\n            min-height: 0;\n            padding: 0;\n            color: transparent;\n            border: none;\n        }\n        \n        treeview expander:hover {\n            color: transparent;\n        }\n        '
         try:
             css_provider.load_from_data(css)
             style_context = self.tree_view.get_style_context()
@@ -634,6 +637,7 @@ class FileExplorerPanel:
             bus.subscribe('project.opened', self._on_project_opened_event)
             bus.subscribe('project.closed', self._on_project_closed_event)
             bus.subscribe('file.opened', self._on_file_opened_event)
+            bus.subscribe('file.closed', self._on_file_closed_event)
             bus.subscribe('file.saved', self._on_file_saved_event)
             bus.subscribe('model.changed', self._on_model_changed_event)
             bus.subscribe('document.focused', self._on_document_focused_event)
@@ -678,6 +682,16 @@ class FileExplorerPanel:
         if filepath:
             GLib.idle_add(self._oe_add_file, filepath)
             GLib.idle_add(self._oe_set_focused, filepath)
+
+    def _on_file_closed_event(self, event_data: dict):
+        """React to file.closed EventBus event — remove entry from Open Editors.
+
+        Args:
+            event_data: dict with key 'filepath'
+        """
+        filepath = (event_data or {}).get('filepath', '')
+        if filepath:
+            GLib.idle_add(self._oe_remove_file, filepath)
 
     def _on_file_saved_event(self, event_data: dict):
         """React to file.saved EventBus event — clear dirty indicator.

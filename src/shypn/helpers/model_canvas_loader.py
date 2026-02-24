@@ -962,6 +962,16 @@ class ModelCanvasLoader:
                 pass  # Failed to destroy canvas in lifecycle
         
         if drawing_area and drawing_area in self.canvas_managers:
+            # Emit file.closed so Open Editors panel removes the entry
+            try:
+                import time
+                from shypn.events import EventBus
+                _mgr = self.canvas_managers[drawing_area]
+                _fp = getattr(_mgr, 'filepath', None)
+                if _fp:
+                    EventBus.emit('file.closed', {'filepath': _fp, 'timestamp': time.time()})
+            except Exception:
+                pass
             del self.canvas_managers[drawing_area]
         if drawing_area and drawing_area in self.simulation_controllers:
             del self.simulation_controllers[drawing_area]
@@ -4465,7 +4475,20 @@ class ModelCanvasLoader:
             # If this was a save operation, mark as saved (clears imported flag)
             if is_save:
                 manager.mark_as_saved()
-        
+
+        # Emit EventBus events so Open Editors panel and other subscribers stay in sync
+        try:
+            import time
+            from shypn.events import EventBus
+            event_name = 'file.saved' if is_save else 'file.opened'
+            EventBus.emit(event_name, {
+                'filepath': filepath,
+                'document': None,
+                'timestamp': time.time()
+            })
+        except Exception:
+            pass
+
 
     def _on_dirty_state_changed(self, is_dirty):
         """Handle dirty state change to update tab label modification indicator.
