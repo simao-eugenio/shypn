@@ -707,9 +707,8 @@ class ParameterSweepBuilder(Gtk.Box):
             else:
                 return f"{seconds}s"
             
-        except Exception as e:
+        except Exception:
             # If we can't calculate, just return None (preview will show without time)
-            print(f"[DEBUG] Could not calculate time estimate: {e}")
             return None
     
     def _on_generate_clicked(self, button):
@@ -827,36 +826,25 @@ class ParameterSweepBuilder(Gtk.Box):
         if self.design_mode == 'factorial':
             # For factorial design, return all combinations
             if len(self.factorial_list) < 2:
-                print(f"[DEBUG] Factorial mode but only {len(self.factorial_list)} parameters in list")
                 return []
-            
-            print(f"[DEBUG] Computing factorial with {len(self.factorial_list)} parameters")
-            
+
             # Collect all parameters and their values
             all_param_values = []
             try:
-                for i, row in enumerate(self.factorial_list):
-                    param_name = row[0]
+                for row in self.factorial_list:
                     range_config = row[3]
-                    print(f"[DEBUG] Parameter {i}: {param_name}, config mode: {range_config.get('mode')}")
-                    
                     values = self._compute_parameter_values_from_config(range_config)
-                    print(f"[DEBUG] Parameter {i} ({param_name}) produced {len(values)} values: {values[:5] if len(values) > 5 else values}")
-                    
                     if not values:
-                        print(f"[DEBUG] Parameter {param_name} has no values!")
                         return []  # If any parameter has no values, can't create combinations
                     all_param_values.append(values)
             except Exception as e:
-                print(f"[ERROR] Error computing parameter values: {e}")
                 import traceback
                 traceback.print_exc()
                 return []
-            
+
             # Generate factorial combinations
             import itertools
             combinations = list(itertools.product(*all_param_values))
-            print(f"[DEBUG] Generated {len(combinations)} combinations")
             return combinations
         else:
             # Single parameter mode - get config from TreeView

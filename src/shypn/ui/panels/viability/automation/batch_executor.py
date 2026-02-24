@@ -238,7 +238,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         baseline_params: Baseline parameter values dict
     """
     # Import property path parser
-    from .property_path_parser import parse_property_path, apply_property_to_object
+    from .property_path_parser import parse_property_path, apply_property_to_object, resolve_object
     
     # DEBUG: File-based logging for worker process
     import os
@@ -386,20 +386,11 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         
         for prop_path, value in property_overrides.items():
             try:
-                # Parse property path
+                # Parse property path and resolve object via central helper
                 obj_id, prop_name = parse_property_path(prop_path)
-                
-                # Get object
-                if obj_id.startswith('P'):
-                    obj = next((p for p in model.places if p.id == obj_id), None)
-                elif obj_id.startswith('T'):
-                    obj = next((t for t in model.transitions if t.id == obj_id), None)
-                elif obj_id.startswith('A'):
-                    obj = next((a for a in model.arcs if a.id == obj_id), None)
-                else:
-                    obj = None
-                
-                # Apply property
+                obj = resolve_object(model, obj_id)
+
+                # Apply property through validated OOP path
                 if obj:
                     success = apply_property_to_object(obj, prop_name, value)
                     with open(debug_log, 'a') as f:
