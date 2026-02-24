@@ -1586,7 +1586,27 @@ class BatchExecutor:
                     arc_type = arc.arc_type if hasattr(arc, 'arc_type') else 'unknown'
                     print(f"[WARNING] Could not set weight for arc {arc_id} (type={arc_type}): {weight} - {e}")
                     # Keep existing weight if conversion fails
-    
+
+        # Apply property_overrides — these carry swept values for BOTH single-param and factorial
+        # experiments. They take precedence over the legacy dicts above because they are set
+        # AFTER copying place_markings/transition_rates/arc_weights from the baseline snapshot.
+        # Without this block, sequential mode silently runs all conditions at baseline values.
+        property_overrides = getattr(snapshot, 'property_overrides', {})
+        if property_overrides:
+            from .property_path_parser import parse_property_path, apply_property_to_object, resolve_object
+            import logging
+            _logger = logging.getLogger(__name__)
+            for prop_path, value in property_overrides.items():
+                try:
+                    obj_id, prop_name = parse_property_path(prop_path)
+                    obj = resolve_object(model, obj_id)
+                    if obj:
+                        apply_property_to_object(obj, prop_name, value)
+                    else:
+                        _logger.warning(f"[SEQUENTIAL] Object not found for override: {obj_id}")
+                except Exception as e:
+                    _logger.warning(f"[SEQUENTIAL] Failed to apply override {prop_path}={value}: {e}")
+
     def get_result(self, experiment_name: str) -> Optional[Dict[str, Any]]:
         """Get results for completed experiment.
         
