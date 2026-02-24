@@ -52,25 +52,19 @@ class ExperimentMetadata(MetadataSection):
         # Experiment-specific parameter values
         exp_params = context.get('experiment_parameters', {})
         
-        # Places (initial markings)
+        # Places (initial markings) — all entries for full reproducibility
         place_markings = exp_params.get('place_markings', {})
         if place_markings:
             self.add_field('', '# Place Initial Markings', '')
-            for place_id, marking in sorted(place_markings.items())[:10]:  # Show first 10
+            for place_id, marking in sorted(place_markings.items()):
                 self.add_field(f'Place_{place_id}', f"{marking:.4g}" if isinstance(marking, (int, float)) else str(marking))
-            
-            if len(place_markings) > 10:
-                self.add_field('...', f'({len(place_markings) - 10} more places)', '')
         
-        # Transitions (rates)
+        # Transitions (rates) — all entries for full reproducibility
         transition_rates = exp_params.get('transition_rates', {})
         if transition_rates:
             self.add_field('', '# Transition Rates', '')
-            for trans_id, rate in sorted(transition_rates.items())[:10]:  # Show first 10
+            for trans_id, rate in sorted(transition_rates.items()):
                 self.add_field(f'Transition_{trans_id}', f"{rate:.4g}" if isinstance(rate, (int, float)) else str(rate))
-            
-            if len(transition_rates) > 10:
-                self.add_field('...', f'({len(transition_rates) - 10} more transitions)', '')
         
         # Arc weights
         arc_weights = exp_params.get('arc_weights', {})

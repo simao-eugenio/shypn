@@ -118,8 +118,13 @@ class ParametrizationState(MetadataSection):
             
             if place_id in critical_places or not critical_places:
                 name = place.get('name', place_id)
-                # Use override value if present (actual swept value), else model baseline
-                marking = property_overrides.get(place_id, place.get('initial_marking', 0))
+                # Use override value if present (actual swept value), else model baseline.
+                # Sweep overrides use 'place_id.initial_marking' as key; fall back to bare
+                # 'place_id' key, then to the model's stored baseline.
+                marking = property_overrides.get(
+                    f'{place_id}.initial_marking',
+                    property_overrides.get(place_id, place.get('initial_marking', 0))
+                )
                 units = 'µM'  # Could be context-specific
                 
                 self.add_field(

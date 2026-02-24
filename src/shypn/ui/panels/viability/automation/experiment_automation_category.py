@@ -713,7 +713,6 @@ class ExperimentAutomationCategory:
         # Determine project folder
         project_folder = self._get_project_folder()
         if not project_folder:
-            print(f"[AUTO-SAVE] Warning: No project folder detected, skipping auto-save for '{name}'")
             return
 
         # Create saver with experiments/results subfolder
@@ -986,7 +985,9 @@ class ExperimentAutomationCategory:
             writer.writerow(['Experiment', name])
             stats = result.get('statistics', {})
             writer.writerow(['N_Replicates', stats.get('n_replicates', 0)])
-            writer.writerow(['Elapsed_Time', stats.get('elapsed_time', 0.0)])
+            # 'elapsed_time' is absent when compute_statistics() ran; use 'mean_elapsed_time'
+            elapsed = stats.get('elapsed_time', stats.get('mean_elapsed_time', 0.0))
+            writer.writerow(['Elapsed_Time', elapsed])
             writer.writerow(['Snapshot_Index', result.get('snapshot_index', '')])
             writer.writerow([])
             
