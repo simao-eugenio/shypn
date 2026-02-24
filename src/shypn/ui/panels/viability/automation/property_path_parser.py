@@ -18,29 +18,52 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_object(model: Any, obj_id: str) -> Optional[Any]:
-    """Resolve a model object by its ID using the P/T/A prefix convention.
+    """Resolve a model object by its ID or name.
 
-    Centralises the type-switch that would otherwise be duplicated in every
-    consumer (batch worker, sweep builders, validators).
+    First tries the fast P/T/A prefix-based ID lookup, then falls back to a
+    linear name search across all collections.  This handles the common case
+    where sweep parameters are specified by place/transition name (e.g.
+    "EPO_external") rather than by internal ID (e.g. "P1").
 
     Args:
         model: DocumentModel instance exposing .places, .transitions, .arcs
-        obj_id: Object identifier e.g. 'P1', 'T5', 'A3'
+        obj_id: Object identifier – either an internal ID ('P1', 'T5', 'A3')
+                or a human-readable name ('EPO_external', 'GATA1_transcription')
 
     Returns:
         Matching Place / Transition / Arc, or None if not found.
 
     Examples:
-        >>> place = resolve_object(model, 'P1')
+        >>> place = resolve_object(model, 'P1')           # by ID
+        >>> place = resolve_object(model, 'EPO_external') # by name
         >>> trans = resolve_object(model, 'T5')
     """
+    # --- fast path: ID-prefix lookup ---
     if obj_id.startswith('P'):
-        return next((p for p in model.places if p.id == obj_id), None)
+        result = next((p for p in model.places if p.id == obj_id), None)
+        if result is not None:
+            return result
     elif obj_id.startswith('T'):
-        return next((t for t in model.transitions if t.id == obj_id), None)
+        result = next((t for t in model.transitions if t.id == obj_id), None)
+        if result is not None:
+            return result
     elif obj_id.startswith('A'):
-        return next((a for a in model.arcs if a.id == obj_id), None)
-    logger.warning(f"resolve_object: unknown ID prefix for '{obj_id}'")
+        result = next((a for a in model.arcs if a.id == obj_id), None)
+        if result is not None:
+            return result
+
+    # --- fallback: name-based search across all collections ---
+    result = next((p for p in model.places if getattr(p, 'name', None) == obj_id), None)
+    if result is not None:
+        return result
+    result = next((t for t in model.transitions if getattr(t, 'name', None) == obj_id), None)
+    if result is not None:
+        return result
+    result = next((a for a in model.arcs if getattr(a, 'name', None) == obj_id), None)
+    if result is not None:
+        return result
+
+    logger.warning(f"resolve_object: no object found with id or name '{obj_id}'")
     return None
 
 
