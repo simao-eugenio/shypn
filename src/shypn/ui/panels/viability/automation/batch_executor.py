@@ -763,12 +763,16 @@ class BatchExecutor:
                 snapshot = self.experiment_manager.snapshots[snapshot_index]
                 
                 # Extract only picklable data from snapshot (avoid GTK/Builder objects)
+                # CRITICAL: property_overrides must be included — it carries factorial sweep values
+                # (e.g. {"P1.initial_marking": 150.0, "P2.initial_marking": 50.0}).
+                # Omitting it causes all parallel factorial conditions to run with baseline values.
                 snapshot_data = {
                     'name': snapshot.name,
                     'place_markings': snapshot.place_markings.copy(),
                     'arc_weights': snapshot.arc_weights.copy(),
                     'transition_rates': snapshot.transition_rates.copy(),
-                    'swept_parameter': snapshot.swept_parameter
+                    'swept_parameter': snapshot.swept_parameter,
+                    'property_overrides': getattr(snapshot, 'property_overrides', {}).copy()
                 }
                 
                 # Serialize all data for pickling
