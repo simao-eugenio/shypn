@@ -1,5 +1,5 @@
 """
-Base Compound Mapper
+Base Species Mapper
 
 Abstract base class for mapping chemical species to standardized compound identifiers.
 Supports multiple identifier systems (KEGG, ChEBI, BiGG, etc.) through subclasses.
@@ -15,6 +15,10 @@ Design Principles:
 - Fallback mechanism: Name matching when annotations unavailable
 - Performance: Caching and batch operations
 - Extensibility: Easy to add new identifier systems
+
+Note: This base class is for species-centric mapping (SBML species lists).
+      For place-centric mapping with confidence scores, see
+      thermodynamics/mappers/base_mapper.py (CompoundMapperBase).
 """
 
 from abc import ABC, abstractmethod
@@ -23,11 +27,20 @@ import logging
 import re
 
 
-class CompoundMapperBase(ABC):
+class SpeciesMapperBase(ABC):
     """
-    Abstract base class for compound mapping.
-    
-    Maps species/metabolites to standardized KEGG compound IDs.
+    Abstract base class for SBML species-to-compound mapping.
+
+    Maps SBML species/metabolites to standardized KEGG compound IDs using
+    annotations (MIRIAM URNs) and name-based fallbacks.
+
+    For place-centric Petri net mapping with confidence scores, see
+    thermodynamics.mappers.CompoundMapperBase instead.
+
+    Subclasses must implement:
+    - map_species(): Map a single species to a KEGG ID
+    - _get_species_id(): Extract the cache key for a species
+
     Subclasses implement source-specific extraction logic.
     """
     

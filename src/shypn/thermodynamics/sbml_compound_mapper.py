@@ -20,12 +20,12 @@ Design:
 from typing import Optional, Dict, List
 import logging
 
-from shypn.thermodynamics.compound_mapper_base import CompoundMapperBase
+from shypn.thermodynamics.compound_mapper_base import SpeciesMapperBase
 from shypn.thermodynamics.compound_resolver import CompoundResolver
 from shypn.thermodynamics.database.xref import CrossReferenceDatabase
 
 
-class SBMLCompoundMapper(CompoundMapperBase):
+class SBMLCompoundMapper(SpeciesMapperBase):
     """
     Maps SBML species to KEGG compound IDs.
     
