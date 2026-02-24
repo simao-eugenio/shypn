@@ -27,14 +27,6 @@ Usage:
     # - If molecule_count < 100 → Uses stochastic (τ-leaping)
     # - If molecule_count ≥ 100 → Uses continuous (ODE integration)
     # - Mode switches dynamically as populations change
-
-# RESOLVED: Mass conservation enforced globally via ConservationEnforcer.
-#           Mode switching WAS the primary issue (firing imbalance from desynchronization),
-#           but this is now corrected after each simulation step.
-#           Mathematical proof: Petri nets with asymmetric stoichiometry (2→1, 1→2)
-#           violate token conservation when firings are imbalanced. This is NOT a bug,
-#           but a fundamental property requiring external enforcement.
-#           See CONSERVATION_ENFORCEMENT_INTEGRATION.md for proof & validation.
 """
 
 import logging

@@ -15,14 +15,6 @@ Spatial Signal Integration:
     - Respects neighbor_compartments topology
 
 Extracted from: legacy/shypnpy/core/petri.py:1908-1970
-
-# RESOLVED: Mass conservation now enforced globally in SimulationController.step()
-#           via ConservationEnforcer (see conservation_enforcer.py).
-#           Per-step global correction proven superior to per-transition verification:
-#           - 12/12 test models pass with 0.0000% error
-#           - Handles firing imbalance (mathematical root cause)
-#           - More efficient (1 correction/step vs N per transitions)
-#           See CONSERVATION_ENFORCEMENT_INTEGRATION.md for details.
 """
 
 from typing import Dict, Tuple, List, Any

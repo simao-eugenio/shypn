@@ -17,14 +17,6 @@ Spatial Signal Integration:
     - Reads compartment_volume → stochastic/continuous selection
 
 Extracted from: legacy/shypnpy/core/petri.py:1691-1900
-
-# RESOLVED: Mass conservation enforced globally after each step.
-#           RK4 numerical drift is corrected by ConservationEnforcer.
-#           Tests show 0.0000% error maintained over all simulations.
-#           Per-step correction superior to Kahan summation approach:
-#           - Handles both numerical drift AND firing imbalances
-#           - Proven effective across continuous/adaptive/mixed modes
-#           See CONSERVATION_ENFORCEMENT_INTEGRATION.md for validation.
 """
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
