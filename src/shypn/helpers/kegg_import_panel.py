@@ -250,9 +250,6 @@ class KEGGImportPanel:
         filter_all.add_pattern("*")
         dialog.add_filter(filter_all)
         
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
-        
         # Wayland-safe async approach
         result_container = [None]
         

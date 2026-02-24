@@ -2272,9 +2272,10 @@ class FileExplorerPanel:
             if needs_new_filepath:
                 # Open file chooser dialog for default/imported files
                 
-                # Determine initial directory: project/models/ if project is open, otherwise workspace
-                if self.project and hasattr(self.project, 'base_path'):
-                    initial_dir = os.path.join(self.project.base_path, 'models')
+                # Determine initial directory: active project/models/ if project is open, otherwise workspace
+                active_project = self._get_active_project()
+                if active_project and hasattr(active_project, 'base_path'):
+                    initial_dir = os.path.join(active_project.base_path, 'models')
                     os.makedirs(initial_dir, exist_ok=True)
                 else:
                     initial_dir = self.explorer.current_path
@@ -2543,9 +2544,6 @@ class FileExplorerPanel:
             filter_all.set_name("All Files")
             filter_all.add_pattern("*")
             dialog.add_filter(filter_all)
-            
-            # Focus on filename entry instead of search
-            dialog.set_current_name("")
             
             # Show dialog and handle response
             response = dialog.run()

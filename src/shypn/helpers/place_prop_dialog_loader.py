@@ -1206,6 +1206,15 @@ class PlacePropDialogLoader(GObject.GObject):
         all_filter.add_pattern("*")
         chooser.add_filter(all_filter)
         
+        # Root to active project if one is open
+        try:
+            from shypn.data.project_models import get_project_manager
+            pm = get_project_manager()
+            if pm.current_project and pm.current_project.base_path:
+                chooser.set_current_folder(pm.current_project.base_path)
+        except Exception:
+            pass
+        
         response = chooser.run()
         filename = chooser.get_filename()
         chooser.destroy()
@@ -1344,6 +1353,15 @@ class PlacePropDialogLoader(GObject.GObject):
         csv_filter.set_name("CSV files")
         csv_filter.add_pattern("*.csv")
         chooser.add_filter(csv_filter)
+        
+        # Root to active project if one is open
+        try:
+            from shypn.data.project_models import get_project_manager
+            pm = get_project_manager()
+            if pm.current_project and pm.current_project.base_path:
+                chooser.set_current_folder(pm.current_project.base_path)
+        except Exception:
+            pass
         
         response = chooser.run()
         filename = chooser.get_filename()
