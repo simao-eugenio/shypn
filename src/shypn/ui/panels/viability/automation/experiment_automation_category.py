@@ -787,7 +787,14 @@ class ExperimentAutomationCategory:
                     f.write(header_text)
             except Exception as e:
                 print(f"[AUTO-SAVE] Warning: Failed to save metadata: {e}")
-    
+
+        # Save CSV — same data as manual export, auto-generated alongside JSON files
+        try:
+            csv_path = batch_path / 'results.csv'
+            self._export_csv(str(csv_path), name, result)
+        except Exception as e:
+            print(f"[AUTO-SAVE] Warning: Failed to save CSV: {e}")
+
     def _get_project_folder(self) -> str:
         """Get current project folder path for auto-save.
         
