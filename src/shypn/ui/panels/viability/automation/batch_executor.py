@@ -185,6 +185,10 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                     'elapsed_time': elapsed_time,
                     'phase': snapshot.get('name', name) if isinstance(snapshot, dict) else name,
                     'swept_parameter': snapshot.get('swept_parameter') if isinstance(snapshot, dict) else None,
+                    'property_overrides': (
+                        snapshot.get('property_overrides', {}) if isinstance(snapshot, dict)
+                        else getattr(snapshot, 'property_overrides', {})
+                    ),
                     # Validation data
                     'trajectory_data': trajectory_data,
                     'warnings': warnings,

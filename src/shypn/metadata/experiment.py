@@ -76,11 +76,18 @@ class ExperimentMetadata(MetadataSection):
         arc_weights = exp_params.get('arc_weights', {})
         if arc_weights and len(arc_weights) > 0:
             self.add_field('', '# Arc Weights', '')
-            for arc_id, weight in sorted(arc_weights.items())[:5]:  # Show first 5
+            for arc_id, weight in sorted(arc_weights.items()):  # All arcs — needed for reproducibility
                 self.add_field(f'Arc_{arc_id}', f"{weight:.4g}" if isinstance(weight, (int, float)) else str(weight))
-            
-            if len(arc_weights) > 5:
-                self.add_field('...', f'({len(arc_weights) - 5} more arcs)', '')
+        
+        # Machine-readable sweep overrides (actual values set for this experiment)
+        overrides = context.get('property_overrides', {})
+        if overrides:
+            self.add_field('', '# Sweep Overrides', '')
+            for param_id, value in sorted(overrides.items()):
+                self.add_field(
+                    param_id,
+                    f"{value:.6g} µM" if isinstance(value, (int, float)) else str(value)
+                )
     
     def validate(self) -> tuple[bool, Optional[str]]:
         """Validate experiment metadata."""
