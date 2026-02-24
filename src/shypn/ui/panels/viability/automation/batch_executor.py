@@ -1236,11 +1236,7 @@ class BatchExecutor:
                 generator.set_context(metadata_context)
                 generator.generate()
                 metadata_header = generator.header
-                print(f"✓ Generated metadata with {len(metadata_header.sections)} sections for {name}")
             except Exception as e:
-                print(f"⚠️ Warning: Failed to generate metadata for {name}: {e}")
-                import traceback
-                traceback.print_exc()
                 metadata_header = None
             
             # Return complete result dict with statistics (plottable from statistics)
@@ -1329,15 +1325,11 @@ class BatchExecutor:
         
         # Check if there are selected localities
         if not self.parent_panel.selected_localities:
-            # No localities selected - return full model as subnet for backwards compatibility
-            print("[SUBNET] No localities selected, using full model")
             return {
                 'places': list(model.places) if hasattr(model, 'places') else [],
                 'transitions': list(model.transitions) if hasattr(model, 'transitions') else [],
                 'arcs': list(model.arcs) if hasattr(model, 'arcs') else []
             }
-        
-        print(f"[SUBNET] Extracting subnet from {len(self.parent_panel.selected_localities)} selected localities")
         
         # Use sets for O(1) membership checking instead of lists
         subnet_places_set = set()
@@ -1381,12 +1373,6 @@ class BatchExecutor:
                     arc_obj = arcs_by_id.get(arc)
                     if arc_obj:
                         subnet_arcs_set.add(arc_obj)
-        
-        print(f"[SUBNET] Extracted {len(subnet_places_set)} places, {len(subnet_transitions_set)} transitions, {len(subnet_arcs_set)} arcs")
-        
-        # Debug: Show first few elements
-        print(f"[SUBNET] First 3 places: {[p.id for p in list(subnet_places_set)[:3]]}")
-        print(f"[SUBNET] First 3 transitions: {[t.id for t in list(subnet_transitions_set)[:3]]}")
         
         return {
             'places': list(subnet_places_set),

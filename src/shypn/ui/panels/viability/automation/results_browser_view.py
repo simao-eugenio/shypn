@@ -1816,13 +1816,10 @@ class ResultsBrowserView(BaseResultsView):
         # Check if result has metadata header
         metadata_header = result.get('metadata')
         if not metadata_header:
-            print(f"⚠️ No metadata header in result. Keys: {list(result.keys())}")
             self.metadata_status_label.set_markup(
                 "<i>Showing results summary only (no detailed metadata)</i>"
             )
             return
-        
-        print(f"✓ Displaying metadata with {len(metadata_header.sections) if hasattr(metadata_header, 'sections') else 0} sections")
         
         # Display metadata sections
         if hasattr(metadata_header, 'sections'):
@@ -1856,12 +1853,10 @@ class ResultsBrowserView(BaseResultsView):
                 path = self.metadata_store.get_path(parent_iter)
                 self.metadata_tree.expand_row(path, False)
             
-            print(f"✓ Populated metadata tree with {len(metadata_header.sections)} sections")
             self.metadata_status_label.set_markup(
                 f"<i>1 results summary + {len(metadata_header.sections)} metadata sections</i>"
             )
         else:
-            print(f"⚠️ Invalid metadata format: {type(metadata_header)}")
             self.metadata_status_label.set_markup(
                 "<i>Invalid metadata format</i>"
             )
