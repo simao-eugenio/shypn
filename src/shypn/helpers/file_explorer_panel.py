@@ -352,7 +352,23 @@ class FileExplorerPanel:
         # Store references to menu items that need dynamic enable/disable
         self.menu_items_refs = {}
         
-        menu_items = [('Open', self._on_context_open_clicked), ('New File', self._on_context_new_file_clicked), ('New Folder', self._on_context_new_folder_clicked), ('---', None), ('Cut', self._on_cut_clicked), ('Copy', self._on_copy_clicked), ('Paste', self._on_paste_clicked), ('---', None), ('Rename', self._on_rename_clicked), ('Delete', self._on_delete_clicked), ('---', None), ('Refresh', self._on_refresh_clicked), ('Properties', self._on_properties_clicked)]
+        menu_items = [
+            ('Open', self._on_context_open_clicked),
+            ('New File', self._on_context_new_file_clicked),
+            ('New Folder', self._on_context_new_folder_clicked),
+            ('New Model', self._on_context_new_model_clicked),       # Phase 6: project-aware
+            ('New Experiment', self._on_context_new_experiment_clicked),  # Phase 6: project-aware
+            ('---', None),
+            ('Cut', self._on_cut_clicked),
+            ('Copy', self._on_copy_clicked),
+            ('Paste', self._on_paste_clicked),
+            ('---', None),
+            ('Rename', self._on_rename_clicked),
+            ('Delete', self._on_delete_clicked),
+            ('---', None),
+            ('Refresh', self._on_refresh_clicked),
+            ('Properties', self._on_properties_clicked),
+        ]
         for label, callback in menu_items:
             if label == '---':
                 separator = Gtk.SeparatorMenuItem()
@@ -363,7 +379,8 @@ class FileExplorerPanel:
                     menu_item.connect('activate', callback)
                 self.context_menu.append(menu_item)
                 # Store references for items that need dynamic state
-                if label in ['Cut', 'Copy', 'Paste', 'Rename', 'Delete', 'Open']:
+                if label in ['Cut', 'Copy', 'Paste', 'Rename', 'Delete', 'Open',
+                             'New Model', 'New Experiment']:
                     self.menu_items_refs[label] = menu_item
         
         # Connect to menu show event to update item states
@@ -392,6 +409,20 @@ class FileExplorerPanel:
             can_open = has_selection and not self.selected_item_is_dir
             self.menu_items_refs['Open'].set_sensitive(can_open)
 
+        # Show/hide project-aware items (New Model, New Experiment) only inside a project
+        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
+        inside_project = False
+        if active_project:
+            current = self.explorer.current_path or ''
+            base = getattr(active_project, 'base_path', '')
+            if base and (os.path.normpath(current) == os.path.normpath(base)
+                         or os.path.normpath(current).startswith(os.path.normpath(base) + os.sep)):
+                inside_project = True
+        for item_name in ('New Model', 'New Experiment'):
+            if item_name in self.menu_items_refs:
+                self.menu_items_refs[item_name].set_visible(inside_project)
+                self.menu_items_refs[item_name].set_sensitive(inside_project)
+
     def _connect_signals(self):
         """Connect widget signals to controller methods.
         
@@ -419,6 +450,7 @@ class FileExplorerPanel:
             self.refresh_button.connect('clicked', self._on_refresh_clicked)
         self.tree_view.connect('row-activated', self._on_row_activated)
         self.tree_view.connect('button-press-event', self._on_tree_view_button_press)
+        self.tree_view.connect('key-press-event', self._on_tree_key_press)
         self.scrolled_window.connect('button-press-event', self._on_scroll_button_press)
         
         # Connect to selection changes to update current file display
@@ -502,6 +534,9 @@ class FileExplorerPanel:
     def _oe_add_file(self, filepath: str):
         """Add a file to the Open Editors list (no-op if already present).
 
+        Only shows files that belong to the currently active project (Phase 4).
+        If no project is active, all open files are shown.
+
         Args:
             filepath: Absolute path of the opened file
         """
@@ -509,6 +544,16 @@ class FileExplorerPanel:
             return
         if not self._open_editors_listbox:
             return
+        # Project filter: only show files inside the active project
+        try:
+            active_project = self._get_active_project()
+            if active_project and active_project.base_path:
+                base = os.path.normpath(active_project.base_path)
+                norm = os.path.normpath(filepath)
+                if not (norm == base or norm.startswith(base + os.sep)):
+                    return
+        except Exception:
+            pass
 
         basename = os.path.basename(filepath)
 
@@ -610,16 +655,14 @@ class FileExplorerPanel:
     def _on_open_editor_close_clicked(self, btn, filepath):
         """Handle ✕ close button on Open Editors row.
 
-        Removes the entry from the list (does not save/discard — that is the
-        canvas loader's responsibility). Emits file.closed so other listeners
-        can react.
+        Emits 'editor.close_requested' so the canvas loader closes the tab
+        (which in turn emits 'file.closed' and triggers _oe_remove_file).
         """
         try:
             from shypn.events.event_bus import EventBus
-            EventBus.get_instance().emit('file.closed', {'filepath': filepath})
+            EventBus.get_instance().emit('editor.close_requested', {'filepath': filepath})
         except Exception:
             pass
-        GLib.idle_add(self._oe_remove_file, filepath)
 
     # ------------------------------------------------------------------
     # EventBus subscriptions
@@ -1032,13 +1075,42 @@ class FileExplorerPanel:
         """Callback when path changes in API (Model).
 
         Also triggers auto project activation/deactivation when navigation
-        crosses project boundaries (Phase 2 of explorer refactor).
+        crosses project boundaries (Phase 2 of explorer refactor),
+        and updates the breadcrumb bar with a project-relative path (Phase 4).
 
         Args:
             new_path: New current path
         """
         GLib.idle_add(self._load_current_directory)
         GLib.idle_add(self._sync_project_state, new_path)
+        GLib.idle_add(self._update_breadcrumb, new_path)
+
+    def _update_breadcrumb(self, new_path: str):
+        """Show project-relative path in the breadcrumb bar (Phase 4).
+
+        When inside an active project, displays '<ProjectName> / rel/path'.
+        When at the projects root or no project active, shows the bare path.
+        """
+        if not self.current_file_entry:
+            return False
+        try:
+            active_project = self._get_active_project()
+            if active_project and active_project.base_path:
+                base = os.path.normpath(active_project.base_path)
+                norm = os.path.normpath(new_path)
+                if norm == base:
+                    text = f'[■ {active_project.name}]'
+                elif norm.startswith(base + os.sep):
+                    rel = os.path.relpath(norm, base)
+                    text = f'[■ {active_project.name}] / {rel}'
+                else:
+                    text = new_path
+            else:
+                text = new_path
+            self.current_file_entry.set_text(text)
+        except Exception:
+            pass
+        return False
 
     def _sync_project_state(self, new_path: str):
         """Synchronise ProjectManager state when navigation crosses project boundaries.
@@ -1154,6 +1226,49 @@ class FileExplorerPanel:
                 self._open_file_from_path(full_path)
         else:
             self.set_current_file(full_path)
+
+    def _on_tree_key_press(self, widget, event):
+        """Handle keyboard shortcuts on the file tree (Phase 6).
+
+        - F2         → inline rename of selected item
+        - Delete     → delete selected item (with confirmation)
+        - Return / KP_Enter → open file or navigate into folder
+        - Ctrl+Shift+N → new model in project models/ folder
+        """
+        import gi
+        gi.require_version('Gdk', '3.0')
+        from gi.repository import Gdk
+        keyval = event.keyval
+        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+
+        if keyval == Gdk.KEY_F2:
+            if self.selected_item_path:
+                self._start_inline_edit_rename()
+            return True
+
+        if keyval == Gdk.KEY_Delete:
+            if self.selected_item_path:
+                self._show_delete_confirmation()
+            return True
+
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            if self.selected_item_path:
+                if self.selected_item_is_dir:
+                    self.explorer.navigate_to(self.selected_item_path)
+                else:
+                    if self.selected_item_path.endswith('.shy'):
+                        if self.on_file_open_requested:
+                            self.on_file_open_requested(self.selected_item_path)
+                        else:
+                            self._open_file_from_path(self.selected_item_path)
+            return True
+
+        if ctrl and shift and keyval == Gdk.KEY_n:
+            self._on_context_new_model_clicked(None)
+            return True
+
+        return False
 
     def _on_tree_view_button_press(self, widget, event):
         """Handle button press on tree view to show context menu and expand folders.
@@ -1395,6 +1510,27 @@ class FileExplorerPanel:
         Args:
             menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
         """
+        self._start_inline_edit_new_folder()
+
+    def _on_context_new_model_clicked(self, menu_item):
+        """Create a new .shy model inside the project's models/ subfolder (Phase 6).
+
+        Falls back to current directory if models/ doesn't exist yet.
+        """
+        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
+        if active_project:
+            target_dir = os.path.join(active_project.base_path, 'models')
+            os.makedirs(target_dir, exist_ok=True)
+            self.explorer.navigate_to(target_dir)
+        self._start_inline_edit_new_file()
+
+    def _on_context_new_experiment_clicked(self, menu_item):
+        """Navigate to project's experiments/ subfolder and create a new folder (Phase 6)."""
+        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
+        if active_project:
+            target_dir = os.path.join(active_project.base_path, 'experiments')
+            os.makedirs(target_dir, exist_ok=True)
+            self.explorer.navigate_to(target_dir)
         self._start_inline_edit_new_folder()
 
     def _on_context_save_clicked(self, menu_item):

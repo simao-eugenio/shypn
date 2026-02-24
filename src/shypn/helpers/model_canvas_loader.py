@@ -175,6 +175,36 @@ class ModelCanvasLoader:
         # Track whether we've fully initialized the first page (page 0)
         self._first_page_initialized = False
 
+        # Subscribe to 'editor.close_requested' so the Open Editors panel ✕ button
+        # triggers a proper tab close (with unsaved-changes dialog etc.)
+        try:
+            from shypn.events import EventBus
+            EventBus.subscribe('editor.close_requested', self._on_editor_close_requested)
+        except Exception:
+            pass
+
+    def _on_editor_close_requested(self, event_data: dict):
+        """Close the canvas tab matching the filepath in event_data.
+
+        Called when the Open Editors panel ✕ button emits 'editor.close_requested'.
+        Delegates to close_tab() which handles unsaved-changes confirmation and
+        full cleanup, then emits 'file.closed' which removes the panel row.
+        """
+        filepath = event_data.get('filepath') if isinstance(event_data, dict) else None
+        if not filepath or not self.notebook:
+            return
+        try:
+            for page_num in range(self.notebook.get_n_pages()):
+                page = self.notebook.get_nth_page(page_num)
+                drawing_area = self._get_drawing_area_from_page(page)
+                if drawing_area:
+                    manager = self.canvas_managers.get(drawing_area)
+                    if manager and getattr(manager, 'filepath', None) == filepath:
+                        GLib.idle_add(self.close_tab, page_num)
+                        return
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
     # Public helpers for per-document access
     # ------------------------------------------------------------------
