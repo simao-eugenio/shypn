@@ -1826,84 +1826,74 @@ class ModelCanvasLoader:
         
 
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
-        """Setup new OOP palette system with SwissKnifePalette.
-        
-        SwissKnifePalette replaces the old ToolsPalette + OperationsPalette + [E] button.
-        
+        """Setup OOP palette system and all per-document panels for one canvas.
+
+        Coordinates 7 sub-components, each extracted to a focused private method:
+
+        1. ``_setup_swissknife_palette``   – SwissKnifePalette widget + signals
+        2. ``_setup_simulation_controller`` – SimulationController + lifecycle reg.
+        3. ``_setup_document_report_panel``  – per-doc Report Panel
+        4. ``_setup_document_viability_panel`` – per-doc Viability Panel
+        5. ``_setup_document_pathway_panel``   – per-doc Pathway Panel
+        6. ``_setup_document_analyses_panel``  – per-doc Analyses Panel + context menu
+        7. ``_setup_document_topology_panel``  – per-doc Topology Panel
+        8. ``_wire_legacy_palettes``           – hidden legacy palettes + final wiring
+
         Args:
             overlay_widget: GtkOverlay to attach palettes to.
             canvas_manager: ModelCanvasManager instance for this canvas.
             drawing_area: GtkDrawingArea widget.
             overlay_manager: CanvasOverlayManager instance.
         """
-        # Old [E] button reference no longer needed - SwissKnifePalette is self-contained
-        
+        swissknife_palette = self._setup_swissknife_palette(
+            overlay_widget, canvas_manager, drawing_area, overlay_manager)
+        simulation_controller = self._setup_simulation_controller(
+            canvas_manager, drawing_area, swissknife_palette)
+        self._setup_document_report_panel(
+            canvas_manager, drawing_area, simulation_controller)
+        self._setup_document_viability_panel(
+            canvas_manager, drawing_area, simulation_controller)
+        self._setup_document_pathway_panel(
+            canvas_manager, drawing_area, simulation_controller)
+        self._setup_document_analyses_panel(
+            canvas_manager, drawing_area, overlay_manager)
+        self._setup_document_topology_panel(canvas_manager, drawing_area)
+        palette_manager = self.palette_managers[drawing_area]
+        self._wire_legacy_palettes(
+            overlay_widget, canvas_manager, drawing_area, overlay_manager, palette_manager)
+
+    # ------------------------------------------------------------------
+    # _setup_edit_palettes sub-methods
+    # Each method is responsible for exactly one of the eight setup concerns.
+    # ------------------------------------------------------------------
+
+    def _setup_swissknife_palette(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
+        """Create PaletteManager and SwissKnifePalette for one canvas.
+
+        Returns the SwissKnifePalette instance (needed by _setup_simulation_controller).
+        """
         # Create palette manager (kept for backward compatibility with old code)
         palette_manager = PaletteManager(overlay_widget, reference_widget=None)
         self.palette_managers[drawing_area] = palette_manager
-        
-        # [E] button is at bottom-center: margin_bottom=24, height=36
-        # Palettes should be centered horizontally, ~18px above edit palette container
-        # Edit palette (refactored with [ ][E][ ] layout):
-        #   - margin_bottom: 12px (changed from 24px)
-        #   - container width: ~100px (3 buttons @ 28px + spacing + padding + border)
-        #   - container height: ~38px (border + padding + button + padding + border)
-        #   - halign: center (follows window center automatically)
-        #   - top from bottom: 12 + 38 = 50px
-        # Palette bottom should be at: 50 + 18 = 68px from bottom
-        
-        # Virtual palette positioning strategy:
-        # Use CENTER alignment instead of FILL with fixed margins
-        # This makes palettes follow the window center automatically on resize
-        #
-        # Tools palette (148px wide):
-        #   - halign: CENTER
-        #   - margin_end: (194 + 80) = 274px (operations width + gap)
-        #   - Effect: Positioned to the left of center by 274px
-        #
-        # Operations palette (194px wide):
-        #   - halign: CENTER
-        #   - margin_start: (148 + 80) = 228px (tools width + gap)
-        #   - Effect: Positioned to the right of center by 228px
-        #
-        # Gap between them: 80px (centered on the window)
-        # Total virtual palette width: 148 + 80 + 194 = 422px
-        # This configuration keeps palettes centered above [E] button on any window size!
-        
-        # ============================================================
-        # SWISSKNIFE PALETTE - Unified Edit/Simulate/Layout palette
-        # ============================================================
-        # Replaces old ToolsPalette + OperationsPalette
-        # Features:
-        #   - Edit category: P/T/A/S/L tools
-        #   - Simulate category: Widget palette (SimulateToolsPaletteLoader)
-        #   - Layout category: Auto/Hier/Force tools
-        #   - Sub-palettes reveal upward with 600ms animations
-        #   - Dark blue-gray theme matching application style
-        
-        # Create tool registry
+
+        # Create tool registry and SwissKnifePalette
         tool_registry = ToolRegistry()
-        
-        # Create SwissKnifePalette in edit mode
-        # NOTE: canvas_manager IS the model (has places, transitions, arcs attributes)
         swissknife_palette = SwissKnifePalette(
             mode='edit',
-            model=canvas_manager,  # canvas_manager itself is the Petri net model
+            model=canvas_manager,
             tool_registry=tool_registry
         )
-        
-        # Get palette widget and position it
+
+        # Position widget
         swissknife_widget = swissknife_palette.get_widget()
         swissknife_widget.set_halign(Gtk.Align.CENTER)
         swissknife_widget.set_valign(Gtk.Align.END)
-        swissknife_widget.set_margin_bottom(20)  # 20px from bottom
+        swissknife_widget.set_margin_bottom(20)
         swissknife_widget.set_hexpand(False)
         swissknife_widget.set_vexpand(False)
-        
-        # Add to overlay
         overlay_widget.add_overlay(swissknife_widget)
-        
-        # Wire SwissKnifePalette signals
+
+        # Wire signals
         swissknife_palette.connect('tool-activated', self._on_swissknife_tool_activated, canvas_manager, drawing_area)
         swissknife_palette.connect('mode-change-requested', self._on_swissknife_mode_change_requested, canvas_manager, drawing_area)
         swissknife_palette.connect('simulation-step-executed', self._on_simulation_step, drawing_area)
@@ -1911,53 +1901,35 @@ class ModelCanvasLoader:
         swissknife_palette.connect('simulation-settings-changed', self._on_simulation_settings_changed, drawing_area)
         swissknife_palette.connect('float-toggled', self._on_swissknife_float_toggled, swissknife_widget, drawing_area)
         swissknife_palette.connect('position-changed', self._on_swissknife_position_changed, swissknife_widget, drawing_area)
-        
-        # ============================================================
-        # Create simulation controller for this canvas
-        # ============================================================
-        # Canvas-centric design: One controller per drawing_area
-        # This wiring survives SwissPalette refactoring because:
-        #   1. Controller keyed by drawing_area (stable, won't change)
-        #   2. Palette can access controller through overlay_manager
-        #   3. Signal handlers use get_canvas_controller() accessor
-        # 
-        # When SwissPalette refactoring happens:
-        #   - Controller creation stays here (unchanged)
-        #   - Signal handler names may change (easy to find and update)
-        #   - Controller access pattern stays the same (drawing_area → controller)
+
+        return swissknife_palette
+
+    def _setup_simulation_controller(self, canvas_manager, drawing_area, swissknife_palette):
+        """Create SimulationController and register the canvas with the lifecycle adapter.
+
+        Returns the SimulationController (needed by panel setup sub-methods).
+        """
         simulation_controller = SimulationController(canvas_manager)
-        # CRITICAL: Store drawing_area reference in controller so Report Panel can find its document
+        # Store drawing_area reference so Report Panel can find its document
         simulation_controller._drawing_area = drawing_area
-        
-        # Week 1 - Phase 4: Set document_id for EventBus scoped events
-        # Enables simulation.progress events to be isolated per document
+        # EventBus scoped events: isolate simulation.progress per document
         simulation_controller.document_id = id(drawing_area)
-        
-        # CRITICAL: Wire data_collector change callback to update analyses panel
-        # This ensures analyses panel gets updated when controller.reset() creates new data_collector
+
+        # Wire data_collector change callback so analyses panel updates on reset()
         def on_data_collector_changed(new_data_collector):
             if hasattr(self.overlay_managers[drawing_area], 'analyses_panel_loader'):
                 analyses_loader = self.overlay_managers[drawing_area].analyses_panel_loader
                 if analyses_loader and hasattr(analyses_loader, 'set_data_collector'):
                     analyses_loader.set_data_collector(new_data_collector)
-        
+
         simulation_controller._on_data_collector_changed = on_data_collector_changed
-        
         self.simulation_controllers[drawing_area] = simulation_controller
-        
-        # CRITICAL FIX: Store controller reference in overlay_manager
-        # This allows arc property dialog's _invalidate_simulation_cache() to find
-        # the actual controller being used by Run button. Without this, dialog can't
-        # invalidate the ModelAdapter cache, causing test arcs to still consume tokens
-        # after transformation.
+
+        # Store in overlay_manager for arc property dialog access
         if drawing_area in self.overlay_managers:
             self.overlay_managers[drawing_area].simulation_controller = simulation_controller
-        
-        # ============================================================
-        # REPORT PANEL INTEGRATION: Wire controller to per-document Report Panel
-        # ============================================================
-        # CRITICAL: Report panels are per-document, stored in overlay_managers
-        # Always wire the controller to the current document's report panel
+
+        # Wire controller to existing report panel (if already present)
         if drawing_area in self.overlay_managers:
             overlay_manager = self.overlay_managers[drawing_area]
             if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
@@ -1967,72 +1939,10 @@ class ModelCanvasLoader:
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
-        
-        # ============================================================
-        # VIABILITY PANEL INTEGRATION: Wire simulation complete callback
-        # ============================================================
-        # When simulation completes, notify the PER-DOCUMENT Viability Panel so it can:
-        #  1. Extract simulation results (dead transitions, inactive places)
-        # ============================================================
-        # NOTE: Viability panel callbacks are now ONLY wired per-document above
-        # No global viability panel fallback - matches Report panel architecture
-        # ============================================================
-        
-        # ============================================================
-        # GLOBAL-SYNC: Integrate with canvas lifecycle system
-        # ============================================================
-        # If lifecycle system is enabled, register this canvas with it.
-        # This provides coordinated management of all canvas components.
-        # 
-        # ═══════════════════════════════════════════════════════════════════
-        # CERTIFICATION: Canvas Lifecycle Integration
-        # ═══════════════════════════════════════════════════════════════════
-        # This registration ensures File→New canvas state is coordinated with
-        # the Global Canvas State Lifecycle system. The lifecycle manager:
-        #
-        # 1. TRACKS: Canvas context in lifecycle_manager.canvas_registry
-        #    - drawing_area → CanvasContext mapping
-        #    - Canvas ID scope for isolated ID generation
-        #
-        # 2. SYNCHRONIZES: State transitions during operations
-        #    - Tab switch: lifecycle_adapter.switch_to_canvas() (line 332)
-        #    - ID scope: Sets active canvas for P1-Pn, T1-Tn, A1-An generation
-        #    - Component access: get_document_model(), get_controller(), get_palette()
-        #
-        # 3. PROTECTS: Against inadvertent state overrides
-        #    - Legacy dictionaries kept in sync via adapter
-        #    - Both old (dict-based) and new (lifecycle) paths coexist
-        #    - Adapter maintains: document_models{}, simulation_controllers{}, swissknife_palettes{}
-        #
-        # 4. CLEANUP: Proper resource disposal on tab close
-        #    - lifecycle_adapter.remove_canvas() (line 659)
-        #    - Destroys all per-document components
-        #    - Prevents memory leaks and stale references
-        #
-        # CONSISTENCY GUARANTEE:
-        # - Registration happens AFTER all components initialized
-        # - Same registration for startup default, File→New, File→Open, imports
-        # - State cannot be overridden after registration completes
-        # - Tab switches use lifecycle_adapter.switch_to_canvas()
-        #
-        # ANTI-OVERRIDE PROTECTION:
-        # The following code paths respect lifecycle state and do NOT override:
-        # - Tab switch handler: Calls lifecycle_adapter.switch_to_canvas() (line 332)
-        # - File load: Calls _reset_manager_for_load() which preserves lifecycle (line 1075)
-        # - Simulation reset: Calls controller.reset() not lifecycle.reset_canvas()
-        # - Dirty tracking: manager.mark_clean/mark_dirty() updates per-document state
-        #
-        # Only ONE method intentionally resets canvas state:
-        # - lifecycle_adapter.reset_canvas(): Explicit File→New equivalent reset
-        #   (Currently not called by File→New handler - uses add_document() instead)
-        #
-        # See: src/shypn/canvas/lifecycle/adapter.py for lifecycle implementation
-        # See: src/shypn/canvas/lifecycle/lifecycle_manager.py for state coordination
-        # ═══════════════════════════════════════════════════════════════════
+
+        # Register with lifecycle adapter
         if self.lifecycle_adapter:
             try:
-                pass
-                # Register canvas with adapter (maintains legacy dict compatibility)
                 self.lifecycle_adapter.register_canvas(
                     drawing_area,
                     canvas_manager,
@@ -2041,32 +1951,30 @@ class ModelCanvasLoader:
                 )
             except Exception as e:
                 self.logger.debug(f"Failed to register canvas with lifecycle adapter: {e}")
-        
-        # Store reference for mode switching
+
+        # Store palette/controller references in overlay_manager
         if drawing_area not in self.overlay_managers:
             self.overlay_managers[drawing_area] = type('obj', (object,), {})()
         self.overlay_managers[drawing_area].swissknife_palette = swissknife_palette
-        # PHASE 4: Also store controller reference for palette access
         self.overlay_managers[drawing_area].simulation_controller = simulation_controller
-        
-        # CRITICAL: Update analyses panel data_collector if panel already exists
-        # This ensures plots receive simulation data when controller is recreated
+
+        # Update existing analyses panel data_collector if it already exists
         if hasattr(self.overlay_managers[drawing_area], 'analyses_panel_loader'):
             analyses_loader = self.overlay_managers[drawing_area].analyses_panel_loader
             if analyses_loader and hasattr(analyses_loader, 'set_data_collector'):
                 analyses_loader.set_data_collector(simulation_controller.data_collector)
-        
-        # MULTI-DOCUMENT: Create per-document report data container
+
+        return simulation_controller
+
+    def _setup_document_report_panel(self, canvas_manager, drawing_area, simulation_controller):
+        """Create (or rewire) the per-document Report Panel."""
+        # Create per-document report data container
         from shypn.ui.panels.report.document_report_data import DocumentReportData
         self.overlay_managers[drawing_area].report_data = DocumentReportData(drawing_area=drawing_area)
-        
-        # MULTI-DOCUMENT: Create per-document Report Panel
-        # Each document gets its own Report Panel instance to maintain independent state
+
         if not hasattr(self.overlay_managers[drawing_area], 'report_panel_loader'):
             from shypn.helpers.report_panel_loader import ReportPanelLoader
-            
-            # Pass the ModelCanvasLoader (self) so Report Panel can access get_current_model()
-            # Also pass document_id and drawing_area for EventBus scoping
+
             report_panel_loader = ReportPanelLoader(
                 project=None,
                 model_canvas_loader=self,
@@ -2074,469 +1982,328 @@ class ModelCanvasLoader:
                 drawing_area=drawing_area
             )
             report_panel_loader.load()
-            
-            # Wire float/attach callbacks from main app (stored in model_canvas_loader)
+
+            # Wire host callbacks
             if hasattr(self, 'on_report_float') and hasattr(self, 'on_report_attach'):
                 report_panel_loader.on_float_callback = self.on_report_float
                 report_panel_loader.on_attach_callback = self.on_report_attach
-            
-            # Set parent window for Wayland transient relationship
             if hasattr(self, 'main_window') and self.main_window:
                 report_panel_loader.parent_window = self.main_window
-            
-            # Set shared container and stack references for detach/hang_on operations
             if hasattr(self, 'report_panel_container') and self.report_panel_container is not None:
                 report_panel_loader.parent_container = self.report_panel_container
                 report_panel_loader.is_hanged = True
             if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
                 report_panel_loader._stack = self.left_dock_stack
                 report_panel_loader._stack_panel_name = 'report'
-            
-            # Week 3 - Phase 4: EventBus handles panel visibility during tab switches
-            # Report panel subscribes to 'document.focused' events and manages its own show/hide
-            # Initial packing happens here; subsequent visibility controlled by EventBus
-            
-            # Wire controller and model to this document's Report Panel
+
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
-                # Set the model manager FIRST so categories can access model data
                 report_panel_loader.panel.set_model_canvas(canvas_manager)
-                # Then set the controller for simulation data
                 report_panel_loader.panel.set_controller(simulation_controller)
-                
-                # CRITICAL: Set the actual model manager for ModelsCategory
-                # Get the model manager for this specific drawing_area
+
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
-                
-                # CRITICAL: Wire all panels to Report Panel (hub architecture)
-                # Report panel aggregates data from all other panels
-                
-                # Connect per-document Pathway Panel for import provenance
-                if hasattr(self.overlay_managers[drawing_area], 'pathway_panel_loader'):
-                    pathway_loader = self.overlay_managers[drawing_area].pathway_panel_loader
+
+                # Wire cross-panel references
+                overlay_manager = self.overlay_managers[drawing_area]
+                if hasattr(overlay_manager, 'pathway_panel_loader'):
+                    pathway_loader = overlay_manager.pathway_panel_loader
                     if pathway_loader and hasattr(pathway_loader, 'panel') and pathway_loader.panel:
-                        print(f"[REPORT_INIT] Wiring Pathway Panel to Report Panel")
                         report_panel_loader.panel.set_pathway_operations_panel(pathway_loader.panel)
-                
-                # Connect per-document Analyses Panel for simulation data
-                if hasattr(self.overlay_managers[drawing_area], 'analyses_panel_loader'):
-                    analyses_loader = self.overlay_managers[drawing_area].analyses_panel_loader
+
+                if hasattr(overlay_manager, 'analyses_panel_loader'):
+                    analyses_loader = overlay_manager.analyses_panel_loader
                     if analyses_loader and hasattr(analyses_loader, 'panel') and analyses_loader.panel:
-                        print(f"[REPORT_INIT] Wiring Analyses Panel to Report Panel")
-                        print(f"[REPORT_INIT] analyses_loader.panel = {analyses_loader.panel}")
-                        print(f"[REPORT_INIT] report_panel_loader.panel = {report_panel_loader.panel}")
                         report_panel_loader.panel.set_dynamic_analyses_panel(analyses_loader.panel)
-                        print(f"[REPORT_INIT] Wiring complete")
-                
-                # Connect per-document Topology Panel for topology analysis data
-                if hasattr(self.overlay_managers[drawing_area], 'topology_panel_loader'):
-                    topology_loader = self.overlay_managers[drawing_area].topology_panel_loader
+
+                if hasattr(overlay_manager, 'topology_panel_loader'):
+                    topology_loader = overlay_manager.topology_panel_loader
                     if topology_loader and hasattr(topology_loader, 'panel') and topology_loader.panel:
-                        print(f"[REPORT_INIT] Wiring Topology Panel to Report Panel")
                         report_panel_loader.panel.set_topology_panel(topology_loader.panel)
-                        
-                        # Trigger immediate refresh to show any existing analysis data
                         report_panel_loader.panel.refresh_all()
-                
-                # NOTE: Locality sync callback will be wired later in set_right_panel_loader()
-                # when the transition panel is guaranteed to exist
-            
+
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
         else:
-            # Report panel already exists, just wire the new controller to it
+            # Rewire existing panel to new controller
             report_panel_loader = self.overlay_managers[drawing_area].report_panel_loader
             if report_panel_loader and hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
                 report_panel_loader.panel.set_controller(simulation_controller)
-                
-                # Also update the model manager in case it changed
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
-        
-        # ============================================================
-        # PER-DOCUMENT VIABILITY PANEL: One instance per model/document
-        # ============================================================
-        # Each document gets its own Viability Panel instance to maintain independent state
-        if not hasattr(self.overlay_managers[drawing_area], 'viability_panel_loader'):
-            from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
-            
-            # Create per-document viability panel (panel is created in __init__)
-            viability_panel_loader = ViabilityPanelLoader(
-                model=None,
-                document_id=id(drawing_area),
-                drawing_area=drawing_area
-            )
-            
-            # Wire model_canvas_loader so viability can access current model
-            viability_panel_loader.set_model_canvas_loader(self)
 
-            # If the shared container/stack are available, expose them to the loader
-            if hasattr(self, 'viability_panel_container') and self.viability_panel_container is not None:
-                viability_panel_loader.parent_container = self.viability_panel_container
-                # Default to docked mode knowledge; actual packing is controlled by UI toggle
-                viability_panel_loader.is_hanged = True
-            if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
-                viability_panel_loader._stack = self.left_dock_stack
-                viability_panel_loader._stack_panel_name = 'viability'
-            else:
-                pass
+    def _setup_document_viability_panel(self, canvas_manager, drawing_area, simulation_controller):
+        """Create the per-document Viability Panel."""
+        if hasattr(self.overlay_managers[drawing_area], 'viability_panel_loader'):
+            return
 
-            # If host provided UI callbacks for float/attach, wire them
-            if hasattr(self, 'on_viability_float') and callable(getattr(self, 'on_viability_float')):
-                viability_panel_loader.on_float_callback = self.on_viability_float
-            if hasattr(self, 'on_viability_attach') and callable(getattr(self, 'on_viability_attach')):
-                viability_panel_loader.on_attach_callback = self.on_viability_attach
-            
-            # Set parent window for Wayland transient relationship
-            if hasattr(self, 'main_window') and self.main_window:
-                viability_panel_loader.parent_window = self.main_window
-            
-            # Wire controller to this document's Viability Panel
-            if hasattr(viability_panel_loader, 'panel') and viability_panel_loader.panel:
-                # Get the panel
-                viability_panel = viability_panel_loader.panel
-                
-                # Do NOT trigger refresh here; drawing area will be bound on first show/tab switch
-            
-            # Store per-document instance
-            self.overlay_managers[drawing_area].viability_panel_loader = viability_panel_loader
-            
-            # Subscribe to EventBus after container is set
-            viability_panel_loader.initialize_eventbus()
-            
-            # Attach panel to container initially
-            if viability_panel_loader.panel and self.viability_panel_container:
-                # Remove from existing parent (if any) to avoid GTK warnings
-                parent = viability_panel_loader.widget.get_parent()
-                if parent:
-                    parent.remove(viability_panel_loader.widget)
-                self.viability_panel_container.pack_start(viability_panel_loader.widget, True, True, 0)
-                # Prepare widget content (doesn't affect container visibility)
-                viability_panel_loader.widget.show_all()
-                
-                # Get panel reference for subsequent wiring
-                viability_panel = viability_panel_loader.panel
-                
-                # Set the model canvas loader (not canvas_manager!)
-                # The panel needs model_canvas_loader to access get_current_knowledge_base()
-                viability_panel.set_model_canvas(self)
-                
-                # Wire simulation complete callback
-                if hasattr(viability_panel, 'on_simulation_complete'):
-                    existing_callback = getattr(simulation_controller, 'on_simulation_complete', None)
-                    
-                    # Check if existing callback is already a Viability Panel callback
-                    # If so, skip to avoid infinite wrapping
-                    is_viability_callback = (
-                        existing_callback and 
-                        hasattr(existing_callback, '__self__') and 
-                        existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
-                    )
-                    
-                    if not is_viability_callback:
-                        # Create combined callback to preserve Report Panel callback
-                        def combined_callback():
-                            if existing_callback and callable(existing_callback):
-                                existing_callback()
-                            viability_panel.on_simulation_complete()
-                        
-                        simulation_controller.on_simulation_complete = combined_callback
-                
-                # Connect per-document Topology Panel to per-document Viability Panel for analysis data
-                if hasattr(self.overlay_managers[drawing_area], 'topology_panel_loader'):
-                    topology_loader = self.overlay_managers[drawing_area].topology_panel_loader
-                    if topology_loader and hasattr(topology_loader, 'panel') and topology_loader.panel:
-                        viability_panel.set_topology_panel(topology_loader.panel)
-        
-        # ============================================================
-        # PER-DOCUMENT PATHWAY PANEL: One instance per model/document
-        # ============================================================
-        # Each document gets its own Pathway Operations panel instance to maintain independent state:
-        # - KEGG: pathway ID, organism, search state
-        # - SBML: file path, BioModels ID
-        # - BiGG: search query, selected reactions
-        # - BRENDA: EC numbers list, parameter settings
-        # - SABIO-RK: query state, kinetics data
-        # - Heuristic Parameters: configuration
-        # - Enrichment History: import history
-        # - THERMODYNAMICS: compound mappings, thermodynamic constraints
-        if not hasattr(self.overlay_managers[drawing_area], 'pathway_panel_loader'):
-            from shypn.helpers.pathway_panel_loader import PathwayPanelLoader
-            
-            # Get the canvas_manager (model) for this document
+        from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
+
+        viability_panel_loader = ViabilityPanelLoader(
+            model=None,
+            document_id=id(drawing_area),
+            drawing_area=drawing_area
+        )
+        viability_panel_loader.set_model_canvas_loader(self)
+
+        if hasattr(self, 'viability_panel_container') and self.viability_panel_container is not None:
+            viability_panel_loader.parent_container = self.viability_panel_container
+            viability_panel_loader.is_hanged = True
+        if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
+            viability_panel_loader._stack = self.left_dock_stack
+            viability_panel_loader._stack_panel_name = 'viability'
+        if hasattr(self, 'on_viability_float') and callable(getattr(self, 'on_viability_float')):
+            viability_panel_loader.on_float_callback = self.on_viability_float
+        if hasattr(self, 'on_viability_attach') and callable(getattr(self, 'on_viability_attach')):
+            viability_panel_loader.on_attach_callback = self.on_viability_attach
+        if hasattr(self, 'main_window') and self.main_window:
+            viability_panel_loader.parent_window = self.main_window
+
+        self.overlay_managers[drawing_area].viability_panel_loader = viability_panel_loader
+        viability_panel_loader.initialize_eventbus()
+
+        if viability_panel_loader.panel and self.viability_panel_container:
+            parent = viability_panel_loader.widget.get_parent()
+            if parent:
+                parent.remove(viability_panel_loader.widget)
+            self.viability_panel_container.pack_start(viability_panel_loader.widget, True, True, 0)
+            viability_panel_loader.widget.show_all()
+
+            viability_panel = viability_panel_loader.panel
+            viability_panel.set_model_canvas(self)
+
+            # Wire simulation complete callback (avoid wrapping if already viability callback)
+            if hasattr(viability_panel, 'on_simulation_complete'):
+                existing_callback = getattr(simulation_controller, 'on_simulation_complete', None)
+                is_viability_callback = (
+                    existing_callback and
+                    hasattr(existing_callback, '__self__') and
+                    existing_callback.__self__.__class__.__name__ == 'ViabilityPanel'
+                )
+                if not is_viability_callback:
+                    def combined_callback():
+                        if existing_callback and callable(existing_callback):
+                            existing_callback()
+                        viability_panel.on_simulation_complete()
+                    simulation_controller.on_simulation_complete = combined_callback
+
+            # Wire topology panel if already present
+            overlay_manager = self.overlay_managers[drawing_area]
+            if hasattr(overlay_manager, 'topology_panel_loader'):
+                topology_loader = overlay_manager.topology_panel_loader
+                if topology_loader and hasattr(topology_loader, 'panel') and topology_loader.panel:
+                    viability_panel.set_topology_panel(topology_loader.panel)
+
+    def _setup_document_pathway_panel(self, canvas_manager, drawing_area, simulation_controller):
+        """Create the per-document Pathway Operations Panel."""
+        if hasattr(self.overlay_managers[drawing_area], 'pathway_panel_loader'):
+            return
+
+        from shypn.helpers.pathway_panel_loader import PathwayPanelLoader
+
+        canvas_manager = self.overlay_managers[drawing_area].canvas_manager
+        pathway_panel_loader = PathwayPanelLoader(
+            model=canvas_manager,
+            parent_window=getattr(self, 'main_window', None),
+            workspace_settings=self.workspace_settings,
+            project=getattr(self, 'project', None),
+            canvas_loader=self,
+            document_id=id(drawing_area),
+            drawing_area=drawing_area
+        )
+        pathway_panel_loader.initialize()
+
+        if hasattr(self, 'pathways_panel_container') and self.pathways_panel_container is not None:
+            pathway_panel_loader.parent_container = self.pathways_panel_container
+        if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
+            pathway_panel_loader._stack = self.left_dock_stack
+            pathway_panel_loader._stack_panel_name = 'pathways'
+
+        self.overlay_managers[drawing_area].pathway_panel_loader = pathway_panel_loader
+
+        if pathway_panel_loader.panel and self.pathways_panel_container:
+            parent = pathway_panel_loader.widget.get_parent()
+            if parent:
+                parent.remove(pathway_panel_loader.widget)
+            self.pathways_panel_container.pack_start(pathway_panel_loader.widget, True, True, 0)
+            pathway_panel_loader.widget.show_all()
+
+            if hasattr(pathway_panel_loader.panel, 'thermodynamics_category'):
+                pathway_panel_loader.panel.thermodynamics_category.set_simulation_controller(simulation_controller)
+
+    def _setup_document_analyses_panel(self, canvas_manager, drawing_area, overlay_manager):
+        """Create the per-document Dynamic Analyses Panel and ContextMenuHandler."""
+        if hasattr(self.overlay_managers[drawing_area], 'analyses_panel_loader'):
+            return
+
+        analyses_panel_loader = None
+        try:
+            from shypn.helpers.analyses_panel_loader import AnalysesPanelLoader
+
             canvas_manager = self.overlay_managers[drawing_area].canvas_manager
-            
-            # Create per-document pathway panel loader
-            pathway_panel_loader = PathwayPanelLoader(
+            simulation_controller = self.overlay_managers[drawing_area].simulation_controller
+            data_collector = getattr(simulation_controller, 'data_collector', None)
+
+            analyses_panel_loader = AnalysesPanelLoader(
                 model=canvas_manager,
                 parent_window=getattr(self, 'main_window', None),
-                workspace_settings=self.workspace_settings,
-                project=getattr(self, 'project', None),
-                canvas_loader=self,  # Pass ModelCanvasLoader for auto-load imports
+                data_collector=data_collector,
                 document_id=id(drawing_area),
                 drawing_area=drawing_area
             )
-            
-            # Initialize the panel (calls _create_panel())
-            pathway_panel_loader.initialize()
-            
-            # If the shared container/stack are available, expose them to the loader
-            if hasattr(self, 'pathways_panel_container') and self.pathways_panel_container is not None:
-                pathway_panel_loader.parent_container = self.pathways_panel_container
+            analyses_panel_loader.initialize()
+            analyses_panel_loader.refresh()
+        except Exception as e:
+            import traceback
+            self.logger.error(f"Failed to create analyses panel: {e}")
+            traceback.print_exc()
+
+        if analyses_panel_loader:
+            if hasattr(self, 'analyses_panel_container') and self.analyses_panel_container is not None:
+                analyses_panel_loader.parent_container = self.analyses_panel_container
             if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
-                pathway_panel_loader._stack = self.left_dock_stack
-                pathway_panel_loader._stack_panel_name = 'pathways'
-            
-            # Store per-document instance
-            self.overlay_managers[drawing_area].pathway_panel_loader = pathway_panel_loader
-            
-            # Attach panel to container initially
-            if pathway_panel_loader.panel and self.pathways_panel_container:
-                # Remove from existing parent (if any) to avoid GTK warnings
-                parent = pathway_panel_loader.widget.get_parent()
+                analyses_panel_loader._stack = self.left_dock_stack
+                analyses_panel_loader._stack_panel_name = 'analyses'
+            self.overlay_managers[drawing_area].analyses_panel_loader = analyses_panel_loader
+
+            if analyses_panel_loader.panel and self.analyses_panel_container:
+                parent = analyses_panel_loader.widget.get_parent()
                 if parent:
-                    parent.remove(pathway_panel_loader.widget)
-                self.pathways_panel_container.pack_start(pathway_panel_loader.widget, True, True, 0)
-                # Prepare widget content (doesn't affect container visibility)
-                pathway_panel_loader.widget.show_all()
-                
-                # CRITICAL: Wire simulation controller to THERMODYNAMICS category for validation results
-                if hasattr(pathway_panel_loader.panel, 'thermodynamics_category'):
-                    pathway_panel_loader.panel.thermodynamics_category.set_simulation_controller(simulation_controller)
-        
-        # ============================================================
-        # PER-DOCUMENT ANALYSES PANEL: One instance per model/document
-        # ============================================================
-        # Each document gets its own Dynamic Analyses panel instance to maintain independent state:
-        # - Transitions: Selected transitions, plot lines, locality tracking
-        # - Places: Selected places, trajectories, marking evolution
-        # - Plotting: Real-time plots, zoom level, axis configuration
-        # - Context: Selected objects for right-click analysis
-        #
-        # CRITICAL: This removes the need for global state clearing on tab switch!
-        # Old code cleared transition_panel.selected_objects on every tab switch.
-        # Now each document preserves its own analysis state independently.
-        if not hasattr(self.overlay_managers[drawing_area], 'analyses_panel_loader'):
-            try:
-                from shypn.helpers.analyses_panel_loader import AnalysesPanelLoader
-                
-                # Get the canvas_manager and simulation_controller for this document
-                canvas_manager = self.overlay_managers[drawing_area].canvas_manager
-                simulation_controller = self.overlay_managers[drawing_area].simulation_controller
-                
-                # Get data_collector from simulation controller
-                data_collector = getattr(simulation_controller, 'data_collector', None)
-                
-                # Create per-document analyses panel loader
-                analyses_panel_loader = AnalysesPanelLoader(
-                    model=canvas_manager,
-                    parent_window=getattr(self, 'main_window', None),
-                    data_collector=data_collector,
-                    document_id=id(drawing_area),
-                    drawing_area=drawing_area
-                )
-                
-                # Initialize the panel (calls _create_panel())
-                analyses_panel_loader.initialize()
-                
-                # CRITICAL: Call refresh() to register panels with model
-                # This ensures transition_panel._model_manager is set for LocalityDetector
-                analyses_panel_loader.refresh()
-            except Exception as e:
-                import logging
-                import traceback
-                logging.getLogger(__name__).error(f"Failed to create analyses panel: {e}")
-                traceback.print_exc()
-                # Continue with canvas setup even if analyses panel fails
-                # This ensures SwissKnifePalette and other essential components are still created
-                analyses_panel_loader = None
-            
-            # If the shared container/stack are available, expose them to the loader
+                    parent.remove(analyses_panel_loader.widget)
+                self.analyses_panel_container.pack_start(analyses_panel_loader.widget, True, True, 0)
+        else:
+            self.overlay_managers[drawing_area].analyses_panel_loader = None
+
+        # Always create context menu handler — needed even if analyses panel failed
+        if hasattr(self, 'model_canvas_loader') or hasattr(self, 'get_current_model'):
+            from shypn.analyses import ContextMenuHandler
+
+            canvas_manager = self.overlay_managers[drawing_area].canvas_manager
+            place_panel = analyses_panel_loader.place_panel if analyses_panel_loader else None
+            transition_panel = analyses_panel_loader.transition_panel if analyses_panel_loader else None
+            plotting_panel = analyses_panel_loader.plotting_panel if analyses_panel_loader else None
+
+            self.logger.debug(
+                "[ANALYSES_INIT] Creating context menu handler: place_panel=%s, "
+                "transition_panel=%s, plotting_panel=%s",
+                place_panel is not None, transition_panel is not None, plotting_panel is not None
+            )
+
+            context_menu_handler = ContextMenuHandler(
+                place_panel=place_panel,
+                transition_panel=transition_panel,
+                model=canvas_manager,
+                diagnostics_panel=plotting_panel,
+                model_canvas_loader=self
+            )
             if analyses_panel_loader:
-                if hasattr(self, 'analyses_panel_container') and self.analyses_panel_container is not None:
-                    analyses_panel_loader.parent_container = self.analyses_panel_container
-                if hasattr(self, 'left_dock_stack') and self.left_dock_stack is not None:
-                    analyses_panel_loader._stack = self.left_dock_stack
-                    analyses_panel_loader._stack_panel_name = 'analyses'
-                
-                # Store per-document instance
-                self.overlay_managers[drawing_area].analyses_panel_loader = analyses_panel_loader
-                
-                # Attach panel to container initially
-                if analyses_panel_loader.panel and self.analyses_panel_container:
-                    # Remove from existing parent (if any) to avoid GTK warnings
-                    parent = analyses_panel_loader.widget.get_parent()
-                    if parent:
-                        parent.remove(analyses_panel_loader.widget)
-                    self.analyses_panel_container.pack_start(analyses_panel_loader.widget, True, True, 0)
-            else:
-                # analyses_panel_loader is None - store it anyway to avoid AttributeError
-                self.overlay_managers[drawing_area].analyses_panel_loader = None
-            
-            # CRITICAL: Create context menu handler ALWAYS, even if analyses panel failed
-            # The context menu handler is needed for basic object context menus (delete, properties, etc.)
-            # and will gracefully handle missing analysis panels by not adding those menu items
-            if hasattr(self, 'model_canvas_loader') or hasattr(self, 'get_current_model'):
-                from shypn.analyses import ContextMenuHandler
-                import logging
-                logger = logging.getLogger(__name__)
-                
-                place_panel = analyses_panel_loader.place_panel if analyses_panel_loader else None
-                transition_panel = analyses_panel_loader.transition_panel if analyses_panel_loader else None
-                plotting_panel = analyses_panel_loader.plotting_panel if analyses_panel_loader else None
-                
-                logger.debug(f"[ANALYSES_INIT] Creating context menu handler: place_panel={place_panel is not None}, transition_panel={transition_panel is not None}, plotting_panel={plotting_panel is not None}")
-                
-                context_menu_handler = ContextMenuHandler(
-                    place_panel=place_panel,
-                    transition_panel=transition_panel,
-                    model=canvas_manager,
-                    diagnostics_panel=plotting_panel,
-                    model_canvas_loader=self
-                )
-                if analyses_panel_loader:
-                    analyses_panel_loader.set_context_menu_handler(context_menu_handler)
-                
-                # CRITICAL: Store per-document context menu handler in overlay_manager
-                # This ensures each document has its own handler pointing to its own panels
-                overlay_manager.context_menu_handler = context_menu_handler
-                
-                # Set context menu handler at model_canvas_loader level for canvas object menus
-                # ALWAYS update for current document (not just if None)
-                self.set_context_menu_handler(context_menu_handler)
-                # Prepare widget content (doesn't affect container visibility)
-                if analyses_panel_loader:
-                    analyses_panel_loader.widget.show_all()
-        
-        # ============================================================
-        # PER-DOCUMENT TOPOLOGY PANEL (Phase 3)
-        # ============================================================
-        # Create per-document Topology panel for structural analysis
-        # Each document gets its own TopologyPanelLoader instance with isolated caches
-        # for P-Invariants, T-Invariants, Siphons, Traps, Reachability, etc.
-        
-        if not hasattr(self.overlay_managers[drawing_area], 'topology_panel_loader'):
-            from shypn.helpers.topology_panel_loader import TopologyPanelLoader
-            
-            # Get per-document canvas manager
-            canvas_manager = self.overlay_managers[drawing_area].canvas_manager
-            
-            # Create per-document topology loader
-            topology_panel_loader = TopologyPanelLoader(
-                model=canvas_manager,
-                parent_window=getattr(self, 'main_window', None),
-                document_id=id(drawing_area),
-                drawing_area=drawing_area
-            )
-            topology_panel_loader.initialize()
-            
-            # Wire model_canvas_loader reference for current model access
-            topology_panel_loader.set_model_canvas_loader(self)
-            
-            # Expose container/stack references for docking behavior
-            if hasattr(self, 'topology_panel_container'):
-                topology_panel_loader.parent_container = self.topology_panel_container
-            if hasattr(self, 'left_dock_stack'):
-                topology_panel_loader._stack = self.left_dock_stack
-                topology_panel_loader._stack_panel_name = 'topology'
-            
-            # Set float/attach callbacks if exposed by main app
-            if hasattr(self, 'topology_float_callback'):
-                topology_panel_loader.on_float_callback = self.topology_float_callback
-            if hasattr(self, 'topology_attach_callback'):
-                topology_panel_loader.on_attach_callback = self.topology_attach_callback
-            
-            # Store per-document instance
-            self.overlay_managers[drawing_area].topology_panel_loader = topology_panel_loader
-            
-            # Attach panel to container initially
-            if topology_panel_loader.panel and self.topology_panel_container:
-                # Remove from existing parent (if any) to avoid GTK warnings
-                parent = topology_panel_loader.widget.get_parent()
-                if parent:
-                    parent.remove(topology_panel_loader.widget)
-                self.topology_panel_container.pack_start(topology_panel_loader.widget, True, True, 0)
-                # Prepare widget content (doesn't affect container visibility)
-                topology_panel_loader.widget.show_all()
-        
-        # ============================================================
-        # OLD PALETTE CODE - Keeping temporarily for reference
-        # ============================================================
-        # Create and register tools palette
+                analyses_panel_loader.set_context_menu_handler(context_menu_handler)
+
+            overlay_manager.context_menu_handler = context_menu_handler
+            self.set_context_menu_handler(context_menu_handler)
+
+            if analyses_panel_loader:
+                analyses_panel_loader.widget.show_all()
+
+    def _setup_document_topology_panel(self, canvas_manager, drawing_area):
+        """Create the per-document Topology Panel."""
+        if hasattr(self.overlay_managers[drawing_area], 'topology_panel_loader'):
+            return
+
+        from shypn.helpers.topology_panel_loader import TopologyPanelLoader
+
+        canvas_manager = self.overlay_managers[drawing_area].canvas_manager
+        topology_panel_loader = TopologyPanelLoader(
+            model=canvas_manager,
+            parent_window=getattr(self, 'main_window', None),
+            document_id=id(drawing_area),
+            drawing_area=drawing_area
+        )
+        topology_panel_loader.initialize()
+        topology_panel_loader.set_model_canvas_loader(self)
+
+        if hasattr(self, 'topology_panel_container'):
+            topology_panel_loader.parent_container = self.topology_panel_container
+        if hasattr(self, 'left_dock_stack'):
+            topology_panel_loader._stack = self.left_dock_stack
+            topology_panel_loader._stack_panel_name = 'topology'
+        if hasattr(self, 'topology_float_callback'):
+            topology_panel_loader.on_float_callback = self.topology_float_callback
+        if hasattr(self, 'topology_attach_callback'):
+            topology_panel_loader.on_attach_callback = self.topology_attach_callback
+
+        self.overlay_managers[drawing_area].topology_panel_loader = topology_panel_loader
+
+        if topology_panel_loader.panel and self.topology_panel_container:
+            parent = topology_panel_loader.widget.get_parent()
+            if parent:
+                parent.remove(topology_panel_loader.widget)
+            self.topology_panel_container.pack_start(topology_panel_loader.widget, True, True, 0)
+            topology_panel_loader.widget.show_all()
+
+    def _wire_legacy_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager, palette_manager):
+        """Create hidden legacy ToolsPalette/OperationsPalette and wire final data_collector.
+
+        The legacy palettes are kept hidden for backward compatibility during transition
+        to SwissKnifePalette. The data_collector is wired here after all palettes exist.
+        """
+        # ── Legacy palette objects (hidden, kept for backward compat) ──────────────
         tools_palette = ToolsPalette()
         palette_manager.register_palette(
             tools_palette,
-            position=(Gtk.Align.CENTER, Gtk.Align.END)  # Changed to CENTER alignment
+            position=(Gtk.Align.CENTER, Gtk.Align.END)
         )
-        # Set margins for positioning relative to center
         tools_revealer = tools_palette.get_widget()
-        tools_revealer.set_margin_bottom(68)   # 18px above edit palette (50 + 18)
-        tools_revealer.set_margin_end(194 + 80)  # Offset left: operations width + gap
-        tools_revealer.set_hexpand(False)      # Don't expand horizontally
-        tools_revealer.hide()  # Hide old palette
-        
-        # Create and register operations palette
+        tools_revealer.set_margin_bottom(68)
+        tools_revealer.set_margin_end(194 + 80)
+        tools_revealer.set_hexpand(False)
+        tools_revealer.hide()
+
         operations_palette = OperationsPalette()
         palette_manager.register_palette(
             operations_palette,
-            position=(Gtk.Align.CENTER, Gtk.Align.END)  # Changed to CENTER alignment
+            position=(Gtk.Align.CENTER, Gtk.Align.END)
         )
-        # Set margins for positioning relative to center
         operations_revealer = operations_palette.get_widget()
-        operations_revealer.set_margin_bottom(68)  # Same vertical position (50 + 18)
-        operations_revealer.set_margin_start(148 + 80)  # Offset right: tools width + gap
-        operations_revealer.set_hexpand(False)     # Don't expand horizontally
-        operations_revealer.hide()  # Hide old palette
-        
-        # Wire old palette signals (keeping for backward compatibility during transition)
+        operations_revealer.set_margin_bottom(68)
+        operations_revealer.set_margin_start(148 + 80)
+        operations_revealer.set_hexpand(False)
+        operations_revealer.hide()
+
         tools_palette.connect('tool-selected', self._on_palette_tool_selected, canvas_manager, drawing_area)
         operations_palette.connect('operation-triggered', self._on_palette_operation_triggered, canvas_manager, drawing_area)
-        
-        # Wire undo/redo button state updates
+
+        # Wire undo/redo button state to legacy operations palette
         if hasattr(canvas_manager, 'undo_manager'):
             def update_undo_redo_buttons(can_undo, can_redo):
                 operations_palette.update_undo_redo_state(can_undo, can_redo)
             canvas_manager.undo_manager.set_state_changed_callback(update_undo_redo_buttons)
-            # Initialize button states
-            initial_undo = canvas_manager.undo_manager.can_undo()
-            initial_redo = canvas_manager.undo_manager.can_redo()
-            update_undo_redo_buttons(initial_undo, initial_redo)
-        
-        # Ensure overlay and all children are visible
+            update_undo_redo_buttons(
+                canvas_manager.undo_manager.can_undo(),
+                canvas_manager.undo_manager.can_redo()
+            )
+
+        # ── Show overlay; hide simulate palette (shown only in simulate mode) ──────
         overlay_widget.show_all()
-        
-        # IMPORTANT: hide [S] button AFTER show_all() (which makes everything visible)
-        # This must be done after show_all() because show_all() recursively shows all children
         if drawing_area in self.overlay_managers:
-            overlay_manager = self.overlay_managers[drawing_area]
-            if overlay_manager.simulate_palette:
-                sim_widget = overlay_manager.simulate_palette.get_widget()
+            overlay_mgr = self.overlay_managers[drawing_area]
+            if overlay_mgr.simulate_palette:
+                sim_widget = overlay_mgr.simulate_palette.get_widget()
                 if sim_widget:
                     sim_widget.hide()
-        
-        # DON'T show palettes initially - they should only appear in edit mode
-        # palette_manager.show_all()  # Removed - mode change handler will show them
-        
-        # ============================================================
-        # WIRE RIGHT PANEL ANALYSES: Set data_collector on initial load
-        # ============================================================
-        # The data_collector is created by SimulateToolsPaletteLoader
-        # and should be wired immediately after palette creation.
-        # This ensures the Analyses Panel is functional on first model load,
-        # not just after tab switches.
-        
+
+        # ── Wire initial data_collector to right panel ─────────────────────────────
         if self.right_panel_loader and drawing_area in self.overlay_managers:
-            overlay_manager = self.overlay_managers[drawing_area]
-            if hasattr(overlay_manager, 'swissknife_palette'):
-                swissknife = overlay_manager.swissknife_palette
-                # Access widget_palette_instances dict directly (not through registry)
+            overlay_mgr = self.overlay_managers[drawing_area]
+            if hasattr(overlay_mgr, 'swissknife_palette'):
+                swissknife = overlay_mgr.swissknife_palette
                 if hasattr(swissknife, 'widget_palette_instances'):
                     simulate_tools_palette = swissknife.widget_palette_instances.get('simulate')
                     if simulate_tools_palette and hasattr(simulate_tools_palette, 'data_collector'):
                         data_collector = simulate_tools_palette.data_collector
                         self.right_panel_loader.set_data_collector(data_collector)
-    
+
+
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
         """Handle tool selection from new OOP tools palette.
         
