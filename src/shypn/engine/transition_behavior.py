@@ -15,7 +15,10 @@ Architecture:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, List, Any, Optional
+import logging
 from shypn.utils.safe_eval import safe_eval_bool
+
+logger = logging.getLogger(__name__)
 
 
 class TransitionBehavior(ABC):
@@ -532,7 +535,7 @@ class TransitionBehavior(ABC):
                 )
             except Exception:
                 # Event recording is not critical for firing success
-                pass
+                logger.debug("Transition event recording failed for %s", self.transition.id, exc_info=True)
     
     def get_last_consumed(self) -> Dict[int, float]:
         """Get tokens consumed in last firing.

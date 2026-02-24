@@ -764,7 +764,7 @@ class Arc(PetriNetObject):
                 parallels = self._manager.detect_parallel_arcs(self)
                 if parallels:
                     parallel_offset = self._manager.calculate_arc_offset(self, parallels)
-            except (AttributeError, Exception):
+            except Exception:
                 pass
         
         # Tolerance: Account for visual stroke width plus comfortable margin

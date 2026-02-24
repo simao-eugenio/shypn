@@ -21,6 +21,7 @@ Example:
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Pango
+import logging
 
 from shypn.diagnostic import (
     LocalityDetector,
@@ -68,6 +69,7 @@ class DiagnosticsPanel:
         self.model = model
         self.data_collector = data_collector
         self.container = None
+        self.logger = logging.getLogger(__name__)
         
         # Analysis components
         if model:
@@ -569,7 +571,7 @@ class DiagnosticsPanel:
                         self.locality = self.detector.get_locality_for_transition(most_recent_transition)
         except Exception:
             # Silently fail - don't disrupt updates
-            pass
+            self.logger.debug("Diagnostics auto-track update failed", exc_info=True)
     
     def _auto_select_transition(self):
         """Auto-select a transition if none is currently selected.

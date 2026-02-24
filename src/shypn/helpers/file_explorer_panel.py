@@ -26,6 +26,7 @@ Example:
 """
 import os
 import sys
+import logging
 from typing import Optional, Callable
 try:
     import gi
@@ -36,6 +37,8 @@ except Exception as e:
     print(f'ERROR: GTK3 not available in file_explorer_panel: {e}', file=sys.stderr)
     sys.exit(1)
 from shypn.file import FileExplorer
+
+logger = logging.getLogger(__name__)
 
 class FileExplorerPanel:
     """Controller for file explorer functionality.
@@ -662,7 +665,7 @@ class FileExplorerPanel:
             from shypn.events.event_bus import EventBus
             EventBus.get_instance().emit('editor.close_requested', {'filepath': filepath})
         except Exception:
-            pass
+            logger.debug("EventBus emit 'editor.close_requested' failed", exc_info=True)
 
     # ------------------------------------------------------------------
     # EventBus subscriptions
@@ -685,7 +688,7 @@ class FileExplorerPanel:
             bus.subscribe('model.changed', self._on_model_changed_event)
             bus.subscribe('document.focused', self._on_document_focused_event)
         except Exception:
-            pass
+            logger.debug("EventBus subscriptions failed", exc_info=True)
 
     def _on_project_opened_event(self, event_data: dict):
         """React to project.opened EventBus event.
@@ -1158,7 +1161,7 @@ class FileExplorerPanel:
         try:
             self._load_directory_tree(directory, parent_iter)
         except Exception:
-            pass
+            logger.debug("Failed to reload directory tree for %s", directory, exc_info=True)
 
     def _on_path_changed(self, new_path: str):
         """Callback when path changes in API (Model).

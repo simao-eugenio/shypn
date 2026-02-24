@@ -1234,7 +1234,7 @@ class SBMLCategory(BasePathwayCategory):
                                 document_model.add_module(module)
                     except Exception as e:
                         # Module conversion failed, continue without modules
-                        pass
+                        self.logger.debug("Module conversion failed, continuing without modules: %s", e)
                 
                 return {
                     'filepath': filepath,

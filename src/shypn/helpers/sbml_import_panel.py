@@ -709,7 +709,7 @@ class SBMLImportPanel:
                             pass
                     except Exception as e:
                         # Module conversion exception, continue without modules
-                        pass
+                        self.logger.debug("Module conversion failed, continuing without modules: %s", e)
                 
                 # Pass results back to main thread for saving
                 GLib.idle_add(self._on_load_and_save_complete, document_model, pathway_name)

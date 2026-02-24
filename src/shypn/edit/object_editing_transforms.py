@@ -229,7 +229,7 @@ class ObjectEditingTransforms:
                                 parallels = obj._manager.detect_parallel_arcs(obj)
                                 if parallels:
                                     offset_distance = obj._manager.calculate_arc_offset(obj, parallels)
-                            except (AttributeError, Exception):
+                            except Exception:
                                 pass
                         
                         control_point = obj._calculate_curve_control_point(offset=offset_distance)
@@ -362,7 +362,7 @@ class ObjectEditingTransforms:
                     parallels = obj._manager.detect_parallel_arcs(obj)
                     if parallels:
                         parallel_offset = obj._manager.calculate_arc_offset(obj, parallels)
-                except (AttributeError, Exception):
+                except Exception:
                     pass
             
             # Check if this is a CurvedArc or Arc with is_curved flag

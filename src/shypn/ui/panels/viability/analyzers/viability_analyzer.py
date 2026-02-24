@@ -22,6 +22,7 @@ Date: February 12, 2026 (Phase 2.2 Extraction)
 """
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
+import logging
 
 # Import specialized analyzers
 from ..analysis import LocalityAnalyzer, DependencyAnalyzer, BoundaryAnalyzer, ConservationAnalyzer
@@ -77,6 +78,7 @@ class ViabilityAnalyzer:
         self.model = model
         self.kb = kb
         self.simulation = simulation
+        self.logger = logging.getLogger(__name__)
         
         # Data access layer
         self.data_cache = data_cache if data_cache is not None else DataCache(default_ttl=60.0)
@@ -222,7 +224,7 @@ class ViabilityAnalyzer:
             issues.extend(locality_issues)
         except Exception as e:
             # Silently continue - don't break pipeline
-            pass
+            self.logger.debug("Locality analysis failed in quick mode: %s", e)
         
         return issues
     
@@ -336,7 +338,7 @@ class ViabilityAnalyzer:
                 all_suggestions.extend(suggestions)
             except Exception as e:
                 # Continue on error - don't break suggestion generation
-                pass
+                self.logger.debug("Suggestion generation failed for issue: %s", e)
         
         return all_suggestions
     
