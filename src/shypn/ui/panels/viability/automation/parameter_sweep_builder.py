@@ -281,16 +281,6 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry.set_tooltip_text("Maximum simulation time in seconds (can stop earlier if condition met)")
         sim_box.attach(self.duration_entry, 3, 0, 1, 1)
         
-        # === STAGE 3: METHOD SELECTOR ===
-        sim_box.attach(Gtk.Label(label="Method:", xalign=0), 4, 0, 1, 1)
-        self.method_combo = Gtk.ComboBoxText()
-        self.method_combo.append("gillespie", "Gillespie (Stochastic)")
-        self.method_combo.append("ode", "ODE (Deterministic)")
-        self.method_combo.append("hybrid", "Hybrid (Mixed)")
-        self.method_combo.set_active_id("gillespie")
-        self.method_combo.set_tooltip_text("Simulation algorithm for batch experiments")
-        sim_box.attach(self.method_combo, 5, 0, 1, 1)
-        
         # Termination condition
         sim_box.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
         self.termination_combo = Gtk.ComboBoxText()
@@ -755,7 +745,6 @@ class ParameterSweepBuilder(Gtk.Box):
             'replicates': int(self.replicates_entry.get_text()),
             'duration': float(self.duration_entry.get_text()),
             'termination_condition': self.termination_combo.get_active_id(),
-            'method': self.method_combo.get_active_id()  # Stage 3: Include simulation method
         }
         
         self.on_generate_callback(config)
@@ -797,7 +786,6 @@ class ParameterSweepBuilder(Gtk.Box):
             'replicates': int(self.replicates_entry.get_text()),
             'duration': float(self.duration_entry.get_text()),
             'termination_condition': self.termination_combo.get_active_id(),
-            'method': self.method_combo.get_active_id()  # Stage 3: Include simulation method
         }
         
         self.on_generate_callback(factorial_config)

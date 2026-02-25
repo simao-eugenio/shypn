@@ -276,7 +276,7 @@ class PlacePropDialogLoader(GObject.GObject):
         if signal_checkbox:
             is_signal = signal_checkbox.get_active()
             self.place_obj.is_signal_place = is_signal
-            
+
             # If enabling signal place, set signal type
             if is_signal:
                 signal_type_combo = self.builder.get_object('signal_type_combo')
@@ -288,10 +288,22 @@ class PlacePropDialogLoader(GObject.GObject):
                         self.place_obj.signal_type = type_map[active_idx]
                     else:
                         self.place_obj.signal_type = SignalType.ENERGY  # Default
+                # Apply signal place visual schema: hexagon + blue border
+                self.place_obj.shape = 'hexagon'
             else:
-                # Clear signal type when unchecked
+                # Clear signal type and restore default circle shape
                 self.place_obj.signal_type = None
-        
+                self.place_obj.shape = 'circle'
+
+            # Always sync border color via ColorSchemaManager so the visual
+            # immediately reflects the new is_signal_place state
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(self.place_obj)
+
+            # Trigger redraw so the place border color updates immediately
+            if hasattr(self.place_obj, '_manager') and self.place_obj._manager:
+                self.place_obj._manager.mark_needs_redraw()
+
         # AUTOMATIC ARC TRANSFORMATION: When place becomes signal place
         # Convert all connected arcs to signal flow arcs (formalism requirement)
         if not was_signal_place and self.place_obj.is_signal_place:
@@ -316,16 +328,21 @@ class PlacePropDialogLoader(GObject.GObject):
                 connected_arcs.append(arc)
         
         # Convert each arc to signal flow
+        converted = False
         for old_arc in connected_arcs:
             try:
                 new_arc = convert_to_signal_flow(old_arc)
                 # Only replace if conversion created a different arc
                 if new_arc is not old_arc:
                     manager.replace_arc(old_arc, new_arc)
+                    converted = True
             except ValueError:
-                # Conversion failed (e.g., arc doesn't connect to signal place)
-                # This shouldn't happen since we're converting arcs connected to a signal place
+                # Conversion failed — skip silently
                 pass
+
+        # Trigger visual redraw so the new arc colors are shown immediately
+        if converted:
+            manager.mark_needs_redraw()
 
     def _populate_spatial_properties(self):
         """Populate spatial properties fields from place object."""
@@ -1212,7 +1229,7 @@ class PlacePropDialogLoader(GObject.GObject):
             pm = get_project_manager()
             if pm.current_project and pm.current_project.base_path:
                 chooser.set_current_folder(pm.current_project.base_path)
-        except Exception:
+        except (ImportError, AttributeError):
             pass
         
         response = chooser.run()
@@ -1360,7 +1377,7 @@ class PlacePropDialogLoader(GObject.GObject):
             pm = get_project_manager()
             if pm.current_project and pm.current_project.base_path:
                 chooser.set_current_folder(pm.current_project.base_path)
-        except Exception:
+        except (ImportError, AttributeError):
             pass
         
         response = chooser.run()

@@ -112,16 +112,38 @@ class BiologicalCategory(BaseTopologyCategory):
             ('Notes', str),               # Biological interpretation
         ]
     
+    # ------------------------------------------------------------------
+    # Row-formatter dispatch
+    # ------------------------------------------------------------------
+
     def _format_analyzer_row(self, analyzer_name, result):
-        """Format biological analyzer result as table rows.
-        
+        """Route to the per-analyzer row formatter.
+
         Args:
-            analyzer_name: Name of analyzer
-            result: Analysis result data
-        
+            analyzer_name: Name of analyzer (key in ``_get_analyzers()``)
+            result: Analysis result dict
+
         Returns:
-            list: List of row tuples
+            list: List of 6-tuple row data
         """
+        _formatters = {
+            'mass_balance':         self._rows_for_mass_balance,
+            'stoichiometry':        self._rows_for_stoichiometry,
+            'flux_balance':         self._rows_for_flux_balance,
+            'thermodynamics':       self._rows_for_thermodynamics,
+            'dependency_coupling':  self._rows_for_dependency_coupling,
+            'regulatory_structure': self._rows_for_regulatory_structure,
+            'signal_hierarchy':     self._rows_for_signal_hierarchy,
+        }
+        formatter = _formatters.get(analyzer_name)
+        return formatter(result) if formatter else []
+
+    # ------------------------------------------------------------------
+    # Per-analyzer formatters
+    # ------------------------------------------------------------------
+
+    def _rows_for_mass_balance(self, result):
+        """Format mass-balance analyzer result."""
         rows = []
         
         if analyzer_name == 'mass_balance':
@@ -172,310 +194,327 @@ class BiologicalCategory(BaseTopologyCategory):
                     'ℹ️ Cannot Verify',
                     f'{statistics.get("places_without_formulas", 0)} places lack formulas'
                 ))
-        
-        elif analyzer_name == 'stoichiometry':
-            # Result format: {'stoichiometric_matrix': [...], 'conservation_laws': [...], 'blocked_transitions': [...]}
-            statistics = result.get('statistics', {})
-            blocked = result.get('blocked_transitions', [])
-            conservation_laws = result.get('conservation_laws', [])
-            
-            if blocked:
-                for trans_id in blocked:
-                    rows.append((
-                        'Blocked',
-                        trans_id,
-                        'No substrates or products',
-                        1.0,
-                        '❌ Blocked',
-                        'Cannot fire'
-                    ))
-            
-            if conservation_laws:
-                for law in conservation_laws[:5]:  # Show first 5
-                    # Handle both numeric and string coefficients
-                    place_parts = []
-                    for pid, coef in law.items():
-                        if coef != 0:
-                            # Try to format as float, fallback to string
-                            try:
-                                place_parts.append(f"{pid}×{float(coef):.2f}")
-                            except (ValueError, TypeError):
-                                place_parts.append(f"{pid}×{coef}")
-                    place_str = ', '.join(place_parts)
-                    rows.append((
-                        'Conservation Law',
-                        'Invariant',
-                        place_str,
-                        0.0,
-                        '✓ Conserved',
-                        'Token/mass invariant'
-                    ))
-            
-            if not blocked and conservation_laws:
+        return rows
+
+    def _rows_for_stoichiometry(self, result):
+        """Format stoichiometry analyzer result."""
+        rows = []
+        # Result format: {'stoichiometric_matrix': [...], 'conservation_laws': [...], 'blocked_transitions': [...]}
+        statistics = result.get('statistics', {})
+        blocked = result.get('blocked_transitions', [])
+        conservation_laws = result.get('conservation_laws', [])
+
+        if blocked:
+            for trans_id in blocked:
                 rows.append((
-                    'Stoichiometry',
-                    'Summary',
-                    f'{len(conservation_laws)} conservation law(s)',
-                    0.0,
-                    '✓ Consistent',
-                    'Matrix rank OK'
+                    'Blocked',
+                    trans_id,
+                    'No substrates or products',
+                    1.0,
+                    '❌ Blocked',
+                    'Cannot fire'
                 ))
-        
-        elif analyzer_name == 'flux_balance':
-            # Result format: {'feasible_transitions': [...], 'infeasible_transitions': [...], 'statistics': {...}}
-            statistics = result.get('statistics', {})
-            infeasible = result.get('infeasible_transitions', [])
-            feasible = result.get('feasible_transitions', [])
-            
-            if infeasible:
-                for trans_info in infeasible:
-                    trans_name = trans_info.get('transition_name', trans_info.get('transition_id', 'Unknown'))
-                    reason = trans_info.get('reason', 'Unknown')
-                    
-                    rows.append((
-                        'Infeasible',
-                        trans_name,
-                        reason,
-                        1.0,
-                        '❌ No Flux',
-                        'Cannot maintain steady state'
-                    ))
-            elif feasible:
+
+        if conservation_laws:
+            for law in conservation_laws[:5]:  # Show first 5
+                # Handle both numeric and string coefficients
+                place_parts = []
+                for pid, coef in law.items():
+                    if coef != 0:
+                        # Try to format as float, fallback to string
+                        try:
+                            place_parts.append(f"{pid}×{float(coef):.2f}")
+                        except (ValueError, TypeError):
+                            place_parts.append(f"{pid}×{coef}")
+                place_str = ', '.join(place_parts)
                 rows.append((
-                    'Flux Balance',
+                    'Conservation Law',
+                    'Invariant',
+                    place_str,
+                    0.0,
+                    '✓ Conserved',
+                    'Token/mass invariant'
+                ))
+
+        if not blocked and conservation_laws:
+            rows.append((
+                'Stoichiometry',
+                'Summary',
+                f'{len(conservation_laws)} conservation law(s)',
+                0.0,
+                '✓ Consistent',
+                'Matrix rank OK'
+            ))
+        return rows
+
+    def _rows_for_flux_balance(self, result):
+        """Format flux-balance analyzer result."""
+        rows = []
+        # Result format: {'feasible_transitions': [...], 'infeasible_transitions': [...], 'statistics': {...}}
+        statistics = result.get('statistics', {})
+        infeasible = result.get('infeasible_transitions', [])
+        feasible = result.get('feasible_transitions', [])
+
+        if infeasible:
+            for trans_info in infeasible:
+                trans_name = trans_info.get('transition_name', trans_info.get('transition_id', 'Unknown'))
+                reason = trans_info.get('reason', 'Unknown')
+
+                rows.append((
+                    'Infeasible',
+                    trans_name,
+                    reason,
+                    1.0,
+                    '❌ No Flux',
+                    'Cannot maintain steady state'
+                ))
+        elif feasible:
+            rows.append((
+                'Flux Balance',
+                'All Transitions',
+                f'{len(feasible)} reaction(s)',
+                0.0,
+                '✓ Feasible',
+                'Steady state possible'
+            ))
+        return rows
+
+    def _rows_for_thermodynamics(self, result):
+        """Format thermodynamics analyzer result."""
+        rows = []
+        # Result format: {'issues': [...], 'statistics': {...}}
+        issues = result.get('issues', [])
+        statistics = result.get('statistics', {})
+
+        if issues:
+            for issue in issues[:10]:  # Show first 10
+                trans_name = issue.get('transition_id', 'Unknown')
+                severity = issue.get('severity', 'warning')
+                description = issue.get('description', '')
+                issue_type = issue.get('type', 'unknown')
+
+                severity_icon = '❌' if severity == 'error' else '⚠️'
+
+                # Handle None suggestion safely
+                suggestion = issue.get('suggestion', '') or ''
+
+                rows.append((
+                    f'{severity_icon} {issue_type.replace("_", " ").title()}',
+                    trans_name,
+                    description[:60],
+                    1.0 if severity == 'error' else 0.5,
+                    severity.title(),
+                    suggestion[:40]
+                ))
+        else:
+            total_transitions = statistics.get('total_transitions', 0)
+            if total_transitions > 0:
+                rows.append((
+                    'Thermodynamics',
                     'All Transitions',
-                    f'{len(feasible)} reaction(s)',
+                    f'{total_transitions} reaction(s)',
                     0.0,
                     '✓ Feasible',
-                    'Steady state possible'
+                    'Thermodynamically valid'
                 ))
-        
-        elif analyzer_name == 'thermodynamics':
-            # Result format: {'issues': [...], 'statistics': {...}}
-            issues = result.get('issues', [])
-            statistics = result.get('statistics', {})
-            
-            if issues:
-                for issue in issues[:10]:  # Show first 10
-                    trans_name = issue.get('transition_id', 'Unknown')
-                    severity = issue.get('severity', 'warning')
-                    description = issue.get('description', '')
-                    issue_type = issue.get('type', 'unknown')
-                    
-                    severity_icon = '❌' if severity == 'error' else '⚠️'
-                    
-                    # Handle None suggestion safely
-                    suggestion = issue.get('suggestion', '') or ''
-                    
-                    rows.append((
-                        f'{severity_icon} {issue_type.replace("_", " ").title()}',
-                        trans_name,
-                        description[:60],
-                        1.0 if severity == 'error' else 0.5,
-                        severity.title(),
-                        suggestion[:40]
-                    ))
-            else:
-                total_transitions = statistics.get('total_transitions', 0)
-                if total_transitions > 0:
-                    rows.append((
-                        'Thermodynamics',
-                        'All Transitions',
-                        f'{total_transitions} reaction(s)',
-                        0.0,
-                        '✓ Feasible',
-                        'Thermodynamically valid'
-                    ))
-        
-        elif analyzer_name == 'dependency_coupling':
-            # Result format: {'classifications': {'competitive': [...], 'convergent': [...], ...}}
-            classifications = result.get('classifications', {})
-            
-            # Process competitive pairs (conflicts)
-            for t1_id, t2_id, details in classifications.get('competitive', []):
-                shared_inputs = details.get('shared_inputs', [])
-                shared_outputs = details.get('shared_outputs', [])
-                shared_reg = details.get('shared_regulatory', [])
-                
-                all_shared = shared_inputs + shared_outputs + shared_reg
-                
-                rows.append((
-                    'Competitive',
-                    f'({t1_id}, {t2_id})',
-                    ', '.join(map(str, all_shared)) if all_shared else '-',
-                    1.0,  # High conflict score
-                    'True Conflict',
-                    'Mutually exclusive firing (input competition)'
-                ))
-            
-            # Process convergent pairs (valid coupling)
-            for t1_id, t2_id, details in classifications.get('convergent', []):
-                shared_outputs = details.get('shared_outputs', [])
-                
-                rows.append((
-                    'Convergent',
-                    f'({t1_id}, {t2_id})',
-                    ', '.join(map(str, shared_outputs)) if shared_outputs else '-',
-                    0.0,  # No conflict
-                    'Valid Coupling',
-                    'Both produce same metabolite'
-                ))
-            
-            # Process regulatory pairs (valid coupling)
-            for t1_id, t2_id, details in classifications.get('regulatory', []):
-                shared_reg = details.get('shared_regulatory', [])
-                
-                rows.append((
-                    'Regulatory',
-                    f'({t1_id}, {t2_id})',
-                    ', '.join(map(str, shared_reg)) if shared_reg else '-',
-                    0.0,  # No conflict
-                    'Valid Coupling',
-                    'Share enzyme, no conflict'
-                ))
-            
-            # Process strongly independent pairs
-            for t1_id, t2_id, details in classifications.get('strongly_independent', []):
-                rows.append((
-                    'Independent',
-                    f'({t1_id}, {t2_id})',
-                    '-',
-                    0.0,
-                    'No Coupling',
-                    'No shared places (parallel or sequential)'
-                ))
-        
-        elif analyzer_name == 'regulatory_structure':
-            # Result format: {'test_arcs': [...], 'inhibitor_arcs': [...], 'catalyst_map': {...}, 'inhibitor_map': {...}}
-            test_arcs = result.get('test_arcs', [])
-            inhibitor_arcs = result.get('inhibitor_arcs', [])
-            catalyst_map = result.get('catalyst_map', {})
-            inhibitor_map = result.get('inhibitor_map', {})
-            
-            # Show each test arc (catalyst)
-            for arc_info in test_arcs:
-                # Test arc structure: source (catalyst place) -> target (transition)
-                catalyst_place_id = arc_info.get('source_id', '')
-                catalyst_place_name = arc_info.get('source_name', str(catalyst_place_id))
-                transition_id = arc_info.get('target_id', '')
-                transition_name = arc_info.get('target_name', str(transition_id))
-                
-                # Get how many transitions use this catalyst
-                catalyst_usage = len(catalyst_map.get(catalyst_place_id, []))
-                
-                rows.append((
-                    'Catalyst',
-                    transition_name,
-                    f'{catalyst_place_name} (test arc)',
-                    0.0,
-                    'Enzymatic',
-                    f'Enzyme used by {catalyst_usage} transition(s)'
-                ))
-            
-            # Show each inhibitor arc
-            for arc_info in inhibitor_arcs:
-                # Inhibitor arc structure: source (inhibitor place) -> target (transition)
-                inhibitor_place_id = arc_info.get('source_id', '')
-                inhibitor_place_name = arc_info.get('source_name', str(inhibitor_place_id))
-                transition_id = arc_info.get('target_id', '')
-                transition_name = arc_info.get('target_name', str(transition_id))
-                
-                # Get how many transitions this inhibitor affects
-                inhibitor_usage = len(inhibitor_map.get(inhibitor_place_id, []))
-                
-                rows.append((
-                    'Inhibitor',
-                    transition_name,
-                    f'{inhibitor_place_name} (inhibitor arc)',
-                    0.0,
-                    'Negative Feedback',
-                    f'Inhibits {inhibitor_usage} transition(s)'
-                ))
-        
-        elif analyzer_name == 'signal_hierarchy':
-            # Result format: {'signal_places': [...], 'signal_flow_arcs': [...], 'hierarchy': {...}, 'validation': {...}, 'statistics': {...}}
-            signal_places = result.get('signal_places', [])
-            signal_flow_arcs = result.get('signal_flow_arcs', [])
-            hierarchy = result.get('hierarchy', {})
-            validation = result.get('validation', {})
-            statistics = result.get('statistics', {})
-            
-            # Show summary first
-            layer_count = hierarchy.get('layer_count', 0)
-            signal_count = len(signal_places)
-            arc_count = len(signal_flow_arcs)
-            
-            if signal_count > 0:
-                rows.append((
-                    'Signal Hierarchy',
-                    'Summary',
-                    f'{signal_count} signal places, {layer_count} layers',
-                    0.0,
-                    '✓ Detected',
-                    f'{arc_count} signal flow arcs'
-                ))
-            
-            # Show each signal place with its layer
-            layers_dict = hierarchy.get('layers', {})
-            for sp in signal_places:
-                sp_id = sp.get('id', '')
-                sp_name = sp.get('name', sp_id)
-                signal_type = sp.get('signal_type', 'unknown')
-                layer_num = layers_dict.get(sp_id, 'N/A')
-                flow_count = sp.get('signal_flow_count', 0)
-                
-                rows.append((
-                    f'Signal Place (Layer {layer_num})',
-                    sp_name,
-                    f'Type: {signal_type}',
-                    0.0,
-                    'Information Channel',
-                    f'{flow_count} outgoing flow arc(s)'
-                ))
-            
-            # Show validation issues if any
-            if not validation.get('is_valid', True):
-                for issue in validation.get('issues', []):
-                    issue_type = issue.get('type', 'unknown')
-                    message = issue.get('message', '')
-                    arc_id = issue.get('arc_id', '')
-                    
-                    rows.append((
-                        f'⚠️ Validation Issue',
-                        issue_type.replace('_', ' ').title(),
-                        message[:60],
-                        0.5,
-                        'Warning',
-                        f'Arc: {arc_id}'
-                    ))
-            
-            # Show hierarchy preemption relationships
-            preemption_map = hierarchy.get('preemption_map', {})
-            if preemption_map:
-                for higher_layer, lower_layers in list(preemption_map.items())[:5]:  # First 5
-                    lower_str = ', '.join(map(str, lower_layers))
-                    rows.append((
-                        'Preemption',
-                        f'Layer {higher_layer}',
-                        f'Controls layers: {lower_str}',
-                        0.0,
-                        'Hierarchical Control',
-                        'Higher layer gates lower'
-                    ))
-            
-            # If no signal places found
-            if signal_count == 0:
-                rows.append((
-                    'Signal Hierarchy',
-                    'Not Detected',
-                    'No signal places annotated',
-                    0.0,
-                    'ℹ️ INFO',
-                    'Use place type "signal" to enable'
-                ))
-        
         return rows
-    
+
+    def _rows_for_dependency_coupling(self, result):
+        """Format dependency-coupling analyzer result."""
+        rows = []
+        # Result format: {'classifications': {'competitive': [...], 'convergent': [...], ...}}
+        classifications = result.get('classifications', {})
+
+        # Process competitive pairs (conflicts)
+        for t1_id, t2_id, details in classifications.get('competitive', []):
+            shared_inputs = details.get('shared_inputs', [])
+            shared_outputs = details.get('shared_outputs', [])
+            shared_reg = details.get('shared_regulatory', [])
+
+            all_shared = shared_inputs + shared_outputs + shared_reg
+
+            rows.append((
+                'Competitive',
+                f'({t1_id}, {t2_id})',
+                ', '.join(map(str, all_shared)) if all_shared else '-',
+                1.0,  # High conflict score
+                'True Conflict',
+                'Mutually exclusive firing (input competition)'
+            ))
+
+        # Process convergent pairs (valid coupling)
+        for t1_id, t2_id, details in classifications.get('convergent', []):
+            shared_outputs = details.get('shared_outputs', [])
+
+            rows.append((
+                'Convergent',
+                f'({t1_id}, {t2_id})',
+                ', '.join(map(str, shared_outputs)) if shared_outputs else '-',
+                0.0,  # No conflict
+                'Valid Coupling',
+                'Both produce same metabolite'
+            ))
+
+        # Process regulatory pairs (valid coupling)
+        for t1_id, t2_id, details in classifications.get('regulatory', []):
+            shared_reg = details.get('shared_regulatory', [])
+
+            rows.append((
+                'Regulatory',
+                f'({t1_id}, {t2_id})',
+                ', '.join(map(str, shared_reg)) if shared_reg else '-',
+                0.0,  # No conflict
+                'Valid Coupling',
+                'Share enzyme, no conflict'
+            ))
+
+        # Process strongly independent pairs
+        for t1_id, t2_id, details in classifications.get('strongly_independent', []):
+            rows.append((
+                'Independent',
+                f'({t1_id}, {t2_id})',
+                '-',
+                0.0,
+                'No Coupling',
+                'No shared places (parallel or sequential)'
+            ))
+        return rows
+
+    def _rows_for_regulatory_structure(self, result):
+        """Format regulatory-structure analyzer result."""
+        rows = []
+        # Result format: {'test_arcs': [...], 'inhibitor_arcs': [...], 'catalyst_map': {...}, 'inhibitor_map': {...}}
+        test_arcs = result.get('test_arcs', [])
+        inhibitor_arcs = result.get('inhibitor_arcs', [])
+        catalyst_map = result.get('catalyst_map', {})
+        inhibitor_map = result.get('inhibitor_map', {})
+
+        # Show each test arc (catalyst)
+        for arc_info in test_arcs:
+            # Test arc structure: source (catalyst place) -> target (transition)
+            catalyst_place_id = arc_info.get('source_id', '')
+            catalyst_place_name = arc_info.get('source_name', str(catalyst_place_id))
+            transition_id = arc_info.get('target_id', '')
+            transition_name = arc_info.get('target_name', str(transition_id))
+
+            # Get how many transitions use this catalyst
+            catalyst_usage = len(catalyst_map.get(catalyst_place_id, []))
+
+            rows.append((
+                'Catalyst',
+                transition_name,
+                f'{catalyst_place_name} (test arc)',
+                0.0,
+                'Enzymatic',
+                f'Enzyme used by {catalyst_usage} transition(s)'
+            ))
+
+        # Show each inhibitor arc
+        for arc_info in inhibitor_arcs:
+            # Inhibitor arc structure: source (inhibitor place) -> target (transition)
+            inhibitor_place_id = arc_info.get('source_id', '')
+            inhibitor_place_name = arc_info.get('source_name', str(inhibitor_place_id))
+            transition_id = arc_info.get('target_id', '')
+            transition_name = arc_info.get('target_name', str(transition_id))
+
+            # Get how many transitions this inhibitor affects
+            inhibitor_usage = len(inhibitor_map.get(inhibitor_place_id, []))
+
+            rows.append((
+                'Inhibitor',
+                transition_name,
+                f'{inhibitor_place_name} (inhibitor arc)',
+                0.0,
+                'Negative Feedback',
+                f'Inhibits {inhibitor_usage} transition(s)'
+            ))
+        return rows
+
+    def _rows_for_signal_hierarchy(self, result):
+        """Format signal-hierarchy analyzer result."""
+        rows = []
+        # Result format: {'signal_places': [...], 'signal_flow_arcs': [...], 'hierarchy': {...}, 'validation': {...}, 'statistics': {...}}
+        signal_places = result.get('signal_places', [])
+        signal_flow_arcs = result.get('signal_flow_arcs', [])
+        hierarchy = result.get('hierarchy', {})
+        validation = result.get('validation', {})
+        statistics = result.get('statistics', {})
+
+        # Show summary first
+        layer_count = hierarchy.get('layer_count', 0)
+        signal_count = len(signal_places)
+        arc_count = len(signal_flow_arcs)
+
+        if signal_count > 0:
+            rows.append((
+                'Signal Hierarchy',
+                'Summary',
+                f'{signal_count} signal places, {layer_count} layers',
+                0.0,
+                '✓ Detected',
+                f'{arc_count} signal flow arcs'
+            ))
+
+        # Show each signal place with its layer
+        layers_dict = hierarchy.get('layers', {})
+        for sp in signal_places:
+            sp_id = sp.get('id', '')
+            sp_name = sp.get('name', sp_id)
+            signal_type = sp.get('signal_type', 'unknown')
+            layer_num = layers_dict.get(sp_id, 'N/A')
+            flow_count = sp.get('signal_flow_count', 0)
+
+            rows.append((
+                f'Signal Place (Layer {layer_num})',
+                sp_name,
+                f'Type: {signal_type}',
+                0.0,
+                'Information Channel',
+                f'{flow_count} outgoing flow arc(s)'
+            ))
+
+        # Show validation issues if any
+        if not validation.get('is_valid', True):
+            for issue in validation.get('issues', []):
+                issue_type = issue.get('type', 'unknown')
+                message = issue.get('message', '')
+                arc_id = issue.get('arc_id', '')
+
+                rows.append((
+                    f'⚠️ Validation Issue',
+                    issue_type.replace('_', ' ').title(),
+                    message[:60],
+                    0.5,
+                    'Warning',
+                    f'Arc: {arc_id}'
+                ))
+
+        # Show hierarchy preemption relationships
+        preemption_map = hierarchy.get('preemption_map', {})
+        if preemption_map:
+            for higher_layer, lower_layers in list(preemption_map.items())[:5]:  # First 5
+                lower_str = ', '.join(map(str, lower_layers))
+                rows.append((
+                    'Preemption',
+                    f'Layer {higher_layer}',
+                    f'Controls layers: {lower_str}',
+                    0.0,
+                    'Hierarchical Control',
+                    'Higher layer gates lower'
+                ))
+
+        # If no signal places found
+        if signal_count == 0:
+            rows.append((
+                'Signal Hierarchy',
+                'Not Detected',
+                'No signal places annotated',
+                0.0,
+                'ℹ️ INFO',
+                'Use place type "signal" to enable'
+            ))
+        return rows
+
     def _format_error_row(self, analyzer_name, error_message):
         """Format error message as table row matching biological table structure.
         

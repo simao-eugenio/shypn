@@ -14,6 +14,30 @@ from shypn.netobjs.signal_flow_arc import SignalFlowArc
 from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
 from shypn.utils.color_schema_manager import ColorSchemaManager
 
+# ---------------------------------------------------------------------------
+# Dispatch tables — single source of truth for arc-type→name and flag→class
+# ---------------------------------------------------------------------------
+
+# Ordered: most-specific subclasses first so isinstance short-circuits correctly.
+_ARC_TYPE_NAMES: tuple = (
+    (CurvedInhibitorArc, "Curved Inhibitor Arc"),
+    (CurvedArc,          "Curved Arc"),
+    (CurvedSignalFlowArc, "Curved Signal Flow Arc"),
+    (SignalFlowArc,       "Signal Flow Arc"),
+    (TestArc,             "Test Arc"),
+    (InhibitorArc,        "Inhibitor Arc"),
+)
+
+# Keys: (is_curved, is_inhibitor, is_signal)
+_ARC_CLASS_MAP: dict = {
+    (True,  True,  False): CurvedInhibitorArc,
+    (True,  False, True):  CurvedSignalFlowArc,
+    (True,  False, False): CurvedArc,
+    (False, True,  False): InhibitorArc,
+    (False, False, True):  SignalFlowArc,
+    (False, False, False): Arc,
+}
+
 
 def transform_arc(arc, make_curved=None, make_inhibitor=None):
     """Transform an arc to a different type while preserving its properties.
@@ -70,20 +94,8 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
                 "Inhibitor arcs must connect Place → Transition only."
             )
     
-    # Select appropriate target class
-    # Priority: inhibitor > signal > normal (test arcs not handled here)
-    if is_curved and is_inhibitor:
-        target_class = CurvedInhibitorArc
-    elif is_curved and is_signal:
-        target_class = CurvedSignalFlowArc
-    elif is_curved:
-        target_class = CurvedArc
-    elif is_inhibitor:
-        target_class = InhibitorArc
-    elif is_signal:
-        target_class = SignalFlowArc
-    else:
-        target_class = Arc
+    # Select appropriate target class via dispatch table
+    target_class = _ARC_CLASS_MAP.get((is_curved, is_inhibitor, is_signal), Arc)
     
     # If already the correct type, return the same instance
     if type(arc) == target_class:
@@ -308,15 +320,15 @@ def is_normal(arc):
 
 
 def is_signal_flow(arc):
-    """Check if arc is a signal flow arc (information transfer).
-    
+    """Check if arc is a signal flow arc (information transfer + token flow).
+
     Args:
         arc: Arc instance to check
-        
+
     Returns:
-        bool: True if arc is signal flow arc (SignalFlowArc)
+        bool: True if arc is a signal flow arc (SignalFlowArc or CurvedSignalFlowArc)
     """
-    return isinstance(arc, SignalFlowArc)
+    return isinstance(arc, (SignalFlowArc, CurvedSignalFlowArc))
 
 
 def convert_to_test(arc):
@@ -394,58 +406,40 @@ def get_arc_type_name(arc):
     Returns:
         str: Arc type name
     """
-    if isinstance(arc, SignalFlowArc):
-        return "Signal Flow Arc"
-    elif isinstance(arc, TestArc):
-        return "Test Arc"
-    elif isinstance(arc, CurvedInhibitorArc):
-        return "Curved Inhibitor Arc"
-    elif isinstance(arc, CurvedArc):
-        return "Curved Arc"
-    elif isinstance(arc, InhibitorArc):
-        return "Inhibitor Arc"
-    else:
-        return "Arc"
+    for cls, name in _ARC_TYPE_NAMES:
+        if isinstance(arc, cls):
+            return name
+    return "Arc"
 
 
 def convert_to_signal_flow(arc):
-    """Convert arc to signal flow arc (information transfer).
-    
-    Signal flow arcs must connect to at least one signal place (Ψ).
-    They consume tokens (unlike test arcs) to model signal depletion
-    in hierarchical control systems.
-    
+    """Convert arc to signal flow arc (dual-role: consumes/produces tokens AND
+    informs the vertical decision hierarchy layers).
+
+    Unlike test arcs (which are purely catalytic), signal flow arcs transfer
+    mass AND propagate information upward through control hierarchies.
+    The one structural restriction: every Place endpoint must be a signal place
+    (is_signal_place=True).  A ValueError is raised if this condition is not met.
+
+    Curvature is preserved: a curved source arc produces CurvedSignalFlowArc;
+    a straight source arc produces SignalFlowArc.
+
     Args:
         arc: Arc instance to convert
-        
+
     Returns:
-        SignalFlowArc: Signal flow version of the arc
-        
-    Raises:
-        ValueError: If arc doesn't connect to a signal place
+        SignalFlowArc or CurvedSignalFlowArc: Signal flow version of the arc
     """
-    from shypn.netobjs.place import Place
-    
     # If already signal flow arc, return it
-    if isinstance(arc, SignalFlowArc):
+    if isinstance(arc, (SignalFlowArc, CurvedSignalFlowArc)):
         return arc
-    
-    # Validate that at least one endpoint is a signal place
-    is_source_signal = (isinstance(arc.source, Place) and 
-                       getattr(arc.source, 'is_signal_place', False))
-    is_target_signal = (isinstance(arc.target, Place) and 
-                       getattr(arc.target, 'is_signal_place', False))
-    
-    if not (is_source_signal or is_target_signal):
-        raise ValueError(
-            f"Cannot convert to signal flow arc: Neither endpoint is a signal place. "
-            f"Source: {arc.source.name} (is_signal_place={is_source_signal}), "
-            f"Target: {arc.target.name} (is_signal_place={is_target_signal}). "
-            f"Mark a place as signal place first (is_signal_place=True)."
-        )
-    
-    # Create new signal flow arc
-    new_arc = SignalFlowArc(
+
+    # Determine target class based on current curvature
+    arc_is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc))
+    target_class = CurvedSignalFlowArc if arc_is_curved else SignalFlowArc
+
+    # Create new arc of target type
+    new_arc = target_class(
         source=arc.source,
         target=arc.target,
         id=arc.id,

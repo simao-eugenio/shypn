@@ -794,6 +794,8 @@ class SBMLCompartmentModuleService:
                 # Create classifier manager (needs a model-like object with places/transitions/arcs)
                 # Build a temporary model wrapper
                 class ModelWrapper:
+                    """Lightweight model container satisfying SignalClassifierManager's interface."""
+
                     def __init__(self, places, transitions, arcs):
                         self.places = places
                         self.transitions = transitions

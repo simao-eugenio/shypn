@@ -576,14 +576,18 @@ class StochasticBehavior(TransitionBehavior):
             )
             return
         
-        # If rate is zero or negative, don't schedule firing
-        # This happens when substrates are depleted and propensity = 0
+        # If rate is zero or negative, don't schedule SSA firing.
+        # This is a normal operating condition (substrates transiently depleted,
+        # or tau-leaping is active so propensity = 0 means 0 expected firings).
+        # Skellam/tau-leaping handles zero/negative propensities in _evaluate_rate;
+        # this path is only the SSA pre-scheduler and can safely skip silently.
         if lambda_rate <= 0:
-            self.logger.warning(
-                f"Transition {self.transition.name} has zero/negative rate ({lambda_rate:.6f}). "
-                f"Check that: (1) transition.rate is set to positive value, "
-                f"(2) if using rate formula, it evaluates correctly. "
-                f"Self.rate={getattr(self, 'rate', 'NOT SET')}, "
+            # Emit DEBUG — zero propensity is valid, not a configuration error.
+            self.logger.debug(
+                f"Transition {self.transition.name}: zero/negative rate "
+                f"({lambda_rate:.6f}) at enablement — SSA scheduling skipped "
+                f"(substrates depleted or tau-leaping active). "
+                f"rate={getattr(self, 'rate', 'NOT SET')}, "
                 f"has_rate_function={getattr(self, 'has_rate_function', False)}"
             )
             # Clear any previous scheduling

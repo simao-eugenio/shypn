@@ -5,10 +5,13 @@ Generates matplotlib plots and exports to SVG/PNG without GUI interaction.
 """
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+import logging
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+
+logger = logging.getLogger(__name__)
 
 
 class PlotExporter:
@@ -95,7 +98,7 @@ class PlotExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting concentration curves: {e}")
+            logger.error("Error exporting concentration curves: %s", e)
             return False
     
     def export_firing_rate_curves(self, filepath: str,
@@ -163,7 +166,7 @@ class PlotExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting firing rate curves: {e}")
+            logger.error("Error exporting firing rate curves: %s", e)
             return False
     
     def export_combined_plot(self, filepath: str, 
@@ -245,7 +248,7 @@ class PlotExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting combined plot: {e}")
+            logger.error("Error exporting combined plot: %s", e)
             return False
     
     def _setup_figure(self, figsize: Tuple[float, float], dpi: int) -> Tuple[Figure, plt.Axes]:

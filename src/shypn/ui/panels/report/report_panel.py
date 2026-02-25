@@ -42,18 +42,20 @@ class ReportPanel(Gtk.Box):
     Each category is collapsible and can export its content.
     """
     
-    def __init__(self, project=None, model_canvas=None):
+    def __init__(self, project=None, model_canvas=None, document_id=None):
         """Initialize report panel.
         
         Args:
             project: Project instance
             model_canvas: ModelCanvasLoader instance (not a specific manager)
+            document_id: Optional document ID (id of drawing_area) for EventBus scoping
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         
         self.project = project
         # Store the loader for accessing get_current_model()
         self.model_canvas_loader = model_canvas
+        self.document_id = document_id  # For EventBus scoped subscriptions
         self.topology_panel = None  # Will be set via set_topology_panel()
         self.dynamic_analyses_panel = None  # Will be set via set_dynamic_analyses_panel()
         self.pathway_operations_panel = None  # Will be set via set_pathway_operations_panel()
@@ -79,6 +81,12 @@ class ReportPanel(Gtk.Box):
         
         # Subscribe to simulation.updated events (global subscription)
         EventBus.subscribe('simulation.updated', self._on_dynamic_analyses_updated)
+        
+        # Subscribe to simulation.controller_ready (document-scoped: only receive for our document)
+        if self.document_id is not None:
+            EventBus.subscribe('simulation.controller_ready',
+                               self._on_controller_ready,
+                               document_id=self.document_id)
         
         # Initial refresh to show placeholder text for empty model
         self.refresh_all()
@@ -551,6 +559,20 @@ class ReportPanel(Gtk.Box):
                 category.set_controller(controller)
             elif isinstance(category, ThermodynamicValidationCategory):
                 category.set_controller(controller)
+
+    def _on_controller_ready(self, data):
+        """Handle simulation.controller_ready EventBus event.
+
+        Replaces all scattered external set_controller() injection calls.
+        The panel self-wires when the simulation controller becomes available
+        or is replaced (controller reset, import, file open).
+
+        Args:
+            data: dict with 'controller' key (SimulationController instance).
+        """
+        controller = data.get('controller')
+        if controller:
+            self.set_controller(controller)
     
     def on_file_opened(self, filepath):
         """Called when a file is opened (File → Open or double-click).

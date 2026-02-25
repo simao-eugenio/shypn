@@ -12,42 +12,41 @@ Date: November 13, 2025
 import random
 import math
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
+@dataclass
 class SimulationState:
     """Current state of subnet simulation."""
-    
-    def __init__(self):
-        self.current_markings = {}      # {place_id: tokens}
-        self.firing_counts = {}          # {trans_id: count}
-        self.time = 0.0                  # Simulation time
-        self.step_count = 0              # Number of firings
-        self.enabled_transitions = []    # Currently enabled transitions
-        self.is_running = False
-        self.is_paused = False
-        self.trajectory = []             # List of (time, markings) tuples
-        
-    def __repr__(self):
+    current_markings: dict = field(default_factory=dict)    # {place_id: tokens}
+    firing_counts: dict = field(default_factory=dict)       # {trans_id: count}
+    time: float = 0.0                                       # Simulation time
+    step_count: int = 0                                     # Number of firings
+    enabled_transitions: list = field(default_factory=list) # Currently enabled transitions
+    is_running: bool = False
+    is_paused: bool = False
+    trajectory: list = field(default_factory=list)          # List of (time, markings) tuples
+
+    def __repr__(self) -> str:
         return f"SimulationState(t={self.time:.2f}, steps={self.step_count}, enabled={len(self.enabled_transitions)})"
 
 
+@dataclass
 class SimulationResults:
     """Complete simulation outcomes."""
-    
-    def __init__(self):
-        self.final_markings = {}         # {place_id: tokens}
-        self.firing_counts = {}          # {trans_id: count}
-        self.fluxes = {}                 # {trans_id: firings/time}
-        self.viability_status = "Unknown"  # ✓ Stable / ✗ Deadlock / ⚠ Unbounded
-        self.execution_time = 0.0        # Real execution time (seconds)
-        self.sim_time = 0.0              # Simulation time
-        self.step_count = 0              # Total firing events
-        self.trajectory = []             # Full time series
-        self.deadlocked = False
-        self.unbounded_places = []
-        
-    def __repr__(self):
+    final_markings: dict = field(default_factory=dict)    # {place_id: tokens}
+    firing_counts: dict = field(default_factory=dict)     # {trans_id: count}
+    fluxes: dict = field(default_factory=dict)            # {trans_id: firings/time}
+    viability_status: str = "Unknown"                     # ✓ Stable / ✗ Deadlock / ⚠ Unbounded
+    execution_time: float = 0.0                           # Real execution time (seconds)
+    sim_time: float = 0.0                                 # Simulation time
+    step_count: int = 0                                   # Total firing events
+    trajectory: list = field(default_factory=list)        # Full time series
+    deadlocked: bool = False
+    unbounded_places: list = field(default_factory=list)
+
+    def __repr__(self) -> str:
         return f"SimulationResults({self.viability_status}, t={self.sim_time:.2f}, steps={self.step_count})"
 
 
@@ -93,6 +92,8 @@ class SubnetSimulator:
         
         # Create compatibility wrapper around controller state
         class ControllerStateWrapper:
+            """Adapter exposing SimulationController state as SimulationState-compatible attributes."""
+
             def __init__(self, controller, initial_markings):
                 self.controller = controller
                 self.initial_markings = initial_markings

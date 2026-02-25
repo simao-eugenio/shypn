@@ -13,6 +13,13 @@ from typing import List, Callable, Optional
 
 
 class UndoManager:
+	"""Manages per-document undo/redo stacks for canvas operations.
+
+	Stores completed operations implementing apply_undo(manager) and
+	apply_redo(manager). Fires an optional state callback whenever
+	the stack changes (used to enable/disable toolbar buttons).
+	"""
+
 	def __init__(self):
 		self._undo_stack: List[object] = []
 		self._redo_stack: List[object] = []

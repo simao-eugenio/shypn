@@ -1921,8 +1921,8 @@ class ResultsBrowserView(BaseResultsView):
             if not os.path.exists(experiments_dir):
                 try:
                     os.makedirs(experiments_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except OSError as e:
+                    self.logger.warning("Could not create experiments directory: %s", e)
             if os.path.isdir(experiments_dir):
                 dialog.set_current_folder(experiments_dir)
             else:
@@ -1982,8 +1982,8 @@ class ResultsBrowserView(BaseResultsView):
             if not os.path.exists(experiments_dir):
                 try:
                     os.makedirs(experiments_dir, exist_ok=True)
-                except Exception:
-                    pass
+                except OSError as e:
+                    self.logger.warning("Could not create experiments directory: %s", e)
             if os.path.isdir(experiments_dir):
                 dialog.set_current_folder(experiments_dir)
             else:

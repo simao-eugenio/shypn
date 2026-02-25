@@ -5,7 +5,7 @@ Places represent conditions or states and can contain tokens.
 Rendered as a circle with optional label and token display.
 """
 import math
-from typing import Optional, List, Tuple
+from typing import Any, List, Optional, Tuple
 from enum import Enum
 from shypn.netobjs.petri_net_object import PetriNetObject
 from shypn.netobjs.signal_type import SignalType
@@ -112,7 +112,7 @@ class Place(PetriNetObject):
         return self._properties
     
     @properties.setter
-    def properties(self, value: dict):
+    def properties(self, value: dict) -> None:
         """Set properties dict (for backward compatibility).
         
         Args:
@@ -135,7 +135,7 @@ class Place(PetriNetObject):
         return self._metadata
     
     @metadata.setter
-    def metadata(self, value: dict):
+    def metadata(self, value: dict) -> None:
         """Set metadata dict with validation.
         
         Args:
@@ -150,7 +150,7 @@ class Place(PetriNetObject):
     
     # ========== End Property Decorators ==========
     
-    def get_bounding_box(self):
+    def get_bounding_box(self) -> dict:
         """Calculate bounding box for the place.
         
         Returns bounding box containing the circle or hexagon.
@@ -168,7 +168,7 @@ class Place(PetriNetObject):
             'height': diameter
         }
     
-    def render(self, cr, zoom=1.0):
+    def render(self, cr: Any, zoom: float = 1.0) -> None:
         """Render the place as a hollow circle (or hexagon for signal places).
         
         Uses legacy rendering style with Cairo transform approach:
@@ -390,7 +390,7 @@ class Place(PetriNetObject):
         else:
             return distance <= self.radius
     
-    def set_position(self, x: float, y: float):
+    def set_position(self, x: float, y: float) -> None:
         """Move the place to a new position.
         
         Args:
@@ -400,7 +400,7 @@ class Place(PetriNetObject):
         self.y = y
         self._trigger_redraw()
     
-    def set_tokens(self, count: float):
+    def set_tokens(self, count: float) -> None:
         """Set the number of tokens in this place.
         
         Supports both discrete (int) and continuous (float) concentrations.
@@ -418,7 +418,7 @@ class Place(PetriNetObject):
         self.tokens = count
         self._trigger_redraw()
     
-    def set_initial_marking(self, count: float):
+    def set_initial_marking(self, count: float) -> None:
         """Set the initial marking for this place (for simulation reset).
         
         Supports both discrete (int) and continuous (float) concentrations.
@@ -428,7 +428,7 @@ class Place(PetriNetObject):
         """
         self.initial_marking = max(0.0, float(count))
     
-    def reset_to_initial_marking(self):
+    def reset_to_initial_marking(self) -> None:
         """Reset the current marking to the initial marking."""
         self.tokens = self.initial_marking
         self._trigger_redraw()
@@ -450,7 +450,7 @@ class Place(PetriNetObject):
         coefficient: float,
         boundary: BoundaryType,
         volume: Optional[float] = None
-    ):
+    ) -> None:
         """Set diffusion properties for spatial signal place.
         
         Args:
@@ -463,7 +463,7 @@ class Place(PetriNetObject):
         if volume is not None:
             self.compartment_volume = volume
     
-    def set_spatial_gradient(self, dx: float, dy: float, dz: float = 0.0):
+    def set_spatial_gradient(self, dx: float, dy: float, dz: float = 0.0) -> None:
         """Set spatial gradient vector.
         
         Args:
@@ -473,7 +473,7 @@ class Place(PetriNetObject):
         """
         self.gradient_vector = (dx, dy, dz)
     
-    def add_neighbor_compartment(self, compartment_id: str):
+    def add_neighbor_compartment(self, compartment_id: str) -> None:
         """Add a neighbor compartment ID to topology.
         
         Args:

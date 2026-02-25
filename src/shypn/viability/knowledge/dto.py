@@ -23,6 +23,9 @@ Date: November 11, 2025
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -245,7 +248,10 @@ class ArcDTO:
                 # Debug: unexpected types
                 source_type = type(arc_obj.source).__name__ if hasattr(arc_obj, 'source') else 'None'
                 target_type = type(arc_obj.target).__name__ if hasattr(arc_obj, 'target') else 'None'
-                print(f"[DTO] Warning: Arc {getattr(arc_obj, 'id', '?')} has unexpected types: {source_type} → {target_type}")
+                logger.warning(
+                    "Arc %s has unexpected types: %s \u2192 %s",
+                    getattr(arc_obj, 'id', '?'), source_type, target_type,
+                )
         
         return cls(
             arc_id=str(arc_obj.id) if hasattr(arc_obj, 'id') else str(arc_obj),

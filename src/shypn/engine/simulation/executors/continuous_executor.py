@@ -156,9 +156,9 @@ class ContinuousExecutor(ChangeListener):
                             f"scheduled to fire at t={scheduled_time:.3f}"
                         )
                     else:
-                        logger.warning(
-                            f"  ⚠ {transition.name} (ID={transition.id}): enabled but NOT scheduled "
-                            f"(rate may be 0 or evaluation failed)"
+                        logger.debug(
+                            f"  ○ {transition.name} (ID={transition.id}): enabled but rate=0 "
+                            f"(normal homeostatic state — will fire when rate becomes positive)"
                         )
                 else:
                     logger.info(

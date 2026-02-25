@@ -685,6 +685,8 @@ class SBMLEnricher:
             
             # Create a simple pathway wrapper with the model
             class PathwayWrapper:
+                """Wraps an SBML model to satisfy the coordinate enricher's pathway interface."""
+
                 def __init__(self, sbml_model):
                     self.model = sbml_model
             

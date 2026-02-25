@@ -294,9 +294,116 @@ class BasePathwayCategory(CategoryFrame):
             self.import_complete_callback(data)
     
     # ========================================================================
+    # Shared simulation helpers (used by BRENDA, SABIO-RK, and similar)
+    # ========================================================================
+
+    def _reset_simulation_after_parameter_changes(self):
+        """Reset the simulation after enrichment parameters have been applied.
+
+        When parameters are applied to transitions (e.g. via BRENDA or SABIO-RK
+        enrichment) the simulation controller's behaviour cache contains stale
+        TransitionBehavior instances.  This method clears that cache so the new
+        parameter values are picked up on the next simulation run.
+
+        Subclasses may override this method if they need different reset
+        behaviour (e.g. partial resets).
+        """
+        source = self.__class__.__name__
+        try:
+            if not self.model_canvas:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "No model canvas available for simulation reset (%s)", source)
+                return
+            drawing_area = self.model_canvas.get_current_document()
+            if not drawing_area:
+                return
+            if not hasattr(self.model_canvas, 'simulation_controllers'):
+                return
+            controllers = self.model_canvas.simulation_controllers
+            if drawing_area not in controllers:
+                return
+            controller = controllers[drawing_area]
+            canvas_manager = getattr(self.model_canvas, 'canvas_managers', {}).get(drawing_area)
+            import logging
+            _log = logging.getLogger(__name__)
+            if canvas_manager:
+                controller.reset_for_new_model(canvas_manager)
+                _log.info("Simulation fully reset after %s parameter changes "
+                          "(model adapter recreated)", source)
+            else:
+                controller.reset()
+                _log.info("Simulation reset after %s parameter changes", source)
+            drawing_area.queue_draw()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(
+                "Error resetting simulation after %s parameter changes: %s",
+                source, e, exc_info=True)
+
+    def _open_sbml_file_dialog(self, entry_widget):
+        """Open a Wayland-safe SBML file chooser and populate *entry_widget*.
+
+        Shared by SBML and BiGG import categories which both load local
+        SBML / XML files.  Sets the initial directory to the active project's
+        ``pathways/`` folder when available.
+
+        Args:
+            entry_widget: Gtk.Entry to fill with the chosen file path.
+        """
+        import os
+        dialog = Gtk.FileChooserDialog(
+            title="Select SBML File",
+            transient_for=self.parent_window,
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+        )
+        # Root to active project's pathways folder when available
+        try:
+            from shypn.data.project_models import get_project_manager
+            pm = get_project_manager()
+            if pm.current_project:
+                pathways_dir = os.path.join(pm.current_project.base_path, 'pathways')
+                if os.path.exists(pathways_dir):
+                    dialog.set_current_folder(pathways_dir)
+                else:
+                    dialog.set_current_folder(pm.current_project.base_path)
+        except (ImportError, AttributeError):
+            pass
+        # File filters
+        filter_sbml = Gtk.FileFilter()
+        filter_sbml.set_name("SBML Files")
+        filter_sbml.add_pattern("*.sbml")
+        filter_sbml.add_pattern("*.xml")
+        dialog.add_filter(filter_sbml)
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+        dialog.add_filter(filter_all)
+        dialog.set_current_name("")
+        # Wayland-safe async pattern (nested main loop)
+        result_container = [None]
+
+        def on_response(dlg, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                result_container[0] = dlg.get_filename()
+            dlg.destroy()
+            Gtk.main_quit()
+
+        dialog.connect('response', on_response)
+        dialog.show()
+        Gtk.main()
+        filepath = result_container[0]
+        if filepath:
+            entry_widget.set_text(filepath)
+
+    # ========================================================================
     # CategoryFrame compatibility methods
     # ========================================================================
-    
+
     def is_expanded(self) -> bool:
         """Check if category is currently expanded.
         

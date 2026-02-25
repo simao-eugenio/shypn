@@ -511,7 +511,7 @@ class SBMLParser:
                 except Exception as e:
                     # Can't evaluate yet (may depend on other rules not yet evaluated)
                     # This is expected during iterative evaluation - silently skip
-                    pass
+                    self.logger.debug("Rule %r deferred (not yet evaluable): %s", variable, e)
             
             if not made_progress:
                 break

@@ -81,7 +81,7 @@ class Module:
         self.description: str = ""  # Optional description
         self.properties: dict = {}  # Extensible properties
     
-    def add_place(self, place) -> None:
+    def add_place(self, place: 'Place') -> None:
         """Add a place to this module and set bidirectional reference.
         
         Args:
@@ -93,7 +93,7 @@ class Module:
         self.places.add(place)
         place.module_id = self.module_id
     
-    def add_transition(self, transition) -> None:
+    def add_transition(self, transition: 'Transition') -> None:
         """Add a transition to this module and set bidirectional reference.
         
         Args:
@@ -105,7 +105,7 @@ class Module:
         self.transitions.add(transition)
         transition.module_id = self.module_id
     
-    def add_boundary_signal(self, signal_place) -> None:
+    def add_boundary_signal(self, signal_place: 'Place') -> None:
         """Mark a signal place as boundary (Ψ_shared).
         
         Args:
@@ -125,7 +125,7 @@ class Module:
             )
         self.boundary_signals.add(signal_place)
     
-    def remove_place(self, place) -> None:
+    def remove_place(self, place: 'Place') -> None:
         """Remove a place from this module and clear its module reference.
         
         Args:
@@ -135,7 +135,7 @@ class Module:
         if place.module_id == self.module_id:
             place.module_id = None
     
-    def remove_transition(self, transition) -> None:
+    def remove_transition(self, transition: 'Transition') -> None:
         """Remove a transition from this module and clear its module reference.
         
         Args:
@@ -145,7 +145,7 @@ class Module:
         if transition.module_id == self.module_id:
             transition.module_id = None
     
-    def remove_boundary_signal(self, signal_place) -> None:
+    def remove_boundary_signal(self, signal_place: 'Place') -> None:
         """Remove a signal place from boundary.
         
         Args:

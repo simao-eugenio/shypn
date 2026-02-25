@@ -180,6 +180,9 @@ class BRENDACategory(BasePathwayCategory):
             model_canvas: Typically a ModelCanvasLoader for the document
         """
         # Store loader reference (if that's what we received)
+        # Populate the canonical base-class attribute so inherited helpers
+        # (e.g. _reset_simulation_after_parameter_changes) work correctly.
+        self.model_canvas = model_canvas
         self.model_canvas_loader = model_canvas
 
         # Resolve the manager using the loader's helper when available
@@ -2241,70 +2244,6 @@ class BRENDACategory(BasePathwayCategory):
                 "Please enter query manually.",
                 error=True
             )
-    
-    def _reset_simulation_after_parameter_changes(self):
-        """Reset simulation to initial state after applying parameter changes.
-        
-        CRITICAL for correct simulation behavior:
-        When parameters are applied to transitions via BRENDA enrichment,
-        the simulation controller's behavior cache contains old TransitionBehavior 
-        instances with old parameter values. If we don't reset the simulation, 
-        these cached behaviors continue to be used, causing transitions to fire 
-        incorrectly or not at all.
-        
-        This is the same root cause as:
-        - Behavior Cache Bug (commit 864ae92) - transitions not firing after reload
-        - Canvas Freeze Bug (commit df037a6) - canvas frozen after save/reload
-        - Comprehensive Reset (commit be02ff5) - stale state across model loads
-        
-        See: CANVAS_STATE_ISSUES_COMPARISON.md for detailed analysis.
-        
-        The fix: Call controller.reset() which clears behavior cache AND resets
-        place tokens to initial marking, ensuring a clean slate for testing the
-        new parameter values.
-        """
-        try:
-            # Get current document and canvas manager
-            if not self.model_canvas_loader:
-                self.logger.warning("No canvas loader available for simulation reset")
-                return
-            
-            drawing_area = self.model_canvas_loader.get_current_document()
-            if not drawing_area:
-                self.logger.warning("No active document for simulation reset")
-                return
-            
-            # Find simulation controller for this drawing area
-            if hasattr(self.model_canvas_loader, 'simulation_controllers'):
-                if drawing_area in self.model_canvas_loader.simulation_controllers:
-                    controller = self.model_canvas_loader.simulation_controllers[drawing_area]
-                    
-                    # Get the canvas manager
-                    canvas_manager = self.model_canvas_loader.canvas_managers.get(drawing_area)
-                    
-                    if canvas_manager:
-                        # CRITICAL: Use reset_for_new_model() instead of reset()
-                        # This recreates the model adapter and clears ALL caches
-                        # After applying parameters, the transition objects have changed
-                        # and we need to rebuild the entire simulation state
-                        controller.reset_for_new_model(canvas_manager)
-                        
-                        self.logger.info("Simulation fully reset after BRENDA parameter changes (model adapter recreated)")
-                    else:
-                        # Fallback to basic reset if we can't get canvas_manager
-                        controller.reset()
-                        self.logger.info("Simulation reset to initial state after BRENDA parameter changes")
-                    
-                    # Refresh canvas to show reset token values
-                    if drawing_area:
-                        drawing_area.queue_draw()
-                else:
-                    self.logger.debug("No simulation controller for current document")
-            else:
-                self.logger.warning("Canvas loader has no simulation_controllers attribute")
-                
-        except Exception as e:
-            self.logger.error(f"Error resetting simulation after parameter changes: {e}", exc_info=True)
     
     def _clear_enrichment_highlight(self):
         """Clear the transition selection highlight after parameters are applied.

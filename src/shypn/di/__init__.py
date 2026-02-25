@@ -35,6 +35,7 @@ from shypn.di.services import (
     register_core_services,
     register_repositories,
     register_builders,
+    register_application_services,
 )
 
 __all__ = [
@@ -49,4 +50,5 @@ __all__ = [
     'register_core_services',
     'register_repositories',
     'register_builders',
+    'register_application_services',
 ]

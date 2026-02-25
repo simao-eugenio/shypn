@@ -344,60 +344,11 @@ class BiGGCategory(BasePathwayCategory):
             else:
                 self.import_button.set_sensitive(False)
                 self.status_label.set_markup("<i>Enter a BiGG model ID to import</i>")
-    
+
     def _on_browse_clicked(self, button):
-        """Handle browse button click - open file chooser for SBML files."""
-        dialog = Gtk.FileChooserDialog(
-            title="Select SBML File",
-            transient_for=self.parent_window,
-            action=Gtk.FileChooserAction.OPEN
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-        )
-        
-        # Set initial directory to project's pathways folder if project is open
-        project_manager = get_project_manager()
-        if project_manager.current_project:
-            pathways_dir = os.path.join(project_manager.current_project.base_path, 'pathways')
-            if os.path.exists(pathways_dir):
-                dialog.set_current_folder(pathways_dir)
-            else:
-                dialog.set_current_folder(project_manager.current_project.base_path)
-        
-        # Add file filters
-        filter_sbml = Gtk.FileFilter()
-        filter_sbml.set_name("SBML Files")
-        filter_sbml.add_pattern("*.sbml")
-        filter_sbml.add_pattern("*.xml")
-        dialog.add_filter(filter_sbml)
-        
-        filter_all = Gtk.FileFilter()
-        filter_all.set_name("All Files")
-        filter_all.add_pattern("*")
-        dialog.add_filter(filter_all)
-        
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
-        
-        # Wayland-safe async approach
-        result_container = [None]
-        
-        def on_response(dlg, response_id):
-            if response_id == Gtk.ResponseType.OK:
-                result_container[0] = dlg.get_filename()
-            dlg.destroy()
-            Gtk.main_quit()
-        
-        dialog.connect('response', on_response)
-        dialog.show()
-        Gtk.main()
-        
-        filepath = result_container[0]
-        if filepath:
-            self.accession_entry.set_text(filepath)
-    
+        """Open SBML file chooser and populate the accession entry."""
+        self._open_sbml_file_dialog(self.accession_entry)
+
     def _parse_and_preview_sbml(self, filepath):
         """Parse a local SBML file in background and populate metadata preview.
         
@@ -1169,9 +1120,12 @@ class BiGGCategory(BasePathwayCategory):
                             if report_panel_loader and hasattr(report_panel_loader, 'panel'):
                                 self.logger.info("Triggering Report Panel refresh after BiGG import (deferred)")
                                 simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                                    report_panel_loader.panel.set_controller(simulation_controller)
-                                    self.logger.info("✅ Report Panel refreshed")
+                                if simulation_controller:
+                                    from shypn.events import EventBus
+                                    EventBus.emit('simulation.controller_ready',
+                                                  {'controller': simulation_controller},
+                                                  document_id=id(drawing_area))
+                                    self.logger.info("✅ Report Panel controller notified")
                                 
                                 # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
                                 # Determine metadata path based on project structure

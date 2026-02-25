@@ -21,6 +21,11 @@ import sys
 import math
 import logging
 from typing import Optional
+from shypn.helpers.canvas_interaction_context import CanvasInteractionContext
+try:
+    from shypn.events import EventBus
+except ImportError:
+    EventBus = None  # type: ignore[assignment]
 try:
     import gi
     gi.require_version('Gtk', '3.0')
@@ -70,6 +75,8 @@ try:
 except ImportError as e:
     print(f'ERROR: Cannot import SimulationController: {e}', file=sys.stderr)
     sys.exit(1)
+
+from shypn.helpers.canvas_layout_controller import CanvasLayoutController
 
 
 class ModelCanvasLoader:
@@ -174,6 +181,14 @@ class ModelCanvasLoader:
 
         # Track whether we've fully initialized the first page (page 0)
         self._first_page_initialized = False
+
+        # Layout sub-controller — owns all _on_layout_* / _apply_specific_layout logic
+        # overlay_managers is passed by reference (dict), so the controller always sees
+        # the live state even after pages are added.
+        self.layout_ctrl = CanvasLayoutController(
+            self.overlay_managers,
+            get_sbml_panel=lambda: getattr(self, 'sbml_panel', None),
+        )
 
         # Subscribe to 'editor.close_requested' so the Open Editors panel ✕ button
         # triggers a proper tab close (with unsaved-changes dialog etc.)
@@ -1580,52 +1595,25 @@ class ModelCanvasLoader:
             )
             drawing_area.set_can_focus(True)
             
-            # Reset drag state (prevents stuck panning/dragging)
-            if hasattr(self, '_drag_state') and drawing_area in self._drag_state:
-                self._drag_state[drawing_area] = {
-                    'active': False,
-                    'button': 0,
-                    'start_x': 0,
-                    'start_y': 0,
-                    'is_panning': False,
-                    'is_rect_selecting': False,
-                    'is_transforming': False
-                }
-            
-            # Reset arc creation state (prevents stuck arc drawing)
-            if hasattr(self, '_arc_state') and drawing_area in self._arc_state:
-                self._arc_state[drawing_area] = {
-                    'source': None,
-                    'cursor_pos': (0, 0),
-                    'target_valid': None,
-                    'hovered_target': None,
-                    'ignore_next_release': False
-                }
-            
-            # Reset click state (prevents stuck double-click detection)
-            if hasattr(self, '_click_state') and drawing_area in self._click_state:
-                click_state = self._click_state[drawing_area]
+            # Reset all canvas interaction state (prevents stuck modes)
+            if hasattr(self, '_canvas_ctx') and drawing_area in self._canvas_ctx:
+                ctx = self._canvas_ctx[drawing_area]
+                ctx.reset_drag()
+                ctx.reset_arc()
                 # Cancel any pending click timeout
-                if click_state.get('pending_timeout'):
-                    GLib.source_remove(click_state['pending_timeout'])
-                self._click_state[drawing_area] = {
+                if ctx.click.get('pending_timeout'):
+                    GLib.source_remove(ctx.click['pending_timeout'])
+                ctx.click.update({
                     'last_click_time': 0.0,
                     'last_click_obj': None,
                     'double_click_threshold': 0.3,
                     'pending_timeout': None,
-                    'pending_click_data': None
-                }
-            
-            # Reset lasso selection state (prevents stuck lasso mode)
-            if hasattr(self, '_lasso_state') and drawing_area in self._lasso_state:
-                lasso_state = self._lasso_state[drawing_area]
+                    'pending_click_data': None,
+                })
                 # Deactivate any active lasso
-                if lasso_state.get('selector'):
-                    lasso_state['selector'].cancel()
-                self._lasso_state[drawing_area] = {
-                    'active': False,
-                    'selector': None
-                }
+                if ctx.lasso.get('selector'):
+                    ctx.lasso['selector'].cancel()
+                ctx.lasso.update({'active': False, 'selector': None})
             
             # ============================================================
             # NOTE: Simulation controller reset moved to AFTER load_objects()
@@ -1745,16 +1733,10 @@ class ModelCanvasLoader:
                                     # (for File → Open, File → Reset, KEGG/SBML imports, parameter changes)
                                     simulate_tools_palette._apply_ui_defaults_to_settings()
                                     
-                                    # PHASE 1-2 FIX: Wire controller to Report Panel for table population
-                                    # The Report Panel needs the controller reference to access simulation results
-                                    if self.report_panel_loader and hasattr(self.report_panel_loader, 'panel'):
-                                        report_panel = self.report_panel_loader.panel
-                                        if report_panel and hasattr(report_panel, 'set_controller'):
-                                            report_panel.set_controller(controller)
-                                        else:
-                                            pass
-                                    else:
-                                        pass
+                                    # Re-wire report panel after controller reset via EventBus (document-scoped)
+                                    EventBus.emit('simulation.controller_ready',
+                                                  {'controller': controller},
+                                                  document_id=id(drawing_area))
                                     
                                     # VIABILITY PANEL: Wire simulation complete callback after reset
                                     # After controller reset, re-establish the callback chain for PER-DOCUMENT panel
@@ -1929,16 +1911,10 @@ class ModelCanvasLoader:
         if drawing_area in self.overlay_managers:
             self.overlay_managers[drawing_area].simulation_controller = simulation_controller
 
-        # Wire controller to existing report panel (if already present)
-        if drawing_area in self.overlay_managers:
-            overlay_manager = self.overlay_managers[drawing_area]
-            if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
-                try:
-                    if hasattr(overlay_manager.report_panel_loader, 'panel') and overlay_manager.report_panel_loader.panel:
-                        overlay_manager.report_panel_loader.panel.set_controller(simulation_controller)
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
+        # Notify existing report panel of controller replacement via EventBus (document-scoped)
+        EventBus.emit('simulation.controller_ready',
+                      {'controller': simulation_controller},
+                      document_id=id(drawing_area))
 
         # Register with lifecycle adapter
         if self.lifecycle_adapter:
@@ -1998,7 +1974,6 @@ class ModelCanvasLoader:
 
             if hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
                 report_panel_loader.panel.set_model_canvas(canvas_manager)
-                report_panel_loader.panel.set_controller(simulation_controller)
 
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
@@ -2022,15 +1997,22 @@ class ModelCanvasLoader:
                         report_panel_loader.panel.set_topology_panel(topology_loader.panel)
                         report_panel_loader.panel.refresh_all()
 
+                # Notify the new panel of its simulation controller via EventBus
+                EventBus.emit('simulation.controller_ready',
+                              {'controller': simulation_controller},
+                              document_id=id(drawing_area))
+
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
         else:
-            # Rewire existing panel to new controller
+            # Rewire existing panel to new controller via EventBus
             report_panel_loader = self.overlay_managers[drawing_area].report_panel_loader
             if report_panel_loader and hasattr(report_panel_loader, 'panel') and report_panel_loader.panel:
-                report_panel_loader.panel.set_controller(simulation_controller)
                 model_manager = self.overlay_managers[drawing_area].canvas_manager
                 if model_manager:
                     report_panel_loader.panel.set_model_canvas(model_manager)
+                EventBus.emit('simulation.controller_ready',
+                              {'controller': simulation_controller},
+                              document_id=id(drawing_area))
 
     def _setup_document_viability_panel(self, canvas_manager, drawing_area, simulation_controller):
         """Create the per-document Viability Panel."""
@@ -2336,14 +2318,10 @@ class ModelCanvasLoader:
             # Import LassoSelector
             from shypn.edit.lasso_selector import LassoSelector
             
-            # Get or create lasso state
-            if drawing_area not in self._lasso_state:
-                self._lasso_state[drawing_area] = {
-                    'active': False,
-                    'selector': None
-                }
-            
-            lasso_state = self._lasso_state[drawing_area]
+            # Get or create lasso state via canvas context
+            if drawing_area not in self._canvas_ctx:
+                self._canvas_ctx[drawing_area] = CanvasInteractionContext()
+            lasso_state = self._canvas_ctx[drawing_area].lasso
             
             # Create LassoSelector instance if needed
             if lasso_state['selector'] is None:
@@ -2432,14 +2410,10 @@ class ModelCanvasLoader:
             # Lasso selection logic (copied from old _on_palette_operation_triggered)
             from shypn.edit.lasso_selector import LassoSelector
             
-            # Get or create lasso state
-            if drawing_area not in self._lasso_state:
-                self._lasso_state[drawing_area] = {
-                    'active': False,
-                    'selector': None
-                }
-            
-            lasso_state = self._lasso_state[drawing_area]
+            # Get or create lasso state via canvas context
+            if drawing_area not in self._canvas_ctx:
+                self._canvas_ctx[drawing_area] = CanvasInteractionContext()
+            lasso_state = self._canvas_ctx[drawing_area].lasso
             
             # Create LassoSelector instance if needed
             if lasso_state['selector'] is None:
@@ -2757,18 +2731,9 @@ class ModelCanvasLoader:
         drawing_area.connect('motion-notify-event', self._on_motion_notify, manager)
         drawing_area.connect('scroll-event', self._on_scroll_event, manager)
         drawing_area.connect('key-press-event', self._on_key_press_event, manager)
-        if not hasattr(self, '_drag_state'):
-            self._drag_state = {}
-        self._drag_state[drawing_area] = {'active': False, 'button': 0, 'start_x': 0, 'start_y': 0, 'is_panning': False, 'is_rect_selecting': False, 'is_transforming': False}
-        if not hasattr(self, '_arc_state'):
-            self._arc_state = {}
-        self._arc_state[drawing_area] = {'source': None, 'cursor_pos': (0, 0), 'target_valid': None, 'hovered_target': None, 'ignore_next_release': False}
-        if not hasattr(self, '_click_state'):
-            self._click_state = {}
-        self._click_state[drawing_area] = {'last_click_time': 0.0, 'last_click_obj': None, 'double_click_threshold': 0.3, 'pending_timeout': None, 'pending_click_data': None}
-        if not hasattr(self, '_lasso_state'):
-            self._lasso_state = {}
-        self._lasso_state[drawing_area] = {'active': False, 'selector': None}
+        if not hasattr(self, '_canvas_ctx'):
+            self._canvas_ctx = {}
+        self._canvas_ctx[drawing_area] = CanvasInteractionContext()
         self._setup_canvas_context_menu(drawing_area, manager)
 
         # Also attach handlers to GtkViewport (wrapper inside scrolled window),
@@ -2838,9 +2803,10 @@ class ModelCanvasLoader:
         if not widget.has_focus():
             widget.grab_focus()
         
-        state = self._drag_state[widget]
-        arc_state = self._arc_state[widget]
-        lasso_state = self._lasso_state.get(widget, {})
+        ctx = self._canvas_ctx[widget]
+        state = ctx.drag
+        arc_state = ctx.arc
+        lasso_state = ctx.lasso
         
         # Check if lasso mode is active
         if lasso_state.get('active', False) and event.button == 1:
@@ -2947,7 +2913,7 @@ class ModelCanvasLoader:
             if clicked_obj is not None:
                 import time
                 from gi.repository import GLib
-                click_state = self._click_state[widget]
+                click_state = ctx.click
                 current_time = time.time()
                 time_since_last = current_time - click_state['last_click_time']
                 is_double_click = time_since_last < click_state['double_click_threshold'] and click_state['last_click_obj'] == clicked_obj
@@ -3047,8 +3013,9 @@ class ModelCanvasLoader:
 
     def _on_button_release(self, widget, event, manager):
         """Handle button release events (GTK3)."""
-        state = self._drag_state[widget]
-        lasso_state = self._lasso_state.get(widget, {})
+        ctx = self._canvas_ctx[widget]
+        state = ctx.drag
+        lasso_state = ctx.lasso
         
         # Complete lasso selection if active
         if lasso_state.get('active', False) and lasso_state.get('selector'):
@@ -3126,9 +3093,10 @@ class ModelCanvasLoader:
 
     def _on_motion_notify(self, widget, event, manager):
         """Handle motion events (GTK3)."""
-        state = self._drag_state[widget]
-        arc_state = self._arc_state[widget]
-        lasso_state = self._lasso_state.get(widget, {})
+        ctx = self._canvas_ctx[widget]
+        state = ctx.drag
+        arc_state = ctx.arc
+        lasso_state = ctx.lasso
         manager.set_pointer_position(event.x, event.y)
         world_x, world_y = manager.screen_to_world(event.x, event.y)
         arc_state['cursor_pos'] = (world_x, world_y)
@@ -3204,7 +3172,7 @@ class ModelCanvasLoader:
                 # Notify report panel of user interaction
                 self._mark_interaction(widget)
                 
-                click_state = self._click_state.get(widget)
+                click_state = ctx.click
                 if click_state and click_state.get('pending_timeout'):
                     from gi.repository import GLib
                     GLib.source_remove(click_state['pending_timeout'])
@@ -3260,6 +3228,7 @@ class ModelCanvasLoader:
 
     def _on_key_press_event(self, widget, event, manager):
         """Handle key press events (GTK3)."""
+        ctx = self._canvas_ctx.get(widget)
         # First, let editing operations palette handle its shortcuts
         if widget in self.overlay_managers:
             overlay_manager = self.overlay_managers[widget]
@@ -3379,7 +3348,7 @@ class ModelCanvasLoader:
         if event.keyval == Gdk.KEY_Escape:
             pass
             # Cancel lasso if active
-            lasso_state = self._lasso_state.get(widget, {})
+            lasso_state = ctx.lasso if ctx else {}
             if lasso_state.get('active', False) and lasso_state.get('selector'):
                 if lasso_state['selector'].is_active:
                     lasso_state['selector'].cancel_lasso()
@@ -3494,14 +3463,13 @@ class ModelCanvasLoader:
         manager.rectangle_selection.render(cr, manager.zoom)
         
         # Render lasso if active
-        if drawing_area in self._lasso_state:
-            lasso_state = self._lasso_state[drawing_area]
-            if lasso_state.get('active', False) and lasso_state.get('selector'):
-                lasso_state['selector'].render_lasso(cr, manager.zoom)
+        ctx = self._canvas_ctx.get(drawing_area)
+        if ctx and ctx.lasso.get('active', False) and ctx.lasso.get('selector'):
+            ctx.lasso['selector'].render_lasso(cr, manager.zoom)
         
         # Highlight source object when creating arc
-        if drawing_area in self._arc_state:
-            arc_state = self._arc_state[drawing_area]
+        if ctx:
+            arc_state = ctx.arc
             source = arc_state.get('source')
             
             if source is not None:
@@ -3543,8 +3511,8 @@ class ModelCanvasLoader:
                     cr.stroke()
         
         cr.restore()
-        if drawing_area in self._arc_state:
-            arc_state = self._arc_state[drawing_area]
+        if ctx:
+            arc_state = ctx.arc
             if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
                 self._draw_arc_preview(cr, arc_state, manager)
         manager.mark_canvas_clean()
@@ -3699,14 +3667,8 @@ class ModelCanvasLoader:
         """
         from shypn.netobjs import Place, Transition, Arc
         menu = Gtk.Menu()
-        if isinstance(obj, Place):
-            obj_type = 'Place'
-        elif isinstance(obj, Transition):
-            obj_type = 'Transition'
-        elif isinstance(obj, Arc):
-            obj_type = 'Arc'
-        else:
-            obj_type = 'Object'
+        _TYPE_LABELS = {Place: 'Place', Transition: 'Transition', Arc: 'Arc'}
+        obj_type = next((lbl for cls, lbl in _TYPE_LABELS.items() if isinstance(obj, cls)), 'Object')
         
         # Format title with ID for arcs, just name for other objects
         if isinstance(obj, Arc):
@@ -3738,99 +3700,15 @@ class ModelCanvasLoader:
             # For normal objects, include "Edit Mode" option
             menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
         
-        # Add signal place conversion options for places
-        if isinstance(obj, Place):
-            is_signal = getattr(obj, 'is_signal_place', False)
-            
-            if is_signal:
-                # If already a signal place, offer to remove designation
-                menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
-            else:
-                # If not a signal place, offer conversion submenu
-                signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
-                signal_submenu = Gtk.Menu()
-                
-                signal_types = [
-                    ('energy', 'Ψₑ - Energy/Metabolic State'),
-                    ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
-                    ('quorum', 'Ψq - Quorum/Cell Communication'),
-                    ('spatial', 'Ψₛ - Spatial/Compartment Sensing')
-                ]
-                
-                for type_value, type_label in signal_types:
-                    signal_item = Gtk.MenuItem(label=type_label)
-                    signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
-                    signal_item.show()
-                    signal_submenu.append(signal_item)
-                
-                signal_submenu_item.set_submenu(signal_submenu)
-                signal_submenu_item.show()
-                menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
-            
-            # Add separator after signal place options
-            menu_items.insert(3, None)
-        
-        if isinstance(obj, Transition):
-            type_submenu_item = Gtk.MenuItem(label='Change Type ►')
-            type_submenu = Gtk.Menu()
-            current_type = getattr(obj, 'transition_type', 'continuous')
-            transition_types = [('immediate', 'Immediate (zero delay)'), ('timed', 'Timed (TPN)'), ('stochastic', 'Stochastic (GSPN)'), ('continuous', 'Continuous (SHPN)')]
-            for type_value, type_label in transition_types:
-                if type_value == current_type:
-                    label = f'✓ {type_label}'
-                else:
-                    label = f'   {type_label}'
-                type_item = Gtk.MenuItem(label=label)
-                type_item.connect('activate', lambda w, t=type_value: self._on_transition_type_change(obj, t, manager, drawing_area))
-                type_item.show()
-                type_submenu.append(type_item)
-            type_submenu_item.set_submenu(type_submenu)
-            type_submenu_item.show()
-            menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
-            
-            # Add flip orientation menu item
-            menu_items.insert(3, ('Flip Orientation', lambda: self._on_transition_flip_orientation(obj, manager, drawing_area)))
-        if isinstance(obj, Arc):
-            pass
-            # Add arc transformation options (flattened - no submenus)
-            from shypn.utils.arc_transform import is_straight, is_curved, is_inhibitor, is_normal
-            from shypn.netobjs.place import Place
-            from shypn.netobjs.transition import Transition
-            from shypn.netobjs.test_arc import TestArc
-            from shypn.netobjs.inhibitor_arc import InhibitorArc
-            
-            # Check arc type capabilities
-            can_be_inhibitor = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
-            can_be_test = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
-            is_test = isinstance(obj, TestArc)
-            is_inhibitor_arc = isinstance(obj, InhibitorArc)
-            is_normal_arc = not is_test and not is_inhibitor_arc
-            
-            # Add weight editing option first
-            menu_items.insert(2, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
-            
-            # Add separator
-            menu_items.insert(3, None)
-            
-            # Add curve/straight transformation
-            if is_curved(obj):
-                menu_items.insert(4, ('Transform to Straight', lambda: self._on_arc_make_straight(obj, manager, drawing_area)))
-            elif is_straight(obj):
-                menu_items.insert(4, ('Transform to Curved', lambda: self._on_arc_make_curved(obj, manager, drawing_area)))
-            
-            # Arc Type Conversion Options (flattened - no nested submenu)
-            if can_be_test or can_be_inhibitor:
-                # Normal arc option
-                if not is_normal_arc:
-                    menu_items.insert(5, ('Convert to Normal Arc', lambda: self._on_arc_convert_to_normal(obj, manager, drawing_area)))
-                
-                # Test arc option (catalyst) - only for Place → Transition
-                if can_be_test and not is_test:
-                    menu_items.insert(5, ('Convert to Test Arc (Catalyst)', lambda: self._on_arc_convert_to_test(obj, manager, drawing_area)))
-                
-                # Inhibitor arc option - only for Place → Transition
-                if can_be_inhibitor and not is_inhibitor_arc:
-                    menu_items.insert(5, ('Convert to Inhibitor Arc', lambda: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area)))
+        # Dispatch to type-specific menu-item builders
+        for obj_cls, builder in [
+            (Place, self._add_place_context_items),
+            (Transition, self._add_transition_context_items),
+            (Arc, self._add_arc_context_items),
+        ]:
+            if isinstance(obj, obj_cls):
+                builder(obj, menu_items, manager, drawing_area)
+                break
         for item_data in menu_items:
             if item_data is None:
                 menu_item = Gtk.SeparatorMenuItem()
@@ -3881,12 +3759,94 @@ class ModelCanvasLoader:
         # popup_at_pointer() handles parent relationships correctly
         menu.popup_at_pointer(None)
 
+    # ------------------------------------------------------------------
+    # Context-menu type-specific item builders (split from _show_object_context_menu)
+    # ------------------------------------------------------------------
+
+    def _add_place_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
+        """Append Place-specific items to the context-menu items list."""
+        is_signal = getattr(obj, 'is_signal_place', False)
+        if is_signal:
+            menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
+        else:
+            signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
+            signal_submenu = Gtk.Menu()
+            for type_value, type_label in [
+                ('energy', 'Ψₑ - Energy/Metabolic State'),
+                ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
+                ('quorum', 'Ψq - Quorum/Cell Communication'),
+                ('spatial', 'Ψₛ - Spatial/Compartment Sensing'),
+            ]:
+                signal_item = Gtk.MenuItem(label=type_label)
+                signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
+                signal_item.show()
+                signal_submenu.append(signal_item)
+            signal_submenu_item.set_submenu(signal_submenu)
+            signal_submenu_item.show()
+            menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
+        menu_items.insert(3, None)  # separator after signal place options
+
+    def _add_transition_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
+        """Append Transition-specific items to the context-menu items list."""
+        type_submenu_item = Gtk.MenuItem(label='Change Type ►')
+        type_submenu = Gtk.Menu()
+        current_type = getattr(obj, 'transition_type', 'continuous')
+        for type_value, type_label in [
+            ('immediate', 'Immediate (zero delay)'),
+            ('timed', 'Timed (TPN)'),
+            ('stochastic', 'Stochastic (GSPN)'),
+            ('continuous', 'Continuous (SHPN)'),
+        ]:
+            label = f'✓ {type_label}' if type_value == current_type else f'   {type_label}'
+            type_item = Gtk.MenuItem(label=label)
+            type_item.connect('activate', lambda w, t=type_value: self._on_transition_type_change(obj, t, manager, drawing_area))
+            type_item.show()
+            type_submenu.append(type_item)
+        type_submenu_item.set_submenu(type_submenu)
+        type_submenu_item.show()
+        menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
+        menu_items.insert(3, ('Flip Orientation', lambda: self._on_transition_flip_orientation(obj, manager, drawing_area)))
+
+    def _add_arc_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
+        """Append Arc-specific items to the context-menu items list."""
+        from shypn.utils.arc_transform import is_straight, is_curved, is_signal_flow
+        from shypn.netobjs.place import Place
+        from shypn.netobjs.transition import Transition
+        from shypn.netobjs.test_arc import TestArc
+        from shypn.netobjs.inhibitor_arc import InhibitorArc
+
+        can_be_directional = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
+        is_test = isinstance(obj, TestArc)
+        is_inhibitor_arc = isinstance(obj, InhibitorArc)
+        is_signal = is_signal_flow(obj)
+        is_normal_arc = not is_test and not is_inhibitor_arc and not is_signal
+
+        menu_items.insert(2, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
+        menu_items.insert(3, None)
+
+        if is_curved(obj):
+            menu_items.insert(4, ('Transform to Straight', lambda: self._on_arc_make_straight(obj, manager, drawing_area)))
+        elif is_straight(obj):
+            menu_items.insert(4, ('Transform to Curved', lambda: self._on_arc_make_curved(obj, manager, drawing_area)))
+
+        if can_be_directional:
+            if not is_normal_arc:
+                menu_items.insert(5, ('Convert to Normal Arc', lambda: self._on_arc_convert_to_normal(obj, manager, drawing_area)))
+            if not is_test:
+                menu_items.insert(5, ('Convert to Test Arc (Catalyst)', lambda: self._on_arc_convert_to_test(obj, manager, drawing_area)))
+            if not is_inhibitor_arc:
+                menu_items.insert(5, ('Convert to Inhibitor Arc', lambda: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area)))
+
+        # Signal flow arcs can connect in both directions
+        if not is_signal:
+            menu_items.insert(5, ('Convert to Signal Flow Arc', lambda: self._on_arc_convert_to_signal_flow(obj, manager, drawing_area)))
+
     def get_canvas_manager(self, drawing_area=None):
         """Get the canvas manager for a drawing area.
-        
+
         Args:
             drawing_area: GtkDrawingArea. If None, returns manager for current document.
-            
+
         Returns:
             ModelCanvasManager: Canvas manager instance, or None if not found.
         """
@@ -4637,282 +4597,41 @@ class ModelCanvasLoader:
         manager.pan_y = 0
         drawing_area.queue_draw()
 
+    # ------------------------------------------------------------------
+    # Layout delegates — logic lives in CanvasLayoutController
+    # ------------------------------------------------------------------
+
     def _on_layout_auto_clicked(self, menu, drawing_area, manager):
-        """Apply automatic layout (best algorithm for graph topology)."""
-        try:
-            from shypn.edit.graph_layout import LayoutEngine
-            
-            # Check if there are nodes to layout
-            if not manager.places and not manager.transitions:
-                self._show_layout_message("No objects to layout", drawing_area)
-                return
-            
-            # Calculate current center of objects (to preserve relative position)
-            all_objs = list(manager.places) + list(manager.transitions)
-            if all_objs:
-                center_x = sum(obj.x for obj in all_objs) / len(all_objs)
-                center_y = sum(obj.y for obj in all_objs) / len(all_objs)
-            else:
-                pass
-                # Default to canvas center
-                center_x = manager.canvas_width / 2
-                center_y = manager.canvas_height / 2
-            
-            # Get layout parameters from Layout Settings (palette parameter panel)
-            layout_params = {}
-            try:
-                if drawing_area in self.overlay_managers:
-                    overlay_mgr = self.overlay_managers.get(drawing_area)
-                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
-                        swissknife = overlay_mgr.swissknife_palette
-                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
-                            settings_loader = swissknife.layout_settings_loader
-                            if settings_loader and hasattr(settings_loader, 'get_settings'):
-                                all_settings = settings_loader.get_settings()
-                                if all_settings:
-                                    # Provide all settings - auto will select best algorithm and use appropriate params
-                                    layout_params = {
-                                        'layer_spacing': all_settings.get('layer_spacing', 150),
-                                        'node_spacing': all_settings.get('node_spacing', 100),
-                                        'iterations': all_settings.get('iterations', 500),
-                                        'k_multiplier': all_settings.get('k_multiplier', 1.5),
-                                        'scale': all_settings.get('scale', 2000.0)
-                                    }
-            except Exception as e:
-                # Use defaults if we can't get settings - don't block layout
-                import traceback
-                print(f"Warning: Could not get layout parameters: {e}")
-                traceback.print_exc()
-                layout_params = {}
-            
-            # Create engine and apply layout with parameters
-            engine = LayoutEngine(manager)
-            result = engine.apply_layout('auto', **layout_params)
-            
-            # The layout algorithms center at (0, 0), so we need to offset
-            # back to the original center or canvas center
-            all_objs = list(manager.places) + list(manager.transitions)
-            if all_objs:
-                pass
-                # Calculate new center after layout
-                new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
-                new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
-                
-                # Calculate offset needed
-                offset_x = center_x - new_center_x
-                offset_y = center_y - new_center_y
-                
-                # Apply offset to all objects
-                for obj in all_objs:
-                    obj.x += offset_x
-                    obj.y += offset_y
-            
-            # Show result
-            message = (f"Applied {result['algorithm']} layout\n"
-                      f"Moved {result['nodes_moved']} objects\n"
-                      f"Reason: {result['reason']}")
-            if layout_params and result.get('parameters'):
-                # Show what parameters were actually used
-                message += f"\nParameters: {result['parameters']}"
-            self._show_layout_message(message, drawing_area)
-            
-            # Redraw
-            drawing_area.queue_draw()
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_auto_clicked(menu, drawing_area, manager)
+
     def _on_layout_hierarchical_clicked(self, menu, drawing_area, manager):
-        """Apply hierarchical (Sugiyama) layout."""
-        self._apply_specific_layout(manager, drawing_area, 'hierarchical', 'Hierarchical (Sugiyama)')
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_hierarchical_clicked(menu, drawing_area, manager)
+
     def _on_layout_force_clicked(self, menu, drawing_area, manager):
-        """Apply force-directed (Fruchterman-Reingold) layout."""
-        self._apply_specific_layout(manager, drawing_area, 'force_directed', 'Force-Directed')
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_force_clicked(menu, drawing_area, manager)
+
     def _on_layout_solar_system_clicked(self, menu, drawing_area, manager):
-        """Apply Solar System (SSCC) layout with unified physics."""
-        try:
-            from shypn.layout.sscc import SolarSystemLayoutEngine
-            
-            # Check if there are nodes to layout
-            if not manager.places and not manager.transitions:
-                self._show_layout_message("No objects to layout", drawing_area)
-                return
-            
-            # Create engine with unified physics (all forces active)
-            engine = SolarSystemLayoutEngine(
-                iterations=1000,
-                use_arc_weight=True,
-                scc_radius=50.0,
-                planet_orbit=300.0,
-                satellite_orbit=50.0
-            )
-            
-            # Apply layout
-            positions = engine.apply_layout(
-                places=list(manager.places),
-                transitions=list(manager.transitions),
-                arcs=list(manager.arcs)
-            )
-            
-            # Update object positions
-            for obj_id, (x, y) in positions.items():
-                pass
-                # Find object by ID
-                obj = None
-                for place in manager.places:
-                    if place.id == obj_id:
-                        obj = place
-                        break
-                if not obj:
-                    for transition in manager.transitions:
-                        if transition.id == obj_id:
-                            obj = transition
-                            break
-                
-                if obj:
-                    obj.x = x
-                    obj.y = y
-            
-            # Get statistics
-            stats = engine.get_statistics()
-            message = f"Applied Solar System (SSCC) layout\n"
-            message += f"Physics: {stats['physics_model']}\n"
-            message += f"SCCs found: {stats['num_sccs']}\n"
-            message += f"Nodes in SCCs: {stats['num_nodes_in_sccs']}\n"
-            message += f"Free places: {stats['num_free_places']}"
-            self._show_layout_message(message, drawing_area)
-            
-            # Redraw
-            drawing_area.queue_draw()
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self._show_layout_message(f"Solar System layout error: {str(e)}", drawing_area)
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_solar_system_clicked(menu, drawing_area, manager)
+
     def _on_layout_circular_clicked(self, menu, drawing_area, manager):
-        """Apply circular layout."""
-        self._apply_specific_layout(manager, drawing_area, 'circular', 'Circular')
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_circular_clicked(menu, drawing_area, manager)
+
     def _on_layout_orthogonal_clicked(self, menu, drawing_area, manager):
-        """Apply orthogonal (grid-aligned) layout."""
-        self._apply_specific_layout(manager, drawing_area, 'orthogonal', 'Orthogonal')
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._on_layout_orthogonal_clicked(menu, drawing_area, manager)
+
     def _apply_specific_layout(self, manager, drawing_area, algorithm, algorithm_name):
-        """Apply a specific layout algorithm.
-        
-        Args:
-            manager: ModelCanvasManager instance
-            drawing_area: GtkDrawingArea widget
-            algorithm: Algorithm name ('hierarchical', 'force_directed', etc.)
-            algorithm_name: Human-readable name for messages
-        """
-        try:
-            from shypn.edit.graph_layout import LayoutEngine
-            
-            # Check if there are nodes to layout
-            if not manager.places and not manager.transitions:
-                self._show_layout_message("No objects to layout", drawing_area)
-                return
-            
-            # Calculate current center of objects (to preserve relative position)
-            all_objs = list(manager.places) + list(manager.transitions)
-            if all_objs:
-                center_x = sum(obj.x for obj in all_objs) / len(all_objs)
-                center_y = sum(obj.y for obj in all_objs) / len(all_objs)
-            else:
-                pass
-                # Default to canvas center
-                center_x = manager.canvas_width / 2
-                center_y = manager.canvas_height / 2
-            
-            # Try to get layout parameters from Layout Settings (palette parameter panel)
-            layout_params = {}
-            try:
-                # First priority: Layout palette parameter panel (layout_settings_loader)
-                if drawing_area in self.overlay_managers:
-                    overlay_mgr = self.overlay_managers.get(drawing_area)
-                    if overlay_mgr and hasattr(overlay_mgr, 'swissknife_palette'):
-                        swissknife = overlay_mgr.swissknife_palette
-                        if swissknife and hasattr(swissknife, 'layout_settings_loader'):
-                            settings_loader = swissknife.layout_settings_loader
-                            if settings_loader and hasattr(settings_loader, 'get_settings'):
-                                all_settings = settings_loader.get_settings()
-                                if all_settings:
-                                    # Extract parameters relevant to this algorithm
-                                    if algorithm == 'hierarchical':
-                                        layout_params = {
-                                            'layer_spacing': all_settings.get('layer_spacing', 150),
-                                            'node_spacing': all_settings.get('node_spacing', 100)
-                                        }
-                                    elif algorithm == 'force_directed':
-                                        layout_params = {
-                                            'iterations': all_settings.get('iterations', 500),
-                                            'k_multiplier': all_settings.get('k_multiplier', 1.5),
-                                            'scale': all_settings.get('scale', 2000.0)
-                                        }
-                
-                # Fallback: SBML Import panel (for SBML import workflows)
-                if not layout_params and hasattr(self, 'sbml_panel') and self.sbml_panel:
-                    layout_params = self.sbml_panel.get_layout_parameters_for_algorithm(algorithm)
-                    if not layout_params:
-                        layout_params = {}
-            except Exception as e:
-                # If we can't get params, just use defaults - don't block layout
-                import traceback
-                print(f"Warning: Could not get layout parameters: {e}")
-                traceback.print_exc()
-                layout_params = {}
-            
-            # Create engine and apply layout with parameters
-            engine = LayoutEngine(manager)
-            result = engine.apply_layout(algorithm, **layout_params)
-            
-            # The layout algorithms center at (0, 0), so we need to offset
-            # back to the original center or canvas center
-            all_objs = list(manager.places) + list(manager.transitions)
-            if all_objs:
-                pass
-                # Calculate new center after layout
-                new_center_x = sum(obj.x for obj in all_objs) / len(all_objs)
-                new_center_y = sum(obj.y for obj in all_objs) / len(all_objs)
-                
-                # Calculate offset needed
-                offset_x = center_x - new_center_x
-                offset_y = center_y - new_center_y
-                
-                # Apply offset to all objects
-                for obj in all_objs:
-                    obj.x += offset_x
-                    obj.y += offset_y
-            
-            # Show result
-            message = f"Applied {algorithm_name} layout\nMoved {result['nodes_moved']} objects"
-            if layout_params:
-                message += f"\nParameters: {layout_params}"
-            self._show_layout_message(message, drawing_area)
-            
-            # Redraw
-            drawing_area.queue_draw()
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self._show_layout_message(f"Layout error: {str(e)}", drawing_area)
-    
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._apply_specific_layout(manager, drawing_area, algorithm, algorithm_name)
+
     def _show_layout_message(self, message, drawing_area):
-        """Show a temporary message on the status bar or console.
-        
-        Args:
-            message: Message to display
-            drawing_area: GtkDrawingArea widget (for future status bar integration)
-        """
-        # Message displayed - could be wired to status bar in future
-        pass
+        """Delegate to CanvasLayoutController."""
+        self.layout_ctrl._show_layout_message(message, drawing_area)
 
     def _on_object_delete(self, obj, manager, drawing_area):
         """Delete an object from the canvas.
@@ -5011,7 +4730,7 @@ class ModelCanvasLoader:
             drawing_area: GtkDrawingArea widget
         """
         # Clear arc creation state to prevent spurious arc creation
-        arc_state = self._arc_state.get(drawing_area)
+        arc_state = self._canvas_ctx[drawing_area].arc if drawing_area in self._canvas_ctx else None
         if arc_state:
             arc_state['source'] = None
             arc_state['ignore_next_release'] = True  # Ignore any queued mouse events
@@ -5106,7 +4825,7 @@ class ModelCanvasLoader:
         
         # CRITICAL: Clear ALL arc creation state before opening dialog
         # This prevents spurious arc creation when dialog closes
-        arc_state = self._arc_state.get(drawing_area)
+        arc_state = self._canvas_ctx[drawing_area].arc if drawing_area in self._canvas_ctx else None
         if arc_state:
             arc_state['source'] = None
             arc_state['cursor_pos'] = (0, 0)
@@ -5119,10 +4838,7 @@ class ModelCanvasLoader:
             manager.set_tool('select')  # Force to select mode during dialog
         
         from shypn.netobjs import Place, Transition, Arc
-        from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
-        from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
-        from shypn.helpers.arc_prop_dialog_loader import create_arc_prop_dialog
-        
+
         # CRITICAL: Ensure parent_window is valid for Wayland
         if not self.parent_window:
             return
@@ -5189,41 +4905,9 @@ class ModelCanvasLoader:
         # main_window is set in shypn.py after ModelCanvasLoader initialization
         parent_window = getattr(self, 'main_window', None)
         
-        dialog_loader = None
-        if isinstance(obj, Place):
-            dialog_loader = create_place_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager)
-        elif isinstance(obj, Transition):
-            data_collector = None
-            if drawing_area in self.overlay_managers:
-                overlay_manager = self.overlay_managers[drawing_area]
-                
-                
-                # Get from SwissKnifePalette widget_palette_instances
-                # NOTE: New SwissKnifePalette architecture stores widget palettes in registry
-                if hasattr(overlay_manager, 'swissknife_palette'):
-                    swissknife = overlay_manager.swissknife_palette
-                    
-                    # Try new architecture (registry.widget_palette_instances)
-                    if hasattr(swissknife, 'registry') and hasattr(swissknife.registry, 'widget_palette_instances'):
-                        simulate_tools = swissknife.registry.widget_palette_instances.get('simulate')
-                        if simulate_tools and hasattr(simulate_tools, 'data_collector'):
-                            data_collector = simulate_tools.data_collector
-                    # Fallback to old architecture (widget_palette_instances directly)
-                    elif hasattr(swissknife, 'widget_palette_instances'):
-                        simulate_tools = swissknife.widget_palette_instances.get('simulate')
-                        if simulate_tools and hasattr(simulate_tools, 'data_collector'):
-                            data_collector = simulate_tools.data_collector
-            else:
-                pass
-                
-            dialog_loader = create_transition_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager, data_collector=data_collector)
-        elif isinstance(obj, Arc):
-            dialog_loader = create_arc_prop_dialog(obj, parent_window=parent_window, persistency_manager=self.persistency, model=manager)
-        else:
+        dialog_loader = self._create_properties_dialog(obj, parent_window, manager, drawing_area)
+        if dialog_loader is None:
             return
-        if isinstance(obj, Arc):
-
-            pass
 
         def on_properties_changed(loader):
             # CRITICAL FIX: Use loader.arc_obj instead of closure obj
@@ -5302,6 +4986,54 @@ class ModelCanvasLoader:
         # Show dialog
         self._show_dialog_safely(dialog_loader, drawing_area, original_tool, manager)
     
+    # ------------------------------------------------------------------
+    # Properties dialog helpers (split from _on_object_properties)
+    # ------------------------------------------------------------------
+
+    def _get_simulation_data_collector(self, drawing_area):
+        """Return the DataCollector for the given drawing area's simulate palette.
+
+        Returns ``None`` when no matching palette is found.
+        """
+        overlay_manager = self.overlay_managers.get(drawing_area)
+        if overlay_manager is None:
+            return None
+        swissknife = getattr(overlay_manager, 'swissknife_palette', None)
+        if swissknife is None:
+            return None
+        # New architecture: registry holds widget palette instances
+        registry = getattr(swissknife, 'registry', None)
+        if registry and hasattr(registry, 'widget_palette_instances'):
+            simulate_tools = registry.widget_palette_instances.get('simulate')
+        else:
+            simulate_tools = getattr(swissknife, 'widget_palette_instances', {}).get('simulate')
+        return getattr(simulate_tools, 'data_collector', None) if simulate_tools else None
+
+    def _create_properties_dialog(self, obj, parent_window, manager, drawing_area):
+        """Return the appropriate properties dialog loader for *obj*.
+
+        Uses a type → factory dispatch so that adding new object types requires
+        only an additional entry rather than a growing elif chain.
+
+        Returns ``None`` when *obj* is not a recognised net-object type.
+        """
+        from shypn.netobjs import Place, Transition, Arc
+        from shypn.helpers.place_prop_dialog_loader import create_place_prop_dialog
+        from shypn.helpers.transition_prop_dialog_loader import create_transition_prop_dialog
+        from shypn.helpers.arc_prop_dialog_loader import create_arc_prop_dialog
+
+        common = dict(parent_window=parent_window, persistency_manager=self.persistency, model=manager)
+
+        for cls, factory in [
+            (Place, lambda o: create_place_prop_dialog(o, **common)),
+            (Transition, lambda o: create_transition_prop_dialog(
+                o, data_collector=self._get_simulation_data_collector(drawing_area), **common)),
+            (Arc, lambda o: create_arc_prop_dialog(o, **common)),
+        ]:
+            if isinstance(obj, cls):
+                return factory(obj)
+        return None
+
     def _show_dialog_safely(self, dialog_loader, drawing_area, original_tool, manager):
         """Show dialog with error handling.
         
@@ -5342,7 +5074,7 @@ class ModelCanvasLoader:
         
         # Clear arc creation state again after dialog closes to prevent spurious arc creation
         # This handles the case where mouse release happens after dialog closes
-        arc_state = self._arc_state.get(drawing_area)
+        arc_state = self._canvas_ctx[drawing_area].arc if drawing_area in self._canvas_ctx else None
         if arc_state:
             arc_state['source'] = None
             arc_state['cursor_pos'] = (0, 0)
@@ -5417,11 +5149,9 @@ class ModelCanvasLoader:
         ColorSchemaManager.reset_place_color(place)  # Blue border for signal places
         
         # Convert connected arcs to SignalFlowArcs
-        from shypn.netobjs.arc import Arc
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.netobjs.test_arc import TestArc
         from shypn.netobjs.inhibitor_arc import InhibitorArc
-        from shypn.utils.arc_transform import convert_to_signal_flow
+        from shypn.utils.arc_transform import convert_to_signal_flow, is_signal_flow
         
         arcs_converted = 0
         arcs_to_replace = []  # List of (old_arc, new_arc) tuples
@@ -5431,23 +5161,23 @@ class ModelCanvasLoader:
             if arc.source != place and arc.target != place:
                 continue
             
-            # Skip if arc is already a SignalFlowArc
-            if isinstance(arc, SignalFlowArc):
+            # Skip if arc is already a signal flow arc (straight or curved)
+            if is_signal_flow(arc):
                 continue
             
             # Skip test arcs and inhibitor arcs (they have special semantics)
             if isinstance(arc, (TestArc, InhibitorArc)):
                 continue
             
-            # Convert regular Arc to SignalFlowArc
-            if isinstance(arc, Arc) and arc.__class__ == Arc:
-                try:
-                    new_arc = convert_to_signal_flow(arc)
-                    arcs_to_replace.append((arc, new_arc))
-                    arcs_converted += 1
-                except ValueError as e:
-                    # Conversion failed (shouldn't happen, but log if it does)
-                    print(f"Warning: Failed to convert arc {arc.id}: {e}")
+            # Convert Arc or CurvedArc to SignalFlowArc / CurvedSignalFlowArc
+            # (curvature is preserved by convert_to_signal_flow)
+            # ColorSchemaManager is applied inside the constructor via reset_arc_color
+            try:
+                new_arc = convert_to_signal_flow(arc)
+                arcs_to_replace.append((arc, new_arc))
+                arcs_converted += 1
+            except ValueError as e:
+                print(f"Warning: Failed to convert arc {arc.id}: {e}")
         
         # Replace arcs in manager
         for old_arc, new_arc in arcs_to_replace:
@@ -5496,9 +5226,8 @@ class ModelCanvasLoader:
         ColorSchemaManager.reset_place_color(place)
         
         # Convert SignalFlowArcs back to normal Arcs if they don't connect to other signal places
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.netobjs.place import Place
-        from shypn.utils.arc_transform import convert_to_normal
+        from shypn.utils.arc_transform import convert_to_normal, is_signal_flow
         
         arcs_converted = 0
         arcs_to_replace = []  # List of (old_arc, new_arc) tuples
@@ -5508,8 +5237,8 @@ class ModelCanvasLoader:
             if arc.source != place and arc.target != place:
                 continue
             
-            # Only process SignalFlowArcs
-            if not isinstance(arc, SignalFlowArc):
+            # Only process signal flow arcs (straight or curved)
+            if not is_signal_flow(arc):
                 continue
             
             # Check if arc still connects to another signal place
@@ -5666,6 +5395,32 @@ class ModelCanvasLoader:
             drawing_area.queue_draw()
         except ValueError as e:
             # Invalid transformation (e.g., Transition → Place)
+            self._show_error_dialog(str(e))
+            return
+
+    def _on_arc_convert_to_signal_flow(self, arc, manager, drawing_area):
+        """Convert arc to signal flow type.
+
+        Signal flow arcs carry dual semantics: they consume/produce tokens
+        (like normal arcs) and also propagate information to the vertical
+        decision hierarchy layers. Curvature is preserved.
+
+        Args:
+            arc: Arc object
+            manager: ModelCanvasManager instance
+            drawing_area: GtkDrawingArea widget
+        """
+        from shypn.utils.arc_transform import convert_to_signal_flow
+
+        try:
+            new_arc = convert_to_signal_flow(arc)
+            manager.replace_arc(arc, new_arc)
+
+            # Invalidate ModelAdapter cache if simulation is running
+            self._invalidate_simulation_cache(manager)
+
+            drawing_area.queue_draw()
+        except ValueError as e:
             self._show_error_dialog(str(e))
             return
     

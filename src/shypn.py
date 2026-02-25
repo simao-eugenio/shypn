@@ -115,6 +115,16 @@ def main(argv=None):
 		# Load workspace settings
 		from shypn.workspace_settings import WorkspaceSettings
 		workspace_settings = WorkspaceSettings()
+
+		# Initialize global service container
+		try:
+			from shypn.di import get_container, register_core_services, register_application_services
+			_container = get_container()
+			workspace_dir = os.path.join(REPO_ROOT, 'workspace')
+			register_core_services(_container, workspace_path=workspace_dir)
+			register_application_services(_container)
+		except Exception as e:
+			logging.getLogger(__name__).warning('Service container init failed (non-fatal): %s', e)
 		
 		# Load CSS for main window styling
 		css_path = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.css')
@@ -718,12 +728,6 @@ def main(argv=None):
 								model_manager = overlay_manager.canvas_manager
 								report_loader.set_model_canvas(model_manager)
         # print(f"[TAB_REPORT] Updated Report Panel with model: {len(model_manager.places)} places, {len(model_manager.transitions)} transitions")
-							
-							# CRITICAL: Set controller to refresh Report Panel data
-							# This triggers refresh of all categories including Reaction Selected table
-							if hasattr(overlay_manager, 'simulation_controller'):
-								simulation_controller = overlay_manager.simulation_controller
-								report_loader.panel.set_controller(simulation_controller)
 							
 							model_canvas_loader.report_panel_container.pack_start(report_loader.panel, True, True, 0)
 							report_loader.parent_container = model_canvas_loader.report_panel_container

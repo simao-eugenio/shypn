@@ -13,9 +13,12 @@ COLOR NORMALIZATION (2025-12-31):
 
 See doc/COLOR_NORMALIZATION.md for details.
 """
+import logging
 import math
-from typing import List, Tuple
+from typing import Any, List, Tuple
 from shypn.netobjs.petri_net_object import PetriNetObject
+
+logger = logging.getLogger(__name__)
 
 
 class Arc(PetriNetObject):
@@ -86,7 +89,7 @@ class Arc(PetriNetObject):
         return self._properties
     
     @properties.setter
-    def properties(self, value: dict):
+    def properties(self, value: dict) -> None:
         """Set properties dict (for backward compatibility).
         
         Args:
@@ -109,7 +112,7 @@ class Arc(PetriNetObject):
         return self._metadata
     
     @metadata.setter
-    def metadata(self, value: dict):
+    def metadata(self, value: dict) -> None:
         """Set metadata dict with validation.
         
         Args:
@@ -146,20 +149,24 @@ class Arc(PetriNetObject):
         from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.netobjs.curved_arc import CurvedArc
         from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-        
-        if isinstance(self, CurvedInhibitorArc):
-            return "curved_inhibitor_arc"
-        if isinstance(self, CurvedArc):
-            return "curved_arc"
-        if isinstance(self, SignalFlowArc):
-            return "signal_flow"
-        if isinstance(self, TestArc):
-            return "test"
-        if isinstance(self, InhibitorArc):
-            return "inhibitor"
+        from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+
+        # Ordered most-specific first; lazily built here due to circular imports.
+        # CurvedSignalFlowArc must come before CurvedArc (it inherits from it).
+        _TYPE_MAP = (
+            (CurvedInhibitorArc,   "curved_inhibitor_arc"),
+            (CurvedSignalFlowArc,  "curved_opposite_signal_flow"),
+            (CurvedArc,            "curved_arc"),
+            (SignalFlowArc,        "signal_flow"),
+            (TestArc,              "test"),
+            (InhibitorArc,         "inhibitor"),
+        )
+        for cls, name in _TYPE_MAP:
+            if isinstance(self, cls):
+                return name
         return "normal"
     
-    def set_arc_type(self, arc_type: str):
+    def set_arc_type(self, arc_type: str) -> None:
         """Set the arc type by converting to appropriate class.
         
         Supported types: 'normal', 'test', 'inhibitor', 'signal_flow'
@@ -213,7 +220,7 @@ class Arc(PetriNetObject):
             return self._arc_type_override != 'test'
         return self.arc_type != 'test'
     
-    def get_bounding_box(self):
+    def get_bounding_box(self) -> dict:
         """Calculate bounding box for the arc.
         
         Returns bounding box containing the entire arc path including arrowheads.
@@ -263,27 +270,20 @@ class Arc(PetriNetObject):
         }
     
     def _is_signal_arc(self) -> bool:
-        """Check if this arc connects to a signal place.
-        
-        Signal arcs (connecting to Ψ places) are rendered with dashed lines
-        to visually distinguish information flow from mass transfer.
-        
+        """Check if this arc is a signal flow arc (for dashed rendering).
+
+        Dashed rendering belongs exclusively to SignalFlowArc and
+        CurvedSignalFlowArc — it represents the arc TYPE, not what the arc
+        connects to.  A plain Arc that happens to connect to a signal place
+        must NOT render dashed; it should be converted to SignalFlowArc first
+        (which happens automatically when a place is promoted to signal type).
+
         Returns:
-            bool: True if source or target is a signal place
+            bool: True only if this arc is a SignalFlowArc or CurvedSignalFlowArc
         """
-        from shypn.netobjs.place import Place
-        
-        # Check if source is a signal place
-        if isinstance(self.source, Place):
-            if hasattr(self.source, 'is_signal_place') and self.source.is_signal_place:
-                return True
-        
-        # Check if target is a signal place
-        if isinstance(self.target, Place):
-            if hasattr(self.target, 'is_signal_place') and self.target.is_signal_place:
-                return True
-        
-        return False
+        from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+        return isinstance(self, (SignalFlowArc, CurvedSignalFlowArc))
     
     @staticmethod
     def _validate_connection(source, target):
@@ -318,7 +318,7 @@ class Arc(PetriNetObject):
                 f"Valid connections: Place→Transition or Transition→Place."
             )
     
-    def render(self, cr, zoom=1.0):
+    def render(self, cr: Any, zoom: float = 1.0) -> None:
         """Render the arc as a line with arrowhead.
         
         Uses legacy rendering style with Cairo transform approach:
@@ -764,8 +764,8 @@ class Arc(PetriNetObject):
                 parallels = self._manager.detect_parallel_arcs(self)
                 if parallels:
                     parallel_offset = self._manager.calculate_arc_offset(self, parallels)
-            except Exception:
-                pass
+            except (AttributeError, TypeError) as e:
+                logger.debug("Parallel arc offset skipped: %s", e)
         
         # Tolerance: Account for visual stroke width plus comfortable margin
         # The arc centerline is measured, but users click on the visible stroke
@@ -875,7 +875,7 @@ class Arc(PetriNetObject):
             
             return dist_sq <= (tolerance * tolerance)
     
-    def set_position(self, x: float, y: float):
+    def set_position(self, x: float, y: float) -> None:
         """Arcs don't have a direct position (they connect other objects).
         
         This method is not applicable for arcs.
@@ -885,7 +885,7 @@ class Arc(PetriNetObject):
         """
         pass  # Arcs move when their source/target objects move
     
-    def set_weight(self, weight: float):
+    def set_weight(self, weight: float) -> None:
         """Set the arc weight.
         
         Args:
@@ -976,6 +976,9 @@ class Arc(PetriNetObject):
         elif arc_type == 'curved_inhibitor_arc':
             from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
             arc_class = CurvedInhibitorArc
+        elif arc_type in ('curved_opposite_signal_flow', 'curved_signal_flow'):
+            from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+            arc_class = CurvedSignalFlowArc
         else:
             arc_class = cls  # Use the class this method was called on (Arc)
         

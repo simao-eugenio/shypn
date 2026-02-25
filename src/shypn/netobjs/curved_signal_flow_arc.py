@@ -61,11 +61,14 @@ class CurvedSignalFlowArc(CurvedArc):
         """
         # Initialize with CurvedArc geometry
         super().__init__(source, target, id, name, weight)
-        
-        # Apply signal flow arc default color
-        self.color = self.DEFAULT_COLOR
-        
-        # Validate signal place connection (from SignalFlowArc)
+
+        # Enforce semantic color via ColorSchemaManager (light gray for signal flow)
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        ColorSchemaManager.reset_arc_color(self)
+
+        # Enforce that every Place endpoint is a signal place (Ψ).
+        # Signal flow arcs MUST connect to signal places — this is the one
+        # structural restriction of the formalism.
         self._validate_signal_connection()
     
     def _validate_signal_connection(self):

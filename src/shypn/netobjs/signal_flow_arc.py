@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""SignalFlowArc - Information transfer arc in hierarchical Bio-PNs.
+"""SignalFlowArc - Dual-role arc in hierarchical Bio-PNs.
 
-Signal flow arcs transmit regulatory information with token consumption,
-enabling hierarchical control through signal depletion. They connect to
-signal places (Ψ) and are visually distinct from mass transfer (normal arcs)
-and catalytic read (test arcs).
+Signal flow arcs behave like normal arcs in terms of token flow: they consume
+tokens from the source place and produce tokens at the target place on every
+firing (weight Ws). Their additional role is to act as an information channel
+over the normal arc: because they connect to or from signal places (Ψ), the
+firing event and the current marking of those signal places are visible to the
+vertical decision layers of the signal hierarchy. This allows upper layers to
+read the state of lower-layer processes and issue preemptive regulatory actions
+without interfering with the underlying token dynamics.
 
 Theoretical Foundation:
 - Signal Hierarchy Theory (Simão 2025)
@@ -19,36 +23,69 @@ References:
 from shypn.netobjs.arc import Arc
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Arc type comparison (13-tuple Bio-PN formalism)
+#
+#   Normal arc       │ Consumes tokens  │ Produces tokens  │ Hierarchy-visible? NO
+#   Test arc         │ Does NOT consume │ Does NOT produce │ Hierarchy-visible? NO
+#   Signal flow arc  │ Consumes tokens  │ Produces tokens  │ Hierarchy-visible? YES
+#
+# Signal flow arcs are topologically identical to normal arcs (same consume /
+# produce semantics, same weight Ws ∈ ℝ⁺), but they connect to signal places
+# (Ψ, is_signal_place=True).  That connection makes the marking of those
+# places observable by the vertical decision layers of the signal hierarchy,
+# allowing upper layers to sense lower-layer state and issue preemptive
+# regulatory actions without altering the token dynamics themselves.
+# ─────────────────────────────────────────────────────────────────────────────
 class SignalFlowArc(Arc):
     """Signal flow arc with light gray color."""
     
     # Default styling for signal flow arcs
     DEFAULT_COLOR = (0.7, 0.7, 0.7)  # Light gray for signal communication
-    """Arc transmitting information with token consumption.
-    
-    Signal flow arcs represent information channels in hierarchical control
-    systems. Unlike normal arcs (mass transfer) and test arcs (catalytic read),
-    signal flow arcs consume tokens to model signal depletion - a key mechanism
-    in hierarchical preemption.
-    
+    """Arc with dual role: normal token flow + vertical information channel.
+
+    Signal flow arcs have two simultaneous roles:
+
+    1. **Token flow (like a normal arc)** — on every firing, Ws tokens are
+       consumed from the source place and Ws tokens are produced at the target
+       place.  The underlying stoichiometry is identical to a normal arc.
+
+    2. **Vertical information channel** — because at least one endpoint is a
+       signal place (Ψ, is_signal_place=True), the marking of that place and
+       the fact that it participates in a firing are sensed by the vertical
+       decision layers of the signal hierarchy.  Upper layers can observe the
+       state of lower-layer signal places through these arcs and issue
+       preemptive regulatory actions (e.g., inhibit, boost, branch) without
+       altering the token dynamics themselves.
+
+    Distinction from related types:
+    - Normal arc      : token flow only; not visible to signal hierarchy.
+    - Test arc        : no token flow; presence check only (non-consuming).
+    - Signal flow arc : token flow (consume + produce) AND hierarchy-visible.
+
     Properties:
-    - Connects to signal places (is_signal_place=True)
-    - Consumes tokens (unlike test arcs)
-    - Transmits information (not mass)
-    - Rendered as dashed line with angled arrowhead
-    
+    - Connects to at least one signal place (is_signal_place=True)
+    - Consumes Ws tokens from source place on firing
+    - Produces Ws tokens at target place on firing
+    - Marking of connected signal place(s) is readable by vertical layers
+    - Rendered as light-gray arc (visually distinct from black normal arcs)
+
     Biological Examples:
-    - CII_Protein → CI_Transcription (integration layer signal)
-    - RecA_Active → CI_Cleavage (hierarchical override signal)
-    - Metabolic_Health → CII_Production (environmental signal)
-    
+    - EPO_external → T5_EPOR_binding  (cytokine layer signals receptor layer)
+    - ATP → T15_translation           (metabolic layer signals synthesis layer)
+    - GTP → T13_mRNA_export           (energy layer signals export layer)
+
     Usage:
-        >>> signal_place = Place("P1", "CII_Protein", is_signal_place=True)
-        >>> transition = Transition("T1", "CI_Transcription")
+        >>> signal_place = Place("P1", "EPO_external", is_signal_place=True)
+        >>> transition = Transition("T5", "EPOR_binding")
         >>> arc = SignalFlowArc(signal_place, transition, "A1", "A1", weight=1.0)
-        >>> arc.arc_type  # Returns "signal_flow"
+        >>> arc.arc_type
         'signal_flow'
-        >>> arc.consumes_tokens()  # Returns True (unlike test arcs)
+        >>> arc.consumes_tokens()   # True — tokens are consumed
+        True
+        >>> arc.produces_tokens()   # True — tokens are produced at target
+        True
+        >>> arc.is_information_arc()  # True — also sensed by hierarchy layers
         True
     """
     
@@ -67,13 +104,18 @@ class SignalFlowArc(Arc):
             ValueError: If weight is 0 (use TestArc for non-consuming)
         """
         super().__init__(source, target, id, name, weight)
-        
-        # Set signal flow arc default color to light gray
-        self.color = self.DEFAULT_COLOR
-        
-        # Validate that at least one endpoint is a signal place
+
+        # Enforce semantic color via ColorSchemaManager (light gray for signal flow)
+        # The base Arc.__init__ already calls CSM, but we call it again after
+        # the subclass is fully initialized so the isinstance check is reliable.
+        from shypn.utils.color_schema_manager import ColorSchemaManager
+        ColorSchemaManager.reset_arc_color(self)
+
+        # Enforce that every Place endpoint is a signal place (Ψ).
+        # Signal flow arcs MUST connect to signal places — this is the one
+        # structural restriction of the formalism.
         self._validate_signal_connection()
-        
+
         # Validate weight is positive (formalism requires Ws ∈ ℝ⁺)
         self._validate_positive_weight()
     
@@ -139,11 +181,29 @@ class SignalFlowArc(Arc):
         return True
     
     def is_information_arc(self) -> bool:
-        """Check if arc transfers information (not mass).
-        
-        Signal flow arcs represent information channels enabling hierarchical
-        control without mass transfer.
-        
+        """Check if arc serves as an information channel to vertical hierarchy layers.
+
+        Signal flow arcs have a dual role: they carry out normal token flow
+        (consume from source, produce at target) AND additionally make the
+        connected signal place(s) visible to the vertical decision layers of
+        the signal hierarchy.  Upper layers sense the marking of these signal
+        places to coordinate preemptive regulatory actions.
+
+        This is what distinguishes a signal_flow arc from a plain normal arc:
+        the normal arc moves tokens; the signal_flow arc moves tokens AND
+        informs the hierarchy.
+
+        Returns:
+            bool: Always True for signal flow arcs
+        """
+        return True
+
+    def produces_tokens(self) -> bool:
+        """Check if arc produces tokens at target place.
+
+        Signal flow arcs produce tokens at their target on firing, symmetrically
+        with consuming tokens from their source. Both sides follow the weight Ws.
+
         Returns:
             bool: Always True for signal flow arcs
         """
@@ -167,6 +227,10 @@ class SignalFlowArc(Arc):
         # Ensure color is always the correct light gray for signal flow arcs
         # This prevents black color from being saved and restored
         data['color'] = list(self.DEFAULT_COLOR)
+        # Explicitly record consume/produce semantics (formalism: Ws ∈ ℝ⁺)
+        # Symmetric with test arcs which write consumes=False
+        data['consumes'] = True
+        data['produces'] = True
         return data
     
     def __repr__(self) -> str:
