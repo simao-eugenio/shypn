@@ -1114,8 +1114,11 @@ class KEGGCategory(BasePathwayCategory):
                                 report_panel_loader = overlay_manager.report_panel_loader
                                 if report_panel_loader and hasattr(report_panel_loader, 'panel'):
                                     simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                    if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
-                                        report_panel_loader.panel.set_controller(simulation_controller)
+                                    if simulation_controller:
+                                        from shypn.events import EventBus
+                                        EventBus.emit('simulation.controller_ready',
+                                                      {'controller': simulation_controller},
+                                                      document_id=id(drawing_area))
                                     # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
                                     # Determine metadata path based on project structure
                                     if self.project and hasattr(self.project, 'get_metadata_dir'):

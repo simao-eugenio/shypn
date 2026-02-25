@@ -588,22 +588,22 @@ class ContinuousBehavior(TransitionBehavior):
     
     def integrate_step(self, dt: float, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:
         """Integrate continuous flow over time step using RK4.
-        
+
         Runge-Kutta 4th order integration:
             k1 = f(t, y)
             k2 = f(t + dt/2, y + k1*dt/2)
             k3 = f(t + dt/2, y + k2*dt/2)
             k4 = f(t + dt, y + k3*dt)
             y_new = y + (k1 + 2*k2 + 2*k3 + k4) * dt / 6
-        
+
         Args:
             dt: Time step size
             input_arcs: List of incoming Arc objects
             output_arcs: List of outgoing Arc objects
-        
+
         Returns:
             Tuple of (success: bool, details: dict)
-            
+
             Success case:
                 (True, {
                     'consumed': {place_id: amount, ...},
@@ -615,68 +615,15 @@ class ContinuousBehavior(TransitionBehavior):
                 })
         """
         try:
-            # Check enablement
             can_fire, reason = self.can_fire()
             if not can_fire:
-                return False, {
-                    'reason': f'not-enabled: {reason}',
-                    'continuous_mode': True
-                }
-            
+                return False, {'reason': f'not-enabled: {reason}', 'continuous_mode': True}
+
             current_time = self._get_current_time()
-            
-            # Gather ALL place objects for rate evaluation
-            # CRITICAL: Rate formulas may reference places not in this transition's arcs
-            # For example, T1 formula "comp1 * (kf_0 * P6 - kr_0 * P5)" needs P5 and P6
-            # even if T1 only has arcs to P1 and P2
-            places_dict = {}
-            
-            # Get all places from the model
-            if hasattr(self.model, 'places'):
-                # model.places might be a list of place objects OR a dict
-                if isinstance(self.model.places, dict):
-                    # It's a dict of {place_id: place_object}
-                    places_dict = self.model.places.copy()
-                elif isinstance(self.model.places, list):
-                    # It's a list of place objects
-                    for place in self.model.places:
-                        if hasattr(place, 'id'):
-                            places_dict[place.id] = place
-                        else:
-                            # place is a string ID - need to get actual object
-                            place_obj = self._get_place(place)
-                            if place_obj:
-                                places_dict[place_obj.id] = place_obj
-            elif hasattr(self.model, 'get_all_places'):
-                for place in self.model.get_all_places():
-                    places_dict[place.id] = place
-            else:
-                # FAIL LOUDLY - model must provide place access
-                raise AttributeError(
-                    f"Model {self.model} does not have 'places' or 'get_all_places()'. "
-                    f"Cannot gather places for rate function evaluation in transition {self.transition.id}"
-                )
-            
-            # Evaluate rate function(s)
-            if self.use_directional_rates:
-                # Directional rates: evaluate both directions
-                rate_forward = self.rate_forward_function(places_dict, current_time)
-                rate_reverse = self.rate_reverse_function(places_dict, current_time)
-                rate = rate_forward - rate_reverse
-                # Store for debugging/visualization
-                self._last_rate_forward = rate_forward
-                self._last_rate_reverse = rate_reverse
-            else:
-                # Single combined rate function
-                rate = self.rate_function(places_dict, current_time)
-                self._last_rate_forward = max(0, rate)
-                self._last_rate_reverse = max(0, -rate)
-            
+            places_dict = self._gather_places_dict()
+            rate = self._evaluate_rate(places_dict, current_time)
             rate = max(self.min_rate, min(self.max_rate, rate))
-            
-            # Check if rate is effectively zero
-            # For reversible reactions, rate can be negative (reverse flow)
-            # Only skip if abs(rate) is too small
+
             effective_min_rate = self.min_token_threshold * 1e-3
             if abs(rate) <= effective_min_rate:
                 return True, {
@@ -688,156 +635,19 @@ class ContinuousBehavior(TransitionBehavior):
                     'rate_reverse': getattr(self, '_last_rate_reverse', 0.0),
                     'dt': dt,
                     'method': 'rk4',
-                    'reason': 'rate-below-threshold'
+                    'reason': 'rate-below-threshold',
                 }
-            
-            # Check if this is a source or sink transition
+
             is_source = getattr(self.transition, 'is_source', False)
             is_sink = getattr(self.transition, 'is_sink', False)
-            
-            consumed_map = {}
-            produced_map = {}
-            
-            # REVERSIBLE REACTION SUPPORT
-            # If rate < 0, reverse the flow direction:
-            # - Consume from output_arcs (normally products)
-            # - Produce to input_arcs (normally reactants)
-            reverse_direction = (rate < 0)
-            flow_magnitude = abs(rate) * dt
-            
-            # For directional rates with bidirectional arcs, filter arcs based on substrates/products
-            if self.use_directional_rates:
-                # Parse rate formulas to identify which places are substrates vs products
-                import re
-                substrate_places = set()
-                product_places = set()
-                
-                # Get places dict for name lookup
-                places_dict_for_lookup = {}
-                if hasattr(self.model, 'places'):
-                    if isinstance(self.model.places, dict):
-                        places_dict_for_lookup = self.model.places
-                    elif isinstance(self.model.places, list):
-                        for place in self.model.places:
-                            if hasattr(place, 'id'):
-                                places_dict_for_lookup[place.id] = place
-                elif hasattr(self.model, 'get_all_places'):
-                    for place in self.model.get_all_places():
-                        places_dict_for_lookup[place.id] = place
-                
-                # Forward rate mentions substrates
-                if hasattr(self.transition, 'rate_forward'):
-                    fwd_expr = str(self.transition.rate_forward)
-                    # Extract compound names (uppercase words that aren't math functions)
-                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', fwd_expr)
-                    for cname in compound_names:
-                        if cname in ['P', 'E']:  # Skip single letters
-                            continue
-                        # Find place with matching name
-                        for place_id, place_obj in places_dict_for_lookup.items():
-                            if hasattr(place_obj, 'name') and place_obj.name == cname:
-                                substrate_places.add(place_id)
-                
-                # Reverse rate mentions products
-                if hasattr(self.transition, 'rate_reverse'):
-                    rev_expr = str(self.transition.rate_reverse)
-                    compound_names = re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', rev_expr)
-                    for cname in compound_names:
-                        if cname in ['P', 'E']:
-                            continue
-                        for place_id, place_obj in places_dict_for_lookup.items():
-                            if hasattr(place_obj, 'name') and place_obj.name == cname:
-                                product_places.add(place_id)
-                
-                # Filter arcs based on direction
-                if reverse_direction:
-                    # Reverse: consume from products, produce to substrates
-                    consume_arcs = [arc for arc in output_arcs if arc.target_id in product_places]
-                    produce_arcs = [arc for arc in input_arcs if arc.source_id in substrate_places]
-                    # Fallback if filtering gives empty results
-                    if not consume_arcs:
-                        consume_arcs = output_arcs
-                    if not produce_arcs:
-                        produce_arcs = input_arcs
-                else:
-                    # Forward: consume from substrates, produce to products
-                    consume_arcs = [arc for arc in input_arcs if arc.source_id in substrate_places]
-                    produce_arcs = [arc for arc in output_arcs if arc.target_id in product_places]
-                    # Fallback if filtering gives empty results
-                    if not consume_arcs:
-                        consume_arcs = input_arcs
-                    if not produce_arcs:
-                        produce_arcs = output_arcs
-            else:
-                # Non-directional: use simple swap logic
-                if reverse_direction:
-                    consume_arcs = output_arcs
-                    produce_arcs = input_arcs
-                else:
-                    consume_arcs = input_arcs
-                    produce_arcs = output_arcs
-            
-            # Phase 1: Clamp flow to available tokens
-            actual_flow = flow_magnitude
-            if not is_source:
-                for arc in consume_arcs:
-                    # Skip non-consuming arcs (test arcs don't limit flow)
-                    if not arc.consumes_tokens():
-                        continue
-                    
-                    # For reversed flow, get source from arc.target_id (normally output)
-                    place_id = arc.source_id if not reverse_direction else arc.target_id
-                    source_place = self._get_place(place_id)
-                    if source_place is None:
-                        continue
-                    
-                    # Calculate max flow possible from this arc
-                    # All consuming arcs (including SignalFlowArcs) limit the flow rate
-                    # CRITICAL: Test arcs should NOT reach here due to continue above
-                    max_flow_from_arc = source_place.tokens / arc.weight if arc.weight > 0 else float('inf')
-                    actual_flow = min(actual_flow, max_flow_from_arc)
-            
-            # Phase 2: Consume tokens continuously
-            if not is_source and actual_flow > 0:
-                for arc in consume_arcs:
-                    # Skip inhibitor arcs and test arcs (they don't consume)
-                    # Use defensive pattern: check kind, properties['kind'], and arc_type
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                    arc_type = getattr(arc, 'arc_type', 'normal')
-                    
-                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
-                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
-                    if arc_type == 'test':
-                        continue
-                    
-                    place_id = arc.source_id if not reverse_direction else arc.target_id
-                    source_place = self._get_place(place_id)
-                    if source_place is None:
-                        continue
-                    
-                    # Continuous consumption: arc_weight * actual_flow
-                    consumption = arc.weight * actual_flow
-                    
-                    if consumption > 0:
-                        source_place.set_tokens(source_place.tokens - consumption)
-                        consumed_map[place_id] = consumption
-            
-            # Phase 3: Produce tokens continuously
-            if not is_sink and actual_flow > 0:
-                for arc in produce_arcs:
-                    place_id = arc.target_id if not reverse_direction else arc.source_id
-                    target_place = self._get_place(place_id)
-                    if target_place is None:
-                        continue
-                    
-                    # Continuous production: arc_weight * actual_flow
-                    production = arc.weight * actual_flow
-                    
-                    if production > 0:
-                        target_place.set_tokens(target_place.tokens + production)
-                        produced_map[place_id] = production
-            
-            # Phase 4: Record continuous flow event
+
+            consume_arcs, produce_arcs, reverse_direction, flow_magnitude = \
+                self._resolve_arc_directions(rate, input_arcs, output_arcs, places_dict)
+
+            consumed_map, produced_map, actual_flow = self._execute_token_flow(
+                consume_arcs, produce_arcs, flow_magnitude * dt, is_source, is_sink, reverse_direction
+            )
+
             self._record_event(
                 consumed=consumed_map,
                 produced=produced_map,
@@ -849,11 +659,11 @@ class ContinuousBehavior(TransitionBehavior):
                 actual_rate=(actual_flow / dt if dt > 0 else 0.0) * (1 if not reverse_direction else -1),
                 dt=dt,
                 method='rk4',
-                clamped=(actual_flow < flow_magnitude),
+                clamped=(actual_flow < flow_magnitude * dt),
                 reverse_direction=reverse_direction,
-                use_directional_rates=self.use_directional_rates
+                use_directional_rates=self.use_directional_rates,
             )
-            
+
             return True, {
                 'consumed': consumed_map,
                 'produced': produced_map,
@@ -867,16 +677,209 @@ class ContinuousBehavior(TransitionBehavior):
                 'use_directional_rates': self.use_directional_rates,
                 'transition_type': 'continuous',
                 'time': current_time,
-                'clamped': (actual_flow < flow_magnitude),
-                'reverse_direction': reverse_direction
+                'clamped': (actual_flow < flow_magnitude * dt),
+                'reverse_direction': reverse_direction,
             }
-            
+
         except (ValueError, AttributeError, KeyError, ZeroDivisionError) as e:
             return False, {
                 'reason': f'continuous-error: {str(e)}',
                 'continuous_mode': True,
-                'error_type': type(e).__name__
+                'error_type': type(e).__name__,
             }
+
+    # -----------------------------------------------------------------------
+    # Private helpers decomposed from integrate_step
+    # -----------------------------------------------------------------------
+
+    def _gather_places_dict(self) -> Dict[str, Any]:
+        """Collect all model places into a {place_id: place} dict.
+
+        Rate formulas may reference places outside this transition's immediate
+        arc neighbourhood, so we gather the full model inventory.
+
+        Returns:
+            Mapping of place_id → place object.
+
+        Raises:
+            AttributeError: When the model exposes no place-access interface.
+        """
+        if hasattr(self.model, 'places'):
+            if isinstance(self.model.places, dict):
+                return self.model.places.copy()
+            places: Dict[str, Any] = {}
+            for p in self.model.places:
+                if hasattr(p, 'id'):
+                    places[p.id] = p
+                else:
+                    obj = self._get_place(p)
+                    if obj:
+                        places[obj.id] = obj
+            return places
+        if hasattr(self.model, 'get_all_places'):
+            return {p.id: p for p in self.model.get_all_places()}
+        raise AttributeError(
+            f"Model {self.model} does not have 'places' or 'get_all_places()'. "
+            f"Cannot gather places for rate evaluation in transition {self.transition.id}"
+        )
+
+    def _evaluate_rate(self, places_dict: Dict[str, Any], current_time: float) -> float:
+        """Evaluate rate function(s) and store directional debugging attributes.
+
+        For directional-rate transitions evaluates both the forward and reverse
+        expressions; for single-rate transitions derives them from sign.
+
+        Args:
+            places_dict: Current {place_id: place} mapping.
+            current_time: Simulation clock used by time-dependent formulas.
+
+        Returns:
+            Net signed rate (positive → forward, negative → reverse).
+        """
+        if self.use_directional_rates:
+            rate_forward = self.rate_forward_function(places_dict, current_time)
+            rate_reverse = self.rate_reverse_function(places_dict, current_time)
+            self._last_rate_forward = rate_forward
+            self._last_rate_reverse = rate_reverse
+            return rate_forward - rate_reverse
+        rate = self.rate_function(places_dict, current_time)
+        self._last_rate_forward = max(0.0, rate)
+        self._last_rate_reverse = max(0.0, -rate)
+        return rate
+
+    def _resolve_arc_directions(
+        self,
+        rate: float,
+        input_arcs: List,
+        output_arcs: List,
+        places_dict: Dict[str, Any],
+    ) -> tuple:
+        """Determine consume/produce arc subsets and flow direction.
+
+        For directional-rate transitions the method inspects the rate formula
+        tokens to identify substrate and product places before choosing the arc
+        subsets; it falls back to the full arc lists when parsing yields no
+        matches.
+
+        Args:
+            rate: Net signed rate.
+            input_arcs: All incoming arcs.
+            output_arcs: All outgoing arcs.
+            places_dict: {place_id: place} mapping for name look-ups.
+
+        Returns:
+            ``(consume_arcs, produce_arcs, reverse_direction, flow_magnitude)``
+        """
+        reverse_direction = rate < 0
+        flow_magnitude = abs(rate)
+
+        if not self.use_directional_rates:
+            if reverse_direction:
+                return output_arcs, input_arcs, reverse_direction, flow_magnitude
+            return input_arcs, output_arcs, reverse_direction, flow_magnitude
+
+        import re
+        name_to_id = {
+            obj.name: pid
+            for pid, obj in places_dict.items()
+            if hasattr(obj, 'name')
+        }
+
+        def _place_ids_from_expr(expr: str) -> set:
+            ids: set = set()
+            for cname in re.findall(r'\b([A-Z][A-Za-z0-9_-]*)\b', str(expr)):
+                if cname not in ('P', 'E') and cname in name_to_id:
+                    ids.add(name_to_id[cname])
+            return ids
+
+        substrate_places = (
+            _place_ids_from_expr(self.transition.rate_forward)
+            if hasattr(self.transition, 'rate_forward') else set()
+        )
+        product_places = (
+            _place_ids_from_expr(self.transition.rate_reverse)
+            if hasattr(self.transition, 'rate_reverse') else set()
+        )
+
+        if reverse_direction:
+            consume_arcs = [a for a in output_arcs if a.target_id in product_places] or output_arcs
+            produce_arcs = [a for a in input_arcs if a.source_id in substrate_places] or input_arcs
+        else:
+            consume_arcs = [a for a in input_arcs if a.source_id in substrate_places] or input_arcs
+            produce_arcs = [a for a in output_arcs if a.target_id in product_places] or output_arcs
+
+        return consume_arcs, produce_arcs, reverse_direction, flow_magnitude
+
+    def _execute_token_flow(
+        self,
+        consume_arcs: List,
+        produce_arcs: List,
+        flow_magnitude: float,
+        is_source: bool,
+        is_sink: bool,
+        reverse_direction: bool,
+    ) -> tuple:
+        """Apply token consumption and production for one continuous time step.
+
+        Phase 1 clamps ``actual_flow`` so no place goes negative.
+        Phase 2 consumes tokens (weight × actual_flow per arc).
+        Phase 3 produces tokens (weight × actual_flow per arc).
+
+        Args:
+            consume_arcs: Arcs that drain tokens.
+            produce_arcs: Arcs that add tokens.
+            flow_magnitude: Unclamped |rate| × dt.
+            is_source: Transition is a source (skip consumption).
+            is_sink: Transition is a sink (skip production).
+            reverse_direction: True when net rate is negative.
+
+        Returns:
+            ``(consumed_map, produced_map, actual_flow)`` where maps are
+            ``{place_id: amount}`` and ``actual_flow ≤ flow_magnitude``.
+        """
+        consumed_map: Dict[str, float] = {}
+        produced_map: Dict[str, float] = {}
+
+        # Phase 1: clamp to available tokens
+        actual_flow = flow_magnitude
+        if not is_source:
+            for arc in consume_arcs:
+                if not arc.consumes_tokens():
+                    continue
+                place_id = arc.source_id if not reverse_direction else arc.target_id
+                src = self._get_place(place_id)
+                if src is None:
+                    continue
+                max_flow = src.tokens / arc.weight if arc.weight > 0 else float('inf')
+                actual_flow = min(actual_flow, max_flow)
+
+        # Phase 2: consume
+        if not is_source and actual_flow > 0:
+            for arc in consume_arcs:
+                if getattr(arc, 'arc_type', 'normal') == 'test':
+                    continue
+                place_id = arc.source_id if not reverse_direction else arc.target_id
+                src = self._get_place(place_id)
+                if src is None:
+                    continue
+                amount = arc.weight * actual_flow
+                if amount > 0:
+                    src.set_tokens(src.tokens - amount)
+                    consumed_map[place_id] = amount
+
+        # Phase 3: produce
+        if not is_sink and actual_flow > 0:
+            for arc in produce_arcs:
+                place_id = arc.target_id if not reverse_direction else arc.source_id
+                tgt = self._get_place(place_id)
+                if tgt is None:
+                    continue
+                amount = arc.weight * actual_flow
+                if amount > 0:
+                    tgt.set_tokens(tgt.tokens + amount)
+                    produced_map[place_id] = amount
+
+        return consumed_map, produced_map, actual_flow
     
     def get_type_name(self) -> str:
         """Return human-readable type name.

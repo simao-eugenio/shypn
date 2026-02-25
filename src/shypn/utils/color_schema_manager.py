@@ -96,20 +96,21 @@ class ColorSchemaManager:
         # Import here to avoid circular dependencies
         from shypn.netobjs.test_arc import TestArc
         from shypn.netobjs.signal_flow_arc import SignalFlowArc
+        from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
         from shypn.netobjs.inhibitor_arc import InhibitorArc
-        
+
         # Test arcs are blue (read-only catalytic)
         if isinstance(arc, TestArc):
             return ColorSchemaManager.ARC_TEST
-        
-        # Signal flow arcs are light gray (information with consumption)
-        if isinstance(arc, SignalFlowArc):
+
+        # Signal flow arcs (straight and curved) are light gray
+        if isinstance(arc, (SignalFlowArc, CurvedSignalFlowArc)):
             return ColorSchemaManager.ARC_SIGNAL_FLOW
-        
+
         # Inhibitor arcs are black (threshold-based inhibition)
         if isinstance(arc, InhibitorArc):
             return ColorSchemaManager.ARC_INHIBITOR
-        
+
         # Default: black for regular mass-transfer arcs
         return ColorSchemaManager.ARC_DEFAULT
     
@@ -193,8 +194,9 @@ class ColorSchemaManager:
         """
         from shypn.netobjs.test_arc import TestArc
         from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        return isinstance(arc, (TestArc, SignalFlowArc))
+        from shypn.netobjs.curved_signal_flow_arc import CurvedSignalFlowArc
+
+        return isinstance(arc, (TestArc, SignalFlowArc, CurvedSignalFlowArc))
     
     @staticmethod
     def is_semantic_transition_color(transition) -> bool:

@@ -203,15 +203,49 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
             except Exception as e:
                 print(f"⚠️ Warning: Worker failed to generate metadata for {name}: {e}")
                 metadata_header = None
-            
+
+            # Build trajectory_summary (lightweight per-replicate metadata)
+            trajectory_summary = []
+            for i, traj in enumerate(results[:100]):
+                if 'error' not in traj:
+                    trajectory_summary.append({
+                        'replicate_id': traj.get('replicate_id', i),
+                        'seed': traj.get('seed'),
+                        'n_timepoints': len(traj.get('time_points', [])),
+                        'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
+                    })
+
+            # Build replicate_data (per-replicate outcomes for replicates.csv)
+            replicate_data = []
+            for rep in results:
+                if 'error' not in rep:
+                    replicate_data.append({
+                        'deadlocked': rep.get('deadlocked', False),
+                        'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0,
+                        'elapsed_time': rep.get('elapsed_time', 0.0)
+                    })
+
+            # Extract swept parameter and subnet structure for config.csv
+            swept_param = snapshot.get('swept_parameter') if isinstance(snapshot, dict) else None
+            subnet_structure = {
+                'place_ids': [p['id'] for p in subnet_data.get('places', [])],
+                'transition_ids': [t['id'] for t in subnet_data.get('transitions', [])],
+                'arc_ids': [a['id'] for a in subnet_data.get('arcs', [])]
+            }
+
             return {
                 'name': name,
                 'snapshot_index': args['snapshot_index'],
                 'statistics': statistics,
                 'n_replicates': len(results),
+                'duration': elapsed_time,
                 'elapsed_time': elapsed_time,
                 'status': 'success',
-                'metadata': metadata_header
+                'metadata': metadata_header,
+                'trajectory_summary': trajectory_summary,
+                'replicate_data': replicate_data,
+                'swept_parameter': swept_param,
+                'subnet_structure': subnet_structure,
             }
         else:
             return {

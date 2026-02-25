@@ -614,6 +614,8 @@ class HierarchicalExplorer(StateSpaceExplorer):
         else:
             # Create minimal mock analyzer
             class MockAnalyzer:
+                """Minimal analyzer shim providing just enough interface for SequentialExplorer."""
+
                 def __init__(self, model):
                     self.model = model
             flat_explorer = SequentialExplorer(MockAnalyzer(self.model))

@@ -60,7 +60,8 @@ class ReportPanelLoader:
         # Create the panel with the model_canvas_loader reference
         self.panel = ReportPanel(
             project=self.project,
-            model_canvas=self.model_canvas_loader  # Pass loader, not manager
+            model_canvas=self.model_canvas_loader,  # Pass loader, not manager
+            document_id=self.document_id,
         )
         
         # Compatibility: expose panel as content/widget for container operations

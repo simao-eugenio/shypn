@@ -2,8 +2,8 @@
 """Simulation control toolbar widget.
 
 Provides UI controls for experiment management and subnet simulation.
-Includes experiment snapshots, simulation controls (Run/Step/Pause/Stop),
-and settings (time limit, steps, method).
+Includes experiment snapshots and simulation controls (Run/Step/Pause/Stop)
+with time and step limits. No method selector — shypn is natively adaptive hybrid.
 
 Author: Simão Eugénio
 Date: November 13, 2025
@@ -128,24 +128,6 @@ class SimulationControlToolbar(Gtk.Box):
         self.reset_button.set_tooltip_text("Reset to initial state")
         row.pack_start(self.reset_button, False, False, 0)
         
-        # Separator
-        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        row.pack_start(sep, False, False, 5)
-        
-        # === SETTINGS ===
-        
-        # Time and Steps moved to the experiment row
-
-        # Method selector
-        row.pack_start(Gtk.Label(label="  Method:"), False, False, 0)
-        self.method_combo = Gtk.ComboBoxText()
-        self.method_combo.append_text("Gillespie")
-        self.method_combo.append_text("ODE")
-        self.method_combo.append_text("Hybrid")
-        self.method_combo.set_active(0)
-        self.method_combo.set_tooltip_text("Simulation algorithm")
-        row.pack_start(self.method_combo, False, False, 0)
-        
         # === STATUS LABEL ===
         
         self.status_label = Gtk.Label(label="Ready")
@@ -184,12 +166,11 @@ class SimulationControlToolbar(Gtk.Box):
         """Get current simulation settings.
         
         Returns:
-            dict: Settings with 'max_time', 'max_steps', 'method'
+            dict: Settings with 'max_time', 'max_steps'
         """
         return {
             'max_time': self.time_spinbutton.get_value(),
             'max_steps': int(self.steps_spinbutton.get_value()),
-            'method': self.method_combo.get_active_text().lower()
         }
     
     def get_active_experiment_index(self):

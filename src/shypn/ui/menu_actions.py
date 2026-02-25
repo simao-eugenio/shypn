@@ -22,6 +22,7 @@ class MenuActions:
 		self.persistency = None  # Set later if needed
 		self.model_canvas_loader = None  # Set later if needed
 		self.file_explorer_panel = None  # Set later if needed
+		self._clipboard: list = []  # Serialized {type, data} dicts for cut/copy/paste
 		
 	def set_persistency(self, persistency):
 		"""Set the persistency manager for file operations."""
@@ -234,47 +235,144 @@ class MenuActions:
 			logger.debug(f"Redo menu action failed: {e}")
 	
 	def on_edit_cut(self, action, param):
-		"""Cut the selected content."""
-		# TODO: Implement cut logic
-		pass
-	
+		"""Cut selected Places and Transitions to the internal clipboard."""
+		try:
+			self._copy_selection_to_clipboard()
+			if not self._clipboard:
+				return
+			if not self.model_canvas_loader:
+				return
+			da = self.model_canvas_loader.get_current_document()
+			if not da:
+				return
+			manager = self.model_canvas_loader.get_canvas_manager(da)
+			if not manager:
+				return
+			selected = manager.selection_manager.get_selected_objects(manager)
+			for obj in selected:
+				self.model_canvas_loader._delete_object(manager, obj)
+			da.queue_draw()
+		except (AttributeError, TypeError) as e:
+			from shypn.utils.logging import get_logger
+			get_logger(__name__).debug(f"Cut failed: {e}")
+
 	def on_edit_copy(self, action, param):
-		"""Copy the selected content."""
-		# TODO: Implement copy logic
-		pass
-	
+		"""Copy selected Places and Transitions to the internal clipboard."""
+		try:
+			self._copy_selection_to_clipboard()
+		except (AttributeError, TypeError) as e:
+			from shypn.utils.logging import get_logger
+			get_logger(__name__).debug(f"Copy failed: {e}")
+
 	def on_edit_paste(self, action, param):
-		"""Paste the clipboard content."""
-		# TODO: Implement paste logic
-		pass
-	
+		"""Paste clipboard contents onto the current canvas with a 20 px offset."""
+		if not self._clipboard:
+			return
+		try:
+			if not self.model_canvas_loader:
+				return
+			da = self.model_canvas_loader.get_current_document()
+			if not da:
+				return
+			manager = self.model_canvas_loader.get_canvas_manager(da)
+			if not manager:
+				return
+			OFFSET = 20  # world-space paste offset so copies are visually distinct
+			for entry in self._clipboard:
+				obj_type = entry.get('type')
+				data = entry.get('data', {})
+				x = data.get('x', 100) + OFFSET
+				y = data.get('y', 100) + OFFSET
+				name = data.get('name', '')
+				if obj_type == 'place':
+					new_obj = manager.add_place(x, y, label=name, tokens=data.get('tokens', 0))
+				elif obj_type == 'transition':
+					new_obj = manager.add_transition(x, y, label=name,
+						transition_type=data.get('transition_type', 'immediate'))
+				else:
+					continue
+				if new_obj:
+					new_obj.name = name
+				da.queue_draw()
+		except (AttributeError, TypeError, KeyError) as e:
+			from shypn.utils.logging import get_logger
+			get_logger(__name__).debug(f"Paste failed: {e}")
+
+	def _copy_selection_to_clipboard(self) -> None:
+		"""Serialise the current canvas selection into ``self._clipboard``.
+
+		Only Places and Transitions are copied; Arcs are intentionally skipped
+		because their source/target IDs would be stale on paste.
+		"""
+		from shypn.netobjs import Place, Transition
+		if not self.model_canvas_loader:
+			return
+		da = self.model_canvas_loader.get_current_document()
+		if not da:
+			return
+		manager = self.model_canvas_loader.get_canvas_manager(da)
+		if not manager or not hasattr(manager, 'selection_manager'):
+			return
+		selected = manager.selection_manager.get_selected_objects(manager)
+		self._clipboard = []
+		for obj in selected:
+			if isinstance(obj, Place):
+				self._clipboard.append({'type': 'place', 'data': obj.to_dict()})
+			elif isinstance(obj, Transition):
+				self._clipboard.append({'type': 'transition', 'data': obj.to_dict()})
+
 	def on_edit_preferences(self, action, param):
-		"""Open preferences dialog."""
-		# TODO: Implement preferences dialog
-		pass	# ====================================================================
+		"""Open a stub preferences dialog."""
+		dialog = Gtk.MessageDialog(
+			transient_for=self.window,
+			modal=True,
+			message_type=Gtk.MessageType.INFO,
+			buttons=Gtk.ButtonsType.CLOSE,
+			text="Preferences",
+		)
+		dialog.format_secondary_text(
+			"A full preferences panel is planned for a future release.\n"
+			"Current simulation and display settings are available in the\n"
+			"Swiss-Knife palette on each canvas."
+		)
+		dialog.run()
+		dialog.destroy()
+
+	# ====================================================================
 	# View Menu Actions
 	# ====================================================================
 	
 	def on_view_zoom_in(self, action, param):
-		"""Zoom in the view."""
-		# TODO: Implement zoom in
-		# if self.model_canvas_loader:
-		#     self.model_canvas_loader.zoom_in()
-		pass
-	
+		"""Zoom in the current canvas view."""
+		self._apply_zoom(lambda vc: vc.zoom_in())
+
 	def on_view_zoom_out(self, action, param):
-		"""Zoom out the view."""
-		# TODO: Implement zoom out
-		# if self.model_canvas_loader:
-		#     self.model_canvas_loader.zoom_out()
-		pass
-	
+		"""Zoom out the current canvas view."""
+		self._apply_zoom(lambda vc: vc.zoom_out())
+
 	def on_view_zoom_reset(self, action, param):
-		"""Reset zoom to 100%."""
-		# TODO: Implement zoom reset
-		# if self.model_canvas_loader:
-		#     self.model_canvas_loader.reset_zoom()
-		pass
+		"""Reset the current canvas zoom to 100 %."""
+		self._apply_zoom(lambda vc: vc.set_zoom(1.0))
+
+	def _apply_zoom(self, zoom_fn) -> None:
+		"""Call *zoom_fn* on the active canvas's ViewportController.
+
+		Args:
+			zoom_fn: Callable that receives a ViewportController instance.
+		"""
+		try:
+			if not self.model_canvas_loader:
+				return
+			da = self.model_canvas_loader.get_current_document()
+			if not da:
+				return
+			manager = self.model_canvas_loader.get_canvas_manager(da)
+			if manager and hasattr(manager, 'viewport_controller'):
+				zoom_fn(manager.viewport_controller)
+				da.queue_draw()
+		except (AttributeError, TypeError) as e:
+			from shypn.utils.logging import get_logger
+			get_logger(__name__).debug(f"Zoom action failed: {e}")
 	
 	def on_view_fullscreen(self, action, param):
 		"""Toggle fullscreen mode."""
@@ -286,14 +384,53 @@ class MenuActions:
 	# ====================================================================
 	
 	def on_help_contents(self, action, param):
-		"""Show help contents."""
-		# TODO: Implement help dialog
-		pass
-	
+		"""Open the project documentation in the default web browser."""
+		try:
+			import webbrowser
+			webbrowser.open("https://github.com/simao-eugenio/shypn")
+		except Exception as e:
+			self._show_error_dialog("Help", f"Could not open browser: {e}")
+
 	def on_help_shortcuts(self, action, param):
-		"""Show keyboard shortcuts."""
-		# TODO: Implement shortcuts window
-		pass
+		"""Show a keyboard-shortcuts reference dialog."""
+		SHORTCUTS = [
+			("File", [
+				("Ctrl+N", "New canvas"),
+				("Ctrl+O", "Open file"),
+				("Ctrl+S", "Save"),
+				("Ctrl+Shift+S", "Save as"),
+				("Ctrl+Shift+N", "Reset canvas"),
+				("Ctrl+Q", "Quit"),
+			]),
+			("Edit", [
+				("Ctrl+Z", "Undo"),
+				("Ctrl+Shift+Z", "Redo"),
+				("Ctrl+X", "Cut"),
+				("Ctrl+C", "Copy"),
+				("Ctrl+V", "Paste"),
+			]),
+			("View", [
+				("Ctrl++", "Zoom in"),
+				("Ctrl+-", "Zoom out"),
+				("Ctrl+0", "Reset zoom"),
+			]),
+		]
+		lines = []
+		for section, items in SHORTCUTS:
+			lines.append(f"── {section} ──")
+			for key, desc in items:
+				lines.append(f"  {key:<20} {desc}")
+			lines.append("")
+		dialog = Gtk.MessageDialog(
+			transient_for=self.window,
+			modal=True,
+			message_type=Gtk.MessageType.INFO,
+			buttons=Gtk.ButtonsType.CLOSE,
+			text="Keyboard Shortcuts",
+		)
+		dialog.format_secondary_text("\n".join(lines))
+		dialog.run()
+		dialog.destroy()
 	
 	def on_help_about(self, action, param):
 		"""Show about dialog."""

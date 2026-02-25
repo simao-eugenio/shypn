@@ -4,7 +4,7 @@
 This module defines the base class for all Petri net objects (Place, Transition, Arc).
 It contains shared properties and behaviors that all objects inherit.
 """
-from typing import Optional, Callable
+from typing import Any, Callable, Optional
 
 
 class PetriNetObject:
@@ -65,7 +65,7 @@ class PetriNetObject:
         return self._name
     
     @name.setter
-    def name(self, value: str):
+    def name(self, value: str) -> None:
         """Set the name (user-editable alias).
         
         Args:
@@ -84,7 +84,7 @@ class PetriNetObject:
         if self.on_changed:
             self.on_changed()
     
-    def render(self, cr, transform=None):
+    def render(self, cr: Any, transform: Optional[Callable] = None) -> None:
         """Render the object using Cairo.
         
         This is an abstract method that must be implemented by subclasses.
@@ -108,7 +108,7 @@ class PetriNetObject:
         """
         raise NotImplementedError("Subclasses must implement contains_point()")
     
-    def set_position(self, x: float, y: float):
+    def set_position(self, x: float, y: float) -> None:
         """Move the object to a new position.
         
         This is an abstract method that must be implemented by subclasses
@@ -139,7 +139,25 @@ class PetriNetObject:
             data["metadata"] = self.metadata
         
         return data
-    
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'PetriNetObject':
+        """Deserialize object from dictionary (inverse of to_dict).
+
+        Subclasses must override this classmethod to reconstruct their
+        specific type from a serialized dict produced by to_dict().
+
+        Args:
+            data: Dictionary containing object properties.
+
+        Returns:
+            PetriNetObject: Reconstructed object instance.
+
+        Raises:
+            NotImplementedError: If called directly on the base class.
+        """
+        raise NotImplementedError("Subclasses must implement from_dict()")
+
     def __repr__(self):
         """String representation for debugging.
         

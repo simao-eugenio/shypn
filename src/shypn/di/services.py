@@ -130,19 +130,19 @@ def register_repositories(
 
 def register_builders(container: ServiceContainer):
     """Register builder classes only.
-    
+
     Registers builder classes that don't require constructor arguments.
     PlaceBuilder and TransitionBuilder are not registered since they require
     id/name parameters - create them directly as needed.
-    
+
     Registers:
     - arc_builder_class: ArcBuilder class
     - petri_net_builder_class: PetriNetBuilder class
     - simulation_config_builder_class: SimulationConfigBuilder class
-    
+
     Args:
         container: ServiceContainer to register services with
-    
+
     Example:
         >>> container = ServiceContainer()
         >>> register_builders(container)
@@ -154,7 +154,66 @@ def register_builders(container: ServiceContainer):
         PetriNetBuilder,
         SimulationConfigBuilder,
     )
-    
+
     container.register_instance('arc_builder_class', ArcBuilder)
     container.register_instance('petri_net_builder_class', PetriNetBuilder)
     container.register_instance('simulation_config_builder_class', SimulationConfigBuilder)
+
+
+def register_application_services(container: ServiceContainer) -> None:
+    """Register stateless domain-service singletons.
+
+    These services carry no per-request mutable state and are safe to share
+    as singletons for the lifetime of the application.
+
+    Registered services
+    -------------------
+    sbml_compartment_module_service
+        :class:`~shypn.services.sbml_compartment_module_service.SBMLCompartmentModuleService`
+        – SBML import / compartment-module extraction.
+    signal_detection_service
+        :class:`~shypn.services.signal_detection_service.SignalDetectionService`
+        – Heuristic place signal-type detection.
+    module_coupling_service
+        :class:`~shypn.services.module_coupling_service.ModuleCouplingService`
+        – Cross-module arc and coupling analysis.
+
+    Args:
+        container: :class:`ServiceContainer` to register services with.
+
+    Example::
+
+        from shypn.di import get_container
+        from shypn.di.services import register_application_services
+
+        container = get_container()
+        register_application_services(container)
+
+        svc = container.get('sbml_compartment_module_service')
+    """
+    try:
+        from shypn.services.sbml_compartment_module_service import SBMLCompartmentModuleService
+        container.register_singleton(
+            'sbml_compartment_module_service',
+            SBMLCompartmentModuleService,
+        )
+    except ImportError:
+        pass  # Optional heavy dependency (libsbml) may not be installed
+
+    try:
+        from shypn.services.signal_detection_service import SignalDetectionService
+        container.register_singleton(
+            'signal_detection_service',
+            SignalDetectionService,
+        )
+    except ImportError:
+        pass
+
+    try:
+        from shypn.services.module_coupling_service import ModuleCouplingService
+        container.register_singleton(
+            'module_coupling_service',
+            ModuleCouplingService,
+        )
+    except ImportError:
+        pass

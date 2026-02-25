@@ -6,7 +6,10 @@ compatible API versions, preventing runtime errors due to version mismatches.
 """
 
 from typing import Tuple, Optional
+import logging
 import warnings
+
+logger = logging.getLogger(__name__)
 
 
 class CompatibilityError(Exception):
@@ -163,9 +166,9 @@ def _auto_check_compatibility():
     """Automatically verify compatibility when module is imported."""
     try:
         verify_submodule_compatibility(strict=False)
-    except Exception:
+    except Exception as e:
         # Don't let compatibility checking break imports
-        pass
+        logger.debug("Compatibility check failed (non-fatal): %s", e)
 
 
 # Run auto-check on import

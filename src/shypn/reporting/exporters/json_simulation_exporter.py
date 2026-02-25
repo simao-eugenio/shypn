@@ -8,7 +8,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+import logging
 import statistics
+
+logger = logging.getLogger(__name__)
 
 
 class JSONSimulationExporter:
@@ -70,7 +73,7 @@ class JSONSimulationExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting JSON: {e}")
+            logger.error("Error exporting JSON: %s", e)
             return False
     
     def _build_metadata_section(self) -> dict:

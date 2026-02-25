@@ -1585,6 +1585,8 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
             
             # Create model wrapper for classifier
             class ModelWrapper:
+                """Lightweight model container satisfying SignalClassifierManager's interface."""
+
                 def __init__(self, places, transitions, arcs):
                     self.places = places
                     self.transitions = transitions

@@ -134,9 +134,9 @@ class NetObjPersistency:
                 self.models_directory = manager.projects_root
                 if not self._last_directory:
                     self._last_directory = self.models_directory
-        except Exception as e:
+        except (ImportError, AttributeError) as e:
             # If ProjectManager not available, keep current directory
-            pass
+            self.logger.debug("ProjectManager unavailable, keeping current directory: %s", e)
 
     @property
     def is_dirty(self) -> bool:

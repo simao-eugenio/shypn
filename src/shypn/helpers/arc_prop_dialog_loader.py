@@ -353,8 +353,8 @@ class ArcPropDialogLoader(GObject.GObject):
                     type_changed = True
                 except ValueError as e:
                     self._show_conversion_error("Cannot convert to Signal Flow Arc",
-                        f"{e}\n\nSignal flow arcs model information transfer in hierarchical control systems. "
-                        "At least one endpoint (source or target) must be a signal place.")
+                        f"{e}\n\nSignal flow arcs model dual-role information transfer: "
+                        "they consume/produce tokens AND propagate information to the vertical decision hierarchy.")
                     return
             
             # If type changed, replace arc in model and done
@@ -363,7 +363,10 @@ class ArcPropDialogLoader(GObject.GObject):
                 if hasattr(old_arc, '_manager') and old_arc._manager:
                     old_arc._manager.replace_arc(old_arc, new_arc)
                     self._invalidate_simulation_cache(old_arc._manager)
-                
+                    # Notify the canvas to redraw the new arc visually
+                    if hasattr(new_arc, 'on_changed') and new_arc.on_changed:
+                        new_arc.on_changed()
+
                 # CRITICAL FIX: Update dialog's arc reference to point to NEW arc
                 # This allows successive transformations (e.g., normal → test → inhibitor)
                 # without the dialog operating on stale/removed arc references

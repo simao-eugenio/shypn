@@ -858,60 +858,11 @@ class SBMLCategory(BasePathwayCategory):
         # Also check project state
         if not self.project:
             self.import_button.set_sensitive(False)
-    
+
     def _on_browse_clicked(self, button):
-        """Handle browse button click - open file chooser for SBML files."""
-        dialog = Gtk.FileChooserDialog(
-            title="Select SBML File",
-            transient_for=self.parent_window,
-            action=Gtk.FileChooserAction.OPEN
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-        )
-        
-        # Set initial directory to project's pathways folder if project is open
-        project_manager = get_project_manager()
-        if project_manager.current_project:
-            pathways_dir = os.path.join(project_manager.current_project.base_path, 'pathways')
-            if os.path.exists(pathways_dir):
-                dialog.set_current_folder(pathways_dir)
-            else:
-                dialog.set_current_folder(project_manager.current_project.base_path)
-        
-        # Add file filters
-        filter_sbml = Gtk.FileFilter()
-        filter_sbml.set_name("SBML Files")
-        filter_sbml.add_pattern("*.sbml")
-        filter_sbml.add_pattern("*.xml")
-        dialog.add_filter(filter_sbml)
-        
-        filter_all = Gtk.FileFilter()
-        filter_all.set_name("All Files")
-        filter_all.add_pattern("*")
-        dialog.add_filter(filter_all)
-        
-        # Focus on filename entry instead of search
-        dialog.set_current_name("")
-        
-        # Wayland-safe async approach
-        result_container = [None]
-        
-        def on_response(dlg, response_id):
-            if response_id == Gtk.ResponseType.OK:
-                result_container[0] = dlg.get_filename()
-            dlg.destroy()
-            Gtk.main_quit()
-        
-        dialog.connect('response', on_response)
-        dialog.show()
-        Gtk.main()
-        
-        filepath = result_container[0]
-        if filepath:
-            self.file_entry.set_text(filepath)
-    
+        """Open SBML file chooser and populate the file entry."""
+        self._open_sbml_file_dialog(self.file_entry)
+
     def _parse_and_preview_sbml(self, filepath):
         """Parse SBML file and show preview in metadata inspector.
         
@@ -1333,312 +1284,283 @@ class SBMLCategory(BasePathwayCategory):
     
     def _on_sbml_import_complete(self, result):
         """Called in main thread after SBML import completes successfully.
-        
+
+        Orchestrates four phases:
+        1. Persist to project (``_save_to_project``)
+        2. Refresh preview (``_update_preview``)
+        3. Auto-load model into a fresh canvas tab (``_provision_canvas_tab``)
+        4. Deferred Report Panel wiring + compound mapping
+
         Args:
-            result: Dict with import results
+            result: Dict with keys 'filepath', 'parsed_pathway', 'document_model'
         """
         try:
             filepath = result['filepath']
             parsed_pathway = result['parsed_pathway']
             document_model = result['document_model']
-            
-            self.logger.info(f"SBML import complete, saving files...")
-            self.logger.info(f"Pathway type: {type(parsed_pathway)}")
-            
-            # Save files to project FIRST
+
+            self.logger.info("SBML import complete — pathway type: %s", type(parsed_pathway).__name__)
+
+            # Phase 1: persist
             saved_filepath = self._save_to_project(filepath, parsed_pathway, document_model)
-            
             if not saved_filepath:
                 self._show_error("Failed to save files to project")
                 self.import_button.set_sensitive(True)
                 return
-            
-            # Update preview AFTER save succeeds
+
+            # Phase 2: preview
             try:
                 self._update_preview(parsed_pathway)
-                self.logger.info("Preview updated successfully")
+                self.logger.info("Preview updated")
             except Exception as preview_error:
-                self.logger.error(f"Failed to update preview: {preview_error}")
-                import traceback
-                traceback.print_exc()
-            
-            # ===== AUTO-LOAD MODEL TO CANVAS =====
-            # Load the saved model into canvas automatically (same as KEGG import)
-            self.logger.info("=== Starting SBML canvas auto-load ===")
-            
-            # Use normalized method to get canvas loader
+                self.logger.error("Failed to update preview: %s", preview_error, exc_info=True)
+
+            # Phase 3: canvas auto-load
             canvas_loader = self._get_canvas_loader()
-            canvas_manager = self._get_canvas_manager()
+            self.logger.info(
+                "Auto-load check: model_canvas=%s, canvas_loader=%s, "
+                "document_model=%s, saved_filepath=%s",
+                self.model_canvas is not None, canvas_loader is not None,
+                document_model is not None, saved_filepath is not None,
+            )
             
-            if self.model_canvas:
-                self.logger.info(f"model_canvas type: {type(self.model_canvas).__name__}")
-                self.logger.info(f"canvas_loader available: {canvas_loader is not None}")
-                self.logger.info(f"canvas_manager available: {canvas_manager is not None}")
-            else:
-                self.logger.error("model_canvas is None! Cannot auto-load to canvas")
-            
-            self.logger.info(f"Auto-load check: model_canvas={self.model_canvas is not None}, "
-                           f"canvas_loader={canvas_loader is not None}, "
-                           f"canvas_manager={canvas_manager is not None}, "
-                           f"document_model={document_model is not None}, "
-                           f"saved_filepath={saved_filepath is not None}")
-            
-            # For auto-load, we need the canvas_loader to create a new tab
             if canvas_loader and document_model and saved_filepath:
-                # Auto-load synchronously (like KEGG) for reliability
-                try:
-                    self.logger.info("✓ Auto-loading imported model into new canvas tab...")
-                    
-                    # Get base name for tab
-                    base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
-                    self.logger.info(f"Loading model: {base_name}")
-                    
-                    # UNIFIED APPROACH: Always create fresh canvas via add_document()
-                    # This ensures IDENTICAL initialization to File→New and File→Open:
-                    # - Fresh ModelCanvasManager
-                    # - Proper controller wiring
-                    # - Report Panel creation and registration
-                    # - Callback setup
-                    # Benefits: No reuse logic complexity, consistent behavior, no stale state
-                    self.logger.info(f"Creating fresh canvas for SBML import: {base_name}")
-                    
-                    try:
-                        # CRITICAL: Create canvas with temporary filename to avoid loading
-                        # stale view state from previous imports of same model
-                        page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
-                        self.logger.info(f"[SBML AUTO-LOAD] Step 1: add_document() returned page_index={page_index}, drawing_area={id(drawing_area) if drawing_area else 'None'}")
-                        
-                        if drawing_area is None:
-                            raise ValueError("add_document() returned None for drawing_area")
-                        
-                        canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
-                        self.logger.info(f"[SBML AUTO-LOAD] Step 2: get_canvas_manager() returned canvas_manager={canvas_manager is not None} (type={type(canvas_manager).__name__ if canvas_manager else 'None'})")
-                        
-                        if not canvas_manager:
-                            raise ValueError("get_canvas_manager() returned None")
-                    
-                        # CRITICAL: Set filepath FIRST before load_objects
-                        # This ensures the correct filename is used for any auto-save operations
-                        self.logger.info(f"[SBML AUTO-LOAD] Step 3: Setting filepath to {saved_filepath}")
-                        canvas_manager.set_filepath(saved_filepath)
-                        
-                        # ===== UNIFIED OBJECT LOADING =====
-                        # Use load_objects() for consistent initialization (same as File → Open)
-                        self.logger.info(f"[SBML AUTO-LOAD] Step 4: Loading objects (places={len(document_model.places)}, transitions={len(document_model.transitions)}, arcs={len(document_model.arcs)})")
-                        try:
-                            canvas_manager.load_objects(
-                                places=document_model.places,
-                                transitions=document_model.transitions,
-                                arcs=document_model.arcs,
-                                modules=document_model.modules
-                            )
-                            self.logger.info(f"[SBML AUTO-LOAD] Step 5: load_objects() completed successfully")
-                        except Exception as e:
-                            raise ValueError(f"Failed to load objects to canvas: {e}")
-                        
-                        # CRITICAL: Copy metadata to canvas manager's document
-                        # This ensures metadata is available for tab-switch and metadata inspector
-                        if hasattr(canvas_manager, 'document') and hasattr(document_model, 'metadata'):
-                            # Copy metadata keys individually (document.metadata is a property)
-                            for key, value in document_model.metadata.items():
-                                canvas_manager.document.metadata[key] = value
-                            self.logger.info(f"Copied metadata to canvas document ({len(document_model.metadata)} keys)")
-                        
-                        # CRITICAL: Set change callback for proper state management
-                        if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
-                            try:
-                                canvas_manager.document_controller.set_change_callback(
-                                    canvas_manager._on_object_changed
-                                )
-                            except Exception as e:
-                                self.logger.warning(f"Failed to set change callback: {e}")
-                        else:
-                            self.logger.warning("document_controller not available for change callback")
-                        
-                        # Mark as clean (just imported/saved)
-                        canvas_manager.mark_clean()
-                        
-                        # Mark as imported
-                        canvas_manager.mark_as_imported(base_name)
-                        
-                        # CRITICAL: Ensure callbacks are enabled before display
-                        # (Should already be False from setup, but verify)
-                        if hasattr(canvas_manager, '_suppress_callbacks'):
-                            canvas_manager._suppress_callbacks = False
-                            self.logger.info(f"Callbacks enabled: _suppress_callbacks={canvas_manager._suppress_callbacks}")
-                        
-                        # Fit to page to show entire model (with padding)
-                        canvas_manager.fit_to_page(
-                            padding_percent=15,
-                            deferred=True,
-                            horizontal_offset_percent=30,  # Shift content RIGHT for left panels
-                            vertical_offset_percent=-10    # Shift content UP for bottom panels
-                        )
-                        
-                        # Force redraw to display loaded objects
-                        canvas_manager.mark_needs_redraw()
-                        
-                        # CRITICAL: Ensure simulation is reset after loading objects
-                        # This guarantees clean initial state for the imported model
-                        if canvas_loader and hasattr(canvas_loader, '_ensure_simulation_reset'):
-                            canvas_loader._ensure_simulation_reset(drawing_area)
-                    
-                        # REPORT PANEL: Trigger refresh after SBML import (deferred)
-                        # Use GLib.idle_add to ensure this happens AFTER tab switch completes
-                        # DEFENSIVE: Check overlay_managers exists and contains drawing_area
-                        if (hasattr(canvas_loader, 'overlay_managers') and 
-                            canvas_loader.overlay_managers and 
-                            drawing_area in canvas_loader.overlay_managers):
-                            
-                            def refresh_report_panel():
-                                """Deferred refresh to ensure tab switch completes first."""
-                                try:
-                                    overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
-                                    if overlay_manager and hasattr(overlay_manager, 'report_panel_loader'):
-                                        report_panel_loader = overlay_manager.report_panel_loader
-                                        if report_panel_loader and hasattr(report_panel_loader, 'panel'):
-                                            self.logger.info("Triggering Report Panel refresh after SBML import (deferred)")
-                                            simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                                            if simulation_controller:
-                                                # Set controller on report panel
-                                                if hasattr(report_panel_loader.panel, 'set_controller'):
-                                                    report_panel_loader.panel.set_controller(simulation_controller)
-                                                    self.logger.info("✅ Report Panel controller set")
-                                                
-                                                # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
-                                                # Determine metadata path based on project structure
-                                                if self.project and hasattr(self.project, 'get_metadata_dir'):
-                                                    metadata_dir = self.project.get_metadata_dir()
-                                                    if metadata_dir:
-                                                        # Look for metadata in project/metadata/ directory
-                                                        import os
-                                                        model_filename = f"{base_name}.shypn"
-                                                        shypn_path = os.path.join(metadata_dir, model_filename)
-                                                    else:
-                                                        # Fallback: look alongside model file
-                                                        shypn_path = saved_filepath.replace('.shy', '.shypn')
-                                                else:
-                                                    # No project context: look alongside model file
-                                                    shypn_path = saved_filepath.replace('.shy', '.shypn')
-                                                
-                                                if hasattr(report_panel_loader.panel, 'on_file_opened'):
-                                                    report_panel_loader.panel.on_file_opened(shypn_path)
-                                                    self.logger.info(f"✅ Metadata loaded from: {shypn_path}")
-                                                
-                                                # CRITICAL: Refresh SBML metadata inspector for imported model
-                                                # This ensures the metadata tree is populated after import
-                                                self.refresh_metadata_inspector()
-                                                self.logger.info("✅ SBML Metadata Inspector refreshed after import")
-                                                
-                                                # Set controller on SBML category for thermodynamic validation
-                                                self.set_controller(simulation_controller)
-                                                self.logger.info("✅ SBML category controller set")
-                                                
-                                                # Enable assignment rule re-evaluation if user chose Option 3
-                                                if hasattr(processed_pathway, 'metadata'):
-                                                    user_choice = processed_pathway.metadata.get('user_choice_transition_type')
-                                                    if user_choice == 'stochastic_with_reevaluation':
-                                                        simulation_controller.enable_assignment_rule_reevaluation = True
-                                                        simulation_controller.initialize_assignment_rules(processed_pathway)
-                                                        self.logger.info("✅ Option 3 enabled: Assignment rule runtime re-evaluation")
-                                                
-                                                # Schedule thermodynamic validation (needs additional deferral for UI updates)
-                                                def run_validation():
-                                                    try:
-                                                        self.logger.info("Running thermodynamic validation...")
-                                                        simulation_controller.validate_thermodynamics()
-                                                        
-                                                        # Get results and update display
-                                                        results = simulation_controller.thermodynamic_results
-                                                        if results:
-                                                            self._update_thermodynamic_display(results)
-                                                            self.logger.info(f"Thermodynamic validation complete: "
-                                                                           f"{len(results.get('valid', []))} valid, "
-                                                                           f"{len(results.get('warnings', []))} warnings, "
-                                                                           f"{len(results.get('violations', []))} violations")
-                                                        else:
-                                                            self.logger.info("No thermodynamic validation results (no reversible transitions)")
-                                                    except Exception as e:
-                                                        self.logger.error(f"Thermodynamic validation failed: {e}")
-                                                        import traceback
-                                                        traceback.print_exc()
-                                                    return False
-                                                
-                                                GLib.idle_add(run_validation)
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to refresh report panel: {e}")
-                                return False  # Don't repeat
-                            
-                            GLib.idle_add(refresh_report_panel)
-                            self.logger.info("Report Panel refresh scheduled (idle)")
-                        
-                        self.logger.info("=== SBML canvas auto-load COMPLETED ===")
-                        self._show_status(
-                            f"✅ Model loaded to canvas: {base_name}\n"
-                            f"💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
-                        )
-                    
-                    except Exception as load_error:
-                        self.logger.error(f"=== SBML canvas auto-load FAILED ===")
-                        self.logger.error(f"Failed to auto-load model to canvas: {load_error}")
-                        import traceback
-                        traceback.print_exc()
-                        # Show fallback message
-                        self._show_status(
-                            f"✅ Model saved successfully:\n{saved_filepath}\n\n"
-                            f"💡 Open from the file browser on the left to view the model"
-                        )
-                
-                except Exception as outer_error:
-                    self.logger.error(f"Outer error during SBML import auto-load: {outer_error}")
-                    import traceback
-                    traceback.print_exc()
+                base_name = os.path.splitext(os.path.basename(saved_filepath))[0]
+                drawing_area = self._provision_canvas_tab(
+                    canvas_loader, document_model, saved_filepath, base_name, parsed_pathway
+                )
+                if drawing_area is not None:
+                    self._schedule_report_panel_refresh(
+                        canvas_loader, drawing_area, base_name, saved_filepath, parsed_pathway
+                    )
             else:
-                # No canvas loader available - this is expected if panel not connected to canvas
                 reason = "model_canvas is None" if not self.model_canvas else "canvas_loader not detected"
-                self.logger.info(f"Canvas auto-load skipped: {reason}")
+                self.logger.info("Canvas auto-load skipped: %s", reason)
                 self._show_status(
                     f"✅ Model saved successfully:\n{saved_filepath}\n\n"
-                    f"💡 Open from the file browser on the left to view the model",
-                    error=False
+                    "💡 Open from the file browser on the left to view the model",
+                    error=False,
                 )
-            
-            # CRITICAL: Trigger callback for Report panel refresh
-            # This must happen AFTER model is loaded to canvas (above)
-            imported_data = {
-                'source': 'sbml',
+
+            # Phase 4: trigger import-complete callbacks
+            self._trigger_import_complete({
+                'source':   'sbml',
                 'filepath': filepath,
-                'pathway': parsed_pathway,
-                'model': document_model
-            }
-            self._trigger_import_complete(imported_data)
-            
-            # PHASE 3: Auto-map compounds for thermodynamic validation
-            if document_model:
-                try:
-                    from shypn.thermodynamics.mappers import CompoundMapperService
-                    
-                    mapper_service = CompoundMapperService()
-                    mappings, confidences = mapper_service.map_all_places(document_model)
-                    
-                    summary = mapper_service.get_mapping_summary(mappings, confidences)
-                    self.logger.info(
-                        f"Thermodynamic mapping: {summary['total_mapped']}/{len(document_model.places)} places mapped "
-                        f"(avg confidence: {summary['average_confidence']:.0%})"
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Compound mapping failed (non-critical): {e}")
-            
-            # Re-enable button
+                'pathway':  parsed_pathway,
+                'model':    document_model,
+            })
+
+            # Phase 5: compound mapping for thermodynamics
+            self._map_compounds_after_import(document_model)
+
             self.import_button.set_sensitive(True)
-            
+
         except Exception as e:
-            self.logger.error(f"Post-import processing failed: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.error("Post-import processing failed: %s", e, exc_info=True)
             self._show_error(f"Import failed: {e}")
             self.import_button.set_sensitive(True)
-    
+
+    # ------------------------------------------------------------------
+    # Import-complete helpers (extracted from _on_sbml_import_complete)
+    # ------------------------------------------------------------------
+
+    def _provision_canvas_tab(self, canvas_loader, document_model, saved_filepath, base_name, parsed_pathway):
+        """Create a fresh canvas tab, load objects, and wire state for an SBML import.
+
+        Returns:
+            GtkDrawingArea if successful, otherwise None.
+        """
+        try:
+            self.logger.info("Creating fresh canvas tab for SBML import: %s", base_name)
+            page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
+            self.logger.info(
+                "[SBML AUTO-LOAD] Step 1: add_document() page_index=%s, drawing_area=%s",
+                page_index, id(drawing_area) if drawing_area else 'None',
+            )
+            if drawing_area is None:
+                raise ValueError("add_document() returned None for drawing_area")
+
+            canvas_manager = canvas_loader.get_canvas_manager(drawing_area)
+            self.logger.info(
+                "[SBML AUTO-LOAD] Step 2: get_canvas_manager() → %s (%s)",
+                canvas_manager is not None,
+                type(canvas_manager).__name__ if canvas_manager else 'None',
+            )
+            if not canvas_manager:
+                raise ValueError("get_canvas_manager() returned None")
+
+            self.logger.info("[SBML AUTO-LOAD] Step 3: filepath → %s", saved_filepath)
+            canvas_manager.set_filepath(saved_filepath)
+
+            self.logger.info(
+                "[SBML AUTO-LOAD] Step 4: loading objects — places=%d, transitions=%d, arcs=%d",
+                len(document_model.places), len(document_model.transitions), len(document_model.arcs),
+            )
+            try:
+                canvas_manager.load_objects(
+                    places=document_model.places,
+                    transitions=document_model.transitions,
+                    arcs=document_model.arcs,
+                    modules=document_model.modules,
+                )
+                self.logger.info("[SBML AUTO-LOAD] Step 5: load_objects() completed")
+            except Exception as e:
+                raise ValueError(f"Failed to load objects to canvas: {e}") from e
+
+            # Copy metadata
+            if hasattr(canvas_manager, 'document') and hasattr(document_model, 'metadata'):
+                for key, value in document_model.metadata.items():
+                    canvas_manager.document.metadata[key] = value
+                self.logger.info("Copied metadata (%d keys)", len(document_model.metadata))
+
+            # Wire change callback
+            if hasattr(canvas_manager, 'document_controller') and canvas_manager.document_controller:
+                try:
+                    canvas_manager.document_controller.set_change_callback(
+                        canvas_manager._on_object_changed
+                    )
+                except Exception as e:
+                    self.logger.warning("Failed to set change callback: %s", e)
+            else:
+                self.logger.warning("document_controller not available for change callback")
+
+            canvas_manager.mark_clean()
+            canvas_manager.mark_as_imported(base_name)
+
+            if hasattr(canvas_manager, '_suppress_callbacks'):
+                canvas_manager._suppress_callbacks = False
+
+            canvas_manager.fit_to_page(
+                padding_percent=15,
+                deferred=True,
+                horizontal_offset_percent=30,
+                vertical_offset_percent=-10,
+            )
+            canvas_manager.mark_needs_redraw()
+
+            if hasattr(canvas_loader, '_ensure_simulation_reset'):
+                canvas_loader._ensure_simulation_reset(drawing_area)
+
+            self.logger.info("=== SBML canvas auto-load COMPLETED ===")
+            self._show_status(
+                f"✅ Model loaded to canvas: {base_name}\n"
+                "💡 Use View → Fit to Page (Ctrl+0) to adjust view if needed"
+            )
+            return drawing_area
+
+        except Exception as load_error:
+            self.logger.error("SBML canvas auto-load FAILED: %s", load_error, exc_info=True)
+            self._show_status(
+                f"✅ Model saved successfully:\n{saved_filepath}\n\n"
+                "💡 Open from the file browser on the left to view the model"
+            )
+            return None
+
+    def _schedule_report_panel_refresh(
+        self, canvas_loader, drawing_area, base_name, saved_filepath, parsed_pathway
+    ):
+        """Schedule a deferred GLib idle callback to wire the Report Panel after import."""
+        if not (
+            hasattr(canvas_loader, 'overlay_managers')
+            and canvas_loader.overlay_managers
+            and drawing_area in canvas_loader.overlay_managers
+        ):
+            return
+
+        def refresh_report_panel():
+            try:
+                overlay_manager = canvas_loader.overlay_managers.get(drawing_area)
+                if not (overlay_manager and hasattr(overlay_manager, 'report_panel_loader')):
+                    return False
+                report_panel_loader = overlay_manager.report_panel_loader
+                if not (report_panel_loader and hasattr(report_panel_loader, 'panel')):
+                    return False
+
+                self.logger.info("Triggering Report Panel refresh after SBML import (deferred)")
+                simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
+                if not simulation_controller:
+                    return False
+
+                from shypn.events import EventBus
+                EventBus.emit(
+                    'simulation.controller_ready',
+                    {'controller': simulation_controller},
+                    document_id=id(drawing_area),
+                )
+                self.logger.info("✅ Report Panel controller notified")
+
+                # Resolve metadata path
+                if self.project and hasattr(self.project, 'get_metadata_dir'):
+                    metadata_dir = self.project.get_metadata_dir()
+                    if metadata_dir:
+                        shypn_path = os.path.join(metadata_dir, f"{base_name}.shypn")
+                    else:
+                        shypn_path = saved_filepath.replace('.shy', '.shypn')
+                else:
+                    shypn_path = saved_filepath.replace('.shy', '.shypn')
+
+                if hasattr(report_panel_loader.panel, 'on_file_opened'):
+                    report_panel_loader.panel.on_file_opened(shypn_path)
+                    self.logger.info("✅ Metadata loaded from: %s", shypn_path)
+
+                self.refresh_metadata_inspector()
+                self.logger.info("✅ SBML Metadata Inspector refreshed")
+                self.set_controller(simulation_controller)
+                self.logger.info("✅ SBML category controller set")
+
+                # Option 3: assignment-rule re-evaluation
+                if hasattr(parsed_pathway, 'metadata'):
+                    user_choice = parsed_pathway.metadata.get('user_choice_transition_type')
+                    if user_choice == 'stochastic_with_reevaluation':
+                        simulation_controller.enable_assignment_rule_reevaluation = True
+                        simulation_controller.initialize_assignment_rules(parsed_pathway)
+                        self.logger.info("✅ Option 3: assignment-rule re-evaluation enabled")
+
+                def run_validation():
+                    try:
+                        self.logger.info("Running thermodynamic validation...")
+                        simulation_controller.validate_thermodynamics()
+                        results = simulation_controller.thermodynamic_results
+                        if results:
+                            self._update_thermodynamic_display(results)
+                            self.logger.info(
+                                "Thermodynamic validation: %d valid, %d warnings, %d violations",
+                                len(results.get('valid', [])),
+                                len(results.get('warnings', [])),
+                                len(results.get('violations', [])),
+                            )
+                        else:
+                            self.logger.info("No thermodynamic results (no reversible transitions)")
+                    except Exception as e:
+                        self.logger.error("Thermodynamic validation failed: %s", e, exc_info=True)
+                    return False
+
+                GLib.idle_add(run_validation)
+
+            except Exception as e:
+                self.logger.warning("Failed to refresh report panel: %s", e)
+            return False
+
+        GLib.idle_add(refresh_report_panel)
+        self.logger.info("Report Panel refresh scheduled (idle)")
+
+    def _map_compounds_after_import(self, document_model):
+        """Run thermodynamic compound mapping after a successful SBML import."""
+        if not document_model:
+            return
+        try:
+            from shypn.thermodynamics.mappers import CompoundMapperService
+            mapper_service = CompoundMapperService()
+            mappings, confidences = mapper_service.map_all_places(document_model)
+            summary = mapper_service.get_mapping_summary(mappings, confidences)
+            self.logger.info(
+                "Thermodynamic mapping: %d/%d places mapped (avg confidence: %.0f%%)",
+                summary['total_mapped'], len(document_model.places),
+                summary['average_confidence'] * 100,
+            )
+        except Exception as e:
+            self.logger.warning("Compound mapping failed (non-critical): %s", e)
+
     def _on_sbml_import_error(self, error):
         """Called in main thread if SBML import fails.
         
@@ -2647,6 +2569,8 @@ class SBMLCategory(BasePathwayCategory):
             # Reconstruct a minimal PathwayData-like object for the inspector
             # We don't need full species/reactions lists, just summary info
             class PathwayDataStub:
+                """Minimal PathwayData-compatible stub reconstructed from serialized metadata."""
+
                 def __init__(self, data_dict):
                     self.name = data_dict.get('name', 'Unnamed')
                     self.organism = data_dict.get('organism', 'Unknown')

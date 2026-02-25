@@ -7,8 +7,11 @@ This module provides utilities for:
 - Providing appropriate cursor types for different handles
 """
 
+import logging
 import math
 from typing import Optional, Dict, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class HandleDetector:
@@ -179,8 +182,8 @@ class HandleDetector:
                 parallels = arc._manager.detect_parallel_arcs(arc)
                 if parallels:
                     parallel_offset = arc._manager.calculate_arc_offset(arc, parallels)
-            except Exception:
-                pass
+            except (AttributeError, TypeError) as e:
+                logger.debug("Parallel arc offset skipped: %s", e)
         
         # Apply parallel arc offset perpendicular to arc direction
         if abs(parallel_offset) > 1e-6:

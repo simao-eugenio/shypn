@@ -26,7 +26,6 @@ Example:
 """
 import os
 import sys
-import logging
 from typing import Optional, Callable
 try:
     import gi
@@ -37,8 +36,6 @@ except Exception as e:
     print(f'ERROR: GTK3 not available in file_explorer_panel: {e}', file=sys.stderr)
     sys.exit(1)
 from shypn.file import FileExplorer
-
-logger = logging.getLogger(__name__)
 
 class FileExplorerPanel:
     """Controller for file explorer functionality.
@@ -80,18 +77,10 @@ class FileExplorerPanel:
         self.parent_window: Optional[Gtk.Window] = None
         # Project reference for saving imported models to project/models/
         self.project = None
-        # Active project name (set via EventBus project.opened / project.closed)
-        self._active_project_name: Optional[str] = None
-        # Open Editors tracking: filepath → {dirty, dirty_dot, name_label, row}
-        self._open_files: dict = {}
-        # Currently focused file (used to correlate model.changed → dirty flag)
-        self._focused_filepath: Optional[str] = None
         self._get_widgets()
         self._configure_tree_view()
         self._setup_context_menu()
         self._connect_signals()
-        self._build_open_editors_section()
-        self._subscribe_event_bus()
         self._load_current_directory()
 
     def _get_widgets(self):
@@ -131,9 +120,6 @@ class FileExplorerPanel:
         # Added background_set (bool) column to prevent GTK warnings for empty color strings
         self.store = Gtk.TreeStore(str, str, str, bool, bool, int, str, bool)
         self.tree_view.set_model(self.store)
-        self.tree_view.set_show_expanders(False)
-        # Restore per-level indentation that set_show_expanders(False) removes
-        self.tree_view.set_level_indentation(16)
         self._apply_tree_view_css()
         
         # Clear any existing columns (from XML or previous configuration)
@@ -323,7 +309,7 @@ class FileExplorerPanel:
     def _apply_tree_view_css(self):
         """Apply CSS styling to improve TreeView appearance."""
         css_provider = Gtk.CssProvider()
-        css = b'\n        /* File explorer TreeView styling */\n        treeview {\n            background-color: #fafafa;\n            color: #2e3436;\n        }\n        \n        /* Row styling */\n        treeview.view {\n            padding: 2px;\n        }\n        \n        /* Selected row */\n        treeview.view:selected {\n            background-color: #4a90d9;\n            color: #ffffff;\n        }\n        \n        /* Hover effect */\n        treeview.view:hover {\n            background-color: #e8e8e8;\n        }\n        \n        /* Selected and focused */\n        treeview.view:selected:focus {\n            background-color: #2a76c6;\n            color: #ffffff;\n        }\n        \n        /* Cell padding and spacing */\n        treeview.view cell {\n            padding-top: 4px;\n            padding-bottom: 4px;\n            padding-left: 6px;\n            padding-right: 6px;\n        }\n        \n        /* Header styling */\n        treeview header button {\n            background-color: #e8e8e8;\n            border: 1px solid #d0d0d0;\n            padding: 4px 8px;\n            font-weight: bold;\n        }\n        \n        /* Separator lines */\n        treeview.view.separator {\n            min-height: 2px;\n            color: #d0d0d0;\n        }\n        \n        /* Expander node hidden via set_show_expanders(False).\n           Zero out allocated space to prevent vertical line artefacts. */\n        treeview expander {\n            min-width: 0;\n            min-height: 0;\n            padding: 0;\n            color: transparent;\n            border: none;\n        }\n        \n        treeview expander:hover {\n            color: transparent;\n        }\n        '
+        css = b'\n        /* File explorer TreeView styling */\n        treeview {\n            background-color: #fafafa;\n            color: #2e3436;\n        }\n        \n        /* Row styling */\n        treeview.view {\n            padding: 2px;\n        }\n        \n        /* Selected row */\n        treeview.view:selected {\n            background-color: #4a90d9;\n            color: #ffffff;\n        }\n        \n        /* Hover effect */\n        treeview.view:hover {\n            background-color: #e8e8e8;\n        }\n        \n        /* Selected and focused */\n        treeview.view:selected:focus {\n            background-color: #2a76c6;\n            color: #ffffff;\n        }\n        \n        /* Cell padding and spacing */\n        treeview.view cell {\n            padding-top: 4px;\n            padding-bottom: 4px;\n            padding-left: 6px;\n            padding-right: 6px;\n        }\n        \n        /* Header styling */\n        treeview header button {\n            background-color: #e8e8e8;\n            border: 1px solid #d0d0d0;\n            padding: 4px 8px;\n            font-weight: bold;\n        }\n        \n        /* Separator lines */\n        treeview.view.separator {\n            min-height: 2px;\n            color: #d0d0d0;\n        }\n        \n        /* Expander arrow for tree hierarchy */\n        treeview.view.expander {\n            color: #5a5a5a;\n        }\n        \n        treeview.view.expander:hover {\n            color: #2a76c6;\n        }\n        '
         try:
             css_provider.load_from_data(css)
             style_context = self.tree_view.get_style_context()
@@ -355,23 +341,7 @@ class FileExplorerPanel:
         # Store references to menu items that need dynamic enable/disable
         self.menu_items_refs = {}
         
-        menu_items = [
-            ('Open', self._on_context_open_clicked),
-            ('New File', self._on_context_new_file_clicked),
-            ('New Folder', self._on_context_new_folder_clicked),
-            ('New Model', self._on_context_new_model_clicked),       # Phase 6: project-aware
-            ('New Experiment', self._on_context_new_experiment_clicked),  # Phase 6: project-aware
-            ('---', None),
-            ('Cut', self._on_cut_clicked),
-            ('Copy', self._on_copy_clicked),
-            ('Paste', self._on_paste_clicked),
-            ('---', None),
-            ('Rename', self._on_rename_clicked),
-            ('Delete', self._on_delete_clicked),
-            ('---', None),
-            ('Refresh', self._on_refresh_clicked),
-            ('Properties', self._on_properties_clicked),
-        ]
+        menu_items = [('Open', self._on_context_open_clicked), ('New File', self._on_context_new_file_clicked), ('New Folder', self._on_context_new_folder_clicked), ('---', None), ('Cut', self._on_cut_clicked), ('Copy', self._on_copy_clicked), ('Paste', self._on_paste_clicked), ('---', None), ('Rename', self._on_rename_clicked), ('Delete', self._on_delete_clicked), ('---', None), ('Refresh', self._on_refresh_clicked), ('Properties', self._on_properties_clicked)]
         for label, callback in menu_items:
             if label == '---':
                 separator = Gtk.SeparatorMenuItem()
@@ -382,8 +352,7 @@ class FileExplorerPanel:
                     menu_item.connect('activate', callback)
                 self.context_menu.append(menu_item)
                 # Store references for items that need dynamic state
-                if label in ['Cut', 'Copy', 'Paste', 'Rename', 'Delete', 'Open',
-                             'New Model', 'New Experiment']:
+                if label in ['Cut', 'Copy', 'Paste', 'Rename', 'Delete', 'Open']:
                     self.menu_items_refs[label] = menu_item
         
         # Connect to menu show event to update item states
@@ -412,20 +381,6 @@ class FileExplorerPanel:
             can_open = has_selection and not self.selected_item_is_dir
             self.menu_items_refs['Open'].set_sensitive(can_open)
 
-        # Show/hide project-aware items (New Model, New Experiment) only inside a project
-        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
-        inside_project = False
-        if active_project:
-            current = self.explorer.current_path or ''
-            base = getattr(active_project, 'base_path', '')
-            if base and (os.path.normpath(current) == os.path.normpath(base)
-                         or os.path.normpath(current).startswith(os.path.normpath(base) + os.sep)):
-                inside_project = True
-        for item_name in ('New Model', 'New Experiment'):
-            if item_name in self.menu_items_refs:
-                self.menu_items_refs[item_name].set_visible(inside_project)
-                self.menu_items_refs[item_name].set_sensitive(inside_project)
-
     def _connect_signals(self):
         """Connect widget signals to controller methods.
         
@@ -453,345 +408,11 @@ class FileExplorerPanel:
             self.refresh_button.connect('clicked', self._on_refresh_clicked)
         self.tree_view.connect('row-activated', self._on_row_activated)
         self.tree_view.connect('button-press-event', self._on_tree_view_button_press)
-        self.tree_view.connect('key-press-event', self._on_tree_key_press)
         self.scrolled_window.connect('button-press-event', self._on_scroll_button_press)
         
         # Connect to selection changes to update current file display
         selection = self.tree_view.get_selection()
         selection.connect('changed', self._on_tree_selection_changed)
-
-    # ------------------------------------------------------------------
-    # Open Editors Section (Phase 3)
-    # ------------------------------------------------------------------
-
-    def _build_open_editors_section(self):
-        """Build the Open Editors collapsible section and insert it above the file tree.
-
-        The widget is injected programmatically into the parent GtkBox so that
-        no UI XML changes are required. It sits immediately above the scrolled
-        file tree.
-        """
-        try:
-            parent = self.scrolled_window.get_parent()
-            if parent is None:
-                return
-
-            # --- Header label (expander title) ---
-            header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            section_label = Gtk.Label()
-            section_label.set_markup('<small><b>OPEN EDITORS</b></small>')
-            section_label.set_halign(Gtk.Align.START)
-            header_box.pack_start(section_label, False, False, 0)
-
-            self._open_editors_count_label = Gtk.Label(label='')
-            self._open_editors_count_label.get_style_context().add_class('dim-label')
-            header_box.pack_start(self._open_editors_count_label, False, False, 0)
-            header_box.show_all()
-
-            # --- Expander ---
-            self.open_editors_expander = Gtk.Expander()
-            self.open_editors_expander.set_label_widget(header_box)
-            self.open_editors_expander.set_expanded(True)
-            self.open_editors_expander.set_margin_start(4)
-            self.open_editors_expander.set_margin_end(4)
-            self.open_editors_expander.set_margin_top(2)
-            self.open_editors_expander.set_margin_bottom(2)
-
-            # --- ListBox inside expander ---
-            self._open_editors_listbox = Gtk.ListBox()
-            self._open_editors_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
-            self._open_editors_listbox.set_activate_on_single_click(True)
-            self._open_editors_listbox.connect('row-activated', self._on_open_editor_row_activated)
-
-            # Wrap listbox in a box for margins
-            list_wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            list_wrapper.pack_start(self._open_editors_listbox, False, False, 0)
-            self.open_editors_expander.add(list_wrapper)
-
-            # --- Insert above scrolled_window ---
-            children = parent.get_children()
-            scroll_pos = children.index(self.scrolled_window) if self.scrolled_window in children else -1
-
-            parent.pack_start(self.open_editors_expander, False, False, 0)
-            if scroll_pos >= 0:
-                parent.reorder_child(self.open_editors_expander, scroll_pos)
-
-            self.open_editors_expander.show_all()
-
-        except Exception:
-            # Never crash if Open Editors section fails to build
-            self.open_editors_expander = None
-            self._open_editors_listbox = None
-            self._open_editors_count_label = None
-
-    def _oe_update_count(self):
-        """Update the count badge on the Open Editors expander header."""
-        try:
-            n = len(self._open_files)
-            if self._open_editors_count_label:
-                text = f'({n})' if n > 0 else ''
-                self._open_editors_count_label.set_text(text)
-        except (AttributeError, RuntimeError) as e:
-            logger.debug("Failed to update open editors count badge: %s", e)
-
-    def _oe_add_file(self, filepath: str):
-        """Add a file to the Open Editors list (no-op if already present).
-
-        Only shows files that belong to the currently active project (Phase 4).
-        If no project is active, all open files are shown.
-
-        Args:
-            filepath: Absolute path of the opened file
-        """
-        if not filepath or filepath in self._open_files:
-            return
-        if not self._open_editors_listbox:
-            return
-        # Project filter: only show files inside the active project
-        try:
-            active_project = self._get_active_project()
-            if active_project and active_project.base_path:
-                base = os.path.normpath(active_project.base_path)
-                norm = os.path.normpath(filepath)
-                if not (norm == base or norm.startswith(base + os.sep)):
-                    return
-        except (AttributeError, OSError) as e:
-            logger.debug("Project path filter check failed: %s", e)
-
-        basename = os.path.basename(filepath)
-
-        row = Gtk.ListBoxRow()
-        row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        row_box.set_margin_start(6)
-        row_box.set_margin_end(2)
-        row_box.set_margin_top(2)
-        row_box.set_margin_bottom(2)
-
-        # Dirty indicator dot
-        dirty_dot = Gtk.Label(label='  ')
-        dirty_dot.set_width_chars(2)
-        row_box.pack_start(dirty_dot, False, False, 0)
-
-        # Filename label
-        name_label = Gtk.Label(label=basename)
-        name_label.set_halign(Gtk.Align.START)
-        name_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
-        name_label.set_max_width_chars(22)
-        name_label.set_tooltip_text(filepath)
-        row_box.pack_start(name_label, True, True, 0)
-
-        # Close button
-        close_btn = Gtk.Button(label='✕')
-        close_btn.get_style_context().add_class('flat')
-        close_btn.set_relief(Gtk.ReliefStyle.NONE)
-        close_btn.set_focus_on_click(False)
-        close_btn.set_tooltip_text('Close')
-        close_btn.connect('clicked', self._on_open_editor_close_clicked, filepath)
-        row_box.pack_end(close_btn, False, False, 0)
-
-        row.add(row_box)
-        row.set_tooltip_text(filepath)
-        row.show_all()
-
-        self._open_editors_listbox.add(row)
-        self._open_files[filepath] = {
-            'dirty': False,
-            'dirty_dot': dirty_dot,
-            'name_label': name_label,
-            'row': row,
-        }
-        self._oe_update_count()
-
-    def _oe_remove_file(self, filepath: str):
-        """Remove a file from the Open Editors list.
-
-        Args:
-            filepath: Absolute path to remove
-        """
-        entry = self._open_files.pop(filepath, None)
-        if entry and self._open_editors_listbox:
-            row = entry['row']
-            self._open_editors_listbox.remove(row)
-        if self._focused_filepath == filepath:
-            self._focused_filepath = None
-        self._oe_update_count()
-
-    def _oe_set_dirty(self, filepath: str, dirty: bool):
-        """Set or clear the dirty indicator for a file.
-
-        Args:
-            filepath: Absolute path of the file
-            dirty: True to show dirty dot, False to clear it
-        """
-        entry = self._open_files.get(filepath)
-        if not entry:
-            return
-        entry['dirty'] = dirty
-        dot = entry['dirty_dot']
-        dot.set_markup('<span color="#e06c00">●</span>' if dirty else '  ')
-
-    def _oe_set_focused(self, filepath: str):
-        """Bold the focused row and un-bold all others.
-
-        Args:
-            filepath: Absolute path of the newly focused file
-        """
-        for fp, entry in self._open_files.items():
-            lbl = entry['name_label']
-            if fp == filepath:
-                lbl.set_markup(f'<b>{GLib.markup_escape_text(os.path.basename(fp))}</b>')
-            else:
-                lbl.set_text(os.path.basename(fp))
-        self._focused_filepath = filepath
-
-    def _on_open_editor_row_activated(self, listbox, row):
-        """Navigate to file when Open Editors row is clicked."""
-        # Find which filepath corresponds to this row
-        for fp, entry in self._open_files.items():
-            if entry['row'] is row:
-                if self.on_file_open_requested:
-                    self.on_file_open_requested(fp)
-                else:
-                    self._open_file_from_path(fp)
-                break
-
-    def _on_open_editor_close_clicked(self, btn, filepath):
-        """Handle ✕ close button on Open Editors row.
-
-        Emits 'editor.close_requested' so the canvas loader closes the tab
-        (which in turn emits 'file.closed' and triggers _oe_remove_file).
-        """
-        try:
-            from shypn.events.event_bus import EventBus
-            EventBus.get_instance().emit('editor.close_requested', {'filepath': filepath})
-        except Exception:
-            logger.debug("EventBus emit 'editor.close_requested' failed", exc_info=True)
-
-    # ------------------------------------------------------------------
-    # EventBus subscriptions
-    # ------------------------------------------------------------------
-
-    def _subscribe_event_bus(self):
-        """Subscribe to relevant EventBus events (project lifecycle + open editors).
-
-        Called once after _connect_signals(). Failures are swallowed so that
-        the panel remains usable even when EventBus is unavailable.
-        """
-        try:
-            from shypn.events.event_bus import EventBus
-            bus = EventBus.get_instance()
-            bus.subscribe('project.opened', self._on_project_opened_event)
-            bus.subscribe('project.closed', self._on_project_closed_event)
-            bus.subscribe('file.opened', self._on_file_opened_event)
-            bus.subscribe('file.closed', self._on_file_closed_event)
-            bus.subscribe('file.saved', self._on_file_saved_event)
-            bus.subscribe('model.changed', self._on_model_changed_event)
-            bus.subscribe('document.focused', self._on_document_focused_event)
-        except Exception:
-            logger.debug("EventBus subscriptions failed", exc_info=True)
-
-    def _on_project_opened_event(self, event_data: dict):
-        """React to project.opened EventBus event.
-
-        Updates the breadcrumb/path bar to show the active project name and
-        stores it for use by file operation defaults.
-
-        Args:
-            event_data: dict with keys 'project', 'base_path', 'name'
-        """
-        name = event_data.get('name', '') if event_data else ''
-        self._active_project_name = name or None
-        if self.current_file_entry and name:
-            GLib.idle_add(self.current_file_entry.set_text, f'[■ {name}]')
-
-    def _on_project_closed_event(self, event_data: dict):
-        """React to project.closed EventBus event.
-
-        Clears the active project badge from the path bar.
-
-        Args:
-            event_data: dict with key 'project_id'
-        """
-        self._active_project_name = None
-        if self.current_file_entry:
-            # Restore plain path text
-            plain_path = self.explorer.current_path if self.explorer else ''
-            GLib.idle_add(self.current_file_entry.set_text, plain_path)
-
-    def _on_file_opened_event(self, event_data: dict):
-        """React to file.opened EventBus event — add entry to Open Editors.
-
-        Args:
-            event_data: dict with keys 'filepath', 'document', 'timestamp'
-        """
-        filepath = (event_data or {}).get('filepath', '')
-        if filepath:
-            GLib.idle_add(self._oe_add_file, filepath)
-            GLib.idle_add(self._oe_set_focused, filepath)
-
-    def _on_file_closed_event(self, event_data: dict):
-        """React to file.closed EventBus event — remove entry from Open Editors.
-
-        Args:
-            event_data: dict with key 'filepath'
-        """
-        filepath = (event_data or {}).get('filepath', '')
-        if filepath:
-            GLib.idle_add(self._oe_remove_file, filepath)
-
-    def _on_file_saved_event(self, event_data: dict):
-        """React to file.saved EventBus event — clear dirty indicator and refresh tree.
-
-        Also adds the entry if the file was saved under a new path (Save As),
-        and triggers a targeted tree refresh so the new file appears immediately
-        without requiring a manual refresh or full page reload.
-
-        Args:
-            event_data: dict with keys 'filepath', 'document', 'timestamp'
-        """
-        filepath = (event_data or {}).get('filepath', '')
-        if not filepath:
-            return
-
-        def _update():
-            self._oe_add_file(filepath)   # no-op if already present
-            self._oe_set_dirty(filepath, False)
-            # Targeted tree refresh: ensure new file appears (covers Save As)
-            parent_dir = os.path.dirname(filepath)
-            self._refresh_dir_in_tree(parent_dir)
-
-        GLib.idle_add(_update)
-
-    def _on_model_changed_event(self, event_data: dict):
-        """React to model.changed EventBus event — mark focused file as dirty.
-
-        model.changed carries a document_id scope but not a filepath. We use
-        the focused filepath as the best available correlation (the user can
-        only be actively editing the focused document).
-
-        Args:
-            event_data: arbitrary model change payload
-        """
-        if self._focused_filepath:
-            GLib.idle_add(self._oe_set_dirty, self._focused_filepath, True)
-
-    def _on_document_focused_event(self, event_data: dict):
-        """React to document.focused EventBus event — update focused row.
-
-        Obtains the filepath via the canvas_manager attached to drawing_area.
-
-        Args:
-            event_data: dict with keys 'drawing_area', 'canvas_manager', etc.
-        """
-        try:
-            canvas_manager = (event_data or {}).get('canvas_manager')
-            if canvas_manager and hasattr(canvas_manager, 'get_filepath'):
-                fp = canvas_manager.get_filepath()
-                if fp:
-                    GLib.idle_add(self._oe_add_file, fp)
-                    GLib.idle_add(self._oe_set_focused, fp)
-        except (AttributeError, KeyError) as e:
-            logger.debug("Canvas manager add-file event handling failed: %s", e)
 
     def _get_expanded_paths(self):
         """Get list of currently expanded directory paths in tree view.
@@ -944,76 +565,22 @@ class FileExplorerPanel:
         # Fallback: it's a project but couldn't read name, use folder name
         return True, name
 
-    # Standard project subfolder order for pinning (Phase 4)
-    _PROJECT_PINNED_FOLDERS = ['models', 'pathways', 'experiments', 'exports']
-    # Internal project marker files — never shown in tree
-    _PROJECT_HIDDEN_FILES = {'.project.shy', 'project_state.json',
-                             'project_index.json', 'recent.json'}
-
-    def _get_active_project(self):
-        """Return the active Project from ProjectManager, falling back to self.project.
-
-        Phase 5 helper: ensures file dialogs always see the authoritative project
-        rather than a stale self.project reference set via the old set_project().
-
-        Returns:
-            Project instance or None
-        """
-        try:
-            from shypn.data.project_models import get_project_manager
-            pm = get_project_manager()
-            if pm.current_project:
-                return pm.current_project
-        except ImportError:
-            pass
-        return self.project  # legacy fallback
-
     def _load_directory_tree(self, directory: str, parent_iter):
         """Load directory contents recursively in tree mode.
-
-        Phase 4 enhancements when at a project root:
-        - Standard folders (models/ pathways/ experiments/ exports/) are pinned
-          at the top in declaration order, always shown even when empty.
-        - .project.shy and other internal files are hidden regardless of
-          the show_hidden setting.
-
+        
         Args:
             directory: Directory path to load
             parent_iter: Parent TreeIter (None for root)
         """
         try:
             items = os.listdir(directory)
-        except PermissionError:
-            if self.explorer.on_error:
-                self.explorer.on_error(f'Permission denied: {directory}')
-            return
-        except Exception as e:
-            if self.explorer.on_error:
-                self.explorer.on_error(f'Error reading directory: {str(e)}')
-            return
-
-        try:
-            # Determine if this directory is a project root (Phase 4)
-            # Guard: the projects container directory is never a project root itself
-            _shy_file_present = os.path.exists(os.path.join(directory, '.project.shy'))
-            if _shy_file_present:
-                try:
-                    from shypn.data.project_models import get_project_manager as _get_pm
-                    _pr = _get_pm().projects_root
-                    if _pr and os.path.normpath(directory) == os.path.normpath(_pr):
-                        _shy_file_present = False
-                except (ImportError, AttributeError):
-                    pass
-            is_project_root = _shy_file_present
-
             directories = []
             files = []
             for item in items:
-                # Always hide internal project/system files
-                if item in self._PROJECT_HIDDEN_FILES:
-                    continue
-                # Hide dotfiles unless show_hidden is on
+                # Skip hidden files (starting with .) and project state files
                 if not self.explorer.show_hidden and item.startswith('.'):
+                    continue
+                if item in ('project_state.json', 'project_index.json', 'recent.json'):
                     continue
                 full_path = os.path.join(directory, item)
                 try:
@@ -1023,49 +590,22 @@ class FileExplorerPanel:
                         files.append((item, full_path))
                 except (PermissionError, OSError):
                     continue
-
             directories.sort(key=lambda x: x[0].lower())
             files.sort(key=lambda x: x[0].lower())
-
-            # Phase 4: pin standard folders at top when inside a project root
-            if is_project_root:
-                dir_names = {n.lower(): (n, p) for n, p in directories}
-                pinned = []
-                rest = list(directories)  # will drop pinned ones
-                for std in self._PROJECT_PINNED_FOLDERS:
-                    if std in dir_names:
-                        entry = dir_names[std]
-                        pinned.append(entry)
-                        rest = [d for d in rest if d[0].lower() != std]
-                    else:
-                        # Folder doesn't exist yet — create a greyed placeholder
-                        ghost_path = os.path.join(directory, std)
-                        pinned.append((std, ghost_path))
-                directories = pinned + rest
-
             for name, path in directories:
-                # Ghost folders (don't exist on disk yet) — shown dimmed
-                ghost = not os.path.exists(path)
-                icon = 'folder-open-symbolic' if not ghost else 'folder-new-symbolic'
+                icon = self.explorer._get_icon_name(name, True)
                 is_project, display_name = self._check_if_project(path, True, name)
-                weight = 700 if is_project else 400
-                bg_color = 'white'
-                bg_set = False
-                if ghost:
-                    display_name = f'{name}/'  # trailing slash hint for empty ghost
-                dir_iter = self.store.append(
-                    parent_iter,
-                    [icon, display_name, path, True, is_project, weight, bg_color, bg_set]
-                )
-                if not ghost:
-                    self._load_directory_tree(path, dir_iter)
-
+                weight = 700 if is_project else 400  # Bold for projects
+                bg_color = 'white'  # Background color (unused if bg_set=False)
+                bg_set = False  # No background color for directories
+                dir_iter = self.store.append(parent_iter, [icon, display_name, path, True, is_project, weight, bg_color, bg_set])
+                self._load_directory_tree(path, dir_iter)
             for name, path in files:
                 icon = self.explorer._get_icon_name(name, False)
-                self.store.append(
-                    parent_iter,
-                    [icon, name, path, False, False, 400, 'white', False]
-                )
+                self.store.append(parent_iter, [icon, name, path, False, False, 400, 'white', False])
+        except PermissionError:
+            if self.explorer.on_error:
+                self.explorer.on_error(f'Permission denied: {directory}')
         except Exception as e:
             if self.explorer.on_error:
                 self.explorer.on_error(f'Error reading directory: {str(e)}')
@@ -1079,183 +619,13 @@ class FileExplorerPanel:
         if self.up_button:
             self.up_button.set_sensitive(self.explorer.can_go_up())
 
-    # ------------------------------------------------------------------
-    # Targeted tree refresh (Phase 4)
-    # ------------------------------------------------------------------
-
-    def _refresh_dir_in_tree(self, directory: str):
-        """Refresh entries for a specific directory without a full tree reload.
-
-        Rules:
-        - If directory == current root → call _load_current_directory() (unavoidable
-          but scoped; skips all other expanded directories).
-        - If directory is an expanded subdirectory in hierarchical view → remove
-          its children from the store and reload from disk in-place.
-        - If directory isn't visible in the tree at all → no-op.
-
-        Args:
-            directory: Absolute path of the directory whose contents changed
-        """
-        if not directory:
-            return False
-        current = self.explorer.current_path
-        if not current:
-            return False
-
-        dir_norm = os.path.normpath(directory)
-        current_norm = os.path.normpath(current)
-
-        if dir_norm == current_norm:
-            # Root-level change — full reload of current directory only
-            self._load_current_directory()
-            return False
-
-        if self.hierarchical_view:
-            parent_iter = self._find_store_iter_for_path(directory)
-            if parent_iter is not None:
-                self._refresh_subtree(parent_iter, directory)
-
-        return False
-
-    def _find_store_iter_for_path(self, path: str):
-        """Return the GtkTreeIter whose path column matches the given filesystem path.
-
-        Args:
-            path: Absolute filesystem path to search for
-
-        Returns:
-            GtkTreeIter or None if not found in the current store
-        """
-        path_norm = os.path.normpath(path)
-
-        def _search(tree_iter):
-            while tree_iter:
-                row_path = self.store.get_value(tree_iter, 2)  # column 2 = full path
-                if os.path.normpath(row_path) == path_norm:
-                    return tree_iter
-                child = self.store.iter_children(tree_iter)
-                if child:
-                    result = _search(child)
-                    if result is not None:
-                        return result
-                tree_iter = self.store.iter_next(tree_iter)
-            return None
-
-        return _search(self.store.get_iter_first())
-
-    def _refresh_subtree(self, parent_iter, directory: str):
-        """Remove all children of parent_iter and reload them from disk.
-
-        Args:
-            parent_iter: GtkTreeIter for the directory row to refresh
-            directory: Filesystem path corresponding to parent_iter
-        """
-        # Remove existing children
-        child = self.store.iter_children(parent_iter)
-        while child:
-            # iter_children/iter_next become invalid after remove; always re-check
-            self.store.remove(child)
-            child = self.store.iter_children(parent_iter)
-
-        # Reload from disk into the now-empty parent row
-        try:
-            self._load_directory_tree(directory, parent_iter)
-        except Exception:
-            logger.debug("Failed to reload directory tree for %s", directory, exc_info=True)
-
     def _on_path_changed(self, new_path: str):
         """Callback when path changes in API (Model).
-
-        Also triggers auto project activation/deactivation when navigation
-        crosses project boundaries (Phase 2 of explorer refactor),
-        and updates the breadcrumb bar with a project-relative path (Phase 4).
-
+        
         Args:
             new_path: New current path
         """
         GLib.idle_add(self._load_current_directory)
-        GLib.idle_add(self._sync_project_state, new_path)
-        GLib.idle_add(self._update_breadcrumb, new_path)
-
-    def _update_breadcrumb(self, new_path: str):
-        """Show project-relative path in the breadcrumb bar (Phase 4).
-
-        When inside an active project, displays '<ProjectName> / rel/path'.
-        When at the projects root or no project active, shows the bare path.
-        """
-        if not self.current_file_entry:
-            return False
-        try:
-            active_project = self._get_active_project()
-            if active_project and active_project.base_path:
-                base = os.path.normpath(active_project.base_path)
-                norm = os.path.normpath(new_path)
-                if norm == base:
-                    text = f'[■ {active_project.name}]'
-                elif norm.startswith(base + os.sep):
-                    rel = os.path.relpath(norm, base)
-                    text = f'[■ {active_project.name}] / {rel}'
-                else:
-                    text = new_path
-            else:
-                text = new_path
-            self.current_file_entry.set_text(text)
-        except (AttributeError, RuntimeError) as e:
-            logger.debug("Failed to update current file entry text: %s", e)
-        return False
-
-    def _sync_project_state(self, new_path: str):
-        """Synchronise ProjectManager state when navigation crosses project boundaries.
-
-        Rules:
-        - Navigating INTO a directory that contains .project.shy → open that project
-          (auto-activates without any dialog, analogous to VS Code opening a workspace folder)
-        - Navigating OUT of (above) the current project's base_path → close the project
-        - Navigating around WITHIN the current project → no change
-
-        Called via GLib.idle_add from _on_path_changed so it runs on the main loop
-        after the tree has refreshed.
-
-        Args:
-            new_path: The directory we just navigated to
-        """
-        try:
-            from shypn.data.project_models import get_project_manager
-            manager = get_project_manager()
-
-            project_file = os.path.join(new_path, '.project.shy')
-            if os.path.exists(project_file):
-                # Guard: never treat the projects container directory as a project
-                if hasattr(manager, 'projects_root') and manager.projects_root:
-                    if os.path.normpath(new_path) == os.path.normpath(manager.projects_root):
-                        return False
-
-                # We are at a project root directory
-                current_base = (
-                    os.path.normpath(manager.current_project.base_path)
-                    if manager.current_project else None
-                )
-                nav_norm = os.path.normpath(new_path)
-                if current_base != nav_norm:
-                    # Different project (or no project) — activate this one
-                    manager.open_project_by_path(project_file)
-                return False
-
-            # Not at a project root — check whether we left the current project
-            if manager.current_project:
-                current_base = os.path.normpath(manager.current_project.base_path)
-                nav_norm = os.path.normpath(new_path)
-                inside_project = (
-                    nav_norm == current_base
-                    or nav_norm.startswith(current_base + os.sep)
-                )
-                if not inside_project:
-                    manager.close_current_project(save=True)
-
-        except (AttributeError, TypeError) as e:
-            logger.debug("Navigation project logic failed (non-fatal): %s", e)
-
-        return False  # Remove idle callback
 
     def _on_error(self, error_message: str):
         """Callback when error occurs in API (Model).
@@ -1318,49 +688,6 @@ class FileExplorerPanel:
                 self._open_file_from_path(full_path)
         else:
             self.set_current_file(full_path)
-
-    def _on_tree_key_press(self, widget, event):
-        """Handle keyboard shortcuts on the file tree (Phase 6).
-
-        - F2         → inline rename of selected item
-        - Delete     → delete selected item (with confirmation)
-        - Return / KP_Enter → open file or navigate into folder
-        - Ctrl+Shift+N → new model in project models/ folder
-        """
-        import gi
-        gi.require_version('Gdk', '3.0')
-        from gi.repository import Gdk
-        keyval = event.keyval
-        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
-        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
-
-        if keyval == Gdk.KEY_F2:
-            if self.selected_item_path:
-                self._start_inline_edit_rename()
-            return True
-
-        if keyval == Gdk.KEY_Delete:
-            if self.selected_item_path:
-                self._show_delete_confirmation()
-            return True
-
-        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
-            if self.selected_item_path:
-                if self.selected_item_is_dir:
-                    self.explorer.navigate_to(self.selected_item_path)
-                else:
-                    if self.selected_item_path.endswith('.shy'):
-                        if self.on_file_open_requested:
-                            self.on_file_open_requested(self.selected_item_path)
-                        else:
-                            self._open_file_from_path(self.selected_item_path)
-            return True
-
-        if ctrl and shift and keyval == Gdk.KEY_n:
-            self._on_context_new_model_clicked(None)
-            return True
-
-        return False
 
     def _on_tree_view_button_press(self, widget, event):
         """Handle button press on tree view to show context menu and expand folders.
@@ -1602,27 +929,6 @@ class FileExplorerPanel:
         Args:
             menu_item: The Gtk.MenuItem that was activated (from 'activate' signal)
         """
-        self._start_inline_edit_new_folder()
-
-    def _on_context_new_model_clicked(self, menu_item):
-        """Create a new .shy model inside the project's models/ subfolder (Phase 6).
-
-        Falls back to current directory if models/ doesn't exist yet.
-        """
-        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
-        if active_project:
-            target_dir = os.path.join(active_project.base_path, 'models')
-            os.makedirs(target_dir, exist_ok=True)
-            self.explorer.navigate_to(target_dir)
-        self._start_inline_edit_new_file()
-
-    def _on_context_new_experiment_clicked(self, menu_item):
-        """Navigate to project's experiments/ subfolder and create a new folder (Phase 6)."""
-        active_project = self._get_active_project() if hasattr(self, '_get_active_project') else None
-        if active_project:
-            target_dir = os.path.join(active_project.base_path, 'experiments')
-            os.makedirs(target_dir, exist_ok=True)
-            self.explorer.navigate_to(target_dir)
         self._start_inline_edit_new_folder()
 
     def _on_context_save_clicked(self, menu_item):
@@ -2275,10 +1581,9 @@ class FileExplorerPanel:
             if needs_new_filepath:
                 # Open file chooser dialog for default/imported files
                 
-                # Determine initial directory: active project/models/ if project is open, otherwise workspace
-                active_project = self._get_active_project()
-                if active_project and hasattr(active_project, 'base_path'):
-                    initial_dir = os.path.join(active_project.base_path, 'models')
+                # Determine initial directory: project/models/ if project is open, otherwise workspace
+                if self.project and hasattr(self.project, 'base_path'):
+                    initial_dir = os.path.join(self.project.base_path, 'models')
                     os.makedirs(initial_dir, exist_ok=True)
                 else:
                     initial_dir = self.explorer.current_path
@@ -2401,12 +1706,16 @@ class FileExplorerPanel:
             document = manager.to_document_model()
             
             
-            # Determine initial directory — Phase 5: prefer active project models/
-            active_project = self._get_active_project()
-            if active_project and hasattr(active_project, 'base_path'):
-                initial_dir = os.path.join(active_project.base_path, 'models')
+            # Determine initial directory: project/models/ if project is open, otherwise workspace
+            if self.project:
+                pass
+            
+            if self.project and hasattr(self.project, 'base_path'):
+                # Start in project/models/ directory
+                initial_dir = os.path.join(self.project.base_path, 'models')
                 os.makedirs(initial_dir, exist_ok=True)
             else:
+                # Start in workspace directory
                 initial_dir = self.explorer.current_path
             
             # Determine default filename
@@ -2512,14 +1821,14 @@ class FileExplorerPanel:
                 Gtk.STOCK_OPEN, Gtk.ResponseType.OK
             )
             
-            # Set starting directory — Phase 5: prefer active project models/
-            active_project = self._get_active_project()
-            if active_project:
-                models_dir = os.path.join(active_project.base_path, 'models')
+            # Set starting directory
+            if self.project:
+                # If project is open, start in project/models/
+                models_dir = os.path.join(self.project.base_path, 'models')
                 if os.path.exists(models_dir):
                     dialog.set_current_folder(models_dir)
                 else:
-                    dialog.set_current_folder(active_project.base_path)
+                    dialog.set_current_folder(self.project.base_path)
             else:
                 # Otherwise use current directory in file tree
                 current_path = self.get_current_path()
@@ -2529,12 +1838,11 @@ class FileExplorerPanel:
                     else:
                         dialog.set_current_folder(current_path)
                 else:
-                    # Fallback: projects root
-                    try:
-                        from shypn.data.project_models import get_project_manager
-                        dialog.set_current_folder(get_project_manager().projects_root)
-                    except (ImportError, AttributeError):
-                        pass
+                    # Default to workspace root
+                    workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'workspace')
+                    workspace_path = os.path.normpath(workspace_path)
+                    if os.path.exists(workspace_path):
+                        dialog.set_current_folder(workspace_path)
             
             # Add file filter for .shy files
             filter_shy = Gtk.FileFilter()
@@ -2547,6 +1855,9 @@ class FileExplorerPanel:
             filter_all.set_name("All Files")
             filter_all.add_pattern("*")
             dialog.add_filter(filter_all)
+            
+            # Focus on filename entry instead of search
+            dialog.set_current_name("")
             
             # Show dialog and handle response
             response = dialog.run()
@@ -2752,12 +2063,11 @@ class FileExplorerPanel:
                         if report_panel_loader and hasattr(report_panel_loader, 'panel'):
                             # Get the simulation controller for this document
                             simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
-                            if simulation_controller:
-                                from shypn.events import EventBus
-                                EventBus.emit('simulation.controller_ready',
-                                              {'controller': simulation_controller},
-                                              document_id=id(drawing_area))
+                            if simulation_controller and hasattr(report_panel_loader.panel, 'set_controller'):
+                                # Re-set controller to trigger refresh
+                                report_panel_loader.panel.set_controller(simulation_controller)
                     return False  # Don't repeat
+                
                 # Schedule refresh to happen after current events complete
                 GLib.idle_add(refresh_report_panel)
 

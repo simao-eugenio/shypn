@@ -5,7 +5,7 @@ Transitions represent events or actions that transform the net state.
 Rendered as a filled black rectangle.
 """
 from shypn.netobjs.petri_net_object import PetriNetObject
-from typing import Optional
+from typing import Any, Optional
 
 # Import kinetic metadata classes
 try:
@@ -119,7 +119,7 @@ class Transition(PetriNetObject):
         return self._properties.get('rate_function')
     
     @rate_function.setter
-    def rate_function(self, expression: Optional[str]):
+    def rate_function(self, expression: Optional[str]) -> None:
         """Set rate function expression with validation (OOP property access).
         
         Args:
@@ -148,7 +148,7 @@ class Transition(PetriNetObject):
         return self._properties.get('rate_forward')
     
     @rate_forward.setter
-    def rate_forward(self, expression: Optional[str]):
+    def rate_forward(self, expression: Optional[str]) -> None:
         """Set forward rate expression for reversible reactions (OOP property access).
         
         Args:
@@ -171,7 +171,7 @@ class Transition(PetriNetObject):
         return self._properties.get('rate_reverse')
     
     @rate_reverse.setter
-    def rate_reverse(self, expression: Optional[str]):
+    def rate_reverse(self, expression: Optional[str]) -> None:
         """Set reverse rate expression for reversible reactions (OOP property access).
         
         Args:
@@ -194,7 +194,7 @@ class Transition(PetriNetObject):
         return self._properties
     
     @properties.setter
-    def properties(self, value: dict):
+    def properties(self, value: dict) -> None:
         """Set properties dict (for backward compatibility).
         
         Args:
@@ -217,7 +217,7 @@ class Transition(PetriNetObject):
         return self._metadata
     
     @metadata.setter
-    def metadata(self, value: dict):
+    def metadata(self, value: dict) -> None:
         """Set metadata dict with validation.
         
         Args:
@@ -232,7 +232,7 @@ class Transition(PetriNetObject):
     
     # ========== End Property Decorators ==========
     
-    def get_bounding_box(self):
+    def get_bounding_box(self) -> dict:
         """Calculate bounding box for the transition.
         
         Returns bounding box containing the rectangle.
@@ -259,7 +259,7 @@ class Transition(PetriNetObject):
             'height': h
         }
     
-    def render(self, cr, zoom=1.0):
+    def render(self, cr: Any, zoom: float = 1.0) -> None:
         """Render the transition as a filled rectangle with optional markers.
         
         Uses legacy rendering style with Cairo transform approach:

@@ -232,8 +232,7 @@ class HeuristicParametersController:
         Returns:
             True if successful, False if failed, None if skipped (protected by override settings)
         """
-        print(f"\n{'='*80}")
-        print(f"{'='*80}")
+        self.logger.debug("="*80)
         
         try:
             # Get canvas manager

@@ -88,7 +88,7 @@ class SimulationSettings:
         return self._token_accounting_enabled
     
     @token_accounting_enabled.setter
-    def token_accounting_enabled(self, value: bool):
+    def token_accounting_enabled(self, value: bool) -> None:
         """Set token accounting enabled with validation.
         
         Args:
@@ -107,7 +107,7 @@ class SimulationSettings:
         return self._time_units
     
     @time_units.setter
-    def time_units(self, value: TimeUnits):
+    def time_units(self, value: TimeUnits) -> None:
         """Set time units with validation.
         
         Args:
@@ -126,7 +126,7 @@ class SimulationSettings:
         return self._duration
     
     @duration.setter
-    def duration(self, value: Optional[float]):
+    def duration(self, value: Optional[float]) -> None:
         """Set simulation duration with validation.
         
         Args:
@@ -152,7 +152,7 @@ class SimulationSettings:
         return self._dt_auto
     
     @dt_auto.setter
-    def dt_auto(self, value: bool):
+    def dt_auto(self, value: bool) -> None:
         """Set auto time step mode."""
         self._dt_auto = bool(value)
     
@@ -162,7 +162,7 @@ class SimulationSettings:
         return self._dt_manual
     
     @dt_manual.setter
-    def dt_manual(self, value: float):
+    def dt_manual(self, value: float) -> None:
         """Set manual time step with validation.
         
         Args:
@@ -182,7 +182,7 @@ class SimulationSettings:
         return self._time_scale
     
     @time_scale.setter
-    def time_scale(self, value: float):
+    def time_scale(self, value: float) -> None:
         """Set time scale with validation.
         
         Args:
@@ -207,7 +207,7 @@ class SimulationSettings:
         return True  # Always enabled
     
     @use_tau_leaping.setter
-    def use_tau_leaping(self, value: bool):
+    def use_tau_leaping(self, value: bool) -> None:
         """DEPRECATED: τ-leaping cannot be disabled (it's the stochastic engine).
         
         Setting this has no effect. τ-leaping is always used for stochastic simulation
@@ -221,7 +221,7 @@ class SimulationSettings:
         return self._tau_epsilon
     
     @tau_epsilon.setter
-    def tau_epsilon(self, value: float):
+    def tau_epsilon(self, value: float) -> None:
         """Set epsilon with validation.
         
         Args:
@@ -240,7 +240,7 @@ class SimulationSettings:
         return self._critical_threshold
     
     @critical_threshold.setter
-    def critical_threshold(self, value: float):
+    def critical_threshold(self, value: float) -> None:
         """Set critical threshold with validation.
         
         Args:
@@ -259,7 +259,7 @@ class SimulationSettings:
         return self._max_tau
     
     @max_tau.setter
-    def max_tau(self, value: float):
+    def max_tau(self, value: float) -> None:
         """Set maximum tau with validation.
         
         Args:
@@ -278,7 +278,7 @@ class SimulationSettings:
         return self._min_tau
     
     @min_tau.setter
-    def min_tau(self, value: float):
+    def min_tau(self, value: float) -> None:
         """Set minimum tau with validation.
         
         Args:
@@ -305,7 +305,7 @@ class SimulationSettings:
         return self._use_parallel_stochastic
     
     @use_parallel_stochastic.setter
-    def use_parallel_stochastic(self, value: bool):
+    def use_parallel_stochastic(self, value: bool) -> None:
         """Set parallel stochastic mode.
         
         Args:
@@ -316,7 +316,7 @@ class SimulationSettings:
     
     # ========== Duration Management ==========
     
-    def set_duration(self, duration: float, units: TimeUnits):
+    def set_duration(self, duration: float, units: TimeUnits) -> None:
         """Set duration with explicit units.
         
         Args:
@@ -336,7 +336,7 @@ class SimulationSettings:
             return None
         return TimeConverter.to_seconds(self._duration, self._time_units)
     
-    def clear_duration(self):
+    def clear_duration(self) -> None:
         """Clear duration (run indefinitely)."""
         self._duration = None
     

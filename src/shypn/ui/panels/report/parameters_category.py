@@ -711,6 +711,8 @@ class DynamicAnalysesCategory(BaseReportCategory):
         
         # Create a temporary data structure that mimics data_collector format
         class TempDataCollector:
+            """Adapter wrapping raw simulation arrays in a DataCollector-compatible interface."""
+
             def __init__(self, time_points, place_data, transition_data, model):
                 self.time_points = time_points
                 self.place_data = place_data

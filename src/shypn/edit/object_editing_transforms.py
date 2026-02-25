@@ -3,8 +3,11 @@
 Unified class for rendering selection feedback, bounding boxes,
 and transform handles for selected objects.
 """
+import logging
 import math
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectEditingTransforms:
@@ -229,8 +232,8 @@ class ObjectEditingTransforms:
                                 parallels = obj._manager.detect_parallel_arcs(obj)
                                 if parallels:
                                     offset_distance = obj._manager.calculate_arc_offset(obj, parallels)
-                            except Exception:
-                                pass
+                            except (AttributeError, TypeError) as e:
+                                logger.debug("Parallel arc offset skipped: %s", e)
                         
                         control_point = obj._calculate_curve_control_point(offset=offset_distance)
                         if control_point:
@@ -362,8 +365,8 @@ class ObjectEditingTransforms:
                     parallels = obj._manager.detect_parallel_arcs(obj)
                     if parallels:
                         parallel_offset = obj._manager.calculate_arc_offset(obj, parallels)
-                except Exception:
-                    pass
+                except (AttributeError, TypeError) as e:
+                    logger.debug("Parallel arc offset skipped: %s", e)
             
             # Check if this is a CurvedArc or Arc with is_curved flag
             is_curved = isinstance(obj, CurvedArc) or getattr(obj, 'is_curved', False)

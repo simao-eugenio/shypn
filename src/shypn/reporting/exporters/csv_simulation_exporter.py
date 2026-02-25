@@ -8,7 +8,10 @@ Exports simulation data in CSV format with two layout options:
 import csv
 from pathlib import Path
 from typing import Dict, List, Optional
+import logging
 import statistics
+
+logger = logging.getLogger(__name__)
 
 
 class CSVSimulationExporter:
@@ -165,7 +168,7 @@ class CSVSimulationExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting CSV (wide): {e}")
+            logger.error("Error exporting CSV (wide): %s", e)
             return False
     
     def export_timeseries_long(self, filepath: str) -> bool:
@@ -222,7 +225,7 @@ class CSVSimulationExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting CSV (long): {e}")
+            logger.error("Error exporting CSV (long): %s", e)
             return False
     
     def export_summary_statistics(self, filepath: str) -> bool:
@@ -298,7 +301,7 @@ class CSVSimulationExporter:
             
             return True
         except Exception as e:
-            print(f"Error exporting CSV (summary): {e}")
+            logger.error("Error exporting CSV (summary): %s", e)
             return False
     
     def _calculate_statistics(self, series: List[float]) -> dict:
