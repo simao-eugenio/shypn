@@ -337,27 +337,7 @@ class SimulationController:
     
     @on_simulation_complete.setter
     def on_simulation_complete(self, value):
-        """Set callback with debug logging to trace all assignments."""
-        import traceback
-        import sys
-        
-        # Log the assignment with controller ID
-        controller_id = id(self)
-        if value is None:
-            pass
-            # print(f"[CALLBACK_TRACE] ⚠️  Controller {controller_id}: on_simulation_complete set to None (was: {self._on_simulation_complete is not None})")
-        else:
-            pass
-            # print(f"[CALLBACK_TRACE] ✅ Controller {controller_id}: on_simulation_complete set to {value}")
-        
-        # Print stack trace to see WHO is setting it
-        # print(f"[CALLBACK_TRACE] Stack trace:")
-        for line in traceback.format_stack()[:-1]:  # Exclude this setter call
-            # Only print relevant lines (skip standard library noise)
-            if '/shypn/' in line and 'traceback' not in line.lower():
-                pass
-                # print(f"[CALLBACK_TRACE]   {line.strip()}")
-        
+        """Set simulation complete callback."""
         self._on_simulation_complete = value
     
     def validate_thermodynamics(self) -> Dict[str, Any]:
@@ -1381,37 +1361,54 @@ class SimulationController:
                 continuous_enabled.append((transition, behavior, input_arcs, output_arcs))
         
         # Apply conflict resolution for continuous transitions
-        continuous_to_integrate = self._resolve_continuous_conflicts(continuous_enabled)
-        
+        continuous_solo, continuous_preemptive_groups = self._resolve_continuous_conflicts(continuous_enabled)
+
         continuous_active = 0
-        for transition, behavior, input_arcs, output_arcs in continuous_to_integrate:
+
+        # --- Sequential (solo) transitions ---
+        for transition, behavior, input_arcs, output_arcs in continuous_solo:
             success, details = behavior.integrate_step(dt=time_step, input_arcs=input_arcs, output_arcs=output_arcs)
             if success:
                 continuous_active += 1
-                
-                # Increment firing count for continuous transitions
                 if details and 'rate' in details:
                     transition.firing_count += abs(details['rate']) * time_step
                 else:
-                    rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
+                    if hasattr(behavior, 'evaluate_rate'):
+                        rate = behavior.evaluate_rate({p.id: p for p in self.model.places}, self.time)
+                    elif hasattr(behavior, '_evaluate_rate_at_enablement'):
+                        rate = behavior._evaluate_rate_at_enablement(self.time)
+                    else:
+                        rate = 0.0
                     transition.firing_count += abs(rate) * time_step
-                
                 if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
                     self.data_collector.on_transition_fired(transition, self.time, details)
-                
-                # Notify step listeners
-                if not hasattr(self, '_debug_continuous_printed'):
-                    self._debug_continuous_printed = True
+                for listener in self.step_listeners:
+                    listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+                    if hasattr(listener_obj, 'on_transition_fired'):
+                        listener_obj.on_transition_fired(transition, self.time, details)
+
+        # --- Preemptive groups: snapshot/apply atomic simultaneous execution ---
+        for group in continuous_preemptive_groups:
+            group_results = self._integrate_preemptive_group(group, dt=time_step)
+            for transition, success, details in group_results:
+                if success:
+                    continuous_active += 1
+                    if details and 'rate' in details:
+                        transition.firing_count += abs(details['rate']) * time_step
+                    else:
+                        if hasattr(self._get_behavior(transition), 'evaluate_rate'):
+                            rate = self._get_behavior(transition).evaluate_rate(
+                                {p.name: p for p in self.model.places}, self.time)
+                        else:
+                            rate = 0.0
+                        transition.firing_count += abs(rate) * time_step
+                    if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
+                        self.data_collector.on_transition_fired(transition, self.time, details)
                     for listener in self.step_listeners:
                         listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
                         if hasattr(listener_obj, 'on_transition_fired'):
                             listener_obj.on_transition_fired(transition, self.time, details)
-                else:
-                    for listener in self.step_listeners:
-                        listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                        if hasattr(listener_obj, 'on_transition_fired'):
-                            listener_obj.on_transition_fired(transition, self.time, details)
-        
+
         return continuous_active
 
     def _execute_discrete_transitions(self, time_step: float) -> tuple:
@@ -1551,20 +1548,24 @@ class SimulationController:
         REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
         
         A transition is enabled if all its input places have enough tokens
-        to satisfy the arc weights.
+        to satisfy the arc weights (and arc type rules + guard conditions).
         
         Returns:
+            List: All transition objects currently enabled.
+        """
+        return [t for t in self.model.transitions if self._viability_checker.is_enabled(t)]
+
+    def _is_transition_enabled(self, transition) -> bool:
+        """Check whether a single transition is currently enabled.
         
-        REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
-        
-        Uses the transition's behavior to determine if it can fire based on
-        locality (input places and arc weights only).
+        Delegates to ViabilityChecker which checks token availability,
+        arc-type rules (normal, signal_flow, inhibitor, test) and guards.
         
         Args:
-            transition: Transition object to check
+            transition: Transition object to check.
             
         Returns:
-            bool: True if transition can fire, False otherwise
+            bool: True if the transition can fire right now.
         """
         return self._viability_checker.is_enabled(transition)
 
@@ -2356,7 +2357,23 @@ class SimulationController:
         
         # If no per-transition policy, use global conflict policy
         if not policy:
-            if self.conflict_policy == ConflictResolutionPolicy.RANDOM:
+            if self.conflict_policy == ConflictResolutionPolicy.PREEMPTIVE:
+                # Rate-proportional selection: anti-monopolization fallback.
+                # (All-preemptive groups are handled upstream in
+                # _resolve_continuous_conflicts; this covers any stray call.)
+                import numpy as np
+                rates = []
+                for t in enabled_transitions:
+                    try:
+                        r = float(t.rate) if hasattr(t, 'rate') and t.rate is not None else 1.0
+                    except Exception:
+                        r = 1.0
+                    rates.append(max(r, 1e-12))
+                total = sum(rates)
+                probs = [r / total for r in rates]
+                idx = int(np.random.choice(len(enabled_transitions), p=probs))
+                return enabled_transitions[idx]
+            elif self.conflict_policy == ConflictResolutionPolicy.RANDOM:
                 return random.choice(enabled_transitions)
             elif self.conflict_policy == ConflictResolutionPolicy.PRIORITY:
                 return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
@@ -2471,125 +2488,237 @@ class SimulationController:
             # Uniform random selection
             return random.choice(enabled_transitions)
         
+        elif policy == 'preemptive':
+            # Rate-proportional selection: anti-monopolization interrupt mechanism.
+            #
+            # Each competing transition fires with probability rate_i / Σrate_j.
+            # This prevents any single transition from permanently monopolizing a
+            # shared substrate: faster reactions dominate probabilistically but
+            # slower ones are never permanently blocked.
+            #
+            # Over many steps this reproduces ODE semantics where all parallel
+            # reactions consume from the shared pool simultaneously, proportional
+            # to their intrinsic kinetics — without explicit stoichiometric splitting.
+            import numpy as np
+            rates = []
+            for t in enabled_transitions:
+                if t.transition_type == 'continuous':
+                    behavior = self._get_behavior(t)
+                    if behavior and hasattr(behavior, 'evaluate_rate'):
+                        places_dict = {}
+                        if hasattr(self.model, 'places'):
+                            for place in (self.model.places.values() if isinstance(self.model.places, dict) else self.model.places):
+                                places_dict[place.id] = place
+                        rate = abs(behavior.evaluate_rate(places_dict, self.time))
+                    else:
+                        rate = float(getattr(t, 'rate', 1.0))
+                elif t.transition_type in ('stochastic', 'adaptive'):
+                    behavior = self._get_behavior(t)
+                    if behavior and hasattr(behavior, '_evaluate_rate_at_enablement'):
+                        try:
+                            rate = abs(behavior._evaluate_rate_at_enablement(self.time))
+                        except Exception:
+                            rate = float(getattr(t, 'rate', 1.0))
+                    else:
+                        rate = float(getattr(t, 'rate', 1.0))
+                else:
+                    try:
+                        rate = float(getattr(t, 'rate', 1.0))
+                    except (ValueError, TypeError):
+                        rate = 1.0
+                rates.append(max(rate, 1e-12))   # floor to avoid zero-weight starvation
+            total = sum(rates)
+            probs = [r / total for r in rates]
+            idx = np.random.choice(len(enabled_transitions), p=probs)
+            return enabled_transitions[idx]
+
         elif policy == 'preemptive-priority':
-            pass
-            # For now, treat same as priority (full preemption requires interrupt mechanism)
-            # TODO: Implement preemption of running lower-priority transitions
+            # Priority-based preemption: highest-priority transition interrupts others.
             return max(enabled_transitions, key=lambda t: getattr(t, 'priority', 0))
-        
+
+        elif policy == 'single':
+            # Single-fire: this transition always wins the conflict group outright.
+            # Select the first member carrying the 'single' policy; fall back to
+            # the first enabled if none explicitly carries it.
+            for t in enabled_transitions:
+                if getattr(t, 'firing_policy', '') == 'single':
+                    return t
+            return enabled_transitions[0]
+
         else:
             pass
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
     def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
-        """Apply conflict resolution for continuous transitions using weak independence theory.
-        
-        Implements the refined locality theory from dependency_coupling.py:
-        - **Competitive (True Conflict)**: Shared places via CONSUMING arcs → Sequential execution
-        - **Regulatory (Valid Coupling)**: Shared places via TEST ARCS (read-only) → Parallel execution OK
-        
-        Test arcs (catalysts/enzymes) don't consume tokens, so multiple transitions can
-        share the same catalyst without conflict. This is correct biological behavior:
-        "Same enzyme catalyzes multiple reactions."
-        
-        Strategy:
-        1. Identify conflict groups (transitions sharing input places via CONSUMING arcs)
-        2. For each conflict group, apply firing policy to select winner(s)
-        3. Non-conflicting and regulatory-coupled transitions fire in parallel
-        
+        """Resolve continuous transition conflicts using LocalityDetector.
+
+        Two transitions belong to the same conflict group when their localities
+        share at least one place (input OR output, excluding test/catalyst arcs).
+
+        Locality L(T) = input_places ∪ output_places  (consuming arcs only)
+
+        Groups are formed by BFS over the locality footprints:
+          - Node = transition
+          - Edge = shared footprint place between two transitions
+
+        Within each group the firing policy decides execution mode:
+          - All preemptive (or global PREEMPTIVE policy): snapshot/apply atomic
+          - Otherwise: sequential winner selection
+
         Args:
-            continuous_enabled: List of (transition, behavior, input_arcs, output_arcs) tuples
-            
+            continuous_enabled: List of (transition, behavior, input_arcs, output_arcs)
+
         Returns:
-            List of (transition, behavior, input_arcs, output_arcs) tuples to integrate
-        
-        See also:
-            - topology/biological/dependency_coupling.py: Weak independence theory
-            - doc/foundation/BIOLOGICAL_PETRI_NET_FORMALIZATION.md: Section 3.1
+            (solo, preemptive_groups) where:
+              - solo:              list of (transition, behavior, input_arcs, output_arcs)
+              - preemptive_groups: list of lists of the same tuples
         """
         if len(continuous_enabled) <= 1:
-            return continuous_enabled
-        
-        # Build map of input places to transitions
-        place_to_transitions = {}
-        transition_data = {}  # Store full tuple data for each transition
-        
+            return continuous_enabled, []
+
+        from shypn.diagnostic.locality_detector import LocalityDetector
+
+        detector = LocalityDetector(self.model)
+        enabled_ids = {trans_tuple[0].id for trans_tuple in continuous_enabled}
+        transition_data = {trans_tuple[0].id: trans_tuple for trans_tuple in continuous_enabled}
+
+        # Build footprint per transition and reverse map place → transitions.
+        # Locality.input_places + output_places already excludes catalyst/test arcs.
+        trans_footprint = {}   # transition_id → list of place objects
+        place_to_trans = {}    # place_id → set of transition_ids
+
         for trans_tuple in continuous_enabled:
-            transition, behavior, input_arcs, output_arcs = trans_tuple
-            transition_data[transition.id] = trans_tuple
-            
-            # Get input places for this transition (only consuming arcs)
-            # Test arcs (catalysts) don't create conflicts → weak independence theory
-            input_places = set()
+            tid = trans_tuple[0].id
+            locality = detector.get_locality_for_transition(trans_tuple[0])
+            footprint = locality.input_places + locality.output_places
+            trans_footprint[tid] = footprint
+            for place in footprint:
+                pid = place.id
+                if pid not in place_to_trans:
+                    place_to_trans[pid] = set()
+                place_to_trans[pid].add(tid)
+
+        # BFS: form conflict groups from shared footprint places
+        visited = set()
+        conflict_groups = []
+
+        for trans_tuple in continuous_enabled:
+            start_id = trans_tuple[0].id
+            if start_id in visited:
+                continue
+
+            group = set()
+            queue = [start_id]
+            while queue:
+                cur = queue.pop()
+                if cur in group:
+                    continue
+                group.add(cur)
+                visited.add(cur)
+                for place in trans_footprint.get(cur, []):
+                    for nbr in place_to_trans.get(place.id, set()):
+                        if nbr not in group and nbr in enabled_ids:
+                            queue.append(nbr)
+
+            if len(group) > 1:
+                conflict_groups.append([transition_data[tid][0] for tid in group])
+
+        # Apply conflict resolution policy within each group
+        solo = []
+        preemptive_groups = []
+        conflicting_ids = set()
+
+        for group in conflict_groups:
+            all_preemptive = (
+                all(getattr(t, 'firing_policy', '') == 'preemptive' for t in group)
+                or self.conflict_policy == ConflictResolutionPolicy.PREEMPTIVE
+            )
+            if all_preemptive:
+                preemptive_groups.append([transition_data[t.id] for t in group])
+            else:
+                winner = self._select_transition(group)
+                solo.append(transition_data[winner.id])
+            conflicting_ids.update(t.id for t in group)
+
+        # Non-conflicting transitions fire individually
+        for trans_tuple in continuous_enabled:
+            if trans_tuple[0].id not in conflicting_ids:
+                solo.append(trans_tuple)
+
+        return solo, preemptive_groups
+
+    def _integrate_preemptive_group(self, group: List, dt: float) -> List:
+        """Fire a preemptive conflict group with snapshot/apply atomics.
+
+        All transitions in *group* evaluate and consume from a shared token
+        snapshot taken before any transition fires.  Each transition's delta
+        is computed independently, then all deltas are summed and applied as
+        one atomic update — reproducing true ODE parallel-reaction semantics
+        without order-of-execution drift.
+
+        Phase 1 — snapshot: record current tokens for all places touched by
+                  any transition in the group.
+        Phase 2 — evaluate: for each transition, restore snapshot, call
+                  integrate_step, record the per-place delta, then restore
+                  snapshot again so the next transition also sees pristine values.
+        Phase 3 — commit: apply summed deltas to live tokens, clamped at 0.
+
+        Args:
+            group: list of (transition, behavior, input_arcs, output_arcs)
+            dt:    integration time step
+
+        Returns:
+            List of (transition, success, details) for the caller to record.
+        """
+        # Build a fast place-id → place map scoped to this model.
+        places_map: Dict[str, Any] = {p.id: p for p in self.model.places}
+
+        # Collect every place that any member of this group touches.
+        touched_ids: set = set()
+        for transition, behavior, input_arcs, output_arcs in group:
             for arc in input_arcs:
                 if hasattr(arc, 'source_id'):
-                    # Skip non-consuming arcs (test arcs are read-only catalysts)
-                    # Inhibitor arcs DO consume, so they DO create conflicts
-                    arc_type = getattr(arc, 'arc_type', 'normal')
-                    if arc_type == 'test':
-                        # Test arcs don't create conflicts → weak independence theory
-                        continue
-                    # Only consuming arcs create true conflicts (competitive coupling)
-                    input_places.add(arc.source_id)
-            
-            # Map places to transitions
-            for place_id in input_places:
-                if place_id not in place_to_transitions:
-                    place_to_transitions[place_id] = []
-                place_to_transitions[place_id].append(transition)
-        
-        # Find conflict groups (transitions sharing at least one input place)
-        conflict_groups = []
-        processed = set()
-        
-        for transition, _, _, _ in continuous_enabled:
-            if transition.id in processed:
-                continue
-                
-            # Find all transitions that share places with this one
-            conflict_group = {transition}
-            to_check = [transition]
-            
-            while to_check:
-                current = to_check.pop()
-                processed.add(current.id)
-                
-                # Get input places for current transition
-                current_tuple = transition_data[current.id]
-                _, _, input_arcs, _ = current_tuple
-                
-                for arc in input_arcs:
-                    if hasattr(arc, 'source_id'):
-                        place_id = arc.source_id
-                        if place_id in place_to_transitions:
-                            for conflicting in place_to_transitions[place_id]:
-                                if conflicting.id not in processed:
-                                    conflict_group.add(conflicting)
-                                    to_check.append(conflicting)
-                                    processed.add(conflicting.id)
-            
-            if len(conflict_group) > 1:
-                conflict_groups.append(list(conflict_group))
-        
-        # Apply conflict resolution
-        selected = []
-        conflicting_ids = set()
-        
-        for group in conflict_groups:
-            if len(group) > 1:
-                # Apply _select_transition to resolve conflict
-                winner = self._select_transition(group)
-                selected.append(transition_data[winner.id])
-                conflicting_ids.update(t.id for t in group)
-        
-        # Add non-conflicting transitions (parallel execution)
-        for trans_tuple in continuous_enabled:
-            transition = trans_tuple[0]
-            if transition.id not in conflicting_ids:
-                selected.append(trans_tuple)
-        
-        return selected
+                    touched_ids.add(arc.source_id)
+                if hasattr(arc, 'target_id'):
+                    touched_ids.add(arc.target_id)
+            for arc in output_arcs:
+                if hasattr(arc, 'source_id'):
+                    touched_ids.add(arc.source_id)
+                if hasattr(arc, 'target_id'):
+                    touched_ids.add(arc.target_id)
+        touched_ids = {pid for pid in touched_ids if pid in places_map}
+
+        # Phase 1: snapshot
+        snapshot: Dict[str, float] = {pid: places_map[pid].tokens for pid in touched_ids}
+
+        # Phase 2: evaluate each transition against the pristine snapshot
+        deltas: Dict[str, float] = {pid: 0.0 for pid in touched_ids}
+        results: List = []
+
+        for transition, behavior, input_arcs, output_arcs in group:
+            # Restore snapshot so this transition sees pre-step values
+            for pid, val in snapshot.items():
+                places_map[pid].tokens = val
+
+            success, details = behavior.integrate_step(
+                dt=dt, input_arcs=input_arcs, output_arcs=output_arcs
+            )
+
+            if success:
+                # Accumulate this transition's contribution to the delta
+                for pid in touched_ids:
+                    deltas[pid] += places_map[pid].tokens - snapshot[pid]
+
+            results.append((transition, success, details))
+
+        # Phase 3: commit — restore snapshot first, then apply summed deltas
+        for pid, val in snapshot.items():
+            places_map[pid].tokens = val
+        for pid, delta in deltas.items():
+            places_map[pid].tokens = max(0.0, snapshot[pid] + delta)
+
+        return results
     
     # ==================== Continuous Execution (Run Mode) ====================
     # REFACTORED (Phase 2.3.1): Extracted to ContinuousExecutor strategy class

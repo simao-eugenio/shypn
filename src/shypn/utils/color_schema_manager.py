@@ -37,6 +37,7 @@ class ColorSchemaManager:
     PLACE_SIGNAL_BORDER = (0.0, 0.0, 1.0)   # Blue - signal places (Ψ)
     PLACE_COMPARTMENT_BORDER = (0.5, 0.0, 0.5)  # Violet - compartment places
     PLACE_REGULATORY_BORDER = (0.0, 0.0, 0.0)   # Black - regulatory places (genes)
+    PLACE_ENERGY_BORDER = (0.8, 0.5, 0.0)        # Amber - energy/metabolic cofactor places (ATP/ADP/GTP/GDP/Pi)
     
     # ========================================================================
     # ARC COLORS
@@ -68,6 +69,11 @@ class ColorSchemaManager:
         Returns:
             RGB tuple (r, g, b) with values 0.0-1.0
         """
+        # Energy/metabolic cofactor places get amber border (ATP, ADP, GTP, GDP, Pi)
+        # Checked before signal: energy is a specific sub-type of signal place
+        if getattr(place, 'is_energy_place', False):
+            return ColorSchemaManager.PLACE_ENERGY_BORDER
+        
         # Signal places get blue border (hexagonal shape distinguishes them)
         if getattr(place, 'is_signal_place', False):
             return ColorSchemaManager.PLACE_SIGNAL_BORDER
@@ -168,7 +174,7 @@ class ColorSchemaManager:
     def is_semantic_place_color(place) -> bool:
         """Check if place has a semantic color that should be preserved.
         
-        Semantic colors indicate special roles: signal, compartment, regulatory.
+        Semantic colors indicate special roles: signal, energy, compartment, regulatory.
         
         Args:
             place: Place object
@@ -177,6 +183,7 @@ class ColorSchemaManager:
             True if place has semantic color, False if default black
         """
         return (getattr(place, 'is_signal_place', False) or
+                getattr(place, 'is_energy_place', False) or
                 getattr(place, 'is_compartment_place', False) or
                 getattr(place, 'is_regulatory_place', False))
     

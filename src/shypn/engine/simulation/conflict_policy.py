@@ -47,7 +47,18 @@ class ConflictResolutionPolicy(Enum):
     to fire. Prevents starvation. Good for resource allocation and fair
     scheduling scenarios.
     """
-    
+
+    PREEMPTIVE = "preemptive"
+    """Simultaneous-fire anti-monopolization (ODE-consistent default).
+
+    All competing transitions in a conflict group fire every step in
+    parallel.  Each reaction consumes its rate_i × dt share; natural token
+    clamping in _execute_token_flow prevents negative counts.  Total
+    throughput equals Σrate_i × dt, reproducing ODE parallel-reaction
+    semantics and preventing any single reaction from monopolizing a
+    shared resource pool.
+    """
+
     def __str__(self) -> str:
         """Human-readable name."""
         return self.value
@@ -58,7 +69,7 @@ class ConflictResolutionPolicy(Enum):
 
 
 # Default policy for new simulations
-DEFAULT_POLICY = ConflictResolutionPolicy.RANDOM
+DEFAULT_POLICY = ConflictResolutionPolicy.PREEMPTIVE
 
 
 # Type priority ordering for TYPE_BASED policy

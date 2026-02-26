@@ -506,23 +506,8 @@ class ExperimentAutomationCategory:
         if hasattr(self.queue_view, 'parallel_checkbox'):
             use_parallel = self.queue_view.parallel_checkbox.get_active()
         
-        # Calculate expected timeout based on execution mode and replicate count
-        # Sequential: 0.827s per simulated second (3×60s = 148.9s measurement)
-        # Parallel: 2.41s per simulated second (1×60s = 144.762s measurement)
-        #   - Parallel overhead: process creation, serialization, resource contention
-        # 
-        # IMPORTANT: Replicates run SEQUENTIALLY within each experiment (even in parallel batch mode)
-        # to avoid ThreadPoolExecutor deadlocks in forked processes.
-        # 
-        # Timeout calculation:
-        #   base_time = replicates × duration × empirical_factor
-        #   safety_margin = 1.5x (accounts for system variations without being excessive)
-        #   max_cap = 36 hours (allows very long experiments with many replicates)
-        empirical_factor = 2.41 if use_parallel else 0.827
-        base_timeout = replicates * duration * empirical_factor
-        safety_timeout = base_timeout * 1.5  # 1.5x safety margin
-        max_cap = 36 * 3600  # Maximum 36 hours
-        expected_timeout = min(safety_timeout, max_cap)
+        # Zombie-detection threshold is computed by the batch executor itself
+        # from the simulation duration. No computation estimate is needed here.
         
         # Clear pending updates tracking
         self._pending_updates.clear()
@@ -697,18 +682,32 @@ class ExperimentAutomationCategory:
         Saves to: {project}/experiments/results/experiment_{name}_{timestamp}/
 
         Creates:
-        - results.csv   : Mean + std trajectories per species over time
-        - replicates.csv: Per-replicate outcomes (deadlock, duration, timing)
-        - config.csv    : Experiment metadata as key-value pairs
-
-        All files use CSV so analysis scripts can use pandas.read_csv() directly
-        without any JSON parsing.
+        - results.csv          : Mean + std trajectories per species over time
+                                 NOTE: mixed-format (section headers + matrices) —
+                                 parse with comment='#' + section-aware reader.
+        - replicates.csv       : Per-replicate outcomes — standard tabular CSV.
+        - config.csv           : Experiment metadata as key-value pairs.
+        - names.csv            : ID → human-readable name mapping (P17 = GATA1_Protein_nuc).
+        - mean_final_state.csv : Final-timepoint mean ± std per species — standard
+                                 tabular CSV, directly loadable with pandas.read_csv().
+        - .complete            : Zero-byte sentinel written ONLY after all files succeed.
+                                 Absence means the save is partial/interrupted.
 
         Args:
             name: Experiment name
             result: Result dictionary with statistics and metadata
         """
         import csv as csv_mod
+        import os as _os
+
+        def _fsync(path):
+            """Flush OS buffers for path to guarantee data is on disk."""
+            try:
+                with open(path, 'a') as fh:
+                    fh.flush()
+                    _os.fsync(fh.fileno())
+            except OSError:
+                pass
 
         # Determine project folder
         project_folder = self._get_project_folder()
@@ -726,26 +725,28 @@ class ExperimentAutomationCategory:
         safe_name = name.replace(' ', '_').replace('/', '_')
         batch_path = saver.create_batch_folder(name_suffix=safe_name)
 
-        # ── results.csv ── mean + std trajectories (same as manual export)
+        save_errors = []
+
+        # ── results.csv ── mean + std trajectories (mixed-format, section-aware)
         try:
             self._export_csv(str(batch_path / 'results.csv'), name, result)
+            _fsync(batch_path / 'results.csv')
         except Exception as e:
-            print(f"[AUTO-SAVE] Warning: Failed to save results.csv: {e}")
+            save_errors.append(f'results.csv: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save results.csv: {e}')
 
-        # ── replicates.csv ── per-replicate outcomes
+        # ── replicates.csv ── per-replicate outcomes (standard tabular)
         try:
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
-
-            # Merge replicate_data and trajectory_summary by index
             n = max(len(replicate_data), len(trajectory_summary))
             with open(batch_path / 'replicates.csv', 'w', newline='') as f:
                 _metadata = result.get('metadata')
                 if _metadata is not None:
                     try:
                         f.write(_metadata.to_header_text())
-                    except Exception as e:
-                        print(f"[AUTO-SAVE] Warning: Failed to write header protocol to replicates.csv: {e}")
+                    except Exception:
+                        pass
                 writer = csv_mod.writer(f)
                 writer.writerow(['replicate_id', 'seed', 'n_timepoints', 'final_time',
                                   'deadlocked', 'sim_duration', 'elapsed_time_s'])
@@ -761,8 +762,10 @@ class ExperimentAutomationCategory:
                         rep.get('duration', ''),
                         rep.get('elapsed_time', '')
                     ])
+            _fsync(batch_path / 'replicates.csv')
         except Exception as e:
-            print(f"[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}")
+            save_errors.append(f'replicates.csv: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}')
 
         # ── config.csv ── experiment metadata as key-value pairs
         try:
@@ -788,13 +791,88 @@ class ExperimentAutomationCategory:
                 if _metadata is not None:
                     try:
                         f.write(_metadata.to_header_text())
-                    except Exception as e:
-                        print(f"[AUTO-SAVE] Warning: Failed to write header protocol to config.csv: {e}")
+                    except Exception:
+                        pass
                 writer = csv_mod.writer(f)
                 writer.writerow(['key', 'value'])
                 writer.writerows(rows)
+            _fsync(batch_path / 'config.csv')
         except Exception as e:
-            print(f"[AUTO-SAVE] Warning: Failed to save config.csv: {e}")
+            save_errors.append(f'config.csv: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save config.csv: {e}')
+
+        # ── names.csv ── place/transition ID → human-readable name lookup
+        # Allows analysis scripts to replace P17 → GATA1_Protein_nuc without
+        # loading the full model.
+        try:
+            subnet_model = getattr(self.parent_panel, 'subnet_model', None)
+            if subnet_model is not None:
+                with open(batch_path / 'names.csv', 'w', newline='') as f:
+                    writer = csv_mod.writer(f)
+                    writer.writerow(['id', 'name', 'type'])
+                    for p in getattr(subnet_model, 'places', []):
+                        writer.writerow([p.id, getattr(p, 'name', p.id), 'place'])
+                    for t in getattr(subnet_model, 'transitions', []):
+                        writer.writerow([t.id, getattr(t, 'name', t.id), 'transition'])
+                _fsync(batch_path / 'names.csv')
+        except Exception as e:
+            save_errors.append(f'names.csv: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save names.csv: {e}')
+
+        # ── mean_final_state.csv ── flat, easily parseable final SS summary
+        # Standard tabular CSV: pandas.read_csv(path, comment='#') works directly.
+        # One row per species with final-timepoint mean and std.
+        try:
+            stats = result.get('statistics', {})
+            species_stats = stats.get('species_statistics', {})
+            if species_stats:
+                # Build name lookup from subnet model if available
+                id_to_name = {}
+                subnet_model = getattr(self.parent_panel, 'subnet_model', None)
+                if subnet_model is not None:
+                    for p in getattr(subnet_model, 'places', []):
+                        id_to_name[p.id] = getattr(p, 'name', p.id)
+                    for t in getattr(subnet_model, 'transitions', []):
+                        id_to_name[t.id] = getattr(t, 'name', t.id)
+
+                with open(batch_path / 'mean_final_state.csv', 'w', newline='') as f:
+                    _metadata = result.get('metadata')
+                    if _metadata is not None:
+                        try:
+                            f.write(_metadata.to_header_text())
+                        except Exception:
+                            pass
+                    writer = csv_mod.writer(f)
+                    writer.writerow(['id', 'name', 'mean_final', 'std_final', 'min_final', 'max_final'])
+                    for species_id, sdata in species_stats.items():
+                        mean_traj = sdata.get('mean', [])
+                        std_traj  = sdata.get('std', [])
+                        min_traj  = sdata.get('min', [])
+                        max_traj  = sdata.get('max', [])
+                        mean_val = mean_traj[-1] if mean_traj else ''
+                        std_val  = std_traj[-1]  if std_traj  else ''
+                        min_val  = min_traj[-1]  if min_traj  else ''
+                        max_val  = max_traj[-1]  if max_traj  else ''
+                        writer.writerow([
+                            species_id,
+                            id_to_name.get(species_id, species_id),
+                            mean_val, std_val, min_val, max_val
+                        ])
+                _fsync(batch_path / 'mean_final_state.csv')
+        except Exception as e:
+            save_errors.append(f'mean_final_state.csv: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save mean_final_state.csv: {e}')
+
+        # ── .complete / .partial sentinel ──────────────────────────────────
+        # .complete is written ONLY when every file succeeded.
+        # Its absence (or presence of .partial) means the save is incomplete.
+        from datetime import datetime as _dt
+        if not save_errors:
+            (batch_path / '.complete').write_text(_dt.now().isoformat())
+            print(f'[AUTO-SAVE] ✓ {name} → {batch_path.name}')
+        else:
+            (batch_path / '.partial').write_text('\n'.join(save_errors))
+            print(f'[AUTO-SAVE] ⚠️  Partial save for "{name}": {save_errors}')
 
     def _get_project_folder(self) -> str:
         """Get current project folder path for auto-save.
@@ -882,13 +960,16 @@ class ExperimentAutomationCategory:
             # Batch export - use pre-selected directory from result
             directory = result.get('_batch_export_dir')
             batch_name = result.get('_batch_export_name', name)
-            
+
             if directory:
-                # Generate safe filename
+                from datetime import datetime as _dt
+                ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                # Append timestamp to prevent silently overwriting a previous export
+                # of the same sweep from an earlier run.
                 safe_name = batch_name.replace(' ', '_').replace('/', '_').replace('=', '_')
                 base_format = format_type.replace('_batch', '')
-                filepath = f"{directory}/{safe_name}.{base_format}"
-                
+                filepath = f"{directory}/{safe_name}_{ts}.{base_format}"
+
                 try:
                     if base_format == 'csv':
                         self._export_csv(filepath, batch_name, result)
@@ -956,12 +1037,30 @@ class ExperimentAutomationCategory:
     
     def _export_csv(self, filepath, name, result):
         """Export results to CSV with Header Protocol preamble.
-        
-        The file begins with '# '-prefixed comment lines (Header Protocol v1.0)
-        carrying model provenance, sweep configuration, temporal metadata, etc.
-        Readers can skip them with pandas.read_csv(..., comment='#') or parse
-        them with MinimalHeaderLoader.
-        
+
+        ⚠️  MIXED-FORMAT FILE — not a standard flat CSV.
+        Structure after the '#'-prefixed header block:
+            [free key-value rows]         Experiment, N_Replicates, ...
+            [section label row]           'Species Statistics - Mean Trajectories'
+            [matrix: Time + species cols] Time, P1, P2, ..., T1, T2, ...
+            [empty row]
+            [section label row]           'Species Statistics - Standard Deviations'
+            [same matrix shape]
+            [empty row]
+            [section label row]           'Trajectory Summary'
+            [matrix: replicate metadata]
+            [empty row]
+            [section label row]           'Summary'
+            [free key-value rows]
+
+        Reading tip:
+            pandas.read_csv(path, comment='#') will fail due to mixed column counts.
+            Use a section-aware reader, or prefer mean_final_state.csv for steady-state
+            analysis (standard tabular, pandas-safe).
+
+        Species are identified by place/transition IDs (P1, P17, T11 ...).
+        Use names.csv in the same folder for the ID → display-name mapping.
+
         Args:
             filepath: Output file path
             name: Experiment name

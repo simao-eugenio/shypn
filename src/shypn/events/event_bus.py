@@ -247,6 +247,41 @@ class EventBus:
         return cls._registered_events.copy()
     
     @classmethod
+    def clear_document(cls, document_id: int) -> int:
+        """Remove all subscriptions bound to a specific document.
+        
+        Call this when a document tab is closed to prevent handler leaks.
+        Removes both exact-match and wildcard subscriptions for the document.
+        
+        Args:
+            document_id: The document ID (previously passed to subscribe/emit).
+                         Use the same value that was used when subscribing.
+        
+        Returns:
+            Number of subscriptions removed.
+        
+        Example:
+            # In ModelCanvasLoader.close_document():
+            EventBus.clear_document(id(drawing_area))
+        """
+        removed = 0
+        for event_name in list(cls._subscribers.keys()):
+            before = len(cls._subscribers[event_name])
+            cls._subscribers[event_name] = [
+                (did, pri, h) for did, pri, h in cls._subscribers[event_name]
+                if did != document_id
+            ]
+            removed += before - len(cls._subscribers[event_name])
+        before_wc = len(cls._wildcard_subscribers)
+        cls._wildcard_subscribers = [
+            (p, did, pri, h) for p, did, pri, h in cls._wildcard_subscribers
+            if did != document_id
+        ]
+        removed += before_wc - len(cls._wildcard_subscribers)
+        logger.debug(f"clear_document({document_id}): removed {removed} subscriptions")
+        return removed
+
+    @classmethod
     def clear_all(cls) -> None:
         """Clear all subscriptions (useful for testing).
         

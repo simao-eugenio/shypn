@@ -485,7 +485,8 @@ class BatchExecutor:
         complete_callback: Optional[Callable] = None,
         experiment_result_callback: Optional[Callable] = None,
         use_parallel: bool = False,
-        n_workers: Optional[int] = None
+        n_workers: Optional[int] = None,
+        timeout_per_experiment: Optional[float] = None
     ):
         """Run batch of experiments asynchronously.
         
@@ -541,7 +542,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers, timeout_per_experiment),
             daemon=True
         )
         self.executor_thread.start()
@@ -578,7 +579,8 @@ class BatchExecutor:
         subnet_data: dict,  # Pre-extracted subnet data
         baseline_params: dict,  # Baseline parameters to reset between experiments
         use_parallel: bool = False,
-        n_workers: Optional[int] = None
+        n_workers: Optional[int] = None,
+        timeout_per_experiment: Optional[float] = None
     ):
         """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
         
@@ -600,7 +602,7 @@ class BatchExecutor:
             self._execute_batch_parallel(
                 experiments, replicates, duration, termination_condition,
                 progress_callback, complete_callback, experiment_result_callback,
-                base_model, subnet_data, baseline_params, n_workers
+                base_model, subnet_data, baseline_params, n_workers, timeout_per_experiment
             )
         else:
             self._execute_batch_sequential(
@@ -765,7 +767,8 @@ class BatchExecutor:
         base_model,
         subnet_data: dict,
         baseline_params: dict,
-        n_workers: Optional[int] = None
+        n_workers: Optional[int] = None,
+        timeout_per_experiment: Optional[float] = None
     ):
         """Execute batch in parallel using multiprocessing.
         
@@ -830,23 +833,10 @@ class BatchExecutor:
             # Create process pool and execute
             total = len(experiment_args)
             completed = 0
-            
-            # Calculate timeout threshold per experiment:
-            # Each worker runs ONE experiment with replicates SEQUENTIALLY
-            # (stochastic parallelism disabled in workers to avoid ThreadPoolExecutor deadlocks)
-            # 
-            # Empirical factors:
-            #   - Sequential mode: 0.827s wall-clock per 1s simulated (3×60s = 148.9s)
-            #   - Parallel mode: 2.41s wall-clock per 1s simulated (1×60s = 144.762s)
-            #     (includes process creation, serialization, resource contention overhead)
-            # 
-            # Timeout calculation:
-            #   base_time = replicates × duration × empirical_factor
-            #   safety_margin = 1.5x (accounts for variations without being excessive)
-            #   max_cap = 36 hours (allows very long experiments with many replicates)
-            expected_time_per_replicate = duration * 2.41  # Parallel overhead: 2.41x simulated time
-            expected_experiment_time = replicates * expected_time_per_replicate
-            timeout_threshold = min(expected_experiment_time * 1.5, 36 * 3600)  # Max 36 hours, 1.5x safety
+            # NOTE: No computation-based timeout. Workers are killed only when they go
+            # SILENT (no progress heartbeat) for ZOMBIE_SILENCE_S seconds, computed
+            # inside the polling loop from `duration`. Legitimate slow runs are never
+            # interrupted.
             
             with multiprocessing.Pool(processes=n_workers) as pool:
                 # Submit all experiments with start time tracking
@@ -855,99 +845,111 @@ class BatchExecutor:
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
                     start_time = time.time()
                     async_results.append((args['queue_index'], args['name'], async_result, start_time))
-                    
+
                     # Set initial running status when experiment is submitted
                     if progress_callback:
                         progress_callback(args['queue_index'], "running", "0%")
-                
-                # Poll for completion with timeout detection
+
+                # Zombie detection: kill a worker only when it goes SILENT, not merely slow.
+                # A legitimate computation that takes longer than any estimate must not be
+                # interrupted.  We classify a worker as a zombie only when it has produced
+                # no progress heartbeat for ZOMBIE_SILENCE_S seconds.
+                #
+                # Threshold: at least 30 min, or 3× the time one single replicate should
+                # take at the sequential empirical rate (0.827 s / simulated-s).  This
+                # ensures a legitimate but slow replicate has 3 chances to complete
+                # before we declare it hung.
+                single_replicate_estimate = duration * 0.827
+                ZOMBIE_SILENCE_S = max(30 * 60, single_replicate_estimate * 3)
+
+                # last_heartbeat[queue_index] = wall-clock time of last progress message
+                # Initialised to submission time so a worker that never sends a message
+                # is caught after ZOMBIE_SILENCE_S from the moment it was submitted.
+                last_heartbeat = {args['queue_index']: time.time() for args in experiment_args}
+
+                # Poll for completion with zombie detection
                 while async_results and not self.is_cancelled:
                     time.sleep(0.1)  # Check every 100ms
-                    
+
                     current_time = time.time()
-                    
-                    # Process progress updates from workers
+
+                    # Process progress updates from workers — each message resets the
+                    # heartbeat clock for that worker.
                     while not progress_queue.empty():
                         try:
                             queue_idx, progress_fraction = progress_queue.get_nowait()
+                            last_heartbeat[queue_idx] = current_time  # worker is alive
                             if progress_callback:
-                                # Convert fraction to percentage string
                                 progress_pct = int(progress_fraction * 100)
                                 progress_callback(queue_idx, "running", f"{progress_pct}%")
                         except (OSError, ValueError) as e:
-                            # Queue empty or communication error
                             import logging
                             logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
-                            break  # Queue empty or error
-                    
-                    # Check completed experiments and detect timeouts
+                            break
+
+                    # Check completed experiments and detect zombies
                     still_running = []
                     for queue_index, name, async_result, start_time in async_results:
-                        # Check for timeout FIRST
                         elapsed = current_time - start_time
-                        if elapsed > timeout_threshold:
-                            # TIMEOUT DETECTED - Kill this worker
-                            print(f"[BATCH] ⚠️ TIMEOUT: {name} exceeded {timeout_threshold:.1f}s (ran {elapsed:.1f}s)")
-                            
-                            # Try to terminate gracefully, but don't wait
+                        silence = current_time - last_heartbeat.get(queue_index, start_time)
+
+                        if silence > ZOMBIE_SILENCE_S:
+                            # ZOMBIE DETECTED: worker has been silent too long
+                            print(
+                                f"[BATCH] ⚠️ ZOMBIE: {name} silent for {silence:.0f}s "
+                                f"(threshold {ZOMBIE_SILENCE_S:.0f}s, total elapsed {elapsed:.0f}s)"
+                            )
                             try:
-                                # Note: We can't kill individual async_result, must terminate entire pool later
-                                pass  # Will be handled by pool.terminate() if needed
-                            except (AttributeError, OSError) as e:
-                                # Worker termination failed (non-fatal)
-                                import logging
-                                logging.getLogger(__name__).debug(f"Worker termination attempt failed: {e}")
+                                pass  # Cannot kill individual async_result; pool.terminate() below
+                            except (AttributeError, OSError):
                                 pass
-                            
-                            # Mark as failed due to timeout
-                            timeout_msg = f"Timeout after {elapsed:.0f}s (limit: {timeout_threshold:.0f}s)"
+
+                            zombie_msg = (
+                                f"No heartbeat for {silence:.0f}s "
+                                f"(zombie threshold {ZOMBIE_SILENCE_S:.0f}s)"
+                            )
                             if progress_callback:
-                                progress_callback(queue_index, "failed", timeout_msg)
-                            
+                                progress_callback(queue_index, "failed", zombie_msg)
+
                             self.results[name] = {
-                                "error": timeout_msg,
+                                "error": zombie_msg,
                                 "name": name,
                                 "timeout": True,
                                 "elapsed_time": elapsed
                             }
-                            
                             completed += 1
-                            # Don't add to still_running - this experiment is done (failed)
-                            continue
-                        
+                            continue  # Don't add to still_running
+
                         if async_result.ready():
                             try:
                                 result = async_result.get(timeout=0.1)
-                                
-                                # Store result
+
                                 self.results[name] = result
-                                
-                                # Update UI via callbacks
+
                                 if progress_callback:
                                     progress_callback(queue_index, "completed", "100%")
-                                
+
                                 if experiment_result_callback:
                                     from gi.repository import GLib
                                     GLib.idle_add(lambda n=name, r=result: experiment_result_callback(n, r) or False)
-                                
+
                                 completed += 1
-                                
+
                             except Exception as e:
                                 import traceback
                                 traceback.print_exc()
-                                
+
                                 error_msg = str(e)[:100]
                                 if progress_callback:
                                     progress_callback(queue_index, "failed", error_msg)
-                                
+
                                 self.results[name] = {
                                     "error": str(e),
                                     "name": name
                                 }
                         else:
-                            # Still running, keep tracking with start time
                             still_running.append((queue_index, name, async_result, start_time))
-                    
+
                     async_results = still_running
                 
                 # Handle cancellation

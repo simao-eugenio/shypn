@@ -174,7 +174,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Firing policy (replaces priority spinner)
         firing_policy_combo = self.builder.get_object('firing_policy_combo')
         if firing_policy_combo and hasattr(self.transition_obj, 'firing_policy'):
-            # Map policy names to combobox indices (order: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority)
+            # Map policy names to combobox indices (order: Random, Earliest, Latest, Priority, Race, Age, Preemptive-Priority, Preemptive, Single)
             policy_map = {
                 'random': 0,
                 'earliest': 1,
@@ -182,7 +182,9 @@ class TransitionPropDialogLoader(GObject.GObject):
                 'priority': 3,
                 'race': 4,
                 'age': 5,
-                'preemptive-priority': 6
+                'preemptive-priority': 6,
+                'preemptive': 7,
+                'single': 8,
             }
             policy = self.transition_obj.firing_policy or 'race'
             firing_policy_combo.set_active(policy_map.get(policy, 4))
@@ -717,7 +719,8 @@ class TransitionPropDialogLoader(GObject.GObject):
         if firing_policy_combo:
             policy_list = [
                 'random', 'earliest', 'latest', 'priority',
-                'race', 'age', 'preemptive-priority'
+                'race', 'age', 'preemptive-priority',
+                'preemptive', 'single',
             ]
             policy_index = firing_policy_combo.get_active()
             if policy_index >= 0:
