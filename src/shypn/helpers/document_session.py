@@ -95,6 +95,42 @@ class DocumentSession:
         return getattr(self.drawing_area, '_shypn_doc_id', id(self.drawing_area))
 
     # ------------------------------------------------------------------
+    # Canvas-manager convenience proxies
+    # ------------------------------------------------------------------
+
+    @property
+    def filepath(self) -> 'Optional[str]':
+        """Absolute path of the saved file, or ``None`` for unsaved documents."""
+        return getattr(self.canvas_manager, 'filepath', None)
+
+    @property
+    def display_name(self) -> str:
+        """User-friendly tab name (filename without path, or default name)."""
+        if hasattr(self.canvas_manager, 'get_display_name'):
+            return self.canvas_manager.get_display_name()
+        return getattr(self.canvas_manager, 'filename', '?')
+
+    @property
+    def is_dirty(self) -> bool:
+        """``True`` if the document has unsaved changes."""
+        return bool(getattr(self.canvas_manager, 'is_dirty', False)
+                    or getattr(self.canvas_manager, 'modified', False))
+
+    # ------------------------------------------------------------------
+    # Simulation-controller convenience proxies
+    # ------------------------------------------------------------------
+
+    @property
+    def data_collector(self):
+        """The active :class:`DataCollector` for this document."""
+        return getattr(self.simulation_controller, 'data_collector', None)
+
+    @property
+    def simulation_time(self) -> float:
+        """Current simulation time for this document."""
+        return getattr(self.simulation_controller, 'time', 0.0)
+
+    # ------------------------------------------------------------------
     # Panel-loader proxies through overlay_manager
     # ------------------------------------------------------------------
 
