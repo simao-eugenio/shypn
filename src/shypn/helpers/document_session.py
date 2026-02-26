@@ -129,13 +129,10 @@ class DocumentSession:
     def close(self) -> None:
         """Release all EventBus subscriptions scoped to this document.
 
-        Called from ``ModelCanvasLoader.close_tab`` BEFORE the GTK widget is
-        destroyed and BEFORE the legacy dicts are cleaned up.  Calling this
-        method is the canonical way to guarantee that no stale EventBus
-        handler survives a tab close.
-
+        Called from ``teardown()`` (and therefore from
+        ``ModelCanvasLoader.close_tab``) BEFORE the GTK widget is destroyed.
         Individual panel loaders may also call their own ``unsubscribe()``
-        methods — that is fine; ``EventBus.clear_document`` is idempotent.
+        methods — ``EventBus.clear_document`` is idempotent.
         """
         try:
             from shypn.events import EventBus
@@ -147,6 +144,50 @@ class DocumentSession:
             )
         except Exception:
             logger.debug("DocumentSession.close(): EventBus.clear_document failed", exc_info=True)
+
+    def teardown(self) -> None:
+        """Full resource teardown for this document session.
+
+        Sequence guarantees:
+
+        1. ``close()`` — EventBus.clear_document so no orphaned subscriptions
+           survive.
+        2. Panel-loader on_tab_closed hooks (topology, others in future).
+        3. Report panel data cleared.
+        4. ``overlay_manager.cleanup_overlays()`` — destroys GTK overlay
+           widgets, palette references, step listeners.
+
+        Called from ``ModelCanvasLoader.close_tab`` before the GTK widget
+        hierarchy is destroyed and before the four legacy dicts are cleaned
+        up.  The dict deletions remain in ``close_tab`` because this class
+        intentionally does not hold a back-reference to the loader.
+        """
+        # Step 1 — release EventBus subscriptions
+        self.close()
+
+        # Step 2 — panel-specific pre-destroy hooks
+        try:
+            tpl = getattr(self.overlay_manager, 'topology_panel_loader', None)
+            if tpl and hasattr(tpl, 'on_tab_closed'):
+                tpl.on_tab_closed(self.drawing_area)
+        except Exception:
+            logger.debug("topology_panel_loader.on_tab_closed failed", exc_info=True)
+
+        # Step 3 — clear report panel data
+        try:
+            rpl = getattr(self.overlay_manager, 'report_panel_loader', None)
+            if rpl:
+                panel = getattr(rpl, 'panel', None)
+                if panel and hasattr(panel, 'clear_all'):
+                    panel.clear_all()
+        except Exception:
+            logger.debug("report_panel_loader.panel.clear_all failed", exc_info=True)
+
+        # Step 4 — destroy overlay widgets and palette references
+        try:
+            self.overlay_manager.cleanup_overlays()
+        except Exception:
+            logger.debug("overlay_manager.cleanup_overlays failed", exc_info=True)
 
     def __repr__(self) -> str:
         fname = getattr(self.canvas_manager, 'filename', '?')
