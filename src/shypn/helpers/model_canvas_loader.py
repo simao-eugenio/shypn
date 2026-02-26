@@ -1040,14 +1040,16 @@ class ModelCanvasLoader:
                 self.logger.debug(f"Failed to destroy canvas in lifecycle: {e}")
                 pass  # Failed to destroy canvas in lifecycle
         
-        if drawing_area and drawing_area in self.canvas_managers:
-            # ── DocumentSession teardown: clear all EventBus subscriptions ──
-            # Must happen BEFORE legacy dict cleanup so panel loaders are still
-            # reachable for individual unsubscribe() calls that may race here.
-            session = self.sessions.pop(drawing_area, None)
-            if session is not None:
-                session.close()  # calls EventBus.clear_document(doc_id)
+        # ── DocumentSession teardown ───────────────────────────────────────
+        # Pop the session and run full teardown (EventBus.clear_document +
+        # panel cleanup + overlay_manager.cleanup_overlays) BEFORE the four
+        # individual dict cleanups below, so all panel loaders are still
+        # reachable for their own unsubscribe() hooks during teardown.
+        session = self.sessions.pop(drawing_area, None) if drawing_area else None
+        if session is not None:
+            session.teardown()
 
+        if drawing_area and drawing_area in self.canvas_managers:
             # Emit file.closed so Open Editors panel removes the entry
             try:
                 import time
@@ -1062,24 +1064,17 @@ class ModelCanvasLoader:
         if drawing_area and drawing_area in self.simulation_controllers:
             del self.simulation_controllers[drawing_area]
         if drawing_area and drawing_area in self.overlay_managers:
-            # Cleanup overlay manager and all its palettes
-            overlay_manager = self.overlay_managers[drawing_area]
-            
-            # Clear topology panel data before cleanup
-            if hasattr(overlay_manager, 'topology_panel_loader') and overlay_manager.topology_panel_loader:
-                if hasattr(overlay_manager.topology_panel_loader, 'on_tab_closed'):
-                    overlay_manager.topology_panel_loader.on_tab_closed(drawing_area)
-            
-            # Clear report panel data before cleanup
-            if hasattr(overlay_manager, 'report_panel_loader') and overlay_manager.report_panel_loader:
-                if hasattr(overlay_manager.report_panel_loader, 'panel') and overlay_manager.report_panel_loader.panel:
-                    if hasattr(overlay_manager.report_panel_loader.panel, 'clear_all'):
-                        overlay_manager.report_panel_loader.panel.clear_all()
-            
-            overlay_manager.cleanup_overlays()
+            # session.teardown() already called cleanup_overlays().
+            # Guard: if session was not registered (very early setup failure),
+            # run cleanup directly so resources are never leaked.
+            if session is None:
+                overlay_manager = self.overlay_managers[drawing_area]
+                try:
+                    overlay_manager.cleanup_overlays()
+                except Exception:
+                    pass
             del self.overlay_managers[drawing_area]
         if drawing_area and drawing_area in self.knowledge_bases:
-            # Cleanup knowledge base
             del self.knowledge_bases[drawing_area]
         if self.notebook.get_n_pages() == 0:
             # ═══════════════════════════════════════════════════════════════════
