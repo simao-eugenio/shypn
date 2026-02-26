@@ -73,6 +73,10 @@ class Place(PetriNetObject):
         # Regulatory places represent genetic elements or constant resource pools
         self.is_regulatory_place = False  # True if this is a gene locus or constant resource
         
+        # Energy/metabolic cofactor places (ATP, ADP, GTP, GDP, Pi, etc.)
+        # Participate in kinetics via rate functions (Φ), not signal hierarchy
+        self.is_energy_place = False  # True if metabolic cofactor (rendered with amber border)
+        
         # Module assignment (modular Bio-PN architecture)
         # Places belong to modules, enabling network partitioning and compartmentalization
         self.module_id: Optional[str] = None  # Module identifier (e.g., "M_cytoplasm", "M_mitochondria")
@@ -592,6 +596,7 @@ class Place(PetriNetObject):
             "signal_type": self._serialize_signal_type(),  # Save signal classification (energy/spatial/quorum/regulatory)
             "is_compartment_place": getattr(self, 'is_compartment_place', False),  # Save compartment place flag
             "is_regulatory_place": getattr(self, 'is_regulatory_place', False),  # Save regulatory place flag
+            "is_energy_place": getattr(self, 'is_energy_place', False),  # Save energy/metabolic cofactor flag
             
             # Spatial signal properties (Layer 1)
             "diffusion_coefficient": getattr(self, 'diffusion_coefficient', None),
@@ -685,6 +690,8 @@ class Place(PetriNetObject):
         place.is_catalyst = data.get("is_catalyst", False)
         # Restore signal place flag (13-tuple formalism: Ψ)
         place.is_signal_place = data.get("is_signal_place", False)
+        # Restore energy/metabolic cofactor flag
+        place.is_energy_place = data.get("is_energy_place", False)
         
         # Restore signal type classification (energy/spatial/quorum/regulatory)
         signal_type_str = data.get("signal_type")
@@ -724,7 +731,7 @@ class Place(PetriNetObject):
         # Color handling: Always enforce color schema for semantic types
         from shypn.utils.color_schema_manager import ColorSchemaManager
         if ColorSchemaManager.is_semantic_place_color(place):
-            # Semantic places (signal, compartment, regulatory) always get schema color
+            # Semantic places (signal, energy, compartment, regulatory) always get schema color
             ColorSchemaManager.reset_place_color(place)
         elif "border_color" in data:
             # Non-semantic places use saved color (may be analysis/recording color)

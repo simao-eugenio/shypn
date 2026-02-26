@@ -921,7 +921,23 @@ class ParameterSweepBuilder(Gtk.Box):
             text = config.get('list_values', '').strip()
             if not text:
                 raise ValueError("Value list is empty")
-            values = [float(v.strip()) for v in text.split(',')]
+            # Accept comma, semicolon, or whitespace as separators.
+            # Also strip trailing punctuation (e.g. stray periods) from each token.
+            import re
+            raw_tokens = re.split(r'[,;\s]+', text)
+            values = []
+            for token in raw_tokens:
+                token = token.strip().rstrip('.,;')
+                if token:
+                    try:
+                        values.append(float(token))
+                    except ValueError:
+                        raise ValueError(
+                            f"Could not convert '{token}' to a number. "
+                            "Use commas to separate values (e.g. 0.1, 0.3, 0.5)."
+                        )
+            if not values:
+                raise ValueError("Value list is empty after parsing")
             return values
             
         elif mode == 'percent':
