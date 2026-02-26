@@ -186,6 +186,7 @@ class SimulationController:
         self.time = 0.0
         self.model_adapter = ModelAdapter(model, controller=self)
         self.step_listeners = []
+        self.data_collector_listeners: List[Callable] = []  # notified when data_collector is replaced
         self._running = False
         self._stop_requested = False
         self._timeout_id = None
@@ -304,7 +305,6 @@ class SimulationController:
             delattr(self, '_tau_leaping_engine')
         
         # Reinitialize model adapter with current model
-        from shypn.engine.simulation.model_adapter import ModelAdapter
         self.model_adapter = ModelAdapter(self.model, controller=self)
         
         # Reinitialize data collector with current model
@@ -318,11 +318,11 @@ class SimulationController:
         
         # CRITICAL: Notify any observers that data_collector changed
         # This ensures analyses panels get the new data_collector reference
-        if hasattr(self, '_on_data_collector_changed'):
+        for _cb in self.data_collector_listeners:
             try:
-                self._on_data_collector_changed(self.data_collector)
-            except (AttributeError, TypeError) as e:
-                logger.warning(f"Error notifying data_collector change: {e}")
+                _cb(self.data_collector)
+            except Exception as e:
+                logger.warning(f"Error in data_collector listener: {e}")
         
         # Reset buffered settings (discard any uncommitted changes from previous model)
         if hasattr(self, 'buffered_settings'):
@@ -572,10 +572,8 @@ class SimulationController:
             pass
             # If a transition was deleted, remove it from our caches
             if isinstance(obj, Transition):
-                if obj.id in self.behavior_cache:
-                    del self.behavior_cache[obj.id]
-                if obj.id in self.transition_states:
-                    del self.transition_states[obj.id]
+                self.behavior_cache.pop(id(obj), None)
+                self.transition_states.pop(id(obj), None)
             
             # If an arc was deleted, invalidate model adapter caches
             if isinstance(obj, Arc):
@@ -593,11 +591,9 @@ class SimulationController:
                 # (they need to rebuild their input/output arc lists)
                 from shypn.netobjs.transition import Transition
                 if isinstance(obj.source, Transition):
-                    if obj.source.id in self.behavior_cache:
-                        del self.behavior_cache[obj.source.id]
+                    self.behavior_cache.pop(id(obj.source), None)
                 if isinstance(obj.target, Transition):
-                    if obj.target.id in self.behavior_cache:
-                        del self.behavior_cache[obj.target.id]
+                    self.behavior_cache.pop(id(obj.target), None)
                 
                 pass  # Behaviors rebuilt for affected transitions
         
@@ -610,8 +606,7 @@ class SimulationController:
             
             # If a new transition was created, initialize its state and enablement
             if isinstance(obj, Transition):
-                if obj.id not in self.transition_states:
-                    self.transition_states[obj.id] = TransitionState()
+                state = self._get_or_create_state(obj)
                 
                 # Immediately update enablement for the new transition
                 # This ensures source transitions are immediately ready to fire
@@ -623,7 +618,6 @@ class SimulationController:
                     logger = logging.getLogger(__name__)
                     logger.info(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
                     # Source transitions are always enabled
-                    state = self.transition_states[obj.id]
                     state.enablement_time = self.time
                     if hasattr(behavior, 'set_enablement_time'):
                         behavior.set_enablement_time(self.time)
@@ -639,7 +633,6 @@ class SimulationController:
                             break
                     
                     if locally_enabled:
-                        state = self.transition_states[obj.id]
                         state.enablement_time = self.time
                         if hasattr(behavior, 'set_enablement_time'):
                             behavior.set_enablement_time(self.time)
@@ -648,8 +641,7 @@ class SimulationController:
             # Object properties were modified
             if isinstance(obj, Transition):
                 # Invalidate behavior cache (type or properties may have changed)
-                if obj.id in self.behavior_cache:
-                    del self.behavior_cache[obj.id]
+                self.behavior_cache.pop(id(obj), None)
                 
                 # Check if it's now a source transition and enable if needed
                 is_source = getattr(obj, 'is_source', False)
@@ -735,8 +727,9 @@ class SimulationController:
         Returns:
             TransitionBehavior: Behavior instance for this transition type
         """
-        if transition.id in self.behavior_cache:
-            cached_behavior = self.behavior_cache[transition.id]
+        _tid = id(transition)
+        if _tid in self.behavior_cache:
+            cached_behavior = self.behavior_cache[_tid]
             cached_type = cached_behavior.get_type_name()
             current_type = getattr(transition, 'transition_type', 'continuous')
             type_name_map = {'Immediate': 'immediate', 'Timed (TPN)': 'timed', 'Stochastic (FSPN)': 'stochastic', 'Continuous (SHPN)': 'continuous', 'Adaptive Hybrid (ODE/Stochastic)': 'adaptive'}
@@ -744,10 +737,9 @@ class SimulationController:
             if cached_type_normalized != current_type:
                 if hasattr(cached_behavior, 'clear_enablement'):
                     cached_behavior.clear_enablement()
-                del self.behavior_cache[transition.id]
-                if transition.id in self.transition_states:
-                    del self.transition_states[transition.id]
-        if transition.id not in self.behavior_cache:
+                self.behavior_cache.pop(_tid, None)
+                self.transition_states.pop(_tid, None)
+        if _tid not in self.behavior_cache:
             pass
             # Create behavior instance
             # IMPORTANT: This method ONLY creates behaviors, it does NOT initialize
@@ -763,9 +755,9 @@ class SimulationController:
             #
             # Now: Single responsibility = creation only, no initialization
             behavior = behavior_factory.create_behavior(transition, self.model_adapter)
-            self.behavior_cache[transition.id] = behavior
+            self.behavior_cache[_tid] = behavior
         
-        return self.behavior_cache[transition.id]
+        return self.behavior_cache[_tid]
 
     def _get_or_create_state(self, transition) -> TransitionState:
         """Get or create state tracking for a transition.
@@ -776,9 +768,10 @@ class SimulationController:
         Returns:
             TransitionState: State tracking instance for this transition
         """
-        if transition.id not in self.transition_states:
-            self.transition_states[transition.id] = TransitionState()
-        return self.transition_states[transition.id]
+        _tid = id(transition)
+        if _tid not in self.transition_states:
+            self.transition_states[_tid] = TransitionState()
+        return self.transition_states[_tid]
 
     def _update_enablement_states(self):
         """Update enablement tracking for all transitions.
@@ -2877,12 +2870,12 @@ class SimulationController:
         
         # CRITICAL: Notify any observers that data_collector changed
         # This ensures analyses panels get the new data_collector reference
-        if hasattr(self, '_on_data_collector_changed'):
+        for _cb in self.data_collector_listeners:
             try:
-                self._on_data_collector_changed(self.data_collector)
+                _cb(self.data_collector)
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).warning(f"Error notifying data_collector change: {e}")
+                logging.getLogger(__name__).warning(f"Error in data_collector listener: {e}")
         
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback

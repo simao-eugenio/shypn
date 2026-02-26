@@ -128,13 +128,13 @@ class DataCollector:
             # Get behavior from controller's cache (behaviors are created on-demand by controller)
             behavior = None
             if self.controller and hasattr(self.controller, 'behavior_cache'):
-                behavior = self.controller.behavior_cache.get(transition.id)
+                behavior = self.controller.behavior_cache.get(id(transition))
                 if not behavior:
                     # Behavior not in cache - try to create it
                     from shypn.engine import behavior_factory
                     try:
                         behavior = behavior_factory.create_behavior(transition, self.model)
-                        self.controller.behavior_cache[transition.id] = behavior
+                        self.controller.behavior_cache[id(transition)] = behavior
                     except Exception as e:
                         self.logger.debug(f"Behavior creation failed for transition {transition.id}: {e}")
                         pass

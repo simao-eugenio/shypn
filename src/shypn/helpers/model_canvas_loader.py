@@ -1904,7 +1904,7 @@ class ModelCanvasLoader:
                 if analyses_loader and hasattr(analyses_loader, 'set_data_collector'):
                     analyses_loader.set_data_collector(new_data_collector)
 
-        simulation_controller._on_data_collector_changed = on_data_collector_changed
+        simulation_controller.data_collector_listeners.append(on_data_collector_changed)
         self.simulation_controllers[drawing_area] = simulation_controller
 
         # Store in overlay_manager for arc property dialog access
@@ -4953,14 +4953,13 @@ class ModelCanvasLoader:
                     pass
                     # Clear behavior cache when transition type/properties change
                     # This forces behavior algorithm recompilation on next simulation step
-                    if obj.id in controller.behavior_cache:
-                        del controller.behavior_cache[obj.id]
+                    controller.behavior_cache.pop(id(obj), None)
                     
                     # CRITICAL: If transition became a source transition, enable it immediately
                     # This allows simulation to run without needing to press Reset
                     if getattr(obj, 'is_source', False):
-                        if obj.id in controller.transition_states:
-                            state = controller.transition_states[obj.id]
+                        if id(obj) in controller.transition_states:
+                            state = controller.transition_states[id(obj)]
                             if state.enablement_time is None:
                                 state.enablement_time = controller.time
                     
