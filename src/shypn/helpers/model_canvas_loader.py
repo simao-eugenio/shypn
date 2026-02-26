@@ -78,6 +78,7 @@ except ImportError as e:
 
 from shypn.helpers.canvas_layout_controller import CanvasLayoutController
 from shypn.core.document_id import alloc_doc_id, doc_id
+from shypn.helpers.document_session import DocumentSession
 
 
 class ModelCanvasLoader:
@@ -172,6 +173,13 @@ class ModelCanvasLoader:
         # Knowledge bases for intelligent model repair (Viability Panel)
         # One ModelKnowledgeBase instance per drawing_area
         self.knowledge_bases = {}  # drawing_area -> ModelKnowledgeBase
+
+        # DocumentSession registry — one session per open tab.
+        # Each session aggregates (drawing_area, canvas_manager, overlay_manager,
+        # simulation_controller, knowledge_base) for a single MDI document.
+        # Populated by _setup_edit_palettes(); torn down by close_tab().
+        # The four legacy dicts above remain as-is for backward compat.
+        self.sessions: dict = {}  # drawing_area -> DocumentSession
         
         # Project reference for structured save paths (pathways/, models/, metadata/)
         self.project = None
@@ -262,9 +270,9 @@ class ModelCanvasLoader:
             EventBus.emit('model.changed', data, document_id=document_id)
         
         Note:
-            The document ID is the Python object ID of the GtkDrawingArea widget.
-            This ID persists for the lifetime of the tab and is used by EventBus
-            to route events to the correct document.
+            The document ID is the stable monotonic integer stamped on the
+            GtkDrawingArea widget by alloc_doc_id() at tab-creation time.
+            It is never reused within a process lifetime, unlike id().
         """
         try:
             if not self.notebook:
@@ -280,10 +288,36 @@ class ModelCanvasLoader:
             if drawing_area is None:
                 return None
             
-            return id(drawing_area)
+            return doc_id(drawing_area)
         except Exception:
             return None
-    
+
+    def get_current_session(self) -> 'DocumentSession | None':
+        """Return the :class:`DocumentSession` for the currently active tab.
+
+        Returns ``None`` if there is no active tab or the session has not yet
+        been registered (which can happen transiently during canvas setup).
+        """
+        try:
+            if not self.notebook:
+                return None
+            page_num = self.notebook.get_current_page()
+            if page_num < 0:
+                return None
+            page_widget = self.notebook.get_nth_page(page_num)
+            if page_widget is None:
+                return None
+            drawing_area = self._get_drawing_area_from_page(page_widget)
+            if drawing_area is None:
+                return None
+            return self.sessions.get(drawing_area)
+        except Exception:
+            return None
+
+    def get_session(self, drawing_area) -> 'DocumentSession | None':
+        """Return the :class:`DocumentSession` for *drawing_area*, or ``None``."""
+        return self.sessions.get(drawing_area)
+
     def get_document_id_for_manager(self, manager) -> Optional[int]:
         """Find the document ID for a given ModelCanvasManager.
         
@@ -299,7 +333,7 @@ class ModelCanvasLoader:
         """
         for drawing_area, mgr in self.canvas_managers.items():
             if mgr is manager:
-                return id(drawing_area)
+                return doc_id(drawing_area)
         return None
     
     def get_drawing_area_for_document_id(self, document_id: int):
@@ -316,12 +350,11 @@ class ModelCanvasLoader:
             manager = loader.canvas_managers.get(drawing_area)
         
         Note:
-            This is rarely needed - most code should use get_current_model_manager()
-            or get_current_document_id() instead. This is primarily for EventBus
-            internal use when routing events.
+            Use get_current_session() / get_session(drawing_area) for new code.
+            This lookup is primarily for EventBus internal routing.
         """
         for drawing_area in self.canvas_managers.keys():
-            if id(drawing_area) == document_id:
+            if doc_id(drawing_area) == document_id:
                 return drawing_area
         return None
 
@@ -582,11 +615,11 @@ class ModelCanvasLoader:
         # Emit event EARLY so panels can respond and handle their own updates
         # This replaces manual panel swapping code with event-driven architecture
         if drawing_area:
-            document_id = id(drawing_area)
             canvas_manager = self.canvas_managers.get(drawing_area)
             overlay_manager = self.overlay_managers.get(drawing_area)
             
             if canvas_manager and overlay_manager:
+                document_id = doc_id(drawing_area)  # use stable ID, not id()
                 from shypn.events import EventBus
                 EventBus.emit('document.focused', {
                     'drawing_area': drawing_area,
@@ -1008,6 +1041,13 @@ class ModelCanvasLoader:
                 pass  # Failed to destroy canvas in lifecycle
         
         if drawing_area and drawing_area in self.canvas_managers:
+            # ── DocumentSession teardown: clear all EventBus subscriptions ──
+            # Must happen BEFORE legacy dict cleanup so panel loaders are still
+            # reachable for individual unsubscribe() calls that may race here.
+            session = self.sessions.pop(drawing_area, None)
+            if session is not None:
+                session.close()  # calls EventBus.clear_document(doc_id)
+
             # Emit file.closed so Open Editors panel removes the entry
             try:
                 import time
@@ -1845,6 +1885,26 @@ class ModelCanvasLoader:
         palette_manager = self.palette_managers[drawing_area]
         self._wire_legacy_palettes(
             overlay_widget, canvas_manager, drawing_area, overlay_manager, palette_manager)
+
+        # ── Register DocumentSession ────────────────────────────────────────
+        # All per-document components are now wired.  Build the session object
+        # and store it as the canonical per-document aggregate.  The four
+        # individual dicts (canvas_managers, overlay_managers,
+        # simulation_controllers, knowledge_bases) still exist for backward
+        # compatibility; the session reads from them by reference.
+        try:
+            self.sessions[drawing_area] = DocumentSession(
+                drawing_area=drawing_area,
+                canvas_manager=canvas_manager,
+                overlay_manager=overlay_manager,
+                simulation_controller=self.simulation_controllers.get(drawing_area),
+                knowledge_base=self.knowledge_bases.get(drawing_area),
+            )
+        except Exception:
+            self.logger.debug(
+                "DocumentSession registration failed for drawing_area=%s",
+                drawing_area, exc_info=True,
+            )
 
     # ------------------------------------------------------------------
     # _setup_edit_palettes sub-methods
