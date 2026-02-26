@@ -48,6 +48,7 @@ import os
 import time
 from datetime import datetime
 from shypn.events import EventBus
+from shypn.core.document_id import doc_id
 from shypn.netobjs import Place, Arc, Transition
 from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
 
@@ -571,7 +572,7 @@ class ModelCanvasManager:
                 'action': 'created',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
         
         return place
     
@@ -601,7 +602,7 @@ class ModelCanvasManager:
                 'action': 'created',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
         
         return transition
     
@@ -636,7 +637,7 @@ class ModelCanvasManager:
                 'action': 'created',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
         
         return arc
     
@@ -663,7 +664,7 @@ class ModelCanvasManager:
                 'action': 'deleted',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
     
     def remove_transition(self, transition):
         """Remove a transition from the model.
@@ -688,7 +689,7 @@ class ModelCanvasManager:
                 'action': 'deleted',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
     
     def remove_arc(self, arc):
         """Remove an arc from the model.
@@ -711,7 +712,7 @@ class ModelCanvasManager:
                 'action': 'deleted',
                 'timestamp': time.time(),
                 'batch_id': None
-            }, document_id=id(self._drawing_area))
+            }, document_id=doc_id(self._drawing_area))
     
     # ==================== Object Loading (Bulk Import/Deserialize) ====================
     

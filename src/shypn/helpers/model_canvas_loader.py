@@ -77,6 +77,7 @@ except ImportError as e:
     sys.exit(1)
 
 from shypn.helpers.canvas_layout_controller import CanvasLayoutController
+from shypn.core.document_id import alloc_doc_id, doc_id
 
 
 class ModelCanvasLoader:
@@ -1275,6 +1276,7 @@ class ModelCanvasLoader:
         overlay = tab_builder.get_object('canvas_overlay_template')
         scrolled = tab_builder.get_object('canvas_scroll_template')
         drawing = tab_builder.get_object('canvas_drawing_template')
+        drawing._shypn_doc_id = alloc_doc_id()  # stable monotonic ID, immune to address reuse
         overlay_box = tab_builder.get_object('canvas_overlay_box_template')
         
         if not all([overlay, scrolled, drawing, overlay_box]):
@@ -1736,7 +1738,7 @@ class ModelCanvasLoader:
                                     # Re-wire report panel after controller reset via EventBus (document-scoped)
                                     EventBus.emit('simulation.controller_ready',
                                                   {'controller': controller},
-                                                  document_id=id(drawing_area))
+                                                  document_id=doc_id(drawing_area))
                                     
                                     # VIABILITY PANEL: Wire simulation complete callback after reset
                                     # After controller reset, re-establish the callback chain for PER-DOCUMENT panel
@@ -1914,7 +1916,7 @@ class ModelCanvasLoader:
         # Notify existing report panel of controller replacement via EventBus (document-scoped)
         EventBus.emit('simulation.controller_ready',
                       {'controller': simulation_controller},
-                      document_id=id(drawing_area))
+                      document_id=doc_id(drawing_area))
 
         # Register with lifecycle adapter
         if self.lifecycle_adapter:
@@ -1954,7 +1956,7 @@ class ModelCanvasLoader:
             report_panel_loader = ReportPanelLoader(
                 project=None,
                 model_canvas_loader=self,
-                document_id=id(drawing_area),
+                document_id=doc_id(drawing_area),
                 drawing_area=drawing_area
             )
             report_panel_loader.load()
@@ -2000,7 +2002,7 @@ class ModelCanvasLoader:
                 # Notify the new panel of its simulation controller via EventBus
                 EventBus.emit('simulation.controller_ready',
                               {'controller': simulation_controller},
-                              document_id=id(drawing_area))
+                              document_id=doc_id(drawing_area))
 
             self.overlay_managers[drawing_area].report_panel_loader = report_panel_loader
         else:
@@ -2012,7 +2014,7 @@ class ModelCanvasLoader:
                     report_panel_loader.panel.set_model_canvas(model_manager)
                 EventBus.emit('simulation.controller_ready',
                               {'controller': simulation_controller},
-                              document_id=id(drawing_area))
+                              document_id=doc_id(drawing_area))
 
     def _setup_document_viability_panel(self, canvas_manager, drawing_area, simulation_controller):
         """Create the per-document Viability Panel."""
@@ -2023,7 +2025,7 @@ class ModelCanvasLoader:
 
         viability_panel_loader = ViabilityPanelLoader(
             model=None,
-            document_id=id(drawing_area),
+            document_id=doc_id(drawing_area),
             drawing_area=drawing_area
         )
         viability_panel_loader.set_model_canvas_loader(self)
@@ -2090,7 +2092,7 @@ class ModelCanvasLoader:
             workspace_settings=self.workspace_settings,
             project=getattr(self, 'project', None),
             canvas_loader=self,
-            document_id=id(drawing_area),
+            document_id=doc_id(drawing_area),
             drawing_area=drawing_area
         )
         pathway_panel_loader.initialize()
@@ -2130,7 +2132,7 @@ class ModelCanvasLoader:
                 model=canvas_manager,
                 parent_window=getattr(self, 'main_window', None),
                 data_collector=data_collector,
-                document_id=id(drawing_area),
+                document_id=doc_id(drawing_area),
                 drawing_area=drawing_area
             )
             analyses_panel_loader.initialize()
@@ -2198,7 +2200,7 @@ class ModelCanvasLoader:
         topology_panel_loader = TopologyPanelLoader(
             model=canvas_manager,
             parent_window=getattr(self, 'main_window', None),
-            document_id=id(drawing_area),
+            document_id=doc_id(drawing_area),
             drawing_area=drawing_area
         )
         topology_panel_loader.initialize()

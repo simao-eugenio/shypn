@@ -1122,9 +1122,10 @@ class BiGGCategory(BasePathwayCategory):
                                 simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
                                 if simulation_controller:
                                     from shypn.events import EventBus
+                                    from shypn.core.document_id import doc_id
                                     EventBus.emit('simulation.controller_ready',
                                                   {'controller': simulation_controller},
-                                                  document_id=id(drawing_area))
+                                                  document_id=doc_id(drawing_area))
                                     self.logger.info("✅ Report Panel controller notified")
                                 
                                 # CRITICAL: Call on_file_opened to load metadata (same as File→Open)
