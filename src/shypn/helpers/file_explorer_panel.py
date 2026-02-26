@@ -2754,9 +2754,10 @@ class FileExplorerPanel:
                             simulation_controller = getattr(overlay_manager, 'simulation_controller', None)
                             if simulation_controller:
                                 from shypn.events import EventBus
+                                from shypn.core.document_id import doc_id
                                 EventBus.emit('simulation.controller_ready',
                                               {'controller': simulation_controller},
-                                              document_id=id(drawing_area))
+                                              document_id=doc_id(drawing_area))
                     return False  # Don't repeat
                 # Schedule refresh to happen after current events complete
                 GLib.idle_add(refresh_report_panel)

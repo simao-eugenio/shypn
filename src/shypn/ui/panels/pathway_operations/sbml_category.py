@@ -1482,10 +1482,11 @@ class SBMLCategory(BasePathwayCategory):
                     return False
 
                 from shypn.events import EventBus
+                from shypn.core.document_id import doc_id
                 EventBus.emit(
                     'simulation.controller_ready',
                     {'controller': simulation_controller},
-                    document_id=id(drawing_area),
+                    document_id=doc_id(drawing_area),
                 )
                 self.logger.info("✅ Report Panel controller notified")
 
