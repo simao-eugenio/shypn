@@ -168,7 +168,8 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, verbose: bool = True, recording_config: 'RecordingConfig' = None):
+    def __init__(self, model, verbose: bool = True, recording_config: 'RecordingConfig' = None,
+                 data_collector_factory=None, viability_checker_factory=None):
         """Initialize the simulation controller.
         
         REFACTORED: Now uses RecordingConfig value object (reduced from 4 parameters to 2).
@@ -177,6 +178,10 @@ class SimulationController:
             model: ModelCanvasManager instance (has places, transitions, arcs lists)
             verbose: If True, print debug output (disable for batch mode performance)
             recording_config: RecordingConfig for data collection (default: 20 Hz time-based, all objects)
+            data_collector_factory: Optional callable(model, controller, config) -> DataCollector.
+                Inject a custom factory for testing or subclassing. Default: DataCollector.
+            viability_checker_factory: Optional callable(controller) -> ViabilityChecker.
+                Inject a custom factory for testing or subclassing. Default: ViabilityChecker.
         """
         if recording_config is None:
             from shypn.core.value_objects import RecordingConfig
@@ -206,8 +211,9 @@ class SimulationController:
         from shypn.engine.simulation.settings import SimulationSettings
         self.settings = SimulationSettings()
         
-        # Create DataCollector with RecordingConfig
-        self.data_collector = DataCollector(model, controller=self, config=recording_config)
+        # Create DataCollector with RecordingConfig (injectable for testing)
+        _dc_factory = data_collector_factory or DataCollector
+        self.data_collector = _dc_factory(model, controller=self, config=recording_config)
         
         # Callback for simulation complete event
         # Use private attribute with property to trace all assignments
@@ -245,8 +251,9 @@ class SimulationController:
         # Continuous execution strategy (Phase 2.3.1 extraction)
         self._continuous_executor = ContinuousExecutor(self)
         
-        # Viability checking strategy (Phase 2.3.2 extraction)
-        self._viability_checker = ViabilityChecker(self)
+        # Viability checking strategy (Phase 2.3.2 extraction, injectable for testing)
+        _vc_factory = viability_checker_factory or ViabilityChecker
+        self._viability_checker = _vc_factory(self)
         
         # Week 4 - Phase 4: Strategy Pattern for simulation algorithms
         # Enables runtime switching between different execution strategies
