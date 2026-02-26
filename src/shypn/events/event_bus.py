@@ -26,6 +26,7 @@ Date: February 2026
 from typing import Dict, List, Callable, Any, Optional
 from collections import defaultdict
 import logging
+import threading
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,16 @@ class EventBus:
             - Document-specific subscribers only receive events for their document
             - Global subscribers (no document_id) receive ALL events
         """
+        # Thread-safety guard: GTK callbacks must be dispatched from the main thread.
+        # Background workers (batch executor, replicate runners) must use
+        # GLib.idle_add(EventBus.emit, ...) instead of calling emit() directly.
+        if threading.current_thread() is not threading.main_thread():
+            logger.warning(
+                f"[EventBus] emit('{event_name}') called from background thread "
+                f"'{threading.current_thread().name}'. Use GLib.idle_add() to "
+                f"dispatch to the GTK main loop. Subscribers may crash or corrupt state."
+            )
+
         # Add document_id to event data for convenience
         if data is None:
             data = {}
