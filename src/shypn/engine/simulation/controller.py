@@ -207,6 +207,10 @@ class SimulationController:
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
+        # Dirty-place index: accelerates per-step enabled-transition scan (Finding #10)
+        self._dirty_since_last_check: set = set()      # accumulated per-step in _fire_transition
+        self._place_to_input_transitions: Dict[str, list] = {}  # place_id → [transitions]
+        self._source_transitions: list = []            # transitions with no input places
         
         # Phase 4: Document ID for scoped event emissions (passed at construction)
         self.document_id: int = document_id
@@ -269,6 +273,8 @@ class SimulationController:
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
             model.register_observer(self._on_model_changed)
+        # Build place→transition index for incremental enablement checking
+        self._rebuild_place_index()
     
     # ==================== Lifecycle Management ====================
     
@@ -320,6 +326,9 @@ class SimulationController:
         
         # Reinitialize model adapter with current model
         self.model_adapter = ModelAdapter(self.model, controller=self)
+        # Reset dirty-place state and rebuild place-transition index for new model
+        self._dirty_since_last_check = set()
+        self._rebuild_place_index()
         
         # Reinitialize data collector with current model
         from shypn.engine.simulation.data_collector import DataCollector
@@ -663,8 +672,66 @@ class SimulationController:
                             behavior.set_enablement_time(self.time)
                         import logging
                         logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
+        
+        # Rebuild place-transition index on any structural topology change
+        if event_type in ('created', 'deleted', 'transformed'):
+            self._rebuild_place_index()
     
     # ========== Token Accounting Methods ==========
+
+    def _rebuild_place_index(self):
+        """Build place_id → [input transitions] and source-transition list.
+
+        Called after reset() and on structural model changes.  Used by
+        get_enabled_transitions() to skip transitions whose input places did
+        not change in the most recent firing step.
+        """
+        idx: Dict[str, list] = {}
+        sources: list = []
+        try:
+            for transition in self.model.transitions:
+                if getattr(transition, 'is_source', False):
+                    sources.append(transition)
+            for arc in self.model.arcs:
+                src = getattr(arc, 'source', None)
+                tgt = getattr(arc, 'target', None)
+                if isinstance(src, Place) and isinstance(tgt, Transition):
+                    pid = getattr(src, 'id', None)
+                    if pid:
+                        idx.setdefault(pid, []).append(tgt)
+        except Exception:
+            pass  # incomplete model during init — index stays empty, fall back to full scan
+        self._place_to_input_transitions = idx
+        self._source_transitions = sources
+
+    def get_enabled_transitions(self, dirty_places: set = None) -> list:
+        """Return currently enabled transitions, using the dirty-place index when possible.
+
+        When dirty_places is a non-empty set and the place-transition index has
+        been built, only transitions connected to those places are re-evaluated.
+        Falls back to a full O(T) scan when dirty_places is None/empty (first
+        step after reset, or index not yet built).
+
+        Source transitions (no input places) are always included as candidates.
+
+        Args:
+            dirty_places: Set of place IDs whose token counts changed in the
+                          most recent firing.  Pass None/empty to force full scan.
+        Returns:
+            List of Transition objects that are currently enabled.
+        """
+        if dirty_places and self._place_to_input_transitions:
+            candidates: list = list(self._source_transitions)
+            seen: set = {id(t) for t in candidates}
+            for pid in dirty_places:
+                for t in self._place_to_input_transitions.get(pid, ()):
+                    if id(t) not in seen:
+                        candidates.append(t)
+                        seen.add(id(t))
+        else:
+            candidates = list(self.model.transitions)
+        return [t for t in candidates if self._is_enabled(t)]
+
     
     def enable_token_accounting(self, strict_mode=False):
         """Enable token conservation accounting.
@@ -1609,6 +1676,17 @@ class SimulationController:
             state = self._get_or_create_state(transition)
             state.enablement_time = None
             state.scheduled_time = None
+            # Track dirty places for incremental enabled-transition scan
+            _dirty: set = set()
+            for _arc in input_arcs:
+                _pid = getattr(_arc, 'source_id', None)
+                if _pid:
+                    _dirty.add(_pid)
+            for _arc in output_arcs:
+                _pid = getattr(_arc, 'target_id', None)
+                if _pid:
+                    _dirty.add(_pid)
+            self._dirty_since_last_check |= _dirty
         if self.data_collector is not None and hasattr(self.data_collector, 'on_transition_fired'):
             self.data_collector.on_transition_fired(transition, self.time, details)
         

@@ -88,16 +88,14 @@ class AdaptiveStrategy(SimulationStrategy):
         return False
     
     def _get_enabled_transitions(self) -> List:
-        """Get list of enabled transitions (any type).
-        
+        """Get list of enabled transitions using dirty-place index when available.
+
         Returns:
             List: Enabled transitions
         """
-        enabled = []
-        for transition in self.model.transitions:
-            if self.controller._is_enabled(transition):
-                enabled.append(transition)
-        return enabled
+        dirty = self.controller._dirty_since_last_check
+        self.controller._dirty_since_last_check = set()  # consume so _step accumulates fresh
+        return self.controller.get_enabled_transitions(dirty)
     
     def get_description(self) -> str:
         """Get strategy description."""
