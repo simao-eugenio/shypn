@@ -97,19 +97,16 @@ class GillespieStrategy(SimulationStrategy):
         return False
     
     def _get_enabled_stochastic_transitions(self) -> List:
-        """Get list of enabled stochastic transitions.
-        
+        """Get list of enabled stochastic transitions using dirty-place index when available.
+
         Returns:
             List: Enabled stochastic transitions
         """
-        enabled = []
-        for transition in self.model.transitions:
-            # Check if stochastic
-            if hasattr(transition, 'transition_type') and transition.transition_type == 'stochastic':
-                # Check structural enablement
-                if self.controller._is_enabled(transition):
-                    enabled.append(transition)
-        return enabled
+        dirty = self.controller._dirty_since_last_check
+        self.controller._dirty_since_last_check = set()
+        candidates = self.controller.get_enabled_transitions(dirty)
+        return [t for t in candidates
+                if hasattr(t, 'transition_type') and t.transition_type == 'stochastic']
     
     def _calculate_propensity(self, transition) -> float:
         """Calculate propensity (stochastic rate) for a transition.
