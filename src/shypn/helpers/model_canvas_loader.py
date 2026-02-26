@@ -1893,11 +1893,9 @@ class ModelCanvasLoader:
 
         Returns the SimulationController (needed by panel setup sub-methods).
         """
-        simulation_controller = SimulationController(canvas_manager)
+        simulation_controller = SimulationController(canvas_manager, document_id=doc_id(drawing_area))
         # Store drawing_area reference so Report Panel can find its document
         simulation_controller._drawing_area = drawing_area
-        # EventBus scoped events: isolate simulation.progress per document
-        simulation_controller.document_id = id(drawing_area)
 
         # Wire data_collector change callback so analyses panel updates on reset()
         def on_data_collector_changed(new_data_collector):

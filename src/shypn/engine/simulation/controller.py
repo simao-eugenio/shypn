@@ -46,6 +46,12 @@ from shypn.engine.simulation.executors import ContinuousExecutor
 from shypn.engine.simulation.checkers import ViabilityChecker
 # Week 1 - Phase 4: EventBus integration for progress events
 from shypn.events import EventBus
+from shypn.netobjs.transition import Transition
+from shypn.netobjs.arc import Arc
+from shypn.netobjs.place import Place
+from shypn.netobjs.inhibitor_arc import InhibitorArc
+from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
+from shypn.utils.threshold_evaluator import ThresholdEvaluator
 
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
@@ -168,7 +174,8 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, verbose: bool = True, recording_config: 'RecordingConfig' = None,
+    def __init__(self, model, document_id: int = 0, verbose: bool = True,
+                 recording_config: 'RecordingConfig' = None,
                  data_collector_factory=None, viability_checker_factory=None):
         """Initialize the simulation controller.
         
@@ -201,8 +208,8 @@ class SimulationController:
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
         
-        # Week 1 - Phase 4: Document ID for scoped event emissions
-        self.document_id: Optional[int] = None  # Set by ModelCanvasLoader
+        # Phase 4: Document ID for scoped event emissions (passed at construction)
+        self.document_id: int = document_id
         
         # Data collection for simulation results
         from shypn.engine.simulation.data_collector import DataCollector
@@ -572,9 +579,6 @@ class SimulationController:
             old_value: Previous value (for transformed events)
             new_value: New value (for transformed events)
         """
-        from shypn.netobjs.transition import Transition
-        from shypn.netobjs.arc import Arc
-        
         if event_type == 'deleted':
             pass
             # If a transition was deleted, remove it from our caches
@@ -596,7 +600,6 @@ class SimulationController:
                 
                 # Invalidate behavior cache for source and target transitions
                 # (they need to rebuild their input/output arc lists)
-                from shypn.netobjs.transition import Transition
                 if isinstance(obj.source, Transition):
                     self.behavior_cache.pop(id(obj.source), None)
                 if isinstance(obj.target, Transition):
@@ -607,7 +610,6 @@ class SimulationController:
         elif event_type == 'created':
             # New object created (place, transition, or arc)
             # Invalidate model adapter caches to include the new object
-            from shypn.netobjs.place import Place
             if isinstance(obj, (Place, Transition, Arc)):
                 self.model_adapter.invalidate_caches()
             
@@ -823,11 +825,6 @@ class SimulationController:
             
             input_arcs = behavior.get_input_arcs()
             locally_enabled = True
-            
-            # Import arc types and threshold evaluator
-            from shypn.netobjs.inhibitor_arc import InhibitorArc
-            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-            from shypn.utils.threshold_evaluator import ThresholdEvaluator
             
             # Create threshold evaluator for dynamic threshold support
             evaluator = ThresholdEvaluator(behavior.model)
