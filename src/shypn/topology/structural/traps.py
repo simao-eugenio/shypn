@@ -100,7 +100,14 @@ class TrapAnalyzer(TopologyAnalyzer):
         # ========================================================================
         # SIZE GUARD: Check model size to prevent exponential computation freeze
         # ========================================================================
-        n_places = len(self.model.places)
+        try:
+            n_places = len(self.model.places)
+        except Exception as e:
+            return AnalysisResult(
+                success=False,
+                errors=[f"Model places is not iterable: {e}"],
+                metadata={'analysis_time': self._end_timer(start_time)}
+            )
         
         # Trap analysis has O(2^n) complexity - exponential in number of places
         # Checking all subsets becomes impractical beyond ~20 places
