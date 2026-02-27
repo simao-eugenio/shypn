@@ -103,6 +103,8 @@ class PathAnalyzer(TopologyAnalyzer):
         try:
             self._validate_model()
             graph = self._build_graph()
+            source_id = str(source_id)  # graph keys are always strings
+            target_id = str(target_id)
             
             # Check if nodes exist
             if source_id not in graph or target_id not in graph:
@@ -179,6 +181,8 @@ class PathAnalyzer(TopologyAnalyzer):
         try:
             self._validate_model()
             graph = self._build_graph()
+            source_id = str(source_id)  # graph keys are always strings
+            target_id = str(target_id)
             
             # Check if nodes exist
             if source_id not in graph or target_id not in graph:
@@ -256,39 +260,6 @@ class PathAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _build_graph(self) -> nx.DiGraph:
-        """Build directed graph from Petri net."""
-        graph = nx.DiGraph()
-        
-        # Add place nodes
-        for place in self.model.places:
-            graph.add_node(
-                place.id,
-                type='place',
-                obj=place,
-                name=getattr(place, 'name', f'P{place.id}')
-            )
-        
-        # Add transition nodes
-        for transition in self.model.transitions:
-            graph.add_node(
-                transition.id,
-                type='transition',
-                obj=transition,
-                name=getattr(transition, 'name', f'T{transition.id}')
-            )
-        
-        # Add arc edges
-        for arc in self.model.arcs:
-            graph.add_edge(
-                arc.source_id,
-                arc.target_id,
-                obj=arc,
-                weight=getattr(arc, 'weight', 1)
-            )
-        
-        return graph
-    
     def _analyze_path(self, path_nodes: List[int], graph: nx.DiGraph) -> Dict[str, Any]:
         """Analyze a single path.
         
@@ -316,7 +287,7 @@ class PathAnalyzer(TopologyAnalyzer):
             weights.append(edge_data.get('weight', 1))
         
         return {
-            'nodes': path_nodes,
+            'nodes': [graph.nodes[nid]['obj'].id if 'obj' in graph.nodes[nid] else nid for nid in path_nodes],
             'names': names,
             'length': len(path_nodes) - 1,  # Number of edges
             'place_count': place_count,

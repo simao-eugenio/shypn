@@ -171,7 +171,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            
+            node_id = str(node_id)  # graph keys are always strings
             if node_id not in graph:
                 return False
             
@@ -333,7 +333,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            
+            node_id = str(node_id)  # graph keys are always strings
             if node_id not in graph:
                 return None
             
@@ -378,39 +378,6 @@ class HubAnalyzer(TopologyAnalyzer):
         
         except Exception:
             return None
-    
-    def _build_graph(self) -> nx.DiGraph:
-        """Build directed graph from Petri net."""
-        graph = nx.DiGraph()
-        
-        # Add place nodes
-        for place in self.model.places:
-            graph.add_node(
-                place.id,
-                type='place',
-                obj=place,
-                name=getattr(place, 'name', f'P{place.id}')
-            )
-        
-        # Add transition nodes
-        for transition in self.model.transitions:
-            graph.add_node(
-                transition.id,
-                type='transition',
-                obj=transition,
-                name=getattr(transition, 'name', f'T{transition.id}')
-            )
-        
-        # Add arc edges
-        for arc in self.model.arcs:
-            graph.add_edge(
-                arc.source_id,
-                arc.target_id,
-                obj=arc,
-                weight=getattr(arc, 'weight', 1)
-            )
-        
-        return graph
     
     def _create_summary(
         self,

@@ -75,28 +75,6 @@ class BiologicalCategory(BaseTopologyCategory):
             'signal_hierarchy': SignalHierarchyAnalyzer,
         }
     
-    def _build_content(self):
-        """Build and return the content widget.
-        
-        Returns:
-            Gtk.Box: The content to display in this category
-        """
-        if self.use_grouped_table:
-            return self._build_grouped_table()
-        
-        # Default: individual expanders (old mode)
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        
-        # 1. Analysis Summary section
-        summary_section = self._build_summary_section()
-        main_box.pack_start(summary_section, False, False, 0)
-        
-        # 2. Individual analyzer expanders
-        analyzer_expanders = self._build_analyzer_expanders()
-        main_box.pack_start(analyzer_expanders, True, True, 0)
-        
-        return main_box
-    
     def _define_table_columns(self):
         """Define columns for biological dependencies grouped table.
         
