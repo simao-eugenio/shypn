@@ -10,7 +10,7 @@ Implementation uses NumPy's optimized Poisson generator for performance.
 """
 
 import numpy as np
-from typing import Union, List
+from typing import Any, Union, List, Optional
 
 
 class PoissonSampler:
@@ -34,7 +34,7 @@ class PoissonSampler:
         >>> firings  # [0, 1, 0] for example
     """
     
-    def __init__(self, seed: int = None):
+    def __init__(self, seed: Optional[int] = None):
         """Initialize Poisson sampler.
         
         Args:
@@ -89,20 +89,20 @@ class PoissonSampler:
         if tau < 0:
             raise ValueError(f"Time leap must be non-negative: {tau}")
         
-        propensities = np.array(propensities)
+        propensities_arr: Any = np.array(propensities)
         
-        if np.any(propensities < 0):
+        if np.any(propensities_arr < 0):
             raise ValueError("All propensities must be non-negative")
         
         # Vectorized: λ_i = a_i × τ for all i
-        lambda_params = propensities * tau
+        lambda_params = propensities_arr * tau
         
         # NumPy Poisson limit check (max lambda ≈ 10^17)
         MAX_LAMBDA = 1e17
         if np.any(lambda_params > MAX_LAMBDA):
             max_lambda = np.max(lambda_params)
             max_idx = np.argmax(lambda_params)
-            max_prop = propensities[max_idx]
+            max_prop = propensities_arr[max_idx]
             
             # Count how many transitions have extreme propensities
             extreme_count = np.sum(lambda_params > MAX_LAMBDA)

@@ -385,7 +385,7 @@ class TokenAccountingAuditor:
         conserved, total_leak = self.check_global_conservation()
         firing_counts_valid = self.validate_firing_counts()
         
-        report = {
+        report: Dict[str, Any] = {
             'leaks_detected': len(self.violations) > 0 or not conserved or not firing_counts_valid,
             'global_conservation': conserved,
             'firing_counts_valid': firing_counts_valid,

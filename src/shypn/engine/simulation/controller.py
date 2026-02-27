@@ -35,7 +35,7 @@ the new architecture.
 import logging
 import random
 import traceback
-from typing import Callable, List, Optional, Dict, Tuple, Any
+from typing import Callable, List, Optional, Dict, Tuple, Any, Set
 try:
     from gi.repository import GLib
     GLIB_AVAILABLE = True
@@ -68,8 +68,8 @@ class TransitionState:
 
     def __init__(self) -> None:
         """Initialize transition state."""
-        self.enablement_time = None
-        self.scheduled_time = None
+        self.enablement_time: Optional[float] = None
+        self.scheduled_time: Optional[float] = None
 
 class ModelAdapter:
     """Adapter to provide dict-like interface for behavior classes.
@@ -88,26 +88,26 @@ class ModelAdapter:
         """
         self.canvas_manager = canvas_manager
         self._controller = controller
-        self._places_dict = None
-        self._transitions_dict = None
-        self._arcs_dict = None
+        self._places_dict: Optional[Dict[Any, Any]] = None
+        self._transitions_dict: Optional[Dict[Any, Any]] = None
+        self._arcs_dict: Optional[Dict[Any, Any]] = None
 
     @property
-    def places(self) -> None:
+    def places(self) -> Dict[Any, Any]:
         """Get places as dictionary keyed by ID."""
         if self._places_dict is None:
             self._places_dict = {p.id: p for p in self.canvas_manager.places}
         return self._places_dict
 
     @property
-    def transitions(self) -> None:
+    def transitions(self) -> Dict[Any, Any]:
         """Get transitions as dictionary keyed by ID."""
         if self._transitions_dict is None:
             self._transitions_dict = {t.id: t for t in self.canvas_manager.transitions}
         return self._transitions_dict
 
     @property
-    def arcs(self) -> None:
+    def arcs(self) -> Dict[Any, Any]:
         """Get arcs as dictionary keyed by ID.
         
         WARNING: Arc IDs may not be unique in models (especially imported ones).
@@ -175,7 +175,7 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model: Any, document_id: int = 0, verbose: bool = True, recording_config: 'RecordingConfig' = None, data_collector_factory: Any=None, viability_checker_factory: Any=None):
+    def __init__(self, model: Any, document_id: int = 0, verbose: bool = True, recording_config: Optional[Any] = None, data_collector_factory: Any=None, viability_checker_factory: Any=None):
         """Initialize the simulation controller.
         
         REFACTORED: Now uses RecordingConfig value object (reduced from 4 parameters to 2).
@@ -196,13 +196,13 @@ class SimulationController:
         self.model = model
         self.time = 0.0
         self.model_adapter = ModelAdapter(model, controller=self)
-        self.step_listeners = []
+        self.step_listeners: List[Any] = []
         self.data_collector_listeners: List[Callable] = []  # notified when data_collector is replaced
         self._running = False
         self._stop_requested = False
         self._timeout_id = None
-        self.behavior_cache = {}
-        self.transition_states = {}
+        self.behavior_cache: Dict[Any, Any] = {}
+        self.transition_states: Dict[Any, Any] = {}
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
@@ -232,7 +232,7 @@ class SimulationController:
         # === NEW: Mode elimination architecture ===
         # State detection replaces explicit mode checks
         from shypn.engine.simulation.state import SimulationStateDetector
-        self.state_detector = SimulationStateDetector(self)
+        self.state_detector = SimulationStateDetector(self)  # type: ignore[arg-type]
         
         # Buffered settings for atomic parameter updates
         from shypn.engine.simulation.buffered import BufferedSimulationSettings
@@ -245,14 +245,14 @@ class SimulationController:
         self.interaction_guard = InteractionGuard(self.state_detector)
         
         # Thermodynamic validation results (populated on demand)
-        self.thermodynamic_results = None
+        self.thermodynamic_results: Optional[Dict[str, Any]] = None
         
         # Option 3: Assignment rule re-evaluation support
         self.enable_assignment_rule_reevaluation = False
         self.pathway_data = None  # Store for assignment rule initialization
         
         # Token accounting auditor (conservation validation)
-        self.auditor = None  # Initialized when enabled via settings
+        self.auditor: Optional[Any] = None  # Initialized when enabled via settings
         
         # Thermodynamic validator manager (Feb 9, 2026)
         from shypn.engine.simulation.validation import ValidatorManager
@@ -267,7 +267,7 @@ class SimulationController:
         
         # Week 4 - Phase 4: Strategy Pattern for simulation algorithms
         # Enables runtime switching between different execution strategies
-        self._execution_strategy = None  # HybridStrategy by default (set on first use)
+        self._execution_strategy: Optional[Any] = None  # HybridStrategy by default (set on first use)
         
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
@@ -352,7 +352,7 @@ class SimulationController:
         logger.info(f"SimulationController reset complete - ready for new model")
     
     @property
-    def on_simulation_complete(self) -> None:
+    def on_simulation_complete(self) -> Optional[Any]:
         """Callback invoked when simulation completes."""
         return self._on_simulation_complete
     
@@ -698,7 +698,7 @@ class SimulationController:
         self._place_to_input_transitions = idx
         self._source_transitions = sources
 
-    def get_enabled_transitions(self, dirty_places: set = None) -> list:
+    def get_enabled_transitions(self, dirty_places: Optional[set] = None) -> list:
         """Return currently enabled transitions, using the dirty-place index when possible.
 
         When dirty_places is a non-empty set and the place-transition index has
@@ -724,7 +724,7 @@ class SimulationController:
                         seen.add(id(t))
         else:
             candidates = list(self.model.transitions)
-        return [t for t in candidates if self._is_enabled(t)]
+        return [t for t in candidates if self._viability_checker.is_enabled(t)]
 
     
     def enable_token_accounting(self, strict_mode: Any = False) -> None:
@@ -972,7 +972,7 @@ class SimulationController:
                 'is_complete': self.is_simulation_complete()
             }, document_id=self.document_id)
         except (TypeError, AttributeError, RuntimeError) as e:
-            logger.debug(f"Event emission failed during simulation: {e}")
+            logging.getLogger(__name__).debug(f"Event emission failed during simulation: {e}")
     
     def is_simulation_complete(self) -> bool:
         """Check if simulation has reached duration limit.
@@ -984,7 +984,7 @@ class SimulationController:
     
     # ========== Strategy Pattern Methods (Week 4 - Phase 4) ==========
     
-    def get_strategy(self) -> None:
+    def get_strategy(self) -> Optional[Any]:
         """Get current execution strategy.
         
         Returns:
@@ -1043,6 +1043,7 @@ class SimulationController:
                     stochastic_count += 1
         
         # Select strategy based on model composition
+        strategy: Any
         if has_continuous and not has_stochastic:
             # Pure continuous model
             strategy = ContinuousStrategy(self)
@@ -1137,12 +1138,12 @@ class SimulationController:
             try:
                 callback(self, self.time)
             except Exception as e:
-                self.logger.debug(f"Step listener callback failed: {e}")
+                logging.getLogger(__name__).debug(f"Step listener callback failed: {e}")
                 pass
     
     # ==================== Single-Step Execution (Hybrid Discrete + Continuous) ====================
 
-    def step(self, time_step: float = None) -> bool:
+    def step(self, time_step: Optional[float] = None) -> bool:
         """Execute a single simulation step with hybrid (discrete + continuous) execution.
         
         REFACTORED (Sprint 2): Extracted helper methods to reduce complexity.
@@ -1306,8 +1307,9 @@ class SimulationController:
                                 if arc_type == 'test':
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
-                                source_place.set_tokens(source_place.tokens - arc.weight)
-                                consumed_map[arc.source_id] = arc.weight
+                                if source_place is not None:
+                                    source_place.set_tokens(source_place.tokens - arc.weight)
+                                    consumed_map[arc.source_id] = arc.weight
                         
                         # Produce tokens to output places
                         is_sink = hasattr(transition, 'properties') and \
@@ -1315,8 +1317,9 @@ class SimulationController:
                         if not is_sink:
                             for arc in behavior.get_output_arcs():
                                 target_place = self.model_adapter.places.get(arc.target_id)
-                                target_place.set_tokens(target_place.tokens + arc.weight)
-                                produced_map[arc.target_id] = arc.weight
+                                if target_place is not None:
+                                    target_place.set_tokens(target_place.tokens + arc.weight)
+                                    produced_map[arc.target_id] = arc.weight
                         
                         # Clear enablement state
                         state = self._get_or_create_state(transition)
@@ -1789,7 +1792,7 @@ class SimulationController:
                 }
         """
         # Initialize empty conflict sets
-        conflict_sets = {t.id: set() for t in transitions}
+        conflict_sets: Dict[Any, Any] = {t.id: set() for t in transitions}
         
         # Compare each pair of transitions
         for i, t1 in enumerate(transitions):
@@ -2358,7 +2361,7 @@ class SimulationController:
             return (True, fired, "")
             
         except Exception as e:
-            self.logger.error(f"Transition firing failed: {e}")
+            logging.getLogger(__name__).error(f"Transition firing failed: {e}")
             pass
             # ROLLBACK: Restore snapshot
             self._restore_marking(snapshot)
@@ -2613,8 +2616,8 @@ class SimulationController:
 
         # Build footprint per transition and reverse map place → transitions.
         # Locality.input_places + output_places already excludes catalyst/test arcs.
-        trans_footprint = {}   # transition_id → list of place objects
-        place_to_trans = {}    # place_id → set of transition_ids
+        trans_footprint: Dict[Any, Any] = {}   # transition_id → list of place objects
+        place_to_trans: Dict[Any, Any] = {}    # place_id → set of transition_ids
 
         for trans_tuple in continuous_enabled:
             tid = trans_tuple[0].id
@@ -2636,26 +2639,26 @@ class SimulationController:
             if start_id in visited:
                 continue
 
-            group = set()
+            bfs_group: Set[Any] = set()
             queue = [start_id]
             while queue:
                 cur = queue.pop()
-                if cur in group:
+                if cur in bfs_group:
                     continue
-                group.add(cur)
+                bfs_group.add(cur)
                 visited.add(cur)
                 for place in trans_footprint.get(cur, []):
                     for nbr in place_to_trans.get(place.id, set()):
-                        if nbr not in group and nbr in enabled_ids:
+                        if nbr not in bfs_group and nbr in enabled_ids:
                             queue.append(nbr)
 
-            if len(group) > 1:
-                conflict_groups.append([transition_data[tid][0] for tid in group])
+            if len(bfs_group) > 1:
+                conflict_groups.append([transition_data[tid][0] for tid in bfs_group])
 
         # Apply conflict resolution policy within each group
         solo = []
         preemptive_groups = []
-        conflicting_ids = set()
+        conflicting_ids: Set[Any] = set()
 
         for group in conflict_groups:
             all_preemptive = (
@@ -2756,7 +2759,7 @@ class SimulationController:
     #           Testable execution logic in isolation
     #           Clear separation of concerns
 
-    def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
+    def run(self, time_step: Optional[float] = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2800,7 +2803,7 @@ class SimulationController:
         """
         self._continuous_executor.stop()
 
-    def reset(self) -> None:
+    def reset(self) -> None:  # type: ignore[no-redef]
         """Reset the simulation to initial marking.
         
         This stops any running simulation and resets all places to their

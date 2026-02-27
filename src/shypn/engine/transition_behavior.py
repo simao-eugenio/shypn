@@ -64,8 +64,8 @@ class TransitionBehavior(ABC):
         self.model = model
         
         # Token accounting tracking
-        self._last_consumed = {}
-        self._last_produced = {}
+        self._last_consumed: Dict[int, float] = {}
+        self._last_produced: Dict[int, float] = {}
         self._accounting_enabled = False
     
     # ============================================================================
@@ -247,7 +247,7 @@ class TransitionBehavior(ABC):
         # Handle both dict and list representations
         arcs_collection = self.model.arcs
         if isinstance(arcs_collection, dict):
-            arcs = arcs_collection.values()
+            arcs: List = list(arcs_collection.values())
         elif isinstance(arcs_collection, list):
             arcs = arcs_collection
         else:
@@ -258,7 +258,7 @@ class TransitionBehavior(ABC):
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
         transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
-        result = []
+        result: List[Any] = []
         
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
@@ -312,7 +312,7 @@ class TransitionBehavior(ABC):
         # Handle both dict and list representations
         arcs_collection = self.model.arcs
         if isinstance(arcs_collection, dict):
-            arcs = arcs_collection.values()
+            arcs: List = list(arcs_collection.values())
         elif isinstance(arcs_collection, list):
             arcs = arcs_collection
         else:
@@ -323,7 +323,7 @@ class TransitionBehavior(ABC):
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
         transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
-        result = []
+        result: List[Any] = []
         
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
@@ -483,7 +483,7 @@ class TransitionBehavior(ABC):
                 from shypn.engine.function_catalog import FUNCTION_CATALOG
                 
                 # Build evaluation context
-                context = {'t': self._get_current_time()}
+                context: Dict[str, Any] = {'t': self._get_current_time()}
                 context.update(FUNCTION_CATALOG)
                 
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)

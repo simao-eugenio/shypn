@@ -82,8 +82,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
     """
     
     # Class-level tracking to prevent duplicate warnings across all instances
-    _warned_no_places_transitions = set()
-    _warned_no_volumes_transitions = set()
+    _warned_no_places_transitions: set = set()
+    _warned_no_volumes_transitions: set = set()
     
     def __init__(self, transition: Any, model: Any):
         """Initialize adaptive hybrid behavior.
@@ -135,8 +135,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         self.volume_selector = VolumeAdaptiveSelector(threshold_molecules=self.volume_threshold)
         
         # Track current mode for mode change detection
-        self._current_mode = None  # 'continuous' or 'stochastic'
-        self._last_volume_check = None
+        self._current_mode: Optional[str] = None  # 'continuous' or 'stochastic'
+        self._last_volume_check: Optional[Dict[str, Any]] = None
         
         # Diagnostic counters (populated by _get_connected_places)
         self._input_count = 0

@@ -53,7 +53,7 @@ class HybridStrategy(SimulationStrategy):
         # - Proper time synchronization
         
         try:
-            self.controller._step(time_step)
+            self.controller.step(time_step)
             return True
         except Exception:
             return False

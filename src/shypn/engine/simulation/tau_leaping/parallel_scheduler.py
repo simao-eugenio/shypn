@@ -16,7 +16,7 @@ References:
 """
 
 import logging
-from typing import List, Dict, Any, Set, Tuple
+from typing import List, Dict, Any, Set, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import os
@@ -74,8 +74,8 @@ class ParallelStochasticScheduler:
         )
         
         # Dependency classification (computed once)
-        self._dependency_groups = None
-        self._competitive_pairs = None
+        self._dependency_groups: Optional[Any] = None
+        self._competitive_pairs: Optional[Any] = None
         
         # Statistics
         self.stats = {
@@ -134,7 +134,7 @@ class ParallelStochasticScheduler:
         Returns:
             Dictionary mapping transition_id -> set of conflicting transition_ids
         """
-        dependency_graph = {}
+        dependency_graph: Dict[Any, Any] = {}
         
         # Get all transitions
         transitions = (self.model.transitions.values() 
@@ -221,7 +221,7 @@ class ParallelStochasticScheduler:
             return []
         
         # Greedy coloring algorithm
-        groups = []
+        groups: List[Any] = []
         assigned = set()
         
         for t in transitions:

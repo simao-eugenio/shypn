@@ -54,7 +54,7 @@ class SettingsTransaction:
         """
         return self
     
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit transaction context.
         
         Automatically commits if no exception and auto_commit=True,
@@ -81,7 +81,7 @@ class SettingsTransaction:
             if not self._rolled_back:
                 self.buffered.rollback()
         
-        return False  # Don't suppress exceptions
+        return  # Don't suppress exceptions
     
     def commit(self) -> bool:
         """Explicitly commit transaction.

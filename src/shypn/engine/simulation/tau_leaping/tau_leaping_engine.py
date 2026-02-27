@@ -44,7 +44,7 @@ class TauLeapingEngine:
         epsilon: float = 0.03,
         critical_threshold: float = 10.0,
         max_tau: float = 1.0,
-        seed: int = None,
+        seed: Optional[int] = None,
         use_parallel: bool = False,
         verbose: bool = True
     ):
@@ -70,7 +70,7 @@ class TauLeapingEngine:
         self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
-        self._parallel_scheduler = None
+        self._parallel_scheduler: Optional[Any] = None
         
         # Control flag for time advancement (can be disabled for hybrid models)
         self._advance_time = True
