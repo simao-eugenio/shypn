@@ -15,7 +15,7 @@ See doc/COLOR_NORMALIZATION.md for details.
 """
 import logging
 import math
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 from shypn.netobjs.petri_net_object import PetriNetObject
 
 logger = logging.getLogger(__name__)
@@ -74,8 +74,8 @@ class Arc(PetriNetObject):
         self.control_points: List[Tuple[float, float]] = []
         
         # Protected attributes - use properties/methods to access
-        self._properties = {}  # Private: arc-specific parameters (access via properties)
-        self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
+        self._properties: dict[str, Any] = {}  # Private: arc-specific parameters
+        self._metadata: dict[str, Any] = {}    # Private: annotations, provenance
     
     # ========== Property Decorators (OOP Pattern) ==========
     
@@ -318,7 +318,7 @@ class Arc(PetriNetObject):
                 f"Valid connections: Place→Transition or Transition→Place."
             )
     
-    def render(self, cr: Any, zoom: float = 1.0) -> None:
+    def render(self, cr: Any, zoom: float = 1.0) -> None:  # type: ignore[override]
         """Render the arc as a line with arrowhead.
         
         Uses legacy rendering style with Cairo transform approach:
@@ -922,7 +922,7 @@ class Arc(PetriNetObject):
         return data
     
     @classmethod
-    def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':
+    def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'Arc':  # type: ignore[override]
         """Create arc from dictionary (deserialization).
         
         Supports both clean OOP format (flat structure) and legacy format (attrs nested).
@@ -961,6 +961,7 @@ class Arc(PetriNetObject):
             print(f"[WARNING] Arc {data.get('id', '?')} loaded without arc_type field - defaulting to 'normal'. File may be from old version - save to update.")
         
         # Import subclasses if needed
+        arc_class: Any = cls  # typed as Any to allow assignment of different Arc subclasses
         if arc_type == 'test':
             from shypn.netobjs.test_arc import TestArc
             arc_class = TestArc

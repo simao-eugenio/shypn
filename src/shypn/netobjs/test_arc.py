@@ -242,7 +242,7 @@ class TestArc(Arc):
         cr.set_line_width(self.width / zoom)
         cr.stroke()
     
-    def render(self, cr, zoom: float = 1.0, selected: bool = False):
+    def render(self, cr, zoom: float = 1.0, selected: bool = False):  # type: ignore[override]
         """Render test arc with dashed line and hollow diamond.
         
         Test arcs use:
