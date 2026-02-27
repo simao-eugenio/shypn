@@ -1,6 +1,6 @@
 """P-Invariant analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple
 import numpy as np
 from scipy import linalg
 
@@ -359,7 +359,7 @@ class PInvariantAnalyzer(TopologyAnalyzer):
             'vector': inv_vector.tolist(),
         }
     
-    def _calculate_coverage(self, p_invariants: List[Dict[str, Any]]) -> set:
+    def _calculate_coverage(self, p_invariants: List[Dict[str, Any]]) -> Set[str]:
         """Calculate which places are covered by at least one invariant."""
         covered = set()
         for inv in p_invariants:

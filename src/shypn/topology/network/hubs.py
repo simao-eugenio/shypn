@@ -238,7 +238,7 @@ class HubAnalyzer(TopologyAnalyzer):
         
         return node_degrees
     
-    def _compute_node_degree(self, graph, node_id, node_data):
+    def _compute_node_degree(self, graph: Any, node_id: str, node_data: Dict[str, Any]) -> Dict[str, Any]:
         """Compute degree information for a single node."""
         in_degree = graph.in_degree(node_id)
         out_degree = graph.out_degree(node_id)
@@ -277,7 +277,7 @@ class HubAnalyzer(TopologyAnalyzer):
         }
     
     @staticmethod
-    def _compute_node_degree_worker(node_id, node_data, graph_data):
+    def _compute_node_degree_worker(node_id: str, node_data: Dict[str, Any], graph_data: Dict[str, Any]) -> Dict[str, Any]:
         """Worker function for parallel degree calculation (must be static for pickling)."""
         predecessors = graph_data['predecessors'].get(node_id, [])
         successors = graph_data['successors'].get(node_id, [])

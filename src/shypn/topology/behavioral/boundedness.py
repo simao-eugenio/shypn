@@ -25,7 +25,7 @@ Implementation approach:
 - Optionally explore marking space to detect unbounded places
 """
 
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
@@ -264,7 +264,7 @@ class BoundednessAnalyzer(TopologyAnalyzer):
         structural_info: Dict[str, Any],
         is_conservative: bool,
         max_bound: int
-    ) -> tuple:
+    ) -> Tuple[bool, Any, List[str]]:
         """Determine overall boundedness from analyses.
         
         Args:

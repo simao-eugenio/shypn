@@ -152,7 +152,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
             }
         )
     
-    def _check_reversibility_consistency(self):
+    def _check_reversibility_consistency(self) -> None:
         """Check if reversibility settings match likely thermodynamics.
         
         CURRENT: Heuristic-based on keywords and reaction patterns
@@ -194,7 +194,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
                 notes=notes
             )
     
-    def _check_atp_coupling(self):
+    def _check_atp_coupling(self) -> None:
         """Identify reactions that should be coupled with ATP hydrolysis.
         
         CURRENT: Pattern matching for biosynthetic reactions without ATP
@@ -225,7 +225,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
                         self.reaction_data[transition.id].needs_coupling = True
                         self.reaction_data[transition.id].notes.append("May need ATP coupling")
     
-    def _check_futile_cycles(self):
+    def _check_futile_cycles(self) -> None:
         """Detect potential futile cycles (ATP-wasting loops).
         
         CURRENT: Simple cycle detection with ATP consumption
@@ -267,7 +267,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
                     suggestion="Verify this cycle has biological function (not just ATP waste)"
                 ))
     
-    def _check_equilibrium_states(self):
+    def _check_equilibrium_states(self) -> None:
         """Identify reactions likely at equilibrium.
         
         CURRENT: Heuristic-based on isomerases and near-equilibrium reactions
@@ -295,7 +295,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
                     self.reaction_data[transition.id].equilibrium_likely = True
                     self.reaction_data[transition.id].notes.append("Near equilibrium")
     
-    def _analyze_energy_flow(self):
+    def _analyze_energy_flow(self) -> None:
         """Analyze overall energy flow in the network.
         
         CURRENT: Count ATP production/consumption
@@ -337,7 +337,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
     
     # Helper methods
     
-    def _is_reversible(self, transition) -> bool:
+    def _is_reversible(self, transition: Any) -> bool:
         """Check if transition is configured as reversible.
         
         FUTURE: Also check if reverse transition exists in network
@@ -354,7 +354,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         label_lower = transition.label.lower()
         return '⇌' in transition.label or 'reversible' in label_lower
     
-    def _should_be_reversible(self, transition) -> Optional[bool]:
+    def _should_be_reversible(self, transition: Any) -> Optional[bool]:
         """Heuristic check if reaction should be reversible.
         
         Returns:
@@ -387,7 +387,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         
         return None
     
-    def _is_biosynthetic(self, transition) -> bool:
+    def _is_biosynthetic(self, transition: Any) -> bool:
         """Check if this is a biosynthetic reaction.
         
         FUTURE: Use reaction database classification
@@ -400,7 +400,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
         ]
         return any(keyword in label_lower for keyword in biosynthetic_keywords)
     
-    def _get_reactants(self, transition) -> List[str]:
+    def _get_reactants(self, transition: Any) -> List[str]:
         """Get reactant place IDs."""
         reactants = []
         for arc in self.model.arcs:
@@ -411,7 +411,7 @@ class ThermodynamicAnalyzer(TopologyAnalyzer):
                     reactants.append(place.label)
         return reactants
     
-    def _get_products(self, transition) -> List[str]:
+    def _get_products(self, transition: Any) -> List[str]:
         """Get product place IDs."""
         products = []
         for arc in self.model.arcs:

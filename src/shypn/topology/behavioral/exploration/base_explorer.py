@@ -91,7 +91,7 @@ class WorkQueue:
         self._queue = queue_impl
         self._is_multiprocessing = hasattr(queue_impl, 'get')
     
-    def put(self, item: Any):
+    def put(self, item: Any) -> None:
         """Add item to queue."""
         if self._is_multiprocessing:
             self._queue.put(item)

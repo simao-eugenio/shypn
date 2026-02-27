@@ -123,7 +123,7 @@ class TransitionPartitioner:
             logger.warning(f"Could not compute assignment hash: {e}")
             return ""
     
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached partition results."""
         self._partition_cache = None
         self._assignment_hash = None
