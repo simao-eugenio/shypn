@@ -32,7 +32,9 @@ the new architecture.
 ║ SEE: doc/ADR-003-simulation-controller-complexity.md (when created)       ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
+import logging
 import random
+import traceback
 from typing import Callable, List, Optional, Dict, Any
 try:
     from gi.repository import GLib
@@ -115,7 +117,6 @@ class ModelAdapter:
         Returns a dict for API compatibility, but keyed by object id() to ensure uniqueness.
         """
         if self._arcs_dict is None:
-            pass
             # Use Python object ID as key to avoid duplicate arc ID issues
             # This ensures all arcs are accessible even if they have duplicate IDs
             self._arcs_dict = {id(a): a for a in self.canvas_manager.arcs}
@@ -297,7 +298,6 @@ class SimulationController:
         
         See: doc/CRITICAL_SIMULATION_INIT_IMPORT_BUG.md
         """
-        import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Resetting SimulationController for new model load")
         
@@ -381,9 +381,8 @@ class SimulationController:
             - 'valid': List of valid transitions
             - 'insufficient_data': List with missing data
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
+
         try:
             from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
             
@@ -514,9 +513,8 @@ class SimulationController:
         Args:
             pathway_data: PathwayData object with species containing assignment_rule field
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
+
         if pathway_data is None:
             logger.warning("No pathway_data provided for assignment rule initialization")
             return
@@ -632,7 +630,6 @@ class SimulationController:
                 is_source = getattr(obj, 'is_source', False)
                 
                 if is_source:
-                    import logging
                     logger = logging.getLogger(__name__)
                     logger.info(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
                     # Source transitions are always enabled
@@ -670,7 +667,6 @@ class SimulationController:
                         behavior = self._get_behavior(obj)
                         if hasattr(behavior, 'set_enablement_time'):
                             behavior.set_enablement_time(self.time)
-                        import logging
                         logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
         
         # Rebuild place-transition index on any structural topology change
@@ -752,7 +748,6 @@ class SimulationController:
             print(f"✓ Token accounting enabled (transitions: {len(self.model.transitions)})")
         except Exception as e:
             print(f"✗ Failed to enable token accounting: {e}")
-            import traceback
             traceback.print_exc()
             self.auditor = None
     
@@ -862,17 +857,8 @@ class SimulationController:
         - If still enabled: keep existing enablement_time
         - If disabled: clear enablement_time
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
-        # Debug: Log source transitions
-        source_transitions = [t for t in self.model.transitions if getattr(t, 'is_source', False)]
-        if source_transitions and not hasattr(self, '_logged_source_transitions'):
-            self._logged_source_transitions = True
-            logger.info(f"Found {len(source_transitions)} source transition(s):")
-            for t in source_transitions:
-                logger.info(f"  - {t.id}: type={t.transition_type}, is_source={getattr(t, 'is_source', False)}")
-        
+
         for transition in self.model.transitions:
             behavior = self._get_behavior(transition)
             
@@ -929,9 +915,7 @@ class SimulationController:
                         locally_enabled = False
                         break
             state = self._get_or_create_state(transition)
-            
-            # Debug stochastic enablement (first time only) - removed for cleaner output
-            
+
             if locally_enabled:
                 if state.enablement_time is None:
                     state.enablement_time = self.time
@@ -1201,25 +1185,9 @@ class SimulationController:
         if time_step > 1.0:
             if not hasattr(self, '_large_timestep_warned'):
                 self._large_timestep_warned = True
-                import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
-        
-        # Print transition types once (for debugging)
-        if not hasattr(self, '_debug_transition_types_printed'):
-            self._debug_transition_types_printed = True
-            type_counts = {}
-            for t in self.model.transitions:
-                ttype = t.transition_type
-                type_counts[ttype] = type_counts.get(ttype, 0) + 1
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Model has {len(self.model.transitions)} transitions: {type_counts}")
-            
-            source_count = len([t for t in self.model.transitions if getattr(t, 'is_source', False)])
-            if source_count > 0:
-                logger.info(f"  - {source_count} source transition(s)")
-        
+
         # Update enablement states
         self._update_enablement_states()
         
@@ -1271,7 +1239,6 @@ class SimulationController:
                     recent = fired_sequence[-10:]
                     previous = fired_sequence[-20:-10]
                     if recent == previous:
-                        import logging
                         logger = logging.getLogger(__name__)
                         logger.error(
                             f"LIVELOCK DETECTED: Immediate transitions forming infinite cycle: "
@@ -1282,7 +1249,6 @@ class SimulationController:
                         break
         
         if iteration >= max_immediate_iterations - 1:
-            import logging
             logger = logging.getLogger(__name__)
             logger.warning(
                 f"Immediate transition limit ({max_immediate_iterations}) reached in single step. "
@@ -1600,7 +1566,6 @@ class SimulationController:
         
         # Check if simulation is complete
         if self.is_simulation_complete():
-            import logging
             logging.getLogger(__name__).info(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
             return False
         
@@ -1662,9 +1627,8 @@ class SimulationController:
                 self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
             except Exception as e:
                 print(f"⚠️ Accounting error (after fire): {e}")
-                import traceback
                 traceback.print_exc()
-        
+
         if success:
             # Increment firing count for statistics
             transition.firing_count += 1
@@ -1691,19 +1655,10 @@ class SimulationController:
             self.data_collector.on_transition_fired(transition, self.time, details)
         
         # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
-        if not hasattr(self, '_debug_listeners_printed'):
-            self._debug_listeners_printed = True
-            # print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
-            for i, listener in enumerate(self.step_listeners):
-                # Check if listener is a bound method with __self__
-                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                if hasattr(listener_obj, 'on_transition_fired'):
-                    listener_obj.on_transition_fired(transition, self.time, details)
-        else:
-            for listener in self.step_listeners:
-                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                if hasattr(listener_obj, 'on_transition_fired'):
-                    listener_obj.on_transition_fired(transition, self.time, details)
+        for listener in self.step_listeners:
+            listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+            if hasattr(listener_obj, 'on_transition_fired'):
+                listener_obj.on_transition_fired(transition, self.time, details)
 
     # ============================================================================
     # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
@@ -2956,14 +2911,10 @@ class SimulationController:
             try:
                 _cb(self.data_collector)
             except Exception as e:
-                import logging
                 logging.getLogger(__name__).warning(f"Error in data_collector listener: {e}")
-        
+
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback
-        if saved_callback:
-            pass
-            # print(f"[RESET_MODEL] ✅ Preserved on_simulation_complete callback")
         
         # Reset data collector if exists (legacy compatibility)
         if self.data_collector is not None:
