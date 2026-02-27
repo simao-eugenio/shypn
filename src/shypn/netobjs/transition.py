@@ -750,21 +750,12 @@ class Transition(PetriNetObject):
         # if self.rate is not None:
         #     data["rate"] = self.rate
         
-        # NOTE: Top-level rate_function/rate_forward/rate_reverse are legacy attributes
-        # Modern code should use properties dict, but we save top-level for backward compatibility
-        # The from_dict() method will migrate these to properties dict on load
-        if hasattr(self, 'rate_function') and self.rate_function:
-            data["rate_function"] = self.rate_function
-        if hasattr(self, 'formula') and self.formula:
-            data["formula"] = self.formula
-        
-        # Serialize directional rates for reversible reactions
-        if hasattr(self, 'rate_forward') and self.rate_forward is not None:
-            data["rate_forward"] = self.rate_forward
-        if hasattr(self, 'rate_reverse') and self.rate_reverse is not None:
-            data["rate_reverse"] = self.rate_reverse
+        # NOTE: rate_function/rate_forward/rate_reverse are @property decorators
+        # that read/write to properties dict. No need to serialize top-level.
+        # from_dict() will migrate legacy top-level entries to properties dict.
         
         # Serialize timed transition parameters (TPN window)
+        # These are regular attributes (not @property), so serialize at top-level
         if hasattr(self, 'earliest_time') and self.earliest_time is not None:
             data["earliest_time"] = self.earliest_time
         if hasattr(self, 'latest_time') and self.latest_time is not None:
@@ -784,8 +775,7 @@ class Transition(PetriNetObject):
             data["compartment"] = self.compartment
         
         # Serialize adaptive transition parameters (volume-based mode selection)
-        # Saved at top level (like transition_type, priority, etc.)
-        # from_dict() checks both top level and properties dict for compatibility
+        # These are regular attributes (not @property), so serialize at top-level
         if hasattr(self, 'adaptive_filter'):
             data["adaptive_filter"] = self.adaptive_filter
         if hasattr(self, 'volume_threshold'):
