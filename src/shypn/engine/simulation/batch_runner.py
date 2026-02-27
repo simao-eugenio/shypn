@@ -128,12 +128,10 @@ class BatchSimulationRunner:
         replicate_controller.data_collector.time_based_recording = True
         replicate_controller.data_collector.recording_time_interval = 0.5  # seconds
         
-        # CRITICAL: Ensure stochastic/continuous mode with tau-leaping
+        # τ-leaping is always active (use_tau_leaping setter is a no-op by design).
+        # All other settings (tau_epsilon, max_tau, use_parallel_stochastic, etc.) are
+        # preserved from the user's controller settings via the deepcopy above.
         replicate_controller.settings.use_tau_leaping = True
-        replicate_controller.settings.use_parallel_stochastic = True
-        replicate_controller.settings.tau_epsilon = 0.03
-        replicate_controller.settings.max_tau = 0.01
-        replicate_controller.settings.critical_threshold = 0.01
         
         for i in range(n_replicates):
             # Check for cancellation before starting replicate

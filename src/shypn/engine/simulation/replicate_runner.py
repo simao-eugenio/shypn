@@ -68,6 +68,7 @@ class ReplicateRunner:
         termination_condition: str = "deadlock",
         time_step: Optional[float] = None,
         epsilon: float = 0.03,
+        max_tau: float = 0.1,
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
         verbose: bool = False,
@@ -89,6 +90,7 @@ class ReplicateRunner:
                 - "steady_state": Stop when steady state detected OR duration is reached
             time_step: Time step for recording (None = auto)
             epsilon: Tau-leaping epsilon parameter
+            max_tau: Maximum leap size for tau-leaping (smaller = more accurate)
             seed_base: Base random seed (replicate i uses seed_base + i)
             time_units: Time units for duration
             verbose: Print progress messages
@@ -146,6 +148,7 @@ class ReplicateRunner:
             controller.settings.use_parallel_stochastic = use_parallel
             controller.settings.use_tau_leaping = use_tau_leaping
             controller.settings.tau_epsilon = epsilon
+            controller.settings.max_tau = max_tau
             controller.settings.duration = duration
             controller.settings.time_units = time_units
             controller.settings.random_seed = seed_base + i

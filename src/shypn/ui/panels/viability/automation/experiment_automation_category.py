@@ -500,7 +500,55 @@ class ExperimentAutomationCategory:
             except Exception as e:
                 print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
-        
+
+        # Read precision settings from sweep builder
+        # Note: use_tau_leaping is always True — SimulationSettings.use_tau_leaping setter is a no-op
+        use_tau_leaping = True
+        tau_epsilon = 0.03
+        dt_manual = None
+
+        if hasattr(self.sweep_builder, 'sweep_tau_epsilon_entry'):
+            try:
+                text = self.sweep_builder.sweep_tau_epsilon_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if 0 < val <= 1:
+                        tau_epsilon = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read tau_epsilon: {e}, using default {tau_epsilon}")
+
+        if (hasattr(self.sweep_builder, 'sweep_dt_manual_radio') and
+                hasattr(self.sweep_builder, 'sweep_dt_manual_entry') and
+                self.sweep_builder.sweep_dt_manual_radio.get_active()):
+            try:
+                text = self.sweep_builder.sweep_dt_manual_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val > 0:
+                        dt_manual = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read dt_manual: {e}, using auto")
+
+        max_tau = 0.1
+        if hasattr(self.sweep_builder, 'sweep_max_tau_entry'):
+            try:
+                text = self.sweep_builder.sweep_max_tau_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if 0 < val <= 100:
+                        max_tau = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read max_tau: {e}, using default {max_tau}")
+
+        seed_base = 42
+        if hasattr(self.sweep_builder, 'sweep_seed_entry'):
+            try:
+                text = self.sweep_builder.sweep_seed_entry.get_text().strip()
+                if text:
+                    seed_base = int(text)
+            except Exception as e:
+                print(f"[WARNING] Failed to read seed_base: {e}, using default {seed_base}")
+
         # Get parallel execution setting from queue view checkbox (E2 enhancement)
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
@@ -533,7 +581,12 @@ class ExperimentAutomationCategory:
                 progress_callback=self._on_experiment_progress,
                 complete_callback=self._on_batch_complete,
                 experiment_result_callback=self._on_experiment_result,
-                use_parallel=use_parallel  # E2: Enable parallel execution if checkbox is checked
+                use_parallel=use_parallel,  # E2: Enable parallel execution if checkbox is checked
+                use_tau_leaping=use_tau_leaping,
+                tau_epsilon=tau_epsilon,
+                max_tau=max_tau,
+                dt_manual=dt_manual,
+                seed_base=seed_base,
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
