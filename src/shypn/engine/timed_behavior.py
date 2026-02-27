@@ -116,31 +116,6 @@ class TimedBehavior(TransitionBehavior):
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
 
-    def _is_signal_place(self, place) -> bool:
-        """Check if a place is a signal place (read-only, non-consuming).
-        
-        Signal places (Ψ) in modular Bio-PN architecture provide information
-        flow without mass transfer. They are never consumed during simulation.
-        
-        Args:
-            place: Place object to check
-        
-        Returns:
-            bool: True if place is a signal place
-        """
-        if place is None:
-            return False
-        
-        # Check is_signal_place attribute (primary indicator)
-        if hasattr(place, 'is_signal_place') and place.is_signal_place:
-            return True
-        
-        # Check signal_type property (alternative indicator)
-        if hasattr(place, 'signal_type') and place.signal_type is not None:
-            return True
-        
-        return False
-
     def set_enablement_time(self, time: float):
         """Set the time when transition became enabled.
         

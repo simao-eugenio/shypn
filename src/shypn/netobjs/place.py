@@ -781,3 +781,14 @@ class Place(PetriNetObject):
         place.spatial_position = tuple(position) if position else None
         
         return place
+
+    def __repr__(self) -> str:
+        """Machine-readable representation for debugging."""
+        return (
+            f"Place(id={self.id!r}, name={self.name!r}, "
+            f"tokens={self.tokens})"
+        )
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        return f"{self.name} ({self.tokens} tok)" if self.name else self.id
