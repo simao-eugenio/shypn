@@ -727,8 +727,10 @@ class KEGGCategory(BasePathwayCategory):
                     summary += f"Organism: {parsed_pathway.org}\\n\\n"
                     entry_counts = parsed_pathway.count_entry_types()
                     summary += "Entries:\\n"
-                    for entry_type, count in entry_counts.items():
-                        summary += f"  {entry_type}: {count}\\n"
+                    summary += "".join(
+                        f"  {entry_type}: {count}\\n"
+                        for entry_type, count in entry_counts.items()
+                    )
                     summary += f"\\nReactions: {len(parsed_pathway.reactions)}\\n"
                     summary += f"Relations: {len(parsed_pathway.relations)}\\n"
                     buffer.set_text(summary)

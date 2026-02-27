@@ -929,10 +929,11 @@ class StandardConversionStrategy(ConversionStrategy):
                 ))
         
         if invalid_arcs:
-            error_msg = f"Bipartite property violation in pathway {pathway.name}:\n"
+            parts = [f"Bipartite property violation in pathway {pathway.name}:\n"]
             for arc, violation_type, arc_str in invalid_arcs:
-                error_msg += f"  - {violation_type}: {arc_str} (Arc ID: {arc.id})\n"
-            error_msg += "\nPetri nets must be bipartite: only Place↔Transition connections allowed."
+                parts.append(f"  - {violation_type}: {arc_str} (Arc ID: {arc.id})\n")
+            parts.append("\nPetri nets must be bipartite: only Place↔Transition connections allowed.")
+            error_msg = "".join(parts)
             
             logger.error(error_msg)
             raise ValueError(error_msg)

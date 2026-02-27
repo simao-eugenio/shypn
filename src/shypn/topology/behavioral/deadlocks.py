@@ -90,8 +90,19 @@ class DeadlockAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
         
+        # SIZE GUARD — avoids iterating Mock objects in test/error contexts
+        try:
+            n_places = len(self.model.places)
+            n_transitions = len(self.model.transitions)
+        except (TypeError, AttributeError):
+            return AnalysisResult(
+                success=False,
+                errors=["Model access failed - invalid model object"],
+                metadata={'analysis_time': self._end_timer(start_time)}
+            )
+
         # Handle empty model
-        if not self.model.places or not self.model.transitions:
+        if n_places == 0 or n_transitions == 0:
             return AnalysisResult(
                 success=True,
                 data={

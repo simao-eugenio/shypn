@@ -729,14 +729,17 @@ class SBMLParser:
         
         # Report errors
         if undeclared_vars:
-            error_msg = "Undeclared variables in rate formulas:\n"
+            parts = ["Undeclared variables in rate formulas:\n"]
             for reaction_id, var_name, formula in undeclared_vars:
-                error_msg += f"  Reaction '{reaction_id}': '{var_name}' not found\n"
-                error_msg += f"    Formula: {formula}\n"
-            error_msg += "\nValid identifiers:\n"
-            error_msg += f"  Species: {sorted([s.id for s in pathway_data.species])}\n"
-            error_msg += f"  Parameters: {sorted(pathway_data.parameters.keys())}\n"
-            error_msg += f"  Compartments: {sorted(pathway_data.compartments_enhanced.keys())}\n"
+                parts.append(f"  Reaction '{reaction_id}': '{var_name}' not found\n")
+                parts.append(f"    Formula: {formula}\n")
+            parts += [
+                "\nValid identifiers:\n",
+                f"  Species: {sorted([s.id for s in pathway_data.species])}\n",
+                f"  Parameters: {sorted(pathway_data.parameters.keys())}\n",
+                f"  Compartments: {sorted(pathway_data.compartments_enhanced.keys())}\n",
+            ]
+            error_msg = "".join(parts)
             
             self.logger.error(error_msg)
             raise ValueError(error_msg)
