@@ -21,6 +21,7 @@ import os
 import hashlib
 import json
 import logging
+import time
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,6 +98,8 @@ class BRENDAAPIClient:
         self.credentials = None
         self.client = None
         self._authenticated = False
+        self._last_request_time: float = 0.0
+        self._min_request_interval: float = 2.0  # BRENDA requires ≥1 request per 2 seconds
         
         if not ZEEP_AVAILABLE:
             self.logger.warning("zeep library not available. Install with: pip install zeep")
@@ -168,6 +171,7 @@ class BRENDAAPIClient:
             
             # Use lightweight getEcNumber() as handshake (much faster than getKmValue)
             # This just checks if EC 2.7.1.1 exists in BRENDA (doesn't retrieve data)
+            self._rate_limit_wait()
             result = self.client.service.getEcNumber(
                 self.credentials.email,
                 password_hash,
@@ -226,6 +230,19 @@ class BRENDAAPIClient:
             self._authenticated = False
             return False
     
+    def _rate_limit_wait(self) -> None:
+        """Enforce minimum 2-second interval between BRENDA SOAP requests.
+
+        BRENDA support requires no more than 1 request per 2 seconds to avoid
+        automated blocking. This method sleeps only as long as necessary.
+        """
+        elapsed = time.monotonic() - self._last_request_time
+        wait = self._min_request_interval - elapsed
+        if wait > 0:
+            self.logger.debug(f"Rate limiting: waiting {wait:.2f}s before next BRENDA request")
+            time.sleep(wait)
+        self._last_request_time = time.monotonic()
+
     def is_authenticated(self) -> bool:
         """Check if client is authenticated."""
         return self._authenticated
@@ -258,7 +275,8 @@ class BRENDAAPIClient:
             self.logger.info(f"[BRENDA_QUERY] Sending SOAP request for EC {ec_number}")
             self.logger.info(f"[BRENDA_QUERY]   Email: {self.credentials.email}")
             self.logger.info(f"[BRENDA_QUERY]   EC query: {ec_query}")
-            
+
+            self._rate_limit_wait()
             result = self.client.service.getKmValue(
                 self.credentials.email,
                 password_hash,
@@ -320,7 +338,8 @@ class BRENDAAPIClient:
             ec_query = f"ecNumber*{ec_number}#"
             
             self.logger.info(f"Querying BRENDA for kcat values: EC={ec_number}, organism={organism or 'all'}")
-            
+
+            self._rate_limit_wait()
             result = self.client.service.getTurnoverNumber(
                 self.credentials.email,
                 password_hash,
@@ -364,7 +383,8 @@ class BRENDAAPIClient:
             ec_query = f"ecNumber*{ec_number}#"
             
             self.logger.info(f"Querying BRENDA for Ki values: EC={ec_number}, organism={organism or 'all'}")
-            
+
+            self._rate_limit_wait()
             result = self.client.service.getKiValue(
                 self.credentials.email,
                 password_hash,
