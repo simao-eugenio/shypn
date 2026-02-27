@@ -1087,3 +1087,14 @@ class Transition(PetriNetObject):
         
         # Combine local and signal places
         return local_places | set(self.signal_places)
+
+    def __repr__(self) -> str:
+        """Machine-readable representation for debugging."""
+        return (
+            f"Transition(id={self.id!r}, name={self.name!r}, "
+            f"type={self.transition_type!r})"
+        )
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        return f"{self.name} [{self.transition_type}]" if self.name else self.id

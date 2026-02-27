@@ -1114,3 +1114,18 @@ class Arc(PetriNetObject):
         else:
             # Default to Arc for backward compatibility
             return Arc.from_dict(data, places, transitions)
+
+    def __repr__(self) -> str:
+        """Machine-readable representation for debugging."""
+        src_id = getattr(self.source, 'id', self.source)
+        tgt_id = getattr(self.target, 'id', self.target)
+        return (
+            f"Arc(id={self.id!r}, src={src_id!r}, tgt={tgt_id!r}, "
+            f"weight={self.weight})"
+        )
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        src_id = getattr(self.source, 'id', self.source)
+        tgt_id = getattr(self.target, 'id', self.target)
+        return f"{src_id} → {tgt_id} (w={self.weight})"
