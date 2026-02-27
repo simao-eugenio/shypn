@@ -70,6 +70,9 @@ class ExperimentAutomationCategory:
         # Phase 4 components (Results Browser)
         self.results_browser = None
         
+        # Per-run isolation: one folder created at batch start, shared by all experiments in the run
+        self._current_run_folder = None  # Path | None
+
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
         self._processing_updates = set()  # Set of queue_index currently being processed
@@ -559,7 +562,18 @@ class ExperimentAutomationCategory:
         
         # Clear pending updates tracking
         self._pending_updates.clear()
-        
+
+        # Create per-run folder — all experiments in this batch live inside it
+        self._current_run_folder = None
+        _run_project = self._get_project_folder()
+        if _run_project:
+            from pathlib import Path as _Path
+            from datetime import datetime as _dt
+            _run_ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+            _run_path = _Path(_run_project) / 'experiments' / 'results' / f'run_{_run_ts}'
+            _run_path.mkdir(parents=True, exist_ok=True)
+            self._current_run_folder = _run_path
+
         # Clear old results from previous batch runs
         if self.results_browser:
             self.results_browser.clear_results()
@@ -767,12 +781,19 @@ class ExperimentAutomationCategory:
         if not project_folder:
             return
 
-        # Create saver with experiments/results subfolder
-        saver = BatchResultsSaver(
-            base_path=project_folder,
-            subfolder='experiments/results',
-            batch_prefix='experiment'
-        )
+        # Create saver — nest inside per-run folder if one was created for this batch
+        if self._current_run_folder is not None:
+            saver = BatchResultsSaver(
+                base_path=str(self._current_run_folder),
+                subfolder='',
+                batch_prefix='experiment'
+            )
+        else:
+            saver = BatchResultsSaver(
+                base_path=project_folder,
+                subfolder='experiments/results',
+                batch_prefix='experiment'
+            )
 
         # Create timestamped folder
         safe_name = name.replace(' ', '_').replace('/', '_')
@@ -963,7 +984,9 @@ class ExperimentAutomationCategory:
         Args:
             cancelled: Whether batch was cancelled by user
         """
-        
+        # Close the per-run folder (next run will create a new one)
+        self._current_run_folder = None
+
         # Use GLib.idle_add for ALL UI updates from background thread
         def complete_ui_updates():
             """Complete all UI updates in main thread."""

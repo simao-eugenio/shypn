@@ -324,7 +324,9 @@ class ParameterSweepBuilder(Gtk.Box):
         self.sweep_tau_epsilon_entry.set_text("0.03")
         self.sweep_tau_epsilon_entry.set_width_chars(8)
         self.sweep_tau_epsilon_entry.set_tooltip_text(
-            "τ-leaping accuracy bound ε (0.01 = accurate/slow, 0.10 = fast/approximate)"
+            "τ-leaping accuracy bound ε (0.01 = accurate/slow, 0.10 = fast/approximate).\n"
+            "Primary accuracy control for both hybrid and pure-stochastic models.\n"
+            "Applied at simulation start; changing it mid-run has no effect."
         )
         sim_box.attach(self.sweep_tau_epsilon_entry, 2, 3, 1, 1)
 
@@ -334,7 +336,10 @@ class ParameterSweepBuilder(Gtk.Box):
         self.sweep_max_tau_entry.set_text("0.1")
         self.sweep_max_tau_entry.set_width_chars(8)
         self.sweep_max_tau_entry.set_tooltip_text(
-            "Maximum leap size for τ-leaping (smaller = more accurate, slower)"
+            "Maximum leap size for τ-leaping.\n"
+            "Only effective for pure-stochastic subnets (all transitions are stochastic/adaptive).\n"
+            "In hybrid models (mixed transition types) τ is automatically clamped to dt each step,\n"
+            "so this value has no effect — use the Time Step control instead."
         )
         sim_box.attach(self.sweep_max_tau_entry, 2, 4, 1, 1)
 
