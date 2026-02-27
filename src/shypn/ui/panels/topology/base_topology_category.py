@@ -321,13 +321,20 @@ class BaseTopologyCategory:
     
     def _build_content(self):
         """Build and return the content widget.
-        
-        Must be implemented by subclasses.
-        
+
         Returns:
-            Gtk.Widget: The content to display in this category
+            Gtk.Box: The content to display in this category
         """
-        raise NotImplementedError("Subclasses must implement _build_content()")
+        if self.use_grouped_table:
+            return self._build_grouped_table()
+
+        # Default: individual expanders
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        summary_section = self._build_summary_section()
+        main_box.pack_start(summary_section, False, False, 0)
+        analyzer_expanders = self._build_analyzer_expanders()
+        main_box.pack_start(analyzer_expanders, True, True, 0)
+        return main_box
     
     def _get_analyzers(self):
         """Get dict of analyzer name -> AnalyzerClass.
