@@ -146,7 +146,7 @@ class LeapSelector:
         self,
         propensities: List[float],
         model: Any,
-        transitions: List[Any] = None
+        transitions: Optional[List[Any]] = None
     ) -> float:
         """Calculate τ using simplified leap condition.
         

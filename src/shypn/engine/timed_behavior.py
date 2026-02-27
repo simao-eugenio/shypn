@@ -109,7 +109,7 @@ class TimedBehavior(TransitionBehavior):
             raise ValueError(f'Earliest time cannot be negative: {self.earliest}')
         if self.latest < self.earliest:
             raise ValueError(f'Latest ({self.latest}) must be >= earliest ({self.earliest})')
-        self._enablement_time = None
+        self._enablement_time: Optional[float] = None
         self._was_too_early = False  # Track if we've been checked while too early
         self._was_in_window = False  # Track if we've been in the firing window
         
@@ -338,7 +338,7 @@ class TimedBehavior(TransitionBehavior):
         info = {'earliest': self.earliest, 'latest': self.latest, 'enablement_time': self._enablement_time, 'current_time': current_time, 'elapsed': elapsed}
         if elapsed is not None:
             info['can_fire_earliest'] = elapsed >= self.earliest
-            info['must_fire_before'] = self._enablement_time + self.latest
+            info['must_fire_before'] = (self._enablement_time or 0.0) + self.latest
             info['time_remaining'] = max(0, self.latest - elapsed)
             info['in_window'] = self.earliest <= elapsed <= self.latest
         else:

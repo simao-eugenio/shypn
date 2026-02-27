@@ -5,7 +5,7 @@ Provides SimulationSettings class to encapsulate all timing and execution
 configuration for simulation. Follows OOP principles with validation,
 defaults, and clear separation of concerns.
 """
-from typing import Any, Optional
+from typing import Any, Optional, Set
 from shypn.utils.time_utils import TimeUnits, TimeConverter, TimeValidator
 
 
@@ -54,7 +54,7 @@ class SimulationSettings:
     def __init__(self) -> None:
         """Initialize with default settings."""
         self._time_units = self.DEFAULT_TIME_UNITS
-        self._duration = self.DEFAULT_DURATION
+        self._duration: Optional[float] = self.DEFAULT_DURATION
         self._dt_auto = self.DEFAULT_DT_AUTO
         self._dt_manual = self.DEFAULT_DT_MANUAL
         self._time_scale = self.DEFAULT_TIME_SCALE
@@ -70,12 +70,12 @@ class SimulationSettings:
         self._batch_mode_enabled = False
         self._batch_replicates = 100
         self._batch_output_folder = None
-        self._recorded_objects = set()  # Set of place/transition IDs to record
+        self._recorded_objects: Set[Any] = set()  # Set of place/transition IDs to record
         
         # Initial condition randomness (biological variability)
         self._ic_noise_enabled = False  # Enable random perturbations to initial conditions
         self._ic_noise_percent = 20.0  # Percentage of noise (±20% = uniform in [0.8, 1.2] range)
-        self._ic_noise_places = set()  # Specific places to randomize (empty = all non-catalyst places)
+        self._ic_noise_places: Set[str] = set()  # Specific places to randomize (empty = all non-catalyst places)
         
         # Token accounting (conservation validation)
         self._token_accounting_enabled = False  # Enable token conservation tracking
@@ -397,7 +397,7 @@ class SimulationSettings:
         duration_seconds = self.get_duration_seconds()
         dt = self.get_effective_dt()
         
-        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)
+        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)  # type: ignore[arg-type]
         return warning if warning else None
     
     # ========== Progress Tracking ==========
@@ -706,7 +706,7 @@ def _add_batch_mode_properties() -> None:
     """
     
     # Batch mode enabled property
-    @property
+    @property  # type: ignore[misc]
     def batch_mode_enabled(self: Any) -> bool:
         """Get whether batch mode is enabled."""
         return getattr(self, '_batch_mode_enabled', False)
@@ -717,7 +717,7 @@ def _add_batch_mode_properties() -> None:
         self._batch_mode_enabled = bool(value)
     
     # Batch replicates property
-    @property
+    @property  # type: ignore[misc]
     def batch_replicates(self: Any) -> int:
         """Get number of batch replicates."""
         return getattr(self, '_batch_replicates', 100)
@@ -737,7 +737,7 @@ def _add_batch_mode_properties() -> None:
         self._batch_replicates = int(value)
     
     # Batch output folder property
-    @property
+    @property  # type: ignore[misc]
     def batch_output_folder(self: Any) -> Optional[str]:
         """Get batch output folder path."""
         return getattr(self, '_batch_output_folder', None)
@@ -748,7 +748,7 @@ def _add_batch_mode_properties() -> None:
         self._batch_output_folder = value
     
     # Recorded objects property
-    @property
+    @property  # type: ignore[misc]
     def recorded_objects(self: Any) -> set:
         """Get set of object IDs marked for recording."""
         if not hasattr(self, '_recorded_objects'):
@@ -794,7 +794,7 @@ def _add_batch_mode_properties() -> None:
         return object_id in self._recorded_objects
     
     # Initial condition noise properties
-    @property
+    @property  # type: ignore[misc]
     def ic_noise_enabled(self: Any) -> bool:
         """Get whether initial condition noise is enabled.
         
@@ -809,7 +809,7 @@ def _add_batch_mode_properties() -> None:
         """Set initial condition noise enabled state."""
         self._ic_noise_enabled = bool(value)
     
-    @property
+    @property  # type: ignore[misc]
     def ic_noise_percent(self: Any) -> float:
         """Get initial condition noise percentage.
         
@@ -832,7 +832,7 @@ def _add_batch_mode_properties() -> None:
             raise ValueError("Noise percentage must be between 0 and 100")
         self._ic_noise_percent = float(value)
     
-    @property
+    @property  # type: ignore[misc]
     def ic_noise_places(self: Any) -> set:
         """Get set of place IDs to apply noise to.
         
@@ -867,20 +867,20 @@ def _add_batch_mode_properties() -> None:
             self._ic_noise_places.clear()
     
     # Add methods to SimulationSettings class
-    SimulationSettings.batch_mode_enabled = batch_mode_enabled
-    SimulationSettings.batch_replicates = batch_replicates
-    SimulationSettings.batch_output_folder = batch_output_folder
-    SimulationSettings.recorded_objects = recorded_objects
-    SimulationSettings.add_recorded_object = add_recorded_object
-    SimulationSettings.remove_recorded_object = remove_recorded_object
-    SimulationSettings.clear_recorded_objects = clear_recorded_objects
-    SimulationSettings.is_object_recorded = is_object_recorded
-    SimulationSettings.ic_noise_enabled = ic_noise_enabled
-    SimulationSettings.ic_noise_percent = ic_noise_percent
-    SimulationSettings.ic_noise_places = ic_noise_places
-    SimulationSettings.add_ic_noise_place = add_ic_noise_place
-    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place
-    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places
+    SimulationSettings.batch_mode_enabled = batch_mode_enabled  # type: ignore[attr-defined]
+    SimulationSettings.batch_replicates = batch_replicates  # type: ignore[attr-defined]
+    SimulationSettings.batch_output_folder = batch_output_folder  # type: ignore[attr-defined]
+    SimulationSettings.recorded_objects = recorded_objects  # type: ignore[attr-defined]
+    SimulationSettings.add_recorded_object = add_recorded_object  # type: ignore[attr-defined]
+    SimulationSettings.remove_recorded_object = remove_recorded_object  # type: ignore[attr-defined]
+    SimulationSettings.clear_recorded_objects = clear_recorded_objects  # type: ignore[attr-defined]
+    SimulationSettings.is_object_recorded = is_object_recorded  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_enabled = ic_noise_enabled  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_percent = ic_noise_percent  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_places = ic_noise_places  # type: ignore[attr-defined]
+    SimulationSettings.add_ic_noise_place = add_ic_noise_place  # type: ignore[attr-defined]
+    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place  # type: ignore[attr-defined]
+    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places  # type: ignore[attr-defined]
 
 
 # Initialize batch mode properties

@@ -73,7 +73,7 @@ class ContinuousBehavior(TransitionBehavior):
         
         # Track if rate function has failed (to prevent repeated errors)
         self._rate_function_failed = False
-        self._rate_function_error = None
+        self._rate_function_error: Optional[str] = None
         
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
@@ -103,10 +103,10 @@ class ContinuousBehavior(TransitionBehavior):
         
         # Compile rate functions
         if self.use_directional_rates:
-            self.rate_forward_function = self._compile_rate_function(rate_forward_expr) if rate_forward_expr else lambda p, t: 0.0
-            self.rate_reverse_function = self._compile_rate_function(rate_reverse_expr) if rate_reverse_expr else lambda p, t: 0.0
+            self.rate_forward_function: Callable[..., float] = self._compile_rate_function(rate_forward_expr) if rate_forward_expr else lambda p, t: 0.0  # type: ignore[assignment]
+            self.rate_reverse_function: Callable[..., float] = self._compile_rate_function(rate_reverse_expr) if rate_reverse_expr else lambda p, t: 0.0  # type: ignore[assignment]
             # Combined rate = forward - reverse
-            self.rate_function = lambda places, t: self.rate_forward_function(places, t) - self.rate_reverse_function(places, t)
+            self.rate_function: Callable[..., float] = lambda places, t: self.rate_forward_function(places, t) - self.rate_reverse_function(places, t)
         else:
             if rate_expr is None:
                 raise ValueError(
@@ -188,7 +188,7 @@ class ContinuousBehavior(TransitionBehavior):
         def evaluate_rate(places: Dict[int, Any], time: float) -> float:
             try:
                 # Build evaluation context with full support
-                context = {
+                context: Dict[Any, Any] = {
                     'time': time,
                     't': time,  # Alias
                     'min': min,
@@ -295,20 +295,20 @@ class ContinuousBehavior(TransitionBehavior):
                 # Evaluate expression safely (replaces eval() for security)
                 result = safe_eval_numeric(expr_processed, context, allow_math=True)
                 return result
-            except Exception as e:
+            except Exception as exc:
                 # Check if this is first error for this transition
                 if not self._rate_function_failed:
                     self._rate_function_failed = True
-                    self._rate_function_error = str(e)
+                    self._rate_function_error = str(exc)
                     
                     # FAIL LOUDLY - print error once
                     print(f"\n❌ Rate Function Error - Simulation Stopped")
                     print(f"   Transition: {self.transition.name} ({self.transition.id})")
                     print(f"   Expression: {expr}")
-                    print(f"   Error: {e}")
+                    print(f"   Error: {exc}")
                     
                     # If NameError, suggest similar function names
-                    if isinstance(e, NameError):
+                    if isinstance(exc, NameError):
                         try:
                             import re
                             import difflib
@@ -316,7 +316,7 @@ class ContinuousBehavior(TransitionBehavior):
                             from shypn.engine import function_catalog
                             
                             # Extract undefined name from error message
-                            match = re.search(r"name '(\w+)' is not defined", str(e))
+                            match = re.search(r"name '(\w+)' is not defined", str(exc))
                             if match:
                                 undefined_name = match.group(1)
                                 # Find close matches (case-insensitive)
@@ -338,10 +338,10 @@ class ContinuousBehavior(TransitionBehavior):
                 
                 # Raise error to stop simulation
                 raise RuntimeError(
-                    f"Failed to evaluate rate function for transition {self.transition.name}: {e}\n"
+                    f"Failed to evaluate rate function for transition {self.transition.name}: {exc}\n"
                     f"Expression: {expr}\n"
                     f"Context keys: {list(context.keys())}"
-                ) from e
+                ) from exc
         
         return evaluate_rate
     

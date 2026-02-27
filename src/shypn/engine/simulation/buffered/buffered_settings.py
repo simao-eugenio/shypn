@@ -236,6 +236,7 @@ class BufferedSimulationSettings:
             ValueError: If any buffered value is invalid
             ValidationError: If cross-constraints violated
         """
+        assert self._buffer is not None
         # Property validation happens automatically via setters
         # Access all properties to trigger validation
         _ = self._buffer.time_units
@@ -317,6 +318,7 @@ class BufferedSimulationSettings:
         This is the critical section where changes are actually applied.
         All validation has already passed at this point.
         """
+        assert self._buffer is not None
         # All validation passed - safe to apply
         self._live.time_units = self._buffer.time_units
         self._live.duration = self._buffer.duration

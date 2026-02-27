@@ -27,7 +27,7 @@ import json
 import time
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Callable, Dict, List, Optional, Any, Union
 from copy import deepcopy
 
 from shypn.engine.simulation.controller import SimulationController
@@ -72,7 +72,7 @@ class ReplicateRunner:
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
         verbose: bool = False,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[Callable] = None
     ) -> List[Dict[str, Any]]:
         """Run n independent stochastic simulation replicates.
         
@@ -151,7 +151,7 @@ class ReplicateRunner:
             controller.settings.max_tau = max_tau
             controller.settings.duration = duration
             controller.settings.time_units = time_units
-            controller.settings.random_seed = seed_base + i
+            controller.settings.random_seed = seed_base + i  # type: ignore[attr-defined]
             
             if time_step is not None:
                 controller.settings.dt_auto = False
@@ -330,7 +330,7 @@ class ReplicateRunner:
         for place_id in place_ids:
             # Stack trajectories into matrix (replicates × time_points)
             # Extract only token values (second element) from (time, tokens) tuples
-            trajectories = []
+            trajectories: Any = []
             for r in successful:
                 place_values = r['place_data'][place_id]
                 # Handle both tuple format [(time, tokens), ...] and flat list [tokens, ...]
@@ -376,7 +376,7 @@ class ReplicateRunner:
         for transition_id in transition_ids:
             # Stack rate trajectories into matrix (replicates × time_points)
             # Extract only rate values (second element) from (time, rate) tuples
-            rate_trajectories = []
+            rate_trajectories: Any = []
             for r in successful:
                 rate_values = r['transition_rates'][transition_id]
                 # Handle both tuple format [(time, rate), ...] and flat list [rate, ...]

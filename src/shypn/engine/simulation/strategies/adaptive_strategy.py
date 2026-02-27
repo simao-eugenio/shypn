@@ -65,7 +65,7 @@ class AdaptiveStrategy(SimulationStrategy):
         
         # Use controller's hybrid step (handles adaptive tau internally)
         try:
-            self.controller._step(time_step)
+            self.controller.step(time_step)
             return True
         except Exception:
             return False

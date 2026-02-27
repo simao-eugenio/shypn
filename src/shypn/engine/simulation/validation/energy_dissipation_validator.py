@@ -89,9 +89,9 @@ class EnergyDissipationValidator(BaseValidator):
             return
         
         # Get current energy pool values
-        atp = places.get(self.atp_place_id).tokens if self.atp_place_id in places else 0.0
-        adp = places.get(self.adp_place_id).tokens if self.adp_place_id in places else 0.0
-        pi = places.get(self.pi_place_id).tokens if self.pi_place_id in places else 0.0
+        atp = places[self.atp_place_id].tokens if self.atp_place_id in places else 0.0
+        adp = places[self.adp_place_id].tokens if self.adp_place_id in places else 0.0
+        pi = places[self.pi_place_id].tokens if self.pi_place_id in places else 0.0
         
         total_energy = atp + adp + pi
         

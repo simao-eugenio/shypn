@@ -64,7 +64,7 @@ def create_behavior(transition: Any, model: Any) -> TransitionBehavior:
         )
     
     # Create and return behavior instance
-    return behavior_class(transition, model)
+    return behavior_class(transition, model)  # type: ignore[abstract]
 
 
 def get_available_types() -> list:

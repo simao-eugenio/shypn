@@ -650,9 +650,9 @@ def smooth_threshold(x: float, threshold: float, width: float) -> float:
 # =============================================================================
 
 # Global state for Wiener process (maintain continuity between calls)
-_wiener_state = {}
+_wiener_state: Dict[Any, Any] = {}
 
-def wiener(t: float, amplitude: float = 1.0, dt: float = 0.1, seed: int = None) -> float:
+def wiener(t: float, amplitude: float = 1.0, dt: float = 0.1, seed: Optional[int] = None) -> float:
     """Wiener process (Brownian motion) - continuous stochastic process.
     
     Generates correlated random noise using discrete-time approximation:
@@ -1209,7 +1209,7 @@ def electro_driving_force(V_m: float, z: float, E_ion: float) -> float:
 # CATALOG DICTIONARY (for easy access)
 # =============================================================================
 
-FUNCTION_CATALOG = {
+FUNCTION_CATALOG: Dict[str, Callable[..., Any]] = {
     # Basic math functions (from Python math module)
     'exp': math.exp,
     'log': math.log,

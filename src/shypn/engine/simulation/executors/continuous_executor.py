@@ -21,9 +21,10 @@ except ImportError:
 
 # Import ChangeListener for atomic settings awareness
 try:
-    from shypn.engine.simulation.buffered.base import ChangeListener
+    from shypn.engine.simulation.buffered.base import ChangeListener as _ChangeListener
 except ImportError:
-    ChangeListener = object  # Fallback if not available
+    _ChangeListener = object  # type: ignore[assignment,misc]  # Fallback if not available
+ChangeListener = _ChangeListener
 
 
 class ContinuousExecutor(ChangeListener):
@@ -69,7 +70,7 @@ class ContinuousExecutor(ChangeListener):
         if hasattr(controller, 'buffered_settings') and controller.buffered_settings:
             controller.buffered_settings.add_listener(self)
     
-    def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
+    def run(self, time_step: Optional[float] = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
         
         Runs the simulation continuously using GLib timeout callbacks.

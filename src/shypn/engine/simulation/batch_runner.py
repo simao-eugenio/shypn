@@ -99,7 +99,7 @@ class BatchSimulationRunner:
         # Get base configuration from controller
         settings = controller.settings
         model = controller.model
-        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42
+        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42  # type: ignore[attr-defined]
         duration = settings.duration if hasattr(settings, 'duration') else 100.0
         
         # Store initial marking for reset between replicates
@@ -141,15 +141,15 @@ class BatchSimulationRunner:
             
             try:
                 # Set unique seed for this replicate
-                replicate_controller.settings.random_seed = base_seed + i
+                replicate_controller.settings.random_seed = base_seed + i  # type: ignore[attr-defined]
                 
                 # Reset model to initial marking with optional noise
                 self._reset_model(
                     model, 
                     initial_marking,
-                    apply_noise=replicate_controller.settings.ic_noise_enabled,
-                    noise_percent=replicate_controller.settings.ic_noise_percent,
-                    noise_places=replicate_controller.settings.ic_noise_places,
+                    apply_noise=replicate_controller.settings.ic_noise_enabled,  # type: ignore[attr-defined]
+                    noise_percent=replicate_controller.settings.ic_noise_percent,  # type: ignore[attr-defined]
+                    noise_places=replicate_controller.settings.ic_noise_places,  # type: ignore[attr-defined]
                     seed=base_seed + i  # Use replicate-specific seed for noise
                 )
                 
@@ -162,7 +162,7 @@ class BatchSimulationRunner:
                 
                 # Calculate time step (use same as real-time mode)
                 dt = replicate_controller.settings.get_effective_dt()
-                max_steps = int(duration / dt) if dt > 0 else 1000
+                max_steps = int(duration / dt) if dt > 0 and duration is not None else 1000
                 
                 # Initialize enablement states before stepping
                 replicate_controller._update_enablement_states()
@@ -246,7 +246,7 @@ class BatchSimulationRunner:
         
         return results
     
-    def _reset_model(self, model: Any, initial_marking: Dict[str, float], apply_noise: bool = False, noise_percent: float = 20.0, noise_places: Set[str] = None, seed: int = None) -> None:
+    def _reset_model(self, model: Any, initial_marking: Dict[str, float], apply_noise: bool = False, noise_percent: float = 20.0, noise_places: Optional[Set[str]] = None, seed: Optional[int] = None) -> None:
         """Reset model places to initial marking with optional random perturbations.
         
         Supports both discrete (int) and continuous (float) concentrations.

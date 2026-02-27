@@ -280,7 +280,7 @@ class ImmediateBehavior(TransitionBehavior):
             Dictionary with enablement details for each input place
         """
         input_arcs = self.get_input_arcs()
-        info = {
+        info: Dict[str, Any] = {
             'is_enabled': True,
             'input_places': []
         }
