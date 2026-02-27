@@ -3,7 +3,7 @@
 
 Collects place tokens and transition firing counts at each simulation step.
 """
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 from shypn.core.value_objects import RecordingConfig
 from shypn.utils.safe_eval import safe_eval_numeric
 
@@ -19,7 +19,7 @@ class DataCollector:
     Thread-safe for single-threaded GTK event loop.
     """
     
-    def __init__(self, model, controller=None, config: RecordingConfig = None):
+    def __init__(self, model: Any, controller: Any=None, config: RecordingConfig = None):
         """Initialize data collector.
         
         REFACTORED: Now uses RecordingConfig value object (reduced from 6 parameters to 2).
@@ -49,7 +49,7 @@ class DataCollector:
         # Thermodynamic validation results (populated at simulation end)
         self.validation_results = None
         
-    def start_collection(self):
+    def start_collection(self) -> None:
         """Initialize data structures and start collecting.
         
         If recorded_objects is None or empty, records ALL places and transitions.
@@ -83,7 +83,7 @@ class DataCollector:
         
         self.is_collecting = True
         
-    def record_state(self, current_time: float, force: bool = False):
+    def record_state(self, current_time: float, force: bool = False) -> None:
         """Record current state at given time point.
         
         Args:
@@ -187,7 +187,7 @@ class DataCollector:
             
             self.transition_rates[transition.id].append(rate)
     
-    def record_event(self, time: float, event_type: str, data: dict = None):
+    def record_event(self, time: float, event_type: str, data: dict = None) -> None:
         """Record a simulation event (for logging/debugging).
         
         This is used by τ-leaping and other advanced features to log
@@ -202,8 +202,7 @@ class DataCollector:
         # Could extend to store event history if needed
         pass
     
-    def record_firing(self, time: float, transition, consumed: dict = None, 
-                     produced: dict = None, mode: str = None, firings: int = 1):
+    def record_firing(self, time: float, transition: Any, consumed: dict = None, produced: dict = None, mode: str = None, firings: int = 1) -> None:
         """Record a transition firing event.
         
         Used by τ-leaping and other engines to record firing details.
@@ -225,11 +224,11 @@ class DataCollector:
         # Could extend to store firing history if needed for analysis
         pass
     
-    def stop_collection(self):
+    def stop_collection(self) -> None:
         """Stop collecting data."""
         self.is_collecting = False
         
-    def clear(self):
+    def clear(self) -> None:
         """Clear all collected data."""
         self.time_points.clear()
         self.place_data.clear()

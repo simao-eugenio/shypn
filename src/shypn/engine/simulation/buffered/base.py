@@ -98,7 +98,7 @@ class ChangeListener(ABC):
     """Abstract interface for listening to parameter changes."""
     
     @abstractmethod
-    def on_parameter_changed(self, parameter_name: str, old_value: Any, new_value: Any):
+    def on_parameter_changed(self, parameter_name: str, old_value: Any, new_value: Any) -> None:
         """Called when a parameter changes.
         
         Args:
@@ -109,7 +109,7 @@ class ChangeListener(ABC):
         pass
     
     @abstractmethod
-    def on_changes_committed(self, changes: Dict[str, tuple[Any, Any]]):
+    def on_changes_committed(self, changes: Dict[str, tuple[Any, Any]]) -> None:
         """Called when buffered changes are committed.
         
         Args:
@@ -118,7 +118,7 @@ class ChangeListener(ABC):
         pass
     
     @abstractmethod
-    def on_changes_rolled_back(self, changes: Dict[str, tuple[Any, Any]]):
+    def on_changes_rolled_back(self, changes: Dict[str, tuple[Any, Any]]) -> None:
         """Called when buffered changes are rolled back.
         
         Args:

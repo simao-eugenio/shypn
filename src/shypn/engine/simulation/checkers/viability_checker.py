@@ -16,7 +16,7 @@ This is distinct from thermodynamic validation, which checks equilibrium
 consistency of reversible reactions.
 """
 
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 
 
 class ViabilityChecker:
@@ -54,7 +54,7 @@ class ViabilityChecker:
         controller: SimulationController instance providing model and behavior access
     """
     
-    def __init__(self, controller):
+    def __init__(self, controller: Any):
         """Initialize viability checker.
         
         Args:
@@ -62,7 +62,7 @@ class ViabilityChecker:
         """
         self.controller = controller
     
-    def is_enabled(self, transition) -> bool:
+    def is_enabled(self, transition: Any) -> bool:
         """Check if a specific transition is enabled using behavior dispatch.
         
         Uses the transition's behavior to determine if it can fire based on
@@ -78,7 +78,7 @@ class ViabilityChecker:
         can_fire, reason = behavior.can_fire()
         return can_fire
     
-    def is_enabled_with_reason(self, transition) -> Tuple[bool, Optional[str]]:
+    def is_enabled_with_reason(self, transition: Any) -> Tuple[bool, Optional[str]]:
         """Check if transition is enabled and return reason if not.
         
         Args:

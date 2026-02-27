@@ -63,7 +63,7 @@ class EnergyDissipationValidator(BaseValidator):
         self._final_adp: Optional[float] = None
         self._final_pi: Optional[float] = None
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset validator state for new simulation."""
         super().reset()
         self._initial_energy = None
@@ -77,7 +77,7 @@ class EnergyDissipationValidator(BaseValidator):
         self._final_adp = None
         self._final_pi = None
     
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update validator with current simulation state.
         
         Args:

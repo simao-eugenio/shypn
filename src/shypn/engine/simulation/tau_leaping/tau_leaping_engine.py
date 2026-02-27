@@ -775,7 +775,7 @@ class TauLeapingEngine:
             'critical_threshold': self.leap_selector.critical_threshold
         }
     
-    def reset_statistics(self):
+    def reset_statistics(self) -> None:
         """Reset statistics counters."""
         self.stats = {
             'total_leaps': 0,

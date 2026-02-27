@@ -34,7 +34,7 @@ class BoundaryValidator:
         )
     """
     
-    def __init__(self, model):
+    def __init__(self, model: Any):
         """Initialize validator with model context.
         
         Args:
@@ -42,12 +42,7 @@ class BoundaryValidator:
         """
         self.model = model
     
-    def validate_crossing(
-        self,
-        source_place,
-        target_place,
-        transition
-    ) -> Tuple[bool, str]:
+    def validate_crossing(self, source_place: Any, target_place: Any, transition: Any) -> Tuple[bool, str]:
         """Validate if transition can transport signal across boundary.
         
         Args:
@@ -104,13 +99,7 @@ class BoundaryValidator:
         # Unknown boundary type - default to permeable
         return True, "unknown-boundary-type"
     
-    def validate_transition_arcs(
-        self,
-        transition,
-        input_arcs: List,
-        output_arcs: List,
-        get_place_func
-    ) -> Tuple[bool, str]:
+    def validate_transition_arcs(self, transition: Any, input_arcs: List, output_arcs: List, get_place_func: Any) -> Tuple[bool, str]:
         """Validate all arcs for a transition respect boundary constraints.
         
         Args:
@@ -163,16 +152,11 @@ class GradientModulator:
         )
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize gradient modulator."""
         pass
     
-    def apply_gradient(
-        self,
-        base_rate: float,
-        source_place,
-        target_place
-    ) -> float:
+    def apply_gradient(self, base_rate: float, source_place: Any, target_place: Any) -> float:
         """Apply gradient-based modulation to rate.
         
         Args:
@@ -229,7 +213,7 @@ class GradientModulator:
         
         return base_rate * max(0.0, modulation_factor)  # Ensure non-negative
     
-    def get_gradient_magnitude(self, place) -> Optional[float]:
+    def get_gradient_magnitude(self, place: Any) -> Optional[float]:
         """Get magnitude of gradient vector from place.
         
         Args:
@@ -268,7 +252,7 @@ class VolumeAdaptiveSelector:
         """
         self.threshold_molecules = threshold_molecules
     
-    def should_use_stochastic(self, place) -> bool:
+    def should_use_stochastic(self, place: Any) -> bool:
         """Check if place molecule count suggests stochastic dynamics.
         
         Calculates molecule count as: tokens × compartment_volume
@@ -367,16 +351,11 @@ class SpatialRateBuilder:
         )
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize rate builder."""
         pass
     
-    def build_diffusion_rate(
-        self,
-        source_place,
-        target_place,
-        base_rate: float = 1.0
-    ) -> str:
+    def build_diffusion_rate(self, source_place: Any, target_place: Any, base_rate: float = 1.0) -> str:
         """Generate Fick's law diffusion rate formula.
         
         Formula: rate = D × |C_target - C_source| / distance²
@@ -408,12 +387,7 @@ class SpatialRateBuilder:
         
         return formula
     
-    def build_gradient_flow_rate(
-        self,
-        source_place,
-        target_place,
-        base_rate: float = 1.0
-    ) -> str:
+    def build_gradient_flow_rate(self, source_place: Any, target_place: Any, base_rate: float = 1.0) -> str:
         """Generate gradient-driven flow rate formula.
         
         Args:
@@ -437,13 +411,7 @@ class SpatialRateBuilder:
         
         return formula
     
-    def build_distance_decay_rate(
-        self,
-        source_place,
-        target_place,
-        base_rate: float = 1.0,
-        decay_constant: float = 1.0
-    ) -> str:
+    def build_distance_decay_rate(self, source_place: Any, target_place: Any, base_rate: float = 1.0, decay_constant: float = 1.0) -> str:
         """Generate distance-dependent decay rate.
         
         Formula: rate = base_rate × exp(-decay_constant × distance)

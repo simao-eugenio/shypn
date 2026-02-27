@@ -90,7 +90,7 @@ class ContinuousStrategy(SimulationStrategy):
         # Pure continuous: has continuous but not stochastic
         return has_continuous and not has_stochastic
     
-    def _get_enabled_continuous_transitions(self):
+    def _get_enabled_continuous_transitions(self) -> None:
         """Get list of enabled continuous/timed transitions.
         
         Returns:

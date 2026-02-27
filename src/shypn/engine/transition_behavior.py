@@ -53,7 +53,7 @@ class TransitionBehavior(ABC):
             )
     """
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize behavior with transition and model context.
         
         Args:
@@ -359,7 +359,7 @@ class TransitionBehavior(ABC):
         
         return result
     
-    def _get_place(self, place_id):
+    def _get_place(self, place_id: Any) -> None:
         """Get place object by ID.
         
         Args:
@@ -390,7 +390,7 @@ class TransitionBehavior(ABC):
                 f"Model.places must be dict or list, got {type(places_collection)}"
             )
     
-    def _get_arc(self, arc_id):
+    def _get_arc(self, arc_id: Any) -> None:
         """Get arc object by ID.
         
         Args:
@@ -511,7 +511,7 @@ class TransitionBehavior(ABC):
         return False, f"guard-unknown-type: {type(guard_expr)}"
     
     def _record_event(self, consumed: Dict[int, float], produced: Dict[int, float], 
-                     mode: str = 'logical', **kwargs):
+                      mode: str = 'logical', **kwargs: Any) -> None:
         """Record transition firing event in model history.
         
         Args:
@@ -553,15 +553,15 @@ class TransitionBehavior(ABC):
         """
         return self._last_produced.copy()
     
-    def enable_accounting(self):
+    def enable_accounting(self) -> None:
         """Enable token accounting tracking."""
         self._accounting_enabled = True
         
-    def disable_accounting(self):
+    def disable_accounting(self) -> None:
         """Disable token accounting tracking."""
         self._accounting_enabled = False
     
-    def _is_signal_place(self, place) -> bool:
+    def _is_signal_place(self, place: Any) -> bool:
         """Check if a place is a signal place (read-only, non-consuming).
         
         Signal places (Ψ) in modular Bio-PN architecture provide information

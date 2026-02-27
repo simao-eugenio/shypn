@@ -49,7 +49,7 @@ class ReplicateRunner:
         default_settings: Default SimulationSettings to use
     """
     
-    def __init__(self, model, settings: Optional[SimulationSettings] = None):
+    def __init__(self, model: Any, settings: Optional[SimulationSettings] = None):
         """Initialize replicate runner.
         
         Args:
@@ -426,7 +426,7 @@ class ReplicateRunner:
         filepath: Union[str, Path],
         format: str = 'wide',
         include_transitions: bool = False
-    ):
+    ) -> None:
         """Export trajectory data to CSV.
         
         Args:
@@ -458,7 +458,7 @@ class ReplicateRunner:
         results: List[Dict[str, Any]],
         filepath: Path,
         include_transitions: bool
-    ):
+    ) -> None:
         """Export in wide format (one row per time point per replicate)."""
         import csv
         
@@ -502,7 +502,7 @@ class ReplicateRunner:
         results: List[Dict[str, Any]],
         filepath: Path,
         include_transitions: bool
-    ):
+    ) -> None:
         """Export in long/tidy format (one row per observation)."""
         import csv
         
@@ -541,7 +541,7 @@ class ReplicateRunner:
         self,
         statistics: Dict[str, Any],
         filepath: Union[str, Path]
-    ):
+    ) -> None:
         """Export statistics to JSON.
         
         Args:
@@ -554,7 +554,7 @@ class ReplicateRunner:
         with open(filepath, 'w') as f:
             json.dump(statistics, f, indent=2)
     
-    def _reset_model(self, model):
+    def _reset_model(self, model: Any) -> None:
         """Reset model to initial marking.
         
         Args:
