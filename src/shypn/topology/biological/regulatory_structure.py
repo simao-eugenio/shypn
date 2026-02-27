@@ -155,7 +155,7 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
                 metadata={'analyzer': self.name}
             )
     
-    def _validate_model(self):
+    def _validate_model(self) -> None:
         """Validate that model has required attributes.
         
         Raises:

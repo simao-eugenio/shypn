@@ -1,7 +1,7 @@
 """Abstract base class for topology analyzers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 import time
 
 from .analysis_result import AnalysisResult
@@ -162,7 +162,7 @@ class TopologyAnalyzer(ABC):
     
     # ======= Shared helpers (used by network/behavioral/structural subclasses) =======
 
-    def _build_graph(self):
+    def _build_graph(self) -> Any:
         """Build directed graph from Petri net."""
         import networkx as nx
         graph = nx.DiGraph()
@@ -181,7 +181,7 @@ class TopologyAnalyzer(ABC):
             graph.add_edge(src, tgt, obj=arc, weight=getattr(arc, 'weight', 1))
         return graph
 
-    def _filter_nodes_by_type(self, graph, node_type: str) -> list:
+    def _filter_nodes_by_type(self, graph: Any, node_type: str) -> List[str]:
         """Filter graph nodes by type (place or transition)."""
         if node_type == 'place':
             return [n for n in graph.nodes() if n.startswith('p_')]
@@ -199,7 +199,7 @@ class TopologyAnalyzer(ABC):
                 return getattr(transition, 'name', node_id)
         return node_id
 
-    def _get_initial_marking(self) -> dict:
+    def _get_initial_marking(self) -> Dict[Any, int]:
         """Get initial marking from the model."""
         marking = {}
         if hasattr(self.model.places, 'items'):
@@ -210,7 +210,7 @@ class TopologyAnalyzer(ABC):
                 marking[place.id] = place.tokens
         return marking
 
-    def _get_enabled_transitions(self, marking: dict) -> list:
+    def _get_enabled_transitions(self, marking: Dict[Any, int]) -> List[Any]:
         """Get list of enabled transitions for a marking."""
         enabled = []
         transitions = (self.model.transitions.keys() if
@@ -231,7 +231,7 @@ class TopologyAnalyzer(ABC):
                 enabled.append(trans_id)
         return enabled
 
-    def _fire_transition(self, marking: dict, trans_id: str) -> dict:
+    def _fire_transition(self, marking: Dict[Any, int], trans_id: str) -> Dict[Any, int]:
         """Fire a transition and return the new marking."""
         new_marking = marking.copy()
         arcs = (self.model.arcs.values() if hasattr(self.model.arcs, 'values')
@@ -248,7 +248,7 @@ class TopologyAnalyzer(ABC):
                 new_marking[arc_target] = new_marking.get(arc_target, 0) + arc.weight
         return new_marking
 
-    def _set_numpy_threads(self, num_threads: int) -> dict:
+    def _set_numpy_threads(self, num_threads: int) -> Dict[str, Any]:
         """Configure NumPy/BLAS threading. Returns old settings dict."""
         import os
         old_settings = {}
@@ -264,7 +264,7 @@ class TopologyAnalyzer(ABC):
             old_settings['threadpool_limits'] = None
         return old_settings
 
-    def _restore_numpy_threads(self, old_settings: dict):
+    def _restore_numpy_threads(self, old_settings: Dict[str, Any]) -> None:
         """Restore NumPy/BLAS threading settings."""
         import os
         env_vars = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS',
@@ -278,7 +278,7 @@ class TopologyAnalyzer(ABC):
         if old_settings.get('threadpool_limits') is not None:
             old_settings['threadpool_limits'].__exit__(None, None, None)
 
-    def _build_place_connectivity(self) -> tuple:
+    def _build_place_connectivity(self) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
         """Build preset/postset maps for places.
 
         Returns:

@@ -408,7 +408,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
         
         return " | ".join(lines)
     
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached analysis results."""
         super().clear_cache()
         self._firing_counts.clear()

@@ -224,7 +224,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _create_explorer(self, parallel: Any, num_workers: Optional[int]):
+    def _create_explorer(self, parallel: Any, num_workers: Optional[int]) -> Any:
         """Create appropriate explorer strategy (OOP factory pattern).
         
         Args:

@@ -241,7 +241,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         max_depth: int,
         find_deadlocks: bool,
         shutdown_event: Any
-    ):
+    ) -> None:
         """Worker process with maximal concurrent set firing."""
         stats['workers_active'] += 1
         

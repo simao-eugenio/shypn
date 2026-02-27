@@ -141,7 +141,7 @@ class TopologyResultAggregator:
             'transitions': dict(transitions)
         }
     
-    def _process_p_invariants(self, data: Dict, places: Dict):
+    def _process_p_invariants(self, data: Dict, places: Dict) -> None:
         """Process P-Invariant results into place properties."""
         invariants = data.get('p_invariants', [])
         
@@ -166,7 +166,7 @@ class TopologyResultAggregator:
                     'expression': expression
                 })
     
-    def _process_t_invariants(self, data: Dict, transitions: Dict):
+    def _process_t_invariants(self, data: Dict, transitions: Dict) -> None:
         """Process T-Invariant results into transition properties."""
         invariants = data.get('t_invariants', [])
         
@@ -191,7 +191,7 @@ class TopologyResultAggregator:
                     'sequence': sequence
                 })
     
-    def _process_siphons(self, data: Dict, places: Dict):
+    def _process_siphons(self, data: Dict, places: Dict) -> None:
         """Process Siphon results into place properties."""
         siphons = data.get('siphons', [])
         
@@ -210,7 +210,7 @@ class TopologyResultAggregator:
                 if is_empty:
                     places[place_id_str]['can_deadlock'] = True
     
-    def _process_traps(self, data: Dict, places: Dict):
+    def _process_traps(self, data: Dict, places: Dict) -> None:
         """Process Trap results into place properties."""
         traps = data.get('traps', [])
         
@@ -226,7 +226,7 @@ class TopologyResultAggregator:
                     'size': len(place_ids)
                 })
     
-    def _process_cycles(self, data: Dict, transitions: Dict):
+    def _process_cycles(self, data: Dict, transitions: Dict) -> None:
         """Process Cycle results into transition properties."""
         cycles = data.get('cycles', [])
         
@@ -248,7 +248,7 @@ class TopologyResultAggregator:
                         'nodes': nodes
                     })
     
-    def _process_paths(self, data: Dict, transitions: Dict):
+    def _process_paths(self, data: Dict, transitions: Dict) -> None:
         """Process Path results into transition properties."""
         paths = data.get('paths', [])
         
@@ -264,7 +264,7 @@ class TopologyResultAggregator:
                         'nodes': nodes
                     })
     
-    def _process_hubs(self, data: Dict, transitions: Dict):
+    def _process_hubs(self, data: Dict, transitions: Dict) -> None:
         """Process Hub results into transition properties."""
         hubs = data.get('hubs', [])
         
@@ -278,7 +278,7 @@ class TopologyResultAggregator:
             transitions[trans_id_str]['hub_degree'] = hub.get('degree', 0)
             transitions[trans_id_str]['connected_to'] = hub.get('neighbors', [])
     
-    def _process_boundedness(self, data: Dict, places: Dict):
+    def _process_boundedness(self, data: Dict, places: Dict) -> None:
         """Process Boundedness results into place properties."""
         is_bounded = data.get('is_bounded', True)
         unbounded_places = data.get('unbounded_places', [])
@@ -293,7 +293,7 @@ class TopologyResultAggregator:
                 if places[place_id_str]['boundedness'] == 'unknown':
                     places[place_id_str]['boundedness'] = 'bounded'
     
-    def _process_reachability(self, data: Dict, places: Dict, transitions: Dict):
+    def _process_reachability(self, data: Dict, places: Dict, transitions: Dict) -> None:
         """Process Reachability results (affects both places and transitions)."""
         # This is complex - for now just store basic info
         total_states = data.get('total_states', 0)
@@ -302,7 +302,7 @@ class TopologyResultAggregator:
         # Could mark transitions that are never enabled, etc.
         pass
     
-    def _process_liveness(self, data: Dict, transitions: Dict):
+    def _process_liveness(self, data: Dict, transitions: Dict) -> None:
         """Process Liveness results into transition properties."""
         liveness_levels = data.get('liveness_levels', {})
         dead_transitions = data.get('dead_transitions', [])
@@ -322,7 +322,7 @@ class TopologyResultAggregator:
             }
             transitions[trans_id_str]['liveness_description'] = level_descriptions.get(level, level)
     
-    def _process_deadlocks(self, data: Dict, places: Dict, transitions: Dict):
+    def _process_deadlocks(self, data: Dict, places: Dict, transitions: Dict) -> None:
         """Process Deadlock results into place/transition properties."""
         has_deadlock = data.get('has_deadlock', False)
         empty_siphons = data.get('empty_siphons', [])
@@ -332,7 +332,7 @@ class TopologyResultAggregator:
             place_id_str = str(place_id)
             places[place_id_str]['can_deadlock'] = True
     
-    def _process_fairness(self, data: Dict, transitions: Dict):
+    def _process_fairness(self, data: Dict, transitions: Dict) -> None:
         """Process Fairness results into transition properties."""
         is_fair = data.get('is_fair', True)
         unfair_transitions = data.get('unfair_transitions', [])

@@ -1,6 +1,6 @@
 """T-Invariant analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Dict, Any, Iterator, List, Optional, Tuple
 import numpy as np
 from scipy import linalg
 
@@ -296,7 +296,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         
         return invariants
     
-    def _generate_coefficient_combinations(self, n_basis: int, max_coef: int):
+    def _generate_coefficient_combinations(self, n_basis: int, max_coef: int) -> Iterator[List[int]]:
         """Generate coefficient combinations for linear combinations.
         
         Args:

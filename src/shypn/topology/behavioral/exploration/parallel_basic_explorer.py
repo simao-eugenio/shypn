@@ -223,7 +223,7 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         max_depth: int,
         find_deadlocks: bool,
         shutdown_event: Any
-    ):
+    ) -> None:
         """Worker process main loop."""
         stats['workers_active'] += 1
         
