@@ -213,31 +213,6 @@ class TrapAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _build_place_connectivity(self) -> tuple:
-        """Build preset and postset maps for places.
-        
-        Returns:
-            (place_presets, place_postsets) where:
-            - place_presets[place_id] = set of transition IDs that input to place
-            - place_postsets[place_id] = set of transition IDs that output from place
-        """
-        place_presets = {str(p.id): set() for p in self.model.places}
-        place_postsets = {str(p.id): set() for p in self.model.places}
-        
-        for arc in self.model.arcs:
-            source_id = str(arc.source_id)
-            target_id = str(arc.target_id)
-            
-            # Transition → Place arc (place is in postset of transition)
-            if target_id in place_presets:
-                place_presets[target_id].add(source_id)
-            
-            # Place → Transition arc (place is in preset of transition)
-            if source_id in place_postsets:
-                place_postsets[source_id].add(target_id)
-        
-        return place_presets, place_postsets
-    
     def _find_traps(
         self,
         place_presets: Dict[str, Set[str]],

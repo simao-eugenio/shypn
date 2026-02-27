@@ -343,67 +343,6 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         
         return intra_community_edges / total_edges
     
-    def _build_graph(self) -> nx.DiGraph:
-        """Build directed graph from Petri net."""
-        graph = nx.DiGraph()
-        
-        # Add place nodes
-        for place in self.model.places:
-            graph.add_node(
-                str(place.id),
-                type='place',
-                obj=place,
-                name=getattr(place, 'name', f'P{place.id}')
-            )
-        
-        # Add transition nodes
-        for transition in self.model.transitions:
-            graph.add_node(
-                str(transition.id),
-                type='transition',
-                obj=transition,
-                name=getattr(transition, 'name', f'T{transition.id}')
-            )
-        
-        # Add arc edges
-        for arc in self.model.arcs:
-            source_id = str(arc.source.id)
-            target_id = str(arc.target.id)
-            graph.add_edge(
-                source_id,
-                target_id,
-                obj=arc,
-                weight=getattr(arc, 'weight', 1)
-            )
-        
-        return graph
-    
-    def _filter_nodes_by_type(
-        self,
-        graph: nx.Graph,
-        node_type: str
-    ) -> List[str]:
-        """Filter graph nodes by type (place or transition)."""
-        if node_type == 'place':
-            return [n for n in graph.nodes() if n.startswith('p_')]
-        elif node_type == 'transition':
-            return [n for n in graph.nodes() if n.startswith('t_')]
-        else:
-            return list(graph.nodes())
-    
-    def _get_node_name(self, node_id: str) -> str:
-        """Get human-readable name for a node."""
-        # Try to get from model
-        for place in self.model.places:
-            if str(place.id) == node_id:
-                return getattr(place, 'name', node_id)
-        
-        for transition in self.model.transitions:
-            if str(transition.id) == node_id:
-                return getattr(transition, 'name', node_id)
-        
-        return node_id
-    
     def _create_summary(
         self,
         num_communities: int,
