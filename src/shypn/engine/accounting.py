@@ -340,7 +340,7 @@ class TokenAccountingAuditor:
         
         return conserved, leak
     
-    def validate_firing_counts(self) -> None:
+    def validate_firing_counts(self) -> bool:
         """Validate that transition.firing_count matches accounting records.
         
         Compares the actual transition.firing_count with the number of

@@ -359,7 +359,7 @@ class TransitionBehavior(ABC):
         
         return result
     
-    def _get_place(self, place_id: Any) -> None:
+    def _get_place(self, place_id: Any) -> Any:
         """Get place object by ID.
         
         Args:
@@ -390,7 +390,7 @@ class TransitionBehavior(ABC):
                 f"Model.places must be dict or list, got {type(places_collection)}"
             )
     
-    def _get_arc(self, arc_id: Any) -> None:
+    def _get_arc(self, arc_id: Any) -> Any:
         """Get arc object by ID.
         
         Args:

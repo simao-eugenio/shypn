@@ -26,7 +26,7 @@ Usage in rate expressions:
 
 import numpy as np
 import math
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, cast
 
 
 # =============================================================================
@@ -1296,16 +1296,16 @@ FUNCTION_CATALOG = {
 }
 
 
-def get_catalog() -> Dict[str, Callable]:
+def get_catalog() -> Dict[str, Callable[..., Any]]:
     """Get the complete function catalog.
     
     Returns:
         Dictionary mapping function names to callable functions
     """
-    return FUNCTION_CATALOG.copy()
+    return dict(FUNCTION_CATALOG)
 
 
-def get_function(name: str) -> Optional[Callable]:
+def get_function(name: str) -> Optional[Callable[..., Any]]:
     """Get a specific function from the catalog.
     
     Args:
@@ -1314,7 +1314,7 @@ def get_function(name: str) -> Optional[Callable]:
     Returns:
         Function callable, or None if not found
     """
-    return FUNCTION_CATALOG.get(name)
+    return cast(Optional[Callable[..., Any]], FUNCTION_CATALOG.get(name))
 
 
 def list_functions() -> list:
