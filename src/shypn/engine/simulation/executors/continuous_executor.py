@@ -348,7 +348,7 @@ class ContinuousExecutor(ChangeListener):
                 
                 # Notify completion callback (deferred to avoid blocking UI)
                 if self.controller.on_simulation_complete:
-                    def deferred_callback() -> None:
+                    def deferred_callback() -> bool:
                         try:
                             self.controller.on_simulation_complete()
                         except Exception as e:
@@ -410,7 +410,7 @@ class ContinuousExecutor(ChangeListener):
         
         # Notify completion callback (deferred to avoid blocking)
         if self.controller.on_simulation_complete and GLIB_AVAILABLE:
-            def deferred_callback() -> None:
+            def deferred_callback() -> bool:
                 try:
                     self.controller.on_simulation_complete()
                 except Exception as e:

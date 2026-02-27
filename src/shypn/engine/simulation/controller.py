@@ -35,7 +35,7 @@ the new architecture.
 import logging
 import random
 import traceback
-from typing import Callable, List, Optional, Dict, Any
+from typing import Callable, List, Optional, Dict, Tuple, Any
 try:
     from gi.repository import GLib
     GLIB_AVAILABLE = True
@@ -123,7 +123,7 @@ class ModelAdapter:
         return self._arcs_dict
 
     @property
-    def logical_time(self) -> None:
+    def logical_time(self) -> float:
         """Get current logical time from controller.
         
         Returns:
@@ -134,7 +134,7 @@ class ModelAdapter:
         return 0.0
 
     @property
-    def thermodynamic_settings(self) -> None:
+    def thermodynamic_settings(self) -> Dict[str, Any]:
         """Get thermodynamic settings from canvas manager.
         
         Returns:
@@ -361,7 +361,7 @@ class SimulationController:
         """Set simulation complete callback."""
         self._on_simulation_complete = value
     
-    def validate_thermodynamics(self) -> Dict[str, Any]:
+    def validate_thermodynamics(self) -> Optional[Dict[str, Any]]:
         """
         Validate thermodynamic consistency of reversible transitions.
         
@@ -1010,7 +1010,7 @@ class SimulationController:
         """
         self._execution_strategy = strategy
     
-    def auto_select_strategy(self) -> None:
+    def auto_select_strategy(self) -> Any:
         """Automatically select best strategy for current model.
         
         Selection logic:
@@ -1061,7 +1061,7 @@ class SimulationController:
         self._execution_strategy = strategy
         return strategy
     
-    def list_available_strategies(self) -> None:
+    def list_available_strategies(self) -> List:
         """Get list of all available execution strategies.
         
         Returns:
@@ -2578,7 +2578,7 @@ class SimulationController:
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
-    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
+    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> Tuple[List, List]:
         """Resolve continuous transition conflicts using LocalityDetector.
 
         Two transitions belong to the same conflict group when their localities

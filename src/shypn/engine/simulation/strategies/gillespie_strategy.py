@@ -152,7 +152,7 @@ class GillespieStrategy(SimulationStrategy):
         
         return -math.log(r) / total_propensity
     
-    def _select_reaction(self, transitions: List, propensities: List[float], total: float) -> None:
+    def _select_reaction(self, transitions: List, propensities: List[float], total: float) -> Any:
         """Select which reaction fires using weighted sampling.
         
         Uses linear search with cumulative propensities.
