@@ -34,8 +34,8 @@ class Place(PetriNetObject):
     SIGNAL_BORDER_COLOR = (0.0, 0.4, 0.8)  # Blue border for signal places
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
-    def __init__(self, x: float, y: float, id: str, name: str, 
-                 radius: float = None, label: str = ""):
+    def __init__(self, x: float, y: float, id: str, name: str,
+                 radius: Optional[float] = None, label: str = ""):
         """Initialize a Place.
         
         Args:
@@ -59,8 +59,8 @@ class Place(PetriNetObject):
         self.border_width = self.DEFAULT_BORDER_WIDTH
         
         # State
-        self.tokens = 0  # Number of tokens in this place
-        self.initial_marking = 0  # Initial marking for simulation reset
+        self.tokens: float = 0.0  # Number of tokens in this place
+        self.initial_marking: float = 0.0  # Initial marking for simulation reset
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
         
         # Signal place properties (13-tuple Bio-PN formalism: Ψ)
@@ -97,8 +97,11 @@ class Place(PetriNetObject):
         self.compartment: Optional[str] = None  # Compartment name (e.g., "cytoplasm", "membrane", "extracellular")
         
         # Protected attributes - use properties/methods to access
-        self._properties = {}  # Private: place-specific parameters (access via properties)
-        self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
+        self._properties: dict[str, Any] = {}  # Private: place-specific parameters
+        self._metadata: dict[str, Any] = {}    # Private: annotations, provenance
+
+        # Optional attributes set dynamically (e.g., from_dict)
+        self.is_catalyst: bool = False  # Catalyst flag (set by importers/layout)
         
         # Apply color schema based on place type (after all properties initialized)
         from shypn.utils.color_schema_manager import ColorSchemaManager
@@ -172,7 +175,7 @@ class Place(PetriNetObject):
             'height': diameter
         }
     
-    def render(self, cr: Any, zoom: float = 1.0) -> None:
+    def render(self, cr: Any, zoom: float = 1.0) -> None:  # type: ignore[override]
         """Render the place as a hollow circle (or hexagon for signal places).
         
         Uses legacy rendering style with Cairo transform approach:
