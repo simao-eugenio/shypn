@@ -732,13 +732,33 @@ class ParameterSweepBuilder(Gtk.Box):
                 if hasattr(queue_view, 'parallel_checkbox'):
                     use_parallel = queue_view.parallel_checkbox.get_active()
             
-            # Use same empirical factors as in experiment_automation_category.py
-            # Sequential: 0.827s per simulated second
-            # Parallel: 2.41s per simulated second (includes multiprocessing overhead)
-            empirical_factor = 2.41 if use_parallel else 0.827
-            
+            # Estimate is based on step count, not simulated duration.
+            #
+            # In auto-dt mode: dt = duration / 10000 (DEFAULT_STEPS_TARGET), so
+            # n_steps = 10000 ALWAYS regardless of duration. A 60s run and a 7200s
+            # run both execute exactly 10000 steps and take the same wall-clock time.
+            # Estimating as (duration × factor) would over-predict by 120× for 7200s.
+            #
+            # Empirical cost per step measured at 60s auto-dt (3 reps × 148.9s):
+            #   sequential: 148.9 / (3 × 10000) ≈ 0.00496 s/step
+            #   parallel:   2.41 × 60 / 10000  ≈ 0.01446 s/step
+            DEFAULT_STEPS_TARGET = 10000
+            dt_is_auto = not (hasattr(self, 'sweep_dt_manual_radio') and
+                              self.sweep_dt_manual_radio.get_active())
+            if dt_is_auto:
+                n_steps = DEFAULT_STEPS_TARGET
+            else:
+                try:
+                    dt_manual = float(self.sweep_dt_manual_entry.get_text().strip() or "0.01")
+                    n_steps = int(duration / dt_manual) if dt_manual > 0 else DEFAULT_STEPS_TARGET
+                except (ValueError, AttributeError):
+                    n_steps = DEFAULT_STEPS_TARGET
+
+            # s/step constants derived from the same 60 s benchmark
+            cost_per_step = 0.01446 if use_parallel else 0.00496
+
             # Calculate time per experiment (replicates run sequentially within each experiment)
-            time_per_experiment = replicates * duration * empirical_factor
+            time_per_experiment = replicates * n_steps * cost_per_step
             
             # Calculate total time based on execution mode
             if use_parallel:
