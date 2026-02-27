@@ -51,6 +51,11 @@ class EventBus:
     _subscribers: Dict[str, List[tuple[Optional[int], int, Callable]]] = defaultdict(list)
     _wildcard_subscribers: List[tuple[str, Optional[int], int, Callable]] = []
     
+    # Thread safety: protects _subscribers and _wildcard_subscribers mutations.
+    # emit() takes a snapshot under the lock and calls handlers outside it
+    # to prevent deadlock when a handler calls subscribe()/unsubscribe().
+    _lock: threading.RLock = threading.RLock()
+    
     # Event name registry for documentation
     _registered_events: Dict[str, str] = {}
     
@@ -86,12 +91,14 @@ class EventBus:
         if '*' in event_name:
             # Wildcard subscription
             pattern = event_name.replace('*', '')
-            cls._wildcard_subscribers.append((pattern, document_id, priority, handler))
-            cls._wildcard_subscribers.sort(key=lambda x: -x[2])  # Sort by priority desc
+            with cls._lock:
+                cls._wildcard_subscribers.append((pattern, document_id, priority, handler))
+                cls._wildcard_subscribers.sort(key=lambda x: -x[2])  # Sort by priority desc
         else:
             # Exact match subscription
-            cls._subscribers[event_name].append((document_id, priority, handler))
-            cls._subscribers[event_name].sort(key=lambda x: -x[1])  # Sort by priority desc
+            with cls._lock:
+                cls._subscribers[event_name].append((document_id, priority, handler))
+                cls._subscribers[event_name].sort(key=lambda x: -x[1])  # Sort by priority desc
         
         doc_str = f" (document_id={document_id})" if document_id else " (global)"
         logger.debug(f"Subscribed to '{event_name}'{doc_str} with priority {priority}")
@@ -116,20 +123,22 @@ class EventBus:
         if '*' in event_name:
             # Remove from wildcard subscribers
             pattern = event_name.replace('*', '')
-            original_len = len(cls._wildcard_subscribers)
-            cls._wildcard_subscribers = [
-                (p, doc_id, pri, h) for p, doc_id, pri, h in cls._wildcard_subscribers
-                if not (p == pattern and h == handler and doc_id == document_id)
-            ]
+            with cls._lock:
+                original_len = len(cls._wildcard_subscribers)
+                cls._wildcard_subscribers = [
+                    (p, doc_id, pri, h) for p, doc_id, pri, h in cls._wildcard_subscribers
+                    if not (p == pattern and h == handler and doc_id == document_id)
+                ]
             return len(cls._wildcard_subscribers) < original_len
         else:
             # Remove from exact match subscribers
             if event_name in cls._subscribers:
-                original_len = len(cls._subscribers[event_name])
-                cls._subscribers[event_name] = [
-                    (doc_id, pri, h) for doc_id, pri, h in cls._subscribers[event_name]
-                    if not (h == handler and doc_id == document_id)
-                ]
+                with cls._lock:
+                    original_len = len(cls._subscribers[event_name])
+                    cls._subscribers[event_name] = [
+                        (doc_id, pri, h) for doc_id, pri, h in cls._subscribers[event_name]
+                        if not (h == handler and doc_id == document_id)
+                    ]
                 return len(cls._subscribers[event_name]) < original_len
         
         return False
@@ -181,20 +190,25 @@ class EventBus:
         doc_str = f" for document_id={document_id}" if document_id else " (global)"
         logger.debug(f"Emitting event '{event_name}'{doc_str} with data: {type(data).__name__}")
         
+        # Take snapshot of subscribers under lock, dispatch outside lock
+        # to prevent deadlock when a handler calls subscribe()/unsubscribe().
+        with cls._lock:
+            exact_subs = list(cls._subscribers.get(event_name, []))
+            wildcard_subs = list(cls._wildcard_subscribers)
+
         # Call exact match subscribers
-        if event_name in cls._subscribers:
-            for sub_doc_id, priority, handler in cls._subscribers[event_name]:
-                if cls._should_call_handler(sub_doc_id, document_id):
-                    try:
-                        handler(data)
-                    except Exception as e:
-                        logger.error(
-                            f"Error in subscriber {handler.__name__} for event '{event_name}': {e}\n"
-                            f"{traceback.format_exc()}"
-                        )
+        for sub_doc_id, priority, handler in exact_subs:
+            if cls._should_call_handler(sub_doc_id, document_id):
+                try:
+                    handler(data)
+                except Exception as e:
+                    logger.error(
+                        f"Error in subscriber {handler.__name__} for event '{event_name}': {e}\n"
+                        f"{traceback.format_exc()}"
+                    )
         
         # Call wildcard subscribers
-        for pattern, sub_doc_id, priority, handler in cls._wildcard_subscribers:
+        for pattern, sub_doc_id, priority, handler in wildcard_subs:
             if event_name.startswith(pattern) and cls._should_call_handler(sub_doc_id, document_id):
                 try:
                     handler(data)
@@ -276,19 +290,20 @@ class EventBus:
             EventBus.clear_document(id(drawing_area))
         """
         removed = 0
-        for event_name in list(cls._subscribers.keys()):
-            before = len(cls._subscribers[event_name])
-            cls._subscribers[event_name] = [
-                (did, pri, h) for did, pri, h in cls._subscribers[event_name]
+        with cls._lock:
+            for event_name in list(cls._subscribers.keys()):
+                before = len(cls._subscribers[event_name])
+                cls._subscribers[event_name] = [
+                    (did, pri, h) for did, pri, h in cls._subscribers[event_name]
+                    if did != document_id
+                ]
+                removed += before - len(cls._subscribers[event_name])
+            before_wc = len(cls._wildcard_subscribers)
+            cls._wildcard_subscribers = [
+                (p, did, pri, h) for p, did, pri, h in cls._wildcard_subscribers
                 if did != document_id
             ]
-            removed += before - len(cls._subscribers[event_name])
-        before_wc = len(cls._wildcard_subscribers)
-        cls._wildcard_subscribers = [
-            (p, did, pri, h) for p, did, pri, h in cls._wildcard_subscribers
-            if did != document_id
-        ]
-        removed += before_wc - len(cls._wildcard_subscribers)
+            removed += before_wc - len(cls._wildcard_subscribers)
         logger.debug(f"clear_document({document_id}): removed {removed} subscriptions")
         return removed
 
@@ -298,8 +313,9 @@ class EventBus:
         
         Warning: This removes ALL subscribers. Only use in tests or shutdown.
         """
-        cls._subscribers.clear()
-        cls._wildcard_subscribers.clear()
+        with cls._lock:
+            cls._subscribers.clear()
+            cls._wildcard_subscribers.clear()
         logger.debug("Cleared all event subscriptions")
 
 
