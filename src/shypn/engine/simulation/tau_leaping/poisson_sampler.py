@@ -156,7 +156,7 @@ class PoissonSampler:
         firings = self.sample(propensity, tau)
         return min(firings, max_firings)
     
-    def set_seed(self, seed: int):
+    def set_seed(self, seed: int) -> None:
         """Reset random seed for reproducibility.
         
         Args:

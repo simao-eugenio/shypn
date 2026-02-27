@@ -80,12 +80,12 @@ class BaseValidator(ABC):
         self._results: List[ValidationResult] = []
     
     @abstractmethod
-    def reset(self):
+    def reset(self) -> None:
         """Reset validator state for new simulation."""
         self._results = []
     
     @abstractmethod
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update validator with current simulation state.
         
         Called at each recording interval during simulation.

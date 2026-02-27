@@ -52,7 +52,7 @@ class FiringRecord:
     produced: Dict[str, float] = field(default_factory=dict)
     net_change: float = 0.0
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate net token change."""
         total_consumed = sum(self.consumed.values())
         total_produced = sum(self.produced.values())
@@ -123,18 +123,18 @@ class TokenAccountingAuditor:
         self.initial_tokens: Dict[str, float] = {}
         self.current_tokens: Dict[str, float] = {}
         
-    def enable(self):
+    def enable(self) -> None:
         """Enable token accounting."""
         self.enabled = True
         self._take_initial_snapshot()
         self.logger.info("Token accounting auditor enabled")
         
-    def disable(self):
+    def disable(self) -> None:
         """Disable token accounting."""
         self.enabled = False
         self.logger.info("Token accounting auditor disabled")
         
-    def reset(self):
+    def reset(self) -> None:
         """Reset all tracking data."""
         self.snapshots.clear()
         self.firing_records.clear()
@@ -145,7 +145,7 @@ class TokenAccountingAuditor:
         self.transition_stats.clear()
         self._take_initial_snapshot()
         
-    def _take_initial_snapshot(self):
+    def _take_initial_snapshot(self) -> None:
         """Record initial token counts."""
         if not hasattr(self.model, 'places'):
             return
@@ -157,7 +157,7 @@ class TokenAccountingAuditor:
             self.initial_tokens[place.id] = float(place.tokens)
             self.current_tokens[place.id] = float(place.tokens)
             
-    def snapshot_before_fire(self, transition: Any, time: float):
+    def snapshot_before_fire(self, transition: Any, time: float) -> None:
         """Take snapshot before transition fires.
         
         Args:
@@ -186,7 +186,7 @@ class TokenAccountingAuditor:
         time: float,
         consumed: Dict[str, float],
         produced: Dict[str, float]
-    ):
+    ) -> None:
         """Take snapshot after transition fires and validate conservation.
         
         Args:
@@ -249,7 +249,7 @@ class TokenAccountingAuditor:
         produced: Dict[str, float],
         post_tokens: Dict[str, float],
         time: float
-    ):
+    ) -> None:
         """Validate token conservation for a firing.
         
         Args:
@@ -340,7 +340,7 @@ class TokenAccountingAuditor:
         
         return conserved, leak
     
-    def validate_firing_counts(self):
+    def validate_firing_counts(self) -> None:
         """Validate that transition.firing_count matches accounting records.
         
         Compares the actual transition.firing_count with the number of
@@ -417,7 +417,7 @@ class TokenAccountingAuditor:
             
         return report
         
-    def print_report(self):
+    def print_report(self) -> None:
         """Print human-readable accounting report."""
         report = self.generate_report()
         

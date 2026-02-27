@@ -350,7 +350,7 @@ class ParallelStochasticScheduler:
             'parallel_percentage': parallel_pct
         }
     
-    def reset_statistics(self):
+    def reset_statistics(self) -> None:
         """Reset statistics counters."""
         self.stats = {
             'parallel_groups': 0,

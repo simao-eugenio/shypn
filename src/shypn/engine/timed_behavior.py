@@ -59,7 +59,7 @@ class TimedBehavior(TransitionBehavior):
             )
     """
 
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize timed behavior.
         
         Args:
@@ -116,7 +116,7 @@ class TimedBehavior(TransitionBehavior):
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
 
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set the time when transition became enabled.
         
         This should be called by the scheduler when structural enablement
@@ -135,7 +135,7 @@ class TimedBehavior(TransitionBehavior):
         """
         return self._enablement_time
 
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement tracking (when transition becomes disabled).
         
         This should be called when input places no longer have sufficient tokens.

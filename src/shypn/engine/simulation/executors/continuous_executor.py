@@ -56,7 +56,7 @@ class ContinuousExecutor(ChangeListener):
         controller: SimulationController instance providing model and state access
     """
     
-    def __init__(self, controller):
+    def __init__(self, controller: Any):
         """Initialize continuous executor.
         
         Args:
@@ -180,7 +180,7 @@ class ContinuousExecutor(ChangeListener):
         self.controller._timeout_id = GLib.timeout_add(100, self._simulation_loop)
         return True
     
-    def _recalculate_batching(self, time_step: float):
+    def _recalculate_batching(self, time_step: float) -> None:
         """Recalculate step batching based on current time_scale.
         
         This is called both at simulation start and when settings change
@@ -348,7 +348,7 @@ class ContinuousExecutor(ChangeListener):
                 
                 # Notify completion callback (deferred to avoid blocking UI)
                 if self.controller.on_simulation_complete:
-                    def deferred_callback():
+                    def deferred_callback() -> None:
                         try:
                             self.controller.on_simulation_complete()
                         except Exception as e:
@@ -376,7 +376,7 @@ class ContinuousExecutor(ChangeListener):
         # All steps in batch completed, GUI will update before next callback
         return True
     
-    def stop(self):
+    def stop(self) -> None:
         """Stop the continuous simulation.
         
         This requests the simulation to stop. The actual stop will occur
@@ -410,7 +410,7 @@ class ContinuousExecutor(ChangeListener):
         
         # Notify completion callback (deferred to avoid blocking)
         if self.controller.on_simulation_complete and GLIB_AVAILABLE:
-            def deferred_callback():
+            def deferred_callback() -> None:
                 try:
                     self.controller.on_simulation_complete()
                 except Exception as e:
@@ -431,7 +431,7 @@ class ContinuousExecutor(ChangeListener):
     
     # ========== ChangeListener Interface (Atomic Settings Awareness) ==========
     
-    def on_parameter_changed(self, parameter_name: str, old_value: Any, new_value: Any):
+    def on_parameter_changed(self, parameter_name: str, old_value: Any, new_value: Any) -> None:
         """Called when a single parameter changes.
         
         Note: Not used in buffered mode (changes are batched and committed atomically).
@@ -443,7 +443,7 @@ class ContinuousExecutor(ChangeListener):
         """
         pass  # Not used - we only react to atomic commits
     
-    def on_changes_committed(self, changes: Dict[str, Tuple[Any, Any]]):
+    def on_changes_committed(self, changes: Dict[str, Tuple[Any, Any]]) -> None:
         """Called when buffered changes are committed atomically.
         
         This is the key method for atomic settings awareness. When settings
@@ -483,7 +483,7 @@ class ContinuousExecutor(ChangeListener):
             logger.debug("✓ Time step mode/value changed atomically")
             # Next loop iteration will use new dt calculation
     
-    def on_changes_rolled_back(self, changes: Dict[str, Tuple[Any, Any]]):
+    def on_changes_rolled_back(self, changes: Dict[str, Tuple[Any, Any]]) -> None:
         """Called when buffered changes are rolled back.
         
         This happens when validation fails or user cancels changes.

@@ -53,7 +53,7 @@ class BatchSimulationRunner:
     - Memory efficient: Discards unrecorded object data
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize batch runner."""
         self.is_cancelled = False
         
@@ -246,15 +246,7 @@ class BatchSimulationRunner:
         
         return results
     
-    def _reset_model(
-        self, 
-        model, 
-        initial_marking: Dict[str, float],
-        apply_noise: bool = False,
-        noise_percent: float = 20.0,
-        noise_places: Set[str] = None,
-        seed: int = None
-    ):
+    def _reset_model(self, model: Any, initial_marking: Dict[str, float], apply_noise: bool = False, noise_percent: float = 20.0, noise_places: Set[str] = None, seed: int = None) -> None:
         """Reset model places to initial marking with optional random perturbations.
         
         Supports both discrete (int) and continuous (float) concentrations.
@@ -316,7 +308,7 @@ class BatchSimulationRunner:
                     # Noise disabled: use exact initial value
                     place.tokens = base_value
     
-    def cancel(self):
+    def cancel(self) -> None:
         """Request cancellation of batch execution.
         
         Cancellation will occur after the current replicate completes.

@@ -62,7 +62,7 @@ class ContinuousBehavior(TransitionBehavior):
         )
     """
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize continuous behavior.
         
         Args:

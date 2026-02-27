@@ -85,7 +85,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
     _warned_no_places_transitions = set()
     _warned_no_volumes_transitions = set()
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize adaptive hybrid behavior.
         
         Creates both continuous and stochastic behavior delegates.
@@ -228,7 +228,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                     unique_places.append(p)
             return unique_places
     
-    def _has_volume_info(self, place) -> bool:
+    def _has_volume_info(self, place: Any) -> bool:
         """Check if place has volume information for adaptive mode selection.
         
         Args:
@@ -243,7 +243,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             return volume is not None and volume > 0
         return False
     
-    def _is_spatial_signal(self, place) -> bool:
+    def _is_spatial_signal(self, place: Any) -> bool:
         """Check if place is a spatial signal (legacy method, kept for compatibility).
         
         Args:
@@ -328,7 +328,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         return mode
     
-    def _handle_mode_change(self, new_mode: str):
+    def _handle_mode_change(self, new_mode: str) -> None:
         """Handle transition between execution modes.
         
         When mode changes, we need to:
@@ -501,7 +501,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                     'dt': dt
                 }
     
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set enablement time (delegates to stochastic behavior if needed).
         
         This is called by the scheduler when transition becomes enabled.
@@ -515,7 +515,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         if mode == 'stochastic':
             self.stochastic_behavior.set_enablement_time(time)
     
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement (delegates to stochastic behavior)."""
         self.stochastic_behavior.clear_enablement()
     

@@ -57,7 +57,7 @@ class StochasticBehavior(TransitionBehavior):
             )
     """
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize stochastic behavior.
         
         Args:
@@ -180,7 +180,7 @@ class StochasticBehavior(TransitionBehavior):
         self._compiled_rules: Dict[int, Any] = {}  # place_id -> compiled code
         self._rules_initialized = False
     
-    def _check_volume_appropriateness(self):
+    def _check_volume_appropriateness(self) -> None:
         """Check if connected places suggest stochastic is appropriate.
         
         Called lazily on first use to avoid accessing model.arcs during
@@ -219,7 +219,7 @@ class StochasticBehavior(TransitionBehavior):
             # Don't fail if volume check fails
             self.logger.debug(f"Volume appropriateness check failed for '{self.transition.name}': {e}")
     
-    def _detect_signal_places(self):
+    def _detect_signal_places(self) -> None:
         r"""Detect signal places (Ψ) for this transition's rate formula.
         
         Signal places are referenced in the rate function but have no
@@ -525,7 +525,7 @@ class StochasticBehavior(TransitionBehavior):
         
         return places_dict
     
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set enablement time and sample firing delay.
         
         When a stochastic transition becomes enabled, we immediately
@@ -688,7 +688,7 @@ class StochasticBehavior(TransitionBehavior):
         """
         return self._sampled_burst
     
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement and scheduled firing."""
         self._enablement_time = None
         self._scheduled_fire_time = None
@@ -989,7 +989,7 @@ class StochasticBehavior(TransitionBehavior):
         
         return info
     
-    def resample_burst(self):
+    def resample_burst(self) -> None:
         """Resample burst size (useful for re-enablement).
         
         This allows changing the burst without resampling the firing time.

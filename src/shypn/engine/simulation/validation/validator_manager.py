@@ -34,12 +34,12 @@ class ValidatorManager:
         summary = manager.get_summary()
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize validator manager."""
         self._validators: List[BaseValidator] = []
         self._enabled = True
     
-    def add_validator(self, validator: BaseValidator):
+    def add_validator(self, validator: BaseValidator) -> None:
         """Add a validator to the manager.
         
         Args:
@@ -76,12 +76,12 @@ class ValidatorManager:
                 return validator
         return None
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset all validators for new simulation."""
         for validator in self._validators:
             validator.reset()
     
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update all validators with current simulation state.
         
         Args:
@@ -169,11 +169,11 @@ class ValidatorManager:
         """
         return all(validator.is_passing() for validator in self._validators)
     
-    def enable(self):
+    def enable(self) -> None:
         """Enable all validators."""
         self._enabled = True
     
-    def disable(self):
+    def disable(self) -> None:
         """Disable all validators."""
         self._enabled = False
     
@@ -181,6 +181,6 @@ class ValidatorManager:
         """Get number of validators."""
         return len(self._validators)
     
-    def __iter__(self):
+    def __iter__(self) -> Any:
         """Iterate over validators."""
         return iter(self._validators)

@@ -66,7 +66,7 @@ class TransitionState:
         scheduled_time: Scheduled firing time for stochastic transitions (None if not scheduled)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize transition state."""
         self.enablement_time = None
         self.scheduled_time = None
@@ -79,7 +79,7 @@ class ModelAdapter:
     (which uses lists) to provide that interface.
     """
 
-    def __init__(self, canvas_manager, controller=None):
+    def __init__(self, canvas_manager: Any, controller: Any=None):
         """Initialize adapter with canvas manager.
         
         Args:
@@ -93,21 +93,21 @@ class ModelAdapter:
         self._arcs_dict = None
 
     @property
-    def places(self):
+    def places(self) -> None:
         """Get places as dictionary keyed by ID."""
         if self._places_dict is None:
             self._places_dict = {p.id: p for p in self.canvas_manager.places}
         return self._places_dict
 
     @property
-    def transitions(self):
+    def transitions(self) -> None:
         """Get transitions as dictionary keyed by ID."""
         if self._transitions_dict is None:
             self._transitions_dict = {t.id: t for t in self.canvas_manager.transitions}
         return self._transitions_dict
 
     @property
-    def arcs(self):
+    def arcs(self) -> None:
         """Get arcs as dictionary keyed by ID.
         
         WARNING: Arc IDs may not be unique in models (especially imported ones).
@@ -123,7 +123,7 @@ class ModelAdapter:
         return self._arcs_dict
 
     @property
-    def logical_time(self):
+    def logical_time(self) -> None:
         """Get current logical time from controller.
         
         Returns:
@@ -134,7 +134,7 @@ class ModelAdapter:
         return 0.0
 
     @property
-    def thermodynamic_settings(self):
+    def thermodynamic_settings(self) -> None:
         """Get thermodynamic settings from canvas manager.
         
         Returns:
@@ -149,7 +149,7 @@ class ModelAdapter:
             'ionic_strength': 0.1
         }
 
-    def invalidate_caches(self):
+    def invalidate_caches(self) -> None:
         """Invalidate dict caches (call when model structure changes)."""
         self._places_dict = None
         self._transitions_dict = None
@@ -175,9 +175,7 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, document_id: int = 0, verbose: bool = True,
-                 recording_config: 'RecordingConfig' = None,
-                 data_collector_factory=None, viability_checker_factory=None):
+    def __init__(self, model: Any, document_id: int = 0, verbose: bool = True, recording_config: 'RecordingConfig' = None, data_collector_factory: Any=None, viability_checker_factory: Any=None):
         """Initialize the simulation controller.
         
         REFACTORED: Now uses RecordingConfig value object (reduced from 4 parameters to 2).
@@ -279,7 +277,7 @@ class SimulationController:
     
     # ==================== Lifecycle Management ====================
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset controller to initial state for new model load.
         
         Called when loading a new model into an existing canvas tab (File → Open,
@@ -354,12 +352,12 @@ class SimulationController:
         logger.info(f"SimulationController reset complete - ready for new model")
     
     @property
-    def on_simulation_complete(self):
+    def on_simulation_complete(self) -> None:
         """Callback invoked when simulation completes."""
         return self._on_simulation_complete
     
     @on_simulation_complete.setter
-    def on_simulation_complete(self, value):
+    def on_simulation_complete(self, value: Any) -> None:
         """Set simulation complete callback."""
         self._on_simulation_complete = value
     
@@ -572,7 +570,7 @@ class SimulationController:
         
         return self.thermodynamic_results.get('summary')
 
-    def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
+    def _on_model_changed(self, event_type: str, obj: Any, old_value: Any=None, new_value: Any=None) -> None:
         """Handle model change notifications.
         
         Responds to model structure changes to keep simulation state consistent:
@@ -675,7 +673,7 @@ class SimulationController:
     
     # ========== Token Accounting Methods ==========
 
-    def _rebuild_place_index(self):
+    def _rebuild_place_index(self) -> None:
         """Build place_id → [input transitions] and source-transition list.
 
         Called after reset() and on structural model changes.  Used by
@@ -729,7 +727,7 @@ class SimulationController:
         return [t for t in candidates if self._is_enabled(t)]
 
     
-    def enable_token_accounting(self, strict_mode=False):
+    def enable_token_accounting(self, strict_mode: Any = False) -> None:
         """Enable token conservation accounting.
         
         Args:
@@ -751,7 +749,7 @@ class SimulationController:
             traceback.print_exc()
             self.auditor = None
     
-    def disable_token_accounting(self):
+    def disable_token_accounting(self) -> None:
         """Disable token conservation accounting."""
         self.auditor = None
         
@@ -760,7 +758,7 @@ class SimulationController:
             behavior = self._get_behavior(transition)
             behavior.disable_accounting()
     
-    def get_accounting_report(self):
+    def get_accounting_report(self) -> None:
         """Get token accounting report.
         
         Returns:
@@ -770,14 +768,14 @@ class SimulationController:
             return None
         return self.auditor.generate_report()
     
-    def print_accounting_report(self):
+    def print_accounting_report(self) -> None:
         """Print token accounting report to console."""
         if self.auditor is not None:
             self.auditor.print_report()
     
     # ==================== Behavior Management ====================
 
-    def _get_behavior(self, transition):
+    def _get_behavior(self, transition: Any) -> Any:
         """Get or create behavior instance for a transition.
         
         Uses factory pattern with caching for efficiency. Behavior instances
@@ -830,7 +828,7 @@ class SimulationController:
         
         return self.behavior_cache[_tid]
 
-    def _get_or_create_state(self, transition) -> TransitionState:
+    def _get_or_create_state(self, transition: Any) -> TransitionState:
         """Get or create state tracking for a transition.
         
         Args:
@@ -844,7 +842,7 @@ class SimulationController:
             self.transition_states[_tid] = TransitionState()
         return self.transition_states[_tid]
 
-    def _update_enablement_states(self):
+    def _update_enablement_states(self) -> None:
         """Update enablement tracking for all transitions.
         
         This method checks structural enablement (sufficient tokens in input places)
@@ -929,7 +927,7 @@ class SimulationController:
                 if hasattr(behavior, 'clear_enablement'):
                     behavior.clear_enablement()
 
-    def set_conflict_policy(self, policy: ConflictResolutionPolicy):
+    def set_conflict_policy(self, policy: ConflictResolutionPolicy) -> None:
         """Set the conflict resolution policy for transition selection.
         
         Args:
@@ -956,7 +954,7 @@ class SimulationController:
         """
         return self.settings.calculate_progress(self.time)
     
-    def _emit_progress_event(self):
+    def _emit_progress_event(self) -> None:
         """Emit simulation.progress event for UI updates.
         
         Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
@@ -986,7 +984,7 @@ class SimulationController:
     
     # ========== Strategy Pattern Methods (Week 4 - Phase 4) ==========
     
-    def get_strategy(self):
+    def get_strategy(self) -> None:
         """Get current execution strategy.
         
         Returns:
@@ -994,7 +992,7 @@ class SimulationController:
         """
         return self._execution_strategy
     
-    def set_strategy(self, strategy):
+    def set_strategy(self, strategy: Any) -> None:
         """Set execution strategy for simulation.
         
         Enables runtime switching between different algorithms:
@@ -1012,7 +1010,7 @@ class SimulationController:
         """
         self._execution_strategy = strategy
     
-    def auto_select_strategy(self):
+    def auto_select_strategy(self) -> None:
         """Automatically select best strategy for current model.
         
         Selection logic:
@@ -1063,7 +1061,7 @@ class SimulationController:
         self._execution_strategy = strategy
         return strategy
     
-    def list_available_strategies(self):
+    def list_available_strategies(self) -> None:
         """Get list of all available execution strategies.
         
         Returns:
@@ -1088,7 +1086,7 @@ class SimulationController:
             for s in strategies
         ]
 
-    def invalidate_behavior_cache(self, transition_id=None):
+    def invalidate_behavior_cache(self, transition_id: Any = None) -> None:
         """Invalidate behavior cache for a specific transition or all transitions.
         
         This forces behavior instances to be recreated on next access, useful
@@ -1114,7 +1112,7 @@ class SimulationController:
     
     # ==================== Observer Pattern (Step Listeners) ====================
 
-    def add_step_listener(self, callback: Callable):
+    def add_step_listener(self, callback: Callable) -> None:
         """Register a callback to be notified on each simulation step.
         
         Args:
@@ -1124,7 +1122,7 @@ class SimulationController:
         if callback not in self.step_listeners:
             self.step_listeners.append(callback)
 
-    def remove_step_listener(self, callback: Callable):
+    def remove_step_listener(self, callback: Callable) -> None:
         """Unregister a step listener callback.
         
         Args:
@@ -1133,7 +1131,7 @@ class SimulationController:
         if callback in self.step_listeners:
             self.step_listeners.remove(callback)
     
-    def _notify_step_listeners(self):
+    def _notify_step_listeners(self) -> None:
         """Notify all registered step listeners."""
         for callback in self.step_listeners:
             try:
@@ -1584,7 +1582,7 @@ class SimulationController:
         """
         return [t for t in self.model.transitions if self._viability_checker.is_enabled(t)]
 
-    def _is_transition_enabled(self, transition) -> bool:
+    def _is_transition_enabled(self, transition: Any) -> bool:
         """Check whether a single transition is currently enabled.
         
         Delegates to ViabilityChecker which checks token availability,
@@ -1598,7 +1596,7 @@ class SimulationController:
         """
         return self._viability_checker.is_enabled(transition)
 
-    def _fire_transition(self, transition):
+    def _fire_transition(self, transition: Any) -> None:
         """Fire a transition using behavior dispatch.
         
         Uses the transition's behavior to perform the firing, which handles
@@ -1664,7 +1662,7 @@ class SimulationController:
     # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
     # ============================================================================
     
-    def _get_all_places_for_transition(self, transition) -> set:
+    def _get_all_places_for_transition(self, transition: Any) -> set:
         """Get all places (input and output) involved in a transition's locality.
         
         This extracts the complete neighborhood of a transition:
@@ -1707,7 +1705,7 @@ class SimulationController:
         
         return place_ids
     
-    def _are_independent(self, t1, t2) -> bool:
+    def _are_independent(self, t1: Any, t2: Any) -> bool:
         """Check if two transitions are independent (don't share places).
         
         Two transitions are independent if their localities don't overlap:
@@ -2057,7 +2055,7 @@ class SimulationController:
             ascending=True:  [T2, T3, T1] (least conflicts first)
             ascending=False: [T1, T3, T2] (most conflicts first)
         """
-        def conflict_degree(t):
+        def conflict_degree(t: Any) -> int:
             return len(conflict_sets.get(t.id, set()))
         
         return sorted(transitions, key=conflict_degree, reverse=not ascending)
@@ -2155,7 +2153,7 @@ class SimulationController:
         elif strategy == 'priority':
             pass
             # Maximize sum of priorities
-            def total_priority(tset):
+            def total_priority(tset: Any) -> int:
                 return sum(getattr(t, 'priority', 0) for t in tset)
             return max(maximal_sets, key=total_priority)
         
@@ -2789,7 +2787,7 @@ class SimulationController:
         """
         return self._continuous_executor._simulation_loop()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the continuous simulation.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2802,7 +2800,7 @@ class SimulationController:
         """
         self._continuous_executor.stop()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the simulation to initial marking.
         
         This stops any running simulation and resets all places to their
@@ -2844,7 +2842,7 @@ class SimulationController:
         self._update_enablement_states()
         self._notify_step_listeners()
     
-    def reset_for_new_model(self, new_model):
+    def reset_for_new_model(self, new_model: Any) -> None:
         """Reset controller for a completely new model (File→Open, Import, etc.).
         
         This is more comprehensive than reset() - it recreates all internal
