@@ -1031,11 +1031,13 @@ class ResultsBrowserView(BaseResultsView):
                     f"<b>Groups ({len(groups)}):</b>\n"
                 )
                 
+                group_parts = []
                 for name in groups.keys():
                     n = anova['group_ns'][name]
                     mean = anova['group_means'][name]
                     std = anova['group_stds'][name]
-                    results_text += f"  • {name}: {mean:.2f} ± {std:.2f} (n={n})\n"
+                    group_parts.append(f"  • {name}: {mean:.2f} ± {std:.2f} (n={n})\n")
+                results_text += "".join(group_parts)
                 
                 results_text += (
                     f"\n<b>ANOVA Results:</b>\n"
@@ -1064,11 +1066,15 @@ class ResultsBrowserView(BaseResultsView):
                         results_text += "<b>Tukey HSD Post-Hoc Tests:</b>\n"
                         tukey = summary['formatted_comparisons']
                         
+                        comparison_parts = []
                         for comparison, stats in tukey.items():
                             sig_marker = "***" if stats['p_value'] < 0.001 else "**" if stats['p_value'] < 0.01 else "*" if stats['p_value'] < 0.05 else "ns"
-                            results_text += f"  • {comparison}:\n"
-                            results_text += f"    Δμ = {stats['mean_diff']:.3f}, "
-                            results_text += f"p = {stats['p_value']:.4f} {sig_marker}\n"
+                            comparison_parts.append(
+                                f"  • {comparison}:\n"
+                                f"    Δμ = {stats['mean_diff']:.3f}, "
+                                f"p = {stats['p_value']:.4f} {sig_marker}\n"
+                            )
+                        results_text += "".join(comparison_parts)
                 else:
                     results_text += f"<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
             

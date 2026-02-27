@@ -1566,14 +1566,15 @@ class BaseTopologyCategory:
         if not analyzed_set:
             self.summary_label.set_markup("<i>Not yet analyzed. Expand an analyzer below to run analysis.</i>")
         else:
-            summary = f"<b>Analyzed:</b> {len(analyzed_set)} of {total_analyzers} analyzers\n\n"
-            summary += "<b>Results:</b>\n"
-            
+            parts = [
+                f"<b>Analyzed:</b> {len(analyzed_set)} of {total_analyzers} analyzers\n\n",
+                "<b>Results:</b>\n",
+            ]
             for analyzer_name in analyzed_set:
                 result = self.results_cache.get(drawing_area, {}).get(analyzer_name)
                 if result:
-                    summary += f"• {self._format_analyzer_title(analyzer_name)}: ✓\n"
-            
+                    parts.append(f"• {self._format_analyzer_title(analyzer_name)}: ✓\n")
+            summary = "".join(parts)
             self.summary_label.set_markup(summary)
         
         # Notify report panel that analyses have been updated

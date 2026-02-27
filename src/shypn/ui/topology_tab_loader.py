@@ -372,16 +372,16 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                     cycles = cycle_analyzer.find_cycles_containing_node(self.element_id)
                     
                     if cycles:
-                        text = f"Part of {len(cycles)} cycle(s):\n\n"
+                        parts = [f"Part of {len(cycles)} cycle(s):\n\n"]
                         for i, cycle in enumerate(cycles[:5], 1):
                             names = ' → '.join(cycle['names'][:10])
                             if len(cycle['names']) > 10:
                                 names += ' ...'
-                            text += f"{i}. {names}\n"
-                            text += f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n"
+                            parts.append(f"{i}. {names}\n")
+                            parts.append(f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n")
                         if len(cycles) > 5:
-                            text += f"... and {len(cycles) - 5} more cycle(s)\n"
-                        self.cycles_label.set_text(text.strip())
+                            parts.append(f"... and {len(cycles) - 5} more cycle(s)\n")
+                        self.cycles_label.set_text("".join(parts).strip())
                     else:
                         self.cycles_label.set_text("Not part of any cycles")
                 except Exception as e:
@@ -394,17 +394,17 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                     invariants = p_inv_analyzer.find_invariants_containing_place(self.element_id)
                     
                     if invariants:
-                        text = f"In {len(invariants)} P-invariant(s):\n\n"
+                        parts = [f"In {len(invariants)} P-invariant(s):\n\n"]
                         for i, inv in enumerate(invariants[:5], 1):
-                            text += f"{i}. {inv['sum_expression']}\n"
-                            text += f"   Conserved value: {inv['conserved_value']}\n\n"
+                            parts.append(f"{i}. {inv['sum_expression']}\n")
+                            parts.append(f"   Conserved value: {inv['conserved_value']}\n\n")
                         if len(invariants) > 5:
-                            text += f"... and {len(invariants) - 5} more invariant(s)\n"
-                        self.p_inv_label.set_text(text.strip())
+                            parts.append(f"... and {len(invariants) - 5} more invariant(s)\n")
+                        self.p_inv_label.set_text("".join(parts).strip())
                     else:
                         self.p_inv_label.set_text("Not in any P-invariants")
                 except Exception as e:
-                    self.p_inv_label.set_text(f"Analysis error: {str(e)}")
+                    self.p_inv_label.set_text(f"Analysis error: {str(e)}") 
             
             # Analyze paths
             if self.paths_label:
@@ -606,16 +606,16 @@ class TransitionTopologyTabLoader(TopologyTabLoader):
                     cycles = cycle_analyzer.find_cycles_containing_node(self.element_id)
                     
                     if cycles:
-                        text = f"Part of {len(cycles)} cycle(s):\n\n"
+                        parts = [f"Part of {len(cycles)} cycle(s):\n\n"]
                         for i, cycle in enumerate(cycles[:5], 1):
-                            names = ' → '.join(cycle['names'][:10])
+                            names = ' \u2192 '.join(cycle['names'][:10])
                             if len(cycle['names']) > 10:
                                 names += ' ...'
-                            text += f"{i}. {names}\n"
-                            text += f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n"
+                            parts.append(f"{i}. {names}\n")
+                            parts.append(f"   Length: {cycle['length']}, Type: {cycle['type']}\n\n")
                         if len(cycles) > 5:
-                            text += f"... and {len(cycles) - 5} more cycle(s)\n"
-                        self.cycles_label.set_text(text.strip())
+                            parts.append(f"... and {len(cycles) - 5} more cycle(s)\n")
+                        self.cycles_label.set_text("".join(parts).strip())
                     else:
                         self.cycles_label.set_text("Not part of any cycles")
                 except Exception as e:

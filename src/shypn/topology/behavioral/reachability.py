@@ -109,12 +109,22 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         # ========================================================================
         # SIZE GUARD: Estimate state space to prevent state explosion freeze
         # ========================================================================
-        n_places = len(self.model.places)
-        n_transitions = len(self.model.transitions)
-        
-        # Estimate state space size (rough heuristic)
-        # Real state space can be much larger for complex nets
-        avg_tokens_per_place = sum(p.tokens for p in self.model.places) / n_places if n_places > 0 else 0
+        try:
+            n_places = len(self.model.places)
+            n_transitions = len(self.model.transitions)
+        except (TypeError, AttributeError):
+            return AnalysisResult(
+                success=False,
+                errors=["Model access failed - invalid model object"],
+                metadata={'analysis_time': self._end_timer(start_time)}
+            )
+
+        try:
+            # Estimate state space size (rough heuristic)
+            # Real state space can be much larger for complex nets
+            avg_tokens_per_place = sum(p.tokens for p in self.model.places) / n_places if n_places > 0 else 0
+        except (TypeError, AttributeError):
+            avg_tokens_per_place = 0
         estimated_states = int((avg_tokens_per_place + 1) ** n_places)
         
         # Warn if estimated state space is very large
