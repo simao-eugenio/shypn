@@ -290,7 +290,64 @@ class ParameterSweepBuilder(Gtk.Box):
         self.termination_combo.set_active_id("deadlock")
         self.termination_combo.set_tooltip_text("When to stop the simulation")
         sim_box.attach(self.termination_combo, 1, 1, 3, 1)
-        
+
+        # Row 2: Time step (Auto / Manual)
+        sim_box.attach(Gtk.Label(label="Time Step:", xalign=0), 0, 2, 1, 1)
+        dt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.sweep_dt_auto_radio = Gtk.RadioButton.new_with_label(None, "Auto")
+        self.sweep_dt_manual_radio = Gtk.RadioButton.new_with_label_from_widget(
+            self.sweep_dt_auto_radio, "Manual"
+        )
+        self.sweep_dt_auto_radio.set_active(True)
+        self.sweep_dt_auto_radio.set_tooltip_text("Automatically compute time step from model kinetics")
+        self.sweep_dt_manual_radio.set_tooltip_text("Use a fixed time step (override auto calculation)")
+        self.sweep_dt_auto_radio.connect("toggled", self._on_sweep_dt_mode_changed)
+        self.sweep_dt_manual_radio.connect("toggled", self._on_sweep_dt_mode_changed)
+        dt_box.pack_start(self.sweep_dt_auto_radio, False, False, 0)
+        dt_box.pack_start(self.sweep_dt_manual_radio, False, False, 0)
+        sim_box.attach(dt_box, 1, 2, 1, 1)
+        self.sweep_dt_manual_entry = Gtk.Entry()
+        self.sweep_dt_manual_entry.set_text("0.01")
+        self.sweep_dt_manual_entry.set_width_chars(8)
+        self.sweep_dt_manual_entry.set_sensitive(False)
+        self.sweep_dt_manual_entry.set_tooltip_text("Fixed time step in seconds (smaller = more accurate, slower)")
+        sim_box.attach(self.sweep_dt_manual_entry, 2, 2, 1, 1)
+        sim_box.attach(Gtk.Label(label="s", xalign=0), 3, 2, 1, 1)
+
+        # Row 3: τ-Leaping accuracy ε (τ-leaping is always active — SimulationSettings.use_tau_leaping is non-disableable)
+        tau_label = Gtk.Label(label="τ-Leaping (always active):", xalign=0)
+        tau_label.set_tooltip_text(
+            "τ-leaping is always enabled in this engine; only the accuracy bound ε can be tuned."
+        )
+        sim_box.attach(tau_label, 0, 3, 2, 1)
+        self.sweep_tau_epsilon_entry = Gtk.Entry()
+        self.sweep_tau_epsilon_entry.set_text("0.03")
+        self.sweep_tau_epsilon_entry.set_width_chars(8)
+        self.sweep_tau_epsilon_entry.set_tooltip_text(
+            "τ-leaping accuracy bound ε (0.01 = accurate/slow, 0.10 = fast/approximate)"
+        )
+        sim_box.attach(self.sweep_tau_epsilon_entry, 2, 3, 1, 1)
+
+        # Row 4: max τ
+        sim_box.attach(Gtk.Label(label="max τ:", xalign=0), 0, 4, 1, 1)
+        self.sweep_max_tau_entry = Gtk.Entry()
+        self.sweep_max_tau_entry.set_text("0.1")
+        self.sweep_max_tau_entry.set_width_chars(8)
+        self.sweep_max_tau_entry.set_tooltip_text(
+            "Maximum leap size for τ-leaping (smaller = more accurate, slower)"
+        )
+        sim_box.attach(self.sweep_max_tau_entry, 2, 4, 1, 1)
+
+        # Row 5: Random seed
+        sim_box.attach(Gtk.Label(label="Seed:", xalign=0), 0, 5, 1, 1)
+        self.sweep_seed_entry = Gtk.Entry()
+        self.sweep_seed_entry.set_text("42")
+        self.sweep_seed_entry.set_width_chars(8)
+        self.sweep_seed_entry.set_tooltip_text(
+            "Base random seed for reproducibility (each replicate uses seed + replicate_id)"
+        )
+        sim_box.attach(self.sweep_seed_entry, 2, 5, 1, 1)
+
         sim_frame.add(sim_box)
         self.pack_start(sim_frame, False, False, 0)
         
@@ -327,6 +384,13 @@ class ParameterSweepBuilder(Gtk.Box):
         self.single_param_box.show_all()  # Ensure all widgets in single mode are visible initially
         self.single_edit_range_button.show()  # Explicitly show the button
     
+    def _on_sweep_dt_mode_changed(self, radio):
+        """Enable or disable the manual dt entry based on radio selection."""
+        if not radio.get_active():
+            return
+        is_manual = (radio == self.sweep_dt_manual_radio)
+        self.sweep_dt_manual_entry.set_sensitive(is_manual)
+
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
         old_type = self.parameter_type
