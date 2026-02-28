@@ -14,13 +14,15 @@ Author: Simão Eugénio
 Date: 2025-10-29
 """
 import gi
+import logging
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+from abc import ABC, abstractmethod
 
 from shypn.ui.category_frame import CategoryFrame
 
 
-class BasePathwayCategory(CategoryFrame):
+class BasePathwayCategory(CategoryFrame, ABC):
     """Base class for pathway operation category controllers.
     
     Each category is responsible for:
@@ -48,9 +50,14 @@ class BasePathwayCategory(CategoryFrame):
         super().__init__(title=category_name, expanded=expanded)
         
         self.category_name = category_name
+        # Guard: subclasses may pre-set these before calling super().__init__()
+        if not hasattr(self, 'logger'):
+            self.logger = logging.getLogger(self.__class__.__name__)
         self.model_canvas = None
         self.project = None
         self.parent_panel = None  # Will be set by PathwayOperationsPanel
+        if not hasattr(self, 'parent_window'):
+            self.parent_window = None
         
         # Import state
         self.current_import_data = None  # Current imported pathway/model data
@@ -66,15 +73,32 @@ class BasePathwayCategory(CategoryFrame):
         if content_widget:
             self.set_content(content_widget)
     
+    @abstractmethod
     def _build_content(self):
         """Build and return the content widget.
-        
+
         Must be implemented by subclasses.
-        
+
         Returns:
             Gtk.Widget: The content to display in this category
         """
-        raise NotImplementedError("Subclasses must implement _build_content()")
+
+    @abstractmethod
+    def on_tab_switched(self) -> None:
+        """Called when the user switches to a different model tab.
+
+        Subclasses must refresh their panel state to reflect the newly active
+        document (update buttons, labels, enrichment states, etc.).
+        """
+
+    @abstractmethod
+    def refresh_metadata_inspector(self) -> None:
+        """Refresh the metadata inspector for the currently active document.
+
+        Called when the user expands the metadata inspector expander.
+        Subclasses must populate their metadata tree/summary from the
+        current canvas manager's document.
+        """
     
     def _get_status_widget(self):
         """Get the status label widget for displaying messages.
@@ -91,28 +115,29 @@ class BasePathwayCategory(CategoryFrame):
     # ========================================================================
     
     def _show_status(self, message: str, error: bool = False):
-        """Show status message in label (Wayland-safe).
-        
+        """Show status message in label (Wayland-safe, thread-safe).
+
         Args:
             message: Status message to display
             error: If True, display as error (red text)
         """
-        status_widget = self._get_status_widget()
-        if not status_widget:
-            return
-        
-        if error:
-            status_widget.set_markup(f'<span foreground="red">{message}</span>')
-        else:
-            status_widget.set_text(message)
+        def _update():
+            status_widget = self._get_status_widget()
+            if not status_widget:
+                return
+            if error:
+                status_widget.set_markup(f'<span foreground="red">{message}</span>')
+            else:
+                status_widget.set_markup(f'<span foreground="gray">{message}</span>')
+        GLib.idle_add(_update)
     
     def _show_progress(self, message: str):
-        """Show progress message with spinner icon.
-        
+        """Show progress message with hourglass icon.
+
         Args:
             message: Progress message to display
         """
-        self._show_status(f"🔄 {message}")
+        self._show_status(f"⏳ {message}")
     
     def _show_success(self, message: str):
         """Show success message with checkmark icon.
@@ -124,12 +149,30 @@ class BasePathwayCategory(CategoryFrame):
     
     def _show_error(self, message: str):
         """Show error message with error icon.
-        
+
         Args:
             message: Error message to display
         """
         self._show_status(f"❌ {message}", error=True)
-    
+
+    def set_parent_window(self, parent_window):
+        """Set parent window for dialogs (Wayland compatibility).
+
+        Args:
+            parent_window: Gtk.Window or Gtk.ApplicationWindow to use as parent
+        """
+        self.parent_window = parent_window
+
+    def _on_metadata_expander_toggled(self, expander, param):
+        """Populate metadata inspector when user expands it.
+
+        Args:
+            expander: The Gtk.Expander widget
+            param: The GObject param (notify signal)
+        """
+        if expander.get_expanded():
+            self.refresh_metadata_inspector()
+
     # ========================================================================
     # Threading Helpers (Wayland-safe)
     # ========================================================================

@@ -225,19 +225,7 @@ class KEGGCategory(BasePathwayCategory):
         # Restore expanded state if it was expanded (don't auto-collapse during import)
         if was_expanded:
             self.set_expanded(True)
-    
-    def _on_metadata_expander_toggled(self, expander, param):
-        """Called when user expands/collapses the metadata inspector.
-        Populates metadata only when expanded to avoid cascade issues.
-        
-        Args:
-            expander: The Gtk.Expander widget
-            param: The parameter (notify signal)
-        """
-        if expander.get_expanded():
-            # User expanded the inspector - now populate metadata
-            self.refresh_metadata_inspector()
-    
+
     def _update_enrichment_buttons(self):
         """Update enrichment button states based on current document.
         Separated from metadata refresh to avoid cascade issues.
@@ -2076,18 +2064,7 @@ class KEGGCategory(BasePathwayCategory):
             import traceback
             traceback.print_exc()
             return False
-    def _on_metadata_expander_toggled(self, expander, param):
-        """Called when user expands/collapses the metadata inspector.
-        Populates metadata only when expanded to avoid cascade issues.
-        
-        Args:
-            expander: The Gtk.Expander widget
-            param: The parameter (notify signal)
-        """
-        if expander.get_expanded():
-            # User expanded the inspector - now populate metadata
-            self.refresh_metadata_inspector()
-    
+
     def _update_enrichment_buttons(self):
         """Update enrichment button states based on current document.
         Separated from metadata refresh to avoid cascade issues.
