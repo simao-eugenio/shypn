@@ -18,7 +18,7 @@ Author: Shypn Development Team
 Date: October 2025
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 
 from .pathway_data import ProcessedPathwayData, Species, Reaction
@@ -33,7 +33,7 @@ from shypn.heuristic import EstimatorFactory
 try:
     from shypn.services.sbml_kinetics_service import SBMLKineticsIntegrationService
 except ImportError:
-    SBMLKineticsIntegrationService = None
+    SBMLKineticsIntegrationService = None  # type: ignore[misc, assignment]
 
 
 class BaseConverter:
@@ -56,7 +56,7 @@ class BaseConverter:
         self.document = document
         self.logger = logging.getLogger(self.__class__.__name__)
     
-    def convert(self) -> Dict:
+    def convert(self) -> Any:  # type: ignore[override]
         """
         Convert pathway elements to document model.
         
@@ -788,7 +788,7 @@ class ArcConverter(BaseConverter):
         self.species_to_place = species_to_place
         self.reaction_to_transition = reaction_to_transition
     
-    def convert(self) -> List[Arc]:
+    def convert(self) -> List[Arc]:  # type: ignore[override]
         """
         Convert all stoichiometric relationships to arcs.
         
@@ -804,7 +804,7 @@ class ArcConverter(BaseConverter):
                 continue
             
             # Aggregate stoichiometries for reactants (in case same species appears multiple times)
-            reactant_weights = {}
+            reactant_weights: Dict[str, float] = {}
             for species_id, stoichiometry in reaction.reactants:
                 reactant_weights[species_id] = reactant_weights.get(species_id, 0) + stoichiometry
             
@@ -833,7 +833,7 @@ class ArcConverter(BaseConverter):
                     )
             
             # Aggregate stoichiometries for products (in case same species appears multiple times)
-            product_weights = {}
+            product_weights: Dict[str, float] = {}
             for species_id, stoichiometry in reaction.products:
                 product_weights[species_id] = product_weights.get(species_id, 0) + stoichiometry
             
@@ -915,7 +915,7 @@ class ModifierConverter(BaseConverter):
         self.species_to_place = species_to_place
         self.reaction_to_transition = reaction_to_transition
     
-    def convert(self) -> List[TestArc]:
+    def convert(self) -> List[TestArc]:  # type: ignore[override]
         """
         Convert all modifiers to test arcs.
         
@@ -1374,9 +1374,9 @@ class PathwayConverter:
                 if has_assignment_rules and not should_convert:
                     # Check input arcs (reactants)
                     for arc in document.arcs:
-                        if arc.kind == 'normal' and arc.target_id == transition.id:
+                        if arc.kind == 'normal' and arc.target_id == transition.id:  # type: ignore[attr-defined]
                             # Input arc - check if source place is rule-defined
-                            source_place = document.get_object_by_id(arc.source_id)
+                            source_place = document.get_object_by_id(arc.source_id)  # type: ignore[attr-defined]
                             if source_place:
                                 species_id = source_place.metadata.get('species_id') if hasattr(source_place, 'metadata') else None
                                 if species_id in rule_defined_species or source_place.name in rule_defined_species:
@@ -1697,7 +1697,7 @@ class PathwayConverter:
             species_to_place: Mapping from species ID to Place
         """
         # Track species roles across all reactions
-        species_roles = {}  # species_id -> {reactions by role}
+        species_roles: Dict[str, Dict[str, List[str]]] = {}  # species_id -> {reactions by role}
         
         for reaction in pathway.reactions:
             # Track reactants
@@ -1798,7 +1798,7 @@ if __name__ == "__main__":
     )
     
     # Post-process
-    postprocessor = PathwayPostProcessor(spacing=150.0, scale_factor=2.0)
+    postprocessor = PathwayPostProcessor(scale_factor=2.0)
     processed = postprocessor.process(pathway)
     
     

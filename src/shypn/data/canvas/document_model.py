@@ -177,6 +177,7 @@ class DocumentModel:
         
         try:
             # Instantiate the appropriate arc subclass based on arc_type
+            arc: Any = None
             if arc_type == 'test':
                 from shypn.netobjs.test_arc import TestArc
                 arc = TestArc(source=source, target=target, id=arc_id, name=arc_name, weight=weight)
@@ -510,7 +511,7 @@ class DocumentModel:
         min_x, max_x = min(x1, x2), max(x1, x2)
         min_y, max_y = min(y1, y2), max(y1, y2)
         
-        objects = []
+        objects: List[PetriNetObject] = []
         
         # Check places
         for place in self.places:
@@ -536,7 +537,7 @@ class DocumentModel:
         Returns:
             List containing all places, transitions, and arcs
         """
-        return self.places + self.transitions + self.arcs
+        return list(self.places) + list(self.transitions) + list(self.arcs)  # type: ignore[return-value]
     
     def get_connected_arcs(self, obj: PetriNetObject) -> List[Arc]:
         """Get all arcs connected to an object.

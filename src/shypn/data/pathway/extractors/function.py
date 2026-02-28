@@ -99,7 +99,7 @@ class FunctionDefinitionExtractor(BaseExtractor[Dict[str, FunctionDefinition]]):
         Returns:
             Dict mapping function IDs to FunctionDefinition objects
         """
-        functions = {}
+        functions: Dict[str, FunctionDefinition] = {}
         
         num_functions = self.model.getNumFunctionDefinitions()
         

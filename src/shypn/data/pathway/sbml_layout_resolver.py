@@ -235,7 +235,7 @@ class SBMLLayoutResolver:
         """
         from collections import Counter
         
-        pathway_votes = Counter()
+        pathway_votes: Counter[str] = Counter()
         
         for species in self.pathway.species:
             if not species.kegg_id:
