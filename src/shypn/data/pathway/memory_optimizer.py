@@ -13,14 +13,14 @@ Key optimizations:
 
 import gc
 import logging
-from typing import Iterator, List, Any, Dict
+from typing import Iterator, List, Any, Dict, Optional
 import sys
 
 
 class MemoryOptimizer:
     """Memory optimization utilities for large model imports."""
     
-    def __init__(self, logger: logging.Logger = None):
+    def __init__(self, logger: Optional[logging.Logger] = None):
         """Initialize memory optimizer.
         
         Args:
@@ -89,7 +89,7 @@ class MemoryOptimizer:
                 delattr(obj, attr)
 
 
-def optimize_large_model_import(parsed_pathway, converter, logger: logging.Logger = None):
+def optimize_large_model_import(parsed_pathway, converter, logger: Optional[logging.Logger] = None):
     """Optimize memory usage during large model conversion.
     
     This function wraps the normal conversion process with memory optimization:
@@ -139,7 +139,7 @@ class ChunkedArcCreator:
     cause memory issues. This class creates arcs in manageable chunks.
     """
     
-    def __init__(self, document, logger: logging.Logger = None, chunk_size: int = 500):
+    def __init__(self, document, logger: Optional[logging.Logger] = None, chunk_size: int = 500):
         """Initialize chunked arc creator.
         
         Args:

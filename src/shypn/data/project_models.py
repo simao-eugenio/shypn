@@ -39,8 +39,8 @@ class ModelDocument:
         analysis_cache: Cached analysis results
     """
     
-    def __init__(self, id: str = None, name: str = "Untitled Model",
-                 description: str = "", file_path: str = None):
+    def __init__(self, id: Optional[str] = None, name: str = "Untitled Model",
+                 description: str = "", file_path: Optional[str] = None):
         """Initialize a ModelDocument.
         
         Args:
@@ -55,8 +55,8 @@ class ModelDocument:
         self.file_path = file_path
         self.created_date = datetime.now().isoformat()
         self.modified_date = self.created_date
-        self.tags = []
-        self.analysis_cache = {}
+        self.tags: List[str] = []
+        self.analysis_cache: Dict[str, Any] = {}
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -108,8 +108,8 @@ class Project:
         settings: Project-specific settings
     """
     
-    def __init__(self, id: str = None, name: str = "Untitled Project",
-                 description: str = "", base_path: str = None):
+    def __init__(self, id: Optional[str] = None, name: str = "Untitled Project",
+                 description: str = "", base_path: Optional[str] = None):
         """Initialize a Project.
         
         Args:
@@ -124,13 +124,13 @@ class Project:
         self.created_date = datetime.now().isoformat()
         self.modified_date = self.created_date
         self.base_path = base_path
-        self.models = {}  # model_id -> ModelDocument
+        self.models: Dict[str, 'ModelDocument'] = {}  # model_id -> ModelDocument
         
         # Pathway management (new structured approach)
         self._pathway_manager = ProjectPathwayManager(self)
         
-        self.simulations = []  # List of simulation result file paths
-        self.tags = []
+        self.simulations: List[str] = []  # List of simulation result file paths
+        self.tags: List[str] = []
         self.settings = {
             'auto_backup': True,
             'backup_frequency': 'daily',
@@ -785,7 +785,7 @@ class ProjectManager:
         sanitized = sanitized.strip('_')
         return sanitized if sanitized else "Project"
     
-    def create_project(self, name: str, description: str = "") -> Project:
+    def create_project(self, name: str, description: str = "") -> Project:  # type: ignore[no-redef]
         """Create a new project.
         
         Creates an empty project with standard directory structure.
@@ -835,7 +835,7 @@ class ProjectManager:
         self.current_project = project
         try:
             from shypn.events.event_bus import EventBus
-            EventBus.get_instance().emit('project.opened', {
+            EventBus.emit('project.opened', {
                 'project': project,
                 'base_path': project.base_path,
                 'name': project.name
@@ -870,7 +870,7 @@ class ProjectManager:
             self.add_to_recent(project_id)
             try:
                 from shypn.events.event_bus import EventBus
-                EventBus.get_instance().emit('project.opened', {
+                EventBus.emit('project.opened', {
                     'project': project,
                     'base_path': project.base_path,
                     'name': project.name
@@ -908,7 +908,7 @@ class ProjectManager:
             self.add_to_recent(project.id)
             try:
                 from shypn.events.event_bus import EventBus
-                EventBus.get_instance().emit('project.opened', {
+                EventBus.emit('project.opened', {
                     'project': project,
                     'base_path': project.base_path,
                     'name': project.name
@@ -935,7 +935,7 @@ class ProjectManager:
         self.current_project = None
         try:
             from shypn.events.event_bus import EventBus
-            EventBus.get_instance().emit('project.closed', {'project_id': _closed_id})
+            EventBus.emit('project.closed', {'project_id': _closed_id})
         except Exception:
             logger.debug("EventBus emit 'project.closed' failed", exc_info=True)
     
@@ -1096,7 +1096,7 @@ class ProjectManager:
         
         return True
     
-    def archive_project(self, project_id: str, archive_path: str = None) -> str:
+    def archive_project(self, project_id: str, archive_path: Optional[str] = None) -> str:
         """Archive a project to a ZIP file (SAFER alternative to deletion).
         
         This creates a backup before removing from index, allowing recovery.

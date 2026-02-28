@@ -12,7 +12,7 @@ Architecture (Phase 1 - Refactored):
 Legacy extractor classes moved to extractors/ subpackage for modularity.
 """
 
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from pathlib import Path
 import logging
 import math
@@ -92,15 +92,15 @@ class SBMLParser:
             FileNotFoundError: If file doesn't exist
             ValueError: If SBML file is invalid
         """
-        filepath = Path(filepath)
+        filepath_path = Path(filepath)
         
-        if not filepath.exists():
-            raise FileNotFoundError(f"SBML file not found: {filepath}")
+        if not filepath_path.exists():
+            raise FileNotFoundError(f"SBML file not found: {filepath_path}")
         
-        self.logger.info(f"Parsing SBML file: {filepath.name}")
+        self.logger.info(f"Parsing SBML file: {filepath_path.name}")
         
         # Read SBML file
-        document = libsbml.readSBML(str(filepath))
+        document = libsbml.readSBML(str(filepath_path))
         
         # Check for errors
         if document.getNumErrors() > 0:
@@ -147,7 +147,7 @@ class SBMLParser:
             print("=" * 80 + "\n")
         
         # Extract all elements using specialized extractors
-        pathway_data = self._extract_pathway_data(model, filepath, filter_isolated_species)
+        pathway_data = self._extract_pathway_data(model, filepath_path, filter_isolated_species)
         
         self.logger.info(
             f"Successfully parsed: "
@@ -358,7 +358,7 @@ class SBMLParser:
             "ATP, F6P, (Km + S)"  →  ["ATP", "F6P", "(Km + S)"]
         """
         args = []
-        current = []
+        current: list[str] = []
         depth = 0
         
         for char in args_str:
@@ -401,7 +401,7 @@ class SBMLParser:
     def _evaluate_assignment_rules(self,
                                    model,
                                    species: List[Species],
-                                   parameters: Dict[str, float]) -> None:
+                                   parameters: Dict[str, float]) -> Optional[Dict[str, Any]]:
         """
         Evaluate assignment rules at t=0 to set initial values.
         
@@ -498,7 +498,7 @@ class SBMLParser:
                         spec = species_dict[variable]
                         spec.initial_concentration = value
                         # Store the assignment rule formula for potential runtime re-evaluation
-                        spec.assignment_rule = formula
+                        spec.assignment_rule = formula  # type: ignore[attr-defined]
                         spec.metadata['has_assignment_rule'] = True
                         self.logger.debug(f"  Rule: {variable} = {value:.6g} (formula stored)")
                     elif variable in parameters:
@@ -687,7 +687,7 @@ class SBMLParser:
         import re
         
         # Build set of all valid identifiers
-        valid_ids = set()
+        valid_ids: set[str] = set()
         
         # Add species IDs
         valid_ids.update(s.id for s in pathway_data.species)

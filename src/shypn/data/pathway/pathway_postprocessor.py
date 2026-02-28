@@ -94,8 +94,8 @@ class ColorProcessor(BaseProcessor):
             processed_data.colors[comp_id] = color
         
         # Default color for species without compartment
-        if None not in processed_data.colors:
-            processed_data.colors[None] = "#F5F5F5"  # Light gray
+        if None not in processed_data.colors:  # type: ignore[comparison-overlap]
+            processed_data.colors[None] = "#F5F5F5"  # type: ignore[index]  # Light gray
         
         self.logger.info(
             f"Assigned colors to {len(processed_data.colors)} compartments"
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     
     
     # Example pathway
-    from pathway_data import Species, Reaction
+    from pathway_data import Species, Reaction  # type: ignore[no-redef]
     
     glucose = Species(
         id="glucose",

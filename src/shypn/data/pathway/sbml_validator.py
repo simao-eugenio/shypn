@@ -14,7 +14,7 @@ Design Philosophy:
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -533,7 +533,7 @@ def format_validation_report(issues: List[ValidationIssue]) -> str:
         return "✓ No validation issues found"
     
     # Group by severity
-    by_severity = {
+    by_severity: Dict[ValidationSeverity, List[Any]] = {
         ValidationSeverity.CRITICAL: [],
         ValidationSeverity.ERROR: [],
         ValidationSeverity.WARNING: [],
@@ -543,7 +543,7 @@ def format_validation_report(issues: List[ValidationIssue]) -> str:
     for issue in issues:
         by_severity[issue.severity].append(issue)
     
-    lines = []
+    lines: List[str] = []
     # Validation report commented out to reduce console noise
     # Only errors/critical issues will be shown via logger
     # lines.append("=" * 80)

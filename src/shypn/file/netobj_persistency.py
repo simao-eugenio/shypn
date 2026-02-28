@@ -21,8 +21,11 @@ Design Philosophy:
 """
 import os
 import sys
-from typing import Optional, Callable
+import logging
+from typing import Optional, Callable, Any
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 try:
     import gi
     gi.require_version('Gtk', '3.0')
@@ -69,7 +72,7 @@ class NetObjPersistency:
         self.current_filepath: Optional[str] = None
         self._is_dirty: bool = False
         self.on_file_saved: Optional[Callable[[str], None]] = None
-        self.on_file_loaded: Optional[Callable[[str, any], None]] = None
+        self.on_file_loaded: Optional[Callable[[str, Any], None]] = None
         self.on_dirty_changed: Optional[Callable[[bool], None]] = None
         self.suggested_filename: Optional[str] = None
         self._last_directory: Optional[str] = None
@@ -100,16 +103,18 @@ class NetObjPersistency:
                 models_directory = os.path.join(repo_root, 'workspace')
         
         self.models_directory = models_directory
+        self.logger = logging.getLogger(__name__)
         if not os.path.exists(self.models_directory):
             try:
                 os.makedirs(self.models_directory)
             except Exception as e:
                 self.logger.warning(f"Cannot create models directory {self.models_directory}: {e}")
                 pass
-        self._last_directory: Optional[str] = self.models_directory
+        self._last_directory = self.models_directory
         
         # Suggested filename for save dialog (used for imported documents)
-        self.suggested_filename: Optional[str] = None
+        # (self.suggested_filename already initialized above)
+
 
     def update_models_directory_from_project(self) -> None:
         """Update models directory based on current project.
@@ -229,6 +234,7 @@ class NetObjPersistency:
             if not filepath:
                 return False
             self.set_filepath(filepath)
+        assert self.current_filepath is not None
         try:
             document.save_to_file(self.current_filepath)
             self.mark_clean()

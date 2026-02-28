@@ -15,7 +15,7 @@ Date: October 2025
 
 import logging
 import math
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set
 from collections import defaultdict
 
 
@@ -339,7 +339,7 @@ class LayoutProjector:
     def project_spiral(self, 
                       positions: Dict[str, Tuple[float, float]], 
                       edges: List[Tuple[str, str]],
-                      entry_nodes: List[str] = None) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, float]]:
+                      entry_nodes: Optional[List[str]] = None) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, float]]:
         """Project force-directed positions onto spiral layout.
         
         SPIRAL STRATEGY:
@@ -470,7 +470,7 @@ class LayoutProjector:
         
         if not entry_nodes:
             # Fallback: use nodes with most outgoing edges
-            outgoing_counts = defaultdict(int)
+            outgoing_counts: Dict[str, int] = defaultdict(int)
             for source, _ in edges:
                 outgoing_counts[source] += 1
             
