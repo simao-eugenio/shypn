@@ -80,6 +80,7 @@ except ImportError as e:
 from shypn.helpers.canvas_layout_controller import CanvasLayoutController
 from shypn.core.document_id import alloc_doc_id, doc_id
 from shypn.helpers.document_session import DocumentSession
+from shypn.canvas.canvas_renderer import CanvasRenderer
 from shypn.helpers.document_panel_setup import DocumentPanelSetup
 
 
@@ -226,6 +227,9 @@ class ModelCanvasLoader:
             self.overlay_managers,
             get_sbml_panel=lambda: getattr(self, 'sbml_panel', None),
         )
+
+        # Sprint 21: canvas rendering delegated to CanvasRenderer
+        self._renderer = CanvasRenderer(canvas_ctx=self._input_handler.canvas_ctx)
 
         # Subscribe to 'editor.close_requested' so the Open Editors panel ✕ button
         # triggers a proper tab close (with unsaved-changes dialog etc.)
@@ -2415,259 +2419,12 @@ class ModelCanvasLoader:
             self.logger.debug(f"Failed to wire GTK events for canvas widgets: {e}")
 
     def _on_draw(self, drawing_area, cr, width, height, manager):
-        """Draw callback for the canvas.
-        
-        Uses Cairo transformation approach (legacy-compatible):
-            pass
-        - Apply cr.scale() and cr.translate() for automatic coordinate transformation
-        - Objects render in world coordinates, Cairo scales them automatically
-        - Line widths compensated to maintain constant pixel size
-        - Grid drawn BEFORE rotation (stays fixed in screen space)
-        - Model objects drawn AFTER rotation (rotate with canvas)
-        
-        Args:
-            drawing_area: GtkDrawingArea being drawn.
-            cr: Cairo context.
-            width: Viewport width in pixels.
-            height: Viewport height in pixels.
-            manager: ModelCanvasManager instance.
-        """
-        if manager.viewport_width != width or manager.viewport_height != height:
-            manager.set_viewport_size(width, height)
-        
-        # Execute deferred fit_to_page if pending (after viewport size is known)
-        if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
-            # Debug prints removed to reduce console noise
-            horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
-            vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
-            manager._fit_to_page_pending = False  # Clear flag before execution
-            manager.fit_to_page(
-                padding_percent=manager._fit_to_page_padding,
-                deferred=False,
-                horizontal_offset_percent=horizontal_offset,
-                vertical_offset_percent=vertical_offset
-            )
-        
-        cr.set_source_rgb(1.0, 1.0, 1.0)
-        cr.paint()
-        
-        # Apply ALL transformations for infinite rotating canvas
-        # Transformation order (Cairo applies in reverse):
-        #   Code order: zoom/pan → rotation
-        #   Actual order: rotation → zoom/pan (rotation happens first in world space)
-        cr.save()
-        
-        # STEP 1: Apply zoom and pan transformations
-        # These establish the viewport position and scale in world space
-        cr.translate(manager.pan_x * manager.zoom, manager.pan_y * manager.zoom)
-        cr.scale(manager.zoom, manager.zoom)
-        
-        # STEP 2: Apply rotation around viewport center
-        # This rotates the entire zoomed/panned coordinate system
-        # Rotation center needs to be in world coordinates (account for zoom/pan)
-        center_world_x = width / (2.0 * manager.zoom) - manager.pan_x
-        center_world_y = height / (2.0 * manager.zoom) - manager.pan_y
-        
-        rotation = manager.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            cr.translate(center_world_x, center_world_y)
-            cr.rotate(rotation.angle_radians)
-            cr.translate(-center_world_x, -center_world_y)
-        
-        # STEP 3: Draw grid with all transformations applied (infinite canvas effect)
-        # Grid bounds are calculated to cover the entire rotated viewport
-        manager.draw_grid(cr)
-        
-        # STEP 4: Module boundaries removed - signal communication happens via formulas
-        # Signal places can be referenced in transition rate formulas without visual arcs
-        
-        # Render all objects (these will be rotated)
-        all_objects = manager.get_all_objects()
-        for obj in all_objects:
-            obj.render(cr, zoom=manager.zoom)
-        
-        manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
-        manager.rectangle_selection.render(cr, manager.zoom)
-        
-        # Render lasso if active
-        ctx = self._canvas_ctx.get(drawing_area)
-        if ctx and ctx.lasso.get('active', False) and ctx.lasso.get('selector'):
-            ctx.lasso['selector'].render_lasso(cr, manager.zoom)
-        
-        # Highlight source object when creating arc
-        if ctx:
-            arc_state = ctx.arc
-            source = arc_state.get('source')
-            
-            if source is not None:
-                pass
-                # Green glow for source
-                cr.set_source_rgba(0.2, 0.9, 0.2, 0.6)
-                cr.set_line_width(4.0 / manager.zoom)
-                
-                if isinstance(source, Place):
-                    cr.arc(source.x, source.y, source.radius + 6, 0, 2 * math.pi)
-                    cr.stroke()
-                elif isinstance(source, Transition):
-                    w = source.width if source.horizontal else source.height
-                    h = source.height if source.horizontal else source.width
-                    cr.rectangle(source.x - w/2 - 6, source.y - h/2 - 6, w + 12, h + 12)
-                    cr.stroke()
-            
-            # Highlight hovered target with validation color
-            hovered = arc_state.get('hovered_target')
-            target_valid = arc_state.get('target_valid')
-            
-            if hovered is not None and target_valid is not None:
-                pass
-                # Green for valid, red for invalid
-                if target_valid:
-                    cr.set_source_rgba(0.2, 0.9, 0.2, 0.5)
-                else:
-                    cr.set_source_rgba(0.9, 0.2, 0.2, 0.5)
-                
-                cr.set_line_width(3.0 / manager.zoom)
-                
-                if isinstance(hovered, Place):
-                    cr.arc(hovered.x, hovered.y, hovered.radius + 4, 0, 2 * math.pi)
-                    cr.stroke()
-                elif isinstance(hovered, Transition):
-                    w = hovered.width if hovered.horizontal else hovered.height
-                    h = hovered.height if hovered.horizontal else hovered.width
-                    cr.rectangle(hovered.x - w/2 - 4, hovered.y - h/2 - 4, w + 8, h + 8)
-                    cr.stroke()
-        
-        cr.restore()
-        if ctx:
-            arc_state = ctx.arc
-            if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
-                self._draw_arc_preview(cr, arc_state, manager)
-        manager.mark_canvas_clean()
+        """Draw callback — delegates to CanvasRenderer (Sprint 21)."""
+        self._renderer.render_frame(drawing_area, cr, width, height, manager)
 
     def _draw_arc_preview(self, cr, arc_state, manager):
-        """Draw orange preview line for arc creation.
-        
-        Args:
-            cr: Cairo context.
-            arc_state: Arc state dictionary with 'source' and 'cursor_pos'.
-            manager: ModelCanvasManager instance.
-        """
-        source = arc_state['source']
-        cursor_x, cursor_y = arc_state['cursor_pos']
-        hovered_target = arc_state.get('hovered_target')
-        
-        src_x, src_y = (source.x, source.y)
-        dx = cursor_x - src_x
-        dy = cursor_y - src_y
-        dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 1:
-            return
-        ux, uy = (dx / dist, dy / dist)
-        
-        # Calculate source boundary point
-        if isinstance(source, Place):
-            src_radius = source.radius
-        elif isinstance(source, Transition):
-            w = source.width if source.horizontal else source.height
-            h = source.height if source.horizontal else source.width
-            src_radius = max(w, h) / 2.0
-        else:
-            src_radius = 20.0
-        start_x = src_x + ux * src_radius
-        start_y = src_y + uy * src_radius
-        
-        # Calculate end point (cursor or target boundary)
-        end_x = cursor_x
-        end_y = cursor_y
-        
-        # Detect parallel arc and calculate offset
-        parallel_offset = 0.0
-        if hovered_target and hovered_target != source:
-            pass
-            # Check if this would create a parallel arc
-            existing_arcs = [arc for arc in manager.arcs 
-                           if (arc.source == source and arc.target == hovered_target) or
-                              (arc.source == hovered_target and arc.target == source)]
-            
-            if existing_arcs:
-                pass
-                # Calculate offset direction based on arc direction
-                # Same direction as existing arc: small offset (±15px)
-                # Opposite direction: large offset (±50px)
-                existing_arc = existing_arcs[0]
-                same_direction = (existing_arc.source == source and existing_arc.target == hovered_target)
-                opposite_direction = (existing_arc.source == hovered_target and existing_arc.target == source)
-                
-                if opposite_direction:
-                    pass
-                    # Opposite direction: offset to opposite sides
-                    parallel_offset = -50.0  # New arc gets negative offset
-                elif same_direction:
-                    pass
-                    # Same direction: both offset to same side (shouldn't happen for new arc, but handle it)
-                    parallel_offset = 15.0
-            
-            # Calculate target boundary point
-            # Only for Place/Transition, not Arc (arcs don't have .x/.y attributes)
-            if isinstance(hovered_target, (Place, Transition)):
-                tgt_x, tgt_y = hovered_target.x, hovered_target.y
-                dx_to_target = tgt_x - src_x
-                dy_to_target = tgt_y - src_y
-                dist_to_target = math.sqrt(dx_to_target * dx_to_target + dy_to_target * dy_to_target)
-                
-                if dist_to_target > 1e-6:
-                    ux_target = dx_to_target / dist_to_target
-                    uy_target = dy_to_target / dist_to_target
-                    
-                    if isinstance(hovered_target, Place):
-                        tgt_radius = hovered_target.radius
-                    elif isinstance(hovered_target, Transition):
-                        w = hovered_target.width if hovered_target.horizontal else hovered_target.height
-                        h = hovered_target.height if hovered_target.horizontal else hovered_target.width
-                        tgt_radius = max(w, h) / 2.0
-                    else:
-                        tgt_radius = 20.0
-                    
-                    end_x = tgt_x - ux_target * tgt_radius
-                    end_y = tgt_y - uy_target * tgt_radius
-        
-        # Apply parallel offset perpendicular to arc direction
-        if abs(parallel_offset) > 1e-6:
-            pass
-            # Calculate perpendicular direction (rotate 90 degrees)
-            perp_x = -uy
-            perp_y = ux
-            
-            # Apply offset to both start and end points
-            start_x += perp_x * parallel_offset
-            start_y += perp_y * parallel_offset
-            end_x += perp_x * parallel_offset
-            end_y += perp_y * parallel_offset
-        
-        # Convert to screen coordinates
-        start_sx, start_sy = manager.world_to_screen(start_x, start_y)
-        end_sx, end_sy = manager.world_to_screen(end_x, end_y)
-        
-        # Draw the preview line
-        cr.set_source_rgba(0.95, 0.5, 0.1, 0.85)
-        cr.set_line_width(2.0)
-        cr.move_to(start_sx, start_sy)
-        cr.line_to(end_sx, end_sy)
-        cr.stroke()
-        
-        # Draw arrowhead
-        arrow_len = 11.0
-        arrow_width = 6.0
-        angle = math.atan2(end_y - start_y, end_x - start_x)
-        left_x = end_sx - arrow_len * math.cos(angle) + arrow_width * math.sin(angle)
-        left_y = end_sy - arrow_len * math.sin(angle) - arrow_width * math.cos(angle)
-        right_x = end_sx - arrow_len * math.cos(angle) - arrow_width * math.sin(angle)
-        right_y = end_sy - arrow_len * math.sin(angle) + arrow_width * math.cos(angle)
-        cr.move_to(end_sx, end_sy)
-        cr.line_to(left_x, left_y)
-        cr.line_to(right_x, right_y)
-        cr.close_path()
-        cr.fill()
+        """Arc-preview draw — delegates to CanvasRenderer (Sprint 21)."""
+        self._renderer.render_arc_preview(cr, arc_state, manager)
 
     def _show_canvas_context_menu(self, x, y, drawing_area):
         """Show the canvas context menu at the given position.
