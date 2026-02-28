@@ -1540,14 +1540,17 @@ class KEGGCategory(BasePathwayCategory):
                     reverse=True
                 )[:5]
                 if top_cofactors:
-                    status_msg += "\nTop cofactors:\n"
-                    for compound_id, count in top_cofactors:
-                        status_msg += f"  • {compound_id}: {count} reactions\n"
+                    cofactor_parts = ["\nTop cofactors:\n"] + [
+                        f"  \u2022 {compound_id}: {count} reactions\n"
+                        for compound_id, count in top_cofactors
+                    ]
+                    status_msg += "".join(cofactor_parts)
             status_msg += "\n💡 Model updated in memory. Save to persist changes."
             if result.warnings:
-                status_msg += f"\n\n⚠️ {len(result.warnings)} warnings:\n"
-                for warning in result.warnings[:3]:  # Show first 3
-                    status_msg += f"  • {warning}\n"
+                warning_parts = [f"\n\n⚠️ {len(result.warnings)} warnings:\n"] + [
+                    f"  • {w}\n" for w in result.warnings[:3]
+                ]
+                status_msg += "".join(warning_parts)
             self._show_status(status_msg)
             # Trigger canvas redraw if model is loaded
             # Use GLib.idle_add to schedule on main thread (enrichment runs in background)
@@ -2259,9 +2262,11 @@ class KEGGCategory(BasePathwayCategory):
             category = warning.get('category', 'Unknown')
             if category == 'reversible_reactions':
                 reaction_count = len(warning.get('reactions', []))
-                message += f"• {reaction_count} reversible reactions detected\n"
-                message += "  ✅ Fully supported in stochastic mode via Skellam distribution\n"
-                message += "  (τ-leaping automatically uses Skellam for net forward/reverse flux)\n\n"
+                message += (
+                    f"• {reaction_count} reversible reactions detected\n"
+                    "  ✅ Fully supported in stochastic mode via Skellam distribution\n"
+                    "  (τ-leaping automatically uses Skellam for net forward/reverse flux)\n\n"
+                )
         message += "\nSIMULATION MODE OPTIONS:\n"
         message += "✓ STOCHASTIC mode: Uses Skellam distribution (recommended, accurate)\n"
         message += "✓ CONTINUOUS mode: Uses ODEs (alternative for fast reactions)\n"

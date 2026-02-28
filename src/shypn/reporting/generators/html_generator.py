@@ -427,10 +427,7 @@ class HTMLGenerator(BaseDocumentGenerator):
         
         contributors = authorship.get("contributors", [])
         if contributors:
-            contrib_list = "<ul>"
-            for contrib in contributors:
-                contrib_list += f"<li>{html.escape(contrib)}</li>"
-            contrib_list += "</ul>"
+            contrib_list = "<ul>" + "".join(f"<li>{html.escape(c)}</li>" for c in contributors) + "</ul>"
             html_parts.append(f'<tr><th>Contributors</th><td>{contrib_list}</td></tr>')
         
         institution = authorship.get("institution")

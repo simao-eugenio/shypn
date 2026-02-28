@@ -2755,12 +2755,16 @@ class SBMLCategory(BasePathwayCategory):
             category = warning.get('category', 'Unknown')
             if category == 'assignment_rules':
                 has_assignment_rules = True
-                message += "• Assignment Rules detected\n"
-                message += "  May cause stale values and extreme propensities\n\n"
+                message += (
+                    "• Assignment Rules detected\n"
+                    "  May cause stale values and extreme propensities\n\n"
+                )
             elif category == 'reversible_formulas':
                 has_reversible_formulas = True
-                message += "• Reversible reaction formulas detected\n"
-                message += "  ✅ Fully supported via Skellam distribution (τ-leaping)\n\n"
+                message += (
+                    "• Reversible reaction formulas detected\n"
+                    "  ✅ Fully supported via Skellam distribution (τ-leaping)\n\n"
+                )
         
         message += "\nRECOMMENDED ACTIONS:\n"
         if has_assignment_rules:

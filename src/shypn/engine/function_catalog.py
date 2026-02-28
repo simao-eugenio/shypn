@@ -621,7 +621,7 @@ def interpolate(x: float, x_points: list, y_points: list) -> float:
         # Custom curve through points
         rate = interpolate(time, [0, 10, 20, 30], [0, 5, 8, 10])
     """
-    return np.interp(x, x_points, y_points)
+    return float(np.interp(x, x_points, y_points))
 
 
 def smooth_threshold(x: float, threshold: float, width: float) -> float:
