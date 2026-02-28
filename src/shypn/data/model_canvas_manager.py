@@ -1515,115 +1515,24 @@ class ModelCanvasManager:
         self.viewport_controller.set_zoom(zoom_level, center_x, center_y)
         self._needs_redraw = True
     
-    def _apply_zoom_factor_with_bounds(self, factor):
-        """Apply zoom factor with bounds checking.
-        
-        Args:
-            factor: Multiplicative zoom factor
-            
-        Returns:
-            tuple: (new_zoom, zoom_changed) - new zoom level and whether it changed
-        """
-        new_zoom = self.zoom * factor
-        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
-        zoom_changed = (new_zoom != self.zoom)
-        return new_zoom, zoom_changed
-    
-    def _calculate_pan_for_zoom_without_rotation(self, world_x, world_y, center_x, center_y):
-        """Calculate pan adjustment for zoom at point (no rotation).
-        
-        Args:
-            world_x: World X coordinate to keep under cursor
-            world_y: World Y coordinate to keep under cursor
-            center_x: Screen X coordinate of zoom center
-            center_y: Screen Y coordinate of zoom center
-            
-        Returns:
-            tuple: (pan_x, pan_y) in world coordinates
-        """
-        # No rotation: simple formula
-        # world = screen/zoom - pan
-        # So: pan = screen/zoom - world
-        pan_x = (center_x / self.zoom) - world_x
-        pan_y = (center_y / self.zoom) - world_y
-        return pan_x, pan_y
-    
-    def _calculate_pan_for_zoom_with_rotation(self, world_x, world_y, center_x, center_y, rotation):
-        """Calculate pan adjustment for zoom at point (with rotation).
-        
-        Solves the equation: pan = c/zoom - world + R_inv((screen - c)/zoom)
-        where rotation center depends on pan (circular dependency).
-        
-        Args:
-            world_x: World X coordinate to keep under cursor
-            world_y: World Y coordinate to keep under cursor
-            center_x: Screen X coordinate of zoom center
-            center_y: Screen Y coordinate of zoom center
-            rotation: CanvasRotation object with angle_radians
-            
-        Returns:
-            tuple: (pan_x, pan_y) in world coordinates
-        """
-        import math
-        
-        cx = self.viewport_width / 2.0
-        cy = self.viewport_height / 2.0
-        
-        # (screen - c)/zoom
-        screen_offset_x = (center_x - cx) / self.zoom
-        screen_offset_y = (center_y - cy) / self.zoom
-        
-        # R_inv((screen - c)/zoom)
-        cos_a = math.cos(-rotation.angle_radians)
-        sin_a = math.sin(-rotation.angle_radians)
-        
-        rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
-        rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
-        
-        # pan = c/zoom - world + R_inv((screen - c)/zoom)
-        pan_x = (cx / self.zoom) - world_x + rotated_x
-        pan_y = (cy / self.zoom) - world_y + rotated_y
-        
-        return pan_x, pan_y
-    
     def zoom_at_point(self, factor, center_x, center_y):
         """Zoom by a factor at a specific point with rotation support.
-        
-        REFACTORED: Now delegates to helper methods for better readability.
-        
+
+        Delegates rotation-aware zoom math to ViewportController.
+
         Args:
-            factor: Multiplicative zoom factor
-            center_x: X coordinate of zoom center (screen space)
-            center_y: Y coordinate of zoom center (screen space)
+            factor: Multiplicative zoom factor.
+            center_x: X coordinate of zoom center (screen space).
+            center_y: Y coordinate of zoom center (screen space).
         """
-        # STEP 1: Get world coordinates of zoom center BEFORE zoom change
+        # Convert screen focal point to world space before zoom changes anything
         world_x, world_y = self.screen_to_world(center_x, center_y)
-        
-        # STEP 2: Apply new zoom with bounds
-        new_zoom, zoom_changed = self._apply_zoom_factor_with_bounds(factor)
-        
-        if not zoom_changed:
-            return  # Zoom didn't change (hit bounds)
-        
-        # STEP 3: Update zoom
-        self.zoom = new_zoom
-        self.viewport_controller.zoom = new_zoom
-        
-        # STEP 4: Calculate new pan (with or without rotation)
         rotation = self.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_with_rotation(
-                world_x, world_y, center_x, center_y, rotation
-            )
-        else:
-            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_without_rotation(
-                world_x, world_y, center_x, center_y
-            )
-        
-        # STEP 5: Cleanup - clamp, save, redraw
-        self.clamp_pan()
-        self.save_view_state_to_file()
-        self._needs_redraw = True
+        changed = self.viewport_controller.zoom_at_point_rotation_aware(
+            factor, center_x, center_y, world_x, world_y, rotation
+        )
+        if changed:
+            self._needs_redraw = True
     
     def clamp_pan(self):
         """Clamp pan to keep canvas bounds within viewport.
@@ -1688,74 +1597,16 @@ class ModelCanvasManager:
     
     def get_content_bounds(self):
         """Calculate the bounding box of all content (places, transitions, and arcs).
-        
-        Includes arc control points and bezier curves to ensure entire model fits.
-        
+
+        Delegates to ViewportController which owns the pure-math algorithm.
+
         Returns:
             tuple: (min_x, min_y, max_x, max_y) or None if no content.
         """
-        all_objects = list(self.places) + list(self.transitions)
-        if not all_objects:
-            return None
-        
-        # Start with place/transition bounds
-        min_x, max_x, min_y, max_y = self._get_object_bounds(all_objects)
-        
-        # Include arc endpoints and control points
-        for arc in self.arcs:
-            min_x, max_x, min_y, max_y = self._update_bounds_with_arc(arc, min_x, max_x, min_y, max_y)
-        
-        return (min_x, min_y, max_x, max_y)
-    
-    @staticmethod
-    def _get_object_bounds(all_objects):
-        """Calculate bounding box for places and transitions.
-        
-        Args:
-            all_objects: List of places and transitions.
-            
-        Returns:
-            tuple: (min_x, max_x, min_y, max_y)
-        """
-        min_x = min(obj.x for obj in all_objects)
-        max_x = max(obj.x for obj in all_objects)
-        min_y = min(obj.y for obj in all_objects)
-        max_y = max(obj.y for obj in all_objects)
-        return min_x, max_x, min_y, max_y
-    
-    @staticmethod
-    def _update_bounds_with_arc(arc, min_x, max_x, min_y, max_y):
-        """Update bounds to include arc endpoints and control points.
-        
-        Args:
-            arc: Arc to include in bounds.
-            min_x, max_x, min_y, max_y: Current bounds.
-            
-        Returns:
-            tuple: Updated (min_x, max_x, min_y, max_y)
-        """
-        # Include source and target points
-        if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
-            min_x = min(min_x, arc.source.x)
-            max_x = max(max_x, arc.source.x)
-            min_y = min(min_y, arc.source.y)
-            max_y = max(max_y, arc.source.y)
-        if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
-            min_x = min(min_x, arc.target.x)
-            max_x = max(max_x, arc.target.x)
-            min_y = min(min_y, arc.target.y)
-            max_y = max(max_y, arc.target.y)
-        
-        # Include control points if arc has bezier curves
-        if hasattr(arc, 'control_points') and arc.control_points:
-            for cp_x, cp_y in arc.control_points:
-                min_x = min(min_x, cp_x)
-                max_x = max(max_x, cp_x)
-                min_y = min(min_y, cp_y)
-                max_y = max(max_y, cp_y)
-        
-        return min_x, max_x, min_y, max_y
-    
+        return self.viewport_controller.get_content_bounds(
+            self.places, self.transitions, self.arcs
+        )
+
     def center_view_on_content(self):
         """Center the viewport on all content.
         
@@ -1777,74 +1628,6 @@ class ModelCanvasManager:
         # Pan to center the content
         self.pan_to(center_x, center_y)
     
-    def _calculate_content_dimensions(self, bounds):
-        """Calculate content dimensions with padding for object sizes.
-        
-        Args:
-            bounds: (min_x, min_y, max_x, max_y) bounding box
-            
-        Returns:
-            tuple: (content_width, content_height) in world coordinates
-        """
-        min_x, min_y, max_x, max_y = bounds
-        
-        # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
-        content_width = max_x - min_x + 80
-        content_height = max_y - min_y + 80
-        
-        # Handle edge case: single object or very small cluster
-        if content_width < 80:
-            content_width = 80
-        if content_height < 80:
-            content_height = 80
-        
-        return content_width, content_height
-    
-    def _calculate_zoom_to_fit(self, content_width, content_height, padding_percent):
-        """Calculate optimal zoom level to fit content in viewport.
-        
-        Args:
-            content_width: Width of content in world coordinates
-            content_height: Height of content in world coordinates
-            padding_percent: Percentage of viewport to leave as margin
-            
-        Returns:
-            float: Target zoom level (clamped to MIN_ZOOM..MAX_ZOOM)
-        """
-        # Calculate available viewport space (with padding margin)
-        padding_factor = 1.0 - (padding_percent / 100.0)
-        available_width = self.viewport_controller.viewport_width * padding_factor
-        available_height = self.viewport_controller.viewport_height * padding_factor
-        
-        # Compute zoom to fit both dimensions
-        zoom_x = available_width / content_width if content_width > 0 else 1.0
-        zoom_y = available_height / content_height if content_height > 0 else 1.0
-        target_zoom = min(zoom_x, zoom_y)  # Use smaller to fit both dimensions
-        
-        # Clamp to zoom limits
-        return max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
-    
-    def _apply_viewport_offsets(self, horizontal_offset_percent, vertical_offset_percent, target_zoom):
-        """Apply horizontal/vertical offsets to viewport pan.
-        
-        Args:
-            horizontal_offset_percent: Percentage of viewport width to offset horizontally
-            vertical_offset_percent: Percentage of viewport height to offset vertically
-            target_zoom: Current zoom level
-        """
-        if horizontal_offset_percent == 0 and vertical_offset_percent == 0:
-            return
-        
-        # Calculate offsets in world coordinates
-        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
-        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
-        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
-        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
-        
-        # Apply offsets to pan
-        self.viewport_controller.pan_x += horizontal_offset_world
-        self.viewport_controller.pan_y += vertical_offset_world
-    
     def fit_to_page(self, padding_percent=10, deferred=False, horizontal_offset_percent=0, vertical_offset_percent=0):
         """Fit all content to viewport with optimal zoom and centering.
         
@@ -1865,24 +1648,19 @@ class ModelCanvasManager:
         # Handle deferred execution
         if deferred:
             return self._defer_fit_to_page(padding_percent, horizontal_offset_percent, vertical_offset_percent)
-        
+
         bounds = self.get_content_bounds()
-        
+
         # Handle empty content
         if not bounds:
             return self._handle_empty_content()
-        
-        # Calculate and apply zoom/pan
-        content_width, content_height = self._calculate_content_dimensions(bounds)
-        target_zoom = self._calculate_zoom_to_fit(content_width, content_height, padding_percent)
-        self._apply_zoom_and_center(bounds, target_zoom)
-        
-        # Apply offsets if specified
-        self._apply_viewport_offsets(horizontal_offset_percent, vertical_offset_percent, target_zoom)
-        
-        # Finalize view state
+
+        # Delegate zoom + pan + offset maths to ViewportController
+        self.viewport_controller.fit_content(
+            bounds, padding_percent, horizontal_offset_percent, vertical_offset_percent
+        )
+
         self._finalize_view_state()
-        
         return True
     
     # Helper methods for fit_to_page (PHASE 1 EXTRACTION)
@@ -1906,35 +1684,16 @@ class ModelCanvasManager:
     
     def _handle_empty_content(self):
         """Handle fit_to_page when no content exists.
-        
+
         Returns:
-            bool: False (no content)
+            bool: False (no content).
         """
-        self.zoom = 1.0
-        self.viewport_controller.zoom = 1.0
+        self.zoom = 1.0  # delegates to viewport_controller via property
         self.pan_to(0.0, 0.0)
         return False
-    
-    def _apply_zoom_and_center(self, bounds, target_zoom):
-        """Apply zoom and center viewport on content.
-        
-        Args:
-            bounds: Content bounding box (min_x, min_y, max_x, max_y).
-            target_zoom: Target zoom level.
-        """
-        self.zoom = target_zoom
-        self.viewport_controller.zoom = target_zoom
-        
-        # Center on content
-        min_x, min_y, max_x, max_y = bounds
-        content_center_x = (min_x + max_x) / 2.0
-        content_center_y = (min_y + max_y) / 2.0
-        self.viewport_controller.pan_to(content_center_x, content_center_y)
-    
+
     def _finalize_view_state(self):
-        """Finalize view state after fit_to_page."""
-        self.pan_x = self.viewport_controller.pan_x
-        self.pan_y = self.viewport_controller.pan_y
+        """Persist view state and request redraw after a fit/zoom operation."""
         self.save_view_state_to_file()
         self._needs_redraw = True
     

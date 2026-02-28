@@ -5,13 +5,129 @@ Implements pointer-centered zoom and infinite canvas with clamping.
 
 This is a stateful controller (first one extracted from god class).
 Unlike services (stateless), controllers maintain state between operations.
+
+Module structure:
+    AbstractViewportController -- ABC defining the public contract
+    ViewportController         -- Concrete implementation
 """
 
+from __future__ import annotations
+
 import json
+import math
 import os
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Tuple
 
 
-class ViewportController:
+class AbstractViewportController(ABC):
+    """Abstract base class defining the ViewportController public contract."""
+
+    # ---- Zoom ----
+    @abstractmethod
+    def zoom_in(self, center_x: Optional[float] = None, center_y: Optional[float] = None) -> None: ...
+
+    @abstractmethod
+    def zoom_out(self, center_x: Optional[float] = None, center_y: Optional[float] = None) -> None: ...
+
+    @abstractmethod
+    def zoom_by_factor(
+        self,
+        factor: float,
+        center_x: Optional[float] = None,
+        center_y: Optional[float] = None,
+    ) -> None: ...
+
+    @abstractmethod
+    def set_zoom(
+        self,
+        zoom_level: float,
+        center_x: Optional[float] = None,
+        center_y: Optional[float] = None,
+    ) -> None: ...
+
+    @abstractmethod
+    def zoom_at_point(self, factor: float, center_x: float, center_y: float) -> None: ...
+
+    @abstractmethod
+    def zoom_at_point_rotation_aware(
+        self,
+        factor: float,
+        center_x: float,
+        center_y: float,
+        world_x: float,
+        world_y: float,
+        rotation: Any,
+    ) -> bool: ...
+
+    # ---- Pan ----
+    @abstractmethod
+    def pan(self, dx: float, dy: float, rotation: Any = None) -> None: ...
+
+    @abstractmethod
+    def pan_to(self, world_x: float, world_y: float) -> None: ...
+
+    @abstractmethod
+    def pan_relative(self, dx: float, dy: float, rotation: Any = None) -> None: ...
+
+    @abstractmethod
+    def clamp_pan(self) -> None: ...
+
+    # ---- Viewport sizing ----
+    @abstractmethod
+    def set_viewport_size(self, width: float, height: float) -> None: ...
+
+    @abstractmethod
+    def set_pointer_position(self, x: float, y: float) -> None: ...
+
+    # ---- Info ----
+    @abstractmethod
+    def get_zoom_percentage(self) -> str: ...
+
+    @abstractmethod
+    def get_viewport_info(self) -> Dict[str, Any]: ...
+
+    # ---- Persistence ----
+    @abstractmethod
+    def save_view_state_to_file(self) -> None: ...
+
+    @abstractmethod
+    def load_view_state_from_file(self) -> bool: ...
+
+    # ---- Redraw tracking ----
+    @abstractmethod
+    def needs_redraw(self) -> bool: ...
+
+    @abstractmethod
+    def mark_clean(self) -> None: ...
+
+    @abstractmethod
+    def mark_dirty(self) -> None: ...
+
+    # ---- Reset ----
+    @abstractmethod
+    def reset(self) -> None: ...
+
+    # ---- Content bounds & fit ----
+    @abstractmethod
+    def get_content_bounds(
+        self,
+        places: Any,
+        transitions: Any,
+        arcs: Any,
+    ) -> Optional[Tuple[float, float, float, float]]: ...
+
+    @abstractmethod
+    def fit_content(
+        self,
+        bounds: Tuple[float, float, float, float],
+        padding_percent: float,
+        horizontal_offset_percent: float,
+        vertical_offset_percent: float,
+    ) -> None: ...
+
+
+class ViewportController(AbstractViewportController):
     """Controller for viewport state (zoom, pan, dimensions).
     
     Responsibilities:
@@ -175,7 +291,6 @@ class ViewportController:
         
         # Apply inverse rotation if canvas is rotated (with tolerance for floating point errors)
         if rotation and abs(rotation.angle_degrees) > 0.001:
-            import math
             cos_a = math.cos(-rotation.angle_radians)  # Inverse rotation
             sin_a = math.sin(-rotation.angle_radians)
             
@@ -419,7 +534,7 @@ class ViewportController:
     
     # ==================== Reset ====================
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset viewport to default state (zoom=1.0, centered)."""
         self.zoom = 1.0
         self.pan_x = 0.0
@@ -433,3 +548,294 @@ class ViewportController:
             self._initial_pan_set = True
         
         self._needs_redraw = True
+
+    # ==================== Rotation-Aware Zoom Helpers ====================
+
+    def _apply_zoom_factor_with_bounds(self, factor: float) -> Tuple[float, bool]:
+        """Apply zoom factor with bounds checking.
+
+        Args:
+            factor: Multiplicative zoom factor.
+
+        Returns:
+            (new_zoom, zoom_changed) tuple.
+        """
+        new_zoom = self.zoom * factor
+        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
+        zoom_changed = new_zoom != self.zoom
+        return new_zoom, zoom_changed
+
+    def _calculate_pan_for_zoom_without_rotation(
+        self,
+        world_x: float,
+        world_y: float,
+        center_x: float,
+        center_y: float,
+    ) -> Tuple[float, float]:
+        """Calculate pan adjustment for pointer-centred zoom (no rotation).
+
+        After the new zoom has been written to ``self.zoom``, solve::
+
+            world = screen / zoom - pan  →  pan = screen / zoom - world
+
+        Args:
+            world_x: World X coordinate to keep under the cursor.
+            world_y: World Y coordinate to keep under the cursor.
+            center_x: Screen X of the zoom focal point.
+            center_y: Screen Y of the zoom focal point.
+
+        Returns:
+            (pan_x, pan_y) in world coordinates.
+        """
+        pan_x = (center_x / self.zoom) - world_x
+        pan_y = (center_y / self.zoom) - world_y
+        return pan_x, pan_y
+
+    def _calculate_pan_for_zoom_with_rotation(
+        self,
+        world_x: float,
+        world_y: float,
+        center_x: float,
+        center_y: float,
+        rotation: Any,
+    ) -> Tuple[float, float]:
+        """Calculate pan adjustment for pointer-centred zoom with canvas rotation.
+
+        Solves::
+
+            pan = c/zoom - world + R_inv((screen - c) / zoom)
+
+        where *c* is the screen centre and *R_inv* is the inverse rotation.
+
+        Args:
+            world_x: World X coordinate to keep under the cursor.
+            world_y: World Y coordinate to keep under the cursor.
+            center_x: Screen X of the zoom focal point.
+            center_y: Screen Y of the zoom focal point.
+            rotation: CanvasRotation with ``angle_radians`` attribute.
+
+        Returns:
+            (pan_x, pan_y) in world coordinates.
+        """
+        cx = self.viewport_width / 2.0
+        cy = self.viewport_height / 2.0
+
+        # Offset of the zoom focal point from the screen centre, in world units
+        screen_offset_x = (center_x - cx) / self.zoom
+        screen_offset_y = (center_y - cy) / self.zoom
+
+        # Rotate the offset by the inverse of the canvas rotation
+        cos_a = math.cos(-rotation.angle_radians)
+        sin_a = math.sin(-rotation.angle_radians)
+        rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
+        rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
+
+        pan_x = (cx / self.zoom) - world_x + rotated_x
+        pan_y = (cy / self.zoom) - world_y + rotated_y
+        return pan_x, pan_y
+
+    def zoom_at_point_rotation_aware(
+        self,
+        factor: float,
+        center_x: float,
+        center_y: float,
+        world_x: float,
+        world_y: float,
+        rotation: Any,
+    ) -> bool:
+        """Zoom by *factor* at a focal point, honouring canvas rotation.
+
+        The caller is responsible for converting the focal screen coordinate to
+        world space (using ``screen_to_world``) before calling this method,
+        because that conversion may require model-level context (e.g.
+        ``transformation_manager``) that the viewport controller does not own.
+
+        Args:
+            factor: Multiplicative zoom factor.
+            center_x: Screen X of the zoom focal point.
+            center_y: Screen Y of the zoom focal point.
+            world_x: World X of the zoom focal point (pre-computed by caller).
+            world_y: World Y of the zoom focal point (pre-computed by caller).
+            rotation: CanvasRotation object, or ``None`` for no rotation.
+
+        Returns:
+            ``True`` if the zoom level changed; ``False`` if it was already at
+            the min/max bound.
+        """
+        new_zoom, zoom_changed = self._apply_zoom_factor_with_bounds(factor)
+        if not zoom_changed:
+            return False
+
+        self.zoom = new_zoom
+
+        if rotation and abs(rotation.angle_degrees) > 0.001:
+            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_with_rotation(
+                world_x, world_y, center_x, center_y, rotation
+            )
+        else:
+            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_without_rotation(
+                world_x, world_y, center_x, center_y
+            )
+
+        self.clamp_pan()
+        self.save_view_state_to_file()
+        self._needs_redraw = True
+        return True
+
+    # ==================== Content Bounds & Fit-to-Viewport ====================
+
+    @staticmethod
+    def _get_object_bounds(
+        all_objects: List[Any],
+    ) -> Tuple[float, float, float, float]:
+        """Return (min_x, max_x, min_y, max_y) for a list of placed objects.
+
+        Each object must expose ``.x`` and ``.y`` attributes.
+        """
+        min_x = min(obj.x for obj in all_objects)
+        max_x = max(obj.x for obj in all_objects)
+        min_y = min(obj.y for obj in all_objects)
+        max_y = max(obj.y for obj in all_objects)
+        return min_x, max_x, min_y, max_y
+
+    @staticmethod
+    def _update_bounds_with_arc(
+        arc: Any,
+        min_x: float,
+        max_x: float,
+        min_y: float,
+        max_y: float,
+    ) -> Tuple[float, float, float, float]:
+        """Expand bounds to include arc endpoints and Bézier control points."""
+        if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
+            min_x = min(min_x, arc.source.x)
+            max_x = max(max_x, arc.source.x)
+            min_y = min(min_y, arc.source.y)
+            max_y = max(max_y, arc.source.y)
+        if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
+            min_x = min(min_x, arc.target.x)
+            max_x = max(max_x, arc.target.x)
+            min_y = min(min_y, arc.target.y)
+            max_y = max(max_y, arc.target.y)
+        if hasattr(arc, 'control_points') and arc.control_points:
+            for cp_x, cp_y in arc.control_points:
+                min_x = min(min_x, cp_x)
+                max_x = max(max_x, cp_x)
+                min_y = min(min_y, cp_y)
+                max_y = max(max_y, cp_y)
+        return min_x, max_x, min_y, max_y
+
+    def get_content_bounds(
+        self,
+        places: Any,
+        transitions: Any,
+        arcs: Any,
+    ) -> Optional[Tuple[float, float, float, float]]:
+        """Calculate the axis-aligned bounding box of all model content.
+
+        Args:
+            places: Iterable of place objects with ``.x`` / ``.y``.
+            transitions: Iterable of transition objects with ``.x`` / ``.y``.
+            arcs: Iterable of arc objects.
+
+        Returns:
+            ``(min_x, min_y, max_x, max_y)`` or ``None`` if the model is empty.
+        """
+        all_objects: List[Any] = list(places) + list(transitions)
+        if not all_objects:
+            return None
+
+        min_x, max_x, min_y, max_y = self._get_object_bounds(all_objects)
+        for arc in arcs:
+            min_x, max_x, min_y, max_y = self._update_bounds_with_arc(
+                arc, min_x, max_x, min_y, max_y
+            )
+        return (min_x, min_y, max_x, max_y)
+
+    def _calculate_content_dimensions(
+        self,
+        bounds: Tuple[float, float, float, float],
+    ) -> Tuple[float, float]:
+        """Return padded content dimensions in world coordinates.
+
+        Adds ~80 world-unit padding (≈ 40 px each side at 100 % zoom) to
+        account for the visual radius of places and transitions.
+        """
+        min_x, min_y, max_x, max_y = bounds
+        content_width = max(max_x - min_x + 80, 80.0)
+        content_height = max(max_y - min_y + 80, 80.0)
+        return content_width, content_height
+
+    def _calculate_zoom_to_fit(
+        self,
+        content_width: float,
+        content_height: float,
+        padding_percent: float,
+    ) -> float:
+        """Return the zoom level required to fit content in the viewport.
+
+        Args:
+            content_width: Content width in world coordinates.
+            content_height: Content height in world coordinates.
+            padding_percent: Percentage of viewport to reserve as margin
+                (e.g. ``10`` = leave 10 % empty on each axis).
+
+        Returns:
+            Zoom level clamped to ``[MIN_ZOOM, MAX_ZOOM]``.
+        """
+        padding_factor = 1.0 - (padding_percent / 100.0)
+        available_width = self.viewport_width * padding_factor
+        available_height = self.viewport_height * padding_factor
+        zoom_x = available_width / content_width if content_width > 0 else 1.0
+        zoom_y = available_height / content_height if content_height > 0 else 1.0
+        target_zoom = min(zoom_x, zoom_y)
+        return max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
+
+    def _apply_viewport_offsets(
+        self,
+        horizontal_offset_percent: float,
+        vertical_offset_percent: float,
+        target_zoom: float,
+    ) -> None:
+        """Shift pan by percentage-based offsets after centering.
+
+        Args:
+            horizontal_offset_percent: % of viewport width to shift right
+                (negative = left).
+            vertical_offset_percent: % of viewport height to shift down
+                (negative = up).
+            target_zoom: Zoom level used to convert to world space.
+        """
+        if horizontal_offset_percent == 0 and vertical_offset_percent == 0:
+            return
+        viewport_width_world = self.viewport_width / target_zoom
+        viewport_height_world = self.viewport_height / target_zoom
+        self.pan_x += (horizontal_offset_percent / 100.0) * viewport_width_world
+        self.pan_y += (vertical_offset_percent / 100.0) * viewport_height_world
+
+    def fit_content(
+        self,
+        bounds: Tuple[float, float, float, float],
+        padding_percent: float,
+        horizontal_offset_percent: float,
+        vertical_offset_percent: float,
+    ) -> None:
+        """Zoom and pan so that *bounds* fits inside the viewport.
+
+        Args:
+            bounds: Content bounding box ``(min_x, min_y, max_x, max_y)``.
+            padding_percent: Viewport fraction to leave as margin.
+            horizontal_offset_percent: Additional horizontal shift (% of width).
+            vertical_offset_percent: Additional vertical shift (% of height).
+        """
+        content_width, content_height = self._calculate_content_dimensions(bounds)
+        target_zoom = self._calculate_zoom_to_fit(
+            content_width, content_height, padding_percent
+        )
+        self.zoom = target_zoom
+
+        min_x, min_y, max_x, max_y = bounds
+        self.pan_to((min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
+        self._apply_viewport_offsets(
+            horizontal_offset_percent, vertical_offset_percent, target_zoom
+        )
