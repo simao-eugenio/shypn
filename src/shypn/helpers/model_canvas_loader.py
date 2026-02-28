@@ -81,6 +81,7 @@ from shypn.helpers.canvas_layout_controller import CanvasLayoutController
 from shypn.core.document_id import alloc_doc_id, doc_id
 from shypn.helpers.document_session import DocumentSession
 from shypn.canvas.canvas_renderer import CanvasRenderer
+from shypn.canvas.canvas_context_menu_controller import CanvasContextMenuController
 from shypn.helpers.document_panel_setup import DocumentPanelSetup
 
 
@@ -230,6 +231,9 @@ class ModelCanvasLoader:
 
         # Sprint 21: canvas rendering delegated to CanvasRenderer
         self._renderer = CanvasRenderer(canvas_ctx=self._input_handler.canvas_ctx)
+
+        # Sprint 22: context-menu pipeline delegated to CanvasContextMenuController
+        self._ctx_menu_ctrl = CanvasContextMenuController(loader=self)
 
         # Subscribe to 'editor.close_requested' so the Open Editors panel ✕ button
         # triggers a proper tab close (with unsaved-changes dialog etc.)
@@ -2331,12 +2335,8 @@ class ModelCanvasLoader:
             return self.notebook.get_current_page() if self.notebook else -1
 
     def _popdown_canvas_context_menu(self):
-        """Pop down the active canvas context menu (Escape key handler)."""
-        if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
-            if isinstance(self._canvas_context_menu, Gtk.Menu):
-                self._canvas_context_menu.popdown()
-                return True
-        return False
+        """Dismiss active canvas context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        return self._ctx_menu_ctrl.popdown_canvas_menu()
 
     def _setup_event_controllers(self, drawing_area, manager):
         """Setup mouse and keyboard event controllers.
@@ -2427,203 +2427,26 @@ class ModelCanvasLoader:
         self._renderer.render_arc_preview(cr, arc_state, manager)
 
     def _show_canvas_context_menu(self, x, y, drawing_area):
-        """Show the canvas context menu at the given position.
-        
-        Args:
-            x, y: Position to show menu (widget-relative coordinates)
-            drawing_area: GtkDrawingArea widget
-        """
-        if hasattr(self, 'canvas_context_menus'):
-            menu = self.canvas_context_menus.get(drawing_area)
-            if menu:
-                pass
-                # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
-                menu.popup_at_pointer(None)
+        """Pop up canvas context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.show_canvas_menu(x, y, drawing_area)
 
     def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
-        """Show object-specific context menu.
-        
-        Args:
-            x, y: Position to show menu (widget-relative coordinates)
-            drawing_area: GtkDrawingArea widget
-            manager: ModelCanvasManager instance
-            obj: Selected object (Place, Transition, or Arc)
-        """
-        from shypn.netobjs import Place, Transition, Arc
-        menu = Gtk.Menu()
-        _TYPE_LABELS = {Place: 'Place', Transition: 'Transition', Arc: 'Arc'}
-        obj_type = next((lbl for cls, lbl in _TYPE_LABELS.items() if isinstance(obj, cls)), 'Object')
-        
-        # Format title with ID for arcs, just name for other objects
-        if isinstance(obj, Arc):
-            title_label = f'{obj_type}: {obj.id} - {obj.name}'
-        else:
-            title_label = f'{obj_type}: {obj.name}'
-        
-        title_item = Gtk.MenuItem(label=title_label)
-        title_item.set_sensitive(False)
-        title_item.show()
-        menu.append(title_item)
-        separator = Gtk.SeparatorMenuItem()
-        separator.show()
-        menu.append(separator)
-        
-        # Check if this is a parallel arc (for disabling edit mode)
-        is_parallel_arc = False
-        if isinstance(obj, Arc):
-            parallels = manager.detect_parallel_arcs(obj)
-            is_parallel_arc = len(parallels) > 0
-        
-        # Build menu items list
-        if is_parallel_arc:
-            pass
-            # For parallel arcs, don't include "Edit Mode" option
-            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
-        else:
-            pass
-            # For normal objects, include "Edit Mode" option
-            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
-        
-        # Dispatch to type-specific menu-item builders
-        for obj_cls, builder in [
-            (Place, self._add_place_context_items),
-            (Transition, self._add_transition_context_items),
-            (Arc, self._add_arc_context_items),
-        ]:
-            if isinstance(obj, obj_cls):
-                builder(obj, menu_items, manager, drawing_area)
-                break
-        for item_data in menu_items:
-            if item_data is None:
-                menu_item = Gtk.SeparatorMenuItem()
-            elif item_data[0] == '__SUBMENU__':
-                menu_item = item_data[1]
-            else:
-                label, callback = item_data
-                menu_item = Gtk.MenuItem(label=label)
+        """Pop up per-object context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.show_object_menu(x, y, drawing_area, manager, obj)
 
-                def on_activate(widget, cb):
-                    cb()
-                menu_item.connect('activate', on_activate, callback)
-                menu_item.show()
-            menu.append(menu_item)
-        
-        # Add analysis menu items from context menu handler
-        if self.context_menu_handler:
-            self.context_menu_handler.add_analysis_menu_items(menu, obj)
-        
-        # Add batch mode recording menu item for places and transitions
-        if isinstance(obj, (Place, Transition)):
-            # Add separator before batch recording item
-            sep = Gtk.SeparatorMenuItem()
-            sep.show()
-            menu.append(sep)
-            
-            # Check if object is already marked for recording
-            is_recorded = False
-            if hasattr(manager, 'simulation_settings'):
-                settings = manager.simulation_settings
-                if settings and hasattr(settings, 'is_object_recorded'):
-                    is_recorded = settings.is_object_recorded(obj.id)
-            
-            # Create menu item with checkmark if marked
-            if is_recorded:
-                record_label = '✓ Mark for Recording (Batch Mode)'
-            else:
-                record_label = '📊 Mark for Recording (Batch Mode)'
-            
-            record_item = Gtk.MenuItem(label=record_label)
-            record_item.connect('activate', lambda w: self._on_toggle_recording(obj, manager, drawing_area))
-            record_item.show()
-            menu.append(record_item)
-        
-        self._active_context_menu = menu
-        
-        # Note: Don't use attach_to_widget() as it causes Wayland warnings
-        # popup_at_pointer() handles parent relationships correctly
-        menu.popup_at_pointer(None)
-
-    # ------------------------------------------------------------------
-    # Context-menu type-specific item builders (split from _show_object_context_menu)
-    # ------------------------------------------------------------------
+    # Context-menu item builders — Sprint 22: delegates to CanvasContextMenuController
 
     def _add_place_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Place-specific items to the context-menu items list."""
-        is_signal = getattr(obj, 'is_signal_place', False)
-        if is_signal:
-            menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
-        else:
-            signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
-            signal_submenu = Gtk.Menu()
-            for type_value, type_label in [
-                ('energy', 'Ψₑ - Energy/Metabolic State'),
-                ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
-                ('quorum', 'Ψq - Quorum/Cell Communication'),
-                ('spatial', 'Ψₛ - Spatial/Compartment Sensing'),
-            ]:
-                signal_item = Gtk.MenuItem(label=type_label)
-                signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
-                signal_item.show()
-                signal_submenu.append(signal_item)
-            signal_submenu_item.set_submenu(signal_submenu)
-            signal_submenu_item.show()
-            menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
-        menu_items.insert(3, None)  # separator after signal place options
+        """Append Place-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_place_context_items(obj, menu_items, manager, drawing_area)
 
     def _add_transition_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Transition-specific items to the context-menu items list."""
-        type_submenu_item = Gtk.MenuItem(label='Change Type ►')
-        type_submenu = Gtk.Menu()
-        current_type = getattr(obj, 'transition_type', 'continuous')
-        for type_value, type_label in [
-            ('immediate', 'Immediate (zero delay)'),
-            ('timed', 'Timed (TPN)'),
-            ('stochastic', 'Stochastic (GSPN)'),
-            ('continuous', 'Continuous (SHPN)'),
-        ]:
-            label = f'✓ {type_label}' if type_value == current_type else f'   {type_label}'
-            type_item = Gtk.MenuItem(label=label)
-            type_item.connect('activate', lambda w, t=type_value: self._on_transition_type_change(obj, t, manager, drawing_area))
-            type_item.show()
-            type_submenu.append(type_item)
-        type_submenu_item.set_submenu(type_submenu)
-        type_submenu_item.show()
-        menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
-        menu_items.insert(3, ('Flip Orientation', lambda: self._on_transition_flip_orientation(obj, manager, drawing_area)))
+        """Append Transition-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_transition_context_items(obj, menu_items, manager, drawing_area)
 
     def _add_arc_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Arc-specific items to the context-menu items list."""
-        from shypn.utils.arc_transform import is_straight, is_curved, is_signal_flow
-        from shypn.netobjs.place import Place
-        from shypn.netobjs.transition import Transition
-        from shypn.netobjs.test_arc import TestArc
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
-
-        can_be_directional = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
-        is_test = isinstance(obj, TestArc)
-        is_inhibitor_arc = isinstance(obj, InhibitorArc)
-        is_signal = is_signal_flow(obj)
-        is_normal_arc = not is_test and not is_inhibitor_arc and not is_signal
-
-        menu_items.insert(2, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
-        menu_items.insert(3, None)
-
-        if is_curved(obj):
-            menu_items.insert(4, ('Transform to Straight', lambda: self._on_arc_make_straight(obj, manager, drawing_area)))
-        elif is_straight(obj):
-            menu_items.insert(4, ('Transform to Curved', lambda: self._on_arc_make_curved(obj, manager, drawing_area)))
-
-        if can_be_directional:
-            if not is_normal_arc:
-                menu_items.insert(5, ('Convert to Normal Arc', lambda: self._on_arc_convert_to_normal(obj, manager, drawing_area)))
-            if not is_test:
-                menu_items.insert(5, ('Convert to Test Arc (Catalyst)', lambda: self._on_arc_convert_to_test(obj, manager, drawing_area)))
-            if not is_inhibitor_arc:
-                menu_items.insert(5, ('Convert to Inhibitor Arc', lambda: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area)))
-
-        # Signal flow arcs can connect in both directions
-        if not is_signal:
-            menu_items.insert(5, ('Convert to Signal Flow Arc', lambda: self._on_arc_convert_to_signal_flow(obj, manager, drawing_area)))
+        """Append Arc-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_arc_context_items(obj, menu_items, manager, drawing_area)
 
     def get_canvas_manager(self, drawing_area=None):
         """Get the canvas manager for a drawing area.
@@ -3253,133 +3076,50 @@ class ModelCanvasLoader:
         self.file_explorer_panel = file_explorer_panel
 
     def _setup_canvas_context_menu(self, drawing_area, manager):
-        """Setup context menu for canvas operations using Gtk.Menu.
-        
-        Args:
-            drawing_area: GtkDrawingArea widget.
-            manager: ModelCanvasManager instance.
-        """
-        menu = Gtk.Menu()
-        # Note: Don't use attach_to_widget() as it causes Wayland warnings
-        # popup_at_pointer() handles parent relationships correctly
-        menu_items = [
-            ('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)),
-            ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)),
-            ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)),
-            ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Rotate 90° CW', lambda: self._on_rotate_90_cw_clicked(menu, drawing_area, manager)),
-            ('Rotate 90° CCW', lambda: self._on_rotate_90_ccw_clicked(menu, drawing_area, manager)),
-            ('Rotate 180°', lambda: self._on_rotate_180_clicked(menu, drawing_area, manager)),
-            ('Reset Rotation', lambda: self._on_reset_rotation_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)),
-            ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)),
-            ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)),
-            ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('🎯 Create Center Marker', lambda: self._on_create_center_marker_clicked(menu, drawing_area, manager))
-        ]
-        for item_data in menu_items:
-            if item_data is None:
-                menu_item = Gtk.SeparatorMenuItem()
-            else:
-                label, callback = item_data
-                menu_item = Gtk.MenuItem(label=label)
-                menu_item.connect('activate', lambda w, cb=callback: cb())
-            menu_item.show()
-            menu.append(menu_item)
-        self._canvas_context_menu = menu
-        if not hasattr(self, 'canvas_context_menus'):
-            self.canvas_context_menus = {}
-        self.canvas_context_menus[drawing_area] = menu
+        """Wire context menu for drawing_area — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.setup_for_drawing_area(drawing_area, manager)
 
     def _on_zoom_in_clicked(self, menu, drawing_area, manager):
-        """Zoom in action (pointer-centered)."""
-        manager.zoom_in(manager.pointer_x, manager.pointer_y)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_zoom_in_clicked(menu, drawing_area, manager)
 
     def _on_zoom_out_clicked(self, menu, drawing_area, manager):
-        """Zoom out action (pointer-centered)."""
-        manager.zoom_out(manager.pointer_x, manager.pointer_y)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_zoom_out_clicked(menu, drawing_area, manager)
 
     def _on_fit_to_window_clicked(self, menu, drawing_area, manager):
-        """Fit entire model to window with padding."""
-        # Use fit_to_page to properly fit all content with 10% padding
-        manager.fit_to_page(padding_percent=10)
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_fit_to_window_clicked(menu, drawing_area, manager)
+
     def _on_rotate_90_cw_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 90° clockwise."""
-        manager.rotate_canvas_90_cw()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_90_cw_clicked(menu, drawing_area, manager)
+
     def _on_rotate_90_ccw_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 90° counterclockwise."""
-        manager.rotate_canvas_90_ccw()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_90_ccw_clicked(menu, drawing_area, manager)
+
     def _on_rotate_180_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 180°."""
-        manager.rotate_canvas_180()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_180_clicked(menu, drawing_area, manager)
+
     def _on_reset_rotation_clicked(self, menu, drawing_area, manager):
-        """Reset canvas rotation to 0°."""
-        manager.reset_canvas_rotation()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_reset_rotation_clicked(menu, drawing_area, manager)
 
     def _on_grid_line_clicked(self, menu, drawing_area, manager):
-        """Set grid to line style."""
-        manager.set_grid_style('line')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_line_clicked(menu, drawing_area, manager)
 
     def _on_grid_dot_clicked(self, menu, drawing_area, manager):
-        """Set grid to dot style."""
-        manager.set_grid_style('dot')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_dot_clicked(menu, drawing_area, manager)
 
     def _on_grid_cross_clicked(self, menu, drawing_area, manager):
-        """Set grid to cross style."""
-        manager.set_grid_style('cross')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_cross_clicked(menu, drawing_area, manager)
 
     def _on_clear_canvas_clicked(self, menu, drawing_area, manager):
-        """Clear the canvas and reset to default state.
-        
-        This removes all objects and resets the document to "default" filename
-        state (unsaved), as if creating a new document. Also resets the
-        persistency manager so the next save will prompt for a new filename.
-        """
-        if self.persistency:
-            if not self.persistency.check_unsaved_changes():
-                return
-            self.persistency.new_document()
-        manager.clear_all_objects()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_clear_canvas_clicked(menu, drawing_area, manager)
 
     def _on_create_center_marker_clicked(self, menu, drawing_area, manager):
-        """Create a red circle at document center (0, 0) for viewport calibration.
-        
-        This creates a large red circle at the exact document origin to help
-        visualize and calibrate viewport centering.
-        """
-        manager.create_test_objects()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_create_center_marker_clicked(menu, drawing_area, manager)
 
     def _on_reset_zoom_clicked(self, menu, drawing_area, manager):
-        """Reset zoom to 100%."""
-        manager.set_zoom(1.0, manager.viewport_width / 2, manager.viewport_height / 2)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_reset_zoom_clicked(menu, drawing_area, manager)
 
     def _on_center_view_clicked(self, menu, drawing_area, manager):
-        """Center the view."""
-        manager.pan_x = 0
-        manager.pan_y = 0
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_center_view_clicked(menu, drawing_area, manager)
 
     # ------------------------------------------------------------------
     # Layout delegates — logic lives in CanvasLayoutController
