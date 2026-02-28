@@ -80,6 +80,7 @@ from shypn.core.services import (
     get_arc_offset_for_rendering as arc_get_offset_for_rendering,
 )
 from shypn.core.services.document_state_service import DocumentStateService
+from shypn.core.services.document_serializer import get_serializer as _get_doc_serializer
 
 
 class ModelCanvasManager:
@@ -2284,29 +2285,8 @@ class ModelCanvasManager:
         return removed_count
     
     def get_document_state(self):
-        """Get the current document state for saving.
-        
-        Returns:
-            dict: Document state including metadata and canvas properties.
-        """
-        return {
-            'filename': self.filename,
-            'modified': self.modified,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'modified_at': self.modified_at.isoformat() if self.modified_at else None,
-            'canvas': {
-                'width': self.canvas_width,
-                'height': self.canvas_height,
-                'zoom': self.zoom,
-                'pan_x': self.pan_x,
-                'pan_y': self.pan_y,
-                'grid_style': self.grid_style,
-            },
-            'viewport': {
-                'width': self.viewport_width,
-                'height': self.viewport_height,
-            }
-        }
+        """Snapshot of document metadata. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().get_document_state(self)
     
     # ===== DOCUMENT STATE — Sprint 19: delegating to DocumentStateService =====
     # All state (dirty flag, filepath, import state) is owned by self._state_svc.
@@ -2426,338 +2406,66 @@ class ModelCanvasManager:
         # Any non-default color is considered semantic
         return arc.color != Arc.DEFAULT_COLOR
     
+    # ===== COLOUR RESET — Sprint 20: delegating to DocumentSerializer =====
+
     def _reset_transition_colors_to_default(self):
-        """Reset transition colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs import Transition
-        
-        for transition in self.transitions:
-            if self._should_preserve_transition_color(transition):
-                continue
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-    
+        _get_doc_serializer()._reset_transition_colors_to_default(self)
+
     def _reset_place_colors_to_default(self):
-        """Reset place colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs import Place
-        
-        for place in self.places:
-            if self._should_preserve_place_color(place):
-                continue
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-    
+        _get_doc_serializer()._reset_place_colors_to_default(self)
+
     def _reset_arc_colors_to_default(self):
-        """Reset arc colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs.arc import Arc
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        for arc in self.arcs:
-            if self._should_preserve_arc_color(arc):
-                continue
-            # Reset to type-specific default
-            if isinstance(arc, SignalFlowArc):
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                arc.color = Arc.DEFAULT_COLOR
-    
+        _get_doc_serializer()._reset_arc_colors_to_default(self)
+
     def _reset_analysis_colors(self):
-        """Reset all analysis-related colors to defaults before saving.
-        
-        When objects are selected in the Analyses panel, they get colored with
-        plot colors for visualization. These colors are temporary and should NOT
-        be saved to the file.
-        
-        REFACTORED: Now delegates to helper methods for better testability.
-        
-        Preserves semantic colors:
-        - Source/sink transitions keep their cyan colors
-        - Compartment places keep their violet borders
-        - Boundary species arcs keep their cyan colors
-        """
-        # Reset colors using extracted helper methods
-        self._reset_transition_colors_to_default()
-        self._reset_place_colors_to_default()
-        self._reset_arc_colors_to_default()
-        
-        # Trigger redraw to show the reset colors
+        _get_doc_serializer()._reset_transition_colors_to_default(self)
+        _get_doc_serializer()._reset_place_colors_to_default(self)
+        _get_doc_serializer()._reset_arc_colors_to_default(self)
         self.mark_needs_redraw()
-    
+
     def _store_and_reset_transition_colors(self):
-        """Store and reset transition colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved transitions)
-        """
-        from shypn.netobjs import Transition
-        
-        original_colors = []
-        for transition in self.transitions:
-            if self._should_preserve_transition_color(transition):
-                original_colors.append(None)
-                continue
-            original_colors.append((transition.border_color, transition.fill_color))
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_transition_colors(self)
+
     def _store_and_reset_place_colors(self):
-        """Store and reset place colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved places)
-        """
-        from shypn.netobjs import Place
-        
-        original_colors = []
-        for place in self.places:
-            if self._should_preserve_place_color(place):
-                original_colors.append(None)
-                continue
-            original_colors.append(place.border_color)
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_place_colors(self)
+
     def _store_and_reset_arc_colors(self):
-        """Store and reset arc colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved arcs)
-        """
-        from shypn.netobjs.arc import Arc
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        original_colors = []
-        for arc in self.arcs:
-            # Check if arc has semantic color
-            if isinstance(arc, SignalFlowArc):
-                if arc.color != SignalFlowArc.DEFAULT_COLOR:
-                    original_colors.append(None)
-                    continue
-                original_colors.append(arc.color)
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                if arc.color != Arc.DEFAULT_COLOR:
-                    original_colors.append(None)
-                    continue
-                original_colors.append(arc.color)
-                arc.color = Arc.DEFAULT_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_arc_colors(self)
+
     def _reset_analysis_colors_for_save(self):
-        """Temporarily reset analysis colors for save, then restore them.
-        
-        Returns the original colors so they can be restored after serialization.
-        This allows saving with default colors without modifying the live canvas.
-        
-        REFACTORED: Now delegates to helper methods for better testability.
-        
-        Returns:
-            dict: Original colors for transitions, places, and arcs
-        """
-        # Store and reset colors using extracted helper methods
-        original_colors = {
-            'transitions': self._store_and_reset_transition_colors(),
-            'places': self._store_and_reset_place_colors(),
-            'arcs': self._store_and_reset_arc_colors()
-        }
-        
-        return original_colors
-    
+        return _get_doc_serializer()._reset_analysis_colors_for_save(self)
+
     def _restore_analysis_colors(self, original_colors):
-        """Restore colors after save.
-        
-        Args:
-            original_colors: Dictionary returned by _reset_analysis_colors_for_save()
-        """
-        # Restore transition colors
-        for i, transition in enumerate(self.transitions):
-            if original_colors['transitions'][i] is not None:
-                transition.border_color, transition.fill_color = original_colors['transitions'][i]
-        
-        # Restore place colors
-        for i, place in enumerate(self.places):
-            if original_colors['places'][i] is not None:
-                place.border_color = original_colors['places'][i]
-        
-        # Restore arc colors
-        for i, arc in enumerate(self.arcs):
-            if original_colors['arcs'][i] is not None:
-                arc.color = original_colors['arcs'][i]
-    
+        _get_doc_serializer()._restore_analysis_colors(original_colors, self)
+
     def _populate_document_objects(self, document):
-        """Populate DocumentModel with Petri net objects.
-        
-        Args:
-            document: DocumentModel to populate
-        """
-        document.places = list(self.places)
-        document.transitions = list(self.transitions)
-        document.arcs = list(self.arcs)
-        
-        # Copy modules if they exist
-        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
-            document.modules = dict(self.document_controller.modules)
-    
+        _get_doc_serializer()._populate_document_objects(document, self)
+
     def _sync_id_counters(self, document):
-        """Sync ID counters from DocumentController to DocumentModel.
-        
-        Args:
-            document: DocumentModel to sync counters to
-        """
-        place_id, trans_id, arc_id, module_id = self.document_controller.id_manager.get_state()
-        document.id_manager.set_state(place_id, trans_id, arc_id, module_id)
-    
+        _get_doc_serializer()._sync_id_counters(document, self)
+
     def _sync_view_state(self, document):
-        """Sync view state (zoom, pan, rotation) to DocumentModel.
-        
-        Args:
-            document: DocumentModel to sync view state to
-        """
-        document.view_state = {
-            "zoom": self.zoom,
-            "pan_x": self.pan_x,
-            "pan_y": self.pan_y,
-            "transformations": self.transformation_manager.to_dict()
-        }
-    
+        _get_doc_serializer()._sync_view_state(document, self)
+
     def to_document_model(self):
-        """Convert canvas manager's Petri net objects to a DocumentModel.
-        
-        This creates a DocumentModel instance that can be saved/loaded by
-        the persistency manager.
-        
-        REFACTORED: Now delegates to extracted helper methods for document setup.
-        
-        Returns:
-            DocumentModel: Document model containing all Petri net objects
-        """
-        from shypn.data.canvas import DocumentModel
-        
-        # Reset analysis colors before serialization
-        original_colors = self._reset_analysis_colors_for_save()
-        
-        # Create and populate document using extracted helpers
-        document = DocumentModel()
-        self._populate_document_objects(document)
-        self._sync_id_counters(document)
-        self._sync_view_state(document)
-        
-        # Restore analysis colors after serialization
-        self._restore_analysis_colors(original_colors)
-        
-        return document
-    
+        """Build and return a DocumentModel. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().to_document_model(self)
+
     # ==================== View State Persistence ====================
-    
-    def get_view_state(self):
-        """Get current canvas view state for persistence.
-        
-        Returns:
-            dict: View state containing pan_x, pan_y, zoom, and transformations (rotation)
-        """
-        return {
-            'pan_x': self.pan_x,
-            'pan_y': self.pan_y,
-            'zoom': self.zoom,
-            'transformations': self.transformation_manager.to_dict()
-        }
-    
-    def set_view_state(self, view_state):
-        """Restore canvas view state from saved data.
-        
-        Args:
-            view_state: Dictionary containing pan_x, pan_y, zoom, and transformations
-        """
-        if view_state:
-            self.pan_x = view_state.get('pan_x', 0.0)
-            self.pan_y = view_state.get('pan_y', 0.0)
-            self.zoom = view_state.get('zoom', 1.0)
-            
-            # Clamp zoom to valid range
-            self.zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, self.zoom))
-            
-            # CRITICAL: Sync viewport controller state BEFORE clamping
-            # The clamp_pan() delegates to viewport_controller.clamp_pan()
-            # so viewport_controller must have the correct values first
-            self.viewport_controller.pan_x = self.pan_x
-            self.viewport_controller.pan_y = self.pan_y
-            self.viewport_controller.zoom = self.zoom
-            self.viewport_controller._initial_pan_set = True  # Prevent auto-centering
-            
-            # Clamp pan to infinite canvas bounds
-            self.clamp_pan()
-            
-            # Sync back after clamping (clamp_pan modifies viewport_controller)
-            self.pan_x = self.viewport_controller.pan_x
-            self.pan_y = self.viewport_controller.pan_y
-            
-            # Restore transformations (rotation)
-            if 'transformations' in view_state:
-                self.transformation_manager.from_dict(view_state['transformations'])
-            
-            # Mark that we don't need initial centering
-            self._initial_pan_set = True
-            
-            self.mark_dirty()  # Mark document as having unsaved changes
-            self.mark_needs_redraw()  # Trigger canvas redraw with restored view
-    
-    def save_view_state_to_file(self, filepath=None):
-        """Save current view state to a JSON file.
-        
-        Args:
-            filepath: Optional custom file path. If None, uses default location.
-            
-        Returns:
-            bool: True if saved successfully, False otherwise
-        """
-        if filepath is None:
-            # Create .shypn config directory in user's home
-            config_dir = os.path.expanduser('~/.shypn')
-            os.makedirs(config_dir, exist_ok=True)
-            
-            # Use filename to create view state file
-            filename = self.filename if self.filename else 'default'
-            filepath = os.path.join(config_dir, f'{filename}_view.json')
-        
-        try:
-            view_state = self.get_view_state()
-            with open(filepath, 'w') as f:
-                json.dump(view_state, f, indent=2)
-            return True
-        except (OSError, IOError, PermissionError, TypeError) as e:
-            logger.debug(f"Failed to save view state: {e}")
-            return False
-    
-    def load_view_state_from_file(self, filepath=None):
-        """Load view state from a JSON file.
-        
-        If no view state file exists or loading fails, centers the view on content.
-        
-        Args:
-            filepath: Optional custom file path. If None, uses default location.
-            
-        Returns:
-            bool: True if loaded successfully, False otherwise
-        """
-        if filepath is None:
-            # Look for view state file in config directory
-            config_dir = os.path.expanduser('~/.shypn')
-            filename = self.filename if self.filename else 'default'
-            filepath = os.path.join(config_dir, f'{filename}_view.json')
-        
-        if not os.path.exists(filepath):
-            # No saved view state - center on content as fallback
-            self.center_view_on_content()
-            return False
-        
-        try:
-            with open(filepath, 'r') as f:
-                view_state = json.load(f)
-            self.set_view_state(view_state)
-            return True
-        except Exception as e:
-            # Failed to load - center on content as fallback
-            self.center_view_on_content()
-            return False
+
+    def get_view_state(self) -> dict:
+        """Current view state dict. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().get_view_state(self)
+
+    def set_view_state(self, view_state) -> None:
+        """Restore view from view_state. Sprint 20: delegates to DocumentSerializer."""
+        _get_doc_serializer().set_view_state(self, view_state)
+
+    def save_view_state_to_file(self, filepath=None) -> bool:
+        """Persist view state to file. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().save_view_state_to_file(self, filepath)
+
+    def load_view_state_from_file(self, filepath=None) -> bool:
+        """Load view state from file. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().load_view_state_from_file(self, filepath)
+
