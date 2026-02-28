@@ -2304,11 +2304,6 @@ class SimulationController:
                 reverse=True
             )
             
-            # Import arc types for proper handling
-            from shypn.netobjs.inhibitor_arc import InhibitorArc
-            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-            from shypn.netobjs.test_arc import TestArc
-            
             for transition in sorted_transitions:
                 pass
                 # Remove input tokens
