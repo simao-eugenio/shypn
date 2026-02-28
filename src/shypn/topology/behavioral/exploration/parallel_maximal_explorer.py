@@ -7,7 +7,7 @@ computation to identify groups of transitions that can fire atomically.
 Expected additional speedup: 2-3× over Phase 1 basic work-stealing.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import multiprocessing
 import queue
 import time
@@ -32,7 +32,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         >>> results = explorer.explore(initial_marking, max_states, ...)
     """
     
-    def __init__(self, analyzer: Any, num_workers: int = None):
+    def __init__(self, analyzer: Any, num_workers: Optional[int] = None):
         """Initialize maximal parallel explorer.
         
         Args:
@@ -140,7 +140,7 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
         # ====================================================================
         # COLLECT RESULTS
         # ====================================================================
-        graph = {'nodes': [], 'edges': []} if compute_graph else None
+        graph = {'nodes': [], 'edges': []} if compute_graph else None  # type: ignore[var-annotated]
         deadlock_states = []
         
         while stats['workers_active'] > 0 or not result_queue.empty():
@@ -148,14 +148,14 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                 result = result_queue.get(timeout=0.1)
                 
                 if result['type'] == 'new_state' and compute_graph:
-                    graph['nodes'].append({
+                    graph['nodes'].append({  # type: ignore[index]
                         'id': result['state_id'],
                         'marking': result['marking'],
                         'depth': result['depth']
                     })
                 
                 elif result['type'] == 'transition' and compute_graph:
-                    graph['edges'].append({
+                    graph['edges'].append({  # type: ignore[index]
                         'source': result['source_id'],
                         'target': result['target_id'],
                         'transition': result['trans_id'],
@@ -184,14 +184,14 @@ class ParallelMaximalExplorer(StateSpaceExplorer):
                 result = result_queue.get(timeout=0.1)
                 
                 if result['type'] == 'new_state' and compute_graph:
-                    graph['nodes'].append({
+                    graph['nodes'].append({  # type: ignore[index]
                         'id': result['state_id'],
                         'marking': result['marking'],
                         'depth': result['depth']
                     })
                 
                 elif result['type'] == 'transition' and compute_graph:
-                    graph['edges'].append({
+                    graph['edges'].append({  # type: ignore[index]
                         'source': result['source_id'],
                         'target': result['target_id'],
                         'transition': result['trans_id'],

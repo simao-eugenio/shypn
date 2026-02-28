@@ -70,7 +70,7 @@ class StandardArcBuilder(ArcBuilder):
         Returns:
             List of Arc objects (place → transition) with stoichiometric weights
         """
-        arcs = []
+        arcs: List[Arc] = []
         
         for substrate in substrates:
             place = place_map.get(substrate.id)
@@ -104,6 +104,7 @@ class StandardArcBuilder(ArcBuilder):
             # - coefficient=0 means catalyst/cofactor (non-consuming) → use TestArc (Ft)
             # - coefficient>0 for signal place → use SignalFlowArc (Fs) with Ws ∈ ℝ⁺
             # - coefficient>0 for normal place → use Arc (F)
+            arc: Arc
             if weight == 0:
                 # Catalyst/cofactor: Use TestArc for non-consuming observation
                 from shypn.netobjs.test_arc import TestArc
@@ -140,7 +141,7 @@ class StandardArcBuilder(ArcBuilder):
         Returns:
             List of Arc objects (transition → place) with stoichiometric weights
         """
-        arcs = []
+        arcs: List[Arc] = []
         
         for product in products:
             place = place_map.get(product.id)
@@ -174,6 +175,7 @@ class StandardArcBuilder(ArcBuilder):
             # - coefficient=0 means catalyst/cofactor (non-consuming) → use TestArc (Ft)
             # - coefficient>0 for signal place → use SignalFlowArc (Fs) with Ws ∈ ℝ⁺
             # - coefficient>0 for normal place → use Arc (F)
+            arc: Arc
             if weight == 0:
                 # Catalyst/cofactor: Use TestArc for non-consuming observation
                 from shypn.netobjs.test_arc import TestArc

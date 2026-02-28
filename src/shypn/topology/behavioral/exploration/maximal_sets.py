@@ -30,7 +30,7 @@ class IndependenceAnalyzer:
             model: Petri net model with transitions and arcs
         """
         self.model = model
-        self._locality_cache = {}  # Cache place sets for transitions
+        self._locality_cache: Dict[Any, Any] = {}  # Cache place sets for transitions
     
     def get_transition_locality(self, transition: Any) -> Set[str]:
         """Get all places involved in transition's locality.

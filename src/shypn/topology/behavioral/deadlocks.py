@@ -55,7 +55,7 @@ class DeadlockAnalyzer(TopologyAnalyzer):
         self.name = "Deadlocks"
         self.description = "Detect structural and behavioral deadlocks"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         check_siphons: bool = True,
         check_enablement: bool = True,

@@ -224,7 +224,7 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
         
         except (np.linalg.LinAlgError, ValueError) as e:
             # If SVD fails, return empty list
-            self.logger.debug(f"SVD computation failed for conservation laws: {e}")
+            self.logger.debug(f"SVD computation failed for conservation laws: {e}")  # type: ignore[attr-defined]
         
         return conservation_laws
     
@@ -330,7 +330,7 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
             str: Formatted text
         """
         if not result.success:
-            return f"Stoichiometry Analysis Failed: {result.message}"
+            return f"Stoichiometry Analysis Failed: {result.message}"  # type: ignore[attr-defined]
         
         lines = ["=" * 60]
         lines.append("STOICHIOMETRIC CONSISTENCY ANALYSIS")

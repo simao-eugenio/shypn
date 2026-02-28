@@ -5,7 +5,7 @@ with work-stealing load balancing. Workers atomically claim states and
 explore them concurrently.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import multiprocessing
 import queue
 import time
@@ -16,7 +16,7 @@ from .base_explorer import StateSpaceExplorer
 class ParallelBasicExplorer(StateSpaceExplorer):
     """Parallel exploration with work-stealing (Phase 1)."""
     
-    def __init__(self, analyzer: Any, num_workers: int = None):
+    def __init__(self, analyzer: Any, num_workers: Optional[int] = None):
         """Initialize parallel explorer.
         
         Args:
@@ -119,7 +119,7 @@ class ParallelBasicExplorer(StateSpaceExplorer):
         # ====================================================================
         # COLLECT RESULTS
         # ====================================================================
-        graph = {'nodes': [], 'edges': []} if compute_graph else None
+        graph = {'nodes': [], 'edges': []} if compute_graph else None  # type: ignore[var-annotated]
         deadlock_states = []
         
         # Keep collecting while workers are active
@@ -129,14 +129,14 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                 result = result_queue.get(timeout=0.1)
                 
                 if result['type'] == 'new_state' and compute_graph:
-                    graph['nodes'].append({
+                    graph['nodes'].append({  # type: ignore[index]
                         'id': result['state_id'],
                         'marking': result['marking'],
                         'depth': result['depth']
                     })
                 
                 elif result['type'] == 'transition' and compute_graph:
-                    graph['edges'].append({
+                    graph['edges'].append({  # type: ignore[index]
                         'source': result['source_id'],
                         'target': result['target_id'],
                         'transition': result['trans_id'],
@@ -167,14 +167,14 @@ class ParallelBasicExplorer(StateSpaceExplorer):
                 result = result_queue.get(timeout=0.1)
                 
                 if result['type'] == 'new_state' and compute_graph:
-                    graph['nodes'].append({
+                    graph['nodes'].append({  # type: ignore[index]
                         'id': result['state_id'],
                         'marking': result['marking'],
                         'depth': result['depth']
                     })
                 
                 elif result['type'] == 'transition' and compute_graph:
-                    graph['edges'].append({
+                    graph['edges'].append({  # type: ignore[index]
                         'source': result['source_id'],
                         'target': result['target_id'],
                         'transition': result['trans_id'],

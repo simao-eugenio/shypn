@@ -63,7 +63,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         self.name = "Reachability"
         self.description = "Explore reachable marking space"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         max_states: int = 10000,
         max_depth: int = 100,
@@ -241,12 +241,12 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             # Phase 2: Maximal concurrent sets (EXPERIMENTAL - slow due to Python multiprocessing overhead)
             import warnings
             warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
-            return ParallelMaximalExplorer(self, num_workers)
+            return ParallelMaximalExplorer(self, num_workers)  # type: ignore[arg-type]
         else:
             # Phase 1: Basic work-stealing (EXPERIMENTAL - slow due to Python multiprocessing overhead)
             import warnings
             warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
-            return ParallelBasicExplorer(self, num_workers)
+            return ParallelBasicExplorer(self, num_workers)  # type: ignore[arg-type]
     
     def _get_initial_marking(self) -> Dict[str, int]:
         """Get initial marking from model.

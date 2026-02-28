@@ -69,7 +69,7 @@ class HierarchicalExplorer(StateSpaceExplorer):
             f"{sum(len(ts) for ts in self.layer_groups.values())} transitions"
         )
     
-    def explore(
+    def explore(  # type: ignore[override]
         self,
         initial_marking: Dict[str, int],
         max_states: int = 10000,
@@ -106,8 +106,8 @@ class HierarchicalExplorer(StateSpaceExplorer):
         # Initialize state tracking
         visited = {}  # marking_tuple → state_id
         states = {}   # state_id → marking dict
-        transitions = []  # (from_id, to_id, trans_id)
-        deadlocks = []
+        transitions: List[Any] = []  # (from_id, to_id, trans_id)
+        deadlocks: List[Any] = []
         
         state_counter = 0
         
@@ -157,7 +157,7 @@ class HierarchicalExplorer(StateSpaceExplorer):
             
             # Get stable states from previous layer
             stable_states = self._find_stable_states(
-                layer0_states if layer == 1 else layer_states,
+                layer0_states if layer == 1 else layer_states,  # type: ignore[has-type]
                 layer - 1
             )
             
@@ -316,8 +316,8 @@ class HierarchicalExplorer(StateSpaceExplorer):
         Returns:
             List of reachable states in this layer
         """
-        layer_states = []
-        work_queue = deque()
+        layer_states: List[Any] = []
+        work_queue: deque = deque()
         
         # Initialize queue with initial states
         for marking in initial_states:
@@ -457,8 +457,8 @@ class HierarchicalExplorer(StateSpaceExplorer):
         from collections import deque
         
         visited_local = {}
-        states_local = []
-        work_queue = deque()
+        states_local: List[Any] = []
+        work_queue: deque = deque()
         
         # Initialize
         for marking in initial_states:

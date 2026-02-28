@@ -58,7 +58,7 @@ class SiphonAnalyzer(TopologyAnalyzer):
         self.name = "Siphons"
         self.description = "Find siphons (place sets that stay empty once emptied)"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_size: int = 1,
         max_size: Optional[int] = None,
@@ -409,7 +409,7 @@ class SiphonAnalyzer(TopologyAnalyzer):
         Returns:
             List of minimal siphon place ID sets
         """
-        minimal = []
+        minimal: List[Any] = []
         
         # Sort by size (smallest first)
         sorted_siphons = sorted(siphons, key=len)

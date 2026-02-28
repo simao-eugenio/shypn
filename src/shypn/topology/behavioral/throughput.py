@@ -52,7 +52,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
         self._token_flow: Dict[str, int] = {}
         self._place_occupancy: Dict[str, List[int]] = {}
         
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         initial_marking: Optional[Dict[str, int]] = None,
         max_steps: int = 10000,
@@ -322,7 +322,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
                 })
         
         # Sort by rate (lowest first)
-        bottlenecks.sort(key=lambda x: x['rate'])
+        bottlenecks.sort(key=lambda x: x['rate'])  # type: ignore[arg-type, return-value]
         
         return bottlenecks
     

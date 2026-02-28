@@ -39,7 +39,7 @@ class ParallelReachabilityAnalyzer(ReachabilityAnalyzer):
         self.description = "Parallel exploration (delegates to base class)"
         self._default_num_workers = num_workers
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         max_states: int = 10000,
         max_depth: int = 100,

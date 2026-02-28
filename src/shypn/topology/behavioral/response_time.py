@@ -53,7 +53,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
         self._inter_firing_times: Dict[str, List[int]] = {}
         self._transition_delays: Dict[Tuple[str, str], List[int]] = {}
         
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         initial_marking: Optional[Dict[str, int]] = None,
         max_steps: int = 10000,
@@ -110,7 +110,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
             # Run simulation
             current_marking = initial_marking.copy()
             steps = 0
-            recent_firings = deque(maxlen=100)  # Track recent firings for delay calculation
+            recent_firings: deque = deque(maxlen=100)  # Track recent firings for delay calculation
             deadlock_count = 0
             max_deadlocks = 100
             

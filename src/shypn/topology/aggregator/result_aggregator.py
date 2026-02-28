@@ -76,7 +76,7 @@ class TopologyResultAggregator:
                 }
             }
         """
-        places = defaultdict(lambda: {
+        places: Dict[str, Any] = defaultdict(lambda: {
             'name': '',
             'id': None,
             'p_invariants': [],
@@ -86,7 +86,7 @@ class TopologyResultAggregator:
             'can_deadlock': False
         })
         
-        transitions = defaultdict(lambda: {
+        transitions: Dict[str, Any] = defaultdict(lambda: {
             'name': '',
             'id': None,
             't_invariants': [],
