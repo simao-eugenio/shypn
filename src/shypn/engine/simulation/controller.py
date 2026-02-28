@@ -54,6 +54,7 @@ from shypn.netobjs.place import Place
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
+from shypn.engine.simulation.abstract_controller import AbstractSimulationController
 
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
@@ -157,8 +158,8 @@ class ModelAdapter:
 
 # ==================== Model Accessors (Property Proxies) ====================
 
-class SimulationController:
-    """Controller for Petri net simulation execution.
+class SimulationController(AbstractSimulationController):
+    """Controller for Petri net simulation execution.  Sprint 23: implements AbstractSimulationController.
     
     This controller manages the simulation of a Petri net model, handling
     transition firing, token movement, and simulation state.
