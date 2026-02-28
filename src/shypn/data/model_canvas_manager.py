@@ -187,6 +187,10 @@ class ModelCanvasManager:
         # Observer pattern for model changes
         self._observers = []  # List of observer callbacks
         
+        # Arc geometry service (Phase 6 extraction — pure math + arc mutation)
+        from shypn.core.services.arc_geometry_service import ArcGeometryService
+        self._arc_geometry = ArcGeometryService(manager=self)
+        
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
     
@@ -1266,427 +1270,85 @@ class ModelCanvasManager:
             logger.debug(f"  {transition.id}: Not enabled (insufficient tokens)")
     
     def detect_parallel_arcs(self, arc):
-        """Find arcs parallel to the given arc (same source/target or reversed).
-        
-        Parallel arcs are arcs that connect the same two nodes, either in the
-        same direction or opposite direction. These need visual offset to
-        avoid overlapping.
-        
-        Args:
-            arc: Arc to check for parallels
-            
-        Returns:
-            list: List of parallel arcs (excluding the given arc)
-        """
-        parallels = []
-        
-        for other in self.arcs:
-            if other == arc:
-                continue
-            
-            # Same direction: same source and target
-            if (other.source == arc.source and other.target == arc.target):
-                parallels.append(other)
-            
-            # Opposite direction: reversed source and target
-            elif (other.source == arc.target and other.target == arc.source):
-                parallels.append(other)
-        
-        if not parallels:
-            pass  # No parallels found
-        
-        return parallels
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.detect_parallel_arcs(arc)
     
     def _auto_convert_parallel_arcs_to_curved(self, new_arc):
-        """Automatically convert parallel arcs and loop arcs to curved arcs.
-        
-        REFACTORED: Now delegates to helper methods for better readability.
-        
-        Args:
-            new_arc: The newly added arc that may create parallels or be a loop
-        """
-        # SAFETY: Validate arc has valid source/target references
-        if not self._validate_arc_references(new_arc):
-            return
-        
-        # Check if this is a loop arc (source == target)
-        is_loop = (new_arc.source == new_arc.target)
-        
-        # Detect parallel arcs
-        parallels = self.detect_parallel_arcs(new_arc)
-        
-        # Convert loop arcs or parallel arcs using extracted helper methods
-        if is_loop:
-            self._convert_loop_arc(new_arc)
-            self.mark_dirty()
-            return
-        
-        if parallels:
-            # Check for opposite-direction pair (A→B and B→A)
-            opposite_arc = self._find_opposite_direction_arc(new_arc, parallels)
-            
-            if opposite_arc:
-                # Convert pair with perpendicular offsets
-                self._convert_opposite_direction_pair(new_arc, opposite_arc)
-            else:
-                # Convert same-direction parallels without special offsets
-                self._convert_same_direction_parallels(new_arc, parallels)
-            
-            self.mark_dirty()
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry.auto_convert_parallel_arcs_to_curved(new_arc)
     
     def _validate_arc_references(self, arc):
-        """Validate arc has valid source/target references.
-        
-        Args:
-            arc: Arc to validate
-            
-        Returns:
-            bool: True if valid, False if invalid
-        """
-        if not hasattr(arc, 'source') or arc.source is None:
-            return False
-        if not hasattr(arc, 'target') or arc.target is None:
-            return False
-        if not hasattr(arc.source, 'x') or not hasattr(arc.source, 'y'):
-            return False
-        if not hasattr(arc.target, 'x') or not hasattr(arc.target, 'y'):
-            return False
-        return True
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.validate_arc_references(arc)
     
     def _convert_loop_arc(self, arc):
-        """Convert loop arc (source == target) to curved with fixed offset.
-        
-        Args:
-            arc: Loop arc to convert
-            
-        Returns:
-            bool: True if converted, False if already curved
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        if isinstance(arc, Arc) and not isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_arc = make_curved(arc)
-            curved_arc.control_offset_x = 60.0
-            curved_arc.control_offset_y = -60.0
-            self._replace_arc_in_list(arc, curved_arc)
-            return True
-        return False
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._convert_loop_arc(arc)
     
     def _find_opposite_direction_arc(self, arc, parallels):
-        """Find arc going in opposite direction (A→B vs B→A).
-        
-        Args:
-            arc: Reference arc
-            parallels: List of parallel arcs
-            
-        Returns:
-            Arc or None: Opposite-direction arc if found
-        """
-        for parallel in parallels:
-            if parallel.source == arc.target and parallel.target == arc.source:
-                return parallel
-        return None
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._find_opposite_direction_arc(arc, parallels)
     
     def _calculate_perpendicular_offset(self, arc1, arc2, offset_distance=50.0):
-        """Calculate perpendicular offset for opposite-direction arc pair.
-        
-        Args:
-            arc1: First arc (A→B)
-            arc2: Second arc (B→A)
-            offset_distance: Distance to offset arcs
-            
-        Returns:
-            tuple: ((offset_x1, offset_y1), (offset_x2, offset_y2))
-        """
-        import math
-        
-        # Calculate direction vector
-        dx, dy, length = self._compute_direction_vector(arc1)
-        
-        if length <= 1:
-            return ((0, 0), (0, 0))
-        
-        # Normalize and compute perpendicular
-        dx, dy = self._normalize_vector(dx, dy, length)
-        perp_x, perp_y = self._compute_perpendicular_vector(dx, dy)
-        
-        # Determine offset directions
-        return self._compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance)
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_perpendicular_offset(arc1, arc2, offset_distance)
     
     # Helper methods for _calculate_perpendicular_offset (PHASE 1 EXTRACTION)
     
-    @staticmethod
-    def _compute_direction_vector(arc):
-        """Compute direction vector between arc endpoints.
-        
-        Args:
-            arc: Arc to compute direction for.
-            
-        Returns:
-            tuple: (dx, dy, length)
-        """
-        import math
-        dx = arc.target.x - arc.source.x
-        dy = arc.target.y - arc.source.y
-        length = math.sqrt(dx*dx + dy*dy)
-        return dx, dy, length
+    def _compute_direction_vector(self, arc):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_direction_vector(arc)
     
-    @staticmethod
-    def _normalize_vector(dx, dy, length):
-        """Normalize a vector to unit length.
-        
-        Args:
-            dx, dy: Vector components.
-            length: Vector length.
-            
-        Returns:
-            tuple: (normalized_dx, normalized_dy)
-        """
-        return dx / length, dy / length
+    def _normalize_vector(self, dx, dy, length):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._normalize_vector(dx, dy, length)
     
-    @staticmethod
-    def _compute_perpendicular_vector(dx, dy):
-        """Compute perpendicular vector (90° rotation).
-        
-        Args:
-            dx, dy: Normalized direction vector.
-            
-        Returns:
-            tuple: (perp_x, perp_y)
-        """
-        return -dy, dx
+    def _compute_perpendicular_vector(self, dx, dy):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_perpendicular_vector(dx, dy)
     
-    @staticmethod
-    def _compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance):
-        """Compute offset pair based on arc IDs.
-        
-        Args:
-            arc1, arc2: Arcs to offset.
-            perp_x, perp_y: Perpendicular vector.
-            offset_distance: Offset distance.
-            
-        Returns:
-            tuple: ((offset1_x, offset1_y), (offset2_x, offset2_y))
-        """
-        if arc1.id < arc2.id:
-            offset1 = (perp_x * offset_distance, perp_y * offset_distance)
-            offset2 = (-perp_x * offset_distance, -perp_y * offset_distance)
-        else:
-            offset1 = (-perp_x * offset_distance, -perp_y * offset_distance)
-            offset2 = (perp_x * offset_distance, perp_y * offset_distance)
-        return (offset1, offset2)
+    def _compute_offset_pair(self, arc1, arc2, perp_x, perp_y, offset_distance):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance)
     
     def _convert_opposite_direction_pair(self, new_arc, opposite_arc):
-        """Convert opposite-direction arc pair (A→B and B→A) with perpendicular offsets.
-        
-        Args:
-            new_arc: Newly added arc
-            opposite_arc: Existing arc in opposite direction
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        # Calculate offsets
-        (offset1, offset2) = self._calculate_perpendicular_offset(new_arc, opposite_arc)
-        
-        # Convert and offset new_arc
-        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_new = make_curved(new_arc)
-            curved_new.control_offset_x = offset1[0]
-            curved_new.control_offset_y = offset1[1]
-            self._replace_arc_in_list(new_arc, curved_new)
-        
-        # Convert and offset opposite_arc
-        if isinstance(opposite_arc, (Arc, InhibitorArc)) and not isinstance(opposite_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_opposite = make_curved(opposite_arc)
-            curved_opposite.control_offset_x = offset2[0]
-            curved_opposite.control_offset_y = offset2[1]
-            self._replace_arc_in_list(opposite_arc, curved_opposite)
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._convert_opposite_direction_pair(new_arc, opposite_arc)
     
     def _convert_same_direction_parallels(self, new_arc, parallels):
-        """Convert same-direction parallel arcs without special offsets.
-        
-        Args:
-            new_arc: Newly added arc
-            parallels: List of parallel arcs (same direction)
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        # Convert all parallels
-        for parallel in parallels:
-            if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
-                curved_arc = make_curved(parallel)
-                self._replace_arc_in_list(parallel, curved_arc)
-        
-        # Convert new_arc too if not curved
-        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_new = make_curved(new_arc)
-            self._replace_arc_in_list(new_arc, curved_new)
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._convert_same_direction_parallels(new_arc, parallels)
     
     def _replace_arc_in_list(self, old_arc, new_arc):
-        """Replace arc in arcs list and set up manager references.
-        
-        Args:
-            old_arc: Arc to replace
-            new_arc: Replacement curved arc
-        """
-        try:
-            index = self.arcs.index(old_arc)
-            self.arcs[index] = new_arc
-            new_arc._manager = self
-            new_arc.on_changed = self._on_object_changed
-        except ValueError:
-            pass  # Already replaced
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._replace_arc_in_list(old_arc, new_arc)
     
     # Helper methods for calculate_arc_offset (PHASE 1 EXTRACTION)
     
-    @staticmethod
-    def _separate_parallel_arcs(arc, parallels):
-        """Separate parallel arcs into same-direction and opposite-direction groups.
-        
-        Args:
-            arc: The arc to check against
-            parallels: List of parallel arcs
-            
-        Returns:
-            Tuple of (same_direction_list, opposite_direction_list)
-        """
-        same_direction = []
-        opposite_direction = []
-        
-        for other in parallels:
-            if other.source == arc.source and other.target == arc.target:
-                same_direction.append(other)
-            elif other.source == arc.target and other.target == arc.source:
-                opposite_direction.append(other)
-        
-        return same_direction, opposite_direction
+    def _separate_parallel_arcs(self, arc, parallels):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._separate_parallel_arcs(arc, parallels)
     
-    @staticmethod
-    def _calculate_opposite_direction_offset(arc, opposite_arc):
-        """Calculate offset for two arcs in opposite directions (mirror symmetry).
-        
-        Args:
-            arc: The arc to calculate offset for
-            opposite_arc: The arc in the opposite direction
-            
-        Returns:
-            float: Offset distance (positive = counterclockwise, negative = clockwise)
-        """
-        # Use a deterministic rule: arc with lower ID gets positive offset
-        if arc.id < opposite_arc.id:
-            return 50.0  # Curve counterclockwise (increased from 25)
-        else:
-            return -50.0  # Curve clockwise (mirror, increased from -25)
+    def _calculate_opposite_direction_offset(self, arc, opposite_arc):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_opposite_direction_offset(arc, opposite_arc)
     
-    @staticmethod
-    def _calculate_same_direction_offset(arc, all_arcs):
-        """Calculate offset based on stable ordering of parallel arcs.
-        
-        Distributes arcs evenly around center (0):
-        - 2 arcs: offsets are +15, -15
-        - 3 arcs: offsets are +20, 0, -20
-        - 4 arcs: offsets are +30, +10, -10, -30
-        
-        Args:
-            arc: The arc to calculate offset for
-            all_arcs: List of all parallel arcs (including this arc)
-            
-        Returns:
-            float: Offset distance in pixels
-        """
-        total = len(all_arcs)
-        if total == 1:
-            return 0.0
-        
-        # Stable ordering by ID
-        all_arcs.sort(key=lambda a: a.id)
-        index = all_arcs.index(arc)
-        
-        if total == 2:
-            # Simple case: ±15 pixels
-            return 15.0 if index == 0 else -15.0
-        else:
-            # General case: distribute evenly with 10px spacing
-            spacing = 10.0
-            center = (total - 1) / 2.0
-            return (index - center) * spacing
+    def _calculate_same_direction_offset(self, arc, all_arcs):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_same_direction_offset(arc, all_arcs)
     
     def calculate_arc_offset(self, arc, parallels):
-        """Calculate offset for arc to avoid overlapping parallels.
-        
-        For parallel arcs between same nodes, we offset them perpendicular
-        to the line connecting the nodes. The offset is calculated to
-        distribute arcs evenly on both sides of the center line.
-        
-        For opposite direction arcs (A→B, B→A), they curve in opposite
-        directions to create mirror symmetry.
-        
-        REFACTORED: Now delegates to extracted helper methods for better readability.
-        
-        Args:
-            arc: Arc to calculate offset for
-            parallels: List of parallel arcs (from detect_parallel_arcs)
-            
-        Returns:
-            float: Offset distance in pixels (positive = counterclockwise,
-                   negative = clockwise, 0 = no offset)
-        """
-        if not parallels:
-            return 0.0  # No offset needed for single arc
-        
-        # Separate parallel arcs into same-direction and opposite-direction groups
-        same_direction, opposite_direction = self._separate_parallel_arcs(arc, parallels)
-        
-        # For opposite direction arcs (most common case: A→B, B→A)
-        if len(opposite_direction) == 1 and len(same_direction) == 0:
-            return self._calculate_opposite_direction_offset(arc, opposite_direction[0])
-        
-        # For same-direction arcs or mixed cases, use stable ordering
-        all_arcs = [arc] + parallels
-        return self._calculate_same_direction_offset(arc, all_arcs)
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.calculate_arc_offset(arc, parallels)
     
     def replace_arc(self, old_arc, new_arc):
-        """Replace an arc with a different type (for arc transformations).
-        
-        Used when transforming arcs via context menu:
-        - Straight ↔ Curved
-        - Normal ↔ Inhibitor
-        
-        The new arc maintains the same ID and properties but has a different
-        class type (Arc, InhibitorArc, CurvedArc, or CurvedInhibitorArc).
-        
-        Args:
-            old_arc: Arc instance to replace
-            new_arc: New arc instance (different class, same ID/properties)
-        """
-        try:
-            index = self.arcs.index(old_arc)
-            self.arcs[index] = new_arc
-            
-            # Ensure new arc has manager reference and change callback
-            new_arc._manager = self
-            new_arc.on_changed = self._on_object_changed
-            
-            self.mark_modified()
-            self.mark_dirty()
-        except ValueError:
-            # Arc not found in list - may have been deleted
-            pass
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry.replace_arc(old_arc, new_arc)
     
     def ensure_arc_references(self):
-        """Ensure all arcs have proper manager and callback references.
-        
-        This is useful after loading files or batch operations to ensure
-        all arcs can be transformed and detected for parallel positioning.
-        """
-        for arc in self.arcs:
-            if not hasattr(arc, '_manager') or arc._manager is None:
-                arc._manager = self
-            if not hasattr(arc, 'on_changed') or arc.on_changed is None:
-                arc.on_changed = self._on_object_changed
+        """Delegate to ArcGeometryService (no-op during __init__ before service is created)."""
+        if hasattr(self, '_arc_geometry'):
+            self._arc_geometry.ensure_arc_references()
     
     def get_all_objects(self):
         """Get all Petri net objects in rendering order.
