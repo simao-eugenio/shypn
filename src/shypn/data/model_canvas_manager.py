@@ -47,6 +47,7 @@ import json
 import os
 import time
 from datetime import datetime
+from typing import Optional
 from shypn.events import EventBus
 from shypn.core.document_id import doc_id
 from shypn.netobjs import Place, Arc, Transition
@@ -78,6 +79,7 @@ from shypn.core.services import (
     has_parallel_arcs as arc_has_parallel,
     get_arc_offset_for_rendering as arc_get_offset_for_rendering,
 )
+from shypn.core.services.document_state_service import DocumentStateService
 
 
 class ModelCanvasManager:
@@ -149,8 +151,8 @@ class ModelCanvasManager:
         self._fit_to_page_vertical_offset = 0  # Default vertical offset (0% = centered)
         
         # Flag to track if document was imported (needs "Save As" on first save)
-        self._is_imported = False
-        
+        # Sprint 19: managed by DocumentStateService — accessed via property below.
+
         # REMOVED: simulation_settings (moved to controller, session-specific)
         # Simulation parameters like duration, dt, batch mode should NOT be model-dependent
         
@@ -158,13 +160,11 @@ class ModelCanvasManager:
         # This provides a persistent model for thermodynamic settings, compound mappings, etc.
         from shypn.data.canvas import DocumentModel
         self._document_model = DocumentModel()
-        
+
         # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
-        # Each manager now owns its filepath and dirty state
-        # This fixes critical data loss issues from single global persistency
-        self.filepath = None  # Full path to saved file (None if unsaved)
-        self._is_dirty = False  # Has unsaved changes
-        self.on_dirty_changed = None  # Callback(is_dirty) when dirty state changes
+        # Sprint 19: DocumentStateService owns dirty flag, filepath, import state.
+        # MCM exposes them via properties below so all existing callers work unchanged.
+        self._state_svc: DocumentStateService = DocumentStateService(filename=filename)
         
         # Pointer position (for pointer-centered zoom)
         self.pointer_x = 0
@@ -363,9 +363,58 @@ class ModelCanvasManager:
     def _next_arc_id(self, value):
         """Set next arc ID counter (delegates to IDManager)."""
         self.document_controller.id_manager._next_arc_id = value
-    
+
+    # ------------------------------------------------------------------
+    # Sprint 19 — DocumentStateService proxy properties
+    # All dirty/filepath/import state is owned by self._state_svc.  The
+    # properties below keep the existing attribute API backward-compatible.
+    # ------------------------------------------------------------------
+
     @property
-    def thermodynamic_settings(self):
+    def filepath(self):
+        """Full path to the saved file, or ``None`` for unsaved documents."""
+        return self._state_svc.filepath
+
+    @filepath.setter
+    def filepath(self, value):
+        self._state_svc.filepath = value
+        # Keep document_model in sync (used by serialization)
+        if hasattr(self, '_document_model') and self._document_model is not None:
+            self._document_model.filepath = value
+
+    @property
+    def _is_dirty(self) -> bool:
+        """Read-only internal dirty flag (canonical state in _state_svc)."""
+        return self._state_svc.is_dirty
+
+    @property
+    def _is_imported(self) -> bool:
+        """Read-only import flag."""
+        return self._state_svc.is_imported
+
+    @_is_imported.setter
+    def _is_imported(self, value: bool) -> None:
+        self._state_svc._is_imported = value
+
+    @property
+    def on_dirty_changed(self):
+        """Dirty-state UI callback; set by ModelCanvasLoader at canvas setup."""
+        return self._state_svc.on_dirty_changed
+
+    @on_dirty_changed.setter
+    def on_dirty_changed(self, callback) -> None:
+        self._state_svc.on_dirty_changed = callback
+
+    @property
+    def _suppress_callbacks(self) -> bool:
+        """When True, dirty-state callbacks are temporarily suppressed."""
+        return self._state_svc.suppress_callbacks
+
+    @_suppress_callbacks.setter
+    def _suppress_callbacks(self, value: bool) -> None:
+        self._state_svc.suppress_callbacks = value
+
+
         """Get thermodynamic settings dictionary (delegates to DocumentModel)."""
         return self._document_model.thermodynamic_settings
     
@@ -2259,159 +2308,89 @@ class ModelCanvasManager:
             }
         }
     
-    def mark_modified(self):
-        """Mark document as modified."""
+    # ===== DOCUMENT STATE — Sprint 19: delegating to DocumentStateService =====
+    # All state (dirty flag, filepath, import state) is owned by self._state_svc.
+    # Methods here are thin shims that maintain backward-compatible MCM API.
+
+    def mark_modified(self) -> None:
+        """Stamp modification time (document_controller) and mark dirty."""
         if not self.modified:
             self.modified = True
             self.modified_at = datetime.now()
-            self.mark_dirty()
-    
-    def set_filename(self, filename):
-        """Set the document filename.
-        
-        Args:
-            filename: Base filename without extension.
-        """
+            self._state_svc.mark_dirty()
+
+    def set_filename(self, filename: str) -> None:
+        """Set the base filename; marks document modified on change."""
         if filename != self.filename:
-            self.filename = filename
+            self.filename = filename        # → document_controller.filename
+            self._state_svc.filename = filename  # keep state_svc mirror in sync
             self.mark_modified()
-    
+
     def is_default_filename(self) -> bool:
-        """Check if document has the default filename (unsaved state).
-        
-        This is a flag that indicates the document is in an unsaved/new state
-        and should trigger file chooser dialogs in save operations.
-        
-        Also returns True for imported documents that haven't been saved yet,
-        so they trigger "Save As" behavior on first save.
-        
-        Returns:
-            bool: True if filename is "default" or document is imported (unsaved), False otherwise
-        """
-        return self.filename == "default" or self._is_imported
-    
-    def mark_as_imported(self, imported_name: str = None):
-        """Mark this document as imported (from KEGG, SBML, etc.).
-        
-        Imported documents should trigger "Save As" on first save, even if they
-        have a descriptive filename.
-        
-        Args:
-            imported_name: Optional descriptive name for the imported document
-        """
-        self._is_imported = True
+        """``True`` for new/imported documents that have never been saved."""
+        return self.filename == "default" or self._state_svc.is_imported
+
+    def mark_as_imported(self, imported_name: Optional[str] = None) -> None:
+        """Flag document as imported; triggers 'Save As' on first save."""
+        self._state_svc.mark_as_imported(imported_name)
         if imported_name and imported_name != "default":
-            self.filename = imported_name
-    
-    def mark_as_saved(self):
-        """Mark this document as saved (no longer imported/new).
-        
-        Call this after a successful save operation to clear the imported flag.
-        """
-        self._is_imported = False
-    
-    # ==================== Per-Document File State Management (Phase 1) ====================
-    
-    def mark_dirty(self):
-        """Mark document as having unsaved changes.
-        
-        This is the new per-document dirty tracking system that replaces
-        the global NetObjPersistency dirty state. Each manager owns its
-        own dirty flag.
-        
-        Automatically called when objects are modified, added, or deleted.
-        Triggers on_dirty_changed callback to update UI (tab labels).
-        """
-        if not self._is_dirty:
-            self._is_dirty = True
-            # Check if callbacks are suppressed during initial setup
-            if not getattr(self, '_suppress_callbacks', False):
-                if self.on_dirty_changed:
-                    self.on_dirty_changed(True)
-    
-    def mark_clean(self):
-        """Mark document as saved (no unsaved changes).
-        
-        Call this after successful save operation.
-        Triggers on_dirty_changed callback to update UI (remove asterisk from tab).
-        """
-        if self._is_dirty:
-            self._is_dirty = False
-            # Check if callbacks are suppressed during initial setup
-            if not getattr(self, '_suppress_callbacks', False):
-                if self.on_dirty_changed:
-                    self.on_dirty_changed(False)
-    
+            self.filename = imported_name   # keep document_controller in sync
+
+    def mark_as_saved(self) -> None:
+        """Clear the imported flag after a successful save."""
+        self._state_svc.mark_as_saved()
+
+    # ==================== Per-Document File State Management ====================
+
+    def mark_dirty(self) -> None:
+        """Mark document as having unsaved changes."""
+        self._state_svc.mark_dirty()
+
+    def mark_clean(self) -> None:
+        """Mark document as saved (no unsaved changes)."""
+        self._state_svc.mark_clean()
+
     def is_dirty(self) -> bool:
-        """Check if document has unsaved changes.
-        
-        Returns:
-            bool: True if document has been modified since last save, False otherwise
-        """
-        return self._is_dirty
-    
-    def set_filepath(self, filepath: str):
-        """Set the full file path for this document.
-        
-        Updates both the filepath (full path) and filename (base name).
-        Used when saving document or loading from file.
-        
-        Args:
-            filepath: Full path to the .shy file (e.g., "/path/to/model.shy")
-        """
-        import os
-        self.filepath = filepath
-        
-        # Sync filepath with document model for settings persistence
+        """Check if document has unsaved changes."""
+        return self._state_svc.is_dirty
+
+    def set_filepath(self, filepath: str) -> None:
+        """Set the full file path; updates filepath, filename,
+        document_model.filepath and viewport_controller.model_filepath."""
+        self._state_svc.filepath = filepath
+        # Sync document_model (used by serialization settings)
         if hasattr(self, '_document_model') and self._document_model:
             self._document_model.filepath = filepath
-        
-        # Update viewport controller's model filepath for view state persistence
+        # Sync viewport_controller (view-state persistence)
         if hasattr(self, 'viewport_controller'):
             self.viewport_controller.model_filepath = filepath
-        
-        if filepath:
-            # Extract base filename without extension
-            base_name = os.path.splitext(os.path.basename(filepath))[0]
-            self.filename = base_name
-        else:
-            self.filename = "default"
-    
-    def get_filepath(self) -> str:
-        """Get the full file path for this document.
-        
-        Returns:
-            str: Full path to file, or None if document hasn't been saved yet
-        """
-        return self.filepath
-    
+        # Extract and propagate base filename
+        base_name = (
+            os.path.splitext(os.path.basename(filepath))[0] if filepath else "default"
+        )
+        self.filename = base_name            # → document_controller.filename
+        self._state_svc.filename = base_name  # keep state_svc mirror in sync
+
+    def get_filepath(self) -> Optional[str]:
+        """Return the full file path, or ``None`` if not yet saved."""
+        return self._state_svc.filepath
+
     def has_filepath(self) -> bool:
-        """Check if document has an associated file path.
-        
-        Returns:
-            bool: True if document has been saved to a file, False if new/unsaved
-        """
-        return self.filepath is not None and self.filepath != ""
-    
+        """``True`` when a valid file path has been set."""
+        return self._state_svc.has_filepath()
+
     def get_display_name(self) -> str:
-        """Get display name for this document.
-        
-        Returns:
-            str: Filename if saved, "Untitled" if new document
-        """
-        if self.has_filepath():
-            import os
-            return os.path.basename(self.filepath)
-        return "Untitled" if self.filename == "default" else self.filename
-    
+        """Human-readable name for tab labels and window titles."""
+        return self._state_svc.get_display_name()
+
     # ==================== End Per-Document State Management ====================
-    
+
     # Helper methods for color reset operations (PHASE 1 EXTRACTION)
-    
+
     @staticmethod
     def _should_preserve_transition_color(transition):
         """Check if transition has semantic colors that should be preserved.
-        
+
         Args:
             transition: Transition object to check
             
