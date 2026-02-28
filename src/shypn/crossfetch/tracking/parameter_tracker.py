@@ -368,7 +368,7 @@ class ParameterTracker:
                 LEFT JOIN pathway_enrichments e ON p.id = e.parameter_id
                 WHERE 1=1
             """
-            params = []
+            params: List[Any] = []
             
             if source:
                 query += " AND p.source = ?"

@@ -107,7 +107,7 @@ class BioModelsKineticsFetcher(BaseFetcher):
             'mass_action'
         ]
     
-    def fetch(self, pathway_id: str = None, data_type: str = 'kinetic_parameters', **kwargs) -> FetchResult:
+    def fetch(self, pathway_id: Optional[str] = None, data_type: str = 'kinetic_parameters', **kwargs) -> FetchResult:
         """Fetch kinetic parameters from BioModels.
         
         Args:
@@ -285,7 +285,7 @@ class BioModelsKineticsFetcher(BaseFetcher):
             self.logger.info(f"Found {len(global_parameters)} global parameters")
             
             # Extract parameters from reactions
-            parameters = []
+            parameters: List[Any] = []
             
             list_of_reactions = model.find(f'{{{ns}}}listOfReactions')
             if list_of_reactions is None:
@@ -413,7 +413,7 @@ class BioModelsKineticsFetcher(BaseFetcher):
         Returns:
             List of parameter dicts (can be multiple per reaction)
         """
-        parameters = []
+        parameters: List[Any] = []
         
         # Get reaction ID and name
         reaction_id = reaction.get('id', 'unknown')

@@ -8,7 +8,7 @@ Author: Shypn Development Team
 Date: October 2025
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import logging
 from pathlib import Path
 
@@ -179,6 +179,7 @@ class EnrichmentPipeline:
         # Create request object  
         request = EnrichmentRequest(
             pathway_id=pathway_id,
+            data_types=[],
             preferred_sources=preferred_sources
         )
         
@@ -194,17 +195,13 @@ class EnrichmentPipeline:
                 self.logger.warning(f"No successful fetches for data type: {data_type_str}")
                 continue
             
-            # Score quality of each result
-            for result in successful:
-                result.quality_score = self.quality_scorer.score(result)
-            
-            # Select best result for this data type
-            best_result = max(successful, key=lambda r: r.quality_score)
+            # Score quality and select best result for this data type
+            best_result = max(successful, key=lambda r: r.get_quality_score())
             all_results.append(best_result)
             
             self.logger.info(
-                f"Selected {best_result.source} for {data_type_str} "
-                f"(quality: {best_result.quality_score:.2f})"
+                f"Selected {best_result.attribution.source_name} for {data_type_str} "
+                f"(quality: {best_result.get_quality_score():.2f})"
             )
         
         self.logger.info(f"Fetch complete: {len(all_results)} data types retrieved")
@@ -226,7 +223,7 @@ class EnrichmentPipeline:
         """
         self.logger.info(f"Starting enrichment for pathway: {request.pathway_id}")
         
-        results = {
+        results: Dict[str, Any] = {
             "pathway_id": request.pathway_id,
             "pathway_file": str(pathway_file),
             "enrichments": [],
@@ -293,7 +290,7 @@ class EnrichmentPipeline:
         """
         self.logger.info(f"Enriching data type: {data_type.value}")
         
-        result = {
+        result: Dict[str, Any] = {
             "data_type": data_type.value,
             "sources_queried": [],
             "sources_successful": [],
@@ -384,7 +381,7 @@ class EnrichmentPipeline:
         Returns:
             Dictionary with application result
         """
-        result = {
+        result: Dict[str, Any] = {
             "data_type": data_type.value,
             "enricher_used": None,
             "success": False,

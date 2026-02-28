@@ -299,14 +299,6 @@ class BaseMetadataManager(ABC):
         stats = self.get_statistics()
         return stats.get("quality_scores", {})
     
-    def get_path(self) -> Path:
-        """Get the metadata file path.
-        
-        Returns:
-            Path to metadata file
-        """
-        return self.metadata_file
-    
     def __repr__(self) -> str:
         """String representation."""
         return f"{self.__class__.__name__}(pathway={self.pathway_file.name}, metadata={self.metadata_file.name})"

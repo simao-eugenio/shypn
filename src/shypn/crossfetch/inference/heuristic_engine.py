@@ -23,11 +23,12 @@ from ..learning.heuristic_learner import HeuristicLearner
 from .initial_marking_inferrer import InitialMarkingInferrer, CompoundClassifier, CompoundClass
 
 # Try to import CompoundResolver (may not be available)
+_resolver: Optional[Any] = None
 try:
     from ...thermodynamics.compound_resolver import CompoundResolver
     _resolver = CompoundResolver()
 except Exception:
-    _resolver = None
+    pass
 
 
 # Reaction mechanism patterns (learned from KEGG, applicable to any source)
@@ -499,6 +500,7 @@ class HeuristicInferenceEngine:
         semantics = self.type_detector.infer_semantics(transition, transition_type)
         
         # Step 3: Infer parameters based on type (pure heuristics)
+        parameters: TransitionParameters
         if transition_type == TransitionType.IMMEDIATE:
             parameters = self._infer_immediate(transition, semantics, organism)
         elif transition_type == TransitionType.TIMED:
@@ -673,8 +675,8 @@ class HeuristicInferenceEngine:
                 reaction_id=param_dict.get('reaction_id'),
                 enzyme_name=param_dict.get('enzyme_name'),
                 organism=param_dict['organism'],
-                temperature=param_dict.get('temperature'),
-                ph=param_dict.get('ph'),
+                temperature=float(param_dict.get('temperature') or 37.0),
+                ph=float(param_dict.get('ph') or 7.4),
                 confidence_score=param_dict['confidence_score'],
                 source=param_dict['source'],
                 notes=param_dict.get('notes')
@@ -692,8 +694,8 @@ class HeuristicInferenceEngine:
                 reaction_id=param_dict.get('reaction_id'),
                 enzyme_name=param_dict.get('enzyme_name'),
                 organism=param_dict['organism'],
-                temperature=param_dict.get('temperature'),
-                ph=param_dict.get('ph'),
+                temperature=float(param_dict.get('temperature') or 37.0),
+                ph=float(param_dict.get('ph') or 7.4),
                 confidence_score=param_dict['confidence_score'],
                 source=param_dict['source'],
                 notes=param_dict.get('notes')
@@ -1483,7 +1485,7 @@ class HeuristicInferenceEngine:
             organism = base_params.organism
             
             if suggested_type == TransitionType.CONTINUOUS:
-                new_params = self._infer_continuous_from_type_override(transition, semantics, organism, override_reason)
+                new_params: TransitionParameters = self._infer_continuous_from_type_override(transition, semantics, organism, override_reason)
             elif suggested_type == TransitionType.STOCHASTIC:
                 new_params = self._infer_stochastic_from_type_override(transition, semantics, organism, override_reason)
             elif suggested_type == TransitionType.IMMEDIATE:
@@ -1576,9 +1578,9 @@ class HeuristicInferenceEngine:
                 return None
             
             # Calculate balance metrics
-            total_input_weight = sum(inp['weight'] for inp in inputs)
-            total_output_weight = sum(out['weight'] for out in outputs)
-            total_input_marking = sum(inp['marking'] for inp in inputs)
+            total_input_weight = sum(int(inp['weight'] or 0) for inp in inputs)
+            total_output_weight = sum(int(out['weight'] or 0) for out in outputs)
+            total_input_marking = sum(int(inp['marking'] or 0) for inp in inputs)
             
             # Balance ratio (how balanced is the reaction)
             balance_ratio = min(total_input_weight, total_output_weight) / max(total_input_weight, total_output_weight, 1)
@@ -1620,8 +1622,8 @@ class HeuristicInferenceEngine:
         Returns:
             Adjusted parameters
         """
-        vmax = params.vmax
-        km = params.km
+        vmax: float = params.vmax or 0.0
+        km: float = params.km or 0.1
         confidence = params.confidence_score
         notes = params.notes or ""
         
@@ -1756,7 +1758,7 @@ class HeuristicInferenceEngine:
         suggestions = self.marking_inferrer.infer_markings_batch(places)
         
         # Convert to dictionary format for results
-        results = []
+        results: List[Dict[str, Any]] = []
         for suggestion in suggestions:
             result = {
                 'place_id': suggestion.place_id,
@@ -1770,11 +1772,14 @@ class HeuristicInferenceEngine:
             }
             results.append(result)
         
-        self.logger.info(
-            f"Generated {len(results)} initial marking suggestions "
-            f"(avg confidence: {sum(r['confidence'] for r in results) / len(results):.0%})"
-            if results else "No suggestions generated"
-        )
+        if results:
+            avg_conf: float = sum(r['confidence'] for r in results) / len(results)
+            self.logger.info(
+                f"Generated {len(results)} initial marking suggestions "
+                f"(avg confidence: {avg_conf:.0%})"
+            )
+        else:
+            self.logger.info("No suggestions generated")
         
         return results
     
@@ -1806,7 +1811,7 @@ class HeuristicInferenceEngine:
         self.logger.info(f"Analyzing model with {len(transitions)} transitions...")
         
         # Analyze transitions (existing functionality)
-        transition_results = {
+        transition_results: Dict[str, List[Any]] = {
             'continuous': [],
             'stochastic': [],
             'timed': [],

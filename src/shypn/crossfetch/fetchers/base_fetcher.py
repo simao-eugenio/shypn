@@ -185,7 +185,7 @@ class BaseFetcher(ABC):
         return {
             "total_fetches": self._fetch_count,
             "total_errors": self._error_count,
-            "success_rate": (
+            "success_rate": (  # type: ignore[dict-item]
                 (self._fetch_count - self._error_count) / self._fetch_count
                 if self._fetch_count > 0 else 0.0
             )

@@ -124,7 +124,7 @@ class HeuristicParametersController:
             return {}
         
         # Classify transitions
-        results = {
+        results: Dict[str, List[Any]] = {
             'immediate': [],
             'timed': [],
             'stochastic': [],
@@ -220,7 +220,7 @@ class HeuristicParametersController:
             return None
     
     def apply_parameters(self, transition_id: str, parameters: Dict[str, Any], 
-                        override_sbml: bool = False, override_enriched: bool = False) -> bool:
+                        override_sbml: bool = False, override_enriched: bool = False) -> Optional[bool]:
         """Apply inferred parameters to a transition.
         
         Args:
@@ -457,7 +457,7 @@ class HeuristicParametersController:
                             rate_function = f"({vmax} * {substrate_expr}) / ({km} + {substrate_expr})"
                         
                         transition.properties['rate_function'] = rate_function
-                        self.logger.info(f"✅ Generated rate_function: {rate_function} ({len(substrate_ids)} substrates)")
+                        self.logger.info(f"✅ Generated rate_function: {rate_function} ({len(substrate_names)} substrates)")
                     else:
                         self.logger.warning(f"No substrate place found for {transition_id}, using constant rate")
                         transition.rate = params['vmax']
@@ -469,7 +469,7 @@ class HeuristicParametersController:
             drawing_area.queue_draw()
             
             # Store in database for future use
-            self._store_applied_parameters(transition_id, transition_type, parameters)
+            self._store_applied_parameters(transition_id, str(transition_type or ''), parameters)
             
             self.logger.info(f"Successfully applied parameters to {transition_id}")
             return True

@@ -376,7 +376,7 @@ class InteractionEnricher(EnricherBase):
     
     def _build_place_lookup(self, pathway: Any) -> Dict[str, Any]:
         """Build lookup dictionary for places."""
-        lookup = {}
+        lookup: Dict[str, Any] = {}
         
         if not hasattr(pathway, "places"):
             return lookup
@@ -394,7 +394,7 @@ class InteractionEnricher(EnricherBase):
     
     def _build_arc_lookup(self, pathway: Any) -> Dict[Tuple[str, str], Any]:
         """Build lookup dictionary for arcs by (source, target) pairs."""
-        lookup = {}
+        lookup: Dict[Tuple[str, str], Any] = {}
         
         if not hasattr(pathway, "arcs"):
             return lookup
@@ -444,7 +444,7 @@ class InteractionEnricher(EnricherBase):
         interactions = fetch_result.data["interactions"]
         
         # Count by type
-        type_counts = {}
+        type_counts: Dict[str, int] = {}
         confidences = []
         
         for interaction in interactions:

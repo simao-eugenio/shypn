@@ -255,7 +255,7 @@ class ConcentrationEnricher(EnricherBase):
         Returns:
             Dictionary mapping species identifiers to place objects
         """
-        lookup = {}
+        lookup: Dict[str, Any] = {}
         
         if not hasattr(pathway, "places"):
             return lookup
