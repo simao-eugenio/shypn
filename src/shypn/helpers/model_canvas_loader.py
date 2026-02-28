@@ -103,9 +103,16 @@ class ModelCanvasLoader:
         self.container = None
         self.notebook = None
         self.document_count = 0
-        self.canvas_managers = {}
-        self.overlay_managers = {}  # Replaces individual palette dictionaries
-        self.palette_managers = {}  # New OOP palette managers
+        # ── Sprint 18 — SessionRegistry replaces four parallel legacy dicts ──
+        # ``sessions`` IS the registry.  The four proxy attributes below are
+        # live dict-like views backed by it, so all existing external callers
+        # (ViabilityPanel, TopologyPanel, experiments, etc.) continue to work
+        # without modification.
+        from shypn.helpers.session_registry import SessionRegistry
+        self.sessions: SessionRegistry = SessionRegistry()
+        self.canvas_managers = self.sessions.canvas_managers
+        self.overlay_managers = self.sessions.overlay_managers
+        self.palette_managers = {}  # New OOP palette managers (keyed by da, not session-scoped)
         
         # ═══════════════════════════════════════════════════════════════════
         # PER-DOCUMENT COMPONENTS ARCHITECTURE
@@ -147,7 +154,8 @@ class ModelCanvasLoader:
         # Canvas-centric design: Controllers stored by drawing_area, not palette.
         # This ensures wiring survives SwissPalette refactoring.
         # Access pattern: drawing_area → controller → state_detector, interaction_guard
-        self.simulation_controllers = {}
+        # Sprint 18: proxy backed by SessionRegistry (live view).
+        self.simulation_controllers = self.sessions.simulation_controllers
         
         # GLOBAL-SYNC: Canvas lifecycle management
         # Initialize lifecycle system for coordinated component management
@@ -201,14 +209,8 @@ class ModelCanvasLoader:
         
         # Knowledge bases for intelligent model repair (Viability Panel)
         # One ModelKnowledgeBase instance per drawing_area
-        self.knowledge_bases = {}  # drawing_area -> ModelKnowledgeBase
-
-        # DocumentSession registry — one session per open tab.
-        # Each session aggregates (drawing_area, canvas_manager, overlay_manager,
-        # simulation_controller, knowledge_base) for a single MDI document.
-        # Populated by _setup_edit_palettes(); torn down by close_tab().
-        # The four legacy dicts above remain as-is for backward compat.
-        self.sessions: dict = {}  # drawing_area -> DocumentSession
+        # Sprint 18: proxy backed by SessionRegistry (live view).
+        self.knowledge_bases = self.sessions.knowledge_bases
         
         # Project reference for structured save paths (pathways/, models/, metadata/)
         self.project = None
@@ -1064,44 +1066,32 @@ class ModelCanvasLoader:
                 self.lifecycle_adapter.destroy_canvas(drawing_area)
             except Exception as e:
                 self.logger.debug(f"Failed to destroy canvas in lifecycle: {e}")
-                pass  # Failed to destroy canvas in lifecycle
-        
-        # ── DocumentSession teardown ───────────────────────────────────────
-        # Pop the session and run full teardown (EventBus.clear_document +
-        # panel cleanup + overlay_manager.cleanup_overlays) BEFORE the four
-        # individual dict cleanups below, so all panel loaders are still
-        # reachable for their own unsubscribe() hooks during teardown.
+
+        # ── Sprint 18: single-session teardown ────────────────────────────
+        # Pop the session (removes it from the SessionRegistry so all four
+        # proxy views stop returning data for this drawing_area), then run
+        # full teardown — EventBus.clear_document + panel cleanup +
+        # overlay_manager.cleanup_overlays.
+        #
+        # The EventBus 'file.closed' emit reads filepath from the session
+        # BEFORE the pop so the reference is still valid.
         session = self.sessions.pop(drawing_area, None) if drawing_area else None
         if session is not None:
-            session.teardown()
-
-        if drawing_area and drawing_area in self.canvas_managers:
             # Emit file.closed so Open Editors panel removes the entry
             try:
                 import time
                 from shypn.events import EventBus
-                _mgr = self.canvas_managers[drawing_area]
-                _fp = getattr(_mgr, 'filepath', None)
+                _fp = getattr(session.canvas_manager, 'filepath', None)
                 if _fp:
                     EventBus.emit('file.closed', {'filepath': _fp, 'timestamp': time.time()})
             except Exception:
                 self.logger.debug("EventBus emit 'file.closed' failed", exc_info=True)
-            del self.canvas_managers[drawing_area]
-        if drawing_area and drawing_area in self.simulation_controllers:
-            del self.simulation_controllers[drawing_area]
-        if drawing_area and drawing_area in self.overlay_managers:
-            # session.teardown() already called cleanup_overlays().
-            # Guard: if session was not registered (very early setup failure),
-            # run cleanup directly so resources are never leaked.
-            if session is None:
-                overlay_manager = self.overlay_managers[drawing_area]
-                try:
-                    overlay_manager.cleanup_overlays()
-                except Exception:
-                    pass
-            del self.overlay_managers[drawing_area]
-        if drawing_area and drawing_area in self.knowledge_bases:
-            del self.knowledge_bases[drawing_area]
+            session.teardown()
+        # palette_managers is not session-scoped — clean it up manually
+        if drawing_area and drawing_area in self.palette_managers:
+            del self.palette_managers[drawing_area]
+        # ──────────────────────────────────────────────────────────────────
+
         if self.notebook.get_n_pages() == 0:
             # ═══════════════════════════════════════════════════════════════════
             # GLOBAL CANVAS STATE CYCLE: Auto-Recreation After Last Tab Close
@@ -1438,7 +1428,19 @@ class ModelCanvasLoader:
                 manager.undo_manager = UndoManager()
         except (ImportError, AttributeError) as e:
             self.logger.debug(f"Failed to initialize UndoManager for canvas: {e}")
-        self.canvas_managers[drawing_area] = manager
+
+        # ── Sprint 18: register DocumentSession BEFORE any proxy writes ──────
+        # overlay_manager and simulation_controller are None here; they are
+        # assigned below via proxy writes (setting the slot on this same session
+        # object), so all code that follows sees a consistent single session.
+        _early_session = DocumentSession(
+            drawing_area=drawing_area,
+            canvas_manager=manager,
+        )
+        self.sessions.register(drawing_area, _early_session)
+        # ----------------------------------------------------------------
+
+        self.canvas_managers[drawing_area] = manager  # proxy: session.canvas_manager = manager (idempotent)
         
         # Store references back to loader and drawing area for simulation reset
         manager._canvas_loader = self
@@ -1873,10 +1875,14 @@ class ModelCanvasLoader:
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
         """Setup OOP palette system and all per-document panels for one canvas.
 
-        Delegates the 8 per-document creation steps to
-        :class:`~shypn.helpers.document_panel_setup.DocumentPanelSetup`, then
-        registers a :class:`~shypn.helpers.document_session.DocumentSession`
-        as the canonical per-document aggregate.
+        Delegates all 8 per-document creation steps to
+        :class:`~shypn.helpers.document_panel_setup.DocumentPanelSetup`.
+
+        Sprint 18 note: the :class:`~shypn.helpers.document_session.DocumentSession`
+        for this drawing_area was already registered early in
+        :meth:`_setup_canvas_manager`.  ``DocumentPanelSetup.build()`` fills
+        in the ``simulation_controller`` field via the ``simulation_controllers``
+        proxy.  No second registration is needed here.
 
         Args:
             overlay_widget: GtkOverlay to attach palettes to.
@@ -1885,26 +1891,6 @@ class ModelCanvasLoader:
             overlay_manager: CanvasOverlayManager instance.
         """
         DocumentPanelSetup(self, drawing_area, canvas_manager, overlay_manager).build(overlay_widget)
-
-        # ── Register DocumentSession ────────────────────────────────────────
-        # All per-document components are now wired.  Build the session object
-        # and store it as the canonical per-document aggregate.  The four
-        # individual dicts (canvas_managers, overlay_managers,
-        # simulation_controllers, knowledge_bases) still exist for backward
-        # compatibility; the session reads from them by reference.
-        try:
-            self.sessions[drawing_area] = DocumentSession(
-                drawing_area=drawing_area,
-                canvas_manager=canvas_manager,
-                overlay_manager=overlay_manager,
-                simulation_controller=self.simulation_controllers.get(drawing_area),
-                knowledge_base=self.knowledge_bases.get(drawing_area),
-            )
-        except Exception:
-            self.logger.debug(
-                "DocumentSession registration failed for drawing_area=%s",
-                drawing_area, exc_info=True,
-            )
 
 
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
