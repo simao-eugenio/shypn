@@ -25,8 +25,15 @@ This is the PRE-processor that enhances SBML before conversion.
 """
 
 import logging
+import urllib.error
+import urllib.request
 from typing import Optional, Dict, List, Any
 from pathlib import Path
+
+try:
+    from requests.exceptions import RequestException as _RequestsException
+except ImportError:
+    _RequestsException = OSError  # type: ignore[misc, assignment]
 
 try:
     import libsbml
@@ -196,11 +203,11 @@ class SBMLEnricher:
             logger.warning(f"BioModels fetch did not return SBML for {pathway_id}")
             return None
             
-        except (urllib.error.HTTPError, urllib.error.URLError, requests.exceptions.RequestException, AttributeError, KeyError) as e:
+        except (urllib.error.HTTPError, urllib.error.URLError, _RequestsException, AttributeError, KeyError) as e:
             logger.error(f"Failed to fetch SBML from BioModels: {e}")
             return None
     
-    def _identify_missing_data(self, model) -> Dict[str, List[str]]:
+    def _identify_missing_data(self, model) -> Dict[str, Any]:
         """Identify what data is missing from SBML model.
         
         Args:
@@ -209,7 +216,7 @@ class SBMLEnricher:
         Returns:
             Dictionary mapping data type to list of missing elements
         """
-        missing = {}
+        missing: Dict[str, Any] = {}
         
         # Check species for missing initial concentrations
         if self.enrich_concentrations:
@@ -287,7 +294,7 @@ class SBMLEnricher:
         Returns:
             Dictionary of fetched data organized by type
         """
-        external_data = {}
+        external_data: Dict[str, Any] = {}
         
         # Determine which data types to fetch
         data_types = []
@@ -315,9 +322,9 @@ class SBMLEnricher:
             # Organize results by data type
             for result in fetch_results:
                 external_data[result.data_type] = result.data
-                logger.info(f"Fetched {result.data_type} from {result.source}")
+                logger.info(f"Fetched {result.data_type} from {result.attribution.source_name}")
             
-        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, AttributeError, KeyError, ValueError) as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, _RequestsException, AttributeError, KeyError, ValueError) as e:
             logger.error(f"Failed to fetch external data: {e}", exc_info=True)
         
         return external_data
@@ -472,7 +479,7 @@ class SBMLEnricher:
         logger.info(f"Inferred organism code: {organism_code or 'unknown'}")
         
         # Collect KEGG pathway IDs from species and reactions
-        pathway_votes = Counter()
+        pathway_votes: Counter[str] = Counter()
         
         # Check species annotations for KEGG compound IDs
         for i in range(model.getNumSpecies()):
@@ -602,7 +609,7 @@ class SBMLEnricher:
                 data = response.read().decode('utf-8')
             
             # Parse response: "cpd:C00031\tpath:hsa00010"
-            pathways = []
+            pathways: List[str] = []
             for line in data.strip().split('\n'):
                 if '\t' in line:
                     _, pathway_ref = line.split('\t')
@@ -615,7 +622,7 @@ class SBMLEnricher:
                         pathways.append(pathway_id)
             
             return pathways
-        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError, AttributeError) as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, _RequestsException, KeyError, ValueError, AttributeError) as e:
             logger.debug(f"Failed to query pathways for {compound_id}: {e}")
             return []
     
@@ -637,7 +644,7 @@ class SBMLEnricher:
                 data = response.read().decode('utf-8')
             
             # Parse response
-            pathways = []
+            pathways: List[str] = []
             for line in data.strip().split('\n'):
                 if '\t' in line:
                     _, pathway_ref = line.split('\t')
@@ -650,7 +657,7 @@ class SBMLEnricher:
                         pathways.append(pathway_id)
             
             return pathways
-        except (urllib.error.URLError, urllib.error.HTTPError, requests.exceptions.RequestException, KeyError, ValueError, AttributeError) as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, _RequestsException, KeyError, ValueError, AttributeError) as e:
             logger.debug(f"Failed to query pathways for {reaction_id}: {e}")
             return []
     
@@ -675,12 +682,11 @@ class SBMLEnricher:
             enricher = CoordinateEnricher()
             
             # Wrap coordinate data in FetchResult format
-            fetch_result = FetchResult(
-                source='KEGG',
+            fetch_result = FetchResult.create_success(
+                data=coordinate_data,
                 data_type='coordinates',
-                pathway_id=model.getId() or 'unknown',
-                success=True,
-                data=coordinate_data
+                source_name='KEGG',
+                fields_filled=['species', 'reactions']
             )
             
             # Create a simple pathway wrapper with the model
@@ -709,11 +715,10 @@ class SBMLEnricher:
             if result.success:
                 logger.info(
                     f"Successfully merged coordinates: "
-                    f"{result.statistics.get('species_glyphs', 0)} species, "
-                    f"{result.statistics.get('reaction_glyphs', 0)} reactions"
+                    f"{result.objects_modified} objects modified"
                 )
             else:
-                logger.error(f"Failed to merge coordinates: {result.message}")
+                logger.error(f"Failed to merge coordinates: {result.errors[0] if result.errors else 'unknown error'}")
                 
         except (AttributeError, KeyError, ValueError, TypeError, ImportError) as e:
             logger.error(f"Failed to merge coordinate data: {e}", exc_info=True)

@@ -666,7 +666,7 @@ class HeuristicDatabase:
             
             # Build query dynamically
             query = "SELECT * FROM transition_parameters WHERE confidence_score >= ?"
-            params = [min_confidence]
+            params: List[Any] = [min_confidence]
             
             if transition_type:
                 query += " AND transition_type = ?"
@@ -876,7 +876,7 @@ class HeuristicDatabase:
                 JOIN transition_parameters p ON e.parameter_id = p.id
                 WHERE 1=1
             """
-            params = []
+            params: List[Any] = []
             
             if pathway_id:
                 query += " AND e.pathway_id = ?"
@@ -1045,12 +1045,12 @@ class HeuristicDatabase:
             return inserted
     
     def query_brenda_data(self, 
-                         ec_number: str = None,
-                         parameter_type: str = None,
-                         organism: str = None,
-                         substrate: str = None,
+                         ec_number: Optional[str] = None,
+                         parameter_type: Optional[str] = None,
+                         organism: Optional[str] = None,
+                         substrate: Optional[str] = None,
                          min_quality: float = 0.0,
-                         limit: int = None) -> List[Dict[str, Any]]:
+                         limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Query BRENDA raw data with optional filters.
         
         Args:
@@ -1068,7 +1068,7 @@ class HeuristicDatabase:
             cursor = conn.cursor()
             
             query = "SELECT * FROM brenda_raw_data WHERE 1=1"
-            params = []
+            params: List[Any] = []
             
             if ec_number:
                 query += " AND ec_number = ?"
@@ -1101,8 +1101,8 @@ class HeuristicDatabase:
     def calculate_brenda_statistics(self, 
                                     ec_number: str,
                                     parameter_type: str,
-                                    organism: str = None,
-                                    substrate: str = None) -> Dict[str, Any]:
+                                    organism: Optional[str] = None,
+                                    substrate: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Calculate statistics from BRENDA raw data and cache in statistics table.
         
         Args:
@@ -1133,7 +1133,7 @@ class HeuristicDatabase:
         
         # Calculate statistics
         import statistics
-        stats = {
+        stats: Dict[str, Any] = {
             'ec_number': ec_number,
             'parameter_type': parameter_type,
             'organism': organism or 'all',
@@ -1189,8 +1189,8 @@ class HeuristicDatabase:
     def get_brenda_statistics(self,
                              ec_number: str,
                              parameter_type: str,
-                             organism: str = None,
-                             substrate: str = None) -> Dict[str, Any]:
+                             organism: Optional[str] = None,
+                             substrate: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Retrieve cached BRENDA statistics.
         
         Args:

@@ -146,7 +146,7 @@ class HeuristicLearner:
             return stats
         
         # Group by EC class (first two parts: e.g., "2.7")
-        ec_class_groups = {}
+        ec_class_groups: Dict[str, List[Any]] = {}
         for enrich in enrichments:
             ec_num = enrich['ec_number']
             parts = ec_num.split('.')
@@ -249,7 +249,7 @@ class HeuristicLearner:
             return stats
         
         # Group by exact EC number
-        ec_groups = {}
+        ec_groups: Dict[str, List[Any]] = {}
         for enrich in enrichments:
             ec_num = enrich['ec_number']
             if ec_num not in ec_groups:
@@ -342,7 +342,7 @@ class HeuristicLearner:
             return stats
         
         # Group by organism
-        organism_groups = {}
+        organism_groups: Dict[str, List[Any]] = {}
         for enrich in enrichments:
             organism = enrich['organism']
             if organism not in organism_groups:
@@ -417,7 +417,7 @@ class HeuristicLearner:
         Returns:
             Dict mapping param_type to list of (value, id) tuples
         """
-        param_data = {
+        param_data: Dict[str, List[Any]] = {
             'vmax': [],
             'km': [],
             'kcat': []

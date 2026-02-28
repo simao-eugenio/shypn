@@ -30,7 +30,7 @@ class BRENDACacheManager(BaseCacheManager):
         """
         super().__init__(database, 'BRENDA')
     
-    def build_query_key(self, 
+    def build_query_key(self,  # type: ignore[override]
                        ec_number: str,
                        parameter_type: str,
                        organism: Optional[str] = None,

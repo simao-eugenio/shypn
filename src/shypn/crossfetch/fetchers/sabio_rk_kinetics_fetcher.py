@@ -41,9 +41,11 @@ class SabioRKKineticsFetcher(BaseFetcher):
         self.base_url = "http://sabiork.h-its.org/sabioRestWebServices/searchKineticLaws/sbml"
     
     def fetch(self,
-             ec_number: str,
-             organism: str = "Homo sapiens",
+             pathway_id: str,
+             data_type: str = "kinetics",
              **kwargs) -> FetchResult:
+        ec_number = kwargs.get('ec_number', pathway_id)
+        organism = kwargs.get('organism', 'Homo sapiens')
         """Fetch kinetic parameters by EC number.
         
         Args:
@@ -58,8 +60,8 @@ class SabioRKKineticsFetcher(BaseFetcher):
         
         try:
             # Build query
-            query_parts = [f"ECNumber:{ec_number}"]
-            if organism:
+            query_parts = [f"ECNumber:{ec_number}"]  # type: ignore[possibly-undefined]
+            if organism:  # type: ignore[possibly-undefined]
                 query_parts.append(f"Organism:{organism}")
             
             query = " AND ".join(query_parts)
@@ -104,7 +106,7 @@ class SabioRKKineticsFetcher(BaseFetcher):
             return self._create_failed_result(
                 data_type="kinetics",
                 error=f"Network error: {str(e)}",
-                status=FetchStatus.NETWORK_ERROR
+                status=FetchStatus.FAILED
             )
         except Exception as e:
             self.logger.error(f"Error fetching from SABIO-RK: {e}")
@@ -127,7 +129,7 @@ class SabioRKKineticsFetcher(BaseFetcher):
         Returns:
             Dictionary of kinetic parameters
         """
-        parameters = {
+        parameters: Dict[str, Any] = {
             'ec_number': ec_number,
             'organism': organism,
             'vmax': None,
@@ -188,7 +190,7 @@ class SabioRKKineticsFetcher(BaseFetcher):
         Returns:
             Dictionary of parameters for this entry
         """
-        entry = {}
+        entry: Dict[str, Any] = {}
         
         # Find reaction with kinetic law
         reactions = model.findall(f'.//{{{self.SBML_NS[ns_key]}}}reaction')

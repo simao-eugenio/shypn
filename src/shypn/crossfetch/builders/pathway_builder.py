@@ -13,7 +13,7 @@ The builder maintains ID counters and naming conventions (P1, P2, T1, T2, A1, A2
 """
 
 import logging
-from typing import List, Dict, Set, Tuple, Optional
+from typing import List, Dict, Set, Tuple, Optional, Any
 from dataclasses import dataclass
 
 from shypn.netobjs.place import Place
@@ -38,10 +38,10 @@ class BuildResult:
         metadata: Dictionary containing pathway metadata (name, source, etc.)
         warnings: List of warning messages generated during build
     """
-    places: Dict[int, Place]
-    transitions: Dict[int, Transition]
-    arcs: Dict[int, Arc]
-    metadata: Dict[str, any]
+    places: Dict[str, Place]
+    transitions: Dict[str, Transition]
+    arcs: Dict[str, Arc]
+    metadata: Dict[str, Any]
     warnings: List[str]
     
     def __str__(self) -> str:
@@ -140,15 +140,15 @@ class PathwayBuilder:
         
         # Extract pathway metadata from first result
         metadata = {
-            'pathway_id': fetch_results[0].pathway_id,
+            'pathway_id': (fetch_results[0].query_params or {}).get('pathway_id', ''),
             'pathway_name': fetch_results[0].data.get('name', 'Imported Pathway'),
-            'source': fetch_results[0].source,
+            'source': fetch_results[0].attribution.source_name,
             'data_types': [r.data_type for r in fetch_results]
         }
         
         # Process each fetch result
-        for result in fetch_results:
-            data = result.data
+        for fetch_result in fetch_results:
+            data = fetch_result.data
             
             # Extract species (as strings, not Place objects)
             if 'species' in data:
@@ -282,7 +282,7 @@ class PathwayBuilder:
                 self._warnings.append(f"Skipping non-dict reaction: {reaction}")
                 continue
             
-            reaction_id = reaction.get('id') or reaction.get('name', f'R{self._next_transition_name}')
+            reaction_id = reaction.get('id') or reaction.get('name', f'R{len(self._transitions)}')
             
             transition_id = self.id_manager.generate_transition_id()
             transition_name = transition_id  # Name matches ID
@@ -394,7 +394,7 @@ class PathwayBuilder:
             logger.debug(f"Arc creation failed: {e}")
             return None
     
-    def _apply_concentrations(self, concentrations: Dict[str, any]):
+    def _apply_concentrations(self, concentrations: Dict[str, Any]):
         """Apply concentration data to Place initial markings.
         
         Converts concentration values to token counts using simple scaling.
@@ -434,7 +434,7 @@ class PathwayBuilder:
             
             logger.debug(f"Set {place.name} initial marking to {tokens} (from {value} {unit})")
     
-    def _apply_kinetics(self, kinetics: Dict[str, any]):
+    def _apply_kinetics(self, kinetics: Dict[str, Any]):
         """Apply kinetic parameters to Transitions.
         
         Args:

@@ -344,7 +344,7 @@ class AnnotationEnricher(EnricherBase):
         elif field_name in self.MULTI_VALUE_FIELDS:
             if self.merge_multi_valued:
                 # Merge all unique values
-                merged = set()
+                merged: Set[Any] = set()
                 sources = []
                 
                 for value, source, quality, _ in values_list:
@@ -362,13 +362,13 @@ class AnnotationEnricher(EnricherBase):
         
         # Unknown field type - merge as multi-value
         else:
-            merged = []
+            merged_list: List[Any] = []
             sources = []
             for value, source, quality, _ in values_list:
-                if value not in merged:
-                    merged.append(value)
+                if value not in merged_list:
+                    merged_list.append(value)
                     sources.append(source)
-            return merged if len(merged) > 1 else merged[0] if merged else None, sources
+            return merged_list if len(merged_list) > 1 else merged_list[0] if merged_list else None, sources
     
     def _add_provenance(self, obj: Any, field_name: str, sources: List[str]) -> None:
         """Add provenance information to object metadata."""

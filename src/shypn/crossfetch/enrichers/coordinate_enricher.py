@@ -78,8 +78,8 @@ class CoordinateEnricher(EnricherBase):
             if not coord_data:
                 return EnrichmentResult(
                     success=False,
-                    changes=[],
-                    message="No coordinate data in fetch result"
+                    objects_modified=0,
+                    errors=["No coordinate data in fetch result"]
                 )
             
             species_data = coord_data.get('species', [])
@@ -88,8 +88,8 @@ class CoordinateEnricher(EnricherBase):
             if not species_data and not reaction_data:
                 return EnrichmentResult(
                     success=False,
-                    changes=[],
-                    message="No species or reaction coordinates found"
+                    objects_modified=0,
+                    errors=["No species or reaction coordinates found"]
                 )
             
             # Get SBML model from pathway
@@ -97,8 +97,8 @@ class CoordinateEnricher(EnricherBase):
             if not model:
                 return EnrichmentResult(
                     success=False,
-                    changes=[],
-                    message="Failed to get SBML model from pathway"
+                    objects_modified=0,
+                    errors=["Failed to get SBML model from pathway"]
                 )
             
             # Transform coordinates from screen to Cartesian system
@@ -139,17 +139,18 @@ class CoordinateEnricher(EnricherBase):
             if not success:
                 return EnrichmentResult(
                     success=False,
-                    changes=[],
-                    message="Failed to write SBML Layout extension"
+                    objects_modified=0,
+                    errors=["Failed to write SBML Layout extension"]
                 )
             
             # Record changes
             changes.append(
                 EnrichmentChange(
-                    element_type='layout',
-                    element_id='kegg_layout_1',
-                    change_type='add',
-                    description=f"Added SBML Layout with {len(species_mapping)} species "
+                    object_id='kegg_layout_1',
+                    object_type='layout',
+                    property_name='layout',
+                    old_value=None,
+                    new_value=f"Added SBML Layout with {len(species_mapping)} species "
                                f"and {len(reaction_mapping)} reaction glyphs"
                 )
             )
@@ -161,21 +162,18 @@ class CoordinateEnricher(EnricherBase):
             
             return EnrichmentResult(
                 success=True,
+                objects_modified=len(changes),
                 changes=changes,
-                message=f"Added layout with {len(species_mapping) + len(reaction_mapping)} glyphs",
-                statistics={
-                    'species_glyphs': len(species_mapping),
-                    'reaction_glyphs': len(reaction_mapping),
-                    'canvas_height': canvas_height
-                }
+                warnings=[f"species_glyphs={len(species_mapping)}, reaction_glyphs={len(reaction_mapping)}"]
             )
             
         except (AttributeError, ValueError, KeyError, ImportError) as e:
             self.logger.error(f"Failed to apply coordinate enrichment: {e}", exc_info=True)
             return EnrichmentResult(
                 success=False,
+                objects_modified=len(changes),
                 changes=changes,
-                message=f"Error during enrichment: {str(e)}"
+                errors=[f"Error during enrichment: {str(e)}"]
             )
     
     def validate(
