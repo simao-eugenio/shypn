@@ -39,6 +39,9 @@ class CSVSimulationExporter:
         self.transition_data = simulation_data.get('transition_data', {})
         self.model = simulation_data.get('model')
         self.validation_results = simulation_data.get('validation_results')
+        # Lazy-built lookup caches — avoids repeated O(N) scans through model lists
+        self._place_cache: Dict[str, Any] = {}
+        self._transition_cache: Dict[str, Any] = {}
     
     def export_timeseries_wide(self, filepath: str) -> bool:
         """Export time series in wide format (one column per species).
@@ -146,13 +149,12 @@ class CSVSimulationExporter:
                 for i, time in enumerate(self.time_points):
                     row = [f"{time:.6f}"]
                     
-                    # Add place values
+                    # Add place values (apply scale_factor so exported values are in model units)
                     for place_id, _, unit in place_headers:
                         if i < len(self.place_data[place_id]):
                             _, value = self.place_data[place_id][i]  # Extract value from (time, tokens) tuple
-                            # Direct 1:1 conversion: 1 token = 1 mM
-                            # No conversion needed - models use mM directly
-                            row.append(f"{value:.6f}")
+                            scale = self._get_place_scale_factor(place_id)
+                            row.append(f"{value / scale:.6f}")
                         else:
                             row.append('')
                     
@@ -195,17 +197,15 @@ class CSVSimulationExporter:
                     place_name = self._get_place_name(place_id)
                     unit = self._get_place_unit(place_id)
                     
+                    scale = self._get_place_scale_factor(place_id)
                     for i, time in enumerate(self.time_points):
                         if i < len(values):
                             _, value = values[i]  # Extract value from (time, tokens) tuple
-                            # Direct 1:1 conversion: 1 token = 1 mM
-                            # No conversion needed - models use mM directly
-                            
                             writer.writerow([
                                 f"{time:.6f}",
                                 place_name,
                                 'Place',
-                                f"{value:.6f}",
+                                f"{value / scale:.6f}",
                                 unit or ''
                             ])
                 
@@ -215,11 +215,13 @@ class CSVSimulationExporter:
                     
                     for i, time in enumerate(self.time_points):
                         if i < len(values):
+                            entry = values[i]
+                            count = entry[1] if isinstance(entry, tuple) else entry
                             writer.writerow([
                                 f"{time:.6f}",
                                 trans_name,
                                 'Transition',
-                                str(values[i]),
+                                str(count),
                                 'firings'
                             ])
             
@@ -255,12 +257,10 @@ class CSVSimulationExporter:
                     place_name = self._get_place_name(place_id)
                     unit = self._get_place_unit(place_id)
                     
-                    # Extract tokens from (time, tokens) tuples
+                    # Extract tokens from (time, tokens) tuples and apply scale_factor
                     token_values = [v[1] if isinstance(v, tuple) else v for v in values]
-                    
-                    # Direct 1:1 conversion: 1 token = 1 mM
-                    # No conversion needed - models use mM directly
-                    converted_values = token_values
+                    scale = self._get_place_scale_factor(place_id)
+                    converted_values = [v / scale for v in token_values]
                     
                     stats = self._calculate_statistics(converted_values)
                     
@@ -345,13 +345,20 @@ class CSVSimulationExporter:
         return 'mM'
     
     def _get_place_obj(self, place_id: str):
-        """Get place object from model."""
-        if self.model and hasattr(self.model, 'places'):
-            for place in self.model.places:
-                if place.id == place_id:
-                    return place
-        return None
-    
+        """Get place object from model (cached)."""
+        if not self._place_cache and self.model and hasattr(self.model, 'places'):
+            self._place_cache = {p.id: p for p in self.model.places}
+        return self._place_cache.get(place_id)
+
+    def _get_place_scale_factor(self, place_id: str) -> float:
+        """Return scale_factor for a place (1.0 if not set or zero)."""
+        place = self._get_place_obj(place_id)
+        if place:
+            sf = getattr(place, 'scale_factor', None)
+            if sf:
+                return float(sf)
+        return 1.0
+
     def _get_transition_name(self, trans_id: str) -> str:
         """Get transition name from model."""
         if self.model:
@@ -359,11 +366,9 @@ class CSVSimulationExporter:
             if trans:
                 return getattr(trans, 'name', trans_id)
         return trans_id
-    
+
     def _get_transition_obj(self, trans_id: str):
-        """Get transition object from model."""
-        if self.model and hasattr(self.model, 'transitions'):
-            for trans in self.model.transitions:
-                if trans.id == trans_id:
-                    return trans
-        return None
+        """Get transition object from model (cached)."""
+        if not self._transition_cache and self.model and hasattr(self.model, 'transitions'):
+            self._transition_cache = {t.id: t for t in self.model.transitions}
+        return self._transition_cache.get(trans_id)
