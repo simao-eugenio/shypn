@@ -4209,10 +4209,6 @@ class ModelCanvasLoader:
         """Delegate to CanvasLayoutController."""
         self.layout_ctrl._on_layout_force_clicked(menu, drawing_area, manager)
 
-    def _on_layout_solar_system_clicked(self, menu, drawing_area, manager):
-        """Delegate to CanvasLayoutController."""
-        self.layout_ctrl._on_layout_solar_system_clicked(menu, drawing_area, manager)
-
     def _on_layout_circular_clicked(self, menu, drawing_area, manager):
         """Delegate to CanvasLayoutController."""
         self.layout_ctrl._on_layout_circular_clicked(menu, drawing_area, manager)
