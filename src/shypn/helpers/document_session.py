@@ -5,8 +5,19 @@ One session owns every object that belongs to a single open canvas tab:
     drawing_area          GtkDrawingArea widget (the stable identity key)
     canvas_manager        ModelCanvasManager  — places/transitions/arcs
     overlay_manager       CanvasOverlayManager — all panel loaders + swissknife
-    simulation_controller SimulationController — execution engine
+    simulation_controller SimulationController — execution engine (may be None
+                          briefly during construction; filled in by
+                          DocumentPanelSetup._setup_simulation_controller)
     knowledge_base        ModelKnowledgeBase or None
+
+Sprint 18 — Phase 7: ``DocumentSession`` is now created earlier (in
+``_setup_canvas_manager``) with ``overlay_manager`` and
+``simulation_controller`` as ``None``; they are populated moments later via
+the :class:`~shypn.helpers.session_registry.SessionRegistry` proxy writes
+inside ``_setup_canvas_manager`` and
+:meth:`DocumentPanelSetup._setup_simulation_controller`.  ``__slots__`` type
+annotations remain ``Optional`` to reflect this incremental construction
+pattern.
 
 The session's :attr:`doc_id` reads the stable monotonic ID stamped on the
 drawing_area widget by :func:`shypn.core.document_id.alloc_doc_id` when the
@@ -18,10 +29,13 @@ own attribute — no extra storage, no staleness.
 
 Lifecycle
 ---------
-* Created in :meth:`ModelCanvasLoader._setup_edit_palettes` after every
-  per-document component has been initialised.
-* Stored in ``ModelCanvasLoader.sessions[drawing_area]``.
-* Destroyed (via :meth:`close`) inside ``ModelCanvasLoader.close_tab``,
+* Created in :meth:`ModelCanvasLoader._setup_canvas_manager` as soon as
+  the canvas manager and knowledge base are available.
+* Registered in :attr:`ModelCanvasLoader.sessions` (a
+  :class:`~shypn.helpers.session_registry.SessionRegistry`) immediately.
+* ``overlay_manager`` and ``simulation_controller`` are filled in within the
+  same call stack, before the session is ever read by external code.
+* Destroyed (via :meth:`teardown`) inside ``ModelCanvasLoader.close_tab``,
   which calls ``EventBus.clear_document(self.doc_id)`` ensuring that no
   EventBus subscriptions survive the tab close.
 """
@@ -29,7 +43,7 @@ Lifecycle
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from shypn.data.model_canvas_manager import ModelCanvasManager
@@ -46,14 +60,18 @@ class DocumentSession:
     ----------
     drawing_area:
         The GtkDrawingArea widget — the canonical key used everywhere in
-        ModelCanvasLoader's four legacy dicts.
+        ModelCanvasLoader's SessionRegistry.
     canvas_manager:
         ModelCanvasManager instance for this tab.
     overlay_manager:
         CanvasOverlayManager that owns all panel loaders and the
-        SwissKnifePalette for this tab.
+        SwissKnifePalette for this tab.  May be ``None`` during incremental
+        construction (filled in by :meth:`_setup_canvas_manager` immediately
+        after this object is registered).
     simulation_controller:
-        SimulationController instance for this tab.
+        SimulationController instance for this tab.  May be ``None`` during
+        incremental construction (filled in by
+        :meth:`DocumentPanelSetup._setup_simulation_controller`).
     knowledge_base:
         Optional ModelKnowledgeBase for model-repair support.
     """
@@ -69,10 +87,10 @@ class DocumentSession:
     def __init__(
         self,
         drawing_area,
-        canvas_manager: 'ModelCanvasManager',
-        overlay_manager: 'CanvasOverlayManager',
-        simulation_controller: 'SimulationController',
-        knowledge_base=None,
+        canvas_manager: "ModelCanvasManager",
+        overlay_manager: "Optional[CanvasOverlayManager]" = None,
+        simulation_controller: "Optional[SimulationController]" = None,
+        knowledge_base: Optional[Any] = None,
     ) -> None:
         self.drawing_area = drawing_area
         self.canvas_manager = canvas_manager
@@ -193,13 +211,16 @@ class DocumentSession:
         4. ``overlay_manager.cleanup_overlays()`` — destroys GTK overlay
            widgets, palette references, step listeners.
 
-        Called from ``ModelCanvasLoader.close_tab`` before the GTK widget
-        hierarchy is destroyed and before the four legacy dicts are cleaned
-        up.  The dict deletions remain in ``close_tab`` because this class
-        intentionally does not hold a back-reference to the loader.
+        Called from ``ModelCanvasLoader.close_tab``.  Guards against ``None``
+        ``overlay_manager`` and ``simulation_controller`` which can occur when
+        tab setup fails very early (Sprint 18 incremental construction).
         """
         # Step 1 — release EventBus subscriptions
         self.close()
+
+        if self.overlay_manager is None:
+            logger.debug("DocumentSession.teardown(): overlay_manager is None — skipping panel hooks")
+            return
 
         # Step 2 — panel-specific pre-destroy hooks
         try:
@@ -224,6 +245,7 @@ class DocumentSession:
             self.overlay_manager.cleanup_overlays()
         except Exception:
             logger.debug("overlay_manager.cleanup_overlays failed", exc_info=True)
+
 
     def __repr__(self) -> str:
         fname = getattr(self.canvas_manager, 'filename', '?')
