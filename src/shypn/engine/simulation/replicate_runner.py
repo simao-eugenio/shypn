@@ -190,15 +190,19 @@ class ReplicateRunner:
                     
                     # Check for steady state (simple heuristic: no token changes for N steps)
                     if termination_condition == "steady_state" and step_num > 100:
-                        # Check if marking hasn't changed in last 50 steps
-                        # This is a simple heuristic - could be improved
+                        # Check if token counts haven't changed in last 50 steps.
+                        # Data is stored as (time, tokens) tuples — extract just the
+                        # token component so the time field doesn't prevent detection.
                         recent_data = controller.data_collector.place_data
                         if recent_data and len(list(recent_data.values())[0]) >= 50:
                             # Check last 50 time points for all places
                             all_stable = True
                             for place_id, data in recent_data.items():
                                 if len(data) >= 50:
-                                    last_50 = data[-50:]
+                                    last_50 = [
+                                        v[1] if isinstance(v, tuple) else v
+                                        for v in data[-50:]
+                                    ]
                                     if not all(v == last_50[0] for v in last_50):
                                         all_stable = False
                                         break

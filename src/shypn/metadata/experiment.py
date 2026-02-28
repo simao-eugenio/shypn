@@ -80,7 +80,7 @@ class ExperimentMetadata(MetadataSection):
             for param_id, value in sorted(overrides.items()):
                 self.add_field(
                     param_id,
-                    f"{value:.6g} µM" if isinstance(value, (int, float)) else str(value)
+                    f"{value:.6g}" if isinstance(value, (int, float)) else str(value)
                 )
     
     def validate(self) -> tuple[bool, Optional[str]]:
