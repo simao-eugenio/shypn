@@ -378,15 +378,41 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             # Delegate to stochastic behavior
             return self.stochastic_behavior._evaluate_rate_at_enablement(time)
         else:
-            # Continuous mode: use evaluate_rate
-            # Build places dict with numeric token values
+            # Continuous mode: use evaluate_rate with place OBJECTS (not token values)
+            # ContinuousBehavior.evaluate_rate expects place objects so it can call
+            # place.tokens internally — passing raw floats would make every variable
+            # fall back to epsilon (1e-10), giving wrong near-zero rates.
             places = {}
             places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             for p in places_to_iterate:
                 if hasattr(p, 'id') and hasattr(p, 'tokens'):
-                    places[p.id] = p.tokens
+                    places[p.id] = p          # store place OBJECT, not p.tokens
                     if hasattr(p, 'name') and p.name:
-                        places[p.name] = p.tokens
+                        places[p.name] = p    # store place OBJECT, not p.tokens
+            return self.continuous_behavior.evaluate_rate(places, time)
+
+    def evaluate_rate(self, places: Any, time: float) -> float:
+        """Evaluate rate for data_collector compatibility.
+
+        Called by DataCollector.record_state when it detects evaluate_rate on the
+        behavior.  Delegates to the currently selected sub-behavior so that the
+        data_collector receives the same correct value as the simulation engine.
+
+        Args:
+            places: Dict of place_id → place object (as built by data_collector)
+            time: Current simulation time
+
+        Returns:
+            Instantaneous rate value
+        """
+        mode = self._select_mode()
+        self._handle_mode_change(mode)
+
+        if mode == 'stochastic':
+            # Stochastic: delegate to stochastic behavior's own evaluator
+            return self.stochastic_behavior._evaluate_rate_at_enablement(time)
+        else:
+            # Continuous: forward the places dict directly — already contains objects
             return self.continuous_behavior.evaluate_rate(places, time)
     
     def can_fire(self) -> Tuple[bool, str]:
