@@ -36,9 +36,9 @@ class SequentialExplorer(StateSpaceExplorer):
         max_depth_reached = 0
         
         # Graph structure
-        graph = {'nodes': [], 'edges': []} if compute_graph else None
+        graph = {'nodes': [], 'edges': []} if compute_graph else None  # type: ignore[var-annotated]
         if compute_graph:
-            graph['nodes'].append({
+            graph['nodes'].append({  # type: ignore[index]
                 'id': 0,
                 'marking': initial_marking.copy(),
                 'depth': 0
@@ -74,7 +74,7 @@ class SequentialExplorer(StateSpaceExplorer):
                     
                     if compute_graph:
                         state_index[marking_tuple] = next_state_id
-                        graph['nodes'].append({
+                        graph['nodes'].append({  # type: ignore[index]
                             'id': next_state_id,
                             'marking': new_marking.copy(),
                             'depth': depth + 1
@@ -85,7 +85,7 @@ class SequentialExplorer(StateSpaceExplorer):
                 if compute_graph:
                     source_id = state_index[self._marking_to_tuple(current_marking)]
                     target_id = state_index[marking_tuple]
-                    graph['edges'].append({
+                    graph['edges'].append({  # type: ignore[index]
                         'source': source_id,
                         'target': target_id,
                         'transition': trans_id,

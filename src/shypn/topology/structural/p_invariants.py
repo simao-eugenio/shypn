@@ -36,7 +36,7 @@ class PInvariantAnalyzer(TopologyAnalyzer):
             for inv in result.get('p_invariants', []):
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_support: int = 1,
         max_invariants: int = 100,
@@ -287,7 +287,7 @@ class PInvariantAnalyzer(TopologyAnalyzer):
     
     def _remove_duplicates(self, invariants: List[np.ndarray]) -> List[np.ndarray]:
         """Remove duplicate invariants (same support and proportional weights)."""
-        unique = []
+        unique: List[Any] = []
         for inv in invariants:
             is_duplicate = False
             for existing in unique:

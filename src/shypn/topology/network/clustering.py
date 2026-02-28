@@ -37,7 +37,7 @@ class ClusteringAnalyzer(TopologyAnalyzer):
             print(f"{node['name']}: {node['clustering']:.3f}")
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         top_n: int = 20,
         node_type: Optional[str] = None,

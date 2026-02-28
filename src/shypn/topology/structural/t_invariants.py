@@ -36,7 +36,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
             for inv in result.get('t_invariants', []):
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_support: int = 1,
         max_invariants: int = 100,
@@ -402,7 +402,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         Returns:
             List without duplicates
         """
-        unique = []
+        unique: List[Any] = []
         
         for vec in vectors:
             is_duplicate = False

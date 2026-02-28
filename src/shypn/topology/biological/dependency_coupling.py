@@ -229,7 +229,7 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
             Dict with keys: 'strongly_independent', 'competitive', 'convergent', 'regulatory'
             Each value is a list of (t1_id, t2_id, details_dict) tuples
         """
-        classifications = {
+        classifications: Dict[str, List[Any]] = {
             'strongly_independent': [],
             'competitive': [],
             'convergent': [],

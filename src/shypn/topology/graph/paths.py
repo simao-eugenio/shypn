@@ -35,7 +35,7 @@ class PathAnalyzer(TopologyAnalyzer):
         result = analyzer.find_all_paths(source_id=1, target_id=5, max_length=10)
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         source_id: Optional[int] = None,
         target_id: Optional[int] = None,
@@ -103,8 +103,8 @@ class PathAnalyzer(TopologyAnalyzer):
         try:
             self._validate_model()
             graph = self._build_graph()
-            source_id = str(source_id)  # graph keys are always strings
-            target_id = str(target_id)
+            source_id = str(source_id)  # type: ignore[assignment]
+            target_id = str(target_id)  # type: ignore[assignment]
             
             # Check if nodes exist
             if source_id not in graph or target_id not in graph:
@@ -181,8 +181,8 @@ class PathAnalyzer(TopologyAnalyzer):
         try:
             self._validate_model()
             graph = self._build_graph()
-            source_id = str(source_id)  # graph keys are always strings
-            target_id = str(target_id)
+            source_id = str(source_id)  # type: ignore[assignment]
+            target_id = str(target_id)  # type: ignore[assignment]
             
             # Check if nodes exist
             if source_id not in graph or target_id not in graph:
@@ -218,7 +218,7 @@ class PathAnalyzer(TopologyAnalyzer):
                 shortest = min(path_data, key=lambda p: p['length'])
                 longest = max(path_data, key=lambda p: p['length'])
             else:
-                shortest = longest = None
+                shortest = longest = None  # type: ignore[assignment]
             
             # Create summary
             summary = self._create_paths_summary(

@@ -70,7 +70,7 @@ class CoverabilityAnalyzer(TopologyAnalyzer):
         self._node_counter = 0
         self._marking_to_node: Dict[Tuple, int] = {}
         
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         initial_marking: Optional[Dict[str, int]] = None,
         max_nodes: int = 10000,
@@ -313,7 +313,7 @@ class CoverabilityAnalyzer(TopologyAnalyzer):
                 result[place_id] = OMEGA
             else:
                 result[place_id] = int(tokens)
-        return result
+        return result  # type: ignore[return-value]
     
     def _get_enabled_transitions(self, marking: Dict[str, int]) -> List[str]:
         """Get list of enabled transitions for a marking."""
@@ -378,7 +378,7 @@ class CoverabilityAnalyzer(TopologyAnalyzer):
                 place_id = arc_target
                 current = new_marking.get(place_id, 0)
                 if current == OMEGA:
-                    new_marking[place_id] = OMEGA
+                    new_marking[place_id] = OMEGA  # type: ignore[assignment]
                 else:
                     new_marking[place_id] = current + arc.weight
         
@@ -433,18 +433,18 @@ class CoverabilityAnalyzer(TopologyAnalyzer):
                         continue
                     
                     if current_val > ancestor_val:
-                        marking_copy[place_id] = OMEGA
+                        marking_copy[place_id] = OMEGA  # type: ignore[assignment]
             
             # Also check max_omega threshold
             for place_id in marking_copy:
                 if marking_copy[place_id] != OMEGA and marking_copy[place_id] >= max_omega:
-                    marking_copy[place_id] = OMEGA
+                    marking_copy[place_id] = OMEGA  # type: ignore[assignment]
             
             # Move to parent
             if ancestor.parent_id is not None:
                 ancestor = self._nodes[ancestor.parent_id]
             else:
-                ancestor = None
+                ancestor = None  # type: ignore[assignment]
         
         return self._dict_to_tuple(marking_copy)
     

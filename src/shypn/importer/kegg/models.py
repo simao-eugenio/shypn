@@ -258,7 +258,7 @@ class KEGGPathway:
         Returns:
             Dictionary mapping type name to count
         """
-        type_counts = {}
+        type_counts: Dict[str, int] = {}
         for entry in self.entries.values():
             type_counts[entry.type] = type_counts.get(entry.type, 0) + 1
         return type_counts
@@ -269,7 +269,7 @@ class KEGGPathway:
         Returns:
             Dictionary mapping relation type to count
         """
-        type_counts = {}
+        type_counts: Dict[str, int] = {}
         for relation in self.relations:
             type_counts[relation.type] = type_counts.get(relation.type, 0) + 1
         return type_counts
@@ -280,7 +280,7 @@ class KEGGPathway:
         Returns:
             Dictionary mapping type name to list of entries
         """
-        groups = {}
+        groups: Dict[str, List[KEGGEntry]] = {}
         for entry in self.entries.values():
             if entry.type not in groups:
                 groups[entry.type] = []
@@ -293,7 +293,7 @@ class KEGGPathway:
         Returns:
             Dictionary mapping relation type to list of relations
         """
-        groups = {}
+        groups: Dict[str, List[KEGGRelation]] = {}
         for relation in self.relations:
             if relation.type not in groups:
                 groups[relation.type] = []

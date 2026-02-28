@@ -33,7 +33,7 @@ class HubAnalyzer(TopologyAnalyzer):
         for hub in result.get('hubs', []):
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_degree: int = 3,
         top_n: int = 20,
@@ -171,7 +171,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            node_id = str(node_id)  # graph keys are always strings
+            node_id = str(node_id)  # type: ignore[assignment]
             if node_id not in graph:
                 return False
             
@@ -333,7 +333,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            node_id = str(node_id)  # graph keys are always strings
+            node_id = str(node_id)  # type: ignore[assignment]
             if node_id not in graph:
                 return None
             

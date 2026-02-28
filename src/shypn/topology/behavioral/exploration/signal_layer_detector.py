@@ -330,7 +330,7 @@ class SignalLayerDetector:
         Returns:
             Dict with statistics
         """
-        layer_counts = defaultdict(int)
+        layer_counts: Dict[int, int] = defaultdict(int)
         for layer in layer_assignment.values():
             layer_counts[layer] += 1
         

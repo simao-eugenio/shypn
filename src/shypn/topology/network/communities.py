@@ -37,7 +37,7 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
             print(f"  Modularity: {comm['modularity']:.3f}")
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         method: str = 'louvain',
         resolution: float = 1.0,

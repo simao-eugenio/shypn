@@ -63,7 +63,7 @@ class TrapAnalyzer(TopologyAnalyzer):
         self.name = "Traps"
         self.description = "Find traps (place sets that stay marked once marked)"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_size: int = 1,
         max_size: Optional[int] = None,
@@ -302,7 +302,7 @@ class TrapAnalyzer(TopologyAnalyzer):
         Returns:
             List of minimal trap place ID sets
         """
-        minimal = []
+        minimal: List[Any] = []
         
         # Sort by size (smallest first)
         sorted_traps = sorted(traps, key=len)

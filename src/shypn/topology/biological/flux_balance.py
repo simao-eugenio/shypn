@@ -374,7 +374,7 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
             str: Formatted text
         """
         if not result.success:
-            return f"Flux Balance Analysis Failed: {result.message}"
+            return f"Flux Balance Analysis Failed: {result.message}"  # type: ignore[attr-defined]
         
         lines = ["=" * 60]
         lines.append("FLUX BALANCE ANALYSIS (FBA)")

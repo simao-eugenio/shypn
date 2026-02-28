@@ -286,8 +286,8 @@ class TopologyAnalyzer(ABC):
             - place_presets[place_id]  = set of transition IDs that input to place
             - place_postsets[place_id] = set of transition IDs that output from place
         """
-        place_presets = {str(p.id): set() for p in self.model.places}
-        place_postsets = {str(p.id): set() for p in self.model.places}
+        place_presets: Dict[str, Set[str]] = {str(p.id): set() for p in self.model.places}
+        place_postsets: Dict[str, Set[str]] = {str(p.id): set() for p in self.model.places}
         for arc in self.model.arcs:
             source_id = str(arc.source_id)
             target_id = str(arc.target_id)

@@ -35,7 +35,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
             print(f"{node['name']}: betweenness={node['betweenness']:.3f}")
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         measures: Optional[List[str]] = None,
         top_n: int = 20,
@@ -138,7 +138,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
                 
                 # Add centrality values
                 for measure, values in centrality_data.items():
-                    node_data[measure] = values.get(node_id, 0.0)
+                    node_data[measure] = values.get(node_id, 0.0)  # type: ignore[assignment]
                 
                 central_nodes.append(node_data)
             

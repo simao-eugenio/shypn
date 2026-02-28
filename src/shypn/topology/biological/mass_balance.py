@@ -280,7 +280,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             dict: {element: count} or None if parse fails
         """
         try:
-            atoms = {}
+            atoms: Dict[str, int] = {}
             
             # Pattern: Element (capital + optional lowercase) followed by optional number
             # Examples: C6, H12, O, Na2, Cl
@@ -314,8 +314,8 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             dict: Balance check result with 'balanced', 'incomplete', or 'unbalanced' status
         """
         # Get input and output places
-        input_atoms = defaultdict(float)
-        output_atoms = defaultdict(float)
+        input_atoms: Dict[str, float] = defaultdict(float)
+        output_atoms: Dict[str, float] = defaultdict(float)
         
         input_places = []
         output_places = []
@@ -450,7 +450,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
             str: Formatted text
         """
         if not result.success:
-            return f"Mass Balance Analysis Failed: {result.message}"
+            return f"Mass Balance Analysis Failed: {result.message}"  # type: ignore[attr-defined]
         
         lines = ["=" * 60]
         lines.append("MASS BALANCE ANALYSIS")

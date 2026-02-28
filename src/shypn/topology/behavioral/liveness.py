@@ -59,7 +59,7 @@ class LivenessAnalyzer(TopologyAnalyzer):
         self.name = "Liveness"
         self.description = "Check if transitions can fire infinitely often"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         check_structural: bool = True,
         check_deadlocks: bool = True,
@@ -193,8 +193,8 @@ class LivenessAnalyzer(TopologyAnalyzer):
         Returns:
             (trans_inputs, trans_outputs) where each maps transition ID to list of places
         """
-        trans_inputs = {}
-        trans_outputs = {}
+        trans_inputs: Dict[str, List[Any]] = {}
+        trans_outputs: Dict[str, List[Any]] = {}
         
         for transition in self.model.transitions:
             trans_id = str(transition.id)
