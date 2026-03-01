@@ -2397,16 +2397,6 @@ class SBMLCategory(BasePathwayCategory):
             self.logger.error(f"Error editing value: {e}", exc_info=True)
             self._show_status(f"✗ Error updating value: {e}", error=True)
     
-    def _show_status(self, message: str, error: bool = False):
-        """Update status label (Wayland-safe)."""
-        def update():
-            if error:
-                self.status_label.set_markup(f"<span foreground='red'>{message}</span>")
-            else:
-                self.status_label.set_markup(f"<span foreground='gray'>{message}</span>")
-        
-        GLib.idle_add(update)
-    
     def _load_last_biomodels_query(self):
         """Load last BioModels query from settings."""
         if not self.workspace_settings:
@@ -2432,31 +2422,6 @@ class SBMLCategory(BasePathwayCategory):
         except Exception as e:
             self.logger.warning(f"Could not save BioModels query: {e}")
     
-    def _show_error(self, message: str):
-        """Show error message in status label.
-        
-        Args:
-            message: Error message to display
-        """
-        self._show_status(f"❌ {message}", error=True)
-    
-    def _show_progress(self, message: str):
-        """Show progress message in status label.
-        
-        Args:
-            message: Progress message to display
-        """
-        self._show_status(f"⏳ {message}", error=False)
-    
-    def set_parent_window(self, parent_window):
-        """Set parent window for dialogs (Wayland compatibility).
-        
-        Args:
-            parent_window: Gtk.Window or Gtk.ApplicationWindow to use as parent
-        """
-        self.parent_window = parent_window
-        self.logger.debug(f"Parent window set: {parent_window}")
-    
     def set_controller(self, controller):
         """Set simulation controller for thermodynamic validation.
         
@@ -2465,28 +2430,6 @@ class SBMLCategory(BasePathwayCategory):
         """
         self.controller = controller
         self.logger.debug(f"Controller set for thermodynamic validation")
-    
-    def set_model_canvas(self, model_canvas):
-        """Set model canvas (called by PathwayOperationsPanel).
-        
-        Note: Metadata inspector refresh is deferred until user expands it.
-        
-        Args:
-            model_canvas: ModelCanvas instance (should be ModelCanvasLoader)
-        """
-        self.model_canvas = model_canvas
-        self.logger.debug(f"Model canvas set: {model_canvas}")
-    
-    def _on_metadata_expander_toggled(self, expander, param):
-        """Called when user expands/collapses the metadata inspector.
-        Populates metadata only when expanded to avoid cascade issues.
-        
-        Args:
-            expander: The Gtk.Expander widget
-            param: The parameter (notify signal)
-        """
-        if expander.get_expanded():
-            self.refresh_metadata_inspector()
     
     def on_tab_switched(self):
         """Called when the user switches to a different model tab.
@@ -2755,12 +2698,16 @@ class SBMLCategory(BasePathwayCategory):
             category = warning.get('category', 'Unknown')
             if category == 'assignment_rules':
                 has_assignment_rules = True
-                message += "• Assignment Rules detected\n"
-                message += "  May cause stale values and extreme propensities\n\n"
+                message += (
+                    "• Assignment Rules detected\n"
+                    "  May cause stale values and extreme propensities\n\n"
+                )
             elif category == 'reversible_formulas':
                 has_reversible_formulas = True
-                message += "• Reversible reaction formulas detected\n"
-                message += "  ✅ Fully supported via Skellam distribution (τ-leaping)\n\n"
+                message += (
+                    "• Reversible reaction formulas detected\n"
+                    "  ✅ Fully supported via Skellam distribution (τ-leaping)\n\n"
+                )
         
         message += "\nRECOMMENDED ACTIONS:\n"
         if has_assignment_rules:

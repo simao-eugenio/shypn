@@ -5,7 +5,7 @@ strategies used in reachability analysis (sequential, parallel, maximal).
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import queue
 
 
@@ -91,14 +91,14 @@ class WorkQueue:
         self._queue = queue_impl
         self._is_multiprocessing = hasattr(queue_impl, 'get')
     
-    def put(self, item: Any):
+    def put(self, item: Any) -> None:
         """Add item to queue."""
         if self._is_multiprocessing:
             self._queue.put(item)
         else:
             self._queue.append(item)
     
-    def get(self, timeout: float = None) -> Any:
+    def get(self, timeout: Optional[float] = None) -> Any:
         """Get item from queue."""
         if self._is_multiprocessing:
             if timeout is not None:

@@ -7,7 +7,10 @@ Following OOP principles with clear separation of concerns.
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from shypn.engine.simulation.state.detector import SimulationStateDetector
 
 
 class SimulationState(Enum):
@@ -106,7 +109,7 @@ class StateChangeObserver(ABC):
     """
     
     @abstractmethod
-    def on_state_changed(self, old_state: SimulationState, new_state: SimulationState):
+    def on_state_changed(self, old_state: SimulationState, new_state: SimulationState) -> None:
         """Called when simulation state changes.
         
         Args:

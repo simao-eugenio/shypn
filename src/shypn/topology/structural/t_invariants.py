@@ -1,6 +1,6 @@
 """T-Invariant analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Dict, Any, Iterator, List, Optional, Tuple
 import numpy as np
 from scipy import linalg
 
@@ -36,7 +36,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
             for inv in result.get('t_invariants', []):
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_support: int = 1,
         max_invariants: int = 100,
@@ -168,54 +168,6 @@ class TInvariantAnalyzer(TopologyAnalyzer):
             if old_thread_settings is not None:
                 self._restore_numpy_threads(old_thread_settings)
     
-    def _set_numpy_threads(self, num_threads: int) -> Dict[str, Any]:
-        """Configure NumPy/BLAS threading.
-        
-        Args:
-            num_threads: Number of threads to use
-            
-        Returns:
-            Dictionary of old settings for restoration
-        """
-        import os
-        old_settings = {}
-        
-        # Save old environment variables
-        env_vars = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']
-        for var in env_vars:
-            old_settings[var] = os.environ.get(var)
-            os.environ[var] = str(num_threads)
-        
-        # Try threadpoolctl if available (more reliable)
-        try:
-            from threadpoolctl import threadpool_limits
-            old_settings['threadpool_limits'] = threadpool_limits(limits=num_threads)
-        except ImportError:
-            old_settings['threadpool_limits'] = None
-        
-        return old_settings
-    
-    def _restore_numpy_threads(self, old_settings: Dict[str, Any]):
-        """Restore NumPy/BLAS threading settings.
-        
-        Args:
-            old_settings: Dictionary returned by _set_numpy_threads
-        """
-        import os
-        
-        # Restore environment variables
-        env_vars = ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']
-        for var in env_vars:
-            old_val = old_settings.get(var)
-            if old_val is None:
-                os.environ.pop(var, None)
-            else:
-                os.environ[var] = old_val
-        
-        # Restore threadpoolctl
-        if old_settings.get('threadpool_limits') is not None:
-            old_settings['threadpool_limits'].__exit__(None, None, None)
-    
     def _build_incidence_matrix(self) -> Tuple[np.ndarray, Dict[int, Any], Dict[int, Any]]:
         """Build incidence matrix C.
         
@@ -344,7 +296,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         
         return invariants
     
-    def _generate_coefficient_combinations(self, n_basis: int, max_coef: int):
+    def _generate_coefficient_combinations(self, n_basis: int, max_coef: int) -> Iterator[List[int]]:
         """Generate coefficient combinations for linear combinations.
         
         Args:
@@ -450,7 +402,7 @@ class TInvariantAnalyzer(TopologyAnalyzer):
         Returns:
             List without duplicates
         """
-        unique = []
+        unique: List[Any] = []
         
         for vec in vectors:
             is_duplicate = False

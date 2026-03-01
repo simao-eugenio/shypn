@@ -33,7 +33,7 @@ class HubAnalyzer(TopologyAnalyzer):
         for hub in result.get('hubs', []):
     """
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         min_degree: int = 3,
         top_n: int = 20,
@@ -171,7 +171,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            
+            node_id = str(node_id)  # type: ignore[assignment]
             if node_id not in graph:
                 return False
             
@@ -238,7 +238,7 @@ class HubAnalyzer(TopologyAnalyzer):
         
         return node_degrees
     
-    def _compute_node_degree(self, graph, node_id, node_data):
+    def _compute_node_degree(self, graph: Any, node_id: str, node_data: Dict[str, Any]) -> Dict[str, Any]:
         """Compute degree information for a single node."""
         in_degree = graph.in_degree(node_id)
         out_degree = graph.out_degree(node_id)
@@ -277,7 +277,7 @@ class HubAnalyzer(TopologyAnalyzer):
         }
     
     @staticmethod
-    def _compute_node_degree_worker(node_id, node_data, graph_data):
+    def _compute_node_degree_worker(node_id: str, node_data: Dict[str, Any], graph_data: Dict[str, Any]) -> Dict[str, Any]:
         """Worker function for parallel degree calculation (must be static for pickling)."""
         predecessors = graph_data['predecessors'].get(node_id, [])
         successors = graph_data['successors'].get(node_id, [])
@@ -333,7 +333,7 @@ class HubAnalyzer(TopologyAnalyzer):
         """
         try:
             graph = self._build_graph()
-            
+            node_id = str(node_id)  # type: ignore[assignment]
             if node_id not in graph:
                 return None
             
@@ -378,39 +378,6 @@ class HubAnalyzer(TopologyAnalyzer):
         
         except Exception:
             return None
-    
-    def _build_graph(self) -> nx.DiGraph:
-        """Build directed graph from Petri net."""
-        graph = nx.DiGraph()
-        
-        # Add place nodes
-        for place in self.model.places:
-            graph.add_node(
-                place.id,
-                type='place',
-                obj=place,
-                name=getattr(place, 'name', f'P{place.id}')
-            )
-        
-        # Add transition nodes
-        for transition in self.model.transitions:
-            graph.add_node(
-                transition.id,
-                type='transition',
-                obj=transition,
-                name=getattr(transition, 'name', f'T{transition.id}')
-            )
-        
-        # Add arc edges
-        for arc in self.model.arcs:
-            graph.add_edge(
-                arc.source_id,
-                arc.target_id,
-                obj=arc,
-                weight=getattr(arc, 'weight', 1)
-            )
-        
-        return graph
     
     def _create_summary(
         self,

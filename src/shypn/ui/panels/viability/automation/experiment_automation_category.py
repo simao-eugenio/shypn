@@ -70,6 +70,9 @@ class ExperimentAutomationCategory:
         # Phase 4 components (Results Browser)
         self.results_browser = None
         
+        # Per-run isolation: one folder created at batch start, shared by all experiments in the run
+        self._current_run_folder = None  # Path | None
+
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
         self._processing_updates = set()  # Set of queue_index currently being processed
@@ -500,7 +503,55 @@ class ExperimentAutomationCategory:
             except Exception as e:
                 print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
-        
+
+        # Read precision settings from sweep builder
+        # Note: use_tau_leaping is always True — SimulationSettings.use_tau_leaping setter is a no-op
+        use_tau_leaping = True
+        tau_epsilon = 0.03
+        dt_manual = None
+
+        if hasattr(self.sweep_builder, 'sweep_tau_epsilon_entry'):
+            try:
+                text = self.sweep_builder.sweep_tau_epsilon_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if 0 < val <= 1:
+                        tau_epsilon = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read tau_epsilon: {e}, using default {tau_epsilon}")
+
+        if (hasattr(self.sweep_builder, 'sweep_dt_manual_radio') and
+                hasattr(self.sweep_builder, 'sweep_dt_manual_entry') and
+                self.sweep_builder.sweep_dt_manual_radio.get_active()):
+            try:
+                text = self.sweep_builder.sweep_dt_manual_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val > 0:
+                        dt_manual = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read dt_manual: {e}, using auto")
+
+        max_tau = 0.1
+        if hasattr(self.sweep_builder, 'sweep_max_tau_entry'):
+            try:
+                text = self.sweep_builder.sweep_max_tau_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if 0 < val <= 100:
+                        max_tau = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read max_tau: {e}, using default {max_tau}")
+
+        seed_base = 42
+        if hasattr(self.sweep_builder, 'sweep_seed_entry'):
+            try:
+                text = self.sweep_builder.sweep_seed_entry.get_text().strip()
+                if text:
+                    seed_base = int(text)
+            except Exception as e:
+                print(f"[WARNING] Failed to read seed_base: {e}, using default {seed_base}")
+
         # Get parallel execution setting from queue view checkbox (E2 enhancement)
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
@@ -511,7 +562,18 @@ class ExperimentAutomationCategory:
         
         # Clear pending updates tracking
         self._pending_updates.clear()
-        
+
+        # Create per-run folder — all experiments in this batch live inside it
+        self._current_run_folder = None
+        _run_project = self._get_project_folder()
+        if _run_project:
+            from pathlib import Path as _Path
+            from datetime import datetime as _dt
+            _run_ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+            _run_path = _Path(_run_project) / 'experiments' / 'results' / f'run_{_run_ts}'
+            _run_path.mkdir(parents=True, exist_ok=True)
+            self._current_run_folder = _run_path
+
         # Clear old results from previous batch runs
         if self.results_browser:
             self.results_browser.clear_results()
@@ -533,7 +595,12 @@ class ExperimentAutomationCategory:
                 progress_callback=self._on_experiment_progress,
                 complete_callback=self._on_batch_complete,
                 experiment_result_callback=self._on_experiment_result,
-                use_parallel=use_parallel  # E2: Enable parallel execution if checkbox is checked
+                use_parallel=use_parallel,  # E2: Enable parallel execution if checkbox is checked
+                use_tau_leaping=use_tau_leaping,
+                tau_epsilon=tau_epsilon,
+                max_tau=max_tau,
+                dt_manual=dt_manual,
+                seed_base=seed_base,
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
@@ -714,12 +781,19 @@ class ExperimentAutomationCategory:
         if not project_folder:
             return
 
-        # Create saver with experiments/results subfolder
-        saver = BatchResultsSaver(
-            base_path=project_folder,
-            subfolder='experiments/results',
-            batch_prefix='experiment'
-        )
+        # Create saver — nest inside per-run folder if one was created for this batch
+        if self._current_run_folder is not None:
+            saver = BatchResultsSaver(
+                base_path=str(self._current_run_folder),
+                subfolder='',
+                batch_prefix='experiment'
+            )
+        else:
+            saver = BatchResultsSaver(
+                base_path=project_folder,
+                subfolder='experiments/results',
+                batch_prefix='experiment'
+            )
 
         # Create timestamped folder
         safe_name = name.replace(' ', '_').replace('/', '_')
@@ -739,7 +813,18 @@ class ExperimentAutomationCategory:
         try:
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
+            compressed_trajectories = result.get('compressed_trajectories', [])
             n = max(len(replicate_data), len(trajectory_summary))
+
+            # Build {replicate_id: CompressionResult} for fast lookup
+            compressed_by_id = {cr.replicate_id: cr for cr in compressed_trajectories}
+
+            # Determine final-state place columns (sorted for stable schema)
+            final_place_ids: list = []
+            if compressed_by_id:
+                _sample = next(iter(compressed_by_id.values()))
+                final_place_ids = _sample.sorted_place_ids()
+
             with open(batch_path / 'replicates.csv', 'w', newline='') as f:
                 _metadata = result.get('metadata')
                 if _metadata is not None:
@@ -748,20 +833,30 @@ class ExperimentAutomationCategory:
                     except Exception:
                         pass
                 writer = csv_mod.writer(f)
-                writer.writerow(['replicate_id', 'seed', 'n_timepoints', 'final_time',
-                                  'deadlocked', 'sim_duration', 'elapsed_time_s'])
+                base_cols = ['replicate_id', 'seed', 'n_timepoints', 'final_time',
+                             'deadlocked', 'sim_duration', 'elapsed_time_s',
+                             'n_kept', 'compression_ratio']
+                writer.writerow(base_cols + [f'final_{pid}' for pid in final_place_ids])
                 for i in range(n):
                     rep = replicate_data[i] if i < len(replicate_data) else {}
                     traj = trajectory_summary[i] if i < len(trajectory_summary) else {}
-                    writer.writerow([
-                        traj.get('replicate_id', i),
+                    rid = traj.get('replicate_id', i)
+                    cr = compressed_by_id.get(rid)
+                    final_vals = cr.final_values() if cr else {}
+                    n_kept = cr.n_kept if cr else ''
+                    comp_ratio = f'{cr.compression_ratio:.2f}' if cr else ''
+                    row = [
+                        rid,
                         traj.get('seed', ''),
                         traj.get('n_timepoints', ''),
                         traj.get('final_time', ''),
                         rep.get('deadlocked', ''),
                         rep.get('duration', ''),
-                        rep.get('elapsed_time', '')
-                    ])
+                        rep.get('elapsed_time', ''),
+                        n_kept,
+                        comp_ratio,
+                    ] + [final_vals.get(pid, '') for pid in final_place_ids]
+                    writer.writerow(row)
             _fsync(batch_path / 'replicates.csv')
         except Exception as e:
             save_errors.append(f'replicates.csv: {e}')
@@ -863,6 +958,49 @@ class ExperimentAutomationCategory:
             save_errors.append(f'mean_final_state.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save mean_final_state.csv: {e}')
 
+        # ── replicates_trajectories/ ── one δ-compressed CSV per replicate
+        # Each file is self-describing (comment header + col_schema line) so
+        # analysis scripts need no external sidecar.  Skipped gracefully when
+        # no compressed data is available (e.g. on error runs).
+        try:
+            compressed_trajectories = result.get('compressed_trajectories', [])
+            if compressed_trajectories:
+                from shypn.helpers.compressor import CompressedTrajectoryWriter
+
+                # Build id→name mapping from subnet model (reuse or build fresh)
+                _id_to_name: dict = {}
+                _subnet_model = getattr(self.parent_panel, 'subnet_model', None)
+                if _subnet_model is not None:
+                    for p in getattr(_subnet_model, 'places', []):
+                        _id_to_name[p.id] = getattr(p, 'name', p.id)
+                    for t in getattr(_subnet_model, 'transitions', []):
+                        _id_to_name[t.id] = getattr(t, 'name', t.id)
+
+                # Determine replicate status from replicate_data list
+                _rep_data = result.get('replicate_data', [])
+                _status_by_order: dict = {}
+                for _idx, _rd in enumerate(_rep_data):
+                    _status_by_order[_idx] = 'deadlocked' if _rd.get('deadlocked') else 'completed'
+
+                traj_dir = batch_path / 'replicates_trajectories'
+                traj_dir.mkdir(exist_ok=True)
+
+                for cr in compressed_trajectories:
+                    _status = _status_by_order.get(cr.replicate_id, 'completed')
+                    csv_path = traj_dir / f'run_{cr.replicate_id + 1:03d}.csv'
+                    CompressedTrajectoryWriter.write(
+                        path=csv_path,
+                        result=cr,
+                        experiment_name=name,
+                        status=_status,
+                        id_to_name=_id_to_name or None,
+                    )
+                    _fsync(csv_path)
+                print(f'[AUTO-SAVE] Saved {len(compressed_trajectories)} compressed trajectories → {traj_dir.name}/')
+        except Exception as e:
+            save_errors.append(f'replicates_trajectories/: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save replicates_trajectories/: {e}')
+
         # ── .complete / .partial sentinel ──────────────────────────────────
         # .complete is written ONLY when every file succeeded.
         # Its absence (or presence of .partial) means the save is incomplete.
@@ -910,7 +1048,9 @@ class ExperimentAutomationCategory:
         Args:
             cancelled: Whether batch was cancelled by user
         """
-        
+        # Close the per-run folder (next run will create a new one)
+        self._current_run_folder = None
+
         # Use GLib.idle_add for ALL UI updates from background thread
         def complete_ui_updates():
             """Complete all UI updates in main thread."""

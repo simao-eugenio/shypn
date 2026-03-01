@@ -20,7 +20,7 @@ References:
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional
 import logging
 
 
@@ -47,7 +47,7 @@ class SkellamSampler:
         >>> # Positive: net forward, Negative: net reverse
     """
     
-    def __init__(self, seed: int = None):
+    def __init__(self, seed: Optional[int] = None):
         """Initialize Skellam sampler.
         
         Args:

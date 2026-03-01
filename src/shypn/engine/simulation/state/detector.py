@@ -202,7 +202,7 @@ class SimulationStateDetector:
     
     # ========== Observer Pattern ==========
     
-    def add_observer(self, observer: StateChangeObserver):
+    def add_observer(self, observer: StateChangeObserver) -> None:
         """Register an observer for state changes.
         
         Args:
@@ -211,7 +211,7 @@ class SimulationStateDetector:
         if observer not in self._observers:
             self._observers.append(observer)
     
-    def remove_observer(self, observer: StateChangeObserver):
+    def remove_observer(self, observer: StateChangeObserver) -> None:
         """Unregister an observer.
         
         Args:
@@ -220,7 +220,7 @@ class SimulationStateDetector:
         if observer in self._observers:
             self._observers.remove(observer)
     
-    def _notify_observers(self, old_state: SimulationState, new_state: SimulationState):
+    def _notify_observers(self, old_state: SimulationState, new_state: SimulationState) -> None:
         """Notify all observers of state change.
         
         Args:

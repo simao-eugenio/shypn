@@ -22,6 +22,7 @@ import math
 import logging
 from typing import Optional
 from shypn.helpers.canvas_interaction_context import CanvasInteractionContext
+from shypn.helpers.canvas_input_handler import CanvasInputCallbacks, CanvasInputHandler
 try:
     from shypn.events import EventBus
 except ImportError:
@@ -79,6 +80,8 @@ except ImportError as e:
 from shypn.helpers.canvas_layout_controller import CanvasLayoutController
 from shypn.core.document_id import alloc_doc_id, doc_id
 from shypn.helpers.document_session import DocumentSession
+from shypn.canvas.canvas_renderer import CanvasRenderer
+from shypn.canvas.canvas_context_menu_controller import CanvasContextMenuController
 from shypn.helpers.document_panel_setup import DocumentPanelSetup
 
 
@@ -102,9 +105,16 @@ class ModelCanvasLoader:
         self.container = None
         self.notebook = None
         self.document_count = 0
-        self.canvas_managers = {}
-        self.overlay_managers = {}  # Replaces individual palette dictionaries
-        self.palette_managers = {}  # New OOP palette managers
+        # ── Sprint 18 — SessionRegistry replaces four parallel legacy dicts ──
+        # ``sessions`` IS the registry.  The four proxy attributes below are
+        # live dict-like views backed by it, so all existing external callers
+        # (ViabilityPanel, TopologyPanel, experiments, etc.) continue to work
+        # without modification.
+        from shypn.helpers.session_registry import SessionRegistry
+        self.sessions: SessionRegistry = SessionRegistry()
+        self.canvas_managers = self.sessions.canvas_managers
+        self.overlay_managers = self.sessions.overlay_managers
+        self.palette_managers = {}  # New OOP palette managers (keyed by da, not session-scoped)
         
         # ═══════════════════════════════════════════════════════════════════
         # PER-DOCUMENT COMPONENTS ARCHITECTURE
@@ -146,7 +156,8 @@ class ModelCanvasLoader:
         # Canvas-centric design: Controllers stored by drawing_area, not palette.
         # This ensures wiring survives SwissPalette refactoring.
         # Access pattern: drawing_area → controller → state_detector, interaction_guard
-        self.simulation_controllers = {}
+        # Sprint 18: proxy backed by SessionRegistry (live view).
+        self.simulation_controllers = self.sessions.simulation_controllers
         
         # GLOBAL-SYNC: Canvas lifecycle management
         # Initialize lifecycle system for coordinated component management
@@ -169,25 +180,43 @@ class ModelCanvasLoader:
         # Pathway Operations panel loader (for KEGG/SBML/BRENDA heuristics)
         self.pathway_panel_loader = None
         self.context_menu_handler = None
-        self._clipboard = []  # Clipboard for cut/copy/paste operations
+        self._input_handler = CanvasInputHandler(
+            callbacks=CanvasInputCallbacks(
+                show_object_context_menu=self._show_object_context_menu,
+                show_canvas_context_menu=self._show_canvas_context_menu,
+                on_file_save=lambda: (
+                    self.file_explorer_panel.save_current_document()
+                    if getattr(self, 'file_explorer_panel', None) else None
+                ),
+                on_file_save_as=lambda: (
+                    self.file_explorer_panel.save_current_document_as()
+                    if getattr(self, 'file_explorer_panel', None) else None
+                ),
+                on_file_open=lambda: (
+                    self.file_explorer_panel.open_document()
+                    if getattr(self, 'file_explorer_panel', None) else None
+                ),
+                on_add_document=lambda: (
+                    self.add_document(replace_empty_default=False)
+                    if hasattr(self, 'add_document') else None
+                ),
+                on_close_tab=self.close_tab,
+                get_page_num_for_widget=self._get_canvas_page_num,
+                get_parent_window=lambda: self.parent_window,
+                overlay_managers=self.overlay_managers,
+                canvas_context_menu_popdown=self._popdown_canvas_context_menu,
+            ),
+            logger=self.logger,
+        )
         
         # Knowledge bases for intelligent model repair (Viability Panel)
         # One ModelKnowledgeBase instance per drawing_area
-        self.knowledge_bases = {}  # drawing_area -> ModelKnowledgeBase
-
-        # DocumentSession registry — one session per open tab.
-        # Each session aggregates (drawing_area, canvas_manager, overlay_manager,
-        # simulation_controller, knowledge_base) for a single MDI document.
-        # Populated by _setup_edit_palettes(); torn down by close_tab().
-        # The four legacy dicts above remain as-is for backward compat.
-        self.sessions: dict = {}  # drawing_area -> DocumentSession
+        # Sprint 18: proxy backed by SessionRegistry (live view).
+        self.knowledge_bases = self.sessions.knowledge_bases
         
         # Project reference for structured save paths (pathways/, models/, metadata/)
         self.project = None
         
-        # Track last pointer position for paste-at-pointer functionality
-        self._last_pointer_world_x = 0.0
-        self._last_pointer_world_y = 0.0
 
         # Track whether we've fully initialized the first page (page 0)
         self._first_page_initialized = False
@@ -199,6 +228,12 @@ class ModelCanvasLoader:
             self.overlay_managers,
             get_sbml_panel=lambda: getattr(self, 'sbml_panel', None),
         )
+
+        # Sprint 21: canvas rendering delegated to CanvasRenderer
+        self._renderer = CanvasRenderer(canvas_ctx=self._input_handler.canvas_ctx)
+
+        # Sprint 22: context-menu pipeline delegated to CanvasContextMenuController
+        self._ctx_menu_ctrl = CanvasContextMenuController(loader=self)
 
         # Subscribe to 'editor.close_requested' so the Open Editors panel ✕ button
         # triggers a proper tab close (with unsaved-changes dialog etc.)
@@ -1039,44 +1074,32 @@ class ModelCanvasLoader:
                 self.lifecycle_adapter.destroy_canvas(drawing_area)
             except Exception as e:
                 self.logger.debug(f"Failed to destroy canvas in lifecycle: {e}")
-                pass  # Failed to destroy canvas in lifecycle
-        
-        # ── DocumentSession teardown ───────────────────────────────────────
-        # Pop the session and run full teardown (EventBus.clear_document +
-        # panel cleanup + overlay_manager.cleanup_overlays) BEFORE the four
-        # individual dict cleanups below, so all panel loaders are still
-        # reachable for their own unsubscribe() hooks during teardown.
+
+        # ── Sprint 18: single-session teardown ────────────────────────────
+        # Pop the session (removes it from the SessionRegistry so all four
+        # proxy views stop returning data for this drawing_area), then run
+        # full teardown — EventBus.clear_document + panel cleanup +
+        # overlay_manager.cleanup_overlays.
+        #
+        # The EventBus 'file.closed' emit reads filepath from the session
+        # BEFORE the pop so the reference is still valid.
         session = self.sessions.pop(drawing_area, None) if drawing_area else None
         if session is not None:
-            session.teardown()
-
-        if drawing_area and drawing_area in self.canvas_managers:
             # Emit file.closed so Open Editors panel removes the entry
             try:
                 import time
                 from shypn.events import EventBus
-                _mgr = self.canvas_managers[drawing_area]
-                _fp = getattr(_mgr, 'filepath', None)
+                _fp = getattr(session.canvas_manager, 'filepath', None)
                 if _fp:
                     EventBus.emit('file.closed', {'filepath': _fp, 'timestamp': time.time()})
             except Exception:
                 self.logger.debug("EventBus emit 'file.closed' failed", exc_info=True)
-            del self.canvas_managers[drawing_area]
-        if drawing_area and drawing_area in self.simulation_controllers:
-            del self.simulation_controllers[drawing_area]
-        if drawing_area and drawing_area in self.overlay_managers:
-            # session.teardown() already called cleanup_overlays().
-            # Guard: if session was not registered (very early setup failure),
-            # run cleanup directly so resources are never leaked.
-            if session is None:
-                overlay_manager = self.overlay_managers[drawing_area]
-                try:
-                    overlay_manager.cleanup_overlays()
-                except Exception:
-                    pass
-            del self.overlay_managers[drawing_area]
-        if drawing_area and drawing_area in self.knowledge_bases:
-            del self.knowledge_bases[drawing_area]
+            session.teardown()
+        # palette_managers is not session-scoped — clean it up manually
+        if drawing_area and drawing_area in self.palette_managers:
+            del self.palette_managers[drawing_area]
+        # ──────────────────────────────────────────────────────────────────
+
         if self.notebook.get_n_pages() == 0:
             # ═══════════════════════════════════════════════════════════════════
             # GLOBAL CANVAS STATE CYCLE: Auto-Recreation After Last Tab Close
@@ -1413,7 +1436,19 @@ class ModelCanvasLoader:
                 manager.undo_manager = UndoManager()
         except (ImportError, AttributeError) as e:
             self.logger.debug(f"Failed to initialize UndoManager for canvas: {e}")
-        self.canvas_managers[drawing_area] = manager
+
+        # ── Sprint 18: register DocumentSession BEFORE any proxy writes ──────
+        # overlay_manager and simulation_controller are None here; they are
+        # assigned below via proxy writes (setting the slot on this same session
+        # object), so all code that follows sees a consistent single session.
+        _early_session = DocumentSession(
+            drawing_area=drawing_area,
+            canvas_manager=manager,
+        )
+        self.sessions.register(drawing_area, _early_session)
+        # ----------------------------------------------------------------
+
+        self.canvas_managers[drawing_area] = manager  # proxy: session.canvas_manager = manager (idempotent)
         
         # Store references back to loader and drawing area for simulation reset
         manager._canvas_loader = self
@@ -1848,10 +1883,14 @@ class ModelCanvasLoader:
     def _setup_edit_palettes(self, overlay_widget, canvas_manager, drawing_area, overlay_manager):
         """Setup OOP palette system and all per-document panels for one canvas.
 
-        Delegates the 8 per-document creation steps to
-        :class:`~shypn.helpers.document_panel_setup.DocumentPanelSetup`, then
-        registers a :class:`~shypn.helpers.document_session.DocumentSession`
-        as the canonical per-document aggregate.
+        Delegates all 8 per-document creation steps to
+        :class:`~shypn.helpers.document_panel_setup.DocumentPanelSetup`.
+
+        Sprint 18 note: the :class:`~shypn.helpers.document_session.DocumentSession`
+        for this drawing_area was already registered early in
+        :meth:`_setup_canvas_manager`.  ``DocumentPanelSetup.build()`` fills
+        in the ``simulation_controller`` field via the ``simulation_controllers``
+        proxy.  No second registration is needed here.
 
         Args:
             overlay_widget: GtkOverlay to attach palettes to.
@@ -1860,26 +1899,6 @@ class ModelCanvasLoader:
             overlay_manager: CanvasOverlayManager instance.
         """
         DocumentPanelSetup(self, drawing_area, canvas_manager, overlay_manager).build(overlay_widget)
-
-        # ── Register DocumentSession ────────────────────────────────────────
-        # All per-document components are now wired.  Build the session object
-        # and store it as the canonical per-document aggregate.  The four
-        # individual dicts (canvas_managers, overlay_managers,
-        # simulation_controllers, knowledge_bases) still exist for backward
-        # compatibility; the session reads from them by reference.
-        try:
-            self.sessions[drawing_area] = DocumentSession(
-                drawing_area=drawing_area,
-                canvas_manager=canvas_manager,
-                overlay_manager=overlay_manager,
-                simulation_controller=self.simulation_controllers.get(drawing_area),
-                knowledge_base=self.knowledge_bases.get(drawing_area),
-            )
-        except Exception:
-            self.logger.debug(
-                "DocumentSession registration failed for drawing_area=%s",
-                drawing_area, exc_info=True,
-            )
 
 
     def _on_palette_tool_selected(self, tools_palette, tool_name, canvas_manager, drawing_area):
@@ -2301,6 +2320,24 @@ class ModelCanvasLoader:
         else:
             manager.clear_tool()
 
+    @property
+    def _canvas_ctx(self):
+        """Proxy to input handler's per-canvas interaction context registry."""
+        return self._input_handler.canvas_ctx
+
+    def _get_canvas_page_num(self, widget):
+        """Return the notebook page index for *widget* (Ctrl+W handler)."""
+        try:
+            if widget and widget.get_parent():
+                return self.notebook.page_num(widget.get_parent().get_parent())
+            return self.notebook.get_current_page() if self.notebook else -1
+        except Exception:
+            return self.notebook.get_current_page() if self.notebook else -1
+
+    def _popdown_canvas_context_menu(self):
+        """Dismiss active canvas context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        return self._ctx_menu_ctrl.popdown_canvas_menu()
+
     def _setup_event_controllers(self, drawing_area, manager):
         """Setup mouse and keyboard event controllers.
         
@@ -2322,14 +2359,12 @@ class ModelCanvasLoader:
         except (TypeError, AttributeError) as e:
             self.logger.debug(f"Failed to add GTK event masks to drawing area: {e}")
         drawing_area.set_can_focus(True)
-        drawing_area.connect('button-press-event', self._on_button_press, manager)
-        drawing_area.connect('button-release-event', self._on_button_release, manager)
-        drawing_area.connect('motion-notify-event', self._on_motion_notify, manager)
-        drawing_area.connect('scroll-event', self._on_scroll_event, manager)
-        drawing_area.connect('key-press-event', self._on_key_press_event, manager)
-        if not hasattr(self, '_canvas_ctx'):
-            self._canvas_ctx = {}
-        self._canvas_ctx[drawing_area] = CanvasInteractionContext()
+        drawing_area.connect('button-press-event', self._input_handler.on_button_press, manager)
+        drawing_area.connect('button-release-event', self._input_handler.on_button_release, manager)
+        drawing_area.connect('motion-notify-event', self._input_handler.on_motion_notify, manager)
+        drawing_area.connect('scroll-event', self._input_handler.on_scroll_event, manager)
+        drawing_area.connect('key-press-event', self._input_handler.on_key_press_event, manager)
+        self._input_handler.register_drawing_area(drawing_area)
         self._setup_canvas_context_menu(drawing_area, manager)
 
         # Also attach handlers to GtkViewport (wrapper inside scrolled window),
@@ -2354,11 +2389,11 @@ class ModelCanvasLoader:
                         scrolled.add_events(required_mask)
                 except (TypeError, AttributeError) as e:
                     self.logger.debug(f"Failed to add GTK event masks to scrolled window: {e}")
-                scrolled.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
-                scrolled.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
-                scrolled.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
-                scrolled.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
-                scrolled.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
+                scrolled.connect('button-press-event', lambda w, e, m=manager: self._input_handler.on_button_press(drawing_area, e, m))
+                scrolled.connect('button-release-event', lambda w, e, m=manager: self._input_handler.on_button_release(drawing_area, e, m))
+                scrolled.connect('motion-notify-event', lambda w, e, m=manager: self._input_handler.on_motion_notify(drawing_area, e, m))
+                scrolled.connect('scroll-event', lambda w, e, m=manager: self._input_handler.on_scroll_event(drawing_area, e, m))
+                scrolled.connect('key-press-event', lambda w, e, m=manager: self._input_handler.on_key_press_event(drawing_area, e, m))
             if viewport and hasattr(viewport, 'connect'):
                 # Preserve masks on viewport and add required ones
                 required_mask = (
@@ -2375,1067 +2410,43 @@ class ModelCanvasLoader:
                     self.logger.debug(f"Failed to add GTK event masks to viewport: {e}")
 
                 # Wrapper lambdas forward events to the drawing_area handlers
-                viewport.connect('button-press-event', lambda w, e, m=manager: self._on_button_press(drawing_area, e, m))
-                viewport.connect('button-release-event', lambda w, e, m=manager: self._on_button_release(drawing_area, e, m))
-                viewport.connect('motion-notify-event', lambda w, e, m=manager: self._on_motion_notify(drawing_area, e, m))
-                viewport.connect('scroll-event', lambda w, e, m=manager: self._on_scroll_event(drawing_area, e, m))
-                viewport.connect('key-press-event', lambda w, e, m=manager: self._on_key_press_event(drawing_area, e, m))
+                viewport.connect('button-press-event', lambda w, e, m=manager: self._input_handler.on_button_press(drawing_area, e, m))
+                viewport.connect('button-release-event', lambda w, e, m=manager: self._input_handler.on_button_release(drawing_area, e, m))
+                viewport.connect('motion-notify-event', lambda w, e, m=manager: self._input_handler.on_motion_notify(drawing_area, e, m))
+                viewport.connect('scroll-event', lambda w, e, m=manager: self._input_handler.on_scroll_event(drawing_area, e, m))
+                viewport.connect('key-press-event', lambda w, e, m=manager: self._input_handler.on_key_press_event(drawing_area, e, m))
         except (TypeError, AttributeError) as e:
             self.logger.debug(f"Failed to wire GTK events for canvas widgets: {e}")
 
-    def _mark_interaction(self, widget):
-        """Mark user interaction timestamp (lightweight tracking).
-        
-        Just stores a timestamp - no widget tree traversal or expensive operations.
-        """
-        import time
-        if not hasattr(self, '_last_interaction_time'):
-            self._last_interaction_time = 0
-        self._last_interaction_time = time.time()
-
-    def _on_button_press(self, widget, event, manager):
-        """Handle button press events (GTK3)."""
-        # Grab focus so keyboard shortcuts work
-        if not widget.has_focus():
-            widget.grab_focus()
-        
-        ctx = self._canvas_ctx[widget]
-        state = ctx.drag
-        arc_state = ctx.arc
-        lasso_state = ctx.lasso
-        
-        # Check if lasso mode is active
-        if lasso_state.get('active', False) and event.button == 1:
-            world_x, world_y = manager.screen_to_world(event.x, event.y)
-            # Store Ctrl state at press time for multi-select support
-            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
-            lasso_state['is_ctrl'] = is_ctrl
-            lasso_state['selector'].start_lasso(world_x, world_y)
-            widget.queue_draw()
-            return True
-        
-        # Check if we should ignore this click (after dialog close)
-        if arc_state.get('ignore_next_release', False):
-            arc_state['ignore_next_release'] = False
-            return True  # Consume the event without doing anything
-        
-        if event.button == 1 and manager.is_tool_active() and (manager.get_tool() == 'arc'):
-            world_x, world_y = manager.screen_to_world(event.x, event.y)
-            clicked_obj = manager.find_object_at_position(world_x, world_y)
-            if clicked_obj is None:
-                if arc_state['source'] is not None:
-                    arc_state['source'] = None
-                    widget.queue_draw()
-                return True
-            if arc_state['source'] is None:
-                if isinstance(clicked_obj, (Place, Transition)):
-                    arc_state['source'] = clicked_obj
-                    widget.queue_draw()
-                return True
-            else:
-                target = clicked_obj
-                source = arc_state['source']
-                if target == source:
-                    return True
-                try:
-                    arc = manager.add_arc(source, target)
-                    widget.queue_draw()
-                except ValueError as e:
-                    pass
-                    # Show error dialog instead of silent failure
-                    # Defensive check for parent window (Wayland compatibility)
-                    parent = self.parent_window if self.parent_window else None
-                    dialog = Gtk.MessageDialog(
-                        transient_for=parent,
-                        flags=0,
-                        message_type=Gtk.MessageType.ERROR,
-                        buttons=Gtk.ButtonsType.OK,
-                        text="Cannot Create Arc"
-                    )
-                    dialog.set_keep_above(True)  # Ensure dialog stays on top
-                    dialog.format_secondary_text(str(e))
-                    dialog.run()
-                    dialog.destroy()
-                finally:
-                    arc_state['source'] = None
-                    arc_state['target_valid'] = None
-                    arc_state['hovered_target'] = None
-                    widget.queue_draw()
-                return True
-        if event.button == 1 and manager.is_tool_active():
-            tool = manager.get_tool()
-            if tool in ('place', 'transition'):
-                world_x, world_y = manager.screen_to_world(event.x, event.y)
-                if tool == 'place':
-                    place = manager.add_place(world_x, world_y)
-                    widget.queue_draw()
-                elif tool == 'transition':
-                    transition = manager.add_transition(world_x, world_y)
-                    widget.queue_draw()
-                return True
-        tool = manager.get_tool() if manager.is_tool_active() else None
-        is_selection_mode = tool is None or tool == 'select'
-        if event.button == 1 and is_selection_mode:
-            world_x, world_y = manager.screen_to_world(event.x, event.y)
-            
-            # Check if clicking on a transform handle in edit mode
-            if manager.selection_manager.is_edit_mode():
-                edit_target = manager.selection_manager.get_edit_target()
-                if edit_target:
-                    handle = manager.editing_transforms.check_handle_at_position(
-                        edit_target, world_x, world_y, manager.zoom
-                    )
-                    
-                    if handle:
-                        pass
-                        # Start transformation instead of normal drag
-                        if manager.editing_transforms.start_transformation(
-                            edit_target, handle, world_x, world_y
-                        ):
-                            state['active'] = True
-                            state['button'] = event.button
-                            state['start_x'] = event.x
-                            state['start_y'] = event.y
-                            state['is_panning'] = False
-                            state['is_rect_selecting'] = False
-                            state['is_transforming'] = True
-                            widget.queue_draw()
-                            return True
-            
-            # Check for objects (places, transitions, arcs)
-            clicked_obj = manager.find_object_at_position(world_x, world_y)
-            
-            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
-            if clicked_obj is not None:
-                import time
-                from gi.repository import GLib
-                click_state = ctx.click
-                current_time = time.time()
-                time_since_last = current_time - click_state['last_click_time']
-                is_double_click = time_since_last < click_state['double_click_threshold'] and click_state['last_click_obj'] == clicked_obj
-                if click_state['pending_timeout'] is not None:
-                    GLib.source_remove(click_state['pending_timeout'])
-                    click_state['pending_timeout'] = None
-                    click_state['pending_click_data'] = None
-                if clicked_obj.selected and (not is_double_click):
-                    pass
-                    # Ctrl+Click on selected object → Deselect (remove from multi-selection)
-                    if is_ctrl:
-                        manager.selection_manager.deselect(clicked_obj)
-                        widget.queue_draw()
-                        # Record for double-click detection
-                        click_state['last_click_time'] = current_time
-                        click_state['last_click_obj'] = clicked_obj
-                        return True
-                    
-                    # Already selected (no Ctrl) - start drag immediately
-                    manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
-                    state['active'] = True
-                    state['button'] = event.button
-                    state['start_x'] = event.x
-                    state['start_y'] = event.y
-                    state['is_panning'] = False
-                    state['is_rect_selecting'] = False
-                    # Record for double-click detection
-                    click_state['last_click_time'] = current_time
-                    click_state['last_click_obj'] = clicked_obj
-                elif not is_double_click:
-                    pass
-                    # Not selected yet - select immediately and start drag
-                    # This makes dragging feel more responsive
-                    if not is_ctrl:
-                        manager.clear_all_selections()
-                    clicked_obj.selected = True
-                    manager.selection_manager.select(clicked_obj, multi=is_ctrl, manager=manager)
-                    manager.selection_manager.start_drag(clicked_obj, event.x, event.y, manager)
-                    state['active'] = True
-                    state['button'] = event.button
-                    state['start_x'] = event.x
-                    state['start_y'] = event.y
-                    state['is_panning'] = False
-                    state['is_rect_selecting'] = False
-                    widget.queue_draw()
-                    # Record for double-click detection
-                    click_state['last_click_time'] = current_time
-                    click_state['last_click_obj'] = clicked_obj
-                    return True
-                if is_double_click:
-                    pass
-                    # Double-click behavior: enter edit mode
-                    # Note: Legacy block that prevented edit mode for parallel arcs has been removed
-                    # Users now have full manual control over curved arc transformations
-                    
-                    if clicked_obj.selected:
-                        manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
-                    else:
-                        manager.selection_manager.toggle_selection(clicked_obj, multi=is_ctrl, manager=manager)
-                        manager.selection_manager.enter_edit_mode(clicked_obj, manager=manager)
-                    click_state['last_click_time'] = 0.0
-                    click_state['last_click_obj'] = None
-                    widget.queue_draw()
-                    return True
-            else:
-                pass
-                # Clicked on empty space
-                # If in edit mode, just exit edit mode (keep selection)
-                if manager.selection_manager.is_edit_mode():
-                    manager.selection_manager.exit_edit_mode()
-                    widget.queue_draw()
-                    # Don't start rectangle selection if just exiting edit mode
-                    return True
-                
-                # Otherwise, start rectangle selection
-                manager.rectangle_selection.start(world_x, world_y)
-                state['active'] = True
-                state['button'] = event.button
-                state['start_x'] = event.x
-                state['start_y'] = event.y
-                state['is_panning'] = False
-                state['is_rect_selecting'] = True
-                if not is_ctrl:
-                    manager.clear_all_selections()
-                widget.grab_focus()
-                return True
-        state['active'] = True
-        state['button'] = event.button
-        state['start_x'] = event.x
-        state['start_y'] = event.y
-        state['start_pan_x'] = manager.pan_x
-        state['start_pan_y'] = manager.pan_y
-        state['is_panning'] = False
-        state['is_rect_selecting'] = False
-        widget.grab_focus()
-        return True
-
-    def _on_button_release(self, widget, event, manager):
-        """Handle button release events (GTK3)."""
-        ctx = self._canvas_ctx[widget]
-        state = ctx.drag
-        lasso_state = ctx.lasso
-        
-        # Complete lasso selection if active
-        if lasso_state.get('active', False) and lasso_state.get('selector'):
-            if lasso_state['selector'].is_active and event.button == 1:
-                pass
-                # Use Ctrl state from button press (not release) for consistent behavior
-                is_ctrl = lasso_state.get('is_ctrl', False)
-                lasso_state['selector'].finish_lasso(multi=is_ctrl)
-                # Deactivate lasso mode completely after selection
-                lasso_state['active'] = False
-                # Clear stored Ctrl state
-                lasso_state['is_ctrl'] = False
-                # Force redraw to remove lasso visualization
-                widget.queue_draw()
-                return True
-        
-        # End transformation if active
-        if state.get('is_transforming', False):
-            if manager.editing_transforms.end_transformation():
-                pass
-                # Transformation was committed successfully
-                widget.queue_draw()
-            state['is_transforming'] = False
-            state['active'] = False
-            state['button'] = 0
-            return True
-        
-        # Capture initial positions before ending drag (for undo)
-        initial_positions = None
-        if manager.selection_manager.is_dragging():
-            initial_positions = manager.selection_manager.get_move_data_for_undo()
-        
-        # End drag
-        if manager.selection_manager.end_drag():
-            # Push move operation capturing final positions
-            if initial_positions and hasattr(manager, 'undo_manager'):
-                from shypn.edit.undo_operations import MoveOperation
-                manager.undo_manager.push(MoveOperation(initial_positions, manager))
-            
-            # Reset drag state immediately to stop further drag processing
-            state['active'] = False
-            state['button'] = 0
-            widget.queue_draw()
-            return True
-            
-        if state.get('is_rect_selecting', False):
-            is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
-            bounds = manager.rectangle_selection.finish()
-            if bounds:
-                count = manager.rectangle_selection.select_objects(manager, multi=is_ctrl)
-                multi_str = ' (multi)' if is_ctrl else ''
-            state['is_rect_selecting'] = False
-            widget.queue_draw()
-        if event.button == 3:
-            # Check if this was actually a pan or just a click with minor movement
-            # Use a more generous threshold for context menu (10px instead of is_panning flag)
-            # This prevents accidental mouse jitter from blocking the context menu
-            dx = event.x - state['start_x']
-            dy = event.y - state['start_y']
-            distance = (dx * dx + dy * dy) ** 0.5
-            if distance < 10:  # Show context menu if movement < 10px
-                world_x, world_y = manager.screen_to_world(event.x, event.y)
-                clicked_obj = manager.find_object_at_position(world_x, world_y)
-                if clicked_obj:
-                    self._show_object_context_menu(event.x, event.y, widget, manager, clicked_obj)
-                else:
-                    self._show_canvas_context_menu(event.x, event.y, widget)
-        was_panning = state['is_panning']
-        state['active'] = False
-        state['button'] = 0
-        state['is_panning'] = False
-        if was_panning:
-            manager.save_view_state_to_file()
-        return True
-
-    def _on_motion_notify(self, widget, event, manager):
-        """Handle motion events (GTK3)."""
-        ctx = self._canvas_ctx[widget]
-        state = ctx.drag
-        arc_state = ctx.arc
-        lasso_state = ctx.lasso
-        manager.set_pointer_position(event.x, event.y)
-        world_x, world_y = manager.screen_to_world(event.x, event.y)
-        arc_state['cursor_pos'] = (world_x, world_y)
-        
-        # Track pointer position for paste-at-pointer functionality
-        self._last_pointer_world_x = world_x
-        self._last_pointer_world_y = world_y
-        
-        # Update hover tooltip - but only if not actively dragging/panning
-        # Tooltip lookup can be expensive for large models (268 objects in rn00071)
-        if not state['active']:
-            hovered_obj = manager.find_object_at_position(world_x, world_y)
-            if hovered_obj:
-                from shypn.netobjs import Place, Transition, Arc
-                if isinstance(hovered_obj, (Place, Transition, Arc)):
-                    # Show ID-Name tooltip with green background and black text (styled via CSS)
-                    # ONLY show tooltips for network objects (places, transitions, arcs)
-                    obj_id = hovered_obj.id if hasattr(hovered_obj, 'id') else "?"
-                    obj_name = hovered_obj.name if hasattr(hovered_obj, 'name') else ""
-                    if obj_name and obj_name != obj_id:
-                        tooltip = f"{obj_id} - {obj_name}"
-                    else:
-                        tooltip = obj_id
-                    # Use set_tooltip_text - CSS will apply green background and black text
-                    widget.set_tooltip_text(tooltip)
-            else:
-                # Clear tooltip when not hovering over any object
-                widget.set_tooltip_text(None)
-        
-        # Update lasso path if active
-        if lasso_state.get('active', False) and lasso_state.get('selector'):
-            if lasso_state['selector'].is_active:
-                lasso_state['selector'].add_point(world_x, world_y)
-                widget.queue_draw()
-                return True
-        
-        # FIX: Update arc preview with target validation
-        if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
-            pass
-            # Check hovered object for target validation
-            hovered = manager.find_object_at_position(world_x, world_y)
-            if hovered and hovered != arc_state['source']:
-                source = arc_state['source']
-                # Valid: Place→Transition or Transition→Place
-                is_valid = (isinstance(source, Place) and isinstance(hovered, Transition)) or \
-                           (isinstance(source, Transition) and isinstance(hovered, Place))
-                arc_state['target_valid'] = is_valid
-                arc_state['hovered_target'] = hovered
-            else:
-                arc_state['target_valid'] = None
-                arc_state['hovered_target'] = None
-            
-            widget.queue_draw()
-        if state['active'] and state['button'] > 0:
-            pass
-            # Handle transformation drag
-            if state.get('is_transforming', False):
-                manager.editing_transforms.update_transformation(world_x, world_y)
-                widget.queue_draw()
-                return True
-            
-            dx = event.x - state['start_x']
-            dy = event.y - state['start_y']
-            # Reduced threshold for more responsive drag (was 5 pixels)
-            if not state['is_panning'] and (abs(dx) >= 2 or abs(dy) >= 2):
-                state['is_panning'] = True
-            if state.get('is_rect_selecting', False):
-                world_x, world_y = manager.screen_to_world(event.x, event.y)
-                manager.rectangle_selection.update(world_x, world_y)
-                widget.queue_draw()
-                return True
-            if manager.selection_manager.update_drag(event.x, event.y, manager):
-                # Notify report panel of user interaction
-                self._mark_interaction(widget)
-                
-                click_state = ctx.click
-                if click_state and click_state.get('pending_timeout'):
-                    from gi.repository import GLib
-                    GLib.source_remove(click_state['pending_timeout'])
-                    click_state['pending_timeout'] = None
-                    click_state['pending_click_data'] = None
-                widget.queue_draw()
-                return True
-            is_shift_pressed = event.state & Gdk.ModifierType.SHIFT_MASK
-            should_pan = state['button'] in [2, 3] or (state['button'] == 1 and is_shift_pressed)
-            if should_pan and state['is_panning']:
-                # Notify report panel of user interaction to defer expensive refreshes
-                self._mark_interaction(widget)
-                
-                dx = event.x - state['start_x']
-                dy = event.y - state['start_y']
-                
-                # Use pan() method which handles rotation correctly
-                # Reset pan to start position first, then apply delta
-                manager.pan_x = state['start_pan_x']
-                manager.pan_y = state['start_pan_y']
-                manager.pan(dx, dy)
-                
-                widget.queue_draw()
-        return True
-
-    def _on_scroll_event(self, widget, event, manager):
-        """Handle scroll events for zoom (GTK3).
-        
-        Supports both discrete scroll wheels and smooth scrolling (trackpads).
-        Zooms centered at cursor position (pointer-centered zoom).
-        """
-        direction = event.direction
-        factor = None
-        if direction == Gdk.ScrollDirection.SMOOTH:
-            dy = event.delta_y
-            if abs(dy) < 1e-06:
-                return False
-            factor = 1 / 1.1 if dy > 0 else 1.1
-        elif direction == Gdk.ScrollDirection.UP:
-            factor = 1.1
-        elif direction == Gdk.ScrollDirection.DOWN:
-            factor = 1 / 1.1
-        if factor is None:
-            return False
-        
-        # Notify report panel of user interaction
-        self._mark_interaction(widget)
-        
-        manager.zoom_at_point(factor, event.x, event.y)
-        manager.save_view_state_to_file()
-        widget.queue_draw()
-        return True
-
-    def _on_key_press_event(self, widget, event, manager):
-        """Handle key press events (GTK3)."""
-        ctx = self._canvas_ctx.get(widget)
-        # First, let editing operations palette handle its shortcuts
-        if widget in self.overlay_managers:
-            overlay_manager = self.overlay_managers[widget]
-            editing_ops_palette = overlay_manager.get_palette('editing_operations')
-            if editing_ops_palette and editing_ops_palette.handle_key_press(event):
-                return True
-        
-        # Check for Ctrl modifier
-        is_ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
-        is_shift = event.state & Gdk.ModifierType.SHIFT_MASK
-        
-        # Delete key - delete selected objects
-        if event.keyval == Gdk.KEY_Delete or event.keyval == Gdk.KEY_KP_Delete:
-            selected = manager.selection_manager.get_selected_objects(manager)
-            if selected:
-                # Capture snapshots for undo
-                if hasattr(manager, 'undo_manager'):
-                    try:
-                        from shypn.edit.snapshots import capture_delete_snapshots
-                        from shypn.edit.undo_operations import DeleteOperation
-                        snapshots = capture_delete_snapshots(manager, selected)
-                        manager.undo_manager.push(DeleteOperation(snapshots))
-                    except Exception:
-                        # Fallback inline capture
-                        try:
-                            from shypn.edit.undo_operations import DeleteOperation
-                            snapshots = self._capture_delete_snapshots_inline(manager, selected)
-                            manager.undo_manager.push(DeleteOperation(snapshots))
-                        except Exception:
-                            self.logger.debug("Undo snapshot capture failed for delete (keyboard)", exc_info=True)
-                # Delete all selected objects (cascade-aware)
-                for obj in list(selected):
-                    self._delete_object(manager, obj)
-                widget.queue_draw()
-                return True
-        
-        # Cut (Ctrl+X) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_x or event.keyval == Gdk.KEY_X):
-            selected = manager.selection_manager.get_selected_objects(manager)
-            if selected:
-                self._cut_selection(manager, widget)
-                return True
-        
-        # Copy (Ctrl+C) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_c or event.keyval == Gdk.KEY_C):
-            selected = manager.selection_manager.get_selected_objects(manager)
-            if selected:
-                self._copy_selection(manager)
-                return True
-        
-        # Paste (Ctrl+V) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_v or event.keyval == Gdk.KEY_V):
-            if hasattr(self, '_clipboard') and self._clipboard:
-                pass
-                # Paste at last known pointer position
-                self._paste_selection(
-                    manager, 
-                    widget, 
-                    self._last_pointer_world_x, 
-                    self._last_pointer_world_y
-                )
-                return True
-        
-        # Save (Ctrl+S) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
-            pass
-            # Trigger save for current document
-            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
-                self.file_explorer_panel.save_current_document()
-                return True
-        
-        # Save As (Ctrl+Shift+S) - check both lowercase and uppercase
-        if is_ctrl and is_shift and (event.keyval == Gdk.KEY_s or event.keyval == Gdk.KEY_S):
-            pass
-            # Trigger save as for current document
-            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
-                self.file_explorer_panel.save_current_document_as()
-                return True
-        
-        # Open (Ctrl+O) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_o or event.keyval == Gdk.KEY_O):
-            pass
-            # Trigger open file dialog (FileChooser, not system file explorer)
-            if hasattr(self, 'file_explorer_panel') and self.file_explorer_panel:
-                self.file_explorer_panel.open_document()
-                return True
-        
-        # Undo (Ctrl+Z) - check both lowercase and uppercase
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z):
-            if hasattr(manager, 'undo_manager') and manager.undo_manager and manager.undo_manager.undo(manager):
-                widget.queue_draw()
-            return True
-        
-        # Redo (Ctrl+Shift+Z or Ctrl+Y) - check both lowercase and uppercase
-        if (is_ctrl and is_shift and (event.keyval == Gdk.KEY_z or event.keyval == Gdk.KEY_Z)) or \
-           (is_ctrl and not is_shift and (event.keyval == Gdk.KEY_y or event.keyval == Gdk.KEY_Y)):
-            if hasattr(manager, 'undo_manager') and manager.undo_manager and manager.undo_manager.redo(manager):
-                widget.queue_draw()
-            return True
-
-        # New document (Ctrl+N)
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_n or event.keyval == Gdk.KEY_N):
-            if hasattr(self, 'add_document'):
-                self.add_document(replace_empty_default=False)
-            return True
-
-        # Close tab (Ctrl+W)
-        if is_ctrl and not is_shift and (event.keyval == Gdk.KEY_w or event.keyval == Gdk.KEY_W):
-            try:
-                page_num = self.notebook.page_num(widget.get_parent().get_parent()) if widget.get_parent() else -1
-            except Exception:
-                page_num = self.notebook.get_current_page()
-            if page_num >= 0:
-                self.close_tab(page_num)
-            return True
-        
-        if event.keyval == Gdk.KEY_Escape:
-            pass
-            # Cancel lasso if active
-            lasso_state = ctx.lasso if ctx else {}
-            if lasso_state.get('active', False) and lasso_state.get('selector'):
-                if lasso_state['selector'].is_active:
-                    lasso_state['selector'].cancel_lasso()
-                    lasso_state['active'] = False
-                    widget.queue_draw()
-                    return True
-            
-            # Cancel transformation if active
-            if manager.editing_transforms.is_transforming():
-                manager.editing_transforms.cancel_transformation()
-                widget.queue_draw()
-                return True
-            
-            # Cancel drag if active
-            if manager.selection_manager.cancel_drag():
-                widget.queue_draw()
-                return True
-            
-            # Exit edit mode if active
-            if manager.selection_manager.is_edit_mode():
-                manager.selection_manager.exit_edit_mode()
-                widget.queue_draw()
-                return True
-            
-            # Close context menu if open
-            if hasattr(self, '_canvas_context_menu') and self._canvas_context_menu:
-                if isinstance(self._canvas_context_menu, Gtk.Menu):
-                    self._canvas_context_menu.popdown()
-                    return True
-            
-            # Finally, clear all selections if any exist
-            if manager.selection_manager.has_selection():
-                manager.clear_all_selections()
-                widget.queue_draw()
-                return True
-        
-        return False
-
     def _on_draw(self, drawing_area, cr, width, height, manager):
-        """Draw callback for the canvas.
-        
-        Uses Cairo transformation approach (legacy-compatible):
-            pass
-        - Apply cr.scale() and cr.translate() for automatic coordinate transformation
-        - Objects render in world coordinates, Cairo scales them automatically
-        - Line widths compensated to maintain constant pixel size
-        - Grid drawn BEFORE rotation (stays fixed in screen space)
-        - Model objects drawn AFTER rotation (rotate with canvas)
-        
-        Args:
-            drawing_area: GtkDrawingArea being drawn.
-            cr: Cairo context.
-            width: Viewport width in pixels.
-            height: Viewport height in pixels.
-            manager: ModelCanvasManager instance.
-        """
-        if manager.viewport_width != width or manager.viewport_height != height:
-            manager.set_viewport_size(width, height)
-        
-        # Execute deferred fit_to_page if pending (after viewport size is known)
-        if hasattr(manager, '_fit_to_page_pending') and manager._fit_to_page_pending:
-            # Debug prints removed to reduce console noise
-            horizontal_offset = getattr(manager, '_fit_to_page_horizontal_offset', 0)
-            vertical_offset = getattr(manager, '_fit_to_page_vertical_offset', 0)
-            manager._fit_to_page_pending = False  # Clear flag before execution
-            manager.fit_to_page(
-                padding_percent=manager._fit_to_page_padding,
-                deferred=False,
-                horizontal_offset_percent=horizontal_offset,
-                vertical_offset_percent=vertical_offset
-            )
-        
-        cr.set_source_rgb(1.0, 1.0, 1.0)
-        cr.paint()
-        
-        # Apply ALL transformations for infinite rotating canvas
-        # Transformation order (Cairo applies in reverse):
-        #   Code order: zoom/pan → rotation
-        #   Actual order: rotation → zoom/pan (rotation happens first in world space)
-        cr.save()
-        
-        # STEP 1: Apply zoom and pan transformations
-        # These establish the viewport position and scale in world space
-        cr.translate(manager.pan_x * manager.zoom, manager.pan_y * manager.zoom)
-        cr.scale(manager.zoom, manager.zoom)
-        
-        # STEP 2: Apply rotation around viewport center
-        # This rotates the entire zoomed/panned coordinate system
-        # Rotation center needs to be in world coordinates (account for zoom/pan)
-        center_world_x = width / (2.0 * manager.zoom) - manager.pan_x
-        center_world_y = height / (2.0 * manager.zoom) - manager.pan_y
-        
-        rotation = manager.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            cr.translate(center_world_x, center_world_y)
-            cr.rotate(rotation.angle_radians)
-            cr.translate(-center_world_x, -center_world_y)
-        
-        # STEP 3: Draw grid with all transformations applied (infinite canvas effect)
-        # Grid bounds are calculated to cover the entire rotated viewport
-        manager.draw_grid(cr)
-        
-        # STEP 4: Module boundaries removed - signal communication happens via formulas
-        # Signal places can be referenced in transition rate formulas without visual arcs
-        
-        # Render all objects (these will be rotated)
-        all_objects = manager.get_all_objects()
-        for obj in all_objects:
-            obj.render(cr, zoom=manager.zoom)
-        
-        manager.editing_transforms.render_selection_layer(cr, manager, manager.zoom)
-        manager.rectangle_selection.render(cr, manager.zoom)
-        
-        # Render lasso if active
-        ctx = self._canvas_ctx.get(drawing_area)
-        if ctx and ctx.lasso.get('active', False) and ctx.lasso.get('selector'):
-            ctx.lasso['selector'].render_lasso(cr, manager.zoom)
-        
-        # Highlight source object when creating arc
-        if ctx:
-            arc_state = ctx.arc
-            source = arc_state.get('source')
-            
-            if source is not None:
-                pass
-                # Green glow for source
-                cr.set_source_rgba(0.2, 0.9, 0.2, 0.6)
-                cr.set_line_width(4.0 / manager.zoom)
-                
-                if isinstance(source, Place):
-                    cr.arc(source.x, source.y, source.radius + 6, 0, 2 * math.pi)
-                    cr.stroke()
-                elif isinstance(source, Transition):
-                    w = source.width if source.horizontal else source.height
-                    h = source.height if source.horizontal else source.width
-                    cr.rectangle(source.x - w/2 - 6, source.y - h/2 - 6, w + 12, h + 12)
-                    cr.stroke()
-            
-            # Highlight hovered target with validation color
-            hovered = arc_state.get('hovered_target')
-            target_valid = arc_state.get('target_valid')
-            
-            if hovered is not None and target_valid is not None:
-                pass
-                # Green for valid, red for invalid
-                if target_valid:
-                    cr.set_source_rgba(0.2, 0.9, 0.2, 0.5)
-                else:
-                    cr.set_source_rgba(0.9, 0.2, 0.2, 0.5)
-                
-                cr.set_line_width(3.0 / manager.zoom)
-                
-                if isinstance(hovered, Place):
-                    cr.arc(hovered.x, hovered.y, hovered.radius + 4, 0, 2 * math.pi)
-                    cr.stroke()
-                elif isinstance(hovered, Transition):
-                    w = hovered.width if hovered.horizontal else hovered.height
-                    h = hovered.height if hovered.horizontal else hovered.width
-                    cr.rectangle(hovered.x - w/2 - 4, hovered.y - h/2 - 4, w + 8, h + 8)
-                    cr.stroke()
-        
-        cr.restore()
-        if ctx:
-            arc_state = ctx.arc
-            if manager.is_tool_active() and manager.get_tool() == 'arc' and (arc_state['source'] is not None):
-                self._draw_arc_preview(cr, arc_state, manager)
-        manager.mark_canvas_clean()
+        """Draw callback — delegates to CanvasRenderer (Sprint 21)."""
+        self._renderer.render_frame(drawing_area, cr, width, height, manager)
 
     def _draw_arc_preview(self, cr, arc_state, manager):
-        """Draw orange preview line for arc creation.
-        
-        Args:
-            cr: Cairo context.
-            arc_state: Arc state dictionary with 'source' and 'cursor_pos'.
-            manager: ModelCanvasManager instance.
-        """
-        source = arc_state['source']
-        cursor_x, cursor_y = arc_state['cursor_pos']
-        hovered_target = arc_state.get('hovered_target')
-        
-        src_x, src_y = (source.x, source.y)
-        dx = cursor_x - src_x
-        dy = cursor_y - src_y
-        dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 1:
-            return
-        ux, uy = (dx / dist, dy / dist)
-        
-        # Calculate source boundary point
-        if isinstance(source, Place):
-            src_radius = source.radius
-        elif isinstance(source, Transition):
-            w = source.width if source.horizontal else source.height
-            h = source.height if source.horizontal else source.width
-            src_radius = max(w, h) / 2.0
-        else:
-            src_radius = 20.0
-        start_x = src_x + ux * src_radius
-        start_y = src_y + uy * src_radius
-        
-        # Calculate end point (cursor or target boundary)
-        end_x = cursor_x
-        end_y = cursor_y
-        
-        # Detect parallel arc and calculate offset
-        parallel_offset = 0.0
-        if hovered_target and hovered_target != source:
-            pass
-            # Check if this would create a parallel arc
-            existing_arcs = [arc for arc in manager.arcs 
-                           if (arc.source == source and arc.target == hovered_target) or
-                              (arc.source == hovered_target and arc.target == source)]
-            
-            if existing_arcs:
-                pass
-                # Calculate offset direction based on arc direction
-                # Same direction as existing arc: small offset (±15px)
-                # Opposite direction: large offset (±50px)
-                existing_arc = existing_arcs[0]
-                same_direction = (existing_arc.source == source and existing_arc.target == hovered_target)
-                opposite_direction = (existing_arc.source == hovered_target and existing_arc.target == source)
-                
-                if opposite_direction:
-                    pass
-                    # Opposite direction: offset to opposite sides
-                    parallel_offset = -50.0  # New arc gets negative offset
-                elif same_direction:
-                    pass
-                    # Same direction: both offset to same side (shouldn't happen for new arc, but handle it)
-                    parallel_offset = 15.0
-            
-            # Calculate target boundary point
-            # Only for Place/Transition, not Arc (arcs don't have .x/.y attributes)
-            if isinstance(hovered_target, (Place, Transition)):
-                tgt_x, tgt_y = hovered_target.x, hovered_target.y
-                dx_to_target = tgt_x - src_x
-                dy_to_target = tgt_y - src_y
-                dist_to_target = math.sqrt(dx_to_target * dx_to_target + dy_to_target * dy_to_target)
-                
-                if dist_to_target > 1e-6:
-                    ux_target = dx_to_target / dist_to_target
-                    uy_target = dy_to_target / dist_to_target
-                    
-                    if isinstance(hovered_target, Place):
-                        tgt_radius = hovered_target.radius
-                    elif isinstance(hovered_target, Transition):
-                        w = hovered_target.width if hovered_target.horizontal else hovered_target.height
-                        h = hovered_target.height if hovered_target.horizontal else hovered_target.width
-                        tgt_radius = max(w, h) / 2.0
-                    else:
-                        tgt_radius = 20.0
-                    
-                    end_x = tgt_x - ux_target * tgt_radius
-                    end_y = tgt_y - uy_target * tgt_radius
-        
-        # Apply parallel offset perpendicular to arc direction
-        if abs(parallel_offset) > 1e-6:
-            pass
-            # Calculate perpendicular direction (rotate 90 degrees)
-            perp_x = -uy
-            perp_y = ux
-            
-            # Apply offset to both start and end points
-            start_x += perp_x * parallel_offset
-            start_y += perp_y * parallel_offset
-            end_x += perp_x * parallel_offset
-            end_y += perp_y * parallel_offset
-        
-        # Convert to screen coordinates
-        start_sx, start_sy = manager.world_to_screen(start_x, start_y)
-        end_sx, end_sy = manager.world_to_screen(end_x, end_y)
-        
-        # Draw the preview line
-        cr.set_source_rgba(0.95, 0.5, 0.1, 0.85)
-        cr.set_line_width(2.0)
-        cr.move_to(start_sx, start_sy)
-        cr.line_to(end_sx, end_sy)
-        cr.stroke()
-        
-        # Draw arrowhead
-        arrow_len = 11.0
-        arrow_width = 6.0
-        angle = math.atan2(end_y - start_y, end_x - start_x)
-        left_x = end_sx - arrow_len * math.cos(angle) + arrow_width * math.sin(angle)
-        left_y = end_sy - arrow_len * math.sin(angle) - arrow_width * math.cos(angle)
-        right_x = end_sx - arrow_len * math.cos(angle) - arrow_width * math.sin(angle)
-        right_y = end_sy - arrow_len * math.sin(angle) + arrow_width * math.cos(angle)
-        cr.move_to(end_sx, end_sy)
-        cr.line_to(left_x, left_y)
-        cr.line_to(right_x, right_y)
-        cr.close_path()
-        cr.fill()
+        """Arc-preview draw — delegates to CanvasRenderer (Sprint 21)."""
+        self._renderer.render_arc_preview(cr, arc_state, manager)
 
     def _show_canvas_context_menu(self, x, y, drawing_area):
-        """Show the canvas context menu at the given position.
-        
-        Args:
-            x, y: Position to show menu (widget-relative coordinates)
-            drawing_area: GtkDrawingArea widget
-        """
-        if hasattr(self, 'canvas_context_menus'):
-            menu = self.canvas_context_menus.get(drawing_area)
-            if menu:
-                pass
-                # Use popup_at_pointer() instead of deprecated popup() for Wayland compatibility
-                menu.popup_at_pointer(None)
+        """Pop up canvas context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.show_canvas_menu(x, y, drawing_area)
 
     def _show_object_context_menu(self, x, y, drawing_area, manager, obj):
-        """Show object-specific context menu.
-        
-        Args:
-            x, y: Position to show menu (widget-relative coordinates)
-            drawing_area: GtkDrawingArea widget
-            manager: ModelCanvasManager instance
-            obj: Selected object (Place, Transition, or Arc)
-        """
-        from shypn.netobjs import Place, Transition, Arc
-        menu = Gtk.Menu()
-        _TYPE_LABELS = {Place: 'Place', Transition: 'Transition', Arc: 'Arc'}
-        obj_type = next((lbl for cls, lbl in _TYPE_LABELS.items() if isinstance(obj, cls)), 'Object')
-        
-        # Format title with ID for arcs, just name for other objects
-        if isinstance(obj, Arc):
-            title_label = f'{obj_type}: {obj.id} - {obj.name}'
-        else:
-            title_label = f'{obj_type}: {obj.name}'
-        
-        title_item = Gtk.MenuItem(label=title_label)
-        title_item.set_sensitive(False)
-        title_item.show()
-        menu.append(title_item)
-        separator = Gtk.SeparatorMenuItem()
-        separator.show()
-        menu.append(separator)
-        
-        # Check if this is a parallel arc (for disabling edit mode)
-        is_parallel_arc = False
-        if isinstance(obj, Arc):
-            parallels = manager.detect_parallel_arcs(obj)
-            is_parallel_arc = len(parallels) > 0
-        
-        # Build menu items list
-        if is_parallel_arc:
-            pass
-            # For parallel arcs, don't include "Edit Mode" option
-            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
-        else:
-            pass
-            # For normal objects, include "Edit Mode" option
-            menu_items = [('Edit Properties...', lambda: self._on_object_properties(obj, manager, drawing_area)), ('Edit Mode (Double-click)', lambda: self._on_object_edit_mode(obj, manager, drawing_area)), None, ('Delete', lambda: self._on_object_delete(obj, manager, drawing_area))]
-        
-        # Dispatch to type-specific menu-item builders
-        for obj_cls, builder in [
-            (Place, self._add_place_context_items),
-            (Transition, self._add_transition_context_items),
-            (Arc, self._add_arc_context_items),
-        ]:
-            if isinstance(obj, obj_cls):
-                builder(obj, menu_items, manager, drawing_area)
-                break
-        for item_data in menu_items:
-            if item_data is None:
-                menu_item = Gtk.SeparatorMenuItem()
-            elif item_data[0] == '__SUBMENU__':
-                menu_item = item_data[1]
-            else:
-                label, callback = item_data
-                menu_item = Gtk.MenuItem(label=label)
+        """Pop up per-object context menu — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.show_object_menu(x, y, drawing_area, manager, obj)
 
-                def on_activate(widget, cb):
-                    cb()
-                menu_item.connect('activate', on_activate, callback)
-                menu_item.show()
-            menu.append(menu_item)
-        
-        # Add analysis menu items from context menu handler
-        if self.context_menu_handler:
-            self.context_menu_handler.add_analysis_menu_items(menu, obj)
-        
-        # Add batch mode recording menu item for places and transitions
-        if isinstance(obj, (Place, Transition)):
-            # Add separator before batch recording item
-            sep = Gtk.SeparatorMenuItem()
-            sep.show()
-            menu.append(sep)
-            
-            # Check if object is already marked for recording
-            is_recorded = False
-            if hasattr(manager, 'simulation_settings'):
-                settings = manager.simulation_settings
-                if settings and hasattr(settings, 'is_object_recorded'):
-                    is_recorded = settings.is_object_recorded(obj.id)
-            
-            # Create menu item with checkmark if marked
-            if is_recorded:
-                record_label = '✓ Mark for Recording (Batch Mode)'
-            else:
-                record_label = '📊 Mark for Recording (Batch Mode)'
-            
-            record_item = Gtk.MenuItem(label=record_label)
-            record_item.connect('activate', lambda w: self._on_toggle_recording(obj, manager, drawing_area))
-            record_item.show()
-            menu.append(record_item)
-        
-        self._active_context_menu = menu
-        
-        # Note: Don't use attach_to_widget() as it causes Wayland warnings
-        # popup_at_pointer() handles parent relationships correctly
-        menu.popup_at_pointer(None)
-
-    # ------------------------------------------------------------------
-    # Context-menu type-specific item builders (split from _show_object_context_menu)
-    # ------------------------------------------------------------------
+    # Context-menu item builders — Sprint 22: delegates to CanvasContextMenuController
 
     def _add_place_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Place-specific items to the context-menu items list."""
-        is_signal = getattr(obj, 'is_signal_place', False)
-        if is_signal:
-            menu_items.insert(2, ('Remove Signal Designation', lambda: self._on_remove_signal_designation(obj, manager, drawing_area)))
-        else:
-            signal_submenu_item = Gtk.MenuItem(label='Convert to Signal Place ►')
-            signal_submenu = Gtk.Menu()
-            for type_value, type_label in [
-                ('energy', 'Ψₑ - Energy/Metabolic State'),
-                ('regulatory', 'Ψᵣ - Regulatory/Gene Expression'),
-                ('quorum', 'Ψq - Quorum/Cell Communication'),
-                ('spatial', 'Ψₛ - Spatial/Compartment Sensing'),
-            ]:
-                signal_item = Gtk.MenuItem(label=type_label)
-                signal_item.connect('activate', lambda w, t=type_value: self._on_convert_to_signal(obj, t, manager, drawing_area))
-                signal_item.show()
-                signal_submenu.append(signal_item)
-            signal_submenu_item.set_submenu(signal_submenu)
-            signal_submenu_item.show()
-            menu_items.insert(2, ('__SUBMENU__', signal_submenu_item))
-        menu_items.insert(3, None)  # separator after signal place options
+        """Append Place-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_place_context_items(obj, menu_items, manager, drawing_area)
 
     def _add_transition_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Transition-specific items to the context-menu items list."""
-        type_submenu_item = Gtk.MenuItem(label='Change Type ►')
-        type_submenu = Gtk.Menu()
-        current_type = getattr(obj, 'transition_type', 'continuous')
-        for type_value, type_label in [
-            ('immediate', 'Immediate (zero delay)'),
-            ('timed', 'Timed (TPN)'),
-            ('stochastic', 'Stochastic (GSPN)'),
-            ('continuous', 'Continuous (SHPN)'),
-        ]:
-            label = f'✓ {type_label}' if type_value == current_type else f'   {type_label}'
-            type_item = Gtk.MenuItem(label=label)
-            type_item.connect('activate', lambda w, t=type_value: self._on_transition_type_change(obj, t, manager, drawing_area))
-            type_item.show()
-            type_submenu.append(type_item)
-        type_submenu_item.set_submenu(type_submenu)
-        type_submenu_item.show()
-        menu_items.insert(2, ('__SUBMENU__', type_submenu_item))
-        menu_items.insert(3, ('Flip Orientation', lambda: self._on_transition_flip_orientation(obj, manager, drawing_area)))
+        """Append Transition-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_transition_context_items(obj, menu_items, manager, drawing_area)
 
     def _add_arc_context_items(self, obj, menu_items: list, manager, drawing_area) -> None:
-        """Append Arc-specific items to the context-menu items list."""
-        from shypn.utils.arc_transform import is_straight, is_curved, is_signal_flow
-        from shypn.netobjs.place import Place
-        from shypn.netobjs.transition import Transition
-        from shypn.netobjs.test_arc import TestArc
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
-
-        can_be_directional = isinstance(obj.source, Place) and isinstance(obj.target, Transition)
-        is_test = isinstance(obj, TestArc)
-        is_inhibitor_arc = isinstance(obj, InhibitorArc)
-        is_signal = is_signal_flow(obj)
-        is_normal_arc = not is_test and not is_inhibitor_arc and not is_signal
-
-        menu_items.insert(2, ('Edit Weight...', lambda: self._on_arc_edit_weight(obj, manager, drawing_area)))
-        menu_items.insert(3, None)
-
-        if is_curved(obj):
-            menu_items.insert(4, ('Transform to Straight', lambda: self._on_arc_make_straight(obj, manager, drawing_area)))
-        elif is_straight(obj):
-            menu_items.insert(4, ('Transform to Curved', lambda: self._on_arc_make_curved(obj, manager, drawing_area)))
-
-        if can_be_directional:
-            if not is_normal_arc:
-                menu_items.insert(5, ('Convert to Normal Arc', lambda: self._on_arc_convert_to_normal(obj, manager, drawing_area)))
-            if not is_test:
-                menu_items.insert(5, ('Convert to Test Arc (Catalyst)', lambda: self._on_arc_convert_to_test(obj, manager, drawing_area)))
-            if not is_inhibitor_arc:
-                menu_items.insert(5, ('Convert to Inhibitor Arc', lambda: self._on_arc_convert_to_inhibitor(obj, manager, drawing_area)))
-
-        # Signal flow arcs can connect in both directions
-        if not is_signal:
-            menu_items.insert(5, ('Convert to Signal Flow Arc', lambda: self._on_arc_convert_to_signal_flow(obj, manager, drawing_area)))
+        """Append Arc-specific context-menu items. Sprint 22: delegates."""
+        self._ctx_menu_ctrl._add_arc_context_items(obj, menu_items, manager, drawing_area)
 
     def get_canvas_manager(self, drawing_area=None):
         """Get the canvas manager for a drawing area.
@@ -4065,133 +3076,50 @@ class ModelCanvasLoader:
         self.file_explorer_panel = file_explorer_panel
 
     def _setup_canvas_context_menu(self, drawing_area, manager):
-        """Setup context menu for canvas operations using Gtk.Menu.
-        
-        Args:
-            drawing_area: GtkDrawingArea widget.
-            manager: ModelCanvasManager instance.
-        """
-        menu = Gtk.Menu()
-        # Note: Don't use attach_to_widget() as it causes Wayland warnings
-        # popup_at_pointer() handles parent relationships correctly
-        menu_items = [
-            ('Reset Zoom (100%)', lambda: self._on_reset_zoom_clicked(menu, drawing_area, manager)),
-            ('Zoom In', lambda: self._on_zoom_in_clicked(menu, drawing_area, manager)),
-            ('Zoom Out', lambda: self._on_zoom_out_clicked(menu, drawing_area, manager)),
-            ('Fit to Window', lambda: self._on_fit_to_window_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Rotate 90° CW', lambda: self._on_rotate_90_cw_clicked(menu, drawing_area, manager)),
-            ('Rotate 90° CCW', lambda: self._on_rotate_90_ccw_clicked(menu, drawing_area, manager)),
-            ('Rotate 180°', lambda: self._on_rotate_180_clicked(menu, drawing_area, manager)),
-            ('Reset Rotation', lambda: self._on_reset_rotation_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Grid: Line Style', lambda: self._on_grid_line_clicked(menu, drawing_area, manager)),
-            ('Grid: Dot Style', lambda: self._on_grid_dot_clicked(menu, drawing_area, manager)),
-            ('Grid: Cross Style', lambda: self._on_grid_cross_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('Center View', lambda: self._on_center_view_clicked(menu, drawing_area, manager)),
-            ('Clear Canvas', lambda: self._on_clear_canvas_clicked(menu, drawing_area, manager)),
-            None,  # Separator
-            ('🎯 Create Center Marker', lambda: self._on_create_center_marker_clicked(menu, drawing_area, manager))
-        ]
-        for item_data in menu_items:
-            if item_data is None:
-                menu_item = Gtk.SeparatorMenuItem()
-            else:
-                label, callback = item_data
-                menu_item = Gtk.MenuItem(label=label)
-                menu_item.connect('activate', lambda w, cb=callback: cb())
-            menu_item.show()
-            menu.append(menu_item)
-        self._canvas_context_menu = menu
-        if not hasattr(self, 'canvas_context_menus'):
-            self.canvas_context_menus = {}
-        self.canvas_context_menus[drawing_area] = menu
+        """Wire context menu for drawing_area — delegates to CanvasContextMenuController (Sprint 22)."""
+        self._ctx_menu_ctrl.setup_for_drawing_area(drawing_area, manager)
 
     def _on_zoom_in_clicked(self, menu, drawing_area, manager):
-        """Zoom in action (pointer-centered)."""
-        manager.zoom_in(manager.pointer_x, manager.pointer_y)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_zoom_in_clicked(menu, drawing_area, manager)
 
     def _on_zoom_out_clicked(self, menu, drawing_area, manager):
-        """Zoom out action (pointer-centered)."""
-        manager.zoom_out(manager.pointer_x, manager.pointer_y)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_zoom_out_clicked(menu, drawing_area, manager)
 
     def _on_fit_to_window_clicked(self, menu, drawing_area, manager):
-        """Fit entire model to window with padding."""
-        # Use fit_to_page to properly fit all content with 10% padding
-        manager.fit_to_page(padding_percent=10)
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_fit_to_window_clicked(menu, drawing_area, manager)
+
     def _on_rotate_90_cw_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 90° clockwise."""
-        manager.rotate_canvas_90_cw()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_90_cw_clicked(menu, drawing_area, manager)
+
     def _on_rotate_90_ccw_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 90° counterclockwise."""
-        manager.rotate_canvas_90_ccw()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_90_ccw_clicked(menu, drawing_area, manager)
+
     def _on_rotate_180_clicked(self, menu, drawing_area, manager):
-        """Rotate canvas 180°."""
-        manager.rotate_canvas_180()
-        drawing_area.queue_draw()
-    
+        self._ctx_menu_ctrl._on_rotate_180_clicked(menu, drawing_area, manager)
+
     def _on_reset_rotation_clicked(self, menu, drawing_area, manager):
-        """Reset canvas rotation to 0°."""
-        manager.reset_canvas_rotation()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_reset_rotation_clicked(menu, drawing_area, manager)
 
     def _on_grid_line_clicked(self, menu, drawing_area, manager):
-        """Set grid to line style."""
-        manager.set_grid_style('line')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_line_clicked(menu, drawing_area, manager)
 
     def _on_grid_dot_clicked(self, menu, drawing_area, manager):
-        """Set grid to dot style."""
-        manager.set_grid_style('dot')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_dot_clicked(menu, drawing_area, manager)
 
     def _on_grid_cross_clicked(self, menu, drawing_area, manager):
-        """Set grid to cross style."""
-        manager.set_grid_style('cross')
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_grid_cross_clicked(menu, drawing_area, manager)
 
     def _on_clear_canvas_clicked(self, menu, drawing_area, manager):
-        """Clear the canvas and reset to default state.
-        
-        This removes all objects and resets the document to "default" filename
-        state (unsaved), as if creating a new document. Also resets the
-        persistency manager so the next save will prompt for a new filename.
-        """
-        if self.persistency:
-            if not self.persistency.check_unsaved_changes():
-                return
-            self.persistency.new_document()
-        manager.clear_all_objects()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_clear_canvas_clicked(menu, drawing_area, manager)
 
     def _on_create_center_marker_clicked(self, menu, drawing_area, manager):
-        """Create a red circle at document center (0, 0) for viewport calibration.
-        
-        This creates a large red circle at the exact document origin to help
-        visualize and calibrate viewport centering.
-        """
-        manager.create_test_objects()
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_create_center_marker_clicked(menu, drawing_area, manager)
 
     def _on_reset_zoom_clicked(self, menu, drawing_area, manager):
-        """Reset zoom to 100%."""
-        manager.set_zoom(1.0, manager.viewport_width / 2, manager.viewport_height / 2)
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_reset_zoom_clicked(menu, drawing_area, manager)
 
     def _on_center_view_clicked(self, menu, drawing_area, manager):
-        """Center the view."""
-        manager.pan_x = 0
-        manager.pan_y = 0
-        drawing_area.queue_draw()
+        self._ctx_menu_ctrl._on_center_view_clicked(menu, drawing_area, manager)
 
     # ------------------------------------------------------------------
     # Layout delegates — logic lives in CanvasLayoutController
@@ -4208,10 +3136,6 @@ class ModelCanvasLoader:
     def _on_layout_force_clicked(self, menu, drawing_area, manager):
         """Delegate to CanvasLayoutController."""
         self.layout_ctrl._on_layout_force_clicked(menu, drawing_area, manager)
-
-    def _on_layout_solar_system_clicked(self, menu, drawing_area, manager):
-        """Delegate to CanvasLayoutController."""
-        self.layout_ctrl._on_layout_solar_system_clicked(menu, drawing_area, manager)
 
     def _on_layout_circular_clicked(self, menu, drawing_area, manager):
         """Delegate to CanvasLayoutController."""
@@ -5018,292 +3942,6 @@ class ModelCanvasLoader:
         except ValueError as e:
             self._show_error_dialog(str(e))
             return
-    
-    def _cut_selection(self, manager, widget):
-        """Cut selected objects to clipboard.
-        
-        Args:
-            manager: ModelCanvasManager instance
-            widget: GtkDrawingArea widget
-        """
-        # First copy, then delete
-        self._copy_selection(manager)
-        
-        # Delete selected objects (with undo snapshots)
-        selected = manager.selection_manager.get_selected_objects(manager)
-        if selected:
-            if hasattr(manager, 'undo_manager'):
-                try:
-                    from shypn.edit.snapshots import capture_delete_snapshots
-                    from shypn.edit.undo_operations import DeleteOperation
-                    snapshots = capture_delete_snapshots(manager, selected)
-                    manager.undo_manager.push(DeleteOperation(snapshots))
-                except Exception:
-                    try:
-                        from shypn.edit.undo_operations import DeleteOperation
-                        snapshots = self._capture_delete_snapshots_inline(manager, selected)
-                        manager.undo_manager.push(DeleteOperation(snapshots))
-                    except Exception:
-                        self.logger.debug("Undo snapshot capture failed for delete (context menu)", exc_info=True)
-            for obj in list(selected):
-                self._delete_object(manager, obj)
-            widget.queue_draw()
-    
-    def _delete_object(self, manager, obj):
-        """Delete an object using the appropriate remove method.
-        
-        Args:
-            manager: ModelCanvasManager instance
-            obj: Object to delete (Place, Transition, or Arc)
-        """
-        from shypn.netobjs import Place, Transition, Arc
-        
-        if isinstance(obj, Place):
-            manager.remove_place(obj)
-        elif isinstance(obj, Transition):
-            manager.remove_transition(obj)
-        elif isinstance(obj, Arc):
-            manager.remove_arc(obj)
-
-    def _capture_delete_snapshots_inline(self, manager, targets):
-        """Inline snapshot capture used when import fails.
-        Mirrors shypn.edit.snapshots.capture_delete_snapshots.
-        """
-        from shypn.netobjs import Place, Transition, Arc
-        snaps = []
-        recorded_arc_ids = set()
-        def snap_arc(a):
-            return {
-                'kind': 'arc',
-                'id': getattr(a, 'id', None),
-                'label': getattr(a, 'label', None),
-                'source_id': getattr(a.source, 'id', None),
-                'target_id': getattr(a.target, 'id', None),
-            }
-        for target in targets:
-            if isinstance(target, Arc):
-                s = snap_arc(target)
-                if s['id'] and s['id'] not in recorded_arc_ids:
-                    snaps.append(s)
-                    recorded_arc_ids.add(s['id'])
-                continue
-            kind = 'place' if isinstance(target, Place) else 'transition'
-            base = {
-                'kind': kind,
-                'id': getattr(target, 'id', None),
-                'label': getattr(target, 'label', None),
-                'x': getattr(target, 'x', 0.0),
-                'y': getattr(target, 'y', 0.0),
-            }
-            if kind == 'place':
-                base['radius'] = getattr(target, 'radius', None)
-            else:
-                base['width'] = getattr(target, 'width', None)
-                base['height'] = getattr(target, 'height', None)
-            incident = []
-            connected_ids = []
-            for a in manager.arcs:
-                if a.source == target or a.target == target:
-                    a_id = getattr(a, 'id', None)
-                    if a_id and a_id not in recorded_arc_ids:
-                        incident.append(snap_arc(a))
-                        connected_ids.append(a_id)
-                        recorded_arc_ids.add(a_id)
-            base['connected_arc_ids'] = connected_ids
-            base['arcs'] = incident
-            snaps.append(base)
-        return snaps
-    
-    def _copy_selection(self, manager):
-        """Copy selected objects to clipboard.
-        
-        Args:
-            manager: ModelCanvasManager instance
-        """
-        from shypn.netobjs import Place, Transition, Arc
-        
-        selected = manager.selection_manager.get_selected_objects(manager)
-        if not selected:
-            return
-        
-        self._clipboard = []
-        
-        # Separate places, transitions, and arcs
-        places = [obj for obj in selected if isinstance(obj, Place)]
-        transitions = [obj for obj in selected if isinstance(obj, Transition)]
-        arcs = [obj for obj in selected if isinstance(obj, Arc)]
-        
-        # Serialize places and transitions
-        for place in places:
-            self._clipboard.append({
-                'type': 'place',
-                'name': place.name,
-                'x': place.x,
-                'y': place.y,
-                'radius': place.radius,
-                'tokens': place.tokens,
-                'capacity': getattr(place, 'capacity', float('inf')),
-                'id': id(place)  # Temporary ID for arc reconstruction
-            })
-        
-        for transition in transitions:
-            self._clipboard.append({
-                'type': 'transition',
-                'name': transition.name,
-                'x': transition.x,
-                'y': transition.y,
-                'width': transition.width,
-                'height': transition.height,
-                'horizontal': transition.horizontal,
-                'transition_type': getattr(transition, 'transition_type', 'continuous'),
-                'rate': getattr(transition, 'rate', 1.0),
-                'delay': getattr(transition, 'delay', 0.0),
-                'id': id(transition)  # Temporary ID for arc reconstruction
-            })
-        
-        # Serialize arcs only if both source and target are in selection
-        for arc in arcs:
-            if arc.source in selected and arc.target in selected:
-                arc_data = {
-                    'type': 'arc',
-                    'source_id': id(arc.source),
-                    'target_id': id(arc.target),
-                    'weight': arc.weight,
-                    'arc_type': getattr(arc, 'arc_type', 'normal')
-                }
-                
-                # Handle curved arcs
-                if hasattr(arc, 'is_curved') and arc.is_curved:
-                    arc_data['is_curved'] = True
-                    arc_data['handle_x'] = arc.handle_x
-                    arc_data['handle_y'] = arc.handle_y
-                
-                self._clipboard.append(arc_data)
-    
-    def _paste_selection(self, manager, widget, pointer_x=None, pointer_y=None):
-        """Paste objects from clipboard at pointer position.
-        
-        Pastes the clipboard contents centered at the pointer position (or canvas center).
-        This provides intuitive paste behavior where objects appear where you want them.
-        
-        Args:
-            manager: ModelCanvasManager instance
-            widget: GtkDrawingArea widget
-            pointer_x: World X coordinate to paste at (None = use canvas center)
-            pointer_y: World Y coordinate to paste at (None = use canvas center)
-        """
-        from shypn.netobjs import Place, Transition
-        
-        if not self._clipboard:
-            return
-        
-        # Calculate clipboard bounding box center
-        items_with_pos = [item for item in self._clipboard if 'x' in item and 'y' in item]
-        if not items_with_pos:
-            return
-        
-        clipboard_min_x = min(item['x'] for item in items_with_pos)
-        clipboard_min_y = min(item['y'] for item in items_with_pos)
-        clipboard_max_x = max(item['x'] for item in items_with_pos)
-        clipboard_max_y = max(item['y'] for item in items_with_pos)
-        clipboard_center_x = (clipboard_min_x + clipboard_max_x) / 2
-        clipboard_center_y = (clipboard_min_y + clipboard_max_y) / 2
-        
-        # Get paste position
-        if pointer_x is None or pointer_y is None:
-            pass
-            # Use canvas center if no pointer position provided
-            screen_center_x = manager.viewport_width / 2
-            screen_center_y = manager.viewport_height / 2
-            pointer_x, pointer_y = manager.screen_to_world(screen_center_x, screen_center_y)
-        
-        # Calculate offset to center clipboard at pointer
-        offset_x = pointer_x - clipboard_center_x
-        offset_y = pointer_y - clipboard_center_y
-        
-        # Clear current selection
-        manager.clear_all_selections()
-        
-        # Map old IDs to new objects
-        id_map = {}
-        
-        # Create places and transitions first
-        for item in self._clipboard:
-            if item['type'] == 'place':
-                place = manager.add_place(
-                    item['x'] + offset_x,
-                    item['y'] + offset_y
-                )
-                place.tokens = item['tokens']
-                place.capacity = item.get('capacity', float('inf'))
-                place.radius = item['radius']
-                id_map[item['id']] = place
-                
-                # Select pasted object
-                place.selected = True
-                manager.selection_manager.select(place, multi=True, manager=manager)
-            
-            elif item['type'] == 'transition':
-                transition = manager.add_transition(
-                    item['x'] + offset_x,
-                    item['y'] + offset_y
-                )
-                transition.horizontal = item['horizontal']
-                transition.width = item['width']
-                transition.height = item['height']
-                transition.transition_type = item.get('transition_type', 'continuous')
-                transition.rate = item.get('rate', 1.0)
-                transition.delay = item.get('delay', 0.0)
-                id_map[item['id']] = transition
-                
-                # Select pasted object
-                transition.selected = True
-                manager.selection_manager.select(transition, multi=True, manager=manager)
-        
-        # Create arcs after all nodes exist
-        for item in self._clipboard:
-            if item['type'] == 'arc':
-                source = id_map.get(item['source_id'])
-                target = id_map.get(item['target_id'])
-                
-                if source and target:
-                    try:
-                        arc = manager.add_arc(source, target)
-                        arc.weight = item['weight']
-                        
-                        # Set arc type and apply proper ColorSchemaManager colors
-                        arc_type = item.get('arc_type', 'normal')
-                        if arc_type == 'inhibitor':
-                            from shypn.utils.arc_transform import convert_to_inhibitor
-                            new_arc = convert_to_inhibitor(arc)
-                            manager.replace_arc(arc, new_arc)
-                            arc = new_arc
-                        elif arc_type == 'test':
-                            from shypn.utils.arc_transform import convert_to_test
-                            new_arc = convert_to_test(arc)
-                            manager.replace_arc(arc, new_arc)
-                            arc = new_arc
-                        elif arc_type == 'signal_flow':
-                            from shypn.utils.arc_transform import convert_to_signal_flow
-                            try:
-                                new_arc = convert_to_signal_flow(arc)
-                                manager.replace_arc(arc, new_arc)
-                                arc = new_arc
-                            except ValueError:
-                                # Signal place constraint not met, keep as normal arc
-                                pass
-                        
-                        # Handle curved arcs
-                        if item.get('is_curved'):
-                            arc.is_curved = True
-                            arc.handle_x = item['handle_x'] + offset_x
-                            arc.handle_y = item['handle_y'] + offset_y
-                    except ValueError:
-                        pass
-                        # Skip invalid arcs
-                        pass
-        
-        widget.queue_draw()
     
     def _generate_unique_name(self, manager, base_name):
         """Generate a unique name for a pasted object.

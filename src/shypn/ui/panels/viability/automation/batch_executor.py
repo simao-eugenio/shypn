@@ -92,15 +92,25 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         # Apply snapshot parameters
         _apply_snapshot_to_worker_model(snapshot, model, baseline_params)
         
+        # Extract precision settings (with safe defaults)
+        use_tau_leaping = args.get('use_tau_leaping', True)
+        tau_epsilon = args.get('tau_epsilon', 0.03)
+        max_tau = args.get('max_tau', 0.1)
+        dt_manual = args.get('dt_manual', None)
+        seed_base = args.get('seed_base', 42)
+
         # Run replicates
         runner = ReplicateRunner(model)
         results = runner.run_replicates(
             n=replicates,
             use_parallel=False,  # Disable stochastic parallelism in workers (ThreadPoolExecutor deadlocks in forked processes)
-            use_tau_leaping=True,
+            use_tau_leaping=use_tau_leaping,
             duration=duration,
             termination_condition=termination_condition,
-            seed_base=hash(name) % (2**31),  # Unique seed per experiment
+            epsilon=tau_epsilon,
+            max_tau=max_tau,
+            time_step=dt_manual,
+            seed_base=seed_base,
             verbose=False,
             progress_callback=worker_progress_callback  # Report progress back to main thread
         )
@@ -178,7 +188,12 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                     'experiment_parameters': experiment_params,
                     'simulation_config': {
                         'duration': duration,
+                        'time_span': (0, duration),
                         'time_units': 'second',
+                        'n_replicates': replicates,
+                        'random_seed': seed_base,
+                        'solver': 'Gillespie_SSA',
+                        'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                         'use_tau_leaping': True,
                     },
                     'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
@@ -233,6 +248,15 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'arc_ids': [a['id'] for a in subnet_data.get('arcs', [])]
             }
 
+            # Compress raw trajectories with δ-filter before discarding raw data.
+            worker_compressed: list = []
+            try:
+                from shypn.helpers.compressor import DeltaFilterCompressor
+                _cmp = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                worker_compressed = _cmp.compress_batch(results)
+            except Exception as _ce:
+                print(f'[WORKER] Warning: trajectory compression failed: {_ce}')
+
             return {
                 'name': name,
                 'snapshot_index': args['snapshot_index'],
@@ -243,6 +267,7 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'status': 'success',
                 'metadata': metadata_header,
                 'trajectory_summary': trajectory_summary,
+                'compressed_trajectories': worker_compressed,
                 'replicate_data': replicate_data,
                 'swept_parameter': swept_param,
                 'subnet_structure': subnet_structure,
@@ -486,7 +511,12 @@ class BatchExecutor:
         experiment_result_callback: Optional[Callable] = None,
         use_parallel: bool = False,
         n_workers: Optional[int] = None,
-        timeout_per_experiment: Optional[float] = None
+        timeout_per_experiment: Optional[float] = None,
+        use_tau_leaping: bool = True,
+        tau_epsilon: float = 0.03,
+        max_tau: float = 0.1,
+        dt_manual: Optional[float] = None,
+        seed_base: int = 42,
     ):
         """Run batch of experiments asynchronously.
         
@@ -542,7 +572,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers, timeout_per_experiment),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers, timeout_per_experiment, use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base),
             daemon=True
         )
         self.executor_thread.start()
@@ -580,7 +610,12 @@ class BatchExecutor:
         baseline_params: dict,  # Baseline parameters to reset between experiments
         use_parallel: bool = False,
         n_workers: Optional[int] = None,
-        timeout_per_experiment: Optional[float] = None
+        timeout_per_experiment: Optional[float] = None,
+        use_tau_leaping: bool = True,
+        tau_epsilon: float = 0.03,
+        max_tau: float = 0.1,
+        dt_manual: Optional[float] = None,
+        seed_base: int = 42,
     ):
         """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
         
@@ -602,13 +637,15 @@ class BatchExecutor:
             self._execute_batch_parallel(
                 experiments, replicates, duration, termination_condition,
                 progress_callback, complete_callback, experiment_result_callback,
-                base_model, subnet_data, baseline_params, n_workers, timeout_per_experiment
+                base_model, subnet_data, baseline_params, n_workers, timeout_per_experiment,
+                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base
             )
         else:
             self._execute_batch_sequential(
                 experiments, replicates, duration, termination_condition,
                 progress_callback, complete_callback, experiment_result_callback,
-                base_model, subnet_data, baseline_params
+                base_model, subnet_data, baseline_params,
+                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base
             )
     
     def _execute_batch_sequential(
@@ -622,7 +659,12 @@ class BatchExecutor:
         experiment_result_callback: Optional[Callable],
         base_model,  # Pre-extracted DocumentModel
         subnet_data: dict,  # Pre-extracted subnet data
-        baseline_params: dict  # Baseline parameters to reset between experiments
+        baseline_params: dict,  # Baseline parameters to reset between experiments
+        use_tau_leaping: bool = True,
+        tau_epsilon: float = 0.03,
+        max_tau: float = 0.1,
+        dt_manual: Optional[float] = None,
+        seed_base: int = 42,
     ):
         """Execute batch sequentially in background thread.
         
@@ -700,7 +742,12 @@ class BatchExecutor:
                         termination_condition,
                         exp_progress_callback,
                         base_model,
-                        subnet_data
+                        subnet_data,
+                        use_tau_leaping=use_tau_leaping,
+                        tau_epsilon=tau_epsilon,
+                        max_tau=max_tau,
+                        dt_manual=dt_manual,
+                        seed_base=seed_base,
                     )
                     
                     # CRITICAL: Verify result is valid before storing
@@ -768,7 +815,12 @@ class BatchExecutor:
         subnet_data: dict,
         baseline_params: dict,
         n_workers: Optional[int] = None,
-        timeout_per_experiment: Optional[float] = None
+        timeout_per_experiment: Optional[float] = None,
+        use_tau_leaping: bool = True,
+        tau_epsilon: float = 0.03,
+        max_tau: float = 0.1,
+        dt_manual: Optional[float] = None,
+        seed_base: int = 42,
     ):
         """Execute batch in parallel using multiprocessing.
         
@@ -827,7 +879,12 @@ class BatchExecutor:
                     'termination_condition': termination_condition,
                     'subnet_data': subnet_data,
                     'baseline_params': baseline_params,
-                    'progress_queue': progress_queue  # Pass queue to workers
+                    'progress_queue': progress_queue,  # Pass queue to workers
+                    'use_tau_leaping': use_tau_leaping,
+                    'tau_epsilon': tau_epsilon,
+                    'max_tau': max_tau,
+                    'dt_manual': dt_manual,
+                    'seed_base': seed_base,
                 })
             
             # Create process pool and execute
@@ -985,7 +1042,12 @@ class BatchExecutor:
         termination_condition: str,
         progress_callback: Optional[Callable] = None,
         base_model = None,  # Pre-extracted DocumentModel
-        subnet_data: dict = None  # Pre-extracted subnet data
+        subnet_data: dict = None,  # Pre-extracted subnet data
+        use_tau_leaping: bool = True,
+        tau_epsilon: float = 0.03,
+        max_tau: float = 0.1,
+        dt_manual: Optional[float] = None,
+        seed_base: int = 42,
     ) -> Dict[str, Any]:
         """Run single experiment with replicates - MUST return valid result dict.
         
@@ -1111,10 +1173,13 @@ class BatchExecutor:
             results = runner.run_replicates(
                 n=replicates,
                 use_parallel=True,  # Enable stochastic parallelism in main thread (safe, 2-4× faster)
-                use_tau_leaping=True,
+                use_tau_leaping=use_tau_leaping,
                 duration=duration,
                 termination_condition=termination_condition,
-                seed_base=42,
+                epsilon=tau_epsilon,
+                max_tau=max_tau,
+                time_step=dt_manual,
+                seed_base=seed_base,
                 verbose=False,
                 progress_callback=progress_callback
             )
@@ -1162,7 +1227,19 @@ class BatchExecutor:
                             'n_timepoints': len(traj.get('time_points', [])),
                             'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
                         })
-            
+
+            # Compress raw trajectories with δ-filter (generic, no model knowledge).
+            # Results are stored in the output dict and consumed by _auto_save_experiment
+            # to write replicates_trajectories/run_NNN.csv files.
+            compressed_trajectories: List[Any] = []
+            try:
+                from shypn.helpers.compressor import DeltaFilterCompressor
+                _compressor = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                if results:
+                    compressed_trajectories = _compressor.compress_batch(results)
+            except Exception as _comp_err:
+                print(f'[EXPERIMENT] Warning: trajectory compression failed: {_comp_err}')
+
             # Include swept parameter metadata from snapshot
             swept_param = getattr(snapshot, 'swept_parameter', None)
             
@@ -1252,7 +1329,12 @@ class BatchExecutor:
                 'experiment_parameters': experiment_params,
                 'simulation_config': {
                     'duration': duration,
+                    'time_span': (0, duration),
                     'time_units': 'second',
+                    'n_replicates': replicates,
+                    'random_seed': seed_base,
+                    'solver': 'Gillespie_SSA',
+                    'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                     'use_tau_leaping': True,
                 },
                 'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
@@ -1280,6 +1362,7 @@ class BatchExecutor:
                 'name': name,
                 'snapshot_index': snapshot_index,
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
+                'compressed_trajectories': compressed_trajectories,  # δ-filtered per-replicate data
                 'n_replicates': len(results) if results else 0,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,

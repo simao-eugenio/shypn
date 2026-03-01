@@ -57,7 +57,7 @@ class BufferedSimulationSettings:
         is atomic - either all changes apply or none do.
     """
     
-    def __init__(self, live_settings: SimulationSettings, model=None):
+    def __init__(self, live_settings: SimulationSettings, model: Any=None):
         """Initialize buffered settings.
         
         Args:
@@ -118,7 +118,7 @@ class BufferedSimulationSettings:
     
     # ========== State Management ==========
     
-    def mark_dirty(self):
+    def mark_dirty(self) -> None:
         """Mark buffer as having uncommitted changes.
         
         UI code should call this after modifying buffer properties.
@@ -182,7 +182,7 @@ class BufferedSimulationSettings:
                 # Validation failed - rollback
                 return False
     
-    def rollback(self):
+    def rollback(self) -> None:
         """Discard uncommitted changes, restore buffer to live values.
         
         This resets the buffer to match current live settings,
@@ -225,7 +225,7 @@ class BufferedSimulationSettings:
         clone.use_parallel_stochastic = settings.use_parallel_stochastic
         return clone
     
-    def _validate_buffer(self):
+    def _validate_buffer(self) -> None:
         """Validate all buffered values.
         
         Performs two types of validation:
@@ -236,6 +236,7 @@ class BufferedSimulationSettings:
             ValueError: If any buffered value is invalid
             ValidationError: If cross-constraints violated
         """
+        assert self._buffer is not None
         # Property validation happens automatically via setters
         # Access all properties to trigger validation
         _ = self._buffer.time_units
@@ -273,7 +274,7 @@ class BufferedSimulationSettings:
                 if step_count < 10:
                     pass  # Could log warning if needed
     
-    def _track_changes(self):
+    def _track_changes(self) -> None:
         """Track what properties have changed for notification."""
         if self._buffer is None:
             return
@@ -311,12 +312,13 @@ class BufferedSimulationSettings:
                 self._buffer.time_scale
             )
     
-    def _apply_buffer_to_live(self):
+    def _apply_buffer_to_live(self) -> None:
         """Apply buffered values to live settings atomically.
         
         This is the critical section where changes are actually applied.
         All validation has already passed at this point.
         """
+        assert self._buffer is not None
         # All validation passed - safe to apply
         self._live.time_units = self._buffer.time_units
         self._live.duration = self._buffer.duration
@@ -333,7 +335,7 @@ class BufferedSimulationSettings:
     
     # ========== Observer Pattern ==========
     
-    def add_listener(self, listener: ChangeListener):
+    def add_listener(self, listener: ChangeListener) -> None:
         """Register a listener for parameter changes.
         
         Args:
@@ -342,7 +344,7 @@ class BufferedSimulationSettings:
         if listener not in self._listeners:
             self._listeners.append(listener)
     
-    def remove_listener(self, listener: ChangeListener):
+    def remove_listener(self, listener: ChangeListener) -> None:
         """Unregister a listener.
         
         Args:
@@ -351,7 +353,7 @@ class BufferedSimulationSettings:
         if listener in self._listeners:
             self._listeners.remove(listener)
     
-    def _notify_commit(self):
+    def _notify_commit(self) -> None:
         """Notify listeners that changes were committed."""
         for listener in self._listeners:
             try:
@@ -359,7 +361,7 @@ class BufferedSimulationSettings:
             except (TypeError, AttributeError, RuntimeError) as e:
                 logger.debug(f"Commit listener notification failed: {e}")
     
-    def _notify_rollback(self):
+    def _notify_rollback(self) -> None:
         """Notify listeners that changes were rolled back."""
         for listener in self._listeners:
             try:
@@ -424,7 +426,7 @@ class BufferedSimulationSettings:
         
         return os.path.join(model_dir, f".settings_{basename}.json")
     
-    def _save_to_disk(self):
+    def _save_to_disk(self) -> None:
         """Atomically save settings to disk.
         
         Uses atomic write pattern (write to temp file, then rename) to ensure
@@ -468,7 +470,7 @@ class BufferedSimulationSettings:
             except OSError:
                 pass  # Best-effort cleanup; ignore if temp file cannot be removed
     
-    def _load_from_disk(self):
+    def _load_from_disk(self) -> None:
         """Load persisted settings from disk if available.
         
         Called during initialization to restore settings from previous session.

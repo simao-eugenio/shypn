@@ -260,7 +260,7 @@ class TopologySummaryGenerator:
             result = self._extract_data(all_results['hubs'])
             if result.get('success', True):
                 hubs = result.get('hubs', [])
-                summary['hubs_count'] = len(hubs)
+                summary['hubs_count'] = len(hubs)  # type: ignore[assignment]
                 if hubs:
                     summary['max_hub_degree'] = max(h.get('degree', 0) for h in hubs)
         

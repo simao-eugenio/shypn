@@ -59,7 +59,7 @@ class TimedBehavior(TransitionBehavior):
             )
     """
 
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize timed behavior.
         
         Args:
@@ -109,39 +109,14 @@ class TimedBehavior(TransitionBehavior):
             raise ValueError(f'Earliest time cannot be negative: {self.earliest}')
         if self.latest < self.earliest:
             raise ValueError(f'Latest ({self.latest}) must be >= earliest ({self.earliest})')
-        self._enablement_time = None
+        self._enablement_time: Optional[float] = None
         self._was_too_early = False  # Track if we've been checked while too early
         self._was_in_window = False  # Track if we've been in the firing window
         
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
 
-    def _is_signal_place(self, place) -> bool:
-        """Check if a place is a signal place (read-only, non-consuming).
-        
-        Signal places (Ψ) in modular Bio-PN architecture provide information
-        flow without mass transfer. They are never consumed during simulation.
-        
-        Args:
-            place: Place object to check
-        
-        Returns:
-            bool: True if place is a signal place
-        """
-        if place is None:
-            return False
-        
-        # Check is_signal_place attribute (primary indicator)
-        if hasattr(place, 'is_signal_place') and place.is_signal_place:
-            return True
-        
-        # Check signal_type property (alternative indicator)
-        if hasattr(place, 'signal_type') and place.signal_type is not None:
-            return True
-        
-        return False
-
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set the time when transition became enabled.
         
         This should be called by the scheduler when structural enablement
@@ -160,7 +135,7 @@ class TimedBehavior(TransitionBehavior):
         """
         return self._enablement_time
 
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement tracking (when transition becomes disabled).
         
         This should be called when input places no longer have sufficient tokens.
@@ -363,7 +338,7 @@ class TimedBehavior(TransitionBehavior):
         info = {'earliest': self.earliest, 'latest': self.latest, 'enablement_time': self._enablement_time, 'current_time': current_time, 'elapsed': elapsed}
         if elapsed is not None:
             info['can_fire_earliest'] = elapsed >= self.earliest
-            info['must_fire_before'] = self._enablement_time + self.latest
+            info['must_fire_before'] = (self._enablement_time or 0.0) + self.latest
             info['time_remaining'] = max(0, self.latest - elapsed)
             info['in_window'] = self.earliest <= elapsed <= self.latest
         else:

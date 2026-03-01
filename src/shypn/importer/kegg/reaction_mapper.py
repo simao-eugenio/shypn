@@ -44,8 +44,8 @@ class StandardReactionMapper(ReactionMapper):
         self.ec_cache: Dict[str, List[str]] = {}  # Cache for pre-fetched EC numbers
         self.id_manager = None  # Will be set during conversion
     
-    def _get_biological_name(self, reaction: KEGGReaction, ec_numbers: List[str] = None, 
-                             transition_id: str = None) -> str:
+    def _get_biological_name(self, reaction: KEGGReaction, ec_numbers: Optional[List[str]] = None, 
+                             transition_id: Optional[str] = None) -> str:
         """Extract biological name from KEGG reaction.
         
         CRITICAL: Names must be biological identifiers (enzymes), NOT database codes!
@@ -156,7 +156,7 @@ class StandardReactionMapper(ReactionMapper):
         products = [p for p in products if p is not None]
         
         # Calculate position
-        x, y = self.get_reaction_position(reaction, pathway, substrates, products, options)
+        x, y = self.get_reaction_position(reaction, pathway, substrates, products, options)  # type: ignore[arg-type]
         
         # Get base name
         base_name = self.get_reaction_name(reaction, pathway)

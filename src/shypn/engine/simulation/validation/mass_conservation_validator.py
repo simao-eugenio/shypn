@@ -53,7 +53,7 @@ class MassConservationValidator(BaseValidator):
         self._max_totals: Dict[str, float] = {}
         self._initialized = False
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset validator state for new simulation."""
         super().reset()
         self._initial_totals = {}
@@ -62,7 +62,7 @@ class MassConservationValidator(BaseValidator):
         self._max_totals = {}
         self._initialized = False
     
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update validator with current simulation state.
         
         Args:

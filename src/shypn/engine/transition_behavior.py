@@ -53,7 +53,7 @@ class TransitionBehavior(ABC):
             )
     """
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize behavior with transition and model context.
         
         Args:
@@ -64,8 +64,8 @@ class TransitionBehavior(ABC):
         self.model = model
         
         # Token accounting tracking
-        self._last_consumed = {}
-        self._last_produced = {}
+        self._last_consumed: Dict[int, float] = {}
+        self._last_produced: Dict[int, float] = {}
         self._accounting_enabled = False
     
     # ============================================================================
@@ -247,7 +247,7 @@ class TransitionBehavior(ABC):
         # Handle both dict and list representations
         arcs_collection = self.model.arcs
         if isinstance(arcs_collection, dict):
-            arcs = arcs_collection.values()
+            arcs: List = list(arcs_collection.values())
         elif isinstance(arcs_collection, list):
             arcs = arcs_collection
         else:
@@ -258,7 +258,7 @@ class TransitionBehavior(ABC):
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
         transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
-        result = []
+        result: List[Any] = []
         
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
@@ -312,7 +312,7 @@ class TransitionBehavior(ABC):
         # Handle both dict and list representations
         arcs_collection = self.model.arcs
         if isinstance(arcs_collection, dict):
-            arcs = arcs_collection.values()
+            arcs: List = list(arcs_collection.values())
         elif isinstance(arcs_collection, list):
             arcs = arcs_collection
         else:
@@ -323,7 +323,7 @@ class TransitionBehavior(ABC):
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
         transition_id = self.transition.id if hasattr(self.transition, 'id') else str(self.transition)
-        result = []
+        result: List[Any] = []
         
         # Use ID comparison (primary) with object reference fallback
         # Netobjects should be dereferenced via properties like source_id, target_id
@@ -359,7 +359,7 @@ class TransitionBehavior(ABC):
         
         return result
     
-    def _get_place(self, place_id):
+    def _get_place(self, place_id: Any) -> Any:
         """Get place object by ID.
         
         Args:
@@ -390,7 +390,7 @@ class TransitionBehavior(ABC):
                 f"Model.places must be dict or list, got {type(places_collection)}"
             )
     
-    def _get_arc(self, arc_id):
+    def _get_arc(self, arc_id: Any) -> Any:
         """Get arc object by ID.
         
         Args:
@@ -483,7 +483,7 @@ class TransitionBehavior(ABC):
                 from shypn.engine.function_catalog import FUNCTION_CATALOG
                 
                 # Build evaluation context
-                context = {'t': self._get_current_time()}
+                context: Dict[str, Any] = {'t': self._get_current_time()}
                 context.update(FUNCTION_CATALOG)
                 
                 # Add place tokens as P1, P2, ... (or P88, P105 if ID already has P)
@@ -511,7 +511,7 @@ class TransitionBehavior(ABC):
         return False, f"guard-unknown-type: {type(guard_expr)}"
     
     def _record_event(self, consumed: Dict[int, float], produced: Dict[int, float], 
-                     mode: str = 'logical', **kwargs):
+                      mode: str = 'logical', **kwargs: Any) -> None:
         """Record transition firing event in model history.
         
         Args:
@@ -553,14 +553,39 @@ class TransitionBehavior(ABC):
         """
         return self._last_produced.copy()
     
-    def enable_accounting(self):
+    def enable_accounting(self) -> None:
         """Enable token accounting tracking."""
         self._accounting_enabled = True
         
-    def disable_accounting(self):
+    def disable_accounting(self) -> None:
         """Disable token accounting tracking."""
         self._accounting_enabled = False
     
+    def _is_signal_place(self, place: Any) -> bool:
+        """Check if a place is a signal place (read-only, non-consuming).
+        
+        Signal places (Ψ) in modular Bio-PN architecture provide information
+        flow without mass transfer. They are never consumed during simulation.
+        
+        Args:
+            place: Place object to check
+        
+        Returns:
+            bool: True if place is a signal place
+        """
+        if place is None:
+            return False
+        
+        # Check is_signal_place attribute (primary indicator)
+        if hasattr(place, 'is_signal_place') and place.is_signal_place:
+            return True
+        
+        # Check signal_type property (alternative indicator)
+        if hasattr(place, 'signal_type') and place.signal_type is not None:
+            return True
+        
+        return False
+
     # ============================================================================
     # String Representation
     # ============================================================================

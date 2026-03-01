@@ -57,7 +57,7 @@ class StochasticBehavior(TransitionBehavior):
             )
     """
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize stochastic behavior.
         
         Args:
@@ -78,7 +78,7 @@ class StochasticBehavior(TransitionBehavior):
         self._volume_check_done = False
         
         # Rate limiting for negative rate warnings (avoid console spam)
-        self._negative_rate_warnings = {}  # transition_name -> (count, last_logged_time)
+        self._negative_rate_warnings: Dict[str, Any] = {}  # transition_name -> (count, last_logged_time)
         self._negative_rate_log_interval = 100  # Log every 100 occurrences
         
         # Track if this is a reversible formula (handled by Skellam in tau-leaping)
@@ -127,7 +127,7 @@ class StochasticBehavior(TransitionBehavior):
             # LEGACY FALLBACK: Check old rate fields (deprecated, with warning)
             # First check properties.rate (numeric)
             if 'rate' in props:
-                self.rate = float(props.get('rate'))
+                self.rate = float(props.get('rate') or 0)
                 self.logger.debug(f"Transition '{transition.name}': using properties.rate (legacy field)")
             else:
                 # Last resort: transition.rate attribute (deprecated)
@@ -171,16 +171,16 @@ class StochasticBehavior(TransitionBehavior):
             self.max_burst = 8
         
         # Scheduling state
-        self._enablement_time = None
-        self._scheduled_fire_time = None
-        self._sampled_burst = None
+        self._enablement_time: Optional[float] = None
+        self._scheduled_fire_time: Optional[float] = None
+        self._sampled_burst: Optional[int] = None
         
         # Assignment rule support (Option 3: Runtime Re-evaluation)
         self.assignment_rules: Dict[int, str] = {}  # place_id -> formula
         self._compiled_rules: Dict[int, Any] = {}  # place_id -> compiled code
         self._rules_initialized = False
     
-    def _check_volume_appropriateness(self):
+    def _check_volume_appropriateness(self) -> None:
         """Check if connected places suggest stochastic is appropriate.
         
         Called lazily on first use to avoid accessing model.arcs during
@@ -219,7 +219,7 @@ class StochasticBehavior(TransitionBehavior):
             # Don't fail if volume check fails
             self.logger.debug(f"Volume appropriateness check failed for '{self.transition.name}': {e}")
     
-    def _detect_signal_places(self):
+    def _detect_signal_places(self) -> None:
         r"""Detect signal places (Ψ) for this transition's rate formula.
         
         Signal places are referenced in the rate function but have no
@@ -243,7 +243,7 @@ class StochasticBehavior(TransitionBehavior):
             detector = QuorumSensingDetector(self.model)
             signal_places = detector.detect_signal_places(
                 self.transition, 
-                self.rate_function_expr
+                self.rate_function_expr or ''
             )
             
             # Annotate transition with results
@@ -263,31 +263,6 @@ class StochasticBehavior(TransitionBehavior):
             )
             self.transition.signal_places = []
             self.transition.is_environment_aware = False
-    
-    def _is_signal_place(self, place) -> bool:
-        """Check if a place is a signal place (read-only, non-consuming).
-        
-        Signal places (Ψ) in modular Bio-PN architecture provide information
-        flow without mass transfer. They are never consumed during simulation.
-        
-        Args:
-            place: Place object to check
-        
-        Returns:
-            bool: True if place is a signal place
-        """
-        if place is None:
-            return False
-        
-        # Check is_signal_place attribute (primary indicator)
-        if hasattr(place, 'is_signal_place') and place.is_signal_place:
-            return True
-        
-        # Check signal_type property (alternative indicator)
-        if hasattr(place, 'signal_type') and place.signal_type is not None:
-            return True
-        
-        return False
     
     def _evaluate_rate_at_enablement(self, time: float) -> float:
         """Evaluate rate (λ) at enablement time.
@@ -311,7 +286,7 @@ class StochasticBehavior(TransitionBehavior):
             from .function_catalog import FUNCTION_CATALOG
             import numpy as np
             
-            context = {
+            context: Dict[str, Any] = {
                 'time': time,
                 't': time,
                 'min': min,
@@ -403,7 +378,7 @@ class StochasticBehavior(TransitionBehavior):
             # Preprocess expression: convert [PlaceName] to PlaceName
             # This supports chemistry notation where [X] means "concentration of X"
             import re
-            expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', self.rate_function_expr)
+            expr_processed = re.sub(r'\[([^\]]+)\]', r'\1', self.rate_function_expr or '')
             
             # Evaluate formula safely (replaces eval() for security)
             result = safe_eval_numeric(expr_processed, context, allow_math=True)
@@ -461,9 +436,9 @@ class StochasticBehavior(TransitionBehavior):
             
             return rate
             
-        except Exception as e:
+        except Exception as exc:
             # If NameError, suggest similar function names
-            if isinstance(e, NameError):
+            if isinstance(exc, NameError):
                 try:
                     import re
                     import difflib
@@ -471,7 +446,7 @@ class StochasticBehavior(TransitionBehavior):
                     from shypn.engine import function_catalog
                     
                     # Extract undefined name from error message
-                    match = re.search(r"name '(\w+)' is not defined", str(e))
+                    match = re.search(r"name '(\w+)' is not defined", str(exc))
                     if match:
                         undefined_name = match.group(1)
                         # Find close matches (case-insensitive)
@@ -490,10 +465,10 @@ class StochasticBehavior(TransitionBehavior):
                     logger.debug(f"Skipping function suggestion: {e}")
             
             raise RuntimeError(
-                f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {e}\n"
+                f"Failed to evaluate rate_function for stochastic transition '{self.transition.name}': {exc}\n"
                 f"Expression: {self.rate_function_expr}\n"
                 f"Available places: {list(places_dict.keys()) if 'places_dict' in locals() else 'N/A'}"
-            ) from e
+            ) from exc
     
     def _get_places_dict(self) -> Dict:
         """Get current place tokens as dict for formula evaluation.
@@ -550,7 +525,7 @@ class StochasticBehavior(TransitionBehavior):
         
         return places_dict
     
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set enablement time and sample firing delay.
         
         When a stochastic transition becomes enabled, we immediately
@@ -713,7 +688,7 @@ class StochasticBehavior(TransitionBehavior):
         """
         return self._sampled_burst
     
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement and scheduled firing."""
         self._enablement_time = None
         self._scheduled_fire_time = None
@@ -763,9 +738,9 @@ class StochasticBehavior(TransitionBehavior):
             burst = self._sampled_burst if self._sampled_burst else self.max_burst
             
             # VERBOSE DEBUG: Print ALL input arcs for T7, T8, T15
-            if self._transition.id in ['T7', 'T8', 'T15']:
+            if self.transition.id in ['T7', 'T8', 'T15']:
                 print(f"\n{'='*60}")
-                print(f"VERBOSE: Checking enablement for {self._transition.id} ({self._transition.name})")
+                print(f"VERBOSE: Checking enablement for {self.transition.id} ({self.transition.name})")
                 print(f"Input arcs: {len(input_arcs)}")
                 for i, arc in enumerate(input_arcs):
                     arc_type_name = type(arc).__name__
@@ -794,14 +769,14 @@ class StochasticBehavior(TransitionBehavior):
                     threshold_value = evaluator.evaluate(arc, context)
                     
                     # VERBOSE DEBUG for specific transitions
-                    if self._transition.id in ['T7', 'T8', 'T15']:
-                        print(f"  INHIBITOR CHECK: {arc.id} ({arc.source_id} → {self._transition.id})")
+                    if self.transition.id in ['T7', 'T8', 'T15']:
+                        print(f"  INHIBITOR CHECK: {arc.id} ({arc.source_id} → {self.transition.id})")
                         print(f"    Source tokens: {source_place.tokens:.2f}")
                         print(f"    Threshold: {threshold_value:.2f}")
                         print(f"    Will inhibit: {source_place.tokens >= threshold_value}")
                     
                     if source_place.tokens >= threshold_value:
-                        logging.info(f"Transition {self._transition.id} INHIBITED by {arc.source_id}: "
+                        logging.info(f"Transition {self.transition.id} INHIBITED by {arc.source_id}: "
                                    f"{source_place.tokens:.2f} >= {threshold_value:.2f}")
                         return False, f"inhibited-by-{arc.source_id} (tokens={source_place.tokens:.1f} >= threshold={threshold_value:.2f})"
                     # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
@@ -898,7 +873,7 @@ class StochasticBehavior(TransitionBehavior):
                         logger.debug(f"    → SKIP consumption (test arc - catalyst)")
                         continue
                     
-                    logger.debug(f"    → CONSUMING {firing_count * arc.weight} tokens")
+                    logger.debug(f"    → CONSUMING {burst * arc.weight} tokens")
                     
                     source_place = self._get_place(arc.source_id)
                     if source_place is None:
@@ -1014,7 +989,7 @@ class StochasticBehavior(TransitionBehavior):
         
         return info
     
-    def resample_burst(self):
+    def resample_burst(self) -> None:
         """Resample burst size (useful for re-enablement).
         
         This allows changing the burst without resampling the firing time.

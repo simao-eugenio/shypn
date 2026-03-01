@@ -437,12 +437,12 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
             Statistics dict
         """
         # Count signal types
-        signal_type_counts = defaultdict(int)
+        signal_type_counts: Dict[str, int] = defaultdict(int)
         for sp in signal_places:
             signal_type_counts[sp['signal_type']] += 1
         
         # Count arc directions
-        direction_counts = defaultdict(int)
+        direction_counts: Dict[str, int] = defaultdict(int)
         for arc in signal_flow_arcs:
             direction_counts[arc['direction']] += 1
         

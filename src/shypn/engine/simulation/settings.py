@@ -5,7 +5,7 @@ Provides SimulationSettings class to encapsulate all timing and execution
 configuration for simulation. Follows OOP principles with validation,
 defaults, and clear separation of concerns.
 """
-from typing import Optional
+from typing import Any, Optional, Set
 from shypn.utils.time_utils import TimeUnits, TimeConverter, TimeValidator
 
 
@@ -51,10 +51,10 @@ class SimulationSettings:
     # while still maintaining high precision for scientific simulations
     TIME_EPSILON = 1e-9
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with default settings."""
         self._time_units = self.DEFAULT_TIME_UNITS
-        self._duration = self.DEFAULT_DURATION
+        self._duration: Optional[float] = self.DEFAULT_DURATION
         self._dt_auto = self.DEFAULT_DT_AUTO
         self._dt_manual = self.DEFAULT_DT_MANUAL
         self._time_scale = self.DEFAULT_TIME_SCALE
@@ -70,12 +70,12 @@ class SimulationSettings:
         self._batch_mode_enabled = False
         self._batch_replicates = 100
         self._batch_output_folder = None
-        self._recorded_objects = set()  # Set of place/transition IDs to record
+        self._recorded_objects: Set[Any] = set()  # Set of place/transition IDs to record
         
         # Initial condition randomness (biological variability)
         self._ic_noise_enabled = False  # Enable random perturbations to initial conditions
         self._ic_noise_percent = 20.0  # Percentage of noise (±20% = uniform in [0.8, 1.2] range)
-        self._ic_noise_places = set()  # Specific places to randomize (empty = all non-catalyst places)
+        self._ic_noise_places: Set[str] = set()  # Specific places to randomize (empty = all non-catalyst places)
         
         # Token accounting (conservation validation)
         self._token_accounting_enabled = False  # Enable token conservation tracking
@@ -397,7 +397,7 @@ class SimulationSettings:
         duration_seconds = self.get_duration_seconds()
         dt = self.get_effective_dt()
         
-        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)
+        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)  # type: ignore[arg-type]
         return warning if warning else None
     
     # ========== Progress Tracking ==========
@@ -598,7 +598,7 @@ class SimulationSettingsBuilder:
                    .build())
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize builder."""
         self._settings = SimulationSettings()
     
@@ -698,7 +698,7 @@ class SimulationSettingsBuilder:
 # ==================== Batch Mode Extension ====================
 
 # Add batch mode properties to SimulationSettings
-def _add_batch_mode_properties():
+def _add_batch_mode_properties() -> None:
     """Add batch mode properties to SimulationSettings class.
     
     This function extends the SimulationSettings class with batch mode
@@ -706,24 +706,24 @@ def _add_batch_mode_properties():
     """
     
     # Batch mode enabled property
-    @property
-    def batch_mode_enabled(self) -> bool:
+    @property  # type: ignore[misc]
+    def batch_mode_enabled(self: Any) -> bool:
         """Get whether batch mode is enabled."""
         return getattr(self, '_batch_mode_enabled', False)
     
     @batch_mode_enabled.setter
-    def batch_mode_enabled(self, value: bool):
+    def batch_mode_enabled(self: Any, value: bool) -> None:
         """Set batch mode enabled state."""
         self._batch_mode_enabled = bool(value)
     
     # Batch replicates property
-    @property
-    def batch_replicates(self) -> int:
+    @property  # type: ignore[misc]
+    def batch_replicates(self: Any) -> int:
         """Get number of batch replicates."""
         return getattr(self, '_batch_replicates', 100)
     
     @batch_replicates.setter
-    def batch_replicates(self, value: int):
+    def batch_replicates(self: Any, value: int) -> None:
         """Set number of batch replicates with validation.
         
         Args:
@@ -737,26 +737,26 @@ def _add_batch_mode_properties():
         self._batch_replicates = int(value)
     
     # Batch output folder property
-    @property
-    def batch_output_folder(self) -> Optional[str]:
+    @property  # type: ignore[misc]
+    def batch_output_folder(self: Any) -> Optional[str]:
         """Get batch output folder path."""
         return getattr(self, '_batch_output_folder', None)
     
     @batch_output_folder.setter
-    def batch_output_folder(self, value: Optional[str]):
+    def batch_output_folder(self: Any, value: Optional[str]) -> None:
         """Set batch output folder path."""
         self._batch_output_folder = value
     
     # Recorded objects property
-    @property
-    def recorded_objects(self) -> set:
+    @property  # type: ignore[misc]
+    def recorded_objects(self: Any) -> set:
         """Get set of object IDs marked for recording."""
         if not hasattr(self, '_recorded_objects'):
             self._recorded_objects = set()
         return self._recorded_objects
     
     # Batch mode methods
-    def add_recorded_object(self, object_id: str):
+    def add_recorded_object(self: Any, object_id: str) -> None:
         """Mark an object (place/transition) for recording.
         
         Args:
@@ -766,7 +766,7 @@ def _add_batch_mode_properties():
             self._recorded_objects = set()
         self._recorded_objects.add(object_id)
     
-    def remove_recorded_object(self, object_id: str):
+    def remove_recorded_object(self: Any, object_id: str) -> None:
         """Unmark an object from recording.
         
         Args:
@@ -775,12 +775,12 @@ def _add_batch_mode_properties():
         if hasattr(self, '_recorded_objects'):
             self._recorded_objects.discard(object_id)
     
-    def clear_recorded_objects(self):
+    def clear_recorded_objects(self: Any) -> None:
         """Clear all recorded objects."""
         if hasattr(self, '_recorded_objects'):
             self._recorded_objects.clear()
     
-    def is_object_recorded(self, object_id: str) -> bool:
+    def is_object_recorded(self: Any, object_id: str) -> bool:
         """Check if an object is marked for recording.
         
         Args:
@@ -794,8 +794,8 @@ def _add_batch_mode_properties():
         return object_id in self._recorded_objects
     
     # Initial condition noise properties
-    @property
-    def ic_noise_enabled(self) -> bool:
+    @property  # type: ignore[misc]
+    def ic_noise_enabled(self: Any) -> bool:
         """Get whether initial condition noise is enabled.
         
         When enabled, initial markings are perturbed by random noise
@@ -805,12 +805,12 @@ def _add_batch_mode_properties():
         return getattr(self, '_ic_noise_enabled', False)
     
     @ic_noise_enabled.setter
-    def ic_noise_enabled(self, value: bool):
+    def ic_noise_enabled(self: Any, value: bool) -> None:
         """Set initial condition noise enabled state."""
         self._ic_noise_enabled = bool(value)
     
-    @property
-    def ic_noise_percent(self) -> float:
+    @property  # type: ignore[misc]
+    def ic_noise_percent(self: Any) -> float:
         """Get initial condition noise percentage.
         
         Noise is applied as uniform distribution: value * uniform(1-p/100, 1+p/100)
@@ -819,7 +819,7 @@ def _add_batch_mode_properties():
         return getattr(self, '_ic_noise_percent', 20.0)
     
     @ic_noise_percent.setter
-    def ic_noise_percent(self, value: float):
+    def ic_noise_percent(self: Any, value: float) -> None:
         """Set noise percentage with validation.
         
         Args:
@@ -832,8 +832,8 @@ def _add_batch_mode_properties():
             raise ValueError("Noise percentage must be between 0 and 100")
         self._ic_noise_percent = float(value)
     
-    @property
-    def ic_noise_places(self) -> set:
+    @property  # type: ignore[misc]
+    def ic_noise_places(self: Any) -> set:
         """Get set of place IDs to apply noise to.
         
         If empty, noise is applied to all non-catalyst places.
@@ -842,7 +842,7 @@ def _add_batch_mode_properties():
             self._ic_noise_places = set()
         return self._ic_noise_places
     
-    def add_ic_noise_place(self, place_id: str):
+    def add_ic_noise_place(self: Any, place_id: str) -> None:
         """Mark a place for initial condition randomization.
         
         Args:
@@ -852,7 +852,7 @@ def _add_batch_mode_properties():
             self._ic_noise_places = set()
         self._ic_noise_places.add(place_id)
     
-    def remove_ic_noise_place(self, place_id: str):
+    def remove_ic_noise_place(self: Any, place_id: str) -> None:
         """Remove a place from randomization.
         
         Args:
@@ -861,26 +861,26 @@ def _add_batch_mode_properties():
         if hasattr(self, '_ic_noise_places'):
             self._ic_noise_places.discard(place_id)
     
-    def clear_ic_noise_places(self):
+    def clear_ic_noise_places(self: Any) -> None:
         """Clear all places from randomization list."""
         if hasattr(self, '_ic_noise_places'):
             self._ic_noise_places.clear()
     
     # Add methods to SimulationSettings class
-    SimulationSettings.batch_mode_enabled = batch_mode_enabled
-    SimulationSettings.batch_replicates = batch_replicates
-    SimulationSettings.batch_output_folder = batch_output_folder
-    SimulationSettings.recorded_objects = recorded_objects
-    SimulationSettings.add_recorded_object = add_recorded_object
-    SimulationSettings.remove_recorded_object = remove_recorded_object
-    SimulationSettings.clear_recorded_objects = clear_recorded_objects
-    SimulationSettings.is_object_recorded = is_object_recorded
-    SimulationSettings.ic_noise_enabled = ic_noise_enabled
-    SimulationSettings.ic_noise_percent = ic_noise_percent
-    SimulationSettings.ic_noise_places = ic_noise_places
-    SimulationSettings.add_ic_noise_place = add_ic_noise_place
-    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place
-    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places
+    SimulationSettings.batch_mode_enabled = batch_mode_enabled  # type: ignore[attr-defined]
+    SimulationSettings.batch_replicates = batch_replicates  # type: ignore[attr-defined]
+    SimulationSettings.batch_output_folder = batch_output_folder  # type: ignore[attr-defined]
+    SimulationSettings.recorded_objects = recorded_objects  # type: ignore[attr-defined]
+    SimulationSettings.add_recorded_object = add_recorded_object  # type: ignore[attr-defined]
+    SimulationSettings.remove_recorded_object = remove_recorded_object  # type: ignore[attr-defined]
+    SimulationSettings.clear_recorded_objects = clear_recorded_objects  # type: ignore[attr-defined]
+    SimulationSettings.is_object_recorded = is_object_recorded  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_enabled = ic_noise_enabled  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_percent = ic_noise_percent  # type: ignore[attr-defined]
+    SimulationSettings.ic_noise_places = ic_noise_places  # type: ignore[attr-defined]
+    SimulationSettings.add_ic_noise_place = add_ic_noise_place  # type: ignore[attr-defined]
+    SimulationSettings.remove_ic_noise_place = remove_ic_noise_place  # type: ignore[attr-defined]
+    SimulationSettings.clear_ic_noise_places = clear_ic_noise_places  # type: ignore[attr-defined]
 
 
 # Initialize batch mode properties

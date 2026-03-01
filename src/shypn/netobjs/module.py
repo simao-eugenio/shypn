@@ -12,8 +12,12 @@ Key principles:
 - Modules can be hierarchical (parent/child relationships)
 """
 
-from typing import Set, List, Optional, Tuple
+from typing import Set, List, Optional, Tuple, TYPE_CHECKING
 from shypn.netobjs.petri_net_object import PetriNetObject
+
+if TYPE_CHECKING:
+    from shypn.netobjs.place import Place
+    from shypn.netobjs.transition import Transition
 
 
 class Module:

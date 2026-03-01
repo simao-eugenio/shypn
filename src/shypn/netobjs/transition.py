@@ -12,8 +12,8 @@ try:
     from shypn.data.kinetics import KineticMetadata, create_metadata_from_dict
 except ImportError:
     # Fallback for when kinetics module not available
-    KineticMetadata = None
-    create_metadata_from_dict = None
+    KineticMetadata = None  # type: ignore[misc, assignment]
+    create_metadata_from_dict = None  # type: ignore[assignment]
 
 
 class Transition(PetriNetObject):
@@ -32,7 +32,7 @@ class Transition(PetriNetObject):
     DEFAULT_BORDER_WIDTH = 3.0  # 3px for better visibility
     
     def __init__(self, x: float, y: float, id: str, name: str,
-                 width: float = None, height: float = None, 
+                 width: Optional[float] = None, height: Optional[float] = None,
                  label: str = "", horizontal: bool = True):
         """Initialize a Transition.
         
@@ -65,7 +65,7 @@ class Transition(PetriNetObject):
         self.transition_type = 'continuous'  # Transition type: immediate, timed, stochastic, continuous (default: continuous)
         self.enabled = True  # Can this transition fire?
         self.guard = 1  # Guard function/expression (enables/disables transition) - defaults to 1 (always enabled)
-        self.rate = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0
+        self.rate: Optional[float] = 1.0  # Rate/delay for timed/stochastic/continuous transitions - defaults to 1.0
         self.priority = 0  # Priority for conflict resolution (higher = higher priority)
         self.firing_policy = 'race'  # Firing policy: 'random', 'earliest', 'latest', 'priority', 'race', 'age', 'preemptive-priority' (default: race - biologically realistic)
         
@@ -77,8 +77,8 @@ class Transition(PetriNetObject):
         self.firing_count = 0  # Cumulative count of firings during simulation
         
         # Protected attributes - use properties/methods to access
-        self._properties = {}  # Private: rate functions, kinetic parameters (access via properties)
-        self._metadata = {}    # Private: annotations, provenance (access via get/set methods)
+        self._properties: dict[str, Any] = {}  # Private: rate functions, kinetic parameters
+        self._metadata: dict[str, Any] = {}    # Private: annotations, provenance
         
         # Set default rate_function for continuous transitions to prevent missing rate errors
         if self.transition_type in ['continuous', 'adaptive']:
@@ -96,7 +96,7 @@ class Transition(PetriNetObject):
         # Quorum sensing / signal dependencies (13-tuple formalism: Ψ: T → 2^P)
         # Places that this transition senses as environmental signals without arc connection
         # Example: AHL concentration in bacterial quorum sensing
-        self.signal_places = []  # List of place IDs (e.g., ['P10', 'P15'])
+        self.signal_places: list[str] = []  # List of place IDs (e.g., ['P10', 'P15'])
         self.is_environment_aware = False  # True if transition has signal dependencies
         
         # Module assignment (modular Bio-PN architecture)
@@ -106,7 +106,15 @@ class Transition(PetriNetObject):
         # Compartment assignment (biological localization)
         # Used for compartment-specific thermodynamic properties
         self.compartment: Optional[str] = None  # Compartment name (e.g., "cytoplasm", "membrane", "extracellular")
-    
+
+        # Legacy/optional attributes (set by from_dict or external code)
+        self.formula: Optional[str] = None  # Petri net formula (legacy field)
+        self.earliest_time: Optional[float] = None  # TPN earliest firing time
+        self.latest_time: Optional[float] = None    # TPN latest firing time
+        self.adaptive_filter: Optional[str] = None  # Adaptive simulation filter
+        self.volume_threshold: Optional[float] = None  # Volume threshold for mode selection
+        self.prefer_continuous: Optional[bool] = None  # Prefer continuous mode
+
     # ========== Property Decorators (OOP Pattern) ==========
     
     @property
@@ -259,7 +267,7 @@ class Transition(PetriNetObject):
             'height': h
         }
     
-    def render(self, cr: Any, zoom: float = 1.0) -> None:
+    def render(self, cr: Any, zoom: float = 1.0) -> None:  # type: ignore[override]
         """Render the transition as a filled rectangle with optional markers.
         
         Uses legacy rendering style with Cairo transform approach:
@@ -612,7 +620,7 @@ class Transition(PetriNetObject):
         # Stochastic transitions: Use properties['rate_function'] for formulas OR simple rate attribute
         # This method (set_rate) only sets the rate attribute. For rate functions, set properties['rate_function'] directly.
     
-    def get_rate_function(self) -> str:
+    def get_rate_function(self) -> Optional[str]:
         """Get the rate function expression for this transition.
         
         Returns:
@@ -640,7 +648,7 @@ class Transition(PetriNetObject):
         
         self.properties['rate_function'] = expression
     
-    def get_rate_forward(self) -> str:
+    def get_rate_forward(self) -> Optional[str]:
         """Get the forward rate expression for reversible reactions.
         
         Returns:
@@ -660,7 +668,7 @@ class Transition(PetriNetObject):
             self.properties = {}
         self.properties['rate_forward'] = expression
     
-    def get_rate_reverse(self) -> str:
+    def get_rate_reverse(self) -> Optional[str]:
         """Get the reverse rate expression for reversible reactions.
         
         Returns:
@@ -750,21 +758,12 @@ class Transition(PetriNetObject):
         # if self.rate is not None:
         #     data["rate"] = self.rate
         
-        # NOTE: Top-level rate_function/rate_forward/rate_reverse are legacy attributes
-        # Modern code should use properties dict, but we save top-level for backward compatibility
-        # The from_dict() method will migrate these to properties dict on load
-        if hasattr(self, 'rate_function') and self.rate_function:
-            data["rate_function"] = self.rate_function
-        if hasattr(self, 'formula') and self.formula:
-            data["formula"] = self.formula
-        
-        # Serialize directional rates for reversible reactions
-        if hasattr(self, 'rate_forward') and self.rate_forward is not None:
-            data["rate_forward"] = self.rate_forward
-        if hasattr(self, 'rate_reverse') and self.rate_reverse is not None:
-            data["rate_reverse"] = self.rate_reverse
+        # NOTE: rate_function/rate_forward/rate_reverse are @property decorators
+        # that read/write to properties dict. No need to serialize top-level.
+        # from_dict() will migrate legacy top-level entries to properties dict.
         
         # Serialize timed transition parameters (TPN window)
+        # These are regular attributes (not @property), so serialize at top-level
         if hasattr(self, 'earliest_time') and self.earliest_time is not None:
             data["earliest_time"] = self.earliest_time
         if hasattr(self, 'latest_time') and self.latest_time is not None:
@@ -784,8 +783,7 @@ class Transition(PetriNetObject):
             data["compartment"] = self.compartment
         
         # Serialize adaptive transition parameters (volume-based mode selection)
-        # Saved at top level (like transition_type, priority, etc.)
-        # from_dict() checks both top level and properties dict for compatibility
+        # These are regular attributes (not @property), so serialize at top-level
         if hasattr(self, 'adaptive_filter'):
             data["adaptive_filter"] = self.adaptive_filter
         if hasattr(self, 'volume_threshold'):
@@ -1087,3 +1085,14 @@ class Transition(PetriNetObject):
         
         # Combine local and signal places
         return local_places | set(self.signal_places)
+
+    def __repr__(self) -> str:
+        """Machine-readable representation for debugging."""
+        return (
+            f"Transition(id={self.id!r}, name={self.name!r}, "
+            f"type={self.transition_type!r})"
+        )
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        return f"{self.name} [{self.transition_type}]" if self.name else self.id

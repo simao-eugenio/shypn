@@ -34,7 +34,7 @@ class CycleAnalyzer(TopologyAnalyzer):
             print("Analysis failed:", result.errors)
     """
     
-    def analyze(self, max_cycles: int = 100, min_length: int = 2) -> AnalysisResult:
+    def analyze(self, max_cycles: int = 100, min_length: int = 2) -> AnalysisResult:  # type: ignore[override]
         """Find all elementary cycles in the Petri net.
         
         Args:

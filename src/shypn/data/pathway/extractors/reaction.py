@@ -169,7 +169,7 @@ class ReactionExtractor(BaseExtractor[List[Reaction]]):
         )
         
         # Attach SBML metadata to kinetic law for converter to use
-        kinetic_law.sbml_metadata = sbml_metadata
+        kinetic_law.sbml_metadata = sbml_metadata  # type: ignore[attr-defined]
         
         return kinetic_law
     

@@ -142,7 +142,7 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _validate_model(self):
+    def _validate_model(self) -> None:
         """Validate that model has required attributes.
         
         Raises:
@@ -202,12 +202,12 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
         
         return input_places, output_places, regulatory_places
     
-    def _is_place(self, obj) -> bool:
+    def _is_place(self, obj: Any) -> bool:
         """Check if object is a Place."""
         from shypn.netobjs.place import Place
         return isinstance(obj, Place)
     
-    def _is_transition(self, obj) -> bool:
+    def _is_transition(self, obj: Any) -> bool:
         """Check if object is a Transition."""
         from shypn.netobjs.transition import Transition
         return isinstance(obj, Transition)
@@ -229,7 +229,7 @@ class DependencyAndCouplingAnalyzer(TopologyAnalyzer):
             Dict with keys: 'strongly_independent', 'competitive', 'convergent', 'regulatory'
             Each value is a list of (t1_id, t2_id, details_dict) tuples
         """
-        classifications = {
+        classifications: Dict[str, List[Any]] = {
             'strongly_independent': [],
             'competitive': [],
             'convergent': [],

@@ -53,14 +53,14 @@ class ATPAccountingValidator(BaseValidator):
         # Track per-transition consumption for diagnostics
         self._consumption_by_transition: Dict[str, float] = {}
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset validator state for new simulation."""
         super().reset()
         self._atp_produced = 0.0
         self._atp_consumed = 0.0
         self._consumption_by_transition = {}
     
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update validator with current simulation state.
         
         Args:

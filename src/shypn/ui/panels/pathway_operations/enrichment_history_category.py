@@ -549,9 +549,9 @@ class EnrichmentHistoryCategory(BasePathwayCategory):
                 # Show previous parameters if available
                 if result.get('previous_parameters'):
                     prev = result['previous_parameters']
-                    msg = "Previous parameters:\n"
-                    for key, value in prev.items():
-                        msg += f"  {key}: {value}\n"
+                    msg = "Previous parameters:\n" + "".join(
+                        f"  {key}: {value}\n" for key, value in prev.items()
+                    )
                     
                     info_dialog = Gtk.MessageDialog(
                         transient_for=None,

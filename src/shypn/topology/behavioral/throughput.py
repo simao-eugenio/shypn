@@ -52,7 +52,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
         self._token_flow: Dict[str, int] = {}
         self._place_occupancy: Dict[str, List[int]] = {}
         
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         initial_marking: Optional[Dict[str, int]] = None,
         max_steps: int = 10000,
@@ -258,80 +258,6 @@ class ThroughputAnalyzer(TopologyAnalyzer):
         
         return sorted(bottlenecks)
     
-    def _get_initial_marking(self) -> Dict[str, int]:
-        """Get initial marking from the model."""
-        marking = {}
-        # Handle both dict and list formats
-        if hasattr(self.model.places, 'items'):
-            # Dict format
-            for place_id, place in self.model.places.items():
-                marking[place_id] = place.tokens
-        else:
-            # List format (DocumentModel)
-            for place in self.model.places:
-                marking[place.id] = place.tokens
-        return marking
-    
-    def _get_enabled_transitions(self, marking: Dict[str, int]) -> List[str]:
-        """Get list of enabled transitions for a marking."""
-        enabled = []
-        
-        # Handle both dict and list formats for transitions
-        transitions = self.model.transitions.keys() if hasattr(self.model.transitions, 'keys') else [t.id for t in self.model.transitions]
-        
-        # Handle both dict and list formats for arcs
-        arcs = self.model.arcs.values() if hasattr(self.model.arcs, 'values') else self.model.arcs
-        
-        for trans_id in transitions:
-            # Check if all input places have enough tokens
-            can_fire = True
-            
-            for arc in arcs:
-                arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-                arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-                
-                if arc_target == trans_id:  # Input arc
-                    tokens = marking.get(arc_source, 0)
-                    if tokens < arc.weight:
-                        can_fire = False
-                        break
-            
-            if can_fire:
-                enabled.append(trans_id)
-        
-        return enabled
-    
-    def _fire_transition(
-        self,
-        marking: Dict[str, int],
-        trans_id: str
-    ) -> Dict[str, int]:
-        """Fire a transition and return the new marking."""
-        new_marking = marking.copy()
-        
-        # Handle both dict and list formats for arcs
-        arcs = self.model.arcs.values() if hasattr(self.model.arcs, 'values') else self.model.arcs
-        
-        # Remove tokens from input places
-        for arc in arcs:
-            arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-            arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-            
-            if arc_target == trans_id:
-                place_id = arc_source
-                new_marking[place_id] = max(0, new_marking.get(place_id, 0) - arc.weight)
-        
-        # Add tokens to output places
-        for arc in arcs:
-            arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-            arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-            
-            if arc_source == trans_id:
-                place_id = arc_target
-                new_marking[place_id] = new_marking.get(place_id, 0) + arc.weight
-        
-        return new_marking
-    
     def _update_token_flow(self, trans_id: str) -> None:
         """Update token flow statistics for a transition firing."""
         # Handle both dict and list formats for arcs
@@ -396,7 +322,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
                 })
         
         # Sort by rate (lowest first)
-        bottlenecks.sort(key=lambda x: x['rate'])
+        bottlenecks.sort(key=lambda x: x['rate'])  # type: ignore[arg-type, return-value]
         
         return bottlenecks
     
@@ -482,7 +408,7 @@ class ThroughputAnalyzer(TopologyAnalyzer):
         
         return " | ".join(lines)
     
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached analysis results."""
         super().clear_cache()
         self._firing_counts.clear()

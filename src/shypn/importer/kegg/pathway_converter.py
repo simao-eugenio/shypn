@@ -1,7 +1,9 @@
 """Main pathway converter implementation."""
 
 import logging
-from typing import Dict, Optional, Callable, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+if TYPE_CHECKING:
+    from shypn.pathway.options import EnhancementOptions
 from shypn.data.canvas.document_model import DocumentModel
 from shypn.netobjs import Place, Transition, Arc
 from shypn.netobjs.test_arc import TestArc
@@ -294,6 +296,7 @@ class KEGGRelationConverter:
                 arc_id_in = self.document.id_manager.generate_arc_id()
                 
                 # Auto-detect signal places and create SignalFlowArc if needed
+                arc_in: Arc
                 if getattr(target_place, 'is_signal_place', False):
                     from shypn.netobjs.signal_flow_arc import SignalFlowArc
                     arc_in = SignalFlowArc(
@@ -316,6 +319,7 @@ class KEGGRelationConverter:
                 arc_id_out = self.document.id_manager.generate_arc_id()
                 
                 # Auto-detect signal places and create SignalFlowArc if needed
+                arc_out: Arc
                 if getattr(target_place, 'is_signal_place', False):
                     from shypn.netobjs.signal_flow_arc import SignalFlowArc
                     arc_out = SignalFlowArc(
@@ -388,7 +392,7 @@ class KEGGRelationConverter:
                 elif subtype in inhibition_types:
                     # Inhibition: inhibitor arc (suppresses transition)
                     arc_id = self.document.id_manager.generate_arc_id()
-                    arc = InhibitorArc(
+                    arc = InhibitorArc(  # type: ignore[assignment]
                         source=source_place,
                         target=target_transition,
                         id=arc_id,
@@ -929,10 +933,11 @@ class StandardConversionStrategy(ConversionStrategy):
                 ))
         
         if invalid_arcs:
-            error_msg = f"Bipartite property violation in pathway {pathway.name}:\n"
+            parts = [f"Bipartite property violation in pathway {pathway.name}:\n"]
             for arc, violation_type, arc_str in invalid_arcs:
-                error_msg += f"  - {violation_type}: {arc_str} (Arc ID: {arc.id})\n"
-            error_msg += "\nPetri nets must be bipartite: only Place↔Transition connections allowed."
+                parts.append(f"  - {violation_type}: {arc_str} (Arc ID: {arc.id})\n")
+            parts.append("\nPetri nets must be bipartite: only Place↔Transition connections allowed.")
+            error_msg = "".join(parts)
             
             logger.error(error_msg)
             raise ValueError(error_msg)
@@ -956,7 +961,7 @@ class StandardConversionStrategy(ConversionStrategy):
         
         # Use new heuristic inference engine (advanced pattern matching + stoichiometry)
         engine = HeuristicInferenceEngine(use_background_fetch=False)
-        enhancement_stats = {
+        enhancement_stats: Dict[str, Any] = {
             'total': 0,
             'enhanced': 0,
             'skipped': 0,
@@ -991,11 +996,11 @@ class StandardConversionStrategy(ConversionStrategy):
                         transition.metadata = {}
                     transition.metadata['ec_numbers'] = reaction.ec_numbers
                     # Also set as direct attribute for new inference engine
-                    transition.ec_number = reaction.ec_numbers[0] if reaction.ec_numbers else None
+                    transition.ec_number = reaction.ec_numbers[0] if reaction.ec_numbers else None  # type: ignore[attr-defined]
                 
                 # Set reaction ID for KEGG reactions
                 if hasattr(reaction, 'id'):
-                    transition.reaction_id = reaction.id
+                    transition.reaction_id = reaction.id  # type: ignore[attr-defined]
             
             # Infer parameters using new engine
             try:
@@ -1016,12 +1021,12 @@ class StandardConversionStrategy(ConversionStrategy):
                         if not hasattr(transition, 'properties'):
                             transition.properties = {}
                         transition.properties['vmax'] = params.vmax
-                        transition.properties['km'] = params.km
+                        transition.properties['km'] = params.km  # type: ignore[attr-defined]
                         # Build rate function string
                         substrate_places = [arc.source for arc in document.arcs if arc.target == transition]
                         if substrate_places:
                             s_id = substrate_places[0].id
-                            rate_func = f"({params.vmax} * {s_id}) / ({params.km} + {s_id})"
+                            rate_func = f"({params.vmax} * {s_id}) / ({params.km} + {s_id})"  # type: ignore[attr-defined]
                             transition.properties['rate_function'] = rate_func
                     enhancement_stats['by_type']['continuous'] += 1
                     
@@ -1034,7 +1039,7 @@ class StandardConversionStrategy(ConversionStrategy):
                 elif params.transition_type == TransitionType.TIMED:
                     transition.transition_type = "timed"
                     if hasattr(params, 'delay') and params.delay:
-                        transition.delay = params.delay
+                        transition.delay = params.delay  # type: ignore[attr-defined]
                     enhancement_stats['by_type']['timed'] += 1
                     
                 elif params.transition_type == TransitionType.IMMEDIATE:
@@ -1096,8 +1101,8 @@ class StandardConversionStrategy(ConversionStrategy):
         from collections import deque
         
         # Build adjacency list for the Petri net graph
-        graph = {}  # node_id -> set of connected node_ids
-        all_nodes = {}  # node_id -> actual object
+        graph: Dict[str, Set[str]] = {}  # node_id -> set of connected node_ids
+        all_nodes: Dict[str, Any] = {}  # node_id -> actual object
         
         # Add all places and transitions to graph
         for place in document.places:
@@ -1361,7 +1366,7 @@ class PathwayConverter:
     using the standard conversion strategy.
     """
     
-    def __init__(self, strategy: ConversionStrategy = None):
+    def __init__(self, strategy: Optional[ConversionStrategy] = None):
         """Initialize converter.
         
         Args:
@@ -1382,7 +1387,7 @@ class PathwayConverter:
         self.strategy = strategy
     
     def convert(self, pathway: KEGGPathway,
-                options: ConversionOptions = None) -> DocumentModel:
+                options: Optional[ConversionOptions] = None) -> DocumentModel:
         """Convert KEGG pathway to Petri net model.
         
         Args:
@@ -1458,7 +1463,7 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                             add_initial_marking: bool = False,
                             filter_isolated_compounds: bool = True,
                             create_enzyme_places: bool = True,
-                            enhancement_options: 'EnhancementOptions' = None,
+                            enhancement_options: 'Optional[EnhancementOptions]' = None,
                             auto_classify_signals: bool = True,
                             signal_confidence_threshold: float = 0.70) -> DocumentModel:
     """Convert pathway with optional post-processing enhancements.
@@ -1611,9 +1616,9 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
                     # Convert string signal_type to enum if needed
                     from shypn.netobjs.signal_type import SignalType
                     if isinstance(signal_type, str):
-                        signal_type = SignalType[signal_type.upper()]
+                        signal_type = SignalType[signal_type.upper()]  # type: ignore[assignment]
                     
-                    place.signal_type = signal_type
+                    place.signal_type = signal_type  # type: ignore[assignment]
                     classified_count += 1
                     
                     logger.debug(
@@ -1627,9 +1632,9 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
             )
             
             # Generate simple summary from classifications
-            summary = {}
+            summary: Dict[str, int] = {}
             for place_name, (sig_type, confidence) in classifications.items():
-                type_key = sig_type.upper() if isinstance(sig_type, str) else sig_type.name.upper()
+                type_key = sig_type.upper() if isinstance(sig_type, str) else sig_type.name.upper()  # type: ignore[attr-defined]
                 summary[type_key] = summary.get(type_key, 0) + 1
             
             if summary:
@@ -1686,7 +1691,7 @@ def _infer_signal_hierarchy_layers(document: DocumentModel) -> Dict[str, int]:
     from shypn.netobjs.signal_type import SignalType
     
     logger = logging.getLogger("KEGGConverter")
-    layers = {}
+    layers: Dict[str, int] = {}
     layer_counts = {0: 0, 1: 0, 2: 0, 3: 0}
     
     # Get all signal places

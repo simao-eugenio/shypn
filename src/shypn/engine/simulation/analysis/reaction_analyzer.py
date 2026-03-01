@@ -3,7 +3,7 @@
 
 Calculates activity metrics for each transition based on firing data.
 """
-from typing import List, Optional
+from typing import Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -33,7 +33,7 @@ class ReactionMetrics:
 class ReactionAnalyzer:
     """Analyze transition (reaction) data from simulation."""
     
-    def __init__(self, data_collector):
+    def __init__(self, data_collector: Any):
         """Initialize analyzer.
         
         Args:
@@ -68,7 +68,7 @@ class ReactionAnalyzer:
                 
         return results
         
-    def _analyze_transition(self, transition, duration: float) -> ReactionMetrics:
+    def _analyze_transition(self, transition: Any, duration: float) -> ReactionMetrics:
         """Analyze a single transition.
         
         Args:
@@ -109,7 +109,7 @@ class ReactionAnalyzer:
             
         return metrics
         
-    def _get_transition_type(self, transition) -> str:
+    def _get_transition_type(self, transition: Any) -> str:
         """Get transition type.
         
         Args:

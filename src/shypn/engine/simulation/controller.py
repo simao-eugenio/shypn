@@ -32,8 +32,10 @@ the new architecture.
 ║ SEE: doc/ADR-003-simulation-controller-complexity.md (when created)       ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
+import logging
 import random
-from typing import Callable, List, Optional, Dict, Any
+import traceback
+from typing import Callable, List, Optional, Dict, Tuple, Any, Set
 try:
     from gi.repository import GLib
     GLIB_AVAILABLE = True
@@ -52,6 +54,7 @@ from shypn.netobjs.place import Place
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
+from shypn.engine.simulation.abstract_controller import AbstractSimulationController
 
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
@@ -64,10 +67,10 @@ class TransitionState:
         scheduled_time: Scheduled firing time for stochastic transitions (None if not scheduled)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize transition state."""
-        self.enablement_time = None
-        self.scheduled_time = None
+        self.enablement_time: Optional[float] = None
+        self.scheduled_time: Optional[float] = None
 
 class ModelAdapter:
     """Adapter to provide dict-like interface for behavior classes.
@@ -77,7 +80,7 @@ class ModelAdapter:
     (which uses lists) to provide that interface.
     """
 
-    def __init__(self, canvas_manager, controller=None):
+    def __init__(self, canvas_manager: Any, controller: Any=None):
         """Initialize adapter with canvas manager.
         
         Args:
@@ -86,26 +89,26 @@ class ModelAdapter:
         """
         self.canvas_manager = canvas_manager
         self._controller = controller
-        self._places_dict = None
-        self._transitions_dict = None
-        self._arcs_dict = None
+        self._places_dict: Optional[Dict[Any, Any]] = None
+        self._transitions_dict: Optional[Dict[Any, Any]] = None
+        self._arcs_dict: Optional[Dict[Any, Any]] = None
 
     @property
-    def places(self):
+    def places(self) -> Dict[Any, Any]:
         """Get places as dictionary keyed by ID."""
         if self._places_dict is None:
             self._places_dict = {p.id: p for p in self.canvas_manager.places}
         return self._places_dict
 
     @property
-    def transitions(self):
+    def transitions(self) -> Dict[Any, Any]:
         """Get transitions as dictionary keyed by ID."""
         if self._transitions_dict is None:
             self._transitions_dict = {t.id: t for t in self.canvas_manager.transitions}
         return self._transitions_dict
 
     @property
-    def arcs(self):
+    def arcs(self) -> Dict[Any, Any]:
         """Get arcs as dictionary keyed by ID.
         
         WARNING: Arc IDs may not be unique in models (especially imported ones).
@@ -115,14 +118,13 @@ class ModelAdapter:
         Returns a dict for API compatibility, but keyed by object id() to ensure uniqueness.
         """
         if self._arcs_dict is None:
-            pass
             # Use Python object ID as key to avoid duplicate arc ID issues
             # This ensures all arcs are accessible even if they have duplicate IDs
             self._arcs_dict = {id(a): a for a in self.canvas_manager.arcs}
         return self._arcs_dict
 
     @property
-    def logical_time(self):
+    def logical_time(self) -> float:
         """Get current logical time from controller.
         
         Returns:
@@ -133,7 +135,7 @@ class ModelAdapter:
         return 0.0
 
     @property
-    def thermodynamic_settings(self):
+    def thermodynamic_settings(self) -> Dict[str, Any]:
         """Get thermodynamic settings from canvas manager.
         
         Returns:
@@ -148,7 +150,7 @@ class ModelAdapter:
             'ionic_strength': 0.1
         }
 
-    def invalidate_caches(self):
+    def invalidate_caches(self) -> None:
         """Invalidate dict caches (call when model structure changes)."""
         self._places_dict = None
         self._transitions_dict = None
@@ -156,8 +158,8 @@ class ModelAdapter:
 
 # ==================== Model Accessors (Property Proxies) ====================
 
-class SimulationController:
-    """Controller for Petri net simulation execution.
+class SimulationController(AbstractSimulationController):
+    """Controller for Petri net simulation execution.  Sprint 23: implements AbstractSimulationController.
     
     This controller manages the simulation of a Petri net model, handling
     transition firing, token movement, and simulation state.
@@ -174,9 +176,7 @@ class SimulationController:
         interaction_guard: InteractionGuard for permission-based UI control
     """
 
-    def __init__(self, model, document_id: int = 0, verbose: bool = True,
-                 recording_config: 'RecordingConfig' = None,
-                 data_collector_factory=None, viability_checker_factory=None):
+    def __init__(self, model: Any, document_id: int = 0, verbose: bool = True, recording_config: Optional[Any] = None, data_collector_factory: Any=None, viability_checker_factory: Any=None):
         """Initialize the simulation controller.
         
         REFACTORED: Now uses RecordingConfig value object (reduced from 4 parameters to 2).
@@ -197,13 +197,13 @@ class SimulationController:
         self.model = model
         self.time = 0.0
         self.model_adapter = ModelAdapter(model, controller=self)
-        self.step_listeners = []
+        self.step_listeners: List[Any] = []
         self.data_collector_listeners: List[Callable] = []  # notified when data_collector is replaced
         self._running = False
         self._stop_requested = False
         self._timeout_id = None
-        self.behavior_cache = {}
-        self.transition_states = {}
+        self.behavior_cache: Dict[Any, Any] = {}
+        self.transition_states: Dict[Any, Any] = {}
         self.conflict_policy = DEFAULT_POLICY
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
@@ -233,7 +233,7 @@ class SimulationController:
         # === NEW: Mode elimination architecture ===
         # State detection replaces explicit mode checks
         from shypn.engine.simulation.state import SimulationStateDetector
-        self.state_detector = SimulationStateDetector(self)
+        self.state_detector = SimulationStateDetector(self)  # type: ignore[arg-type]
         
         # Buffered settings for atomic parameter updates
         from shypn.engine.simulation.buffered import BufferedSimulationSettings
@@ -246,14 +246,14 @@ class SimulationController:
         self.interaction_guard = InteractionGuard(self.state_detector)
         
         # Thermodynamic validation results (populated on demand)
-        self.thermodynamic_results = None
+        self.thermodynamic_results: Optional[Dict[str, Any]] = None
         
         # Option 3: Assignment rule re-evaluation support
         self.enable_assignment_rule_reevaluation = False
         self.pathway_data = None  # Store for assignment rule initialization
         
         # Token accounting auditor (conservation validation)
-        self.auditor = None  # Initialized when enabled via settings
+        self.auditor: Optional[Any] = None  # Initialized when enabled via settings
         
         # Thermodynamic validator manager (Feb 9, 2026)
         from shypn.engine.simulation.validation import ValidatorManager
@@ -266,9 +266,17 @@ class SimulationController:
         _vc_factory = viability_checker_factory or ViabilityChecker
         self._viability_checker = _vc_factory(self)
         
+        # Phase 6 extraction: ConflictResolver manages maximal-step conflict logic
+        from shypn.engine.simulation.conflict_resolver import ConflictResolver
+        self._conflict_resolver = ConflictResolver(
+            model=self.model,
+            viability_checker=self._viability_checker,
+            get_places_fn=self._get_all_places_for_transition,
+        )
+        
         # Week 4 - Phase 4: Strategy Pattern for simulation algorithms
         # Enables runtime switching between different execution strategies
-        self._execution_strategy = None  # HybridStrategy by default (set on first use)
+        self._execution_strategy: Optional[Any] = None  # HybridStrategy by default (set on first use)
         
         # Register to observe model changes (for arc transformations, deletions, etc.)
         if hasattr(model, 'register_observer'):
@@ -278,7 +286,7 @@ class SimulationController:
     
     # ==================== Lifecycle Management ====================
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset controller to initial state for new model load.
         
         Called when loading a new model into an existing canvas tab (File → Open,
@@ -297,7 +305,6 @@ class SimulationController:
         
         See: doc/CRITICAL_SIMULATION_INIT_IMPORT_BUG.md
         """
-        import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Resetting SimulationController for new model load")
         
@@ -354,16 +361,16 @@ class SimulationController:
         logger.info(f"SimulationController reset complete - ready for new model")
     
     @property
-    def on_simulation_complete(self):
+    def on_simulation_complete(self) -> Optional[Any]:
         """Callback invoked when simulation completes."""
         return self._on_simulation_complete
     
     @on_simulation_complete.setter
-    def on_simulation_complete(self, value):
+    def on_simulation_complete(self, value: Any) -> None:
         """Set simulation complete callback."""
         self._on_simulation_complete = value
     
-    def validate_thermodynamics(self) -> Dict[str, Any]:
+    def validate_thermodynamics(self) -> Optional[Dict[str, Any]]:
         """
         Validate thermodynamic consistency of reversible transitions.
         
@@ -381,9 +388,8 @@ class SimulationController:
             - 'valid': List of valid transitions
             - 'insufficient_data': List with missing data
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
+
         try:
             from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
             
@@ -514,9 +520,8 @@ class SimulationController:
         Args:
             pathway_data: PathwayData object with species containing assignment_rule field
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
+
         if pathway_data is None:
             logger.warning("No pathway_data provided for assignment rule initialization")
             return
@@ -574,7 +579,7 @@ class SimulationController:
         
         return self.thermodynamic_results.get('summary')
 
-    def _on_model_changed(self, event_type: str, obj, old_value=None, new_value=None):
+    def _on_model_changed(self, event_type: str, obj: Any, old_value: Any=None, new_value: Any=None) -> None:
         """Handle model change notifications.
         
         Responds to model structure changes to keep simulation state consistent:
@@ -632,7 +637,6 @@ class SimulationController:
                 is_source = getattr(obj, 'is_source', False)
                 
                 if is_source:
-                    import logging
                     logger = logging.getLogger(__name__)
                     logger.info(f"[OBSERVER] ✅ Enabling source transition {obj.id} at t={self.time}")
                     # Source transitions are always enabled
@@ -670,7 +674,6 @@ class SimulationController:
                         behavior = self._get_behavior(obj)
                         if hasattr(behavior, 'set_enablement_time'):
                             behavior.set_enablement_time(self.time)
-                        import logging
                         logging.getLogger(__name__).info(f"[OBSERVER] ✅ Enabled source transition {obj.id} at t={self.time}")
         
         # Rebuild place-transition index on any structural topology change
@@ -679,7 +682,7 @@ class SimulationController:
     
     # ========== Token Accounting Methods ==========
 
-    def _rebuild_place_index(self):
+    def _rebuild_place_index(self) -> None:
         """Build place_id → [input transitions] and source-transition list.
 
         Called after reset() and on structural model changes.  Used by
@@ -704,7 +707,7 @@ class SimulationController:
         self._place_to_input_transitions = idx
         self._source_transitions = sources
 
-    def get_enabled_transitions(self, dirty_places: set = None) -> list:
+    def get_enabled_transitions(self, dirty_places: Optional[set] = None) -> list:
         """Return currently enabled transitions, using the dirty-place index when possible.
 
         When dirty_places is a non-empty set and the place-transition index has
@@ -730,10 +733,10 @@ class SimulationController:
                         seen.add(id(t))
         else:
             candidates = list(self.model.transitions)
-        return [t for t in candidates if self._is_enabled(t)]
+        return [t for t in candidates if self._viability_checker.is_enabled(t)]
 
     
-    def enable_token_accounting(self, strict_mode=False):
+    def enable_token_accounting(self, strict_mode: Any = False) -> None:
         """Enable token conservation accounting.
         
         Args:
@@ -752,11 +755,10 @@ class SimulationController:
             print(f"✓ Token accounting enabled (transitions: {len(self.model.transitions)})")
         except Exception as e:
             print(f"✗ Failed to enable token accounting: {e}")
-            import traceback
             traceback.print_exc()
             self.auditor = None
     
-    def disable_token_accounting(self):
+    def disable_token_accounting(self) -> None:
         """Disable token conservation accounting."""
         self.auditor = None
         
@@ -765,7 +767,7 @@ class SimulationController:
             behavior = self._get_behavior(transition)
             behavior.disable_accounting()
     
-    def get_accounting_report(self):
+    def get_accounting_report(self) -> None:
         """Get token accounting report.
         
         Returns:
@@ -775,14 +777,14 @@ class SimulationController:
             return None
         return self.auditor.generate_report()
     
-    def print_accounting_report(self):
+    def print_accounting_report(self) -> None:
         """Print token accounting report to console."""
         if self.auditor is not None:
             self.auditor.print_report()
     
     # ==================== Behavior Management ====================
 
-    def _get_behavior(self, transition):
+    def _get_behavior(self, transition: Any) -> Any:
         """Get or create behavior instance for a transition.
         
         Uses factory pattern with caching for efficiency. Behavior instances
@@ -835,7 +837,7 @@ class SimulationController:
         
         return self.behavior_cache[_tid]
 
-    def _get_or_create_state(self, transition) -> TransitionState:
+    def _get_or_create_state(self, transition: Any) -> TransitionState:
         """Get or create state tracking for a transition.
         
         Args:
@@ -849,7 +851,7 @@ class SimulationController:
             self.transition_states[_tid] = TransitionState()
         return self.transition_states[_tid]
 
-    def _update_enablement_states(self):
+    def _update_enablement_states(self) -> None:
         """Update enablement tracking for all transitions.
         
         This method checks structural enablement (sufficient tokens in input places)
@@ -862,17 +864,8 @@ class SimulationController:
         - If still enabled: keep existing enablement_time
         - If disabled: clear enablement_time
         """
-        import logging
         logger = logging.getLogger(__name__)
-        
-        # Debug: Log source transitions
-        source_transitions = [t for t in self.model.transitions if getattr(t, 'is_source', False)]
-        if source_transitions and not hasattr(self, '_logged_source_transitions'):
-            self._logged_source_transitions = True
-            logger.info(f"Found {len(source_transitions)} source transition(s):")
-            for t in source_transitions:
-                logger.info(f"  - {t.id}: type={t.transition_type}, is_source={getattr(t, 'is_source', False)}")
-        
+
         for transition in self.model.transitions:
             behavior = self._get_behavior(transition)
             
@@ -929,9 +922,7 @@ class SimulationController:
                         locally_enabled = False
                         break
             state = self._get_or_create_state(transition)
-            
-            # Debug stochastic enablement (first time only) - removed for cleaner output
-            
+
             if locally_enabled:
                 if state.enablement_time is None:
                     state.enablement_time = self.time
@@ -945,7 +936,7 @@ class SimulationController:
                 if hasattr(behavior, 'clear_enablement'):
                     behavior.clear_enablement()
 
-    def set_conflict_policy(self, policy: ConflictResolutionPolicy):
+    def set_conflict_policy(self, policy: ConflictResolutionPolicy) -> None:
         """Set the conflict resolution policy for transition selection.
         
         Args:
@@ -972,7 +963,7 @@ class SimulationController:
         """
         return self.settings.calculate_progress(self.time)
     
-    def _emit_progress_event(self):
+    def _emit_progress_event(self) -> None:
         """Emit simulation.progress event for UI updates.
         
         Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
@@ -990,7 +981,7 @@ class SimulationController:
                 'is_complete': self.is_simulation_complete()
             }, document_id=self.document_id)
         except (TypeError, AttributeError, RuntimeError) as e:
-            logger.debug(f"Event emission failed during simulation: {e}")
+            logging.getLogger(__name__).debug(f"Event emission failed during simulation: {e}")
     
     def is_simulation_complete(self) -> bool:
         """Check if simulation has reached duration limit.
@@ -1002,7 +993,7 @@ class SimulationController:
     
     # ========== Strategy Pattern Methods (Week 4 - Phase 4) ==========
     
-    def get_strategy(self):
+    def get_strategy(self) -> Optional[Any]:
         """Get current execution strategy.
         
         Returns:
@@ -1010,7 +1001,7 @@ class SimulationController:
         """
         return self._execution_strategy
     
-    def set_strategy(self, strategy):
+    def set_strategy(self, strategy: Any) -> None:
         """Set execution strategy for simulation.
         
         Enables runtime switching between different algorithms:
@@ -1028,7 +1019,7 @@ class SimulationController:
         """
         self._execution_strategy = strategy
     
-    def auto_select_strategy(self):
+    def auto_select_strategy(self) -> Any:
         """Automatically select best strategy for current model.
         
         Selection logic:
@@ -1061,6 +1052,7 @@ class SimulationController:
                     stochastic_count += 1
         
         # Select strategy based on model composition
+        strategy: Any
         if has_continuous and not has_stochastic:
             # Pure continuous model
             strategy = ContinuousStrategy(self)
@@ -1079,7 +1071,7 @@ class SimulationController:
         self._execution_strategy = strategy
         return strategy
     
-    def list_available_strategies(self):
+    def list_available_strategies(self) -> List:
         """Get list of all available execution strategies.
         
         Returns:
@@ -1104,7 +1096,7 @@ class SimulationController:
             for s in strategies
         ]
 
-    def invalidate_behavior_cache(self, transition_id=None):
+    def invalidate_behavior_cache(self, transition_id: Any = None) -> None:
         """Invalidate behavior cache for a specific transition or all transitions.
         
         This forces behavior instances to be recreated on next access, useful
@@ -1130,7 +1122,7 @@ class SimulationController:
     
     # ==================== Observer Pattern (Step Listeners) ====================
 
-    def add_step_listener(self, callback: Callable):
+    def add_step_listener(self, callback: Callable) -> None:
         """Register a callback to be notified on each simulation step.
         
         Args:
@@ -1140,7 +1132,7 @@ class SimulationController:
         if callback not in self.step_listeners:
             self.step_listeners.append(callback)
 
-    def remove_step_listener(self, callback: Callable):
+    def remove_step_listener(self, callback: Callable) -> None:
         """Unregister a step listener callback.
         
         Args:
@@ -1149,18 +1141,18 @@ class SimulationController:
         if callback in self.step_listeners:
             self.step_listeners.remove(callback)
     
-    def _notify_step_listeners(self):
+    def _notify_step_listeners(self) -> None:
         """Notify all registered step listeners."""
         for callback in self.step_listeners:
             try:
                 callback(self, self.time)
             except Exception as e:
-                self.logger.debug(f"Step listener callback failed: {e}")
+                logging.getLogger(__name__).debug(f"Step listener callback failed: {e}")
                 pass
     
     # ==================== Single-Step Execution (Hybrid Discrete + Continuous) ====================
 
-    def step(self, time_step: float = None) -> bool:
+    def step(self, time_step: Optional[float] = None) -> bool:
         """Execute a single simulation step with hybrid (discrete + continuous) execution.
         
         REFACTORED (Sprint 2): Extracted helper methods to reduce complexity.
@@ -1201,25 +1193,9 @@ class SimulationController:
         if time_step > 1.0:
             if not hasattr(self, '_large_timestep_warned'):
                 self._large_timestep_warned = True
-                import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
-        
-        # Print transition types once (for debugging)
-        if not hasattr(self, '_debug_transition_types_printed'):
-            self._debug_transition_types_printed = True
-            type_counts = {}
-            for t in self.model.transitions:
-                ttype = t.transition_type
-                type_counts[ttype] = type_counts.get(ttype, 0) + 1
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Model has {len(self.model.transitions)} transitions: {type_counts}")
-            
-            source_count = len([t for t in self.model.transitions if getattr(t, 'is_source', False)])
-            if source_count > 0:
-                logger.info(f"  - {source_count} source transition(s)")
-        
+
         # Update enablement states
         self._update_enablement_states()
         
@@ -1271,7 +1247,6 @@ class SimulationController:
                     recent = fired_sequence[-10:]
                     previous = fired_sequence[-20:-10]
                     if recent == previous:
-                        import logging
                         logger = logging.getLogger(__name__)
                         logger.error(
                             f"LIVELOCK DETECTED: Immediate transitions forming infinite cycle: "
@@ -1282,7 +1257,6 @@ class SimulationController:
                         break
         
         if iteration >= max_immediate_iterations - 1:
-            import logging
             logger = logging.getLogger(__name__)
             logger.warning(
                 f"Immediate transition limit ({max_immediate_iterations}) reached in single step. "
@@ -1342,8 +1316,9 @@ class SimulationController:
                                 if arc_type == 'test':
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
-                                source_place.set_tokens(source_place.tokens - arc.weight)
-                                consumed_map[arc.source_id] = arc.weight
+                                if source_place is not None:
+                                    source_place.set_tokens(source_place.tokens - arc.weight)
+                                    consumed_map[arc.source_id] = arc.weight
                         
                         # Produce tokens to output places
                         is_sink = hasattr(transition, 'properties') and \
@@ -1351,8 +1326,9 @@ class SimulationController:
                         if not is_sink:
                             for arc in behavior.get_output_arcs():
                                 target_place = self.model_adapter.places.get(arc.target_id)
-                                target_place.set_tokens(target_place.tokens + arc.weight)
-                                produced_map[arc.target_id] = arc.weight
+                                if target_place is not None:
+                                    target_place.set_tokens(target_place.tokens + arc.weight)
+                                    produced_map[arc.target_id] = arc.weight
                         
                         # Clear enablement state
                         state = self._get_or_create_state(transition)
@@ -1600,7 +1576,6 @@ class SimulationController:
         
         # Check if simulation is complete
         if self.is_simulation_complete():
-            import logging
             logging.getLogger(__name__).info(f"[SIMULATION] Duration reached: time={self.time}, duration={self.settings.duration}")
             return False
         
@@ -1619,7 +1594,7 @@ class SimulationController:
         """
         return [t for t in self.model.transitions if self._viability_checker.is_enabled(t)]
 
-    def _is_transition_enabled(self, transition) -> bool:
+    def _is_transition_enabled(self, transition: Any) -> bool:
         """Check whether a single transition is currently enabled.
         
         Delegates to ViabilityChecker which checks token availability,
@@ -1633,7 +1608,7 @@ class SimulationController:
         """
         return self._viability_checker.is_enabled(transition)
 
-    def _fire_transition(self, transition):
+    def _fire_transition(self, transition: Any) -> None:
         """Fire a transition using behavior dispatch.
         
         Uses the transition's behavior to perform the firing, which handles
@@ -1662,9 +1637,8 @@ class SimulationController:
                 self.auditor.snapshot_after_fire(transition, self.time, consumed, produced)
             except Exception as e:
                 print(f"⚠️ Accounting error (after fire): {e}")
-                import traceback
                 traceback.print_exc()
-        
+
         if success:
             # Increment firing count for statistics
             transition.firing_count += 1
@@ -1691,25 +1665,16 @@ class SimulationController:
             self.data_collector.on_transition_fired(transition, self.time, details)
         
         # PHASE 1-2 FIX: Also notify step listeners if they have on_transition_fired
-        if not hasattr(self, '_debug_listeners_printed'):
-            self._debug_listeners_printed = True
-            # print(f"[FIRE_NOTIFY] Discrete: {transition.id}, notifying {len(self.step_listeners)} listeners")
-            for i, listener in enumerate(self.step_listeners):
-                # Check if listener is a bound method with __self__
-                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                if hasattr(listener_obj, 'on_transition_fired'):
-                    listener_obj.on_transition_fired(transition, self.time, details)
-        else:
-            for listener in self.step_listeners:
-                listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
-                if hasattr(listener_obj, 'on_transition_fired'):
-                    listener_obj.on_transition_fired(transition, self.time, details)
+        for listener in self.step_listeners:
+            listener_obj = listener.__self__ if hasattr(listener, '__self__') else listener
+            if hasattr(listener_obj, 'on_transition_fired'):
+                listener_obj.on_transition_fired(transition, self.time, details)
 
     # ============================================================================
     # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
     # ============================================================================
     
-    def _get_all_places_for_transition(self, transition) -> set:
+    def _get_all_places_for_transition(self, transition: Any) -> set:
         """Get all places (input and output) involved in a transition's locality.
         
         This extracts the complete neighborhood of a transition:
@@ -1752,165 +1717,17 @@ class SimulationController:
         
         return place_ids
     
-    def _are_independent(self, t1, t2) -> bool:
-        """Check if two transitions are independent (don't share places).
-        
-        Two transitions are independent if their localities don't overlap:
-        - They don't share input places (no conflict for tokens)
-        - They don't share output places (no conflict for production)
-        
-        Mathematical definition:
-            t1 ⊥ t2  ⟺  (•t1 ∪ t1•) ∩ (•t2 ∪ t2•) = ∅
-        
-        **Source/Sink Independence:**
-        - Two source transitions: Independent unless they share output places
-          Example: T1(source)→P1, T2(source)→P2  →  Independent
-                   T1(source)→P1, T2(source)→P1  →  Dependent (same output)
-        
-        - Two sink transitions: Independent unless they share input places
-          Example: P1→T1(sink), P2→T2(sink)  →  Independent
-                   P1→T1(sink), P1→T2(sink)  →  Dependent (same input)
-        
-        - Source and sink: Always independent (no place overlap)
-          Example: T1(source)→P1, P2→T2(sink)  →  Independent
-        
-        - Source/sink with normal: Independent unless they share places
-          Example: T1(source)→P1, P1→T2→P2  →  Dependent (share P1)
-        
-        Independent transitions CAN fire in parallel (maximal step semantics).
-        Dependent transitions MUST fire sequentially (conflict resolution needed).
-        
-        Args:
-            t1: First transition
-            t2: Second transition
-            
-        Returns:
-            True if transitions don't share ANY places, False otherwise
-            
-        Examples:
-            Normal: P1→T1→P2, P3→T2→P4  →  Independent (no shared places)
-            Normal: P1→T1→P2, P1→T2→P3  →  Dependent (share P1)
-            Source: T1→P1, T2→P2        →  Independent (different outputs)
-            Sink:   P1→T1, P2→T2        →  Independent (different inputs)
-        """
-        # Get all places for each transition (respects source/sink structure)
-        places_t1 = self._get_all_places_for_transition(t1)
-        places_t2 = self._get_all_places_for_transition(t2)
-        
-        # Check for intersection (shared places)
-        shared_places = places_t1 & places_t2
-        
-        # Independent if NO shared places
-        return len(shared_places) == 0
+    def _are_independent(self, t1: Any, t2: Any) -> bool:
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.are_independent(t1, t2)
     
     def _compute_conflict_sets(self, transitions: List) -> Dict[str, set]:
-        """Build conflict graph showing which transitions share places.
-        
-        A conflict graph represents dependencies between transitions:
-        - Nodes: Transitions
-        - Edges: Conflicts (transitions that share at least one place)
-        
-        Two transitions conflict if they share ANY place (input or output).
-        Conflicting transitions CANNOT fire simultaneously.
-        
-        This is the foundation for computing maximal concurrent sets
-        (Phase 2 implementation).
-        
-        Args:
-            transitions: List of Transition objects to analyze
-            
-        Returns:
-            Dictionary mapping transition ID to set of conflicting transition IDs
-            
-        Example:
-            Network:
-                P1 → T1 → P2
-                P1 → T2 → P3  (shares P1 with T1)
-                P4 → T3 → P5  (independent)
-            
-            Result:
-                {
-                    'T1': {'T2'},      # T1 conflicts with T2
-                    'T2': {'T1'},      # T2 conflicts with T1
-                    'T3': set()        # T3 has no conflicts
-                }
-        """
-        # Initialize empty conflict sets
-        conflict_sets = {t.id: set() for t in transitions}
-        
-        # Compare each pair of transitions
-        for i, t1 in enumerate(transitions):
-            for t2 in transitions[i+1:]:
-                pass
-                # Check if they share places
-                if not self._are_independent(t1, t2):
-                    pass
-                    # They share places → Conflict!
-                    conflict_sets[t1.id].add(t2.id)
-                    conflict_sets[t2.id].add(t1.id)
-        
-        return conflict_sets
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.compute_conflict_sets(transitions)
     
     def _get_independent_transitions(self, transitions: List) -> List[List]:
-        """Group transitions into independent sets (no place sharing within groups).
-        
-        This partitions transitions into groups where transitions within
-        each group are mutually independent (pairwise non-conflicting).
-        
-        This is useful for visualizing/debugging locality independence.
-        
-        Args:
-            transitions: List of Transition objects
-            
-        Returns:
-            List of lists, where each inner list contains independent transitions
-            
-        Example:
-            Network:
-                P1 → T1 → P2
-                P1 → T2 → P3  (conflicts with T1)
-                P4 → T3 → P5  (independent)
-                P4 → T4 → P6  (conflicts with T3)
-            
-            Result:
-                [
-                    [T1, T3],  # Group 1: T1 and T3 are independent
-                    [T2, T4]   # Group 2: T2 and T4 are independent
-                ]
-        """
-        if not transitions:
-            return []
-        
-        conflict_sets = self._compute_conflict_sets(transitions)
-        independent_groups = []
-        remaining = set(t.id for t in transitions)
-        transitions_by_id = {t.id: t for t in transitions}
-        
-        while remaining:
-            pass
-            # Start new group with first remaining transition
-            current_id = next(iter(remaining))
-            current_group = [transitions_by_id[current_id]]
-            remaining.remove(current_id)
-            
-            # Try to add non-conflicting transitions to this group
-            to_check = list(remaining)
-            for tid in to_check:
-                pass
-                # Check if this transition is independent of ALL in current group
-                independent_of_all = True
-                for group_transition in current_group:
-                    if tid in conflict_sets[group_transition.id]:
-                        independent_of_all = False
-                        break
-                
-                if independent_of_all:
-                    current_group.append(transitions_by_id[tid])
-                    remaining.remove(tid)
-            
-            independent_groups.append(current_group)
-        
-        return independent_groups
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.get_independent_groups(transitions)
 
     # ==================================================================================
     # PHASE 2: MAXIMAL CONCURRENT SET COMPUTATION
@@ -1926,236 +1743,23 @@ class SimulationController:
     # ==================================================================================
 
     def _find_maximal_concurrent_sets(self, enabled_transitions: List, max_sets: int = 5) -> List[List]:
-        """
-        Find maximal concurrent sets of enabled transitions.
-        
-        A maximal concurrent set is a set of transitions where:
-        1. All transitions are mutually independent (don't share places)
-        2. Cannot add any more transitions without creating conflicts
-        
-        Uses hybrid approach with multiple greedy strategies to find diverse
-        maximal sets without exponential complexity.
-        
-        Args:
-            enabled_transitions: List of enabled Transition objects
-            max_sets: Maximum number of maximal sets to return (default: 5)
-            
-        Returns:
-            List of lists, each inner list is a maximal concurrent set of
-            Transition objects
-            
-        Example:
-            enabled = [T1, T2, T3, T4]
-            conflicts: T1↔T2 (share P1), T3↔T4 (share P5)
-            
-            Result: [[T1, T3], [T2, T4], [T1, T4], [T2, T3]]
-            Each is maximal (cannot add more without conflict)
-            
-        Complexity:
-            Time: O(k × n²) where k = max_sets, n = |enabled|
-            Space: O(n²) for conflict sets
-        """
-        if not enabled_transitions:
-            return []
-        
-        if len(enabled_transitions) == 1:
-            return [[enabled_transitions[0]]]
-        
-        # Build conflict graph using Phase 1
-        conflict_sets = self._compute_conflict_sets(enabled_transitions)
-        
-        maximal_sets = []
-        seen_sets = set()  # Track unique sets using frozenset of IDs
-        
-        # Strategy 1: Standard greedy from natural order
-        maximal_set = self._greedy_maximal_set(
-            enabled_transitions, conflict_sets, start_index=0
-        )
-        if maximal_set:
-            set_key = frozenset(t.id for t in maximal_set)
-            seen_sets.add(set_key)
-            maximal_sets.append(maximal_set)
-        
-        # Strategy 2: Try different starting points (rotation)
-        # This explores different orderings to find diverse maximal sets
-        for start_idx in range(1, min(len(enabled_transitions), max_sets)):
-            maximal_set = self._greedy_maximal_set(
-                enabled_transitions, conflict_sets, start_index=start_idx
-            )
-            if maximal_set:
-                set_key = frozenset(t.id for t in maximal_set)
-                if set_key not in seen_sets:
-                    seen_sets.add(set_key)
-                    maximal_sets.append(maximal_set)
-                    if len(maximal_sets) >= max_sets:
-                        break
-        
-        # Strategy 3: Prioritize transitions with MOST conflicts
-        # Handles constrained transitions first
-        if len(maximal_sets) < max_sets:
-            ordered = self._sort_by_conflict_degree(
-                enabled_transitions, conflict_sets, ascending=False
-            )
-            maximal_set = self._greedy_maximal_set(
-                ordered, conflict_sets, start_index=0
-            )
-            if maximal_set:
-                set_key = frozenset(t.id for t in maximal_set)
-                if set_key not in seen_sets:
-                    seen_sets.add(set_key)
-                    maximal_sets.append(maximal_set)
-        
-        # Strategy 4: Prioritize transitions with LEAST conflicts
-        # Maximizes set size by starting with least constrained
-        if len(maximal_sets) < max_sets:
-            ordered = self._sort_by_conflict_degree(
-                enabled_transitions, conflict_sets, ascending=True
-            )
-            maximal_set = self._greedy_maximal_set(
-                ordered, conflict_sets, start_index=0
-            )
-            if maximal_set:
-                set_key = frozenset(t.id for t in maximal_set)
-                if set_key not in seen_sets:
-                    seen_sets.add(set_key)
-                    maximal_sets.append(maximal_set)
-        
-        return maximal_sets
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.find_maximal_concurrent_sets(enabled_transitions, max_sets)
 
-    def _greedy_maximal_set(self, transitions: List, conflict_sets: dict, 
+    def _greedy_maximal_set(self, transitions: List, conflict_sets: dict,
                            start_index: int = 0) -> List:
-        """
-        Build one maximal concurrent set using greedy algorithm.
-        
-        Starting from a given position, greedily adds transitions that are
-        independent of all transitions already in the set.
-        
-        Args:
-            transitions: List of Transition objects to consider
-            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
-            start_index: Index to start greedy selection (for rotation)
-            
-        Returns:
-            List of Transition objects forming a maximal concurrent set
-            
-        Algorithm:
-            1. Start with transition at start_index
-            2. For each remaining transition:
-                - Check if independent of ALL in current set
-                - If yes, add to set
-            3. Result is maximal (cannot extend further)
-            
-        Complexity:
-            Time: O(n²) where n = |transitions|
-            Space: O(n)
-        """
-        if not transitions:
-            return []
-        
-        # Rotate list to start from different position
-        ordered = transitions[start_index:] + transitions[:start_index]
-        
-        # Initialize with first transition
-        maximal_set = [ordered[0]]
-        maximal_set_ids = {ordered[0].id}
-        
-        # Try to add each remaining transition
-        for t in ordered[1:]:
-            pass
-            # Check if t is independent of ALL transitions in current set
-            can_add = True
-            for tid in maximal_set_ids:
-                if t.id in conflict_sets[tid]:
-                    pass
-                    # Conflict found - cannot add
-                    can_add = False
-                    break
-            
-            if can_add:
-                maximal_set.append(t)
-                maximal_set_ids.add(t.id)
-        
-        return maximal_set
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver._greedy_maximal_set(transitions, conflict_sets, start_index)
 
     def _sort_by_conflict_degree(self, transitions: List, conflict_sets: dict,
                                  ascending: bool = True) -> List:
-        """
-        Sort transitions by number of conflicts (degree in conflict graph).
-        
-        Transitions with more conflicts are more "constrained" and may need
-        priority handling. Transitions with fewer conflicts are more "flexible".
-        
-        Args:
-            transitions: List of Transition objects
-            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
-            ascending: If True, sort by least conflicts first (flexible first)
-                      If False, sort by most conflicts first (constrained first)
-            
-        Returns:
-            Sorted list of Transition objects
-            
-        Example:
-            T1 conflicts with 3 transitions
-            T2 conflicts with 1 transition
-            T3 conflicts with 2 transitions
-            
-            ascending=True:  [T2, T3, T1] (least conflicts first)
-            ascending=False: [T1, T3, T2] (most conflicts first)
-        """
-        def conflict_degree(t):
-            return len(conflict_sets.get(t.id, set()))
-        
-        return sorted(transitions, key=conflict_degree, reverse=not ascending)
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver._sort_by_conflict_degree(transitions, conflict_sets, ascending)
 
     def _is_concurrent_set_maximal(self, concurrent_set: List, 
                                    all_enabled: List, conflict_sets: dict) -> bool:
-        """
-        Check if a concurrent set is maximal (cannot be extended).
-        
-        A set is maximal if there is no transition outside the set that is
-        independent of all transitions in the set.
-        
-        Args:
-            concurrent_set: List of Transition objects in the set to check
-            all_enabled: List of all enabled Transition objects
-            conflict_sets: Dict mapping transition IDs to sets of conflicting IDs
-            
-        Returns:
-            True if the set is maximal, False if it can be extended
-            
-        Example:
-            concurrent_set = [T1, T3]
-            all_enabled = [T1, T2, T3, T4]
-            
-            If T2 conflicts with T1 AND T4 conflicts with T3:
-                → Cannot add T2 or T4 → Maximal ✅
-            
-            If T4 is independent of both T1 and T3:
-                → Can add T4 → Not maximal ❌
-        """
-        set_ids = {t.id for t in concurrent_set}
-        
-        # Try to add each transition not in the set
-        for t in all_enabled:
-            if t.id in set_ids:
-                continue  # Already in set, skip
-            
-            # Check if t is independent of ALL transitions in the set
-            can_add = True
-            for tid in set_ids:
-                if t.id in conflict_sets[tid]:
-                    pass
-                    # Conflict found - cannot add this transition
-                    can_add = False
-                    break
-            
-            if can_add:
-                pass
-                # Found a transition we can add - not maximal!
-                return False
-        
-        # Cannot add any transition - is maximal!
-        return True
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.is_concurrent_set_maximal(concurrent_set, all_enabled, conflict_sets)
 
     # ========================================================================
     # PHASE 3: MAXIMAL STEP EXECUTION
@@ -2166,250 +1770,24 @@ class SimulationController:
 
     def _select_maximal_set(self, maximal_sets: List[List], 
                            strategy: str = 'largest') -> List:
-        """
-        Select which maximal concurrent set to execute.
-        
-        Args:
-            maximal_sets: List of maximal concurrent sets from Phase 2
-            strategy: Selection strategy
-                - 'largest': Fire most transitions (maximize parallelism)
-                - 'priority': Fire highest priority transitions
-                - 'random': Random selection (for exploration)
-                - 'first': First set found (deterministic)
-                
-        Returns:
-            Selected maximal concurrent set (List of Transition objects)
-            Empty list if no sets provided
-            
-        Example:
-            maximal_sets = [[T1, T3], [T2, T3], [T2]]
-            
-            strategy='largest': → [T1, T3] or [T2, T3] (both size 2)
-            strategy='priority': → Based on sum of priorities
-            strategy='random': → Any set randomly
-            strategy='first': → [T1, T3] (first in list)
-        """
-        if not maximal_sets:
-            return []
-        
-        if strategy == 'largest':
-            pass
-            # Maximize parallelism - choose set with most transitions
-            return max(maximal_sets, key=len)
-        
-        elif strategy == 'priority':
-            pass
-            # Maximize sum of priorities
-            def total_priority(tset):
-                return sum(getattr(t, 'priority', 0) for t in tset)
-            return max(maximal_sets, key=total_priority)
-        
-        elif strategy == 'random':
-            pass
-            # Random for exploration
-            return random.choice(maximal_sets)
-        
-        elif strategy == 'first':
-            pass
-            # Deterministic (natural order from Phase 2)
-            return maximal_sets[0]
-        
-        else:
-            pass
-            # Unknown strategy - fall back to first
-            return maximal_sets[0]
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.select_maximal_set(maximal_sets, strategy)
 
     def _validate_all_can_fire(self, transition_set: List) -> bool:
-        """
-        Check if all transitions in set are currently enabled.
-        
-        REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
-        
-        Pre-flight validation before snapshot to avoid rollback overhead.
-        
-        Args:
-            transition_set: List of Transition objects to validate
-            
-        Returns:
-            True if all transitions can fire, False otherwise
-            
-        Checks:
-            1. All input places have sufficient tokens
-            2. All guards evaluate to True (if present)
-            3. All arc thresholds are met (if applicable)
-            
-        Example:
-            T1: P1(2) --[weight=1]--> T1 ---> P2
-            T2: P3(0) --[weight=1]--> T2 ---> P4
-            
-            validate([T1, T2]) → False (P3 has 0 < 1 tokens)
-            validate([T1]) → True (P1 has 2 >= 1 tokens)
-        """
-        return self._viability_checker.validate_all(transition_set)
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.validate_all_can_fire(transition_set)
 
     def _snapshot_marking(self) -> dict:
-        """
-        Create snapshot of current marking for rollback.
-        
-        Returns:
-            Dictionary mapping place_id → token_count
-            
-        Used for atomic execution: If any transition fails, we can
-        restore to this snapshot.
-        
-        Example:
-            Before: {P1: 2, P2: 0, P3: 1}
-            Snapshot: {'P1': 2, 'P2': 0, 'P3': 1}
-            
-            (Used later for rollback if execution fails)
-        """
-        # Handle both dict and list for places
-        places = self.model.places if hasattr(self.model, 'places') else []
-        if isinstance(places, dict):
-            return {place.id: place.tokens for place in places.values()}
-        else:
-            return {place.id: place.tokens for place in places}
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver._snapshot_marking()
 
     def _restore_marking(self, snapshot: dict) -> None:
-        """
-        Restore marking from snapshot (rollback).
-        
-        Args:
-            snapshot: Dictionary from _snapshot_marking()
-            
-        Restores all place token counts to snapshotted values.
-        Used when maximal step execution fails partway through.
-        
-        Example:
-            snapshot = {'P1': 2, 'P2': 0, 'P3': 1}
-            
-            After partial execution: {P1: 1, P2: 1, P3: 1}
-            After restore: {P1: 2, P2: 0, P3: 1}  # Reverted ✓
-        """
-        # Handle both dict and list for places
-        places = self.model.places if hasattr(self.model, 'places') else []
-        if isinstance(places, dict):
-            places = places.values()
-        
-        for place in places:
-            if place.id in snapshot:
-                place.tokens = snapshot[place.id]
+        """Delegate to ConflictResolver."""
+        self._conflict_resolver._restore_marking(snapshot)
 
     def _execute_maximal_step(self, transition_set: List) -> tuple:
-        """
-        Execute all transitions in set atomically with rollback guarantee.
-        
-        Uses three-phase commit protocol:
-        1. VALIDATE: Check all transitions can fire
-        2. PREPARE: Create snapshot for rollback
-        3. COMMIT: Execute all transitions (rollback on failure)
-        
-        Args:
-            transition_set: List of Transition objects to fire atomically
-            
-        Returns:
-            Tuple of (success: bool, fired_transitions: List, error: str)
-            - success: True if all transitions fired, False if any failed
-            - fired_transitions: List of transitions that fired (empty on failure)
-            - error: Error message (empty on success)
-            
-        Guarantees:
-            - Atomicity: All fire or none fire
-            - Consistency: Net state remains valid
-            - Isolation: No partial states visible
-            
-        Example:
-            Success case:
-                execute([T1, T3]) → (True, [T1, T3], "")
-                
-            Failure case:
-                execute([T1, T3]) → (False, [], "T3 failed: insufficient tokens")
-                (Net state rolled back to before attempt)
-        """
-        if not transition_set:
-            return (False, [], "Empty transition set")
-        
-        # PHASE 1: VALIDATE
-        if not self._validate_all_can_fire(transition_set):
-            return (False, [], "Pre-condition failed: Not all transitions enabled")
-        
-        # PHASE 2: PREPARE (snapshot for rollback)
-        snapshot = self._snapshot_marking()
-        
-        try:
-            pass
-            # PHASE 3: COMMIT (execute atomically)
-            fired = []
-            
-            # Sort by priority for deterministic execution order
-            sorted_transitions = sorted(
-                transition_set, 
-                key=lambda t: (getattr(t, 'priority', 0), t.id), 
-                reverse=True
-            )
-            
-            # Import arc types for proper handling
-            from shypn.netobjs.inhibitor_arc import InhibitorArc
-            from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
-            from shypn.netobjs.test_arc import TestArc
-            
-            for transition in sorted_transitions:
-                pass
-                # Remove input tokens
-                for arc in self.model.arcs:
-                    if arc.target == transition:
-                        pass
-                        # Input arc (place → transition)
-                        place = arc.source
-                        
-                        # Skip arcs that don't consume tokens (test arcs only)
-                        # Inhibitor arcs DO consume tokens in SHPN (Living Systems semantics)
-                        arc_type = getattr(arc, 'arc_type', 'normal')
-                        if arc_type == 'test':
-                            continue  # Test arcs are read arcs - catalyst behavior
-                        
-                        # CRITICAL: ALWAYS use weight for consumption (NOT threshold!)
-                        # Threshold is for enablement only, weight is for token transfer
-                        tokens_consumed = getattr(arc, 'weight', 1)
-                        
-                        # Safety check (should not fail after validation)
-                        if place.tokens < tokens_consumed:
-                            raise RuntimeError(
-                                f"{transition.id} cannot fire: {place.id} has "
-                                f"{place.tokens} < {tokens_consumed} tokens"
-                            )
-                        
-                        place.tokens -= tokens_consumed
-                
-                # Execute transition behavior (if any)
-                if hasattr(transition, 'behavior') and transition.behavior is not None:
-                    try:
-                        transition.behavior.execute()
-                    except (AttributeError, TypeError, ValueError) as e:
-                        raise RuntimeError(
-                            f"{transition.id} behavior failed: {e}"
-                        )
-                
-                # Add output tokens
-                for arc in self.model.arcs:
-                    if arc.source == transition:
-                        pass
-                        # Output arc (transition → place)
-                        place = arc.target
-                        tokens_produced = getattr(arc, 'weight', 1)
-                        place.tokens += tokens_produced
-                
-                fired.append(transition)
-            
-            # SUCCESS: All transitions fired
-            return (True, fired, "")
-            
-        except Exception as e:
-            self.logger.error(f"Transition firing failed: {e}")
-            pass
-            # ROLLBACK: Restore snapshot
-            self._restore_marking(snapshot)
-            return (False, [], f"Execution failed: {e}, rolled back")
+        """Delegate to ConflictResolver."""
+        return self._conflict_resolver.execute_maximal_step(transition_set)
 
     def _select_transition(self, enabled_transitions: List) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
@@ -2625,7 +2003,7 @@ class SimulationController:
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
-    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> List:
+    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> Tuple[List, List]:
         """Resolve continuous transition conflicts using LocalityDetector.
 
         Two transitions belong to the same conflict group when their localities
@@ -2660,8 +2038,8 @@ class SimulationController:
 
         # Build footprint per transition and reverse map place → transitions.
         # Locality.input_places + output_places already excludes catalyst/test arcs.
-        trans_footprint = {}   # transition_id → list of place objects
-        place_to_trans = {}    # place_id → set of transition_ids
+        trans_footprint: Dict[Any, Any] = {}   # transition_id → list of place objects
+        place_to_trans: Dict[Any, Any] = {}    # place_id → set of transition_ids
 
         for trans_tuple in continuous_enabled:
             tid = trans_tuple[0].id
@@ -2683,26 +2061,26 @@ class SimulationController:
             if start_id in visited:
                 continue
 
-            group = set()
+            bfs_group: Set[Any] = set()
             queue = [start_id]
             while queue:
                 cur = queue.pop()
-                if cur in group:
+                if cur in bfs_group:
                     continue
-                group.add(cur)
+                bfs_group.add(cur)
                 visited.add(cur)
                 for place in trans_footprint.get(cur, []):
                     for nbr in place_to_trans.get(place.id, set()):
-                        if nbr not in group and nbr in enabled_ids:
+                        if nbr not in bfs_group and nbr in enabled_ids:
                             queue.append(nbr)
 
-            if len(group) > 1:
-                conflict_groups.append([transition_data[tid][0] for tid in group])
+            if len(bfs_group) > 1:
+                conflict_groups.append([transition_data[tid][0] for tid in bfs_group])
 
         # Apply conflict resolution policy within each group
         solo = []
         preemptive_groups = []
-        conflicting_ids = set()
+        conflicting_ids: Set[Any] = set()
 
         for group in conflict_groups:
             all_preemptive = (
@@ -2803,7 +2181,7 @@ class SimulationController:
     #           Testable execution logic in isolation
     #           Clear separation of concerns
 
-    def run(self, time_step: float = None, max_steps: Optional[int] = None) -> bool:
+    def run(self, time_step: Optional[float] = None, max_steps: Optional[int] = None) -> bool:
         """Start continuous simulation execution.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2834,7 +2212,7 @@ class SimulationController:
         """
         return self._continuous_executor._simulation_loop()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the continuous simulation.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2847,7 +2225,7 @@ class SimulationController:
         """
         self._continuous_executor.stop()
 
-    def reset(self):
+    def reset(self) -> None:  # type: ignore[no-redef]
         """Reset the simulation to initial marking.
         
         This stops any running simulation and resets all places to their
@@ -2889,7 +2267,7 @@ class SimulationController:
         self._update_enablement_states()
         self._notify_step_listeners()
     
-    def reset_for_new_model(self, new_model):
+    def reset_for_new_model(self, new_model: Any) -> None:
         """Reset controller for a completely new model (File→Open, Import, etc.).
         
         This is more comprehensive than reset() - it recreates all internal
@@ -2956,14 +2334,10 @@ class SimulationController:
             try:
                 _cb(self.data_collector)
             except Exception as e:
-                import logging
                 logging.getLogger(__name__).warning(f"Error in data_collector listener: {e}")
-        
+
         # PHASE 1-2 FIX: Restore callback after recreating data collector
         self.on_simulation_complete = saved_callback
-        if saved_callback:
-            pass
-            # print(f"[RESET_MODEL] ✅ Preserved on_simulation_complete callback")
         
         # Reset data collector if exists (legacy compatibility)
         if self.data_collector is not None:

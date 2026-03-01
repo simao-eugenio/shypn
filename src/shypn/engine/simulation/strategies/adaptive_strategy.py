@@ -14,7 +14,7 @@ More efficient than Gillespie SSA for models with many reactions,
 while maintaining reasonable accuracy.
 """
 
-from typing import List
+from typing import Any, List
 from .base_strategy import SimulationStrategy
 
 
@@ -32,7 +32,7 @@ class AdaptiveStrategy(SimulationStrategy):
     - Purely continuous models - use ContinuousStrategy
     """
     
-    def __init__(self, controller, epsilon: float = 0.03):
+    def __init__(self, controller: Any, epsilon: float = 0.03):
         """Initialize adaptive strategy.
         
         Args:
@@ -65,7 +65,7 @@ class AdaptiveStrategy(SimulationStrategy):
         
         # Use controller's hybrid step (handles adaptive tau internally)
         try:
-            self.controller._step(time_step)
+            self.controller.step(time_step)
             return True
         except Exception:
             return False

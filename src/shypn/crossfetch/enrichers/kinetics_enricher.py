@@ -329,7 +329,7 @@ class KineticsEnricher(EnricherBase):
         match_by: str
     ) -> Dict[str, Any]:
         """Build lookup dictionary for transitions."""
-        lookup = {}
+        lookup: Dict[str, Any] = {}
         
         if not hasattr(pathway, "transitions"):
             return lookup
@@ -393,7 +393,7 @@ class KineticsEnricher(EnricherBase):
         
         # Collect statistics
         rates = []
-        law_types = {}
+        law_types: Dict[str, int] = {}
         
         for kinetic_data in kinetics.values():
             if "rate" in kinetic_data:

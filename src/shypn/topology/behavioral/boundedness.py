@@ -25,7 +25,7 @@ Implementation approach:
 - Optionally explore marking space to detect unbounded places
 """
 
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
@@ -56,7 +56,7 @@ class BoundednessAnalyzer(TopologyAnalyzer):
         self.name = "Boundedness"
         self.description = "Check if places have bounded token capacity"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         max_bound: int = 1000,
         check_conservation: bool = True,
@@ -139,7 +139,7 @@ class BoundednessAnalyzer(TopologyAnalyzer):
             # Determine overflow risk
             overflow_risk = self._assess_overflow_risk(
                 place_bounds,
-                unbounded_places,
+                unbounded_places,  # type: ignore[arg-type]
                 max_bound
             )
             
@@ -249,12 +249,12 @@ class BoundednessAnalyzer(TopologyAnalyzer):
         # Source places: no inputs
         sources = [pid for pid, count in place_inputs.items() if count == 0]
         info['has_sources'] = len(sources) > 0
-        info['source_places'] = sources
+        info['source_places'] = sources  # type: ignore[assignment]
         
         # Sink places: no outputs
         sinks = [pid for pid, count in place_outputs.items() if count == 0]
         info['has_sinks'] = len(sinks) > 0
-        info['sink_places'] = sinks
+        info['sink_places'] = sinks  # type: ignore[assignment]
         
         return info
     
@@ -264,7 +264,7 @@ class BoundednessAnalyzer(TopologyAnalyzer):
         structural_info: Dict[str, Any],
         is_conservative: bool,
         max_bound: int
-    ) -> tuple:
+    ) -> Tuple[bool, Any, List[str]]:
         """Determine overall boundedness from analyses.
         
         Args:
@@ -310,7 +310,7 @@ class BoundednessAnalyzer(TopologyAnalyzer):
         
         # Determine boundedness
         if unbounded_places:
-            return False, None, unbounded_places
+            return False, None, unbounded_places  # type: ignore[return-value]
         
         # Find bound level (max tokens in any place)
         if place_bounds:

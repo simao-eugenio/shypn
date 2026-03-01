@@ -4,6 +4,7 @@
 Combines curved path from CurvedArc with hollow circle marker from InhibitorArc.
 """
 import math
+from typing import Optional
 from shypn.netobjs.curved_arc import CurvedArc
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 
@@ -23,13 +24,13 @@ class CurvedInhibitorArc(CurvedArc):
     # Marker size (same as InhibitorArc)
     MARKER_RADIUS = 8.0
     
-    def __init__(self, source, target, id: int, name: str, weight: float = 1):
+    def __init__(self, source, target, id: str, name: str, weight: float = 1):
         """Initialize a curved inhibitor arc.
         
         Args:
             source: Source PetriNetObject (typically a Place)
             target: Target PetriNetObject (typically a Transition)
-            id: Unique integer identifier (immutable, system-assigned)
+            id: Unique string identifier (immutable, system-assigned)
             name: Unique name in format "CI1", "CI2", etc. (immutable, system-assigned)
             weight: Arc weight (default: 1)
         """
@@ -52,7 +53,7 @@ class CurvedInhibitorArc(CurvedArc):
         """
         # Use InhibitorArc's marker rendering
         # This is composition through method delegation
-        InhibitorArc._render_arrowhead(self, cr, x, y, dx, dy, zoom)
+        InhibitorArc._render_arrowhead(self, cr, x, y, dx, dy, zoom)  # type: ignore[arg-type]
     
     def render(self, cr, zoom=1.0):
         """Render curved inhibitor arc with line stopping before the hollow circle.
@@ -182,7 +183,7 @@ class CurvedInhibitorArc(CurvedArc):
         cr.new_path()
     
     def _render_weight_curved(self, cr, x1: float, y1: float, x2: float, y2: float,
-                             cp_x: float, cp_y: float, curve_offset: float, 
+                             cp_x: float, cp_y: float, curve_offset: Optional[float],
                              zoom: float = 1.0):
         """Render weight label on curved inhibitor arc.
         
@@ -301,7 +302,7 @@ class CurvedInhibitorArc(CurvedArc):
             zoom: Current zoom level
         """
         # Use InhibitorArc's threshold label rendering
-        InhibitorArc._render_threshold_label_curved(self, cr, x1, y1, x2, y2, 
+        InhibitorArc._render_threshold_label_curved(self, cr, x1, y1, x2, y2,  # type: ignore[arg-type]
                                                     cp_x, cp_y, threshold_value, zoom)
     
     def consumes_tokens(self) -> bool:

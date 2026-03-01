@@ -63,7 +63,7 @@ class EnergyDissipationValidator(BaseValidator):
         self._final_adp: Optional[float] = None
         self._final_pi: Optional[float] = None
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset validator state for new simulation."""
         super().reset()
         self._initial_energy = None
@@ -77,7 +77,7 @@ class EnergyDissipationValidator(BaseValidator):
         self._final_adp = None
         self._final_pi = None
     
-    def update(self, time: float, places: Dict, transitions: Dict):
+    def update(self, time: float, places: Dict, transitions: Dict) -> None:
         """Update validator with current simulation state.
         
         Args:
@@ -89,9 +89,9 @@ class EnergyDissipationValidator(BaseValidator):
             return
         
         # Get current energy pool values
-        atp = places.get(self.atp_place_id).tokens if self.atp_place_id in places else 0.0
-        adp = places.get(self.adp_place_id).tokens if self.adp_place_id in places else 0.0
-        pi = places.get(self.pi_place_id).tokens if self.pi_place_id in places else 0.0
+        atp = places[self.atp_place_id].tokens if self.atp_place_id in places else 0.0
+        adp = places[self.adp_place_id].tokens if self.adp_place_id in places else 0.0
+        pi = places[self.pi_place_id].tokens if self.pi_place_id in places else 0.0
         
         total_energy = atp + adp + pi
         

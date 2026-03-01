@@ -57,7 +57,7 @@ class FairnessAnalyzer(TopologyAnalyzer):
         self.name = "Fairness"
         self.description = "Check if transitions get fair firing opportunities"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         check_conflicts: bool = True,
         check_starvation: bool = True,
@@ -127,7 +127,7 @@ class FairnessAnalyzer(TopologyAnalyzer):
             
             # Classify fairness level
             fairness_level = 'none'
-            fairness_violations = []
+            fairness_violations: List[Any] = []
             
             if classify_fairness:
                 fairness_level, fairness_violations = self._classify_fairness(
@@ -177,7 +177,7 @@ class FairnessAnalyzer(TopologyAnalyzer):
         conflicts = []
         
         # Build mapping of places to transitions that consume from them
-        place_consumers = {}
+        place_consumers: Dict[str, List[str]] = {}
         
         for arc in self.model.arcs:
             source_id = str(arc.source_id)

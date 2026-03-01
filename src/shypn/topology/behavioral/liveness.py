@@ -28,7 +28,7 @@ Implementation approach:
 - Classify liveness levels based on firing potential
 """
 
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
@@ -59,7 +59,7 @@ class LivenessAnalyzer(TopologyAnalyzer):
         self.name = "Liveness"
         self.description = "Check if transitions can fire infinitely often"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         check_structural: bool = True,
         check_deadlocks: bool = True,
@@ -187,14 +187,14 @@ class LivenessAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _build_transition_mappings(self) -> tuple:
+    def _build_transition_mappings(self) -> Tuple[Dict[str, List[Dict]], Dict[str, List[Dict]]]:
         """Build mappings of transitions to their input/output places.
         
         Returns:
             (trans_inputs, trans_outputs) where each maps transition ID to list of places
         """
-        trans_inputs = {}
-        trans_outputs = {}
+        trans_inputs: Dict[str, List[Any]] = {}
+        trans_outputs: Dict[str, List[Any]] = {}
         
         for transition in self.model.transitions:
             trans_id = str(transition.id)
@@ -351,7 +351,7 @@ class LivenessAnalyzer(TopologyAnalyzer):
         structurally_enabled: bool,
         token_flow: Dict,
         deadlock_impact: Dict
-    ) -> tuple:
+    ) -> Tuple[str, Dict[str, Any]]:
         """Classify transition into liveness level.
         
         Args:

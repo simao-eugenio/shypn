@@ -26,7 +26,7 @@ Usage in rate expressions:
 
 import numpy as np
 import math
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, cast
 
 
 # =============================================================================
@@ -621,7 +621,7 @@ def interpolate(x: float, x_points: list, y_points: list) -> float:
         # Custom curve through points
         rate = interpolate(time, [0, 10, 20, 30], [0, 5, 8, 10])
     """
-    return np.interp(x, x_points, y_points)
+    return float(np.interp(x, x_points, y_points))
 
 
 def smooth_threshold(x: float, threshold: float, width: float) -> float:
@@ -650,9 +650,9 @@ def smooth_threshold(x: float, threshold: float, width: float) -> float:
 # =============================================================================
 
 # Global state for Wiener process (maintain continuity between calls)
-_wiener_state = {}
+_wiener_state: Dict[Any, Any] = {}
 
-def wiener(t: float, amplitude: float = 1.0, dt: float = 0.1, seed: int = None) -> float:
+def wiener(t: float, amplitude: float = 1.0, dt: float = 0.1, seed: Optional[int] = None) -> float:
     """Wiener process (Brownian motion) - continuous stochastic process.
     
     Generates correlated random noise using discrete-time approximation:
@@ -1209,7 +1209,7 @@ def electro_driving_force(V_m: float, z: float, E_ion: float) -> float:
 # CATALOG DICTIONARY (for easy access)
 # =============================================================================
 
-FUNCTION_CATALOG = {
+FUNCTION_CATALOG: Dict[str, Callable[..., Any]] = {
     # Basic math functions (from Python math module)
     'exp': math.exp,
     'log': math.log,
@@ -1296,16 +1296,16 @@ FUNCTION_CATALOG = {
 }
 
 
-def get_catalog() -> Dict[str, Callable]:
+def get_catalog() -> Dict[str, Callable[..., Any]]:
     """Get the complete function catalog.
     
     Returns:
         Dictionary mapping function names to callable functions
     """
-    return FUNCTION_CATALOG.copy()
+    return dict(FUNCTION_CATALOG)
 
 
-def get_function(name: str) -> Optional[Callable]:
+def get_function(name: str) -> Optional[Callable[..., Any]]:
     """Get a specific function from the catalog.
     
     Args:
@@ -1314,7 +1314,7 @@ def get_function(name: str) -> Optional[Callable]:
     Returns:
         Function callable, or None if not found
     """
-    return FUNCTION_CATALOG.get(name)
+    return cast(Optional[Callable[..., Any]], FUNCTION_CATALOG.get(name))
 
 
 def list_functions() -> list:

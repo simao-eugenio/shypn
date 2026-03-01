@@ -4,7 +4,7 @@ Settings Transaction Context Manager
 Provides convenient context manager for atomic settings updates.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from .buffered_settings import BufferedSimulationSettings
 
 
@@ -46,7 +46,7 @@ class SettingsTransaction:
         self._committed = False
         self._rolled_back = False
     
-    def __enter__(self):
+    def __enter__(self) -> 'SettingsTransaction':
         """Enter transaction context.
         
         Returns:
@@ -54,7 +54,7 @@ class SettingsTransaction:
         """
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit transaction context.
         
         Automatically commits if no exception and auto_commit=True,
@@ -81,7 +81,7 @@ class SettingsTransaction:
             if not self._rolled_back:
                 self.buffered.rollback()
         
-        return False  # Don't suppress exceptions
+        return  # Don't suppress exceptions
     
     def commit(self) -> bool:
         """Explicitly commit transaction.
@@ -100,7 +100,7 @@ class SettingsTransaction:
             self._committed = True
         return success
     
-    def rollback(self):
+    def rollback(self) -> None:
         """Explicitly rollback transaction."""
         if self._committed:
             raise RuntimeError("Cannot rollback after commit")
@@ -172,7 +172,7 @@ class SettingsTransactionBuilder:
             self._error_message = str(e)
         return self
     
-    def set_duration(self, duration: float, units) -> 'SettingsTransactionBuilder':
+    def set_duration(self, duration: float, units: Any) -> 'SettingsTransactionBuilder':
         """Set duration with units.
         
         Args:

@@ -3,7 +3,7 @@
 
 Calculates metrics for each place based on collected time-series data.
 """
-from typing import List, Optional
+from typing import Any, List, Optional
 import statistics
 from dataclasses import dataclass
 
@@ -27,7 +27,7 @@ class SpeciesMetrics:
 class SpeciesAnalyzer:
     """Analyze place (species) data from simulation."""
     
-    def __init__(self, data_collector):
+    def __init__(self, data_collector: Any):
         """Initialize analyzer.
         
         Args:
@@ -52,7 +52,7 @@ class SpeciesAnalyzer:
             
         return results
         
-    def _analyze_place(self, place, duration: float) -> SpeciesMetrics:
+    def _analyze_place(self, place: Any, duration: float) -> SpeciesMetrics:
         """Analyze a single place.
         
         Args:
@@ -92,7 +92,7 @@ class SpeciesAnalyzer:
             
         return metrics
         
-    def _get_place_color(self, place) -> str:
+    def _get_place_color(self, place: Any) -> str:
         """Get place color for display.
         
         Args:

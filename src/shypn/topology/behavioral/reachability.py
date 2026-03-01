@@ -63,7 +63,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         self.name = "Reachability"
         self.description = "Explore reachable marking space"
     
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         max_states: int = 10000,
         max_depth: int = 100,
@@ -109,12 +109,22 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
         # ========================================================================
         # SIZE GUARD: Estimate state space to prevent state explosion freeze
         # ========================================================================
-        n_places = len(self.model.places)
-        n_transitions = len(self.model.transitions)
-        
-        # Estimate state space size (rough heuristic)
-        # Real state space can be much larger for complex nets
-        avg_tokens_per_place = sum(p.tokens for p in self.model.places) / n_places if n_places > 0 else 0
+        try:
+            n_places = len(self.model.places)
+            n_transitions = len(self.model.transitions)
+        except (TypeError, AttributeError):
+            return AnalysisResult(
+                success=False,
+                errors=["Model access failed - invalid model object"],
+                metadata={'analysis_time': self._end_timer(start_time)}
+            )
+
+        try:
+            # Estimate state space size (rough heuristic)
+            # Real state space can be much larger for complex nets
+            avg_tokens_per_place = sum(p.tokens for p in self.model.places) / n_places if n_places > 0 else 0
+        except (TypeError, AttributeError):
+            avg_tokens_per_place = 0
         estimated_states = int((avg_tokens_per_place + 1) ** n_places)
         
         # Warn if estimated state space is very large
@@ -214,7 +224,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
                 metadata={'analysis_time': self._end_timer(start_time)}
             )
     
-    def _create_explorer(self, parallel: Any, num_workers: Optional[int]):
+    def _create_explorer(self, parallel: Any, num_workers: Optional[int]) -> Any:
         """Create appropriate explorer strategy (OOP factory pattern).
         
         Args:
@@ -231,12 +241,12 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             # Phase 2: Maximal concurrent sets (EXPERIMENTAL - slow due to Python multiprocessing overhead)
             import warnings
             warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
-            return ParallelMaximalExplorer(self, num_workers)
+            return ParallelMaximalExplorer(self, num_workers)  # type: ignore[arg-type]
         else:
             # Phase 1: Basic work-stealing (EXPERIMENTAL - slow due to Python multiprocessing overhead)
             import warnings
             warnings.warn("Parallel modes are experimental and 100-125x slower than sequential. Use parallel=False for production.", UserWarning)
-            return ParallelBasicExplorer(self, num_workers)
+            return ParallelBasicExplorer(self, num_workers)  # type: ignore[arg-type]
     
     def _get_initial_marking(self) -> Dict[str, int]:
         """Get initial marking from model.

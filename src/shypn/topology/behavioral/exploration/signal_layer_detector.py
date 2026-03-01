@@ -135,7 +135,7 @@ class SignalLayerDetector:
             logger.warning(f"Could not compute model hash: {e}")
             return ""
     
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached layer detection results."""
         self._layer_cache = None
         self._model_hash = None
@@ -330,7 +330,7 @@ class SignalLayerDetector:
         Returns:
             Dict with statistics
         """
-        layer_counts = defaultdict(int)
+        layer_counts: Dict[int, int] = defaultdict(int)
         for layer in layer_assignment.values():
             layer_counts[layer] += 1
         

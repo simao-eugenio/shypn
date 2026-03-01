@@ -17,7 +17,7 @@ coupled chemical reactions. J. Phys. Chem., 81(25), 2340-2361.
 
 import random
 import math
-from typing import Optional, List
+from typing import Any, Optional, List
 from .base_strategy import SimulationStrategy
 
 
@@ -108,7 +108,7 @@ class GillespieStrategy(SimulationStrategy):
         return [t for t in candidates
                 if hasattr(t, 'transition_type') and t.transition_type == 'stochastic']
     
-    def _calculate_propensity(self, transition) -> float:
+    def _calculate_propensity(self, transition: Any) -> float:
         """Calculate propensity (stochastic rate) for a transition.
         
         Propensity = rate × (product of reactant marking combinations)
@@ -152,7 +152,7 @@ class GillespieStrategy(SimulationStrategy):
         
         return -math.log(r) / total_propensity
     
-    def _select_reaction(self, transitions: List, propensities: List[float], total: float):
+    def _select_reaction(self, transitions: List, propensities: List[float], total: float) -> Any:
         """Select which reaction fires using weighted sampling.
         
         Uses linear search with cumulative propensities.

@@ -29,6 +29,9 @@ IDManager can track object lifecycle and emit events for observers:
 
 from typing import Tuple, Optional, Callable, Dict, Any
 from contextlib import contextmanager
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Global reference to lifecycle ID scope manager (set by lifecycle system)
 _lifecycle_scope_manager: Optional['IDScopeManager'] = None  # type: ignore
@@ -266,7 +269,7 @@ class IDManager:
             self._next_module_id = numeric_id + 1
     
     @staticmethod
-    def extract_numeric_id(id_value: any, prefix: str = '') -> int:
+    def extract_numeric_id(id_value: Any, prefix: str = '') -> int:
         """Extract numeric part from an ID.
         
         Handles various ID formats:
@@ -379,7 +382,7 @@ class IDManager:
             except (TypeError, AttributeError, RuntimeError) as e:
                 logger.debug(f"Object creation callback failed: {e}")
     
-    def notify_modified(self, obj: Any, property_name: str = None, old_value: Any = None, new_value: Any = None):
+    def notify_modified(self, obj: Any, property_name: Optional[str] = None, old_value: Any = None, new_value: Any = None):
         """Notify observers that object was modified.
         
         Args:

@@ -1,9 +1,8 @@
 """Canvas Layout Sub-Controller.
 
 Handles graph-layout application for the Petri Net drawing canvas.
-This includes auto, hierarchical, force-directed, solar-system, circular
-and orthogonal layouts via the ``shypn.edit.graph_layout`` /
-``shypn.layout.sscc`` engines.
+This includes auto, hierarchical, force-directed, circular and orthogonal
+layouts via the ``shypn.edit.graph_layout`` engine.
 
 Extracted from ``ModelCanvasLoader`` to keep layout concerns isolated.
 """
@@ -103,58 +102,6 @@ class CanvasLayoutController:
     def _on_layout_force_clicked(self, menu, drawing_area, manager):
         """Apply force-directed (Fruchterman-Reingold) layout."""
         self._apply_specific_layout(manager, drawing_area, 'force_directed', 'Force-Directed')
-
-    def _on_layout_solar_system_clicked(self, menu, drawing_area, manager):
-        """Apply Solar System (SSCC) layout with unified physics."""
-        try:
-            from shypn.layout.sscc import SolarSystemLayoutEngine
-
-            if not manager.places and not manager.transitions:
-                self._show_layout_message("No objects to layout", drawing_area)
-                return
-
-            engine = SolarSystemLayoutEngine(
-                iterations=1000,
-                use_arc_weight=True,
-                scc_radius=50.0,
-                planet_orbit=300.0,
-                satellite_orbit=50.0,
-            )
-            positions = engine.apply_layout(
-                places=list(manager.places),
-                transitions=list(manager.transitions),
-                arcs=list(manager.arcs),
-            )
-
-            for obj_id, (x, y) in positions.items():
-                obj = None
-                for place in manager.places:
-                    if place.id == obj_id:
-                        obj = place
-                        break
-                if not obj:
-                    for transition in manager.transitions:
-                        if transition.id == obj_id:
-                            obj = transition
-                            break
-                if obj:
-                    obj.x = x
-                    obj.y = y
-
-            stats = engine.get_statistics()
-            message = (
-                f"Applied Solar System (SSCC) layout\n"
-                f"Physics: {stats['physics_model']}\n"
-                f"SCCs found: {stats['num_sccs']}\n"
-                f"Nodes in SCCs: {stats['num_nodes_in_sccs']}\n"
-                f"Free places: {stats['num_free_places']}"
-            )
-            self._show_layout_message(message, drawing_area)
-            drawing_area.queue_draw()
-
-        except Exception as e:
-            self.logger.error("Solar System layout error: %s", e, exc_info=True)
-            self._show_layout_message(f"Solar System layout error: {str(e)}", drawing_area)
 
     def _on_layout_circular_clicked(self, menu, drawing_area, manager):
         """Apply circular layout."""

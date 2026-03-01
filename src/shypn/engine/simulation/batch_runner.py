@@ -53,7 +53,7 @@ class BatchSimulationRunner:
     - Memory efficient: Discards unrecorded object data
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize batch runner."""
         self.is_cancelled = False
         
@@ -99,7 +99,7 @@ class BatchSimulationRunner:
         # Get base configuration from controller
         settings = controller.settings
         model = controller.model
-        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42
+        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42  # type: ignore[attr-defined]
         duration = settings.duration if hasattr(settings, 'duration') else 100.0
         
         # Store initial marking for reset between replicates
@@ -128,12 +128,10 @@ class BatchSimulationRunner:
         replicate_controller.data_collector.time_based_recording = True
         replicate_controller.data_collector.recording_time_interval = 0.5  # seconds
         
-        # CRITICAL: Ensure stochastic/continuous mode with tau-leaping
+        # τ-leaping is always active (use_tau_leaping setter is a no-op by design).
+        # All other settings (tau_epsilon, max_tau, use_parallel_stochastic, etc.) are
+        # preserved from the user's controller settings via the deepcopy above.
         replicate_controller.settings.use_tau_leaping = True
-        replicate_controller.settings.use_parallel_stochastic = True
-        replicate_controller.settings.tau_epsilon = 0.03
-        replicate_controller.settings.max_tau = 0.01
-        replicate_controller.settings.critical_threshold = 0.01
         
         for i in range(n_replicates):
             # Check for cancellation before starting replicate
@@ -143,15 +141,15 @@ class BatchSimulationRunner:
             
             try:
                 # Set unique seed for this replicate
-                replicate_controller.settings.random_seed = base_seed + i
+                replicate_controller.settings.random_seed = base_seed + i  # type: ignore[attr-defined]
                 
                 # Reset model to initial marking with optional noise
                 self._reset_model(
                     model, 
                     initial_marking,
-                    apply_noise=replicate_controller.settings.ic_noise_enabled,
-                    noise_percent=replicate_controller.settings.ic_noise_percent,
-                    noise_places=replicate_controller.settings.ic_noise_places,
+                    apply_noise=replicate_controller.settings.ic_noise_enabled,  # type: ignore[attr-defined]
+                    noise_percent=replicate_controller.settings.ic_noise_percent,  # type: ignore[attr-defined]
+                    noise_places=replicate_controller.settings.ic_noise_places,  # type: ignore[attr-defined]
                     seed=base_seed + i  # Use replicate-specific seed for noise
                 )
                 
@@ -164,7 +162,7 @@ class BatchSimulationRunner:
                 
                 # Calculate time step (use same as real-time mode)
                 dt = replicate_controller.settings.get_effective_dt()
-                max_steps = int(duration / dt) if dt > 0 else 1000
+                max_steps = int(duration / dt) if dt > 0 and duration is not None else 1000
                 
                 # Initialize enablement states before stepping
                 replicate_controller._update_enablement_states()
@@ -248,15 +246,7 @@ class BatchSimulationRunner:
         
         return results
     
-    def _reset_model(
-        self, 
-        model, 
-        initial_marking: Dict[str, float],
-        apply_noise: bool = False,
-        noise_percent: float = 20.0,
-        noise_places: Set[str] = None,
-        seed: int = None
-    ):
+    def _reset_model(self, model: Any, initial_marking: Dict[str, float], apply_noise: bool = False, noise_percent: float = 20.0, noise_places: Optional[Set[str]] = None, seed: Optional[int] = None) -> None:
         """Reset model places to initial marking with optional random perturbations.
         
         Supports both discrete (int) and continuous (float) concentrations.
@@ -318,7 +308,7 @@ class BatchSimulationRunner:
                     # Noise disabled: use exact initial value
                     place.tokens = base_value
     
-    def cancel(self):
+    def cancel(self) -> None:
         """Request cancellation of batch execution.
         
         Cancellation will occur after the current replicate completes.

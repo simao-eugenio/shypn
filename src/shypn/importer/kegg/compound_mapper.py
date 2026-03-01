@@ -3,6 +3,7 @@
 from shypn.netobjs import Place
 from shypn.netobjs.signal_type import SignalType
 from .converter_base import CompoundMapper, ConversionOptions
+import logging
 from .models import KEGGEntry
 
 # Import CompoundResolver for cross-reference database lookups
@@ -10,7 +11,7 @@ try:
     from shypn.thermodynamics.compound_resolver import CompoundResolver
     _resolver = CompoundResolver()
 except ImportError:
-    _resolver = None
+    _resolver = None  # type: ignore[assignment]
 
 
 # Common cofactors that can be filtered out to reduce clutter
@@ -106,7 +107,7 @@ class StandardCompoundMapper(CompoundMapper):
     
     def __init__(self):
         """Initialize compound mapper."""
-        pass
+        self.logger = logging.getLogger(__name__)
     
     def _get_biological_name(self, entry: KEGGEntry) -> str:
         """Extract biological name from KEGG entry.

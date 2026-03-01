@@ -81,16 +81,16 @@ class HubBasedMassAssigner:
             total_degree = in_degree.get(place.id, 0) + out_degree.get(place.id, 0)
             
             if total_degree >= self.SUPER_HUB_THRESHOLD:
-                masses[place.id] = self.MASS_SUPER_HUB
+                masses[place.id] = self.MASS_SUPER_HUB  # type: ignore[index]
                 self.hub_stats[place.id] = ('super-hub', total_degree)
             elif total_degree >= self.MAJOR_HUB_THRESHOLD:
-                masses[place.id] = self.MASS_MAJOR_HUB
+                masses[place.id] = self.MASS_MAJOR_HUB  # type: ignore[index]
                 self.hub_stats[place.id] = ('major-hub', total_degree)
             elif total_degree >= self.MINOR_HUB_THRESHOLD:
-                masses[place.id] = self.MASS_MINOR_HUB
+                masses[place.id] = self.MASS_MINOR_HUB  # type: ignore[index]
                 self.hub_stats[place.id] = ('minor-hub', total_degree)
             else:
-                masses[place.id] = self.MASS_PLACE
+                masses[place.id] = self.MASS_PLACE  # type: ignore[index]
                 self.hub_stats[place.id] = ('regular', total_degree)
         
         # Transitions: also apply hub-based masses (NEW!)
@@ -103,16 +103,16 @@ class HubBasedMassAssigner:
             
             # Apply same hub logic to transitions
             if total_degree >= self.SUPER_HUB_THRESHOLD:
-                masses[transition.id] = self.MASS_SUPER_HUB
+                masses[transition.id] = self.MASS_SUPER_HUB  # type: ignore[index]
                 self.hub_stats[transition.id] = ('super-hub-transition', total_degree)
             elif total_degree >= self.MAJOR_HUB_THRESHOLD:
-                masses[transition.id] = self.MASS_MAJOR_HUB
+                masses[transition.id] = self.MASS_MAJOR_HUB  # type: ignore[index]
                 self.hub_stats[transition.id] = ('major-hub-transition', total_degree)
             elif total_degree >= self.MINOR_HUB_THRESHOLD:
-                masses[transition.id] = self.MASS_MINOR_HUB
+                masses[transition.id] = self.MASS_MINOR_HUB  # type: ignore[index]
                 self.hub_stats[transition.id] = ('minor-hub-transition', total_degree)
             else:
-                masses[transition.id] = self.MASS_TRANSITION  # Light mass for regular transitions
+                masses[transition.id] = self.MASS_TRANSITION  # type: ignore[index]
                 self.hub_stats[transition.id] = ('transition', total_degree)
         
         return masses

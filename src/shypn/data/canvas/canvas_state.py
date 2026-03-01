@@ -221,7 +221,7 @@ class DocumentState:
             filename: Initial filename/path, or None for new unsaved document
         """
         self.filename = filename
-        self.filepath = None  # Full path when saved
+        self.filepath: Optional[str] = None  # Full path when saved
         self._modified = False
         self.created_at = datetime.now()
         self.modified_at = self.created_at

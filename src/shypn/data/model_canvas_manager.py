@@ -47,6 +47,7 @@ import json
 import os
 import time
 from datetime import datetime
+from typing import Optional
 from shypn.events import EventBus
 from shypn.core.document_id import doc_id
 from shypn.netobjs import Place, Arc, Transition
@@ -78,6 +79,8 @@ from shypn.core.services import (
     has_parallel_arcs as arc_has_parallel,
     get_arc_offset_for_rendering as arc_get_offset_for_rendering,
 )
+from shypn.core.services.document_state_service import DocumentStateService
+from shypn.core.services.document_serializer import get_serializer as _get_doc_serializer
 
 
 class ModelCanvasManager:
@@ -149,8 +152,8 @@ class ModelCanvasManager:
         self._fit_to_page_vertical_offset = 0  # Default vertical offset (0% = centered)
         
         # Flag to track if document was imported (needs "Save As" on first save)
-        self._is_imported = False
-        
+        # Sprint 19: managed by DocumentStateService — accessed via property below.
+
         # REMOVED: simulation_settings (moved to controller, session-specific)
         # Simulation parameters like duration, dt, batch mode should NOT be model-dependent
         
@@ -158,13 +161,11 @@ class ModelCanvasManager:
         # This provides a persistent model for thermodynamic settings, compound mappings, etc.
         from shypn.data.canvas import DocumentModel
         self._document_model = DocumentModel()
-        
+
         # ===== PER-DOCUMENT FILE STATE (Phase 1: Multi-Document Support) =====
-        # Each manager now owns its filepath and dirty state
-        # This fixes critical data loss issues from single global persistency
-        self.filepath = None  # Full path to saved file (None if unsaved)
-        self._is_dirty = False  # Has unsaved changes
-        self.on_dirty_changed = None  # Callback(is_dirty) when dirty state changes
+        # Sprint 19: DocumentStateService owns dirty flag, filepath, import state.
+        # MCM exposes them via properties below so all existing callers work unchanged.
+        self._state_svc: DocumentStateService = DocumentStateService(filename=filename)
         
         # Pointer position (for pointer-centered zoom)
         self.pointer_x = 0
@@ -186,6 +187,10 @@ class ModelCanvasManager:
         
         # Observer pattern for model changes
         self._observers = []  # List of observer callbacks
+        
+        # Arc geometry service (Phase 6 extraction — pure math + arc mutation)
+        from shypn.core.services.arc_geometry_service import ArcGeometryService
+        self._arc_geometry = ArcGeometryService(manager=self)
         
         # Ensure all arcs have proper manager references
         self.ensure_arc_references()
@@ -359,9 +364,58 @@ class ModelCanvasManager:
     def _next_arc_id(self, value):
         """Set next arc ID counter (delegates to IDManager)."""
         self.document_controller.id_manager._next_arc_id = value
-    
+
+    # ------------------------------------------------------------------
+    # Sprint 19 — DocumentStateService proxy properties
+    # All dirty/filepath/import state is owned by self._state_svc.  The
+    # properties below keep the existing attribute API backward-compatible.
+    # ------------------------------------------------------------------
+
     @property
-    def thermodynamic_settings(self):
+    def filepath(self):
+        """Full path to the saved file, or ``None`` for unsaved documents."""
+        return self._state_svc.filepath
+
+    @filepath.setter
+    def filepath(self, value):
+        self._state_svc.filepath = value
+        # Keep document_model in sync (used by serialization)
+        if hasattr(self, '_document_model') and self._document_model is not None:
+            self._document_model.filepath = value
+
+    @property
+    def _is_dirty(self) -> bool:
+        """Read-only internal dirty flag (canonical state in _state_svc)."""
+        return self._state_svc.is_dirty
+
+    @property
+    def _is_imported(self) -> bool:
+        """Read-only import flag."""
+        return self._state_svc.is_imported
+
+    @_is_imported.setter
+    def _is_imported(self, value: bool) -> None:
+        self._state_svc._is_imported = value
+
+    @property
+    def on_dirty_changed(self):
+        """Dirty-state UI callback; set by ModelCanvasLoader at canvas setup."""
+        return self._state_svc.on_dirty_changed
+
+    @on_dirty_changed.setter
+    def on_dirty_changed(self, callback) -> None:
+        self._state_svc.on_dirty_changed = callback
+
+    @property
+    def _suppress_callbacks(self) -> bool:
+        """When True, dirty-state callbacks are temporarily suppressed."""
+        return self._state_svc.suppress_callbacks
+
+    @_suppress_callbacks.setter
+    def _suppress_callbacks(self, value: bool) -> None:
+        self._state_svc.suppress_callbacks = value
+
+
         """Get thermodynamic settings dictionary (delegates to DocumentModel)."""
         return self._document_model.thermodynamic_settings
     
@@ -1266,427 +1320,85 @@ class ModelCanvasManager:
             logger.debug(f"  {transition.id}: Not enabled (insufficient tokens)")
     
     def detect_parallel_arcs(self, arc):
-        """Find arcs parallel to the given arc (same source/target or reversed).
-        
-        Parallel arcs are arcs that connect the same two nodes, either in the
-        same direction or opposite direction. These need visual offset to
-        avoid overlapping.
-        
-        Args:
-            arc: Arc to check for parallels
-            
-        Returns:
-            list: List of parallel arcs (excluding the given arc)
-        """
-        parallels = []
-        
-        for other in self.arcs:
-            if other == arc:
-                continue
-            
-            # Same direction: same source and target
-            if (other.source == arc.source and other.target == arc.target):
-                parallels.append(other)
-            
-            # Opposite direction: reversed source and target
-            elif (other.source == arc.target and other.target == arc.source):
-                parallels.append(other)
-        
-        if not parallels:
-            pass  # No parallels found
-        
-        return parallels
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.detect_parallel_arcs(arc)
     
     def _auto_convert_parallel_arcs_to_curved(self, new_arc):
-        """Automatically convert parallel arcs and loop arcs to curved arcs.
-        
-        REFACTORED: Now delegates to helper methods for better readability.
-        
-        Args:
-            new_arc: The newly added arc that may create parallels or be a loop
-        """
-        # SAFETY: Validate arc has valid source/target references
-        if not self._validate_arc_references(new_arc):
-            return
-        
-        # Check if this is a loop arc (source == target)
-        is_loop = (new_arc.source == new_arc.target)
-        
-        # Detect parallel arcs
-        parallels = self.detect_parallel_arcs(new_arc)
-        
-        # Convert loop arcs or parallel arcs using extracted helper methods
-        if is_loop:
-            self._convert_loop_arc(new_arc)
-            self.mark_dirty()
-            return
-        
-        if parallels:
-            # Check for opposite-direction pair (A→B and B→A)
-            opposite_arc = self._find_opposite_direction_arc(new_arc, parallels)
-            
-            if opposite_arc:
-                # Convert pair with perpendicular offsets
-                self._convert_opposite_direction_pair(new_arc, opposite_arc)
-            else:
-                # Convert same-direction parallels without special offsets
-                self._convert_same_direction_parallels(new_arc, parallels)
-            
-            self.mark_dirty()
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry.auto_convert_parallel_arcs_to_curved(new_arc)
     
     def _validate_arc_references(self, arc):
-        """Validate arc has valid source/target references.
-        
-        Args:
-            arc: Arc to validate
-            
-        Returns:
-            bool: True if valid, False if invalid
-        """
-        if not hasattr(arc, 'source') or arc.source is None:
-            return False
-        if not hasattr(arc, 'target') or arc.target is None:
-            return False
-        if not hasattr(arc.source, 'x') or not hasattr(arc.source, 'y'):
-            return False
-        if not hasattr(arc.target, 'x') or not hasattr(arc.target, 'y'):
-            return False
-        return True
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.validate_arc_references(arc)
     
     def _convert_loop_arc(self, arc):
-        """Convert loop arc (source == target) to curved with fixed offset.
-        
-        Args:
-            arc: Loop arc to convert
-            
-        Returns:
-            bool: True if converted, False if already curved
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        if isinstance(arc, Arc) and not isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_arc = make_curved(arc)
-            curved_arc.control_offset_x = 60.0
-            curved_arc.control_offset_y = -60.0
-            self._replace_arc_in_list(arc, curved_arc)
-            return True
-        return False
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._convert_loop_arc(arc)
     
     def _find_opposite_direction_arc(self, arc, parallels):
-        """Find arc going in opposite direction (A→B vs B→A).
-        
-        Args:
-            arc: Reference arc
-            parallels: List of parallel arcs
-            
-        Returns:
-            Arc or None: Opposite-direction arc if found
-        """
-        for parallel in parallels:
-            if parallel.source == arc.target and parallel.target == arc.source:
-                return parallel
-        return None
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._find_opposite_direction_arc(arc, parallels)
     
     def _calculate_perpendicular_offset(self, arc1, arc2, offset_distance=50.0):
-        """Calculate perpendicular offset for opposite-direction arc pair.
-        
-        Args:
-            arc1: First arc (A→B)
-            arc2: Second arc (B→A)
-            offset_distance: Distance to offset arcs
-            
-        Returns:
-            tuple: ((offset_x1, offset_y1), (offset_x2, offset_y2))
-        """
-        import math
-        
-        # Calculate direction vector
-        dx, dy, length = self._compute_direction_vector(arc1)
-        
-        if length <= 1:
-            return ((0, 0), (0, 0))
-        
-        # Normalize and compute perpendicular
-        dx, dy = self._normalize_vector(dx, dy, length)
-        perp_x, perp_y = self._compute_perpendicular_vector(dx, dy)
-        
-        # Determine offset directions
-        return self._compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance)
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_perpendicular_offset(arc1, arc2, offset_distance)
     
     # Helper methods for _calculate_perpendicular_offset (PHASE 1 EXTRACTION)
     
-    @staticmethod
-    def _compute_direction_vector(arc):
-        """Compute direction vector between arc endpoints.
-        
-        Args:
-            arc: Arc to compute direction for.
-            
-        Returns:
-            tuple: (dx, dy, length)
-        """
-        import math
-        dx = arc.target.x - arc.source.x
-        dy = arc.target.y - arc.source.y
-        length = math.sqrt(dx*dx + dy*dy)
-        return dx, dy, length
+    def _compute_direction_vector(self, arc):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_direction_vector(arc)
     
-    @staticmethod
-    def _normalize_vector(dx, dy, length):
-        """Normalize a vector to unit length.
-        
-        Args:
-            dx, dy: Vector components.
-            length: Vector length.
-            
-        Returns:
-            tuple: (normalized_dx, normalized_dy)
-        """
-        return dx / length, dy / length
+    def _normalize_vector(self, dx, dy, length):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._normalize_vector(dx, dy, length)
     
-    @staticmethod
-    def _compute_perpendicular_vector(dx, dy):
-        """Compute perpendicular vector (90° rotation).
-        
-        Args:
-            dx, dy: Normalized direction vector.
-            
-        Returns:
-            tuple: (perp_x, perp_y)
-        """
-        return -dy, dx
+    def _compute_perpendicular_vector(self, dx, dy):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_perpendicular_vector(dx, dy)
     
-    @staticmethod
-    def _compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance):
-        """Compute offset pair based on arc IDs.
-        
-        Args:
-            arc1, arc2: Arcs to offset.
-            perp_x, perp_y: Perpendicular vector.
-            offset_distance: Offset distance.
-            
-        Returns:
-            tuple: ((offset1_x, offset1_y), (offset2_x, offset2_y))
-        """
-        if arc1.id < arc2.id:
-            offset1 = (perp_x * offset_distance, perp_y * offset_distance)
-            offset2 = (-perp_x * offset_distance, -perp_y * offset_distance)
-        else:
-            offset1 = (-perp_x * offset_distance, -perp_y * offset_distance)
-            offset2 = (perp_x * offset_distance, perp_y * offset_distance)
-        return (offset1, offset2)
+    def _compute_offset_pair(self, arc1, arc2, perp_x, perp_y, offset_distance):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._compute_offset_pair(arc1, arc2, perp_x, perp_y, offset_distance)
     
     def _convert_opposite_direction_pair(self, new_arc, opposite_arc):
-        """Convert opposite-direction arc pair (A→B and B→A) with perpendicular offsets.
-        
-        Args:
-            new_arc: Newly added arc
-            opposite_arc: Existing arc in opposite direction
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        # Calculate offsets
-        (offset1, offset2) = self._calculate_perpendicular_offset(new_arc, opposite_arc)
-        
-        # Convert and offset new_arc
-        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_new = make_curved(new_arc)
-            curved_new.control_offset_x = offset1[0]
-            curved_new.control_offset_y = offset1[1]
-            self._replace_arc_in_list(new_arc, curved_new)
-        
-        # Convert and offset opposite_arc
-        if isinstance(opposite_arc, (Arc, InhibitorArc)) and not isinstance(opposite_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_opposite = make_curved(opposite_arc)
-            curved_opposite.control_offset_x = offset2[0]
-            curved_opposite.control_offset_y = offset2[1]
-            self._replace_arc_in_list(opposite_arc, curved_opposite)
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._convert_opposite_direction_pair(new_arc, opposite_arc)
     
     def _convert_same_direction_parallels(self, new_arc, parallels):
-        """Convert same-direction parallel arcs without special offsets.
-        
-        Args:
-            new_arc: Newly added arc
-            parallels: List of parallel arcs (same direction)
-        """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
-        from shypn.utils.arc_transform import make_curved
-        
-        # Convert all parallels
-        for parallel in parallels:
-            if isinstance(parallel, (Arc, InhibitorArc)) and not isinstance(parallel, (CurvedArc, CurvedInhibitorArc)):
-                curved_arc = make_curved(parallel)
-                self._replace_arc_in_list(parallel, curved_arc)
-        
-        # Convert new_arc too if not curved
-        if isinstance(new_arc, Arc) and not isinstance(new_arc, (CurvedArc, CurvedInhibitorArc)):
-            curved_new = make_curved(new_arc)
-            self._replace_arc_in_list(new_arc, curved_new)
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._convert_same_direction_parallels(new_arc, parallels)
     
     def _replace_arc_in_list(self, old_arc, new_arc):
-        """Replace arc in arcs list and set up manager references.
-        
-        Args:
-            old_arc: Arc to replace
-            new_arc: Replacement curved arc
-        """
-        try:
-            index = self.arcs.index(old_arc)
-            self.arcs[index] = new_arc
-            new_arc._manager = self
-            new_arc.on_changed = self._on_object_changed
-        except ValueError:
-            pass  # Already replaced
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry._replace_arc_in_list(old_arc, new_arc)
     
     # Helper methods for calculate_arc_offset (PHASE 1 EXTRACTION)
     
-    @staticmethod
-    def _separate_parallel_arcs(arc, parallels):
-        """Separate parallel arcs into same-direction and opposite-direction groups.
-        
-        Args:
-            arc: The arc to check against
-            parallels: List of parallel arcs
-            
-        Returns:
-            Tuple of (same_direction_list, opposite_direction_list)
-        """
-        same_direction = []
-        opposite_direction = []
-        
-        for other in parallels:
-            if other.source == arc.source and other.target == arc.target:
-                same_direction.append(other)
-            elif other.source == arc.target and other.target == arc.source:
-                opposite_direction.append(other)
-        
-        return same_direction, opposite_direction
+    def _separate_parallel_arcs(self, arc, parallels):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._separate_parallel_arcs(arc, parallels)
     
-    @staticmethod
-    def _calculate_opposite_direction_offset(arc, opposite_arc):
-        """Calculate offset for two arcs in opposite directions (mirror symmetry).
-        
-        Args:
-            arc: The arc to calculate offset for
-            opposite_arc: The arc in the opposite direction
-            
-        Returns:
-            float: Offset distance (positive = counterclockwise, negative = clockwise)
-        """
-        # Use a deterministic rule: arc with lower ID gets positive offset
-        if arc.id < opposite_arc.id:
-            return 50.0  # Curve counterclockwise (increased from 25)
-        else:
-            return -50.0  # Curve clockwise (mirror, increased from -25)
+    def _calculate_opposite_direction_offset(self, arc, opposite_arc):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_opposite_direction_offset(arc, opposite_arc)
     
-    @staticmethod
-    def _calculate_same_direction_offset(arc, all_arcs):
-        """Calculate offset based on stable ordering of parallel arcs.
-        
-        Distributes arcs evenly around center (0):
-        - 2 arcs: offsets are +15, -15
-        - 3 arcs: offsets are +20, 0, -20
-        - 4 arcs: offsets are +30, +10, -10, -30
-        
-        Args:
-            arc: The arc to calculate offset for
-            all_arcs: List of all parallel arcs (including this arc)
-            
-        Returns:
-            float: Offset distance in pixels
-        """
-        total = len(all_arcs)
-        if total == 1:
-            return 0.0
-        
-        # Stable ordering by ID
-        all_arcs.sort(key=lambda a: a.id)
-        index = all_arcs.index(arc)
-        
-        if total == 2:
-            # Simple case: ±15 pixels
-            return 15.0 if index == 0 else -15.0
-        else:
-            # General case: distribute evenly with 10px spacing
-            spacing = 10.0
-            center = (total - 1) / 2.0
-            return (index - center) * spacing
+    def _calculate_same_direction_offset(self, arc, all_arcs):
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry._calculate_same_direction_offset(arc, all_arcs)
     
     def calculate_arc_offset(self, arc, parallels):
-        """Calculate offset for arc to avoid overlapping parallels.
-        
-        For parallel arcs between same nodes, we offset them perpendicular
-        to the line connecting the nodes. The offset is calculated to
-        distribute arcs evenly on both sides of the center line.
-        
-        For opposite direction arcs (A→B, B→A), they curve in opposite
-        directions to create mirror symmetry.
-        
-        REFACTORED: Now delegates to extracted helper methods for better readability.
-        
-        Args:
-            arc: Arc to calculate offset for
-            parallels: List of parallel arcs (from detect_parallel_arcs)
-            
-        Returns:
-            float: Offset distance in pixels (positive = counterclockwise,
-                   negative = clockwise, 0 = no offset)
-        """
-        if not parallels:
-            return 0.0  # No offset needed for single arc
-        
-        # Separate parallel arcs into same-direction and opposite-direction groups
-        same_direction, opposite_direction = self._separate_parallel_arcs(arc, parallels)
-        
-        # For opposite direction arcs (most common case: A→B, B→A)
-        if len(opposite_direction) == 1 and len(same_direction) == 0:
-            return self._calculate_opposite_direction_offset(arc, opposite_direction[0])
-        
-        # For same-direction arcs or mixed cases, use stable ordering
-        all_arcs = [arc] + parallels
-        return self._calculate_same_direction_offset(arc, all_arcs)
+        """Delegate to ArcGeometryService."""
+        return self._arc_geometry.calculate_arc_offset(arc, parallels)
     
     def replace_arc(self, old_arc, new_arc):
-        """Replace an arc with a different type (for arc transformations).
-        
-        Used when transforming arcs via context menu:
-        - Straight ↔ Curved
-        - Normal ↔ Inhibitor
-        
-        The new arc maintains the same ID and properties but has a different
-        class type (Arc, InhibitorArc, CurvedArc, or CurvedInhibitorArc).
-        
-        Args:
-            old_arc: Arc instance to replace
-            new_arc: New arc instance (different class, same ID/properties)
-        """
-        try:
-            index = self.arcs.index(old_arc)
-            self.arcs[index] = new_arc
-            
-            # Ensure new arc has manager reference and change callback
-            new_arc._manager = self
-            new_arc.on_changed = self._on_object_changed
-            
-            self.mark_modified()
-            self.mark_dirty()
-        except ValueError:
-            # Arc not found in list - may have been deleted
-            pass
+        """Delegate to ArcGeometryService."""
+        self._arc_geometry.replace_arc(old_arc, new_arc)
     
     def ensure_arc_references(self):
-        """Ensure all arcs have proper manager and callback references.
-        
-        This is useful after loading files or batch operations to ensure
-        all arcs can be transformed and detected for parallel positioning.
-        """
-        for arc in self.arcs:
-            if not hasattr(arc, '_manager') or arc._manager is None:
-                arc._manager = self
-            if not hasattr(arc, 'on_changed') or arc.on_changed is None:
-                arc.on_changed = self._on_object_changed
+        """Delegate to ArcGeometryService (no-op during __init__ before service is created)."""
+        if hasattr(self, '_arc_geometry'):
+            self._arc_geometry.ensure_arc_references()
     
     def get_all_objects(self):
         """Get all Petri net objects in rendering order.
@@ -1853,115 +1565,24 @@ class ModelCanvasManager:
         self.viewport_controller.set_zoom(zoom_level, center_x, center_y)
         self._needs_redraw = True
     
-    def _apply_zoom_factor_with_bounds(self, factor):
-        """Apply zoom factor with bounds checking.
-        
-        Args:
-            factor: Multiplicative zoom factor
-            
-        Returns:
-            tuple: (new_zoom, zoom_changed) - new zoom level and whether it changed
-        """
-        new_zoom = self.zoom * factor
-        new_zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, new_zoom))
-        zoom_changed = (new_zoom != self.zoom)
-        return new_zoom, zoom_changed
-    
-    def _calculate_pan_for_zoom_without_rotation(self, world_x, world_y, center_x, center_y):
-        """Calculate pan adjustment for zoom at point (no rotation).
-        
-        Args:
-            world_x: World X coordinate to keep under cursor
-            world_y: World Y coordinate to keep under cursor
-            center_x: Screen X coordinate of zoom center
-            center_y: Screen Y coordinate of zoom center
-            
-        Returns:
-            tuple: (pan_x, pan_y) in world coordinates
-        """
-        # No rotation: simple formula
-        # world = screen/zoom - pan
-        # So: pan = screen/zoom - world
-        pan_x = (center_x / self.zoom) - world_x
-        pan_y = (center_y / self.zoom) - world_y
-        return pan_x, pan_y
-    
-    def _calculate_pan_for_zoom_with_rotation(self, world_x, world_y, center_x, center_y, rotation):
-        """Calculate pan adjustment for zoom at point (with rotation).
-        
-        Solves the equation: pan = c/zoom - world + R_inv((screen - c)/zoom)
-        where rotation center depends on pan (circular dependency).
-        
-        Args:
-            world_x: World X coordinate to keep under cursor
-            world_y: World Y coordinate to keep under cursor
-            center_x: Screen X coordinate of zoom center
-            center_y: Screen Y coordinate of zoom center
-            rotation: CanvasRotation object with angle_radians
-            
-        Returns:
-            tuple: (pan_x, pan_y) in world coordinates
-        """
-        import math
-        
-        cx = self.viewport_width / 2.0
-        cy = self.viewport_height / 2.0
-        
-        # (screen - c)/zoom
-        screen_offset_x = (center_x - cx) / self.zoom
-        screen_offset_y = (center_y - cy) / self.zoom
-        
-        # R_inv((screen - c)/zoom)
-        cos_a = math.cos(-rotation.angle_radians)
-        sin_a = math.sin(-rotation.angle_radians)
-        
-        rotated_x = screen_offset_x * cos_a - screen_offset_y * sin_a
-        rotated_y = screen_offset_x * sin_a + screen_offset_y * cos_a
-        
-        # pan = c/zoom - world + R_inv((screen - c)/zoom)
-        pan_x = (cx / self.zoom) - world_x + rotated_x
-        pan_y = (cy / self.zoom) - world_y + rotated_y
-        
-        return pan_x, pan_y
-    
     def zoom_at_point(self, factor, center_x, center_y):
         """Zoom by a factor at a specific point with rotation support.
-        
-        REFACTORED: Now delegates to helper methods for better readability.
-        
+
+        Delegates rotation-aware zoom math to ViewportController.
+
         Args:
-            factor: Multiplicative zoom factor
-            center_x: X coordinate of zoom center (screen space)
-            center_y: Y coordinate of zoom center (screen space)
+            factor: Multiplicative zoom factor.
+            center_x: X coordinate of zoom center (screen space).
+            center_y: Y coordinate of zoom center (screen space).
         """
-        # STEP 1: Get world coordinates of zoom center BEFORE zoom change
+        # Convert screen focal point to world space before zoom changes anything
         world_x, world_y = self.screen_to_world(center_x, center_y)
-        
-        # STEP 2: Apply new zoom with bounds
-        new_zoom, zoom_changed = self._apply_zoom_factor_with_bounds(factor)
-        
-        if not zoom_changed:
-            return  # Zoom didn't change (hit bounds)
-        
-        # STEP 3: Update zoom
-        self.zoom = new_zoom
-        self.viewport_controller.zoom = new_zoom
-        
-        # STEP 4: Calculate new pan (with or without rotation)
         rotation = self.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_with_rotation(
-                world_x, world_y, center_x, center_y, rotation
-            )
-        else:
-            self.pan_x, self.pan_y = self._calculate_pan_for_zoom_without_rotation(
-                world_x, world_y, center_x, center_y
-            )
-        
-        # STEP 5: Cleanup - clamp, save, redraw
-        self.clamp_pan()
-        self.save_view_state_to_file()
-        self._needs_redraw = True
+        changed = self.viewport_controller.zoom_at_point_rotation_aware(
+            factor, center_x, center_y, world_x, world_y, rotation
+        )
+        if changed:
+            self._needs_redraw = True
     
     def clamp_pan(self):
         """Clamp pan to keep canvas bounds within viewport.
@@ -2026,74 +1647,16 @@ class ModelCanvasManager:
     
     def get_content_bounds(self):
         """Calculate the bounding box of all content (places, transitions, and arcs).
-        
-        Includes arc control points and bezier curves to ensure entire model fits.
-        
+
+        Delegates to ViewportController which owns the pure-math algorithm.
+
         Returns:
             tuple: (min_x, min_y, max_x, max_y) or None if no content.
         """
-        all_objects = list(self.places) + list(self.transitions)
-        if not all_objects:
-            return None
-        
-        # Start with place/transition bounds
-        min_x, max_x, min_y, max_y = self._get_object_bounds(all_objects)
-        
-        # Include arc endpoints and control points
-        for arc in self.arcs:
-            min_x, max_x, min_y, max_y = self._update_bounds_with_arc(arc, min_x, max_x, min_y, max_y)
-        
-        return (min_x, min_y, max_x, max_y)
-    
-    @staticmethod
-    def _get_object_bounds(all_objects):
-        """Calculate bounding box for places and transitions.
-        
-        Args:
-            all_objects: List of places and transitions.
-            
-        Returns:
-            tuple: (min_x, max_x, min_y, max_y)
-        """
-        min_x = min(obj.x for obj in all_objects)
-        max_x = max(obj.x for obj in all_objects)
-        min_y = min(obj.y for obj in all_objects)
-        max_y = max(obj.y for obj in all_objects)
-        return min_x, max_x, min_y, max_y
-    
-    @staticmethod
-    def _update_bounds_with_arc(arc, min_x, max_x, min_y, max_y):
-        """Update bounds to include arc endpoints and control points.
-        
-        Args:
-            arc: Arc to include in bounds.
-            min_x, max_x, min_y, max_y: Current bounds.
-            
-        Returns:
-            tuple: Updated (min_x, max_x, min_y, max_y)
-        """
-        # Include source and target points
-        if hasattr(arc.source, 'x') and hasattr(arc.source, 'y'):
-            min_x = min(min_x, arc.source.x)
-            max_x = max(max_x, arc.source.x)
-            min_y = min(min_y, arc.source.y)
-            max_y = max(max_y, arc.source.y)
-        if hasattr(arc.target, 'x') and hasattr(arc.target, 'y'):
-            min_x = min(min_x, arc.target.x)
-            max_x = max(max_x, arc.target.x)
-            min_y = min(min_y, arc.target.y)
-            max_y = max(max_y, arc.target.y)
-        
-        # Include control points if arc has bezier curves
-        if hasattr(arc, 'control_points') and arc.control_points:
-            for cp_x, cp_y in arc.control_points:
-                min_x = min(min_x, cp_x)
-                max_x = max(max_x, cp_x)
-                min_y = min(min_y, cp_y)
-                max_y = max(max_y, cp_y)
-        
-        return min_x, max_x, min_y, max_y
-    
+        return self.viewport_controller.get_content_bounds(
+            self.places, self.transitions, self.arcs
+        )
+
     def center_view_on_content(self):
         """Center the viewport on all content.
         
@@ -2115,74 +1678,6 @@ class ModelCanvasManager:
         # Pan to center the content
         self.pan_to(center_x, center_y)
     
-    def _calculate_content_dimensions(self, bounds):
-        """Calculate content dimensions with padding for object sizes.
-        
-        Args:
-            bounds: (min_x, min_y, max_x, max_y) bounding box
-            
-        Returns:
-            tuple: (content_width, content_height) in world coordinates
-        """
-        min_x, min_y, max_x, max_y = bounds
-        
-        # Add ~40px padding to account for object sizes (places/transitions are ~20-30px radius)
-        content_width = max_x - min_x + 80
-        content_height = max_y - min_y + 80
-        
-        # Handle edge case: single object or very small cluster
-        if content_width < 80:
-            content_width = 80
-        if content_height < 80:
-            content_height = 80
-        
-        return content_width, content_height
-    
-    def _calculate_zoom_to_fit(self, content_width, content_height, padding_percent):
-        """Calculate optimal zoom level to fit content in viewport.
-        
-        Args:
-            content_width: Width of content in world coordinates
-            content_height: Height of content in world coordinates
-            padding_percent: Percentage of viewport to leave as margin
-            
-        Returns:
-            float: Target zoom level (clamped to MIN_ZOOM..MAX_ZOOM)
-        """
-        # Calculate available viewport space (with padding margin)
-        padding_factor = 1.0 - (padding_percent / 100.0)
-        available_width = self.viewport_controller.viewport_width * padding_factor
-        available_height = self.viewport_controller.viewport_height * padding_factor
-        
-        # Compute zoom to fit both dimensions
-        zoom_x = available_width / content_width if content_width > 0 else 1.0
-        zoom_y = available_height / content_height if content_height > 0 else 1.0
-        target_zoom = min(zoom_x, zoom_y)  # Use smaller to fit both dimensions
-        
-        # Clamp to zoom limits
-        return max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
-    
-    def _apply_viewport_offsets(self, horizontal_offset_percent, vertical_offset_percent, target_zoom):
-        """Apply horizontal/vertical offsets to viewport pan.
-        
-        Args:
-            horizontal_offset_percent: Percentage of viewport width to offset horizontally
-            vertical_offset_percent: Percentage of viewport height to offset vertically
-            target_zoom: Current zoom level
-        """
-        if horizontal_offset_percent == 0 and vertical_offset_percent == 0:
-            return
-        
-        # Calculate offsets in world coordinates
-        viewport_width_world = self.viewport_controller.viewport_width / target_zoom
-        viewport_height_world = self.viewport_controller.viewport_height / target_zoom
-        horizontal_offset_world = (horizontal_offset_percent / 100.0) * viewport_width_world
-        vertical_offset_world = (vertical_offset_percent / 100.0) * viewport_height_world
-        
-        # Apply offsets to pan
-        self.viewport_controller.pan_x += horizontal_offset_world
-        self.viewport_controller.pan_y += vertical_offset_world
-    
     def fit_to_page(self, padding_percent=10, deferred=False, horizontal_offset_percent=0, vertical_offset_percent=0):
         """Fit all content to viewport with optimal zoom and centering.
         
@@ -2203,24 +1698,19 @@ class ModelCanvasManager:
         # Handle deferred execution
         if deferred:
             return self._defer_fit_to_page(padding_percent, horizontal_offset_percent, vertical_offset_percent)
-        
+
         bounds = self.get_content_bounds()
-        
+
         # Handle empty content
         if not bounds:
             return self._handle_empty_content()
-        
-        # Calculate and apply zoom/pan
-        content_width, content_height = self._calculate_content_dimensions(bounds)
-        target_zoom = self._calculate_zoom_to_fit(content_width, content_height, padding_percent)
-        self._apply_zoom_and_center(bounds, target_zoom)
-        
-        # Apply offsets if specified
-        self._apply_viewport_offsets(horizontal_offset_percent, vertical_offset_percent, target_zoom)
-        
-        # Finalize view state
+
+        # Delegate zoom + pan + offset maths to ViewportController
+        self.viewport_controller.fit_content(
+            bounds, padding_percent, horizontal_offset_percent, vertical_offset_percent
+        )
+
         self._finalize_view_state()
-        
         return True
     
     # Helper methods for fit_to_page (PHASE 1 EXTRACTION)
@@ -2244,35 +1734,16 @@ class ModelCanvasManager:
     
     def _handle_empty_content(self):
         """Handle fit_to_page when no content exists.
-        
+
         Returns:
-            bool: False (no content)
+            bool: False (no content).
         """
-        self.zoom = 1.0
-        self.viewport_controller.zoom = 1.0
+        self.zoom = 1.0  # delegates to viewport_controller via property
         self.pan_to(0.0, 0.0)
         return False
-    
-    def _apply_zoom_and_center(self, bounds, target_zoom):
-        """Apply zoom and center viewport on content.
-        
-        Args:
-            bounds: Content bounding box (min_x, min_y, max_x, max_y).
-            target_zoom: Target zoom level.
-        """
-        self.zoom = target_zoom
-        self.viewport_controller.zoom = target_zoom
-        
-        # Center on content
-        min_x, min_y, max_x, max_y = bounds
-        content_center_x = (min_x + max_x) / 2.0
-        content_center_y = (min_y + max_y) / 2.0
-        self.viewport_controller.pan_to(content_center_x, content_center_y)
-    
+
     def _finalize_view_state(self):
-        """Finalize view state after fit_to_page."""
-        self.pan_x = self.viewport_controller.pan_x
-        self.pan_y = self.viewport_controller.pan_y
+        """Persist view state and request redraw after a fit/zoom operation."""
         self.save_view_state_to_file()
         self._needs_redraw = True
     
@@ -2814,183 +2285,92 @@ class ModelCanvasManager:
         return removed_count
     
     def get_document_state(self):
-        """Get the current document state for saving.
-        
-        Returns:
-            dict: Document state including metadata and canvas properties.
-        """
-        return {
-            'filename': self.filename,
-            'modified': self.modified,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'modified_at': self.modified_at.isoformat() if self.modified_at else None,
-            'canvas': {
-                'width': self.canvas_width,
-                'height': self.canvas_height,
-                'zoom': self.zoom,
-                'pan_x': self.pan_x,
-                'pan_y': self.pan_y,
-                'grid_style': self.grid_style,
-            },
-            'viewport': {
-                'width': self.viewport_width,
-                'height': self.viewport_height,
-            }
-        }
+        """Snapshot of document metadata. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().get_document_state(self)
     
-    def mark_modified(self):
-        """Mark document as modified."""
+    # ===== DOCUMENT STATE — Sprint 19: delegating to DocumentStateService =====
+    # All state (dirty flag, filepath, import state) is owned by self._state_svc.
+    # Methods here are thin shims that maintain backward-compatible MCM API.
+
+    def mark_modified(self) -> None:
+        """Stamp modification time (document_controller) and mark dirty."""
         if not self.modified:
             self.modified = True
             self.modified_at = datetime.now()
-            self.mark_dirty()
-    
-    def set_filename(self, filename):
-        """Set the document filename.
-        
-        Args:
-            filename: Base filename without extension.
-        """
+            self._state_svc.mark_dirty()
+
+    def set_filename(self, filename: str) -> None:
+        """Set the base filename; marks document modified on change."""
         if filename != self.filename:
-            self.filename = filename
+            self.filename = filename        # → document_controller.filename
+            self._state_svc.filename = filename  # keep state_svc mirror in sync
             self.mark_modified()
-    
+
     def is_default_filename(self) -> bool:
-        """Check if document has the default filename (unsaved state).
-        
-        This is a flag that indicates the document is in an unsaved/new state
-        and should trigger file chooser dialogs in save operations.
-        
-        Also returns True for imported documents that haven't been saved yet,
-        so they trigger "Save As" behavior on first save.
-        
-        Returns:
-            bool: True if filename is "default" or document is imported (unsaved), False otherwise
-        """
-        return self.filename == "default" or self._is_imported
-    
-    def mark_as_imported(self, imported_name: str = None):
-        """Mark this document as imported (from KEGG, SBML, etc.).
-        
-        Imported documents should trigger "Save As" on first save, even if they
-        have a descriptive filename.
-        
-        Args:
-            imported_name: Optional descriptive name for the imported document
-        """
-        self._is_imported = True
+        """``True`` for new/imported documents that have never been saved."""
+        return self.filename == "default" or self._state_svc.is_imported
+
+    def mark_as_imported(self, imported_name: Optional[str] = None) -> None:
+        """Flag document as imported; triggers 'Save As' on first save."""
+        self._state_svc.mark_as_imported(imported_name)
         if imported_name and imported_name != "default":
-            self.filename = imported_name
-    
-    def mark_as_saved(self):
-        """Mark this document as saved (no longer imported/new).
-        
-        Call this after a successful save operation to clear the imported flag.
-        """
-        self._is_imported = False
-    
-    # ==================== Per-Document File State Management (Phase 1) ====================
-    
-    def mark_dirty(self):
-        """Mark document as having unsaved changes.
-        
-        This is the new per-document dirty tracking system that replaces
-        the global NetObjPersistency dirty state. Each manager owns its
-        own dirty flag.
-        
-        Automatically called when objects are modified, added, or deleted.
-        Triggers on_dirty_changed callback to update UI (tab labels).
-        """
-        if not self._is_dirty:
-            self._is_dirty = True
-            # Check if callbacks are suppressed during initial setup
-            if not getattr(self, '_suppress_callbacks', False):
-                if self.on_dirty_changed:
-                    self.on_dirty_changed(True)
-    
-    def mark_clean(self):
-        """Mark document as saved (no unsaved changes).
-        
-        Call this after successful save operation.
-        Triggers on_dirty_changed callback to update UI (remove asterisk from tab).
-        """
-        if self._is_dirty:
-            self._is_dirty = False
-            # Check if callbacks are suppressed during initial setup
-            if not getattr(self, '_suppress_callbacks', False):
-                if self.on_dirty_changed:
-                    self.on_dirty_changed(False)
-    
+            self.filename = imported_name   # keep document_controller in sync
+
+    def mark_as_saved(self) -> None:
+        """Clear the imported flag after a successful save."""
+        self._state_svc.mark_as_saved()
+
+    # ==================== Per-Document File State Management ====================
+
+    def mark_dirty(self) -> None:
+        """Mark document as having unsaved changes."""
+        self._state_svc.mark_dirty()
+
+    def mark_clean(self) -> None:
+        """Mark document as saved (no unsaved changes)."""
+        self._state_svc.mark_clean()
+
     def is_dirty(self) -> bool:
-        """Check if document has unsaved changes.
-        
-        Returns:
-            bool: True if document has been modified since last save, False otherwise
-        """
-        return self._is_dirty
-    
-    def set_filepath(self, filepath: str):
-        """Set the full file path for this document.
-        
-        Updates both the filepath (full path) and filename (base name).
-        Used when saving document or loading from file.
-        
-        Args:
-            filepath: Full path to the .shy file (e.g., "/path/to/model.shy")
-        """
-        import os
-        self.filepath = filepath
-        
-        # Sync filepath with document model for settings persistence
+        """Check if document has unsaved changes."""
+        return self._state_svc.is_dirty
+
+    def set_filepath(self, filepath: str) -> None:
+        """Set the full file path; updates filepath, filename,
+        document_model.filepath and viewport_controller.model_filepath."""
+        self._state_svc.filepath = filepath
+        # Sync document_model (used by serialization settings)
         if hasattr(self, '_document_model') and self._document_model:
             self._document_model.filepath = filepath
-        
-        # Update viewport controller's model filepath for view state persistence
+        # Sync viewport_controller (view-state persistence)
         if hasattr(self, 'viewport_controller'):
             self.viewport_controller.model_filepath = filepath
-        
-        if filepath:
-            # Extract base filename without extension
-            base_name = os.path.splitext(os.path.basename(filepath))[0]
-            self.filename = base_name
-        else:
-            self.filename = "default"
-    
-    def get_filepath(self) -> str:
-        """Get the full file path for this document.
-        
-        Returns:
-            str: Full path to file, or None if document hasn't been saved yet
-        """
-        return self.filepath
-    
+        # Extract and propagate base filename
+        base_name = (
+            os.path.splitext(os.path.basename(filepath))[0] if filepath else "default"
+        )
+        self.filename = base_name            # → document_controller.filename
+        self._state_svc.filename = base_name  # keep state_svc mirror in sync
+
+    def get_filepath(self) -> Optional[str]:
+        """Return the full file path, or ``None`` if not yet saved."""
+        return self._state_svc.filepath
+
     def has_filepath(self) -> bool:
-        """Check if document has an associated file path.
-        
-        Returns:
-            bool: True if document has been saved to a file, False if new/unsaved
-        """
-        return self.filepath is not None and self.filepath != ""
-    
+        """``True`` when a valid file path has been set."""
+        return self._state_svc.has_filepath()
+
     def get_display_name(self) -> str:
-        """Get display name for this document.
-        
-        Returns:
-            str: Filename if saved, "Untitled" if new document
-        """
-        if self.has_filepath():
-            import os
-            return os.path.basename(self.filepath)
-        return "Untitled" if self.filename == "default" else self.filename
-    
+        """Human-readable name for tab labels and window titles."""
+        return self._state_svc.get_display_name()
+
     # ==================== End Per-Document State Management ====================
-    
+
     # Helper methods for color reset operations (PHASE 1 EXTRACTION)
-    
+
     @staticmethod
     def _should_preserve_transition_color(transition):
         """Check if transition has semantic colors that should be preserved.
-        
+
         Args:
             transition: Transition object to check
             
@@ -3026,338 +2406,66 @@ class ModelCanvasManager:
         # Any non-default color is considered semantic
         return arc.color != Arc.DEFAULT_COLOR
     
+    # ===== COLOUR RESET — Sprint 20: delegating to DocumentSerializer =====
+
     def _reset_transition_colors_to_default(self):
-        """Reset transition colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs import Transition
-        
-        for transition in self.transitions:
-            if self._should_preserve_transition_color(transition):
-                continue
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-    
+        _get_doc_serializer()._reset_transition_colors_to_default(self)
+
     def _reset_place_colors_to_default(self):
-        """Reset place colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs import Place
-        
-        for place in self.places:
-            if self._should_preserve_place_color(place):
-                continue
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-    
+        _get_doc_serializer()._reset_place_colors_to_default(self)
+
     def _reset_arc_colors_to_default(self):
-        """Reset arc colors to defaults (preserving semantic colors)."""
-        from shypn.netobjs.arc import Arc
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        for arc in self.arcs:
-            if self._should_preserve_arc_color(arc):
-                continue
-            # Reset to type-specific default
-            if isinstance(arc, SignalFlowArc):
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                arc.color = Arc.DEFAULT_COLOR
-    
+        _get_doc_serializer()._reset_arc_colors_to_default(self)
+
     def _reset_analysis_colors(self):
-        """Reset all analysis-related colors to defaults before saving.
-        
-        When objects are selected in the Analyses panel, they get colored with
-        plot colors for visualization. These colors are temporary and should NOT
-        be saved to the file.
-        
-        REFACTORED: Now delegates to helper methods for better testability.
-        
-        Preserves semantic colors:
-        - Source/sink transitions keep their cyan colors
-        - Compartment places keep their violet borders
-        - Boundary species arcs keep their cyan colors
-        """
-        # Reset colors using extracted helper methods
-        self._reset_transition_colors_to_default()
-        self._reset_place_colors_to_default()
-        self._reset_arc_colors_to_default()
-        
-        # Trigger redraw to show the reset colors
+        _get_doc_serializer()._reset_transition_colors_to_default(self)
+        _get_doc_serializer()._reset_place_colors_to_default(self)
+        _get_doc_serializer()._reset_arc_colors_to_default(self)
         self.mark_needs_redraw()
-    
+
     def _store_and_reset_transition_colors(self):
-        """Store and reset transition colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved transitions)
-        """
-        from shypn.netobjs import Transition
-        
-        original_colors = []
-        for transition in self.transitions:
-            if self._should_preserve_transition_color(transition):
-                original_colors.append(None)
-                continue
-            original_colors.append((transition.border_color, transition.fill_color))
-            transition.border_color = Transition.DEFAULT_BORDER_COLOR
-            transition.fill_color = Transition.DEFAULT_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_transition_colors(self)
+
     def _store_and_reset_place_colors(self):
-        """Store and reset place colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved places)
-        """
-        from shypn.netobjs import Place
-        
-        original_colors = []
-        for place in self.places:
-            if self._should_preserve_place_color(place):
-                original_colors.append(None)
-                continue
-            original_colors.append(place.border_color)
-            place.border_color = Place.DEFAULT_BORDER_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_place_colors(self)
+
     def _store_and_reset_arc_colors(self):
-        """Store and reset arc colors (preserving semantic colors).
-        
-        Returns:
-            list: Original colors (or None for preserved arcs)
-        """
-        from shypn.netobjs.arc import Arc
-        from shypn.netobjs.signal_flow_arc import SignalFlowArc
-        
-        original_colors = []
-        for arc in self.arcs:
-            # Check if arc has semantic color
-            if isinstance(arc, SignalFlowArc):
-                if arc.color != SignalFlowArc.DEFAULT_COLOR:
-                    original_colors.append(None)
-                    continue
-                original_colors.append(arc.color)
-                arc.color = SignalFlowArc.DEFAULT_COLOR
-            else:
-                if arc.color != Arc.DEFAULT_COLOR:
-                    original_colors.append(None)
-                    continue
-                original_colors.append(arc.color)
-                arc.color = Arc.DEFAULT_COLOR
-        
-        return original_colors
-    
+        return _get_doc_serializer()._store_and_reset_arc_colors(self)
+
     def _reset_analysis_colors_for_save(self):
-        """Temporarily reset analysis colors for save, then restore them.
-        
-        Returns the original colors so they can be restored after serialization.
-        This allows saving with default colors without modifying the live canvas.
-        
-        REFACTORED: Now delegates to helper methods for better testability.
-        
-        Returns:
-            dict: Original colors for transitions, places, and arcs
-        """
-        # Store and reset colors using extracted helper methods
-        original_colors = {
-            'transitions': self._store_and_reset_transition_colors(),
-            'places': self._store_and_reset_place_colors(),
-            'arcs': self._store_and_reset_arc_colors()
-        }
-        
-        return original_colors
-    
+        return _get_doc_serializer()._reset_analysis_colors_for_save(self)
+
     def _restore_analysis_colors(self, original_colors):
-        """Restore colors after save.
-        
-        Args:
-            original_colors: Dictionary returned by _reset_analysis_colors_for_save()
-        """
-        # Restore transition colors
-        for i, transition in enumerate(self.transitions):
-            if original_colors['transitions'][i] is not None:
-                transition.border_color, transition.fill_color = original_colors['transitions'][i]
-        
-        # Restore place colors
-        for i, place in enumerate(self.places):
-            if original_colors['places'][i] is not None:
-                place.border_color = original_colors['places'][i]
-        
-        # Restore arc colors
-        for i, arc in enumerate(self.arcs):
-            if original_colors['arcs'][i] is not None:
-                arc.color = original_colors['arcs'][i]
-    
+        _get_doc_serializer()._restore_analysis_colors(original_colors, self)
+
     def _populate_document_objects(self, document):
-        """Populate DocumentModel with Petri net objects.
-        
-        Args:
-            document: DocumentModel to populate
-        """
-        document.places = list(self.places)
-        document.transitions = list(self.transitions)
-        document.arcs = list(self.arcs)
-        
-        # Copy modules if they exist
-        if hasattr(self.document_controller, 'modules') and self.document_controller.modules:
-            document.modules = dict(self.document_controller.modules)
-    
+        _get_doc_serializer()._populate_document_objects(document, self)
+
     def _sync_id_counters(self, document):
-        """Sync ID counters from DocumentController to DocumentModel.
-        
-        Args:
-            document: DocumentModel to sync counters to
-        """
-        place_id, trans_id, arc_id, module_id = self.document_controller.id_manager.get_state()
-        document.id_manager.set_state(place_id, trans_id, arc_id, module_id)
-    
+        _get_doc_serializer()._sync_id_counters(document, self)
+
     def _sync_view_state(self, document):
-        """Sync view state (zoom, pan, rotation) to DocumentModel.
-        
-        Args:
-            document: DocumentModel to sync view state to
-        """
-        document.view_state = {
-            "zoom": self.zoom,
-            "pan_x": self.pan_x,
-            "pan_y": self.pan_y,
-            "transformations": self.transformation_manager.to_dict()
-        }
-    
+        _get_doc_serializer()._sync_view_state(document, self)
+
     def to_document_model(self):
-        """Convert canvas manager's Petri net objects to a DocumentModel.
-        
-        This creates a DocumentModel instance that can be saved/loaded by
-        the persistency manager.
-        
-        REFACTORED: Now delegates to extracted helper methods for document setup.
-        
-        Returns:
-            DocumentModel: Document model containing all Petri net objects
-        """
-        from shypn.data.canvas import DocumentModel
-        
-        # Reset analysis colors before serialization
-        original_colors = self._reset_analysis_colors_for_save()
-        
-        # Create and populate document using extracted helpers
-        document = DocumentModel()
-        self._populate_document_objects(document)
-        self._sync_id_counters(document)
-        self._sync_view_state(document)
-        
-        # Restore analysis colors after serialization
-        self._restore_analysis_colors(original_colors)
-        
-        return document
-    
+        """Build and return a DocumentModel. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().to_document_model(self)
+
     # ==================== View State Persistence ====================
-    
-    def get_view_state(self):
-        """Get current canvas view state for persistence.
-        
-        Returns:
-            dict: View state containing pan_x, pan_y, zoom, and transformations (rotation)
-        """
-        return {
-            'pan_x': self.pan_x,
-            'pan_y': self.pan_y,
-            'zoom': self.zoom,
-            'transformations': self.transformation_manager.to_dict()
-        }
-    
-    def set_view_state(self, view_state):
-        """Restore canvas view state from saved data.
-        
-        Args:
-            view_state: Dictionary containing pan_x, pan_y, zoom, and transformations
-        """
-        if view_state:
-            self.pan_x = view_state.get('pan_x', 0.0)
-            self.pan_y = view_state.get('pan_y', 0.0)
-            self.zoom = view_state.get('zoom', 1.0)
-            
-            # Clamp zoom to valid range
-            self.zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, self.zoom))
-            
-            # CRITICAL: Sync viewport controller state BEFORE clamping
-            # The clamp_pan() delegates to viewport_controller.clamp_pan()
-            # so viewport_controller must have the correct values first
-            self.viewport_controller.pan_x = self.pan_x
-            self.viewport_controller.pan_y = self.pan_y
-            self.viewport_controller.zoom = self.zoom
-            self.viewport_controller._initial_pan_set = True  # Prevent auto-centering
-            
-            # Clamp pan to infinite canvas bounds
-            self.clamp_pan()
-            
-            # Sync back after clamping (clamp_pan modifies viewport_controller)
-            self.pan_x = self.viewport_controller.pan_x
-            self.pan_y = self.viewport_controller.pan_y
-            
-            # Restore transformations (rotation)
-            if 'transformations' in view_state:
-                self.transformation_manager.from_dict(view_state['transformations'])
-            
-            # Mark that we don't need initial centering
-            self._initial_pan_set = True
-            
-            self.mark_dirty()  # Mark document as having unsaved changes
-            self.mark_needs_redraw()  # Trigger canvas redraw with restored view
-    
-    def save_view_state_to_file(self, filepath=None):
-        """Save current view state to a JSON file.
-        
-        Args:
-            filepath: Optional custom file path. If None, uses default location.
-            
-        Returns:
-            bool: True if saved successfully, False otherwise
-        """
-        if filepath is None:
-            # Create .shypn config directory in user's home
-            config_dir = os.path.expanduser('~/.shypn')
-            os.makedirs(config_dir, exist_ok=True)
-            
-            # Use filename to create view state file
-            filename = self.filename if self.filename else 'default'
-            filepath = os.path.join(config_dir, f'{filename}_view.json')
-        
-        try:
-            view_state = self.get_view_state()
-            with open(filepath, 'w') as f:
-                json.dump(view_state, f, indent=2)
-            return True
-        except (OSError, IOError, PermissionError, TypeError) as e:
-            logger.debug(f"Failed to save view state: {e}")
-            return False
-    
-    def load_view_state_from_file(self, filepath=None):
-        """Load view state from a JSON file.
-        
-        If no view state file exists or loading fails, centers the view on content.
-        
-        Args:
-            filepath: Optional custom file path. If None, uses default location.
-            
-        Returns:
-            bool: True if loaded successfully, False otherwise
-        """
-        if filepath is None:
-            # Look for view state file in config directory
-            config_dir = os.path.expanduser('~/.shypn')
-            filename = self.filename if self.filename else 'default'
-            filepath = os.path.join(config_dir, f'{filename}_view.json')
-        
-        if not os.path.exists(filepath):
-            # No saved view state - center on content as fallback
-            self.center_view_on_content()
-            return False
-        
-        try:
-            with open(filepath, 'r') as f:
-                view_state = json.load(f)
-            self.set_view_state(view_state)
-            return True
-        except Exception as e:
-            # Failed to load - center on content as fallback
-            self.center_view_on_content()
-            return False
+
+    def get_view_state(self) -> dict:
+        """Current view state dict. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().get_view_state(self)
+
+    def set_view_state(self, view_state) -> None:
+        """Restore view from view_state. Sprint 20: delegates to DocumentSerializer."""
+        _get_doc_serializer().set_view_state(self, view_state)
+
+    def save_view_state_to_file(self, filepath=None) -> bool:
+        """Persist view state to file. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().save_view_state_to_file(self, filepath)
+
+    def load_view_state_from_file(self, filepath=None) -> bool:
+        """Load view state from file. Sprint 20: delegates to DocumentSerializer."""
+        return _get_doc_serializer().load_view_state_from_file(self, filepath)
+

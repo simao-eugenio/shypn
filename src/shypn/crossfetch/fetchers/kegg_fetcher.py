@@ -137,13 +137,13 @@ class KEGGFetcher(BaseFetcher):
                 from shypn.importer.kegg.kgml_parser import KGMLParser
             except ImportError as e:
                 self.logger.warning(f"KGML parser not available: {e}")
-                return self._create_failure_result(
+                return self._create_failed_result(
                     error="KGML parser not available",
                     data_type="coordinates"
                 )
             
             parser = KGMLParser()
-            pathway_data = parser.parse_string(response.text)
+            pathway_data = parser.parse(response.text)
             
             # Extract coordinates from entries
             species_coords = []
@@ -198,13 +198,13 @@ class KEGGFetcher(BaseFetcher):
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Network error fetching KGML: {e}")
-            return self._create_failure_result(
+            return self._create_failed_result(
                 error=f"Network error: {str(e)}",
                 data_type="coordinates"
             )
         except Exception as e:
             self.logger.error(f"Failed to fetch KEGG coordinates: {e}")
-            return self._create_failure_result(
+            return self._create_failed_result(
                 error=str(e),
                 data_type="coordinates"
             )

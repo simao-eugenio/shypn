@@ -290,7 +290,69 @@ class ParameterSweepBuilder(Gtk.Box):
         self.termination_combo.set_active_id("deadlock")
         self.termination_combo.set_tooltip_text("When to stop the simulation")
         sim_box.attach(self.termination_combo, 1, 1, 3, 1)
-        
+
+        # Row 2: Time step (Auto / Manual)
+        sim_box.attach(Gtk.Label(label="Time Step:", xalign=0), 0, 2, 1, 1)
+        dt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.sweep_dt_auto_radio = Gtk.RadioButton.new_with_label(None, "Auto")
+        self.sweep_dt_manual_radio = Gtk.RadioButton.new_with_label_from_widget(
+            self.sweep_dt_auto_radio, "Manual"
+        )
+        self.sweep_dt_auto_radio.set_active(True)
+        self.sweep_dt_auto_radio.set_tooltip_text("Automatically compute time step from model kinetics")
+        self.sweep_dt_manual_radio.set_tooltip_text("Use a fixed time step (override auto calculation)")
+        self.sweep_dt_auto_radio.connect("toggled", self._on_sweep_dt_mode_changed)
+        self.sweep_dt_manual_radio.connect("toggled", self._on_sweep_dt_mode_changed)
+        dt_box.pack_start(self.sweep_dt_auto_radio, False, False, 0)
+        dt_box.pack_start(self.sweep_dt_manual_radio, False, False, 0)
+        sim_box.attach(dt_box, 1, 2, 1, 1)
+        self.sweep_dt_manual_entry = Gtk.Entry()
+        self.sweep_dt_manual_entry.set_text("0.01")
+        self.sweep_dt_manual_entry.set_width_chars(8)
+        self.sweep_dt_manual_entry.set_sensitive(False)
+        self.sweep_dt_manual_entry.set_tooltip_text("Fixed time step in seconds (smaller = more accurate, slower)")
+        sim_box.attach(self.sweep_dt_manual_entry, 2, 2, 1, 1)
+        sim_box.attach(Gtk.Label(label="s", xalign=0), 3, 2, 1, 1)
+
+        # Row 3: τ-Leaping accuracy ε (τ-leaping is always active — SimulationSettings.use_tau_leaping is non-disableable)
+        tau_label = Gtk.Label(label="τ-Leaping (always active):", xalign=0)
+        tau_label.set_tooltip_text(
+            "τ-leaping is always enabled in this engine; only the accuracy bound ε can be tuned."
+        )
+        sim_box.attach(tau_label, 0, 3, 2, 1)
+        self.sweep_tau_epsilon_entry = Gtk.Entry()
+        self.sweep_tau_epsilon_entry.set_text("0.03")
+        self.sweep_tau_epsilon_entry.set_width_chars(8)
+        self.sweep_tau_epsilon_entry.set_tooltip_text(
+            "τ-leaping accuracy bound ε (0.01 = accurate/slow, 0.10 = fast/approximate).\n"
+            "Primary accuracy control for both hybrid and pure-stochastic models.\n"
+            "Applied at simulation start; changing it mid-run has no effect."
+        )
+        sim_box.attach(self.sweep_tau_epsilon_entry, 2, 3, 1, 1)
+
+        # Row 4: max τ
+        sim_box.attach(Gtk.Label(label="max τ:", xalign=0), 0, 4, 1, 1)
+        self.sweep_max_tau_entry = Gtk.Entry()
+        self.sweep_max_tau_entry.set_text("0.1")
+        self.sweep_max_tau_entry.set_width_chars(8)
+        self.sweep_max_tau_entry.set_tooltip_text(
+            "Maximum leap size for τ-leaping.\n"
+            "Only effective for pure-stochastic subnets (all transitions are stochastic/adaptive).\n"
+            "In hybrid models (mixed transition types) τ is automatically clamped to dt each step,\n"
+            "so this value has no effect — use the Time Step control instead."
+        )
+        sim_box.attach(self.sweep_max_tau_entry, 2, 4, 1, 1)
+
+        # Row 5: Random seed
+        sim_box.attach(Gtk.Label(label="Seed:", xalign=0), 0, 5, 1, 1)
+        self.sweep_seed_entry = Gtk.Entry()
+        self.sweep_seed_entry.set_text("42")
+        self.sweep_seed_entry.set_width_chars(8)
+        self.sweep_seed_entry.set_tooltip_text(
+            "Base random seed for reproducibility (each replicate uses seed + replicate_id)"
+        )
+        sim_box.attach(self.sweep_seed_entry, 2, 5, 1, 1)
+
         sim_frame.add(sim_box)
         self.pack_start(sim_frame, False, False, 0)
         
@@ -327,6 +389,13 @@ class ParameterSweepBuilder(Gtk.Box):
         self.single_param_box.show_all()  # Ensure all widgets in single mode are visible initially
         self.single_edit_range_button.show()  # Explicitly show the button
     
+    def _on_sweep_dt_mode_changed(self, radio):
+        """Enable or disable the manual dt entry based on radio selection."""
+        if not radio.get_active():
+            return
+        is_manual = (radio == self.sweep_dt_manual_radio)
+        self.sweep_dt_manual_entry.set_sensitive(is_manual)
+
     def _on_type_changed(self, combo):
         """Handle parameter type change."""
         old_type = self.parameter_type
@@ -663,13 +732,33 @@ class ParameterSweepBuilder(Gtk.Box):
                 if hasattr(queue_view, 'parallel_checkbox'):
                     use_parallel = queue_view.parallel_checkbox.get_active()
             
-            # Use same empirical factors as in experiment_automation_category.py
-            # Sequential: 0.827s per simulated second
-            # Parallel: 2.41s per simulated second (includes multiprocessing overhead)
-            empirical_factor = 2.41 if use_parallel else 0.827
-            
+            # Estimate is based on step count, not simulated duration.
+            #
+            # In auto-dt mode: dt = duration / 10000 (DEFAULT_STEPS_TARGET), so
+            # n_steps = 10000 ALWAYS regardless of duration. A 60s run and a 7200s
+            # run both execute exactly 10000 steps and take the same wall-clock time.
+            # Estimating as (duration × factor) would over-predict by 120× for 7200s.
+            #
+            # Empirical cost per step measured at 60s auto-dt (3 reps × 148.9s):
+            #   sequential: 148.9 / (3 × 10000) ≈ 0.00496 s/step
+            #   parallel:   2.41 × 60 / 10000  ≈ 0.01446 s/step
+            DEFAULT_STEPS_TARGET = 10000
+            dt_is_auto = not (hasattr(self, 'sweep_dt_manual_radio') and
+                              self.sweep_dt_manual_radio.get_active())
+            if dt_is_auto:
+                n_steps = DEFAULT_STEPS_TARGET
+            else:
+                try:
+                    dt_manual = float(self.sweep_dt_manual_entry.get_text().strip() or "0.01")
+                    n_steps = int(duration / dt_manual) if dt_manual > 0 else DEFAULT_STEPS_TARGET
+                except (ValueError, AttributeError):
+                    n_steps = DEFAULT_STEPS_TARGET
+
+            # s/step constants derived from the same 60 s benchmark
+            cost_per_step = 0.01446 if use_parallel else 0.00496
+
             # Calculate time per experiment (replicates run sequentially within each experiment)
-            time_per_experiment = replicates * duration * empirical_factor
+            time_per_experiment = replicates * n_steps * cost_per_step
             
             # Calculate total time based on execution mode
             if use_parallel:

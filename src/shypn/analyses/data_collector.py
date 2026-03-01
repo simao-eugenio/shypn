@@ -55,6 +55,14 @@ class SimulationDataCollector:
         self.step_count = 0
         self.total_firings = 0
 
+    def record_state(self, current_time: float, force: bool = False) -> None:
+        """No-op stub for compatibility with engine SimulationController.
+
+        Data is already captured via the step listener (on_simulation_step).
+        The engine data_collector calls this method; we satisfy the interface.
+        """
+        pass
+
     def on_simulation_step(self, controller, time: float):
         """Collect data on each simulation step.
         

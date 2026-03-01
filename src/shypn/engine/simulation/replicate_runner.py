@@ -27,7 +27,7 @@ import json
 import time
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Callable, Dict, List, Optional, Any, Union
 from copy import deepcopy
 
 from shypn.engine.simulation.controller import SimulationController
@@ -49,7 +49,7 @@ class ReplicateRunner:
         default_settings: Default SimulationSettings to use
     """
     
-    def __init__(self, model, settings: Optional[SimulationSettings] = None):
+    def __init__(self, model: Any, settings: Optional[SimulationSettings] = None):
         """Initialize replicate runner.
         
         Args:
@@ -68,10 +68,11 @@ class ReplicateRunner:
         termination_condition: str = "deadlock",
         time_step: Optional[float] = None,
         epsilon: float = 0.03,
+        max_tau: float = 0.1,
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
         verbose: bool = False,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[Callable] = None
     ) -> List[Dict[str, Any]]:
         """Run n independent stochastic simulation replicates.
         
@@ -89,6 +90,7 @@ class ReplicateRunner:
                 - "steady_state": Stop when steady state detected OR duration is reached
             time_step: Time step for recording (None = auto)
             epsilon: Tau-leaping epsilon parameter
+            max_tau: Maximum leap size for tau-leaping (smaller = more accurate)
             seed_base: Base random seed (replicate i uses seed_base + i)
             time_units: Time units for duration
             verbose: Print progress messages
@@ -146,9 +148,10 @@ class ReplicateRunner:
             controller.settings.use_parallel_stochastic = use_parallel
             controller.settings.use_tau_leaping = use_tau_leaping
             controller.settings.tau_epsilon = epsilon
+            controller.settings.max_tau = max_tau
             controller.settings.duration = duration
             controller.settings.time_units = time_units
-            controller.settings.random_seed = seed_base + i
+            controller.settings.random_seed = seed_base + i  # type: ignore[attr-defined]
             
             if time_step is not None:
                 controller.settings.dt_auto = False
@@ -187,15 +190,19 @@ class ReplicateRunner:
                     
                     # Check for steady state (simple heuristic: no token changes for N steps)
                     if termination_condition == "steady_state" and step_num > 100:
-                        # Check if marking hasn't changed in last 50 steps
-                        # This is a simple heuristic - could be improved
+                        # Check if token counts haven't changed in last 50 steps.
+                        # Data is stored as (time, tokens) tuples — extract just the
+                        # token component so the time field doesn't prevent detection.
                         recent_data = controller.data_collector.place_data
                         if recent_data and len(list(recent_data.values())[0]) >= 50:
                             # Check last 50 time points for all places
                             all_stable = True
                             for place_id, data in recent_data.items():
                                 if len(data) >= 50:
-                                    last_50 = data[-50:]
+                                    last_50 = [
+                                        v[1] if isinstance(v, tuple) else v
+                                        for v in data[-50:]
+                                    ]
                                     if not all(v == last_50[0] for v in last_50):
                                         all_stable = False
                                         break
@@ -327,7 +334,7 @@ class ReplicateRunner:
         for place_id in place_ids:
             # Stack trajectories into matrix (replicates × time_points)
             # Extract only token values (second element) from (time, tokens) tuples
-            trajectories = []
+            trajectories: Any = []
             for r in successful:
                 place_values = r['place_data'][place_id]
                 # Handle both tuple format [(time, tokens), ...] and flat list [tokens, ...]
@@ -373,7 +380,7 @@ class ReplicateRunner:
         for transition_id in transition_ids:
             # Stack rate trajectories into matrix (replicates × time_points)
             # Extract only rate values (second element) from (time, rate) tuples
-            rate_trajectories = []
+            rate_trajectories: Any = []
             for r in successful:
                 rate_values = r['transition_rates'][transition_id]
                 # Handle both tuple format [(time, rate), ...] and flat list [rate, ...]
@@ -423,7 +430,7 @@ class ReplicateRunner:
         filepath: Union[str, Path],
         format: str = 'wide',
         include_transitions: bool = False
-    ):
+    ) -> None:
         """Export trajectory data to CSV.
         
         Args:
@@ -455,7 +462,7 @@ class ReplicateRunner:
         results: List[Dict[str, Any]],
         filepath: Path,
         include_transitions: bool
-    ):
+    ) -> None:
         """Export in wide format (one row per time point per replicate)."""
         import csv
         
@@ -499,7 +506,7 @@ class ReplicateRunner:
         results: List[Dict[str, Any]],
         filepath: Path,
         include_transitions: bool
-    ):
+    ) -> None:
         """Export in long/tidy format (one row per observation)."""
         import csv
         
@@ -538,7 +545,7 @@ class ReplicateRunner:
         self,
         statistics: Dict[str, Any],
         filepath: Union[str, Path]
-    ):
+    ) -> None:
         """Export statistics to JSON.
         
         Args:
@@ -551,7 +558,7 @@ class ReplicateRunner:
         with open(filepath, 'w') as f:
             json.dump(statistics, f, indent=2)
     
-    def _reset_model(self, model):
+    def _reset_model(self, model: Any) -> None:
         """Reset model to initial marking.
         
         Args:

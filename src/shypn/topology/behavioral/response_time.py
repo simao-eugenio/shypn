@@ -53,7 +53,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
         self._inter_firing_times: Dict[str, List[int]] = {}
         self._transition_delays: Dict[Tuple[str, str], List[int]] = {}
         
-    def analyze(
+    def analyze(  # type: ignore[override]
         self,
         initial_marking: Optional[Dict[str, int]] = None,
         max_steps: int = 10000,
@@ -110,7 +110,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
             # Run simulation
             current_marking = initial_marking.copy()
             steps = 0
-            recent_firings = deque(maxlen=100)  # Track recent firings for delay calculation
+            recent_firings: deque = deque(maxlen=100)  # Track recent firings for delay calculation
             deadlock_count = 0
             max_deadlocks = 100
             
@@ -263,77 +263,6 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
         
         return critical[0]
     
-    def _get_initial_marking(self) -> Dict[str, int]:
-        """Get initial marking from the model."""
-        marking = {}
-        # Handle both dict and list formats
-        if hasattr(self.model.places, 'items'):
-            # Dict format
-            for place_id, place in self.model.places.items():
-                marking[place_id] = place.tokens
-        else:
-            # List format (DocumentModel)
-            for place in self.model.places:
-                marking[place.id] = place.tokens
-        return marking
-    
-    def _get_enabled_transitions(self, marking: Dict[str, int]) -> List[str]:
-        """Get list of enabled transitions for a marking."""
-        enabled = []
-        
-        # Handle both dict and list formats
-        transitions = self.model.transitions.keys() if hasattr(self.model.transitions, 'keys') else [t.id for t in self.model.transitions]
-        arcs = self.model.arcs.values() if hasattr(self.model.arcs, 'values') else self.model.arcs
-        
-        for trans_id in transitions:
-            can_fire = True
-            
-            for arc in arcs:
-                arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-                arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-                
-                if arc_target == trans_id:
-                    tokens = marking.get(arc_source, 0)
-                    if tokens < arc.weight:
-                        can_fire = False
-                        break
-            
-            if can_fire:
-                enabled.append(trans_id)
-        
-        return enabled
-    
-    def _fire_transition(
-        self,
-        marking: Dict[str, int],
-        trans_id: str
-    ) -> Dict[str, int]:
-        """Fire a transition and return the new marking."""
-        new_marking = marking.copy()
-        
-        # Handle both dict and list formats for arcs
-        arcs = self.model.arcs.values() if hasattr(self.model.arcs, 'values') else self.model.arcs
-        
-        # Remove tokens from input places
-        for arc in arcs:
-            arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-            arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-            
-            if arc_target == trans_id:
-                place_id = arc_source
-                new_marking[place_id] = max(0, new_marking.get(place_id, 0) - arc.weight)
-        
-        # Add tokens to output places
-        for arc in arcs:
-            arc_target = arc.target.id if hasattr(arc.target, 'id') else arc.target
-            arc_source = arc.source.id if hasattr(arc.source, 'id') else arc.source
-            
-            if arc_source == trans_id:
-                place_id = arc_target
-                new_marking[place_id] = new_marking.get(place_id, 0) + arc.weight
-        
-        return new_marking
-    
     def _compute_average_delays(self) -> Dict[Tuple[str, str], float]:
         """Compute average delays for all transition pairs."""
         avg_delays = {}
@@ -405,7 +334,7 @@ class ResponseTimeAnalyzer(TopologyAnalyzer):
         
         return " | ".join(lines)
     
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached analysis results."""
         super().clear_cache()
         self._firing_times.clear()

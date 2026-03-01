@@ -14,6 +14,8 @@ Best for models where all species have high abundances and can be
 approximated as continuous variables.
 """
 
+from typing import List
+
 from .base_strategy import SimulationStrategy
 
 
@@ -54,14 +56,14 @@ class ContinuousStrategy(SimulationStrategy):
         if hasattr(self.controller, '_continuous_executor'):
             try:
                 # Execute one step using continuous dynamics
-                self.controller._step(time_step)
+                self.controller.step(time_step)
                 return True
             except Exception:
                 return False
         else:
             # Fallback: manual step execution
             try:
-                self.controller._step(time_step)
+                self.controller.step(time_step)
                 return True
             except Exception:
                 return False
@@ -90,7 +92,7 @@ class ContinuousStrategy(SimulationStrategy):
         # Pure continuous: has continuous but not stochastic
         return has_continuous and not has_stochastic
     
-    def _get_enabled_continuous_transitions(self):
+    def _get_enabled_continuous_transitions(self) -> List:
         """Get list of enabled continuous/timed transitions.
         
         Returns:
@@ -101,7 +103,7 @@ class ContinuousStrategy(SimulationStrategy):
             if hasattr(transition, 'transition_type'):
                 t_type = transition.transition_type
                 if t_type in ('continuous', 'timed'):
-                    if self.controller._is_enabled(transition):
+                    if self.controller._viability_checker.is_enabled(transition):
                         enabled.append(transition)
         return enabled
     

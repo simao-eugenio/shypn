@@ -74,7 +74,7 @@ class SabioRKCacheManager(BaseCacheManager):
                 conn.commit()
                 self.logger.info("sabio_rk_cache table created")
     
-    def build_query_key(self, ec_number: str, organism: Optional[str] = None) -> str:
+    def build_query_key(self, ec_number: str, organism: Optional[str] = None) -> str:  # type: ignore[override]
         """Build unique query key for SABIO-RK query.
         
         Args:

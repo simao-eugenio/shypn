@@ -82,10 +82,10 @@ class AdaptiveHybridBehavior(TransitionBehavior):
     """
     
     # Class-level tracking to prevent duplicate warnings across all instances
-    _warned_no_places_transitions = set()
-    _warned_no_volumes_transitions = set()
+    _warned_no_places_transitions: set = set()
+    _warned_no_volumes_transitions: set = set()
     
-    def __init__(self, transition, model):
+    def __init__(self, transition: Any, model: Any):
         """Initialize adaptive hybrid behavior.
         
         Creates both continuous and stochastic behavior delegates.
@@ -135,8 +135,8 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         self.volume_selector = VolumeAdaptiveSelector(threshold_molecules=self.volume_threshold)
         
         # Track current mode for mode change detection
-        self._current_mode = None  # 'continuous' or 'stochastic'
-        self._last_volume_check = None
+        self._current_mode: Optional[str] = None  # 'continuous' or 'stochastic'
+        self._last_volume_check: Optional[Dict[str, Any]] = None
         
         # Diagnostic counters (populated by _get_connected_places)
         self._input_count = 0
@@ -228,7 +228,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                     unique_places.append(p)
             return unique_places
     
-    def _has_volume_info(self, place) -> bool:
+    def _has_volume_info(self, place: Any) -> bool:
         """Check if place has volume information for adaptive mode selection.
         
         Args:
@@ -243,7 +243,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             return volume is not None and volume > 0
         return False
     
-    def _is_spatial_signal(self, place) -> bool:
+    def _is_spatial_signal(self, place: Any) -> bool:
         """Check if place is a spatial signal (legacy method, kept for compatibility).
         
         Args:
@@ -328,7 +328,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         
         return mode
     
-    def _handle_mode_change(self, new_mode: str):
+    def _handle_mode_change(self, new_mode: str) -> None:
         """Handle transition between execution modes.
         
         When mode changes, we need to:
@@ -378,15 +378,41 @@ class AdaptiveHybridBehavior(TransitionBehavior):
             # Delegate to stochastic behavior
             return self.stochastic_behavior._evaluate_rate_at_enablement(time)
         else:
-            # Continuous mode: use evaluate_rate
-            # Build places dict with numeric token values
+            # Continuous mode: use evaluate_rate with place OBJECTS (not token values)
+            # ContinuousBehavior.evaluate_rate expects place objects so it can call
+            # place.tokens internally — passing raw floats would make every variable
+            # fall back to epsilon (1e-10), giving wrong near-zero rates.
             places = {}
             places_to_iterate = self.model.places.values() if isinstance(self.model.places, dict) else self.model.places
             for p in places_to_iterate:
                 if hasattr(p, 'id') and hasattr(p, 'tokens'):
-                    places[p.id] = p.tokens
+                    places[p.id] = p          # store place OBJECT, not p.tokens
                     if hasattr(p, 'name') and p.name:
-                        places[p.name] = p.tokens
+                        places[p.name] = p    # store place OBJECT, not p.tokens
+            return self.continuous_behavior.evaluate_rate(places, time)
+
+    def evaluate_rate(self, places: Any, time: float) -> float:
+        """Evaluate rate for data_collector compatibility.
+
+        Called by DataCollector.record_state when it detects evaluate_rate on the
+        behavior.  Delegates to the currently selected sub-behavior so that the
+        data_collector receives the same correct value as the simulation engine.
+
+        Args:
+            places: Dict of place_id → place object (as built by data_collector)
+            time: Current simulation time
+
+        Returns:
+            Instantaneous rate value
+        """
+        mode = self._select_mode()
+        self._handle_mode_change(mode)
+
+        if mode == 'stochastic':
+            # Stochastic: delegate to stochastic behavior's own evaluator
+            return self.stochastic_behavior._evaluate_rate_at_enablement(time)
+        else:
+            # Continuous: forward the places dict directly — already contains objects
             return self.continuous_behavior.evaluate_rate(places, time)
     
     def can_fire(self) -> Tuple[bool, str]:
@@ -501,7 +527,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
                     'dt': dt
                 }
     
-    def set_enablement_time(self, time: float):
+    def set_enablement_time(self, time: float) -> None:
         """Set enablement time (delegates to stochastic behavior if needed).
         
         This is called by the scheduler when transition becomes enabled.
@@ -515,7 +541,7 @@ class AdaptiveHybridBehavior(TransitionBehavior):
         if mode == 'stochastic':
             self.stochastic_behavior.set_enablement_time(time)
     
-    def clear_enablement(self):
+    def clear_enablement(self) -> None:
         """Clear enablement (delegates to stochastic behavior)."""
         self.stochastic_behavior.clear_enablement()
     

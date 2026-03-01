@@ -135,7 +135,7 @@ class ReactomeFetcher(BaseFetcher):
             
             return result
             
-        except (urllib.error.HTTPError, urllib.error.URLError, requests.exceptions.RequestException, ConnectionError, TimeoutError, ValueError, KeyError, AttributeError) as e:
+        except Exception as e:
             return self._create_failed_result(
                 data_type=data_type,
                 error=f"Reactome fetch error: {str(e)}",
