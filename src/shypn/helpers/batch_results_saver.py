@@ -25,7 +25,7 @@ import os
 import json
 import csv
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from pathlib import Path
 
 
@@ -352,69 +352,106 @@ class BatchResultsSaver:
         metadata_context: Optional[Dict[str, Any]] = None
     ) -> Path:
         """Complete batch save operation (all-in-one method).
-        
-        Convenience method that handles:
-        1. Folder creation
-        2. Config save
-        3. All replicate CSVs
-        4. Summary statistics
-        
+
+        Saves:
+        1. ``config.json``            — simulation parameters
+        2. ``replicates.csv``         — per-replicate metadata + final-state values
+        3. ``replicates_trajectories/run_NNN.csv`` — δ-compressed trajectories
+        4. ``summary.json``           — cross-replicate statistics
+
         Args:
             results: List of result dicts from all replicates
             recorded_objects: Set of recorded object IDs
             n_replicates: Total number of replicates
             settings: Simulation settings dict
-            model: Optional DocumentModel for metadata
+            model: Optional DocumentModel for metadata / id→name mapping
             name_suffix: Optional suffix for batch folder name
             metadata_context: Optional additional metadata context
-        
+
         Returns:
             Path to created batch folder
         """
-        # Create batch folder
+        # ── 1. Folder + config ────────────────────────────────────────────────
         batch_path = self.create_batch_folder(name_suffix)
         print(f"✓ Created batch folder: {batch_path}")
-        
-        # Save configuration
+
         self.save_config(n_replicates, list(recorded_objects), settings)
         print(f"✓ Saved config.json")
-        
-        # Build metadata context if model provided
+
+        # ── 2. Build metadata context (for summary / legacy callers) ──────────
         if metadata_context is None and model:
             metadata_context = self._build_metadata_context_from_model(
-                model,
-                settings,
-                n_replicates,
-                recorded_objects
+                model, settings, n_replicates, recorded_objects
             )
-        
-        # Save individual replicate CSVs
-        csv_count = 0
-        for result in results:
-            if 'error' in result:
-                continue  # Skip failed replicates
-            
-            replicate_id = result['replicate_id']
-            time_points = result['time_points']
-            place_data = result.get('place_data', {})
-            transition_data = result.get('transition_data', {})
-            
-            self.save_replicate_csv(
-                replicate_id,
-                time_points,
-                place_data,
-                transition_data,
-                metadata_context,
-                use_metadata_header=True
+
+        # ── 3. Build id→name lookup from model ────────────────────────────────
+        id_to_name: Dict[str, str] = {}
+        if model is not None:
+            for p in getattr(model, 'places', []):
+                id_to_name[p.id] = getattr(p, 'name', p.id)
+            for t in getattr(model, 'transitions', []):
+                id_to_name[t.id] = getattr(t, 'name', t.id)
+
+        # ── 4. δ-filter compression ───────────────────────────────────────────
+        from shypn.helpers.compressor import DeltaFilterCompressor, CompressedTrajectoryWriter
+
+        compressor = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+        compressed = compressor.compress_batch(results)
+
+        # ── 5. replicates.csv — summary with final-state columns ──────────────
+        successful = [r for r in results if 'error' not in r]
+        compressed_by_id = {cr.replicate_id: cr for cr in compressed}
+        final_place_ids: List[str] = []
+        if compressed_by_id:
+            final_place_ids = next(iter(compressed_by_id.values())).sorted_place_ids()
+
+        replicates_csv = batch_path / 'replicates.csv'
+        with open(replicates_csv, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            base_cols = [
+                'replicate_id', 'seed', 'n_timepoints', 'final_time',
+                'deadlocked', 'elapsed_time_s', 'n_kept', 'compression_ratio',
+            ]
+            writer.writerow(base_cols + [f'final_{pid}' for pid in final_place_ids])
+            for r in successful:
+                rid = r.get('replicate_id', 0)
+                cr = compressed_by_id.get(rid)
+                final_vals = cr.final_values() if cr else {}
+                writer.writerow([
+                    rid,
+                    r.get('seed', ''),
+                    len(r.get('time_points', [])),
+                    r.get('final_time', r.get('time_points', [0])[-1] if r.get('time_points') else ''),
+                    r.get('deadlocked', False),
+                    r.get('elapsed_time', ''),
+                    cr.n_kept if cr else '',
+                    f'{cr.compression_ratio:.2f}' if cr else '',
+                ] + [final_vals.get(pid, '') for pid in final_place_ids])
+        print(f"✓ Saved replicates.csv ({len(successful)} rows, {len(final_place_ids)} final-state cols)")
+
+        # ── 6. replicates_trajectories/ — one compressed CSV per replicate ────
+        traj_dir = batch_path / 'replicates_trajectories'
+        traj_dir.mkdir(exist_ok=True)
+        experiment_name = name_suffix or batch_path.name
+
+        for cr in compressed:
+            r = next((x for x in results if x.get('replicate_id') == cr.replicate_id), {})
+            status = 'deadlocked' if r.get('deadlocked') else 'completed'
+            csv_path = traj_dir / f'run_{cr.replicate_id + 1:03d}.csv'
+            CompressedTrajectoryWriter.write(
+                path=csv_path,
+                result=cr,
+                experiment_name=experiment_name,
+                status=status,
+                id_to_name=id_to_name or None,
             )
-            csv_count += 1
-        
-        print(f"✓ Saved {csv_count} replicate CSVs")
-        
-        # Save summary statistics
+
+        print(f"✓ Saved {len(compressed)} compressed trajectories → replicates_trajectories/")
+
+        # ── 7. summary.json ───────────────────────────────────────────────────
         self.save_summary(results, recorded_objects, n_replicates)
         print(f"✓ Saved summary.json")
-        
+
         return batch_path
     
     def _build_metadata_context_from_model(

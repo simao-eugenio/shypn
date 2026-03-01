@@ -813,7 +813,18 @@ class ExperimentAutomationCategory:
         try:
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
+            compressed_trajectories = result.get('compressed_trajectories', [])
             n = max(len(replicate_data), len(trajectory_summary))
+
+            # Build {replicate_id: CompressionResult} for fast lookup
+            compressed_by_id = {cr.replicate_id: cr for cr in compressed_trajectories}
+
+            # Determine final-state place columns (sorted for stable schema)
+            final_place_ids: list = []
+            if compressed_by_id:
+                _sample = next(iter(compressed_by_id.values()))
+                final_place_ids = _sample.sorted_place_ids()
+
             with open(batch_path / 'replicates.csv', 'w', newline='') as f:
                 _metadata = result.get('metadata')
                 if _metadata is not None:
@@ -822,20 +833,30 @@ class ExperimentAutomationCategory:
                     except Exception:
                         pass
                 writer = csv_mod.writer(f)
-                writer.writerow(['replicate_id', 'seed', 'n_timepoints', 'final_time',
-                                  'deadlocked', 'sim_duration', 'elapsed_time_s'])
+                base_cols = ['replicate_id', 'seed', 'n_timepoints', 'final_time',
+                             'deadlocked', 'sim_duration', 'elapsed_time_s',
+                             'n_kept', 'compression_ratio']
+                writer.writerow(base_cols + [f'final_{pid}' for pid in final_place_ids])
                 for i in range(n):
                     rep = replicate_data[i] if i < len(replicate_data) else {}
                     traj = trajectory_summary[i] if i < len(trajectory_summary) else {}
-                    writer.writerow([
-                        traj.get('replicate_id', i),
+                    rid = traj.get('replicate_id', i)
+                    cr = compressed_by_id.get(rid)
+                    final_vals = cr.final_values() if cr else {}
+                    n_kept = cr.n_kept if cr else ''
+                    comp_ratio = f'{cr.compression_ratio:.2f}' if cr else ''
+                    row = [
+                        rid,
                         traj.get('seed', ''),
                         traj.get('n_timepoints', ''),
                         traj.get('final_time', ''),
                         rep.get('deadlocked', ''),
                         rep.get('duration', ''),
-                        rep.get('elapsed_time', '')
-                    ])
+                        rep.get('elapsed_time', ''),
+                        n_kept,
+                        comp_ratio,
+                    ] + [final_vals.get(pid, '') for pid in final_place_ids]
+                    writer.writerow(row)
             _fsync(batch_path / 'replicates.csv')
         except Exception as e:
             save_errors.append(f'replicates.csv: {e}')
@@ -936,6 +957,49 @@ class ExperimentAutomationCategory:
         except Exception as e:
             save_errors.append(f'mean_final_state.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save mean_final_state.csv: {e}')
+
+        # ── replicates_trajectories/ ── one δ-compressed CSV per replicate
+        # Each file is self-describing (comment header + col_schema line) so
+        # analysis scripts need no external sidecar.  Skipped gracefully when
+        # no compressed data is available (e.g. on error runs).
+        try:
+            compressed_trajectories = result.get('compressed_trajectories', [])
+            if compressed_trajectories:
+                from shypn.helpers.compressor import CompressedTrajectoryWriter
+
+                # Build id→name mapping from subnet model (reuse or build fresh)
+                _id_to_name: dict = {}
+                _subnet_model = getattr(self.parent_panel, 'subnet_model', None)
+                if _subnet_model is not None:
+                    for p in getattr(_subnet_model, 'places', []):
+                        _id_to_name[p.id] = getattr(p, 'name', p.id)
+                    for t in getattr(_subnet_model, 'transitions', []):
+                        _id_to_name[t.id] = getattr(t, 'name', t.id)
+
+                # Determine replicate status from replicate_data list
+                _rep_data = result.get('replicate_data', [])
+                _status_by_order: dict = {}
+                for _idx, _rd in enumerate(_rep_data):
+                    _status_by_order[_idx] = 'deadlocked' if _rd.get('deadlocked') else 'completed'
+
+                traj_dir = batch_path / 'replicates_trajectories'
+                traj_dir.mkdir(exist_ok=True)
+
+                for cr in compressed_trajectories:
+                    _status = _status_by_order.get(cr.replicate_id, 'completed')
+                    csv_path = traj_dir / f'run_{cr.replicate_id + 1:03d}.csv'
+                    CompressedTrajectoryWriter.write(
+                        path=csv_path,
+                        result=cr,
+                        experiment_name=name,
+                        status=_status,
+                        id_to_name=_id_to_name or None,
+                    )
+                    _fsync(csv_path)
+                print(f'[AUTO-SAVE] Saved {len(compressed_trajectories)} compressed trajectories → {traj_dir.name}/')
+        except Exception as e:
+            save_errors.append(f'replicates_trajectories/: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save replicates_trajectories/: {e}')
 
         # ── .complete / .partial sentinel ──────────────────────────────────
         # .complete is written ONLY when every file succeeded.

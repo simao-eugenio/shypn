@@ -248,6 +248,15 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'arc_ids': [a['id'] for a in subnet_data.get('arcs', [])]
             }
 
+            # Compress raw trajectories with δ-filter before discarding raw data.
+            worker_compressed: list = []
+            try:
+                from shypn.helpers.compressor import DeltaFilterCompressor
+                _cmp = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                worker_compressed = _cmp.compress_batch(results)
+            except Exception as _ce:
+                print(f'[WORKER] Warning: trajectory compression failed: {_ce}')
+
             return {
                 'name': name,
                 'snapshot_index': args['snapshot_index'],
@@ -258,6 +267,7 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 'status': 'success',
                 'metadata': metadata_header,
                 'trajectory_summary': trajectory_summary,
+                'compressed_trajectories': worker_compressed,
                 'replicate_data': replicate_data,
                 'swept_parameter': swept_param,
                 'subnet_structure': subnet_structure,
@@ -1217,7 +1227,19 @@ class BatchExecutor:
                             'n_timepoints': len(traj.get('time_points', [])),
                             'final_time': traj.get('time_points', [0])[-1] if traj.get('time_points') else 0
                         })
-            
+
+            # Compress raw trajectories with δ-filter (generic, no model knowledge).
+            # Results are stored in the output dict and consumed by _auto_save_experiment
+            # to write replicates_trajectories/run_NNN.csv files.
+            compressed_trajectories: List[Any] = []
+            try:
+                from shypn.helpers.compressor import DeltaFilterCompressor
+                _compressor = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                if results:
+                    compressed_trajectories = _compressor.compress_batch(results)
+            except Exception as _comp_err:
+                print(f'[EXPERIMENT] Warning: trajectory compression failed: {_comp_err}')
+
             # Include swept parameter metadata from snapshot
             swept_param = getattr(snapshot, 'swept_parameter', None)
             
@@ -1340,6 +1362,7 @@ class BatchExecutor:
                 'name': name,
                 'snapshot_index': snapshot_index,
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
+                'compressed_trajectories': compressed_trajectories,  # δ-filtered per-replicate data
                 'n_replicates': len(results) if results else 0,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
