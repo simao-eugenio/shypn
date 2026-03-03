@@ -96,7 +96,10 @@ def _replicate_range_worker(
             controller.time = 0.0
             controller._event_last_triggered = {}
             controller._event_pending_assignments = []
-            controller.data_collector.start_collection()
+            # Phase 5: pre-allocated numpy buffer + skip expensive rate eval
+            _rec_iv = getattr(controller.data_collector, 'recording_time_interval', 0.5)
+            _n_hint = (int(duration / _rec_iv) + 16) if duration and _rec_iv > 0 else None
+            controller.data_collector.start_collection(n_steps_hint=_n_hint, skip_rate_eval=True)
             controller.data_collector.record_state(controller.time)
 
             dt = controller.settings.get_effective_dt()
@@ -109,6 +112,7 @@ def _replicate_range_worker(
                     stopped_reason = 'deadlock'
                     break
 
+            controller.data_collector.finalize_buf()  # Phase 5: flush numpy recording buffer
             time_points = controller.data_collector.time_points.copy()
             if not recorded_objects:
                 place_data = {
@@ -297,14 +301,18 @@ class BatchSimulationRunner:
                 
                 # Reset controller time to 0 for new replicate
                 replicate_controller.time = 0.0
-                
+
                 # Reset environment-event tracking so edge-triggered events re-arm
                 # in every replicate (controller is reused for performance).
                 replicate_controller._event_last_triggered = {}
                 replicate_controller._event_pending_assignments = []
-                
-                # Start data collection (will track all objects initially)
-                replicate_controller.data_collector.start_collection()
+
+                # Phase 5: pre-allocated numpy buffer + skip expensive rate eval
+                _rec_iv = getattr(replicate_controller.data_collector, 'recording_time_interval', 0.5)
+                _n_hint = (int(duration / _rec_iv) + 16) if duration and _rec_iv > 0 else None
+                replicate_controller.data_collector.start_collection(
+                    n_steps_hint=_n_hint, skip_rate_eval=True
+                )
                 replicate_controller.data_collector.record_state(replicate_controller.time)
                 
                 # Calculate time step (use same as real-time mode)
@@ -329,6 +337,7 @@ class BatchSimulationRunner:
                         break
                 
                 # Collect data - if recorded_objects is empty, include everything
+                replicate_controller.data_collector.finalize_buf()  # Phase 5: flush numpy recording buffer
                 time_points = replicate_controller.data_collector.time_points.copy()
                 
                 # If no objects specified for recording, export ALL data
