@@ -11,7 +11,7 @@ Supports:
 
 import logging
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Set
 
 from .leap_selector import LeapSelector
 from .poisson_sampler import PoissonSampler
@@ -74,7 +74,13 @@ class TauLeapingEngine:
         
         # Control flag for time advancement (can be disabled for hybrid models)
         self._advance_time = True
-        
+
+        # Phase 2.2: dirty-flag tracking — IDs of places modified by the last
+        # _apply_firings call.  None on the very first step (forces full sync).
+        # Replaces update_y_from_model() on subsequent steps with a partial
+        # update touching only the places whose token counts actually changed.
+        self._changed_place_ids: Optional[Set[str]] = None
+
         self.logger = logging.getLogger(__name__)
         
         # Suppress warnings if not verbose
@@ -128,7 +134,12 @@ class TauLeapingEngine:
         _prop_accel = getattr(controller, '_propensity_accelerator', None)
         if _prop_accel is not None and _prop_accel.ready:
             try:
-                _prop_accel.update_y_from_model()
+                # Phase 2.2: partial y[] update — only sync places that changed
+                # last step; fall back to full update on the first step.
+                if self._changed_place_ids is not None:
+                    _prop_accel.update_y_partial(self._changed_place_ids)
+                else:
+                    _prop_accel.update_y_from_model()
                 _prop_accel.update_thermo_params()
                 _a_net, _a_fwd, _a_rev = _prop_accel.compute(current_time)
                 self._accel_props = {
@@ -148,6 +159,14 @@ class TauLeapingEngine:
                 self._accel_props = None
         # ──────────────────────────────────────────────────────────────────────
 
+        # Phase 2.1: pass precomputed arc table to leap selector so
+        # _get_min_input_tokens uses O(k) lookup instead of O(|arcs|) scan.
+        _arc_table = (
+            _prop_accel._input_arc_table
+            if _prop_accel is not None and _prop_accel.ready
+            else None
+        )
+
         # Step 1: Select leap size τ
         tau, leap_info = self.leap_selector.select_tau(
             stochastic_transitions,
@@ -155,6 +174,7 @@ class TauLeapingEngine:
             current_time,
             controller,
             propensity_hint=self._accel_props,
+            arc_table=_arc_table,
         )
         
         # Log tau selection for debugging
@@ -182,6 +202,8 @@ class TauLeapingEngine:
         )
         
         # Step 3: Apply firings (consume/produce tokens)
+        # Reset dirty-flag set; _apply_firings will populate it.
+        self._changed_place_ids = set()
         total_firings = self._apply_firings(
             firings_map,
             controller
@@ -620,7 +642,12 @@ class TauLeapingEngine:
                 actual_firings,
                 behavior
             )
-            
+
+            # Phase 2.2: record which place IDs changed for the dirty-flag
+            if self._changed_place_ids is not None:
+                self._changed_place_ids.update(consumed_map)
+                self._changed_place_ids.update(produced_map)
+
             total_firings += actual_firings
             
             # Record firing event in engine's data collector (for reports)

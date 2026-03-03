@@ -79,6 +79,7 @@ class LeapSelector:
         current_time: float,
         controller: Any = None,
         propensity_hint: Optional[Dict[str, Any]] = None,
+        arc_table: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, Dict[str, Any]]:
         """Select appropriate time leap based on current state.
         
@@ -138,7 +139,7 @@ class LeapSelector:
             }
         
         # Calculate τ using simplified leap condition
-        tau_unbounded = self._calculate_tau_simplified(propensities, model, transitions)
+        tau_unbounded = self._calculate_tau_simplified(propensities, model, transitions, arc_table)
         
         # Apply bounds
         tau = max(self.min_tau, min(tau_unbounded, self.max_tau))
@@ -156,7 +157,8 @@ class LeapSelector:
         self,
         propensities: List[float],
         model: Any,
-        transitions: Optional[List[Any]] = None
+        transitions: Optional[List[Any]] = None,
+        arc_table: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Calculate τ using simplified leap condition.
         
@@ -197,7 +199,7 @@ class LeapSelector:
                     continue
                 
                 # Get minimum tokens available in input places
-                min_tokens = self._get_min_input_tokens(transition, model)
+                min_tokens = self._get_min_input_tokens(transition, model, arc_table)
                 if min_tokens > 0:
                     # Limit tau so expected firings <= min_tokens
                     # The _calculate_max_firings method will cap actual firings if needed
@@ -207,19 +209,39 @@ class LeapSelector:
         
         return tau
     
-    def _get_min_input_tokens(self, transition: Any, model: Any) -> float:
+    def _get_min_input_tokens(
+        self,
+        transition: Any,
+        model: Any,
+        arc_table: Optional[Dict[str, Any]] = None,
+    ) -> float:
         """Get minimum available tokens across all input places.
-        
+
+        Uses the precomputed *arc_table* (Phase 2.1) when available for
+        O(k) lookup instead of O(|arcs|) scan of ``model.arcs``.
+
         Args:
             transition: Transition to check
             model: Petri net model
-        
+            arc_table: Optional precomputed mapping transition_id →
+                       [(place_obj, weight), ...] from PropensityAccelerator.
         Returns:
             Minimum tokens available (accounting for arc weights)
         """
         min_tokens = float('inf')
-        
-        # Get input arcs for this transition
+
+        # Phase 2.1: O(k) fast path using precomputed table
+        _tid = getattr(transition, "id", None)
+        if arc_table is not None and _tid is not None:
+            entries = arc_table.get(_tid)
+            if not entries:
+                return float('inf')  # source transition — no consume arcs
+            for _place, _weight in entries:
+                if _weight > 0 and hasattr(_place, "tokens"):
+                    min_tokens = min(min_tokens, _place.tokens / _weight)
+            return min_tokens if min_tokens != float('inf') else 0.0
+
+        # Fallback: O(|arcs|) scan when no table available
         input_arcs = [arc for arc in model.arcs 
                      if arc.target == transition and hasattr(arc, 'source')]
         
