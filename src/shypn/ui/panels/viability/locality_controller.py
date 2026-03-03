@@ -155,7 +155,7 @@ class LocalityController(AbstractLocalityController):
             return []
 
         try:
-            from shypn.diagnostic import LocalityDetector  # type: ignore[import]
+            from shypn.diagnostic import LocalityDetector
             locality_detector = LocalityDetector(model)
             locality = locality_detector.get_locality_for_transition(transition_obj)
             locality_place_ids: Set[str] = set()
@@ -229,7 +229,7 @@ class LocalityController(AbstractLocalityController):
             if not formula and hasattr(transition, 'formula') and transition.formula:
                 formula = transition.formula
             if not formula and isinstance(getattr(transition, 'rate', None), str):
-                formula = transition.rate  # type: ignore[assignment]
+                formula = transition.rate
             if not formula:
                 continue
 
@@ -251,7 +251,7 @@ class LocalityController(AbstractLocalityController):
         Uses direct object references — no deep-copy — so inline edits in the
         panel's parameter table update the actual canvas objects.
         """
-        from shypn.data.canvas.document_model import DocumentModel  # type: ignore[import]
+        from shypn.data.canvas.document_model import DocumentModel
 
         subnet_places: Set[Any] = set()
         subnet_transitions: Set[Any] = set()
