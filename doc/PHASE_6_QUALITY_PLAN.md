@@ -1,6 +1,6 @@
 # Phase 6 Quality Plan — God Class Reduction via OOP Extraction
 
-**Status:** Sprint 14 next (Sprint 13 ✅ complete)  
+**Status:** Sprint 15 next (Sprint 14 ✅ complete)  
 **Branch:** Usability-and-enhancements  
 **Precursor:** Sprint 12 (CSV normalization, metadata fixes) — committed `834ec18`  
 **Methodology:** Extract cohesive clusters into typed service classes (ABC + concrete), one module per service.
@@ -36,7 +36,7 @@
 |---|---|---|---|---|
 | 🔴 **P1** | `ModelCanvasManager` | `ArcGeometryService` | Low — pure math, no GTK | `core/services/arc_geometry_service.py` |
 | 🔴 **P2** | `SimulationController` | `ConflictResolver` | Low — pure algorithm, no UI | `engine/simulation/conflict_resolver.py` |
-| 🟠 P3 | `ModelCanvasManager` | `ViewportController` split | Medium | Refactor existing `viewport_controller.py` |
+| 🟠 P3 | `ModelCanvasManager` | `ViewportController` split | Medium | Refactor existing `viewport_controller.py` | ✅ Sprint 14 |
 | 🟠 P4 | `ModelCanvasLoader` | `CanvasInputHandler` | Medium | New `helpers/canvas_input_handler.py` |
 | 🟡 P5 | `ViabilityPanel` | `LocalityController` | Medium | New `ui/locality_controller.py` |
 | 🟡 P6 | `SBMLCategory`/`KEGGCategory` | `PathwayImportService` | Low | New `data/pathway/import_service.py` |
@@ -193,6 +193,17 @@ Reduces duplication of ~600 lines shared between the two classes.
 - [x] God class line count decreased by extracted cluster size
 - [x] Module-level docstring describing the service's single responsibility
 
+### Sprint 14 — `ViewportController` cleanup (P3) ✅
+
+- [x] Coordinate-transform methods (`screen_to_world`, `world_to_screen`, `get_visible_bounds`, `get_visible_bounds_no_rotation`, `get_grid_spacing`) moved from `ModelCanvasManager` to `ViewportController`
+- [x] Private rotation helpers (`_calculate_rotation_center`, `_apply_rotation_to_point`) deleted from MCM, reimplemented in VC
+- [x] Dead duplicate methods (`find_object_at_position`, `clear_all_selections`) removed from MCM
+- [x] Unused imports (`import math`, `coord_screen_to_world`, `coord_world_to_screen`) removed from MCM
+- [x] `cast(float, ...)` / `cast(Tuple[float, float], ...)` added to silence `no-any-return` in new VC methods
+- [x] `mypy --strict --follow-imports=skip` — no new errors introduced
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+- [x] `ModelCanvasManager` reduced from 2 480 → 2 341 lines (−139 lines; target ~180)
+
 ### Future sprints checklist template
 
 - [ ] `from __future__ import annotations` present
@@ -206,4 +217,4 @@ Reduces duplication of ~600 lines shared between the two classes.
 
 ---
 
-*Next action: implement Sprint 14 — `ViewportController` cleanup (P3).*
+*Next action: implement Sprint 15 — `CanvasInputHandler` (P4).*
