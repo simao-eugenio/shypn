@@ -17,7 +17,6 @@ References:
 
 import logging
 from typing import List, Dict, Any, Set, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import os
 
@@ -270,42 +269,18 @@ class ParallelStochasticScheduler:
         propensities: List[float],
         tau: float
     ) -> Dict[Any, int]:
-        """Sample firings for a group of independent transitions in parallel.
-        
-        Args:
-            group: Group of independent transitions
-            all_transitions: Full list of transitions (for indexing)
-            propensities: Propensities for all transitions
-            tau: Time leap size
-        
-        Returns:
-            Dictionary mapping transition -> firings for this group
+        """Sample firings for a group of independent transitions.
+
+        Phase 4b: was ThreadPoolExecutor (GIL-bound, overhead > benefit).
+        Now uses a single vectorised numpy Poisson call — O(1) C overhead
+        regardless of group size.
         """
-        # Extract propensities for this group
-        group_propensities = []
-        for t in group:
-            idx = all_transitions.index(t)
-            group_propensities.append(propensities[idx])
-        
-        # Parallel sampling using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(len(group), self.max_workers)) as executor:
-            # Submit sampling tasks
-            futures = []
-            for i, t in enumerate(group):
-                future = executor.submit(
-                    self.poisson_sampler.sample,
-                    group_propensities[i],
-                    tau
-                )
-                futures.append((t, future))
-            
-            # Collect results
-            firings_map = {}
-            for t, future in futures:
-                firings = future.result()
-                firings_map[t] = firings
-        
-        return firings_map
+        lam = np.array(
+            [max(0.0, propensities[all_transitions.index(t)]) for t in group],
+            dtype=np.float64,
+        ) * tau
+        k = self.poisson_sampler.rng.poisson(lam=lam)
+        return {t: int(k[i]) for i, t in enumerate(group)}
     
     def _sample_sequential(
         self,
@@ -313,24 +288,15 @@ class ParallelStochasticScheduler:
         propensities: List[float],
         tau: float
     ) -> Dict[Any, int]:
-        """Sample firings sequentially (fallback).
-        
-        Args:
-            transitions: List of transitions
-            propensities: Propensities for each transition
-            tau: Time leap size
-        
-        Returns:
-            Dictionary mapping transition -> firings
+        """Sample firings for all transitions using vectorised numpy Poisson.
+
+        Phase 4b: replaces the Python for-loop that called poisson_sampler.sample()
+        once per transition.  Single numpy C call regardless of N transitions.
         """
-        firings_map = {}
-        
-        for t, propensity in zip(transitions, propensities):
-            firings = self.poisson_sampler.sample(propensity, tau)
-            firings_map[t] = firings
-            self.stats['total_sequential_samples'] += 1
-        
-        return firings_map
+        lam = np.maximum(0.0, np.array(propensities, dtype=np.float64)) * tau
+        k   = self.poisson_sampler.rng.poisson(lam=lam)
+        self.stats['total_sequential_samples'] += len(transitions)
+        return {t: int(k[i]) for i, t in enumerate(transitions)}
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get scheduler statistics.
