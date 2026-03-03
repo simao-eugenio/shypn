@@ -170,6 +170,13 @@ class PropensityAccelerator:
         # Kinetic parameters from transition.kinetic_metadata.parameters
         self._model_kinetic_params: Dict[str, float] = {}
 
+        # Phase 2.1: Precomputed arc lookup table built once in _analyse_model().
+        # transition_id → [(place_object, consume_weight), ...] (normal arcs only).
+        # Shared with LeapSelector to eliminate O(|arcs|) scan per τ-step.
+        self._input_arc_table: Dict[str, List[Tuple[Any, float]]] = {}
+        # Direct place lookup by id for update_y_partial().
+        self._places_by_id: Dict[str, Any] = {}
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -216,7 +223,8 @@ class PropensityAccelerator:
             return False
 
     def update_y_from_model(self) -> None:
-        """Copy current place tokens into y[] before calling ``compute``."""
+        """Copy ALL place tokens into y[] (full sync). Used on the first step
+        and whenever a complete refresh is required (e.g. exact-SSA fallback)."""
         if self._y_arr is None:
             return
         places = _place_map(self._model)
@@ -225,6 +233,29 @@ class PropensityAccelerator:
             if p is not None:
                 self._y_arr[idx] = max(
                     float(getattr(p, "tokens", 0.0)), 0.0
+                )
+
+    def update_y_partial(self, changed_ids: Set[str]) -> None:
+        """Copy only the places in *changed_ids* into y[] (partial sync).
+
+        Faster than :meth:`update_y_from_model` when just a few places
+        changed during the previous τ-step.  The caller is responsible for
+        ensuring *changed_ids* lists every place whose ``tokens`` attribute
+        was modified since the last sync.
+
+        Phase 2.2 optimisation — called by :class:`TauLeapingEngine` after
+        every firing step instead of the full update.
+        """
+        if self._y_arr is None:
+            return
+        for pid in changed_ids:
+            idx = self._all_place_index.get(pid)
+            if idx is None:
+                continue
+            place = self._places_by_id.get(pid)
+            if place is not None:
+                self._y_arr[idx] = max(
+                    float(getattr(place, "tokens", 0.0)), 0.0
                 )
 
     def update_thermo_params(self) -> None:
@@ -332,6 +363,36 @@ class PropensityAccelerator:
                         except (TypeError, ValueError):
                             pass
         self._model_kinetic_params = model_params
+
+        # Phase 2.1: build input arc lookup table and place-by-id map.
+        # Done here (after all_places is built) so place objects are live refs.
+        places_by_id: Dict[str, Any] = {
+            p.id: p for p in all_places if hasattr(p, "id")
+        }
+        input_arc_table: Dict[str, List[Tuple[Any, float]]] = {}
+        for _arc in getattr(model, "arcs", []):
+            _target = getattr(_arc, "target", None)
+            if _target is None or not hasattr(_target, "transition_type"):
+                continue
+            _tid = getattr(_target, "id", None)
+            if _tid is None:
+                continue
+            # Skip test and inhibitor arcs (they don't consume tokens)
+            _kind = (
+                getattr(_arc, "kind", None)
+                or (getattr(_arc, "properties", None) or {}).get("kind", "normal")
+                or "normal"
+            )
+            _arc_type = getattr(_arc, "arc_type", "normal")
+            if _kind != "normal" or _arc_type in ("inhibitor", "test"):
+                continue
+            _source = getattr(_arc, "source", None)
+            if _source is None or not hasattr(_source, "tokens"):
+                continue
+            _weight = float(getattr(_arc, "weight", 1.0))
+            input_arc_table.setdefault(_tid, []).append((_source, _weight))
+        self._input_arc_table = input_arc_table
+        self._places_by_id = places_by_id
 
     def _extract_rate(
         self, transition: Any

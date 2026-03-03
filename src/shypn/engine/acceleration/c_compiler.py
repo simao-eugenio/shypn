@@ -23,15 +23,39 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Compiler flags:  -O3 for max speed, -ffast-math for Arrhenius exp() speed
+# Compiler flags:
+#   -O3             maximum optimisation
+#   -march=native   enable AVX2/FMA auto-vectorisation on the build machine
+#   -funroll-loops  unroll the fixed-size propensity / ODE loops
+#   -ffast-math     allow reassociation / fast exp() — safe for rate expressions
 _GCC_FLAGS = [
     "-O3",
+    "-march=native",
+    "-funroll-loops",
     "-ffast-math",
     "-fPIC",
     "-shared",
     "-std=c99",
     "-lm",
 ]
+
+# Fallback flags used when -march=native is not supported by the host gcc
+# (e.g. cross-compilation or very old gcc versions).
+_GCC_FLAGS_SAFE = [
+    "-O3",
+    "-funroll-loops",
+    "-ffast-math",
+    "-fPIC",
+    "-shared",
+    "-std=c99",
+    "-lm",
+]
+
+# A short tag derived from the active flags set.
+# Embedding this in the cache directory name ensures that changing flags
+# (e.g. adding -march=native) triggers automatic recompilation instead of
+# silently reusing a stale .so built with different flags.
+_FLAGS_HASH: str = hashlib.md5(" ".join(_GCC_FLAGS).encode()).hexdigest()[:6]
 
 _CACHE_BASE = Path.home() / ".cache" / "shypn" / "ode_accel"
 
@@ -42,7 +66,9 @@ def _source_hash(c_source: str) -> str:
 
 
 def _cache_dir(model_hash: str) -> Path:
-    return _CACHE_BASE / model_hash
+    # Include the flags tag so any change to _GCC_FLAGS causes a fresh directory
+    # (and therefore a fresh compilation) without manual cache clearing.
+    return _CACHE_BASE / f"{model_hash}_{_FLAGS_HASH}"
 
 
 def _so_path(model_hash: str) -> Path:
@@ -110,11 +136,26 @@ def compile_ode_rhs(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
-    cmd = [gcc] + _GCC_FLAGS + ["-o", str(so), str(src)]
-    logger.info("ODE accel: compiling %s …", src.name)
-    logger.debug("ODE accel: cmd = %s", " ".join(cmd))
+    def _try_compile(flags: list) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [gcc] + flags + ["-o", str(so), str(src)],
+            capture_output=True, text=True,
+        )
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    cmd_flags = _GCC_FLAGS
+    logger.info("ODE accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
+    result = _try_compile(cmd_flags)
+
+    # If -march=native caused a failure (rare: old gcc or cross-compile env),
+    # retry with the safe fallback flags before giving up.
+    if result.returncode != 0 and "-march=native" in cmd_flags:
+        logger.warning(
+            "ODE accel: compilation with -march=native failed; retrying with safe flags.\n%s",
+            result.stderr,
+        )
+        cmd_flags = _GCC_FLAGS_SAFE
+        result = _try_compile(cmd_flags)
+
     if result.returncode != 0:
         # Preserve source for debugging
         logger.error("ODE accel: compilation FAILED\n%s", result.stderr)
@@ -175,11 +216,24 @@ def compile_c_lib(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
-    cmd = [gcc] + _GCC_FLAGS + ["-o", str(so), str(src)]
-    logger.info("C accel: compiling %s …", src.name)
-    logger.debug("C accel: cmd = %s", " ".join(cmd))
+    def _try_compile(flags: list) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [gcc] + flags + ["-o", str(so), str(src)],
+            capture_output=True, text=True,
+        )
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    cmd_flags = _GCC_FLAGS
+    logger.info("C accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
+    result = _try_compile(cmd_flags)
+
+    if result.returncode != 0 and "-march=native" in cmd_flags:
+        logger.warning(
+            "C accel: compilation with -march=native failed; retrying with safe flags.\n%s",
+            result.stderr,
+        )
+        cmd_flags = _GCC_FLAGS_SAFE
+        result = _try_compile(cmd_flags)
+
     if result.returncode != 0:
         logger.error("C accel: compilation FAILED\n%s", result.stderr)
         raise RuntimeError(
