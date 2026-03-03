@@ -12,7 +12,7 @@ from __future__ import annotations
 __all__ = ["AbstractSimulationController"]
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Set
 
 
 class AbstractSimulationController(ABC):
@@ -70,8 +70,8 @@ class AbstractSimulationController(ABC):
 
     @abstractmethod
     def get_enabled_transitions(
-        self, dirty_places: Optional[set] = None
-    ) -> list:
+        self, dirty_places: Optional[Set[Any]] = None
+    ) -> List[Any]:
         """Return the list of currently enabled transitions.
 
         Args:
@@ -128,7 +128,7 @@ class AbstractSimulationController(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def add_step_listener(self, callback: Callable) -> None:
+    def add_step_listener(self, callback: Callable[[], None]) -> None:
         """Register *callback* to be called after every simulation step.
 
         Args:
@@ -136,7 +136,7 @@ class AbstractSimulationController(ABC):
         """
 
     @abstractmethod
-    def remove_step_listener(self, callback: Callable) -> None:
+    def remove_step_listener(self, callback: Callable[[], None]) -> None:
         """De-register a previously registered step listener.
 
         Args:
