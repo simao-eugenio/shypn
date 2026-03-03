@@ -36,6 +36,20 @@ warnings.filterwarnings('ignore', message="'parseString' deprecated")
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 UI_PATH = os.path.join(REPO_ROOT, 'ui', 'main', 'main_window.ui')
 
+_display_available = (
+    os.environ.get('DISPLAY')
+    or os.environ.get('WAYLAND_DISPLAY')
+    or os.environ.get('MIR_SOCKET')
+)
+if not _display_available:
+    print(
+        "error: no display found.\n"
+        "  Set $DISPLAY (X11) or $WAYLAND_DISPLAY (Wayland) before launching shypn.\n"
+        "  Example: DISPLAY=:0 python src/shypn.py",
+        file=sys.stderr
+    )
+    sys.exit(1)
+
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
@@ -458,6 +472,7 @@ def main(argv=None):
 		if left_dock_stack is None:
 			logging.getLogger(__name__).error('left_dock_stack not found in main window')
 			sys.exit(6)
+		left_dock_stack.set_size_request(0, -1)  # Allow pane to shrink to zero width
 		
 		# CRITICAL: Set left_dock_stack on model_canvas_loader BEFORE any documents are created
 		# This ensures per-document panel loaders (Viability, Report) can access it during initialization
@@ -470,11 +485,13 @@ def main(argv=None):
 		pathways_panel_container = main_builder.get_object('pathways_panel_container')
 		topology_panel_container = main_builder.get_object('topology_panel_container')
 		report_panel_container = main_builder.get_object('report_panel_container')
+		environment_panel_container = main_builder.get_object('environment_panel_container')
 		
 		# Expose containers to model_canvas_loader for per-document panel swapping
 		model_canvas_loader.pathways_panel_container = pathways_panel_container
 		model_canvas_loader.analyses_panel_container = analyses_panel_container
 		model_canvas_loader.topology_panel_container = topology_panel_container
+		model_canvas_loader.environment_panel_container = environment_panel_container
 		
 		# Viability panel container (not in UI file - create programmatically)
 		viability_panel_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -513,6 +530,9 @@ def main(argv=None):
 		if report_panel_container:
 			report_panel_container.set_visible(False)
 			report_panel_container.set_no_show_all(False)
+		if environment_panel_container:
+			environment_panel_container.set_visible(False)
+			environment_panel_container.set_no_show_all(False)
 		
 		# Collapse left_paned to 0 width
 		if left_paned:
@@ -577,6 +597,9 @@ def main(argv=None):
 		if report_panel_container:
 			report_panel_container.set_visible(False)
 			report_panel_container.set_no_show_all(False)
+		if environment_panel_container:
+			environment_panel_container.set_visible(False)
+			environment_panel_container.set_no_show_all(False)
 		
 		# ====================================================================
 		# NOW add panels to GtkStack AFTER window is shown
@@ -652,7 +675,7 @@ def main(argv=None):
 				"""Expand left paned when Report panel attaches."""
 				if left_paned:
 					try:
-						left_paned.set_position(320)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass  # Ignore paned errors
 				# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
@@ -871,13 +894,14 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				left_panel_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if left_panel_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(250)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
@@ -921,13 +945,14 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				pathway_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if pathway_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(250)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
@@ -970,13 +995,14 @@ def main(argv=None):
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				analyses_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if analyses_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(280)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
@@ -1016,17 +1042,64 @@ def main(argv=None):
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('viability', False)
 				master_palette.set_active('report', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				topology_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if topology_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(320)  # Match Report panel width
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
 				topology_loader.hide_in_stack()
+				# Hide stack when last panel is hidden
+				if left_dock_stack:
+					left_dock_stack.set_visible(False)
+				if left_paned:
+					try:
+						left_paned.set_position(0)
+					except Exception:
+						pass
+
+		def on_environment_toggle(is_active):
+			"""Handle Environment panel toggle from Master Palette (per-document).
+			
+			EXCLUSIVE MODE: Only one panel active at a time.
+			Per-document: Gets current document's environment loader.
+			"""
+			drawing_area = model_canvas_loader.get_current_document()
+			if not drawing_area:
+				return
+			
+			overlay_manager = model_canvas_loader.overlay_managers.get(drawing_area)
+			if not overlay_manager or not hasattr(overlay_manager, 'environment_panel_loader'):
+				return
+			
+			environment_loader = overlay_manager.environment_panel_loader
+			if not environment_loader:
+				return
+			
+			if is_active:
+				# Deactivate other panels (exclusive mode)
+				master_palette.set_active('files', False)
+				master_palette.set_active('pathways', False)
+				master_palette.set_active('analyses', False)
+				master_palette.set_active('viability', False)
+				master_palette.set_active('topology', False)
+				master_palette.set_active('report', False)
+				
+				# Show this panel (in stack if hanged, or floating if detached)
+				environment_loader.show_in_stack()
+				# Expand left paned to show stack only if panel is hanged
+				if environment_loader.is_hanged and left_paned:
+					try:
+						left_paned.set_position(567)  # 15 cm at 96 DPI
+					except Exception:
+						pass
+			else:
+				environment_loader.hide_in_stack()
 				# Hide stack when last panel is hidden
 				if left_dock_stack:
 					left_dock_stack.set_visible(False)
@@ -1065,13 +1138,14 @@ def main(argv=None):
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
 				master_palette.set_active('viability', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				report_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if report_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(320)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
@@ -1114,13 +1188,14 @@ def main(argv=None):
 				master_palette.set_active('analyses', False)
 				master_palette.set_active('topology', False)
 				master_palette.set_active('report', False)
+				master_palette.set_active('environment', False)
 				
 				# Show this panel (in stack if hanged, or floating if detached)
 				viability_loader.show_in_stack()
 				# Expand left paned to show stack only if panel is hanged
 				if viability_loader.is_hanged and left_paned:
 					try:
-						left_paned.set_position(320)
+						left_paned.set_position(567)  # 15 cm at 96 DPI
 					except Exception:
 						pass
 			else:
@@ -1148,7 +1223,7 @@ def main(argv=None):
 			"""Expand left paned when Files panel attaches."""
 			if left_paned:
 				try:
-					left_paned.set_position(250)
+					left_paned.set_position(567)  # 15 cm at 96 DPI
 				except Exception:
 					pass  # Ignore paned errors
 			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
@@ -1166,7 +1241,7 @@ def main(argv=None):
 			"""Expand left paned when Analyses panel attaches (now docks LEFT)."""
 			if left_paned:
 				try:
-					left_paned.set_position(280)
+					left_paned.set_position(567)  # 15 cm at 96 DPI
 				except Exception:
 					pass  # Ignore paned errors
 			# NOTE: DO NOT call master_palette.set_active() here - creates circular callbacks
@@ -1185,7 +1260,7 @@ def main(argv=None):
 			"""Expand left paned when Pathways panel attaches."""
 			if left_paned:
 				try:
-					left_paned.set_position(270)
+					left_paned.set_position(567)  # 15 cm at 96 DPI
 				except Exception:
 					pass  # Ignore paned errors
 			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
@@ -1204,9 +1279,28 @@ def main(argv=None):
 			"""Expand left paned when Topology panel attaches."""
 			if left_paned:
 				try:
-					left_paned.set_position(400)
+					left_paned.set_position(567)  # 15 cm at 96 DPI
 				except Exception:
 					pass  # Ignore paned errors
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+
+		# Define float/attach callbacks for environment panel
+		def on_environment_float():
+			"""Collapse left paned when Environment panel floats."""
+			if left_paned:
+				try:
+					left_paned.set_position(0)
+				except Exception:
+					pass
+			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
+
+		def on_environment_attach():
+			"""Expand left paned when Environment panel attaches."""
+			if left_paned:
+				try:
+					left_paned.set_position(567)  # 15 cm at 96 DPI
+				except Exception:
+					pass
 			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
 
 		# Define float/attach callbacks for viability panel (left dock)
@@ -1241,7 +1335,7 @@ def main(argv=None):
 			"""Expand left paned when Viability panel reattaches/docks."""
 			if left_paned:
 				try:
-					left_paned.set_position(320)
+					left_paned.set_position(567)  # 15 cm at 96 DPI
 				except Exception:
 					pass  # Ignore paned errors
 			# NOTE: Do NOT call master_palette.set_active() here - creates circular callbacks
@@ -1255,6 +1349,10 @@ def main(argv=None):
 		# Expose topology callbacks to model_canvas_loader for per-document wiring
 		model_canvas_loader.topology_float_callback = on_topology_float
 		model_canvas_loader.topology_attach_callback = on_topology_attach
+
+		# Expose environment callbacks to model_canvas_loader for per-document wiring
+		model_canvas_loader.environment_float_callback = on_environment_float
+		model_canvas_loader.environment_attach_callback = on_environment_attach
 		
 	# Expose pathway callbacks to model_canvas_loader for per-document wiring
 		model_canvas_loader.pathway_float_callback = on_pathway_float
@@ -1271,6 +1369,7 @@ def main(argv=None):
 		master_palette.connect('topology', on_topology_toggle)
 		master_palette.connect('viability', on_viability_toggle)
 		master_palette.connect('report', on_report_toggle)
+		master_palette.connect('environment', on_environment_toggle)
 		
 		
 		# Topology button always available (per-document topology panels)
@@ -1283,6 +1382,11 @@ def main(argv=None):
 		master_palette.set_sensitive('viability', True)
 		if 'viability' in master_palette.buttons:
 			master_palette.buttons['viability'].widget.set_tooltip_text('Model Viability & Repair')
+
+		# Enable environment button (per-document panels created automatically)
+		master_palette.set_sensitive('environment', True)
+		if 'environment' in master_palette.buttons:
+			master_palette.buttons['environment'].widget.set_tooltip_text('Environment – Signal Places & Events')
 		
 		# Both maximize and minimize buttons removed for Wayland compatibility
 		# Users can:

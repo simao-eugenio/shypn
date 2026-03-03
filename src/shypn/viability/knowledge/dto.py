@@ -222,6 +222,7 @@ class ArcDTO:
     target_id: str      # Place or Transition ID
     arc_type: str       # "place_to_transition" or "transition_to_place"
     weight: int = 1
+    threshold: object = None  # Sensing threshold τ_t (None = use weight as fallback)
     
     @classmethod
     def from_object(cls, arc_obj) -> 'ArcDTO':
@@ -258,7 +259,8 @@ class ArcDTO:
             source_id=str(arc_obj.source.id) if hasattr(arc_obj, 'source') and hasattr(arc_obj.source, 'id') else '',
             target_id=str(arc_obj.target.id) if hasattr(arc_obj, 'target') and hasattr(arc_obj.target, 'id') else '',
             arc_type=arc_type,
-            weight=int(arc_obj.weight) if hasattr(arc_obj, 'weight') else 1
+            weight=int(arc_obj.weight) if hasattr(arc_obj, 'weight') else 1,
+            threshold=getattr(arc_obj, 'threshold', None)
         )
     
     @classmethod
@@ -288,7 +290,8 @@ class ArcDTO:
             source_id=str(data.get('source_id', '')),
             target_id=str(data.get('target_id', '')),
             arc_type=arc_type,
-            weight=int(data.get('weight', 1))
+            weight=int(data.get('weight', 1)),
+            threshold=data.get('threshold', None)
         )
 
 

@@ -94,7 +94,7 @@ class SweepConfiguration(MetadataSection):
         random_seed = sim_config.get('random_seed', 42)
         self.add_field('Random_Seed', random_seed)
         
-        solver = sim_config.get('solver', 'Gillespie_SSA')
+        solver = sim_config.get('solver', 'TauLeaping_SSA')
         self.add_field('Solver', solver)
         
         timestep = sim_config.get('timestep', 'adaptive')

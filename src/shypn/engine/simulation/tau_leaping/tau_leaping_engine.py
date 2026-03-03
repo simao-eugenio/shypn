@@ -117,13 +117,44 @@ class TauLeapingEngine:
         
         if not stochastic_transitions:
             return False  # No stochastic transitions to execute
-        
+
+        # ── Propensity acceleration ────────────────────────────────────────────
+        # Compute the full propensity vector via the C accelerator (once per
+        # step) so that both select_tau and _sample_firings share the result
+        # instead of each calling _evaluate_rate_at_enablement × N.
+        self._accel_props = None
+        if hasattr(controller, '_ensure_propensity_accelerator'):
+            controller._ensure_propensity_accelerator()
+        _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        if _prop_accel is not None and _prop_accel.ready:
+            try:
+                _prop_accel.update_y_from_model()
+                _prop_accel.update_thermo_params()
+                _a_net, _a_fwd, _a_rev = _prop_accel.compute(current_time)
+                self._accel_props = {
+                    tid: (
+                        float(_a_net[i]),
+                        float(_a_fwd[i]),
+                        float(_a_rev[i]),
+                    )
+                    for i, tid in enumerate(_prop_accel.transition_ids_order)
+                }
+            except Exception as _exc:
+                self.logger.debug(
+                    "PropensityAccelerator.compute failed (%s); "
+                    "falling back to Python eval",
+                    _exc,
+                )
+                self._accel_props = None
+        # ──────────────────────────────────────────────────────────────────────
+
         # Step 1: Select leap size τ
         tau, leap_info = self.leap_selector.select_tau(
             stochastic_transitions,
             model,
             current_time,
-            controller
+            controller,
+            propensity_hint=self._accel_props,
         )
         
         # Log tau selection for debugging
@@ -214,23 +245,41 @@ class TauLeapingEngine:
             Dictionary mapping transition -> number of firings (can be negative for reversible)
         """
         propensities = []
-        
+
         for transition in transitions:
+            # ── Fast path: use pre-computed propensity from C accelerator ─────
+            _cached = (self._accel_props or {}).get(
+                getattr(transition, 'id', None)
+            )
+            if _cached is not None:
+                net, fwd, rev = _cached
+                propensities.append(net)
+                # Only trust rev > 0 as reversible; otherwise leave existing flag
+                if rev > 0.0:
+                    transition._skellam_reversible = True
+                    transition._accel_fwd_prop = fwd
+                    transition._accel_rev_prop = rev
+                else:
+                    # Clear stale accelerator props if present
+                    transition.__dict__.pop('_accel_fwd_prop', None)
+                    transition.__dict__.pop('_accel_rev_prop', None)
+                continue
+            # ── Python eval fallback ──────────────────────────────────────────
             behavior = self._get_behavior(transition)
             if behavior is None:
                 propensities.append(0.0)
                 continue
-            
+
             # Calculate propensity
             try:
                 propensity = behavior._evaluate_rate_at_enablement(current_time)
-                
+
                 # Check if this is a reversible reaction
                 if hasattr(behavior, 'rate_function_expr') and behavior.rate_function_expr:
                     is_reversible, forward_expr, reverse_expr = (
                         SkellamSampler.detect_reversible_formula(behavior.rate_function_expr)
                     )
-                    
+
                     if is_reversible:
                         # Mark for Skellam sampling
                         transition._skellam_reversible = True
@@ -240,36 +289,36 @@ class TauLeapingEngine:
                         transition._skellam_reversible = False
                 else:
                     transition._skellam_reversible = False
-                    
+
             except Exception as e:
                 self.logger.warning(
                     f"Could not evaluate propensity for {transition.name}: {e}. Using default rate."
                 )
                 propensity = getattr(behavior, 'rate', 1.0)
                 transition._skellam_reversible = False
-            
+
             propensities.append(propensity)
         
         # Use parallel or sequential sampling
         if self.use_parallel and len(transitions) >= 4:
             # Lazy initialize parallel scheduler
             if self._parallel_scheduler is None:
-                from shypn.engine.simulation.controller import SimulationController
+                # Prefer controller reference (set in execute_step) over the
+                # now-removed transition.parent_model attribute.
                 model = None
-                # Try to get model from first transition
-                if transitions and hasattr(transitions[0], 'parent_model'):
-                    model = transitions[0].parent_model
-                
+                if hasattr(self, '_controller') and self._controller is not None:
+                    model = getattr(self._controller, 'model', None)
+
                 if model:
                     self._parallel_scheduler = ParallelStochasticScheduler(
                         model=model,
                         enable_parallel=True
                     )
                 else:
-                    # Fallback to sequential (normal for small models)
+                    # Fallback to sequential (should not happen in normal use)
                     self.logger.debug("Could not access model for parallel scheduler, using sequential")
                     self.use_parallel = False
-            
+
             if self._parallel_scheduler:
                 return self._parallel_scheduler.sample_parallel(
                     transitions, propensities, tau
@@ -338,20 +387,20 @@ class TauLeapingEngine:
             if getattr(transition, '_skellam_reversible', False):
                 # Reversible reaction: use Skellam distribution
                 try:
-                    behavior = self._get_behavior(transition)
-                    
-                    # Evaluate forward and reverse propensities separately
-                    # For now, use the net propensity and split based on sign
-                    # TODO: Improve by parsing formula to extract forward/reverse components
-                    if propensity >= 0:
-                        # Net forward
+                    # Prefer accelerator-provided fwd/rev (both components correct);
+                    # fall back to sign-split heuristic when Python eval was used.
+                    if hasattr(transition, '_accel_fwd_prop'):
+                        forward_prop = transition._accel_fwd_prop
+                        reverse_prop = transition._accel_rev_prop
+                    elif propensity >= 0:
+                        # Net forward (heuristic)
                         forward_prop = propensity
                         reverse_prop = 0.0
                     else:
-                        # Net reverse
+                        # Net reverse (heuristic)
                         forward_prop = 0.0
                         reverse_prop = abs(propensity)
-                    
+
                     firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
                     firings_map[transition] = firings
                     self.stats['reversible_reactions'] += 1
@@ -746,23 +795,26 @@ class TauLeapingEngine:
     
     def _get_behavior(self, transition: Any) -> Optional[Any]:
         """Get behavior object for transition.
-        
+
+        Delegates to controller._get_behavior(transition) which keys the
+        cache by id(transition) (Python object address), not transition.id
+        (string '"T1"').  Using the string key was the original bug that
+        caused all tau-leaping behavior lookups to return None.
+
         Args:
             transition: Transition object
-        
+
         Returns:
             Behavior object or None
         """
-        # Use controller's behavior cache (transitions don't store behavior directly)
-        if hasattr(self, '_controller') and hasattr(self._controller, 'behavior_cache'):
-            return self._controller.behavior_cache.get(transition.id)
-        
+        # Preferred: delegate to controller which manages the cache correctly
+        if hasattr(self, '_controller') and hasattr(self._controller, '_get_behavior'):
+            return self._controller._get_behavior(transition)
+
         # Fallback: check if transition has behavior attribute (backward compatibility)
         if hasattr(transition, 'behavior'):
             return transition.behavior
-        
-        return None
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get engine statistics.
         

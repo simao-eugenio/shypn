@@ -77,7 +77,8 @@ class LeapSelector:
         transitions: List[Any],
         model: Any,
         current_time: float,
-        controller: Any = None
+        controller: Any = None,
+        propensity_hint: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, Dict[str, Any]]:
         """Select appropriate time leap based on current state.
         
@@ -102,17 +103,26 @@ class LeapSelector:
         critical_transitions = []
         
         for transition in transitions:
+            # Use pre-computed propensity from the C accelerator when available
+            _hint = (propensity_hint or {}).get(getattr(transition, 'id', None))
+            if _hint is not None:
+                propensity = _hint[0]   # net propensity
+                propensities.append(propensity)
+                if propensity < self.critical_threshold:
+                    critical_transitions.append((transition.name, propensity))
+                continue
+
             behavior = self._get_behavior(transition)
             if behavior is None:
                 continue
-            
+
             # Get propensity (rate at current state)
             try:
                 propensity = behavior._evaluate_rate_at_enablement(current_time)
             except Exception as e:
                 self.logger.warning(f"Could not evaluate propensity for {transition.name}: {e}")
                 propensity = getattr(behavior, 'rate', 1.0)
-            
+
             propensities.append(propensity)
             
             # Check if critical (low propensity)

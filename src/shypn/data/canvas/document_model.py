@@ -53,6 +53,11 @@ class DocumentModel:
         # Compound mappings (place_id → compound_id for thermodynamic validation)
         # Format: {"P001": "C00002", "P002": "CHEBI:15422", ...}
         self.compound_mappings: Dict[str, str] = {}
+
+        # Environment events (user-defined model-level events for signal place
+        # perturbations — e.g. temperature step at t=100, pH pulse at t=50).
+        # Stored as shypn.data.pathway.pathway_data.Event instances.
+        self.events: list = []
         
         # Model metadata (source, creation date, model type, etc.)
         # Always initialized to ensure metadata is available for all models
@@ -613,7 +618,8 @@ class DocumentModel:
             "places": [place.to_dict() for place in self.places],
             "transitions": [transition.to_dict() for transition in self.transitions],
             "arcs": [arc.to_dict() for arc in self.arcs],
-            "modules": [module.to_dict() for module in self.modules.values()]
+            "modules": [module.to_dict() for module in self.modules.values()],
+            "events": [e.to_dict() for e in self.events if hasattr(e, 'to_dict')],
         }
     
     @classmethod
@@ -748,7 +754,18 @@ class DocumentModel:
         # Replace converted arcs
         for i, signal_arc in arcs_to_convert:
             document.arcs[i] = signal_arc
-        
+
+        # Restore environment events (optional key — old files have none)
+        if 'events' in data:
+            try:
+                from shypn.data.pathway.pathway_data import Event as ModelEvent
+                document.events = [
+                    ModelEvent.from_dict(e) for e in data['events']
+                    if isinstance(e, dict) and 'id' in e
+                ]
+            except Exception:
+                document.events = []
+
         return document
     
     # ============================================================================

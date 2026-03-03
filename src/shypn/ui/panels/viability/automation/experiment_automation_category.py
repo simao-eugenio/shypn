@@ -552,6 +552,39 @@ class ExperimentAutomationCategory:
             except Exception as e:
                 print(f"[WARNING] Failed to read seed_base: {e}, using default {seed_base}")
 
+        compressor_epsilon = 0.02
+        if hasattr(self.sweep_builder, 'sweep_compressor_epsilon_entry'):
+            try:
+                text = self.sweep_builder.sweep_compressor_epsilon_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if 0 < val < 1:
+                        compressor_epsilon = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read compressor_epsilon: {e}, using default {compressor_epsilon}")
+
+        compressor_min_gap = 0.0
+        if hasattr(self.sweep_builder, 'sweep_compressor_min_gap_entry'):
+            try:
+                text = self.sweep_builder.sweep_compressor_min_gap_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val >= 0:
+                        compressor_min_gap = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read compressor_min_gap: {e}, using default {compressor_min_gap}")
+
+        compressor_max_gap = 300.0
+        if hasattr(self.sweep_builder, 'sweep_compressor_max_gap_entry'):
+            try:
+                text = self.sweep_builder.sweep_compressor_max_gap_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val > 0:
+                        compressor_max_gap = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read compressor_max_gap: {e}, using default {compressor_max_gap}")
+
         # Get parallel execution setting from queue view checkbox (E2 enhancement)
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
@@ -601,6 +634,9 @@ class ExperimentAutomationCategory:
                 max_tau=max_tau,
                 dt_manual=dt_manual,
                 seed_base=seed_base,
+                compressor_epsilon=compressor_epsilon,
+                compressor_min_gap=compressor_min_gap,
+                compressor_max_gap=compressor_max_gap,
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
@@ -819,12 +855,30 @@ class ExperimentAutomationCategory:
             # Build {replicate_id: CompressionResult} for fast lookup
             compressed_by_id = {cr.replicate_id: cr for cr in compressed_trajectories}
 
+            # Build id→name lookup once — reused across replicates.csv,
+            # mean_final_state.csv, and replicates_trajectories/ so the
+            # subnet model is queried only once per save.
+            _id_to_name_early: dict = {}
+            _subnet_mdl = getattr(self.parent_panel, 'subnet_model', None)
+            if _subnet_mdl is not None:
+                for _xp in getattr(_subnet_mdl, 'places', []):
+                    _id_to_name_early[_xp.id] = getattr(_xp, 'name', _xp.id)
+                for _xt in getattr(_subnet_mdl, 'transitions', []):
+                    _id_to_name_early[_xt.id] = getattr(_xt, 'name', _xt.id)
+            # Reverse lookup: resolve place IDs for fate-determining markers
+            _name_to_pid = {v: k for k, v in _id_to_name_early.items()}
+            _gata1_pid = _name_to_pid.get('GATA1_Protein_nuc', 'P17')
+            _pu1_pid   = _name_to_pid.get('PU1_Protein_nuc',   'P18')
+
             # Determine final-state place columns (sorted for stable schema)
             final_place_ids: list = []
             if compressed_by_id:
                 _sample = next(iter(compressed_by_id.values()))
                 final_place_ids = _sample.sorted_place_ids()
+            # Human-readable column names (fall back to place ID when no mapping)
+            _final_col_names = [_id_to_name_early.get(pid, pid) for pid in final_place_ids]
 
+            _per_rep_fates: list = []  # collected per replicate for fate_summary.csv
             with open(batch_path / 'replicates.csv', 'w', newline='') as f:
                 _metadata = result.get('metadata')
                 if _metadata is not None:
@@ -835,8 +889,8 @@ class ExperimentAutomationCategory:
                 writer = csv_mod.writer(f)
                 base_cols = ['replicate_id', 'seed', 'n_timepoints', 'final_time',
                              'deadlocked', 'sim_duration', 'elapsed_time_s',
-                             'n_kept', 'compression_ratio']
-                writer.writerow(base_cols + [f'final_{pid}' for pid in final_place_ids])
+                             'n_kept', 'compression_ratio', 'fate_class']
+                writer.writerow(base_cols + [f'final_{nm}' for nm in _final_col_names])
                 for i in range(n):
                     rep = replicate_data[i] if i < len(replicate_data) else {}
                     traj = trajectory_summary[i] if i < len(trajectory_summary) else {}
@@ -845,6 +899,16 @@ class ExperimentAutomationCategory:
                     final_vals = cr.final_values() if cr else {}
                     n_kept = cr.n_kept if cr else ''
                     comp_ratio = f'{cr.compression_ratio:.2f}' if cr else ''
+                    # Fate classification: 1.5× GATA1_Protein_nuc vs PU1_Protein_nuc
+                    try:
+                        _gf = float(final_vals.get(_gata1_pid, 'nan'))
+                        _pf = float(final_vals.get(_pu1_pid,   'nan'))
+                        if _gf > 1.5 * _pf:   _fate = 'ery'
+                        elif _pf > 1.5 * _gf: _fate = 'mye'
+                        else:                  _fate = 'unc'
+                    except (ValueError, TypeError):
+                        _fate = ''
+                    _per_rep_fates.append(_fate)
                     row = [
                         rid,
                         traj.get('seed', ''),
@@ -855,9 +919,45 @@ class ExperimentAutomationCategory:
                         rep.get('elapsed_time', ''),
                         n_kept,
                         comp_ratio,
+                        _fate,
                     ] + [final_vals.get(pid, '') for pid in final_place_ids]
                     writer.writerow(row)
             _fsync(batch_path / 'replicates.csv')
+            # ── fate_summary.csv ── pre-computed population fate statistics ──
+            # Eliminates re-reading all trajectory files just to count fates.
+            try:
+                from math import sqrt as _sqrt
+                _fc = {k: _per_rep_fates.count(k) for k in ('ery', 'mye', 'unc', '')}
+                _n_valid = _fc['ery'] + _fc['mye'] + _fc['unc']
+                _p_ery = _fc['ery'] / _n_valid if _n_valid > 0 else 0.0
+                _z = 1.96
+                if _n_valid > 0:
+                    _w_d = 1 + _z**2 / _n_valid
+                    _w_c = (_p_ery + _z**2 / (2 * _n_valid)) / _w_d
+                    _w_h = _z * _sqrt(_p_ery * (1 - _p_ery) / _n_valid + _z**2 / (4 * _n_valid**2)) / _w_d
+                    _ci_lo, _ci_hi = max(0.0, _w_c - _w_h), min(1.0, _w_c + _w_h)
+                else:
+                    _ci_lo = _ci_hi = 0.0
+                with open(batch_path / 'fate_summary.csv', 'w', newline='') as _fsf:
+                    _fw = csv_mod.writer(_fsf)
+                    _fw.writerow([
+                        'n_total', 'n_ery', 'n_mye', 'n_unc', 'n_unknown',
+                        'p_ery', 'ci_lo_95', 'ci_hi_95',
+                        'fate_classifier', 'gata1_marker', 'pu1_marker',
+                    ])
+                    _fw.writerow([
+                        _n_valid + _fc.get('', 0),
+                        _fc['ery'], _fc['mye'], _fc['unc'], _fc.get('', 0),
+                        round(_p_ery, 6),
+                        round(_ci_lo, 6),
+                        round(_ci_hi, 6),
+                        'GATA1/PU1_nuc>1.5x',
+                        _id_to_name_early.get(_gata1_pid, _gata1_pid),
+                        _id_to_name_early.get(_pu1_pid, _pu1_pid),
+                    ])
+                _fsync(batch_path / 'fate_summary.csv')
+            except Exception as _fse:
+                print(f'[AUTO-SAVE] Warning: Failed to save fate_summary.csv: {_fse}')
         except Exception as e:
             save_errors.append(f'replicates.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}')
@@ -921,14 +1021,8 @@ class ExperimentAutomationCategory:
             stats = result.get('statistics', {})
             species_stats = stats.get('species_statistics', {})
             if species_stats:
-                # Build name lookup from subnet model if available
-                id_to_name = {}
-                subnet_model = getattr(self.parent_panel, 'subnet_model', None)
-                if subnet_model is not None:
-                    for p in getattr(subnet_model, 'places', []):
-                        id_to_name[p.id] = getattr(p, 'name', p.id)
-                    for t in getattr(subnet_model, 'transitions', []):
-                        id_to_name[t.id] = getattr(t, 'name', t.id)
+                # Reuse id→name map built during replicates.csv section
+                id_to_name = _id_to_name_early
 
                 with open(batch_path / 'mean_final_state.csv', 'w', newline='') as f:
                     _metadata = result.get('metadata')
@@ -967,14 +1061,8 @@ class ExperimentAutomationCategory:
             if compressed_trajectories:
                 from shypn.helpers.compressor import CompressedTrajectoryWriter
 
-                # Build id→name mapping from subnet model (reuse or build fresh)
-                _id_to_name: dict = {}
-                _subnet_model = getattr(self.parent_panel, 'subnet_model', None)
-                if _subnet_model is not None:
-                    for p in getattr(_subnet_model, 'places', []):
-                        _id_to_name[p.id] = getattr(p, 'name', p.id)
-                    for t in getattr(_subnet_model, 'transitions', []):
-                        _id_to_name[t.id] = getattr(t, 'name', t.id)
+                # Reuse id→name map built during replicates.csv section
+                _id_to_name = _id_to_name_early
 
                 # Determine replicate status from replicate_data list
                 _rep_data = result.get('replicate_data', [])

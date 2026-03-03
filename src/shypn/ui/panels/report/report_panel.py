@@ -26,8 +26,12 @@ from .parameters_category import DynamicAnalysesCategory
 from .topology_analyses_category import TopologyAnalysesCategory
 from .thermodynamic_validation_category import ThermodynamicValidationCategory
 from .export_toolbar import ExportToolbar
+import logging
+
 from shypn.data.project_models import get_project_manager
 from shypn.events import EventBus
+
+_logger = logging.getLogger(__name__)
 
 
 class ReportPanel(Gtk.Box):
@@ -51,7 +55,8 @@ class ReportPanel(Gtk.Box):
             document_id: Optional document ID (id of drawing_area) for EventBus scoping
         """
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        
+
+        self.logger = _logger
         self.project = project
         # Store the loader for accessing get_current_model()
         self.model_canvas_loader = model_canvas

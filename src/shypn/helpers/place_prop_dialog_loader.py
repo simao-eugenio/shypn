@@ -308,7 +308,21 @@ class PlacePropDialogLoader(GObject.GObject):
         # Convert all connected arcs to signal flow arcs (formalism requirement)
         if not was_signal_place and self.place_obj.is_signal_place:
             self._convert_connected_arcs_to_signal_flow()
-    
+
+        # Notify listeners that this place was modified (e.g. EnvironmentPanel)
+        try:
+            from shypn.events import EventBus
+            from shypn.core.document_id import doc_id
+            drawing_area = None
+            if hasattr(self.place_obj, '_manager') and self.place_obj._manager:
+                drawing_area = getattr(self.place_obj._manager, '_drawing_area', None)
+            if drawing_area is not None:
+                EventBus.emit('model.place.modified',
+                              {'object': self.place_obj, 'object_id': self.place_obj.id},
+                              document_id=doc_id(drawing_area))
+        except Exception:
+            pass
+
     def _convert_connected_arcs_to_signal_flow(self):
         """Convert all arcs connected to this place to signal flow arcs.
         

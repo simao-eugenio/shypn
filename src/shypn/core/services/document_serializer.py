@@ -313,6 +313,9 @@ class DocumentSerializer(AbstractDocumentSerializer):
             and manager.document_controller.modules
         ):
             document.modules = dict(manager.document_controller.modules)
+        # Sync environment events
+        if hasattr(manager, 'events'):
+            document.events = list(manager.events)
 
     @staticmethod
     def _sync_id_counters(document: Any, manager: Any) -> None:

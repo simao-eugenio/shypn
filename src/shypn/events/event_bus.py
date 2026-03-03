@@ -384,6 +384,12 @@ def register_standard_events():
     EventBus.register_event('lifecycle.object.modified', 'Object modified after creation')
     EventBus.register_event('lifecycle.object.deleted', 'Object deleted and unregistered from lifecycle')
 
+    # Environment events (document-scoped)
+    EventBus.register_event('model.environment.event_added', 'Environment event added to model')
+    EventBus.register_event('model.environment.event_removed', 'Environment event removed from model')
+    EventBus.register_event('model.environment.event_modified', 'Environment event modified')
+    EventBus.register_event('model.environment.place_value_changed', 'Signal place token value changed via environment panel')
+
 
 # Auto-register on module import
 register_standard_events()

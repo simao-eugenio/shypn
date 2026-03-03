@@ -1139,8 +1139,14 @@ class ViabilityPanel(Gtk.Box):
         """Build a DocumentModel from the current selected localities.
 
         Delegates to LocalityController; stores result in ``self.subnet_model``.
+        Environment events are copied from the full canvas model so all
+        simulation paths (inline, batch, replicate) evaluate scheduled events.
         """
         model = self._locality_ctrl.create_subnet_model(self.selected_localities)
+        # Copy environment events from the full document model so that every
+        # simulation run on this subnet is aware of the user-defined event schedule.
+        base_model = self._get_current_model()
+        model.events = list(getattr(base_model, 'events', []) or []) if base_model is not None else []
         self.subnet_model = model
         return model
     

@@ -119,7 +119,32 @@ class ReplicateRunner:
         # Report initial 0% progress
         if progress_callback:
             progress_callback(0.0)
-        
+
+        # ── Create ONE controller for all replicates ────────────────────
+        # PERFORMANCE: building a fresh SimulationController per replicate
+        # caused N× ctypes.CDLL loads of the compiled C accelerator .so.
+        # Instead we create it once, configure all settings, and only reset
+        # the model marking / time / data-collector between replicates — the
+        # same pattern used by batch_runner.py.
+        controller = SimulationController(self.model)
+        controller.settings.use_parallel_stochastic = use_parallel
+        controller.settings.use_tau_leaping = use_tau_leaping
+        controller.settings.tau_epsilon = epsilon
+        controller.settings.max_tau = max_tau
+        controller.settings.duration = duration
+        controller.settings.time_units = time_units
+        if time_step is not None:
+            controller.settings.dt_auto = False
+            controller.settings.dt_manual = time_step
+
+        # Pre-calculate dt / max_steps (constant across replicates)
+        dt = time_step if time_step else controller.settings.get_effective_dt()
+        max_steps = int(duration / dt)
+
+        # Snapshot the initial model marking so we can restore it each replicate
+        initial_marking = {p.id: p.tokens for p in self.model.places}
+        # ────────────────────────────────────────────────────────────────
+
         for i in range(n):
             # Track wall-clock time for this replicate
             replicate_start_time = time.time()
@@ -141,23 +166,23 @@ class ReplicateRunner:
                     progress_callback(i / n)
                     last_callback_time = time.time()
             
-            # Create fresh controller for this replicate
-            controller = SimulationController(self.model)
-            
-            # Configure settings
-            controller.settings.use_parallel_stochastic = use_parallel
-            controller.settings.use_tau_leaping = use_tau_leaping
-            controller.settings.tau_epsilon = epsilon
-            controller.settings.max_tau = max_tau
-            controller.settings.duration = duration
-            controller.settings.time_units = time_units
+            # ── Reset state for this replicate (controller is reused) ──────
+            # Unique seed for reproducible but independent replicates
             controller.settings.random_seed = seed_base + i  # type: ignore[attr-defined]
-            
-            if time_step is not None:
-                controller.settings.dt_auto = False
-                controller.settings.dt_manual = time_step
-            
-            # Reset model to initial marking
+
+            # Restore model to initial marking
+            for place in self.model.places:
+                place.tokens = initial_marking.get(place.id, place.tokens)
+            for transition in self.model.transitions:
+                transition.firing_count = 0
+
+            # Reset controller time and one-shot event state
+            controller.time = 0.0
+            controller._event_last_triggered = {}
+            controller._event_pending_assignments = []
+            # ────────────────────────────────────────────────────────────────
+
+            # Reset model to initial marking (for any place not in initial_marking)
             self._reset_model(self.model)
             
             # Start data collection
@@ -165,9 +190,8 @@ class ReplicateRunner:
             # Record initial state at t=0
             controller.data_collector.record_state(controller.time)
             
-            # Calculate max_steps from duration
-            dt = time_step if time_step else controller.settings.get_effective_dt()
-            max_steps = int(duration / dt)
+            # Calculate max_steps from duration (already computed above; kept for clarity)
+            # dt and max_steps are constant across replicates
             
             # Run simulation synchronously (step-by-step) for background execution
             # controller.run() uses GLib callbacks which don't work in threads
