@@ -17,7 +17,7 @@ import json
 import math
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 
 class AbstractViewportController(ABC):
@@ -125,6 +125,28 @@ class AbstractViewportController(ABC):
         horizontal_offset_percent: float,
         vertical_offset_percent: float,
     ) -> None: ...
+
+    # ---- Coordinate transforms ----
+    @abstractmethod
+    def screen_to_world(
+        self, screen_x: float, screen_y: float, rotation: Any = None
+    ) -> Tuple[float, float]: ...
+
+    @abstractmethod
+    def world_to_screen(
+        self, world_x: float, world_y: float, rotation: Any = None
+    ) -> Tuple[float, float]: ...
+
+    @abstractmethod
+    def get_visible_bounds(
+        self, rotation: Any = None
+    ) -> Tuple[float, float, float, float]: ...
+
+    @abstractmethod
+    def get_visible_bounds_no_rotation(self) -> Tuple[float, float, float, float]: ...
+
+    @abstractmethod
+    def get_grid_spacing(self, px_per_mm: float, base_spacing: float = 1.0) -> float: ...
 
 
 class ViewportController(AbstractViewportController):
@@ -789,7 +811,7 @@ class ViewportController(AbstractViewportController):
         zoom_x = available_width / content_width if content_width > 0 else 1.0
         zoom_y = available_height / content_height if content_height > 0 else 1.0
         target_zoom = min(zoom_x, zoom_y)
-        return max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom))
+        return cast(float, max(self.MIN_ZOOM, min(self.MAX_ZOOM, target_zoom)))
 
     def _apply_viewport_offsets(
         self,
@@ -839,3 +861,148 @@ class ViewportController(AbstractViewportController):
         self._apply_viewport_offsets(
             horizontal_offset_percent, vertical_offset_percent, target_zoom
         )
+
+    # ==================== Coordinate Transforms ====================
+
+    def _calculate_rotation_center(self) -> Tuple[float, float]:
+        """Return the viewport centre in world space (used as the rotation pivot)."""
+        cx = self.viewport_width / (2.0 * self.zoom) - self.pan_x
+        cy = self.viewport_height / (2.0 * self.zoom) - self.pan_y
+        return cx, cy
+
+    @staticmethod
+    def _apply_rotation_to_point(
+        x: float, y: float,
+        center_x: float, center_y: float,
+        cos_angle: float, sin_angle: float,
+    ) -> Tuple[float, float]:
+        """Rotate *(x, y)* around *(center_x, center_y)* by a pre-computed angle."""
+        dx = x - center_x
+        dy = y - center_y
+        return (
+            dx * cos_angle - dy * sin_angle + center_x,
+            dx * sin_angle + dy * cos_angle + center_y,
+        )
+
+    def screen_to_world(
+        self, screen_x: float, screen_y: float, rotation: Any = None
+    ) -> Tuple[float, float]:
+        """Convert screen-pixel coordinates to model-space world coordinates.
+
+        Applies the inverse of the rendering pipeline
+        (zoom/pan inversion, then optional rotation inversion).
+
+        Args:
+            screen_x: Pixel X coordinate.
+            screen_y: Pixel Y coordinate.
+            rotation: ``CanvasRotation`` object, or ``None`` for no rotation.
+
+        Returns:
+            ``(world_x, world_y)`` in model space.
+        """
+        from shypn.core.services.coordinate_transform import (
+            screen_to_world as _s2w,
+        )
+        pre_rot_x, pre_rot_y = _s2w(
+            screen_x, screen_y, self.zoom, self.pan_x, self.pan_y
+        )
+        if rotation and rotation.angle_degrees != 0:
+            cx, cy = self._calculate_rotation_center()
+            cos_a = math.cos(-rotation.angle_radians)
+            sin_a = math.sin(-rotation.angle_radians)
+            return self._apply_rotation_to_point(
+                pre_rot_x, pre_rot_y, cx, cy, cos_a, sin_a
+            )
+        return cast(Tuple[float, float], (pre_rot_x, pre_rot_y))
+
+    def world_to_screen(
+        self, world_x: float, world_y: float, rotation: Any = None
+    ) -> Tuple[float, float]:
+        """Convert model-space world coordinates to screen-pixel coordinates.
+
+        Applies the rendering pipeline (optional rotation, then zoom/pan).
+
+        Args:
+            world_x: X coordinate in model space.
+            world_y: Y coordinate in model space.
+            rotation: ``CanvasRotation`` object, or ``None`` for no rotation.
+
+        Returns:
+            ``(screen_x, screen_y)`` in pixel space.
+        """
+        from shypn.core.services.coordinate_transform import (
+            world_to_screen as _w2s,
+        )
+        if rotation and rotation.angle_degrees != 0:
+            cx, cy = self._calculate_rotation_center()
+            cos_a = math.cos(rotation.angle_radians)
+            sin_a = math.sin(rotation.angle_radians)
+            world_x, world_y = self._apply_rotation_to_point(
+                world_x, world_y, cx, cy, cos_a, sin_a
+            )
+        return cast(Tuple[float, float], _w2s(world_x, world_y, self.zoom, self.pan_x, self.pan_y))
+
+    def get_visible_bounds(
+        self, rotation: Any = None
+    ) -> Tuple[float, float, float, float]:
+        """Return the axis-aligned bounding box of the viewport in world space.
+
+        When *rotation* is ``None`` or zero this equals
+        :meth:`get_visible_bounds_no_rotation`.
+
+        Args:
+            rotation: ``CanvasRotation`` object, or ``None``.
+
+        Returns:
+            ``(min_x, min_y, max_x, max_y)`` in world coordinates.
+        """
+        w, h = self.viewport_width, self.viewport_height
+        corners = [
+            self.screen_to_world(0, 0, rotation),
+            self.screen_to_world(w, 0, rotation),
+            self.screen_to_world(0, h, rotation),
+            self.screen_to_world(w, h, rotation),
+        ]
+        xs = [c[0] for c in corners]
+        ys = [c[1] for c in corners]
+        return min(xs), min(ys), max(xs), max(ys)
+
+    def get_visible_bounds_no_rotation(self) -> Tuple[float, float, float, float]:
+        """Return the viewport bounds in world space, ignoring any rotation.
+
+        Returns:
+            ``(min_x, min_y, max_x, max_y)`` in world coordinates.
+        """
+        from shypn.core.services.coordinate_transform import (
+            screen_to_world as _s2w,
+        )
+        min_x, min_y = _s2w(0, 0, self.zoom, self.pan_x, self.pan_y)
+        max_x, max_y = _s2w(
+            self.viewport_width, self.viewport_height,
+            self.zoom, self.pan_x, self.pan_y,
+        )
+        return min_x, min_y, max_x, max_y
+
+    def get_grid_spacing(self, px_per_mm: float, base_spacing: float = 1.0) -> float:
+        """Return adaptive grid cell size in world units.
+
+        The spacing halves/doubles at zoom thresholds so the rendered grid
+        never becomes too dense or too sparse.
+
+        Args:
+            px_per_mm: Pixels per millimetre (``screen_dpi / 25.4``).
+            base_spacing: Physical grid spacing in millimetres (default 1 mm).
+
+        Returns:
+            Grid cell size in world (model) units.
+        """
+        base_px = base_spacing * px_per_mm
+        if self.zoom >= 5.0:
+            return base_px / 5
+        if self.zoom >= 2.0:
+            return base_px / 2
+        if self.zoom >= 0.5:
+            return base_px
+        if self.zoom >= 0.2:
+            return base_px * 2
+        return base_px * 5
