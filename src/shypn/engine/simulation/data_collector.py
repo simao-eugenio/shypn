@@ -3,8 +3,12 @@
 
 Collects place tokens and transition firing counts at each simulation step.
 """
-from typing import Any, Dict, List, Set, Tuple, Optional
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Set, Tuple
 import logging
+import numpy as np
+
 from shypn.core.value_objects import RecordingConfig
 from shypn.utils.safe_eval import safe_eval_numeric
 
@@ -49,39 +53,87 @@ class DataCollector:
         
         # Thermodynamic validation results (populated at simulation end)
         self.validation_results = None
-        
-    def start_collection(self) -> None:
+
+        # Phase 5 — fast recording state (built in start_collection)
+        # Ordered lists of place/transition objects to iterate in record_state.
+        # Only contains *recorded* objects so the hot loop skips unrecorded ones.
+        self._rec_places: List[Any] = []
+        self._rec_transitions: List[Any] = []
+        # Flag: skip the expensive _evaluate_rate_at_enablement loop entirely.
+        # Set to True in batch mode where rates come from the C accelerator.
+        self._skip_rate_eval: bool = False
+        # Pre-allocated numpy recording buffers (enabled by n_steps_hint).
+        self._buf_enabled: bool = False
+        self._buf_ptr: int = 0
+        self._t_buf: Optional[np.ndarray] = None     # (max_pts,)           float64
+        self._p_buf: Optional[np.ndarray] = None     # (max_pts, n_places)  float32
+        self._p_buf_ids: List[str] = []              # place IDs in column order
+        self._buf_cap: int = 0                       # allocated row count
+
+    def start_collection(
+        self,
+        n_steps_hint: Optional[int] = None,
+        skip_rate_eval: bool = False,
+    ) -> None:
         """Initialize data structures and start collecting.
-        
+
         If recorded_objects is None or empty, records ALL places and transitions.
         Otherwise, only records objects in the recorded_objects set.
+
+        Args:
+            n_steps_hint: Expected number of *recorded* time points.  When
+                given, pre-allocates compact numpy float32 buffers for place
+                tokens instead of Python list-of-tuples, cutting per-step
+                allocation cost to a single numpy row-fill.  The buffers are
+                converted back to the standard format by :meth:`finalize_buf`
+                (called automatically from :meth:`stop_collection`).
+            skip_rate_eval: If True, skip the expensive per-transition rate
+                evaluation inside :meth:`record_state`.  Use in batch /
+                tau-leaping mode where propensities are already computed by
+                the C accelerator.
         """
         self.time_points = []
-        self._record_counter = 0  # Reset counter
-        self._last_recorded_time = None  # Reset time tracking
-        
+        self._record_counter = 0
+        self._last_recorded_time = None
+        self._skip_rate_eval = skip_rate_eval
+        self._buf_enabled = False
+        self._buf_ptr = 0
+
         # Refresh recorded_objects from controller settings if available
-        # This ensures we pick up any objects added to analysis after initialization
         if self.controller and hasattr(self.controller, 'settings'):
             if hasattr(self.controller.settings, 'recorded_objects'):
                 self.recorded_objects = self.controller.settings.recorded_objects
-        
-        # If no objects specified, record everything (default behavior)
+
+        # Build place/transition dicts keyed to recorded IDs only
         if not self.recorded_objects:
-            # Initialize place data with empty lists for ALL places
-            self.place_data = {p.id: [] for p in self.model.places}
-            
-            # Initialize transition data with empty lists for ALL transitions
-            self.transition_data = {t.id: [] for t in self.model.transitions}
-            
-            # Initialize transition rates for ALL transitions
-            self.transition_rates = {t.id: [] for t in self.model.transitions}
+            self.place_data       = {p.id: [] for p in self.model.places}
+            self.transition_data  = {t.id: [] for t in self.model.transitions}
+            self.transition_rates = ({} if skip_rate_eval
+                                     else {t.id: [] for t in self.model.transitions})
+            self._rec_places      = list(self.model.places)
+            self._rec_transitions = list(self.model.transitions)
         else:
-            # Selective recording: only initialize data for recorded objects
-            self.place_data = {p.id: [] for p in self.model.places if p.id in self.recorded_objects}
-            self.transition_data = {t.id: [] for t in self.model.transitions if t.id in self.recorded_objects}
-            self.transition_rates = {t.id: [] for t in self.model.transitions if t.id in self.recorded_objects}
-        
+            self.place_data = {
+                p.id: [] for p in self.model.places if p.id in self.recorded_objects
+            }
+            self.transition_data = {
+                t.id: [] for t in self.model.transitions if t.id in self.recorded_objects
+            }
+            self.transition_rates = ({} if skip_rate_eval else {
+                t.id: [] for t in self.model.transitions if t.id in self.recorded_objects
+            })
+            self._rec_places      = [p for p in self.model.places      if p.id in self.recorded_objects]
+            self._rec_transitions = [t for t in self.model.transitions if t.id in self.recorded_objects]
+
+        # Phase 5.1: pre-allocated numpy place-token buffer
+        if n_steps_hint and n_steps_hint > 0 and self._rec_places:
+            cap = n_steps_hint + 64
+            self._buf_cap   = cap
+            self._t_buf     = np.empty(cap, dtype=np.float64)
+            self._p_buf     = np.empty((cap, len(self._rec_places)), dtype=np.float32)
+            self._p_buf_ids = [p.id for p in self._rec_places]
+            self._buf_enabled = True
+
         self.is_collecting = True
         
     def record_state(self, current_time: float, force: bool = False) -> None:
@@ -111,22 +163,47 @@ class DataCollector:
                 return  # Skip this recording
             
         self.time_points.append(current_time)
-        
-        # Record place tokens as (time, tokens) tuples
-        for place in self.model.places:
-            tokens = place.tokens
-            self.place_data[place.id].append((current_time, tokens))
-            
-        # Record transition firing counts (cumulative) AND instantaneous rates as tuples
-        for transition in self.model.transitions:
-            # Cumulative firing count stored as (time, count) tuple
+
+        # ── Phase 5: fast path — numpy buffer fill ────────────────────────────
+        if self._buf_enabled:
+            ptr = self._buf_ptr
+            if ptr >= self._buf_cap:
+                # Grow buffer by 50 % to handle underestimated n_steps_hint
+                new_cap = max(self._buf_cap + 64, int(self._buf_cap * 1.5))
+                self._t_buf = np.resize(self._t_buf, new_cap)          # type: ignore[arg-type]
+                new_p = np.empty((new_cap, len(self._rec_places)), dtype=np.float32)
+                new_p[:self._buf_cap] = self._p_buf
+                self._p_buf = new_p
+                self._buf_cap = new_cap
+
+            self._t_buf[ptr] = current_time
+            p_row = self._p_buf[ptr]
+            for col, place in enumerate(self._rec_places):
+                p_row[col] = place.tokens
+            self._buf_ptr += 1
+
+            # Still record transition firing counts (cheap — just int getAttribute)
+            if not self._skip_rate_eval:
+                for transition in self._rec_transitions:
+                    count = getattr(transition, 'firing_count', 0)
+                    self.transition_data[transition.id].append((current_time, count))
+            return  # skip rate-eval entirely in fast path
+
+        # ── Standard path — Python list-of-tuples ────────────────────────────
+        # Iterate ONLY the pre-filtered recorded places (fixes selective-recording
+        # KeyError bug and avoids touch of all 58 places when only 5 are recorded)
+        for place in self._rec_places:
+            self.place_data[place.id].append((current_time, place.tokens))
+
+        for transition in self._rec_transitions:
             count = getattr(transition, 'firing_count', 0)
             self.transition_data[transition.id].append((current_time, count))
-            
-            # Instantaneous rate/propensity - evaluate with CURRENT token state
+
+            if self._skip_rate_eval:
+                continue
+
+            # Instantaneous rate/propensity evaluation (expensive — skipped in batch)
             rate = 0.0
-            
-            # Get behavior from controller's cache (behaviors are created on-demand by controller)
             behavior = None
             if self.controller and hasattr(self.controller, 'behavior_cache'):
                 behavior = self.controller.behavior_cache.get(id(transition))
@@ -187,6 +264,36 @@ class DataCollector:
                     rate = 0.0
             
             self.transition_rates[transition.id].append(rate)
+
+    # ------------------------------------------------------------------
+    # Phase 5 helpers
+    # ------------------------------------------------------------------
+
+    def finalize_buf(self) -> None:
+        """Convert pre-allocated numpy place buffers to standard tuple-list format.
+
+        Called automatically by :meth:`stop_collection`.  Safe to call
+        multiple times (no-op if buffer not enabled or already finalised).
+        """
+        if not self._buf_enabled or self._buf_ptr == 0:
+            return
+        n = self._buf_ptr
+        t_arr = self._t_buf[:n]         # type: ignore[index]
+        p_arr = self._p_buf[:n, :]      # type: ignore[index]
+
+        # Rebuild time_points list (was empty / partial while buf was active)
+        self.time_points = list(t_arr)
+
+        # Reconstruct place_data as list-of-tuples, matching the standard format
+        for col, pid in enumerate(self._p_buf_ids):
+            values = p_arr[:, col]
+            self.place_data[pid] = [
+                (float(t_arr[i]), float(values[i])) for i in range(n)
+            ]
+
+        # Disable buffer so further record_state calls use the list path
+        self._buf_enabled = False
+        self._buf_ptr = 0
     
     def record_event(self, time: float, event_type: str, data: Optional[dict] = None) -> None:
         """Record a simulation event (for logging/debugging).
@@ -227,6 +334,7 @@ class DataCollector:
     
     def stop_collection(self) -> None:
         """Stop collecting data."""
+        self.finalize_buf()  # Phase 5: flush numpy buffer if active
         self.is_collecting = False
         
     def clear(self) -> None:
