@@ -229,7 +229,7 @@ class ConflictResolver(AbstractConflictResolver):
 
         conflict_sets = self.compute_conflict_sets(enabled)
         maximal: List[List[Any]] = []
-        seen: Set[frozenset] = set()
+        seen: Set[frozenset[Any]] = set()
 
         def _try_add(candidate: List[Any]) -> None:
             if candidate:

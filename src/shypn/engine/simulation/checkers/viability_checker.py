@@ -161,13 +161,22 @@ class ViabilityChecker:
                         if place.tokens < tokens_needed:
                             return False  # Not enough tokens
             
-            # Check guard condition (if any)
+            # Check guard condition (if any).
+            # guard=1 (int) is the scientific convention for "always enabled";
+            # guard=0 means "disabled". Only call .evaluate() for guard objects.
             if hasattr(transition, 'guard') and transition.guard is not None:
-                try:
-                    if not transition.guard.evaluate():
-                        return False  # Guard prevents firing
-                except Exception:
-                    return False  # Guard evaluation failed
+                guard = transition.guard
+                if hasattr(guard, 'evaluate'):
+                    try:
+                        if not guard.evaluate():
+                            return False  # Guard prevents firing
+                    except Exception:
+                        return False  # Guard evaluation failed — conservatively disable
+                elif isinstance(guard, (bool, int, float)):
+                    if not guard:
+                        return False  # guard=0/False means disabled
+                    # guard=1/True means always enabled — continue
+                # else: unknown guard type → treat as enabled
         
         return True  # All transitions can fire
     
