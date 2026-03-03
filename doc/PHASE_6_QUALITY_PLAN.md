@@ -1,6 +1,6 @@
 # Phase 6 Quality Plan — God Class Reduction via OOP Extraction
 
-**Status:** Sprint 13 active  
+**Status:** Sprint 14 next (Sprint 13 ✅ complete)  
 **Branch:** Usability-and-enhancements  
 **Precursor:** Sprint 12 (CSV normalization, metadata fixes) — committed `834ec18`  
 **Methodology:** Extract cohesive clusters into typed service classes (ABC + concrete), one module per service.
@@ -182,6 +182,19 @@ Reduces duplication of ~600 lines shared between the two classes.
 
 ## Quality Enforcement Checklist (per extraction)
 
+### Sprint 13 — P1 `ArcGeometryService` + P2 `ConflictResolver` ✅
+
+- [x] `from __future__ import annotations` present
+- [x] All parameters type-annotated (no bare `Any` except true duck-typing boundaries)
+- [x] All return types annotated
+- [x] `mypy --strict` passes on the new module (or justified `# type: ignore` with comment)
+- [x] `@abstractmethod` for every interface method in the ABC
+- [x] Existing tests still pass (`pytest tests/engine/ tests/engine_core/` — 37 passed)
+- [x] God class line count decreased by extracted cluster size
+- [x] Module-level docstring describing the service's single responsibility
+
+### Future sprints checklist template
+
 - [ ] `from __future__ import annotations` present
 - [ ] All parameters type-annotated (no bare `Any` except true duck-typing boundaries)
 - [ ] All return types annotated
@@ -193,4 +206,4 @@ Reduces duplication of ~600 lines shared between the two classes.
 
 ---
 
-*Next action: implement Sprint 13 (P1 + P2).*
+*Next action: implement Sprint 14 — `ViewportController` cleanup (P3).*
