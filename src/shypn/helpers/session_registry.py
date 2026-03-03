@@ -79,13 +79,13 @@ class _SessionFieldProxy:
             raise KeyError(key)
         return getattr(session, self._field)
 
-    def __contains__(self, key: Any) -> bool:  # type: ignore[override]
+    def __contains__(self, key: Any) -> bool:
         return key in self._registry._sessions
 
     def __iter__(self) -> Iterator[Any]:
         return iter(self._registry._sessions)
 
-    def keys(self):
+    def keys(self) -> Any:
         return self._registry._sessions.keys()
 
     def items(self) -> Iterator[Tuple[Any, Any]]:
@@ -199,7 +199,7 @@ class SessionRegistry:
     def __delitem__(self, key: Any) -> None:
         self._sessions.pop(key, None)
 
-    def __contains__(self, key: Any) -> bool:  # type: ignore[override]
+    def __contains__(self, key: Any) -> bool:
         return key in self._sessions
 
     def __iter__(self) -> Iterator[Any]:
@@ -208,13 +208,13 @@ class SessionRegistry:
     def __len__(self) -> int:
         return len(self._sessions)
 
-    def items(self):
+    def items(self) -> Any:
         return self._sessions.items()
 
-    def keys(self):
+    def keys(self) -> Any:
         return self._sessions.keys()
 
-    def values(self):
+    def values(self) -> Any:
         return self._sessions.values()
 
     def __repr__(self) -> str:  # pragma: no cover
