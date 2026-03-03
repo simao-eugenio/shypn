@@ -9,16 +9,18 @@ Handles KEGG pathway import workflow:
 Author: Simão Eugénio
 Date: 2025-10-29
 """
+from __future__ import annotations
+
 import os
 import sys
 import time
 import logging
 import threading
 from typing import Optional, Dict, Any
-import gi
+import gi  # type: ignore[import-untyped]
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk, GLib, Pango  # type: ignore[import-untyped]
 from .base_pathway_category import BasePathwayCategory
 from shypn.data.project_models import get_project_manager
 # Import KEGG backend modules
@@ -37,7 +39,7 @@ try:
     from shypn.data.pathway_document import PathwayDocument
 except ImportError:
     PathwayDocument = None
-class KEGGCategory(BasePathwayCategory):
+class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
     """KEGG import category for Pathway Operations Panel.
     Contains:
     - Pathway ID input

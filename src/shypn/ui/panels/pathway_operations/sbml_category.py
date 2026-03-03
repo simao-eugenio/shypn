@@ -12,6 +12,8 @@ It handles:
 
 Follows the CategoryFrame pattern used across all panels (Topology, Dynamic Analyses, Report).
 """
+from __future__ import annotations
+
 import os
 import sys
 import time
@@ -20,10 +22,10 @@ import logging
 from typing import Optional
 
 try:
-    import gi
+    import gi  # type: ignore[import-untyped]
     gi.require_version('Gtk', '3.0')
     gi.require_version('Pango', '1.0')
-    from gi.repository import Gtk, GLib, Pango
+    from gi.repository import Gtk, GLib, Pango  # type: ignore[import-untyped]
 except Exception as e:
     print(f'ERROR: GTK3 not available in sbml_category: {e}', file=sys.stderr)
     sys.exit(1)
@@ -48,7 +50,7 @@ except ImportError as e:
     SBMLCompartmentModuleService = None
 
 
-class SBMLCategory(BasePathwayCategory):
+class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
     """SBML import category for Pathway Operations panel.
     
     Provides complete SBML import workflow with local file and BioModels support.
