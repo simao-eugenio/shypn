@@ -278,6 +278,7 @@ class BatchSimulationRunner:
         # All other settings (tau_epsilon, max_tau, use_parallel_stochastic, etc.) are
         # preserved from the user's controller settings via the deepcopy above.
         replicate_controller.settings.use_tau_leaping = True
+        replicate_controller.settings.use_jit_kernel = True  # Phase 6: enable JIT in batch
         
         for i in range(n_replicates):
             # Check for cancellation before starting replicate
@@ -465,6 +466,7 @@ class BatchSimulationRunner:
         replicate_controller.data_collector.time_based_recording = True
         replicate_controller.data_collector.recording_time_interval = 0.5
         replicate_controller.settings.use_tau_leaping = True
+        replicate_controller.settings.use_jit_kernel = True  # Phase 6: enable JIT in batch
 
         # Warm up the C accelerator BEFORE forking so every child inherits the
         # compiled .so (avoids N separate compilations in parallel workers).
