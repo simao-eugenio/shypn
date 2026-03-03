@@ -31,6 +31,9 @@ dependencies = [
 thermodynamics = [
     "requests>=2.31.0",
 ]
+acceleration = [
+    "numba>=0.59.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/simao-eugenio/shypn"

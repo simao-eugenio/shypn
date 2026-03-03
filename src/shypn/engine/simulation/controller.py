@@ -1804,6 +1804,7 @@ class SimulationController(AbstractSimulationController):
                         max_tau=self.settings.max_tau,
                         seed=None,
                         use_parallel=self.settings.use_parallel_stochastic,
+                        use_jit_kernel=getattr(self.settings, 'use_jit_kernel', False),
                         verbose=self.verbose
                     )
                     self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau

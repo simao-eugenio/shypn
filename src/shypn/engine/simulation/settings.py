@@ -43,6 +43,7 @@ class SimulationSettings:
     DEFAULT_MAX_TAU = 0.1  # Maximum leap size (seconds) - allows reasonable simulation speed
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
+    DEFAULT_USE_JIT_KERNEL = False           # Phase 6: Numba JIT τ-step kernel (opt-in; requires numba>=0.59)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
     # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
@@ -65,6 +66,7 @@ class SimulationSettings:
         self._max_tau = self.DEFAULT_MAX_TAU
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
+        self._use_jit_kernel = self.DEFAULT_USE_JIT_KERNEL
         
         # Batch mode settings (for experiment replication)
         self._batch_mode_enabled = False
@@ -313,6 +315,29 @@ class SimulationSettings:
         """
         self._use_parallel_stochastic = bool(value)
 
+    @property
+    def use_jit_kernel(self) -> bool:
+        """Get whether the Numba JIT τ-step kernel is enabled.
+
+        When ``True`` and ``numba>=0.59`` is installed, the τ selection
+        and Poisson/Skellam sampling are compiled to native code in a
+        single JIT call, eliminating the Python-loop overhead of
+        ``select_tau()`` and ``_sample_firings()``.  Has no effect if
+        numba is not installed (falls back to the Python path silently).
+
+        Enabled automatically in batch mode via the batch runner.
+        """
+        return self._use_jit_kernel
+
+    @use_jit_kernel.setter
+    def use_jit_kernel(self, value: bool) -> None:
+        """Set JIT kernel mode.
+
+        Args:
+            value: True to enable the Numba JIT τ-step kernel.
+        """
+        self._use_jit_kernel = bool(value)
+
     
     # ========== Duration Management ==========
     
@@ -480,7 +505,8 @@ class SimulationSettings:
             'critical_threshold': self._critical_threshold,
             'max_tau': self._max_tau,
             'min_tau': self._min_tau,
-            'use_parallel_stochastic': self._use_parallel_stochastic
+            'use_parallel_stochastic': self._use_parallel_stochastic,
+            'use_jit_kernel': self._use_jit_kernel,
         }
     
     @classmethod
@@ -528,6 +554,9 @@ class SimulationSettings:
         
         if 'use_parallel_stochastic' in data:
             settings.use_parallel_stochastic = data['use_parallel_stochastic']
+
+        if 'use_jit_kernel' in data:
+            settings.use_jit_kernel = data['use_jit_kernel']
         
         return settings
     
