@@ -13,26 +13,26 @@ from __future__ import annotations
 __all__ = ["CanvasContextMenuController"]
 
 import logging
-from typing import Any
+from typing import Any, Dict, List
 
 from shypn.canvas.abstract_context_menu_controller import AbstractContextMenuController
 
 logger = logging.getLogger(__name__)
 
 try:
-    import gi
+    import gi  # type: ignore[import-untyped]
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
+    from gi.repository import Gtk  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover
-    Gtk = None  # type: ignore[assignment]
+    Gtk = None
 
 try:
     from shypn.netobjs import Place, Transition, Arc
 except Exception:  # pragma: no cover
-    Place = Transition = Arc = None  # type: ignore[assignment]
+    Place = Transition = Arc = None
 
 
-class CanvasContextMenuController(AbstractContextMenuController):
+class CanvasContextMenuController(AbstractContextMenuController):  # type: ignore[misc]
     """Builds, shows and manages all canvas / object context menus.
 
     Args:
@@ -45,7 +45,7 @@ class CanvasContextMenuController(AbstractContextMenuController):
 
     def __init__(self, loader: Any) -> None:
         self._loader = loader
-        self._canvas_context_menus: dict = {}
+        self._canvas_context_menus: Dict[Any, Any] = {}
         self._active_canvas_menu: Any = None
 
     # ------------------------------------------------------------------
@@ -132,7 +132,7 @@ class CanvasContextMenuController(AbstractContextMenuController):
             is_parallel_arc = len(parallels) > 0
 
         if is_parallel_arc:
-            menu_items: list = [
+            menu_items: List[Any] = [
                 ('Edit Properties...', lambda: _loader._on_object_properties(obj, manager, drawing_area)),
                 None,
                 ('Delete', lambda: _loader._on_object_delete(obj, manager, drawing_area)),
@@ -207,7 +207,7 @@ class CanvasContextMenuController(AbstractContextMenuController):
     # ------------------------------------------------------------------
 
     def _add_place_context_items(
-        self, obj: Any, menu_items: list, manager: Any, drawing_area: Any
+        self, obj: Any, menu_items: List[Any], manager: Any, drawing_area: Any
     ) -> None:
         """Append Place-specific items."""
         _loader = self._loader
@@ -242,7 +242,7 @@ class CanvasContextMenuController(AbstractContextMenuController):
         menu_items.insert(3, None)
 
     def _add_transition_context_items(
-        self, obj: Any, menu_items: list, manager: Any, drawing_area: Any
+        self, obj: Any, menu_items: List[Any], manager: Any, drawing_area: Any
     ) -> None:
         """Append Transition-specific items."""
         _loader = self._loader
@@ -279,7 +279,7 @@ class CanvasContextMenuController(AbstractContextMenuController):
         )
 
     def _add_arc_context_items(
-        self, obj: Any, menu_items: list, manager: Any, drawing_area: Any
+        self, obj: Any, menu_items: List[Any], manager: Any, drawing_area: Any
     ) -> None:
         """Append Arc-specific items."""
         from shypn.utils.arc_transform import is_straight, is_curved, is_signal_flow
