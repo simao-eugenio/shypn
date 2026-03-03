@@ -167,6 +167,23 @@ class TauLeapingEngine:
             else None
         )
 
+        # Phase 3: pass stoichiometry data so the Cao et al. (2006) full leap
+        # condition can be used instead of the simplified ε/max(a) formula.
+        _cao_data = None
+        if (
+            _prop_accel is not None
+            and _prop_accel.ready
+            and _prop_accel._stoich_matrix is not None
+            and self._accel_props is not None
+        ):
+            _cao_data = (
+                _prop_accel._stoich_matrix,
+                _prop_accel._stoich_matrix_sq,
+                _prop_accel._y_arr,
+                _prop_accel._g_vec,
+                _prop_accel.transition_ids_order,
+            )
+
         # Step 1: Select leap size τ
         tau, leap_info = self.leap_selector.select_tau(
             stochastic_transitions,
@@ -175,6 +192,7 @@ class TauLeapingEngine:
             controller,
             propensity_hint=self._accel_props,
             arc_table=_arc_table,
+            cao_data=_cao_data,
         )
         
         # Log tau selection for debugging
@@ -585,7 +603,107 @@ class TauLeapingEngine:
             constrained_map[transition] = max_allowed_firings
         
         return constrained_map
-    
+
+    def _apply_firings_fast(
+        self,
+        firings_map: Dict[Any, int],
+        controller: Any,
+        accel: Any,
+    ) -> int:
+        """Vectorised _apply_firings using the stoichiometry matrix (Phase 3).
+
+        Replaces the sequential per-arc ``set_tokens`` loop with a single BLAS
+        ``S @ k`` matrix-vector product, then writes all place tokens back from
+        the ``_y_arr`` buffer.  Consumed/produced maps are derived from the
+        precomputed arc tables so no ``behavior.get_*_arcs()`` calls are needed.
+        """
+        import numpy as np
+
+        n_t = accel._n_transitions
+        k_arr = np.zeros(n_t, dtype=np.float64)
+        tid_to_j: Dict[str, int] = {
+            tid: j for j, tid in enumerate(accel.transition_ids_order)
+        }
+        _in_tbl  = accel._input_arc_table
+        _out_tbl = accel._output_arc_table
+        per_trans: List[Tuple[Any, int, Dict, Dict]] = []
+
+        for transition, num_firings in firings_map.items():
+            if num_firings == 0:
+                continue
+            _tid = getattr(transition, 'id', None)
+
+            # Cap firings using precomputed input arc table (O(k) per transition)
+            in_entries = _in_tbl.get(_tid, [])
+            max_poss = num_firings
+            for _p, _w in in_entries:
+                if _w > 0.0:
+                    max_poss = min(max_poss, int(_p.tokens // _w))
+            actual = max(0, min(num_firings, max_poss))
+            if actual == 0:
+                continue
+
+            consumed_map: Dict[str, float] = {
+                _p.id: _w * actual for _p, _w in in_entries
+            }
+            produced_map: Dict[str, float] = {
+                _p.id: _w * actual for _p, _w in _out_tbl.get(_tid, [])
+            }
+            per_trans.append((transition, actual, consumed_map, produced_map))
+
+            j = tid_to_j.get(_tid)
+            if j is not None:
+                k_arr[j] = float(actual)
+
+        total_firings = sum(act for _, act, _, _ in per_trans)
+
+        if total_firings > 0:
+            # ── Vectorised token update ─────────────────────────────────────
+            delta = accel._stoich_matrix @ k_arr   # shape (n_places,)
+            y = accel._y_arr
+            y += delta
+            np.clip(y, 0.0, None, out=y)
+            # Write back to place objects
+            for pid, idx in accel._all_place_index.items():
+                p = accel._places_by_id.get(pid)
+                if p is not None:
+                    p.tokens = float(y[idx])
+            # ────────────────────────────────────────────────────────────────
+
+        # ── Recording + dirty-flag tracking ─────────────────────────────────
+        _dc = getattr(controller, 'data_collector', None)
+        _listeners = getattr(controller, 'step_listeners', [])
+        for transition, actual, consumed_map, produced_map in per_trans:
+            # Phase 2.2: dirty-flag tracks which places changed
+            if self._changed_place_ids is not None:
+                self._changed_place_ids.update(consumed_map)
+                self._changed_place_ids.update(produced_map)
+            if _dc is not None:
+                _dc.record_firing(
+                    time=controller.time,
+                    transition=transition,
+                    consumed=consumed_map,
+                    produced=produced_map,
+                    mode='tau_leaping',
+                    firings=actual,
+                )
+            if _listeners:
+                details = {
+                    'consumed': consumed_map,
+                    'produced': produced_map,
+                    'mode': 'tau_leaping',
+                    'firings': actual,
+                }
+                for listener in _listeners:
+                    listener_obj = getattr(listener, '__self__', listener)
+                    if hasattr(listener_obj, 'on_transition_fired'):
+                        for _ in range(actual):
+                            listener_obj.on_transition_fired(
+                                transition, controller.time, details
+                            )
+        # ────────────────────────────────────────────────────────────────────
+        return total_firings
+
     def _apply_firings(
         self,
         firings_map: Dict[Any, int],
@@ -600,6 +718,15 @@ class TauLeapingEngine:
         Returns:
             Total number of firings applied
         """
+        # Phase 3: dispatch to vectorised fast path when stoich matrix is ready.
+        _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        if (
+            _prop_accel is not None
+            and _prop_accel.ready
+            and _prop_accel._stoich_matrix is not None
+        ):
+            return self._apply_firings_fast(firings_map, controller, _prop_accel)
+
         total_firings = 0
         
         for transition, num_firings in firings_map.items():

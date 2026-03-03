@@ -12,6 +12,7 @@ References:
 """
 
 import math
+import numpy as np
 from typing import Dict, List, Tuple, Any, Optional
 import logging
 
@@ -80,6 +81,7 @@ class LeapSelector:
         controller: Any = None,
         propensity_hint: Optional[Dict[str, Any]] = None,
         arc_table: Optional[Dict[str, Any]] = None,
+        cao_data: Optional[Tuple] = None,
     ) -> Tuple[float, Dict[str, Any]]:
         """Select appropriate time leap based on current state.
         
@@ -138,8 +140,13 @@ class LeapSelector:
                 'recommendation': 'use_exact_ssa'
             }
         
-        # Calculate τ using simplified leap condition
-        tau_unbounded = self._calculate_tau_simplified(propensities, model, transitions, arc_table)
+        # Calculate τ using Cao et al. (2006) full formula when the stoichiometry
+        # matrix and C-accelerated propensities are both available; otherwise fall
+        # back to the conservative simplified formula.
+        if cao_data is not None and propensity_hint is not None:
+            tau_unbounded = self._calculate_tau_cao(propensity_hint, *cao_data)
+        else:
+            tau_unbounded = self._calculate_tau_simplified(propensities, model, transitions, arc_table)
         
         # Apply bounds
         tau = max(self.min_tau, min(tau_unbounded, self.max_tau))
@@ -303,7 +310,66 @@ class LeapSelector:
                     pass
         
         return self._calculate_tau_simplified(propensities, model)
-    
+
+    def _calculate_tau_cao(
+        self,
+        propensity_hint: Dict[str, Any],
+        S: np.ndarray,
+        S_sq: np.ndarray,
+        x_arr: np.ndarray,
+        g_vec: np.ndarray,
+        tid_order: List[str],
+    ) -> float:
+        """Cao et al. (2006) Algorithm 2 tau selection.
+
+        Bounds τ so that the expected relative change in every place population
+        stays within epsilon.  This is the full leap condition and typically
+        yields 10–100× larger τ than the conservative simplified formula.
+
+        Parameters
+        ----------
+        propensity_hint : dict  tid → (net, fwd, rev)
+        S : ndarray              stoichiometric matrix (n_places × n_transitions)
+        S_sq : ndarray           S element-wise squared
+        x_arr : ndarray          current place populations (n_places,)
+        g_vec : ndarray          highest stoichiometric order per place
+        tid_order : list[str]    transition IDs aligned with S columns
+
+        Returns
+        -------
+        float
+            Upper-bound τ, clipped to [min_tau, max_tau].
+        """
+        # Build propensity vector aligned with S columns
+        a = np.array(
+            [max(0.0, propensity_hint.get(tid, (0.0,))[0]) for tid in tid_order],
+            dtype=np.float64,
+        )
+        # Zero out critical transitions (handled via exact SSA elsewhere)
+        a_nc = np.where(a >= self.critical_threshold, a, 0.0)
+
+        if not np.any(a_nc > 0.0):
+            # All critical — max_tau tells caller to use SSA fallback
+            return self.max_tau
+
+        # μi = Σj vij * aj  (drift: net rate of change per place)
+        mu = S @ a_nc      # shape (n_places,)
+        # σ²i = Σj v²ij * aj  (variance term; always ≥ 0)
+        var = S_sq @ a_nc  # shape (n_places,)
+
+        # Effective tolerance per place: εi = max(ε * xi / gi, 1)
+        eps_i = np.maximum(self.epsilon * x_arr / g_vec, 1.0)
+
+        abs_mu = np.abs(mu)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            tau_drift = np.where(abs_mu > 0.0, eps_i / abs_mu,         np.inf)
+            tau_var   = np.where(var    > 0.0, eps_i * eps_i / var, np.inf)
+
+        tau = float(np.minimum(tau_drift, tau_var).min())
+        if not np.isfinite(tau):
+            tau = self.max_tau
+        return max(self.min_tau, min(tau, self.max_tau))
+
     def _get_behavior(self, transition: Any) -> Optional[Any]:
         """Get behavior object for transition.
         

@@ -177,6 +177,17 @@ class PropensityAccelerator:
         # Direct place lookup by id for update_y_partial().
         self._places_by_id: Dict[str, Any] = {}
 
+        # Phase 3: stoichiometry matrix S[n_places × n_transitions] built in
+        # _analyse_model().  S[i,j] = net token change in place i per single
+        # firing of transition j (negative = consume, positive = produce).
+        # S_sq = S² element-wise — precomputed for the Cao variance term.
+        # g_vec = per-place highest stoichiometric order (≥ 1).
+        # output_arc_table mirrors _input_arc_table for produce arcs.
+        self._stoich_matrix: Optional[np.ndarray] = None
+        self._stoich_matrix_sq: Optional[np.ndarray] = None
+        self._g_vec: Optional[np.ndarray] = None
+        self._output_arc_table: Dict[str, List[Tuple[Any, float]]] = {}
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -393,6 +404,54 @@ class PropensityAccelerator:
             input_arc_table.setdefault(_tid, []).append((_source, _weight))
         self._input_arc_table = input_arc_table
         self._places_by_id = places_by_id
+
+        # Phase 3: stoichiometry matrix S[n_places × n_transitions].
+        # Only covers the stochastic/adaptive transitions (same set as the
+        # C propensity function).
+        _tid_to_j: Dict[str, int] = {
+            tid: j for j, tid in enumerate(self.transition_ids_order)
+        }
+        _S = np.zeros((self._n_places, self._n_transitions), dtype=np.float64)
+        _out_tbl: Dict[str, List[Tuple[Any, float]]] = {}
+        for _arc in getattr(model, "arcs", []):
+            _kind = (
+                getattr(_arc, "kind", None)
+                or (getattr(_arc, "properties", None) or {}).get("kind", "normal")
+                or "normal"
+            )
+            _arc_type = getattr(_arc, "arc_type", "normal")
+            if _kind != "normal" or _arc_type in ("inhibitor", "test"):
+                continue
+            _src = getattr(_arc, "source", None)
+            _tgt = getattr(_arc, "target", None)
+            if _src is None or _tgt is None:
+                continue
+            _w = float(getattr(_arc, "weight", 1.0))
+            # Consume arc: place → transition  (negative stoichiometry)
+            if hasattr(_src, "tokens") and hasattr(_tgt, "transition_type"):
+                _pid = getattr(_src, "id", None)
+                _tid = getattr(_tgt, "id", None)
+                _i = self._all_place_index.get(_pid)
+                _j = _tid_to_j.get(_tid)
+                if _i is not None and _j is not None:
+                    _S[_i, _j] -= _w
+            # Produce arc: transition → place  (positive stoichiometry)
+            elif hasattr(_src, "transition_type") and hasattr(_tgt, "tokens"):
+                _pid = getattr(_tgt, "id", None)
+                _tid = getattr(_src, "id", None)
+                _i = self._all_place_index.get(_pid)
+                _j = _tid_to_j.get(_tid)
+                if _i is not None and _j is not None:
+                    _S[_i, _j] += _w
+                if _tid is not None:
+                    _out_tbl.setdefault(_tid, []).append((_tgt, _w))
+
+        self._stoich_matrix = _S
+        self._stoich_matrix_sq = _S * _S  # element-wise; used for Cao variance term
+        # g_i: conservative approx — max |v_{ij}| for place i.
+        # Bounded below at 1.0 (first-order minimum; prevents /0).
+        self._g_vec = np.maximum(np.abs(_S).max(axis=1), 1.0)
+        self._output_arc_table = _out_tbl
 
     def _extract_rate(
         self, transition: Any
