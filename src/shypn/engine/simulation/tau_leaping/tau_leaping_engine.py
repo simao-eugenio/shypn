@@ -422,51 +422,47 @@ class TauLeapingEngine:
                 f"  Kinetic law: {formula_str[:200]}{'...' if len(formula_str) > 200 else ''}"
             )
         
-        # Sample firings - use Skellam for reversible, Poisson for irreversible
-        for transition, propensity in zip(transitions, propensities):
-            if getattr(transition, '_skellam_reversible', False):
-                # Reversible reaction: use Skellam distribution
-                try:
-                    # Prefer accelerator-provided fwd/rev (both components correct);
-                    # fall back to sign-split heuristic when Python eval was used.
-                    if hasattr(transition, '_accel_fwd_prop'):
-                        forward_prop = transition._accel_fwd_prop
-                        reverse_prop = transition._accel_rev_prop
-                    elif propensity >= 0:
-                        # Net forward (heuristic)
-                        forward_prop = propensity
-                        reverse_prop = 0.0
-                    else:
-                        # Net reverse (heuristic)
-                        forward_prop = 0.0
-                        reverse_prop = abs(propensity)
+        # Phase 4b: Single vectorized Poisson call for all irreversible transitions.
+        # Reversible reactions (Skellam) are sampled individually — they are a small
+        # minority in metabolic/signalling models.  For GATA: ~3 reversible out of 29.
+        _irrev_trans: List[Any] = []
+        _irrev_lam:   List[float] = []
+        for _t, _p in zip(transitions, propensities):
+            if not getattr(_t, '_skellam_reversible', False):
+                _irrev_trans.append(_t)
+                _irrev_lam.append(max(0.0, _p))
+        if _irrev_trans:
+            _lam_arr = np.array(_irrev_lam, dtype=np.float64) * tau
+            _k_arr   = self.poisson_sampler.rng.poisson(lam=_lam_arr)  # ONE C call
+            for _t, _k in zip(_irrev_trans, _k_arr):
+                firings_map[_t] = int(_k)
+            self.stats['irreversible_reactions'] += len(_irrev_trans)
 
-                    firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
-                    firings_map[transition] = firings
-                    self.stats['reversible_reactions'] += 1
-                    
-                except Exception as e:
-                    self.logger.warning(
-                        f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
-                    )
-                    # Fallback to Poisson with clamped propensity
-                    firings = self.poisson_sampler.sample(max(0, propensity), tau)
-                    firings_map[transition] = firings
-                    self.stats['irreversible_reactions'] += 1
-            else:
-                # Irreversible reaction: use Poisson distribution
-                # Clamp negative propensities to zero (shouldn't happen for irreversible)
-                if propensity < 0:
-                    self.logger.warning(
-                        f"Negative propensity for irreversible transition {transition.name}: {propensity}. "
-                        f"Clamping to 0."
-                    )
-                    propensity = 0.0
-                
-                firings = self.poisson_sampler.sample(propensity, tau)
+        # Reversible reactions: individual Skellam sampling
+        for transition, propensity in zip(transitions, propensities):
+            if not getattr(transition, '_skellam_reversible', False):
+                continue
+            try:
+                if hasattr(transition, '_accel_fwd_prop'):
+                    forward_prop = transition._accel_fwd_prop
+                    reverse_prop = transition._accel_rev_prop
+                elif propensity >= 0:
+                    forward_prop = propensity
+                    reverse_prop = 0.0
+                else:
+                    forward_prop = 0.0
+                    reverse_prop = abs(propensity)
+                firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
+                firings_map[transition] = firings
+                self.stats['reversible_reactions'] += 1
+            except Exception as e:
+                self.logger.warning(
+                    f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
+                )
+                firings = self.poisson_sampler.sample(max(0, propensity), tau)
                 firings_map[transition] = firings
                 self.stats['irreversible_reactions'] += 1
-        
+
         # Apply inhibitor arc constraints to limit firings
         firings_map = self._apply_inhibitor_constraints(firings_map, transitions)
         
