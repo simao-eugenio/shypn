@@ -128,6 +128,33 @@ class Event:
     def __repr__(self) -> str:
         return f"Event(id={self.id!r}, trigger={self.trigger!r}, assignments={len(self.assignments)})"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a JSON-compatible dict (skips compiled trigger)."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'trigger': self.trigger,
+            'delay': self.delay,
+            'use_values_from_trigger_time': self.use_values_from_trigger_time,
+            'priority': self.priority,
+            'assignments': dict(self.assignments),
+            'metadata': dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Event':
+        """Deserialize from a dict produced by to_dict()."""
+        return cls(
+            id=data['id'],
+            name=data.get('name'),
+            trigger=data.get('trigger', ''),
+            delay=float(data.get('delay', 0.0)),
+            use_values_from_trigger_time=bool(data.get('use_values_from_trigger_time', True)),
+            priority=int(data.get('priority', 0)),
+            assignments=dict(data.get('assignments', {})),
+            metadata=dict(data.get('metadata', {})),
+        )
+
 
 @dataclass
 class UnitDefinition:

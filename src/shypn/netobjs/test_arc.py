@@ -22,7 +22,7 @@ class TestArc(Arc):
     that enable reactions but are not consumed in the process.
     
     **Key Properties**:
-    - **Enabling Condition**: source.tokens >= weight (must have enough)
+    - **Enabling Condition**: source.tokens >= τ_t (sensing threshold; default τ_t = arc.weight when arc.threshold is None)
     - **Token Transfer**: NO - tokens are NOT consumed by THIS transition
     - **Read-Only**: Catalyst concentration affects rate but remains unchanged
     - **Mixed Roles**: Same species can be catalyst (test arc) in one reaction,
@@ -75,7 +75,7 @@ class TestArc(Arc):
     | Arc Type | Consumes? | Enables When | Use Case |
     |----------|-----------|--------------|----------|
     | Normal   | YES       | tokens ≥ weight | Substrates, reactants |
-    | Test     | NO        | tokens ≥ weight | Catalysts, enzymes |
+    | Test     | NO        | tokens ≥ τ_t    | Catalysts, enzymes (τ_t = arc.threshold or arc.weight) |
     | Inhibitor| YES*      | tokens ≥ weight | Cooperation, sharing |
     
     *Inhibitor in Shypn uses Living Systems semantics (consumes).

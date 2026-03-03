@@ -2647,7 +2647,8 @@ class FileExplorerPanel:
             manager.load_objects(
                 places=document.places,
                 transitions=document.transitions,
-                arcs=document.arcs
+                arcs=document.arcs,
+                events=getattr(document, 'events', None)
             )
             
             # CRITICAL: Set on_changed callback on all loaded objects

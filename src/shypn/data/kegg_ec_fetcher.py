@@ -477,7 +477,7 @@ class PersistentECCache:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             
             with open(self.cache_file, 'w') as f:
-                json.dump(self.cache, f, indent=2)
+                json.dump(dict(self.cache), f, indent=2)  # snapshot avoids race with concurrent writes
             logger.debug(f"Saved EC cache to {self.cache_file} "
                         f"({len(self.cache)} entries)")
         except Exception as e:

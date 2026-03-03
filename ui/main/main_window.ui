@@ -488,11 +488,25 @@
                         <property name="name">report</property>
                       </packing>
                     </child>
+
+                    <!-- Environment Panel Container -->
+                    <child>
+                      <object class="GtkBox" id="environment_panel_container">
+                        <property name="orientation">vertical</property>
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <!-- Content loaded from environment panel at startup -->
+                      </object>
+                      <packing>
+                        <property name="name">environment</property>
+                      </packing>
+                    </child>
                     
                   </object>
                   <packing>
                     <property name="resize">False</property>
-                    <property name="shrink">False</property>
+                    <property name="shrink">True</property>
                   </packing>
                 </child>
                 

@@ -156,6 +156,11 @@ class BatchSimulationRunner:
                 # Reset controller time to 0 for new replicate
                 replicate_controller.time = 0.0
                 
+                # Reset environment-event tracking so edge-triggered events re-arm
+                # in every replicate (controller is reused for performance).
+                replicate_controller._event_last_triggered = {}
+                replicate_controller._event_pending_assignments = []
+                
                 # Start data collection (will track all objects initially)
                 replicate_controller.data_collector.start_collection()
                 replicate_controller.data_collector.record_state(replicate_controller.time)

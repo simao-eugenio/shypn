@@ -259,40 +259,64 @@ class ParameterSweepBuilder(Gtk.Box):
         sim_frame = Gtk.Frame()
         sim_frame.set_label("Simulation Settings")
         sim_frame.set_margin_top(6)
-        
-        sim_box = Gtk.Grid()
-        sim_box.set_column_spacing(6)
-        sim_box.set_row_spacing(6)
-        sim_box.set_margin_start(12)
-        sim_box.set_margin_end(12)
-        sim_box.set_margin_top(6)
-        sim_box.set_margin_bottom(6)
-        
-        sim_box.attach(Gtk.Label(label="Replicates:", xalign=0), 0, 0, 1, 1)
+
+        sim_outer_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        sim_outer_vbox.set_margin_start(12)
+        sim_outer_vbox.set_margin_end(12)
+        sim_outer_vbox.set_margin_top(6)
+        sim_outer_vbox.set_margin_bottom(6)
+
+        # ── Top row: global run parameters (Replicates, Duration, Stop condition) ──
+        top_grid = Gtk.Grid()
+        top_grid.set_column_spacing(6)
+        top_grid.set_row_spacing(4)
+
+        top_grid.attach(Gtk.Label(label="Replicates:", xalign=0), 0, 0, 1, 1)
         self.replicates_entry = Gtk.Entry()
         self.replicates_entry.set_text("3")
         self.replicates_entry.set_width_chars(8)
-        sim_box.attach(self.replicates_entry, 1, 0, 1, 1)
-        
-        sim_box.attach(Gtk.Label(label="Duration (s):", xalign=0), 2, 0, 1, 1)
+        top_grid.attach(self.replicates_entry, 1, 0, 1, 1)
+
+        top_grid.attach(Gtk.Label(label="Duration (s):", xalign=0), 2, 0, 1, 1)
         self.duration_entry = Gtk.Entry()
         self.duration_entry.set_text("60.0")
         self.duration_entry.set_width_chars(8)
         self.duration_entry.set_tooltip_text("Maximum simulation time in seconds (can stop earlier if condition met)")
-        sim_box.attach(self.duration_entry, 3, 0, 1, 1)
-        
-        # Termination condition
-        sim_box.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
+        top_grid.attach(self.duration_entry, 3, 0, 1, 1)
+
+        top_grid.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
         self.termination_combo = Gtk.ComboBoxText()
         self.termination_combo.append("time_only", "Time limit only")
         self.termination_combo.append("deadlock", "Deadlock or time limit")
         self.termination_combo.append("steady_state", "Steady state or time limit")
         self.termination_combo.set_active_id("deadlock")
         self.termination_combo.set_tooltip_text("When to stop the simulation")
-        sim_box.attach(self.termination_combo, 1, 1, 3, 1)
+        top_grid.attach(self.termination_combo, 1, 1, 3, 1)
 
-        # Row 2: Time step (Auto / Manual)
-        sim_box.attach(Gtk.Label(label="Time Step:", xalign=0), 0, 2, 1, 1)
+        sim_outer_vbox.pack_start(top_grid, False, False, 0)
+
+        # Separator between global params and solver/compressor subgroups
+        sim_outer_vbox.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 2
+        )
+
+        # ── Bottom row: two side-by-side sub-groups ──────────────────────────────
+        subgroups_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+
+        # ── Left sub-group: Time Step / Solver ───────────────────────
+        solver_frame = Gtk.Frame()
+        solver_frame.set_label("Time Step / Solver")
+
+        solver_grid = Gtk.Grid()
+        solver_grid.set_column_spacing(6)
+        solver_grid.set_row_spacing(6)
+        solver_grid.set_margin_start(8)
+        solver_grid.set_margin_end(8)
+        solver_grid.set_margin_top(4)
+        solver_grid.set_margin_bottom(4)
+
+        # Row 0: Time step — Auto / Manual radio + manual entry
+        solver_grid.attach(Gtk.Label(label="Time step:", xalign=0), 0, 0, 1, 1)
         dt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         self.sweep_dt_auto_radio = Gtk.RadioButton.new_with_label(None, "Auto")
         self.sweep_dt_manual_radio = Gtk.RadioButton.new_with_label_from_widget(
@@ -305,21 +329,21 @@ class ParameterSweepBuilder(Gtk.Box):
         self.sweep_dt_manual_radio.connect("toggled", self._on_sweep_dt_mode_changed)
         dt_box.pack_start(self.sweep_dt_auto_radio, False, False, 0)
         dt_box.pack_start(self.sweep_dt_manual_radio, False, False, 0)
-        sim_box.attach(dt_box, 1, 2, 1, 1)
+        solver_grid.attach(dt_box, 1, 0, 1, 1)
         self.sweep_dt_manual_entry = Gtk.Entry()
         self.sweep_dt_manual_entry.set_text("0.01")
         self.sweep_dt_manual_entry.set_width_chars(8)
         self.sweep_dt_manual_entry.set_sensitive(False)
         self.sweep_dt_manual_entry.set_tooltip_text("Fixed time step in seconds (smaller = more accurate, slower)")
-        sim_box.attach(self.sweep_dt_manual_entry, 2, 2, 1, 1)
-        sim_box.attach(Gtk.Label(label="s", xalign=0), 3, 2, 1, 1)
+        solver_grid.attach(self.sweep_dt_manual_entry, 2, 0, 1, 1)
+        solver_grid.attach(Gtk.Label(label="s", xalign=0), 3, 0, 1, 1)
 
-        # Row 3: τ-Leaping accuracy ε (τ-leaping is always active — SimulationSettings.use_tau_leaping is non-disableable)
-        tau_label = Gtk.Label(label="τ-Leaping (always active):", xalign=0)
+        # Row 1: τ-Leaping accuracy ε
+        tau_label = Gtk.Label(label="τ-Leaping ε:", xalign=0)
         tau_label.set_tooltip_text(
             "τ-leaping is always enabled in this engine; only the accuracy bound ε can be tuned."
         )
-        sim_box.attach(tau_label, 0, 3, 2, 1)
+        solver_grid.attach(tau_label, 0, 1, 1, 1)
         self.sweep_tau_epsilon_entry = Gtk.Entry()
         self.sweep_tau_epsilon_entry.set_text("0.03")
         self.sweep_tau_epsilon_entry.set_width_chars(8)
@@ -328,10 +352,10 @@ class ParameterSweepBuilder(Gtk.Box):
             "Primary accuracy control for both hybrid and pure-stochastic models.\n"
             "Applied at simulation start; changing it mid-run has no effect."
         )
-        sim_box.attach(self.sweep_tau_epsilon_entry, 2, 3, 1, 1)
+        solver_grid.attach(self.sweep_tau_epsilon_entry, 1, 1, 2, 1)
 
-        # Row 4: max τ
-        sim_box.attach(Gtk.Label(label="max τ:", xalign=0), 0, 4, 1, 1)
+        # Row 2: max τ
+        solver_grid.attach(Gtk.Label(label="max τ:", xalign=0), 0, 2, 1, 1)
         self.sweep_max_tau_entry = Gtk.Entry()
         self.sweep_max_tau_entry.set_text("0.1")
         self.sweep_max_tau_entry.set_width_chars(8)
@@ -341,19 +365,76 @@ class ParameterSweepBuilder(Gtk.Box):
             "In hybrid models (mixed transition types) τ is automatically clamped to dt each step,\n"
             "so this value has no effect — use the Time Step control instead."
         )
-        sim_box.attach(self.sweep_max_tau_entry, 2, 4, 1, 1)
+        solver_grid.attach(self.sweep_max_tau_entry, 1, 2, 2, 1)
 
-        # Row 5: Random seed
-        sim_box.attach(Gtk.Label(label="Seed:", xalign=0), 0, 5, 1, 1)
+        # Row 3: Random seed
+        solver_grid.attach(Gtk.Label(label="Seed:", xalign=0), 0, 3, 1, 1)
         self.sweep_seed_entry = Gtk.Entry()
         self.sweep_seed_entry.set_text("42")
         self.sweep_seed_entry.set_width_chars(8)
         self.sweep_seed_entry.set_tooltip_text(
             "Base random seed for reproducibility (each replicate uses seed + replicate_id)"
         )
-        sim_box.attach(self.sweep_seed_entry, 2, 5, 1, 1)
+        solver_grid.attach(self.sweep_seed_entry, 1, 3, 2, 1)
 
-        sim_frame.add(sim_box)
+        solver_frame.add(solver_grid)
+        subgroups_hbox.pack_start(solver_frame, True, True, 0)
+
+        # ── Right sub-group: Trajectory Compressor ───────────────────
+        comp_frame = Gtk.Frame()
+        comp_frame.set_label("Trajectory Compressor")
+
+        comp_grid = Gtk.Grid()
+        comp_grid.set_column_spacing(6)
+        comp_grid.set_row_spacing(6)
+        comp_grid.set_margin_start(8)
+        comp_grid.set_margin_end(8)
+        comp_grid.set_margin_top(4)
+        comp_grid.set_margin_bottom(4)
+
+        comp_grid.attach(Gtk.Label(label="δ-filter ε:", xalign=0), 0, 0, 1, 1)
+        self.sweep_compressor_epsilon_entry = Gtk.Entry()
+        self.sweep_compressor_epsilon_entry.set_text("0.02")
+        self.sweep_compressor_epsilon_entry.set_width_chars(8)
+        self.sweep_compressor_epsilon_entry.set_tooltip_text(
+            "Normalised-change threshold (0.01–0.10).\n"
+            "A time-point is kept whenever any channel changes by more than\n"
+            "ε × (1 + range).  Lower = more points, higher fidelity.\n"
+            "Default 0.02 (2%)."
+        )
+        comp_grid.attach(self.sweep_compressor_epsilon_entry, 1, 0, 1, 1)
+
+        comp_grid.attach(Gtk.Label(label="min gap:", xalign=0), 0, 1, 1, 1)
+        self.sweep_compressor_min_gap_entry = Gtk.Entry()
+        self.sweep_compressor_min_gap_entry.set_text("0.0")
+        self.sweep_compressor_min_gap_entry.set_width_chars(8)
+        self.sweep_compressor_min_gap_entry.set_tooltip_text(
+            "Minimum interval (s) between kept points (0 = disabled).\n"
+            "For SSA / Gillespie data: set to 5–10× the raw time-step to prevent\n"
+            "fast-transient species (nuclear mRNAs, GTP/GDP) from defeating\n"
+            "compression.  E.g. raw step ≈ 0.36 s → min gap = 1.8 s gives\n"
+            "~15–20× compression vs ~2.5× without this floor."
+        )
+        comp_grid.attach(self.sweep_compressor_min_gap_entry, 1, 1, 1, 1)
+        comp_grid.attach(Gtk.Label(label="s", xalign=0), 2, 1, 1, 1)
+
+        comp_grid.attach(Gtk.Label(label="max gap:", xalign=0), 0, 2, 1, 1)
+        self.sweep_compressor_max_gap_entry = Gtk.Entry()
+        self.sweep_compressor_max_gap_entry.set_text("300.0")
+        self.sweep_compressor_max_gap_entry.set_width_chars(8)
+        self.sweep_compressor_max_gap_entry.set_tooltip_text(
+            "Heartbeat interval (s): unconditionally keep a point when no point\n"
+            "has been kept for this many seconds.  Prevents silent stretches from\n"
+            "being dropped entirely.  Default 300 s (5 min)."
+        )
+        comp_grid.attach(self.sweep_compressor_max_gap_entry, 1, 2, 1, 1)
+        comp_grid.attach(Gtk.Label(label="s", xalign=0), 2, 2, 1, 1)
+
+        comp_frame.add(comp_grid)
+        subgroups_hbox.pack_start(comp_frame, True, True, 0)
+
+        sim_outer_vbox.pack_start(subgroups_hbox, False, False, 0)
+        sim_frame.add(sim_outer_vbox)
         self.pack_start(sim_frame, False, False, 0)
         
         # === PREVIEW AND ACTIONS ===

@@ -89,6 +89,10 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         model.arcs = [Arc.from_dict(a_dict, places_dict, transitions_dict)
                       for a_dict in subnet_data['arcs']]
         
+        # Restore environment events so _evaluate_environment_events fires them
+        from shypn.data.pathway.pathway_data import Event as _WorkerEvent
+        model.events = [_WorkerEvent.from_dict(e) for e in subnet_data.get('events', [])]
+        
         # Apply snapshot parameters
         _apply_snapshot_to_worker_model(snapshot, model, baseline_params)
         
@@ -192,7 +196,7 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                         'time_units': 'second',
                         'n_replicates': replicates,
                         'random_seed': seed_base,
-                        'solver': 'Gillespie_SSA',
+                        'solver': 'TauLeaping_SSA',
                         'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                         'use_tau_leaping': True,
                     },
@@ -252,7 +256,11 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
             worker_compressed: list = []
             try:
                 from shypn.helpers.compressor import DeltaFilterCompressor
-                _cmp = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                _cmp = DeltaFilterCompressor(
+                    epsilon=args.get('compressor_epsilon', 0.02),
+                    max_gap=args.get('compressor_max_gap', 300.0),
+                    min_gap=args.get('compressor_min_gap', 0.0),
+                )
                 worker_compressed = _cmp.compress_batch(results)
             except Exception as _ce:
                 print(f'[WORKER] Warning: trajectory compression failed: {_ce}')
@@ -517,6 +525,9 @@ class BatchExecutor:
         max_tau: float = 0.1,
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
+        compressor_epsilon: float = 0.02,
+        compressor_min_gap: float = 0.0,
+        compressor_max_gap: float = 300.0,
     ):
         """Run batch of experiments asynchronously.
         
@@ -554,7 +565,9 @@ class BatchExecutor:
             subnet_data = {
                 'places': [p.to_dict() for p in subnet_model.places],
                 'transitions': [t.to_dict() for t in subnet_model.transitions],
-                'arcs': [a.to_dict() for a in subnet_model.arcs]
+                'arcs': [a.to_dict() for a in subnet_model.arcs],
+                # Serialize environment events so worker processes can reconstruct them
+                'events': [e.to_dict() for e in getattr(subnet_model, 'events', []) if hasattr(e, 'to_dict')],
             }
             
             if not subnet_data['transitions']:
@@ -572,7 +585,7 @@ class BatchExecutor:
         # Start execution thread with pre-extracted data
         self.executor_thread = threading.Thread(
             target=self._execute_batch,
-            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers, timeout_per_experiment, use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base),
+            args=(experiments, replicates, duration, termination_condition, progress_callback, complete_callback, experiment_result_callback, subnet_model, subnet_data, baseline_params, use_parallel, n_workers, timeout_per_experiment, use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base, compressor_epsilon, compressor_min_gap, compressor_max_gap),
             daemon=True
         )
         self.executor_thread.start()
@@ -616,6 +629,9 @@ class BatchExecutor:
         max_tau: float = 0.1,
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
+        compressor_epsilon: float = 0.02,
+        compressor_min_gap: float = 0.0,
+        compressor_max_gap: float = 300.0,
     ):
         """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
         
@@ -638,14 +654,16 @@ class BatchExecutor:
                 experiments, replicates, duration, termination_condition,
                 progress_callback, complete_callback, experiment_result_callback,
                 base_model, subnet_data, baseline_params, n_workers, timeout_per_experiment,
-                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base
+                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base,
+                compressor_epsilon, compressor_min_gap, compressor_max_gap,
             )
         else:
             self._execute_batch_sequential(
                 experiments, replicates, duration, termination_condition,
                 progress_callback, complete_callback, experiment_result_callback,
                 base_model, subnet_data, baseline_params,
-                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base
+                use_tau_leaping, tau_epsilon, max_tau, dt_manual, seed_base,
+                compressor_epsilon, compressor_min_gap, compressor_max_gap,
             )
     
     def _execute_batch_sequential(
@@ -665,6 +683,9 @@ class BatchExecutor:
         max_tau: float = 0.1,
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
+        compressor_epsilon: float = 0.02,
+        compressor_min_gap: float = 0.0,
+        compressor_max_gap: float = 300.0,
     ):
         """Execute batch sequentially in background thread.
         
@@ -748,6 +769,9 @@ class BatchExecutor:
                         max_tau=max_tau,
                         dt_manual=dt_manual,
                         seed_base=seed_base,
+                        compressor_epsilon=compressor_epsilon,
+                        compressor_min_gap=compressor_min_gap,
+                        compressor_max_gap=compressor_max_gap,
                     )
                     
                     # CRITICAL: Verify result is valid before storing
@@ -821,6 +845,9 @@ class BatchExecutor:
         max_tau: float = 0.1,
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
+        compressor_epsilon: float = 0.02,
+        compressor_min_gap: float = 0.0,
+        compressor_max_gap: float = 300.0,
     ):
         """Execute batch in parallel using multiprocessing.
         
@@ -885,6 +912,9 @@ class BatchExecutor:
                     'max_tau': max_tau,
                     'dt_manual': dt_manual,
                     'seed_base': seed_base,
+                    'compressor_epsilon': compressor_epsilon,
+                    'compressor_min_gap': compressor_min_gap,
+                    'compressor_max_gap': compressor_max_gap,
                 })
             
             # Create process pool and execute
@@ -932,17 +962,25 @@ class BatchExecutor:
 
                     # Process progress updates from workers — each message resets the
                     # heartbeat clock for that worker.
-                    while not progress_queue.empty():
-                        try:
-                            queue_idx, progress_fraction = progress_queue.get_nowait()
-                            last_heartbeat[queue_idx] = current_time  # worker is alive
-                            if progress_callback:
-                                progress_pct = int(progress_fraction * 100)
-                                progress_callback(queue_idx, "running", f"{progress_pct}%")
-                        except (OSError, ValueError) as e:
-                            import logging
-                            logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
-                            break
+                    # NOTE: progress_queue.empty() itself can raise ConnectionResetError
+                    # (subclass of OSError) when the Manager server process has exited
+                    # (e.g. all workers finished and the Manager was GC'd before this
+                    # polling loop checks one last time).  Wrap the entire drain block.
+                    try:
+                        while not progress_queue.empty():
+                            try:
+                                queue_idx, progress_fraction = progress_queue.get_nowait()
+                                last_heartbeat[queue_idx] = current_time  # worker is alive
+                                if progress_callback:
+                                    progress_pct = int(progress_fraction * 100)
+                                    progress_callback(queue_idx, "running", f"{progress_pct}%")
+                            except (OSError, EOFError, ValueError) as e:
+                                import logging
+                                logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
+                                break
+                    except (OSError, EOFError) as e:
+                        import logging
+                        logging.getLogger(__name__).debug(f"Progress queue unavailable (manager exited): {e}")
 
                     # Check completed experiments and detect zombies
                     still_running = []
@@ -1048,6 +1086,9 @@ class BatchExecutor:
         max_tau: float = 0.1,
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
+        compressor_epsilon: float = 0.02,
+        compressor_min_gap: float = 0.0,
+        compressor_max_gap: float = 300.0,
     ) -> Dict[str, Any]:
         """Run single experiment with replicates - MUST return valid result dict.
         
@@ -1117,6 +1158,10 @@ class BatchExecutor:
             # Step 3: Reconstruct arcs from serialized dicts (they need references to the copied places and transitions)
             model.arcs = [Arc.from_dict(a_dict, places_dict, transitions_dict) 
                           for a_dict in subnet_data['arcs']]
+            
+            # Step 4: Restore environment events so _evaluate_environment_events fires them
+            from shypn.data.pathway.pathway_data import Event as _ModelEvent
+            model.events = [_ModelEvent.from_dict(e) for e in subnet_data.get('events', [])]
             
             # Apply snapshot parameters to subnet model (pass None since model IS the subnet)
             self._apply_snapshot_to_model(snapshot, model, None)
@@ -1234,7 +1279,11 @@ class BatchExecutor:
             compressed_trajectories: List[Any] = []
             try:
                 from shypn.helpers.compressor import DeltaFilterCompressor
-                _compressor = DeltaFilterCompressor(epsilon=0.02, max_gap=300.0)
+                _compressor = DeltaFilterCompressor(
+                    epsilon=compressor_epsilon,
+                    max_gap=compressor_max_gap,
+                    min_gap=compressor_min_gap,
+                )
                 if results:
                     compressed_trajectories = _compressor.compress_batch(results)
             except Exception as _comp_err:
@@ -1333,7 +1382,7 @@ class BatchExecutor:
                     'time_units': 'second',
                     'n_replicates': replicates,
                     'random_seed': seed_base,
-                    'solver': 'Gillespie_SSA',
+                    'solver': 'TauLeaping_SSA',
                     'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                     'use_tau_leaping': True,
                 },

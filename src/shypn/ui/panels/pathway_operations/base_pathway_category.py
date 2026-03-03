@@ -17,12 +17,16 @@ import gi
 import logging
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from shypn.ui.category_frame import CategoryFrame
 
 
-class BasePathwayCategory(CategoryFrame, ABC):
+class _BasePathwayCategoryMeta(type(CategoryFrame), ABCMeta):
+    pass
+
+
+class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     """Base class for pathway operation category controllers.
     
     Each category is responsible for:
