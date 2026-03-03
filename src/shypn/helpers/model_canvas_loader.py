@@ -3723,7 +3723,17 @@ class ModelCanvasLoader:
             print(f"  → Converted {arcs_converted} connected arc(s) to SignalFlowArc")
         # else:
         #     print(f"Converted '{place.name}' to signal place: {type_label}")
-    
+
+        # Notify environment panel (and any other listeners)
+        try:
+            from shypn.events import EventBus
+            from shypn.core.document_id import doc_id
+            EventBus.emit('model.place.modified',
+                          {'object': place, 'object_id': place.id},
+                          document_id=doc_id(drawing_area))
+        except Exception:
+            pass
+
     def _on_remove_signal_designation(self, place, manager, drawing_area):
         """Remove signal place designation from place.
         
@@ -3791,6 +3801,16 @@ class ModelCanvasLoader:
             print(f"  → Converted {arcs_converted} SignalFlowArc(s) back to normal Arc")
         else:
             print(f"Removed signal designation from '{place.name}'")
+
+        # Notify environment panel (and any other listeners)
+        try:
+            from shypn.events import EventBus
+            from shypn.core.document_id import doc_id
+            EventBus.emit('model.place.modified',
+                          {'object': place, 'object_id': place.id},
+                          document_id=doc_id(drawing_area))
+        except Exception:
+            pass
 
     def _on_arc_edit_weight(self, arc, manager, drawing_area):
         """Quick edit arc weight.

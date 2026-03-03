@@ -31,7 +31,7 @@ class CompressedTrajectoryWriter:
         # status: completed
         # t_start: 0.0   t_end: 3600.0   t_units: s
         # n_points_original: 7200   n_points_kept: 147   compression_ratio: 49.0
-        # compressor: DeltaFilterCompressor   epsilon: 0.02   max_gap_s: 300.0
+        # compressor: DeltaFilterCompressor   epsilon: 0.02   max_gap_s: 300.0   min_gap_s: 0.0
         # generated: 2026-03-01T17:42:00Z
         # col_schema: 0:time(s) | 1:P19:ATP:place | 2:P17:GATA1_Protein_nuc:place | ...
         time,P17,P19,...
@@ -91,7 +91,8 @@ class CompressedTrajectoryWriter:
             fh.write(
                 f"# compressor: DeltaFilterCompressor   "
                 f"epsilon: {result.epsilon}   "
-                f"max_gap_s: {result.max_gap}\n"
+                f"max_gap_s: {result.max_gap}   "
+                f"min_gap_s: {result.min_gap}\n"
             )
             if extra_meta:
                 for k, v in extra_meta.items():

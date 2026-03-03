@@ -18,6 +18,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1908-1970
 """
 
 from typing import Dict, Tuple, List, Any
+import math
 import logging
 from .transition_behavior import TransitionBehavior
 from .spatial_utils import BoundaryValidator
@@ -107,14 +108,17 @@ class ImmediateBehavior(TransitionBehavior):
             
             # Check based on arc type
             # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
+            # Hybrid PN: immediate transitions are discrete — floor fractional tokens
+            # so that a place with e.g. 1.5 µM contributes 1 countable token.
+            check_tokens = math.floor(source_place.tokens)
             if kind == 'inhibitor' or arc_type == 'inhibitor' or 'inhibitor' in arc_type:
                 # Inhibitor: INVERTED check - transition DISABLED when tokens >= weight
-                if source_place.tokens >= arc.weight:
+                if check_tokens >= arc.weight:
                     return False, f"inhibited-by-{source_place.name}"
             else:
                 # Normal and test arcs: check token presence (tokens >= weight)
                 # Test arcs check enablement but don't consume (checked in fire)
-                if source_place.tokens < arc.weight:
+                if check_tokens < arc.weight:
                     return False, f"insufficient-tokens-{source_place.name}"
         
         # NEW: Validate spatial boundary constraints

@@ -194,6 +194,7 @@ class MasterPalette:
         ('topology', 'applications-science-symbolic', ''),
         ('viability', 'dialog-warning-symbolic', ''),
         ('report', 'document-properties-symbolic', ''),
+        ('environment', 'weather-clear-symbolic', ''),
     ]
 
     def __init__(self, builder: Gtk.Builder = None):

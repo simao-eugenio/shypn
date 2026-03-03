@@ -782,22 +782,48 @@ class StochasticBehavior(TransitionBehavior):
                     # If tokens < threshold, inhibitor doesn't block (continue checking other arcs)
                     continue
                 
-                # TEST ARC: Check presence only (weight), not burst requirements
-                # They don't consume tokens, so burst doesn't apply
+                # Classify arc type (inhibitor arcs already handled above via continue)
                 kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
                 arc_type = getattr(arc, 'arc_type', 'normal')
                 
                 logger.debug(f"  [BURST CALC] Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}, burst={burst}")
                 
-                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
-                    required = arc.weight  # Just check presence for catalysts
-                    logger.debug(f"    → Test/Inhibitor: checking weight={required} only")
+                if arc_type == 'test' or kind == 'test':
+                    # TEST ARC — two distinct semantic regimes depending on transition origin:
+                    #
+                    # ADAPTIVE transition in stochastic mode (Gillespie approximation for a
+                    # fundamentally continuous-rate reaction): use PRESENCE CHECK (τ_t = 1e-15).
+                    # The test arc weight W_t is a kinetic parameter for the rate function, not
+                    # an integer count requirement. Using floor() would always give 0 for
+                    # sub-1.0 µM concentrations (e.g. 0.01 µM at 0.01× IC scale), permanently
+                    # blocking adaptive transitions. Presence check is scale-invariant.
+                    #
+                    # STOCHASTIC transition (discrete, integer count semantics): use arc.weight
+                    # as the integer minimum required for the stochastic event (classic PN
+                    # semantics: M(p) >= W_t as a count, not a concentration).
+                    #
+                    # See doc/foundation/TEST_ARC_SENSING_THRESHOLD_SEPARATION.md.
+                    trans_type = getattr(self.transition, 'transition_type', 'stochastic')
+                    if trans_type == 'adaptive':
+                        # Presence check: τ_t default = 0, scale-invariant
+                        effective_tau = arc.threshold if arc.threshold is not None else 1e-15
+                        logger.debug(f"    → Test arc (adaptive): presence check τ_t={effective_tau} tokens={source_place.tokens:.4g}")
+                        if source_place.tokens < effective_tau:
+                            return False, f"catalyst-absent-{arc.source_id}"
+                    else:
+                        # Discrete stochastic: integer count semantics — use weight
+                        required = arc.threshold if arc.threshold is not None else arc.weight
+                        logger.debug(f"    → Test arc (stochastic): floor({source_place.tokens:.4g}) >= {required}?")
+                        if math.floor(source_place.tokens) < required:
+                            return False, f"insufficient-catalyst-{arc.source_id}"
                 else:
-                    required = arc.weight * burst  # Normal arcs (including SignalFlowArcs) need burst tokens
+                    # NORMAL ARC: Check sufficient tokens for burst firing.
+                    # Hybrid PN: stochastic transitions are discrete — floor fractional tokens
+                    # so that a place with e.g. 1.5 µM contributes 1 countable token.
+                    required = arc.weight * burst
                     logger.debug(f"    → Normal: checking burst requirement={required}")
-                
-                if source_place.tokens < required:
-                    return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+                    if math.floor(source_place.tokens) < required:
+                        return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
         if is_source:
             return True, f"enabled-source (burst={self._sampled_burst if self._sampled_burst else self.max_burst})"

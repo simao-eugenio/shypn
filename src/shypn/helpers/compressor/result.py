@@ -40,6 +40,11 @@ class CompressionResult:
         n_kept:       Number of time-points after compression.
         epsilon:      Normalised-change threshold used by the compressor.
         max_gap:      Maximum heartbeat interval (seconds) used by the compressor.
+        min_gap:      Minimum interval (seconds) enforced between any two kept
+                      points.  ``0.0`` disables the floor (default, backward
+                      compatible).  Useful for stochastic SSA trajectories where
+                      fast-transient channels (nuclear mRNAs) would otherwise
+                      trigger *epsilon* at nearly every raw step.
     """
 
     replicate_id: int
@@ -51,6 +56,8 @@ class CompressionResult:
     n_kept: int
     epsilon: float
     max_gap: float
+    #: Minimum interval (seconds) between any two kept points (0 = disabled).
+    min_gap: float = 0.0
 
     # ── derived properties ────────────────────────────────────────────────────
 

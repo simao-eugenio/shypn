@@ -68,7 +68,7 @@ class DocumentPanelSetup:
     # ------------------------------------------------------------------
 
     def build(self, overlay_widget) -> tuple:
-        """Run all 8 per-document setup steps in order.
+        """Run all 9 per-document setup steps in order.
 
         Returns:
             ``(swissknife_palette, simulation_controller)`` — both are needed
@@ -82,6 +82,7 @@ class DocumentPanelSetup:
         self._setup_document_pathway_panel(controller)
         self._setup_document_analyses_panel()
         self._setup_document_topology_panel()
+        self._setup_document_environment_panel()
         palette_manager = self._L.palette_managers[self._da]
         self._wire_legacy_palettes(overlay_widget, palette_manager)
         return swissknife, controller
@@ -502,7 +503,49 @@ class DocumentPanelSetup:
             topology_panel_loader.widget.show_all()
 
     # ------------------------------------------------------------------
-    # Step 8 – Legacy palettes + final data_collector wiring
+    # Step 8 – Environment Panel
+    # ------------------------------------------------------------------
+
+    def _setup_document_environment_panel(self):
+        """Create the per-document Environment Panel (signal places + events)."""
+        L, da = self._L, self._da
+
+        if hasattr(L.overlay_managers[da], 'environment_panel_loader'):
+            return
+
+        from shypn.helpers.environment_panel_loader import EnvironmentPanelLoader
+
+        canvas_manager = L.overlay_managers[da].canvas_manager
+        environment_panel_loader = EnvironmentPanelLoader(
+            model=canvas_manager,
+            parent_window=getattr(L, 'main_window', None),
+            document_id=doc_id(da),
+            drawing_area=da
+        )
+        environment_panel_loader.initialize()
+        environment_panel_loader.set_model_canvas_loader(L)
+
+        if hasattr(L, 'environment_panel_container'):
+            environment_panel_loader.parent_container = L.environment_panel_container
+        if hasattr(L, 'left_dock_stack'):
+            environment_panel_loader._stack = L.left_dock_stack
+            environment_panel_loader._stack_panel_name = 'environment'
+        if hasattr(L, 'environment_float_callback'):
+            environment_panel_loader.on_float_callback = L.environment_float_callback
+        if hasattr(L, 'environment_attach_callback'):
+            environment_panel_loader.on_attach_callback = L.environment_attach_callback
+
+        L.overlay_managers[da].environment_panel_loader = environment_panel_loader
+
+        if environment_panel_loader.panel and getattr(L, 'environment_panel_container', None):
+            parent = environment_panel_loader.widget.get_parent()
+            if parent:
+                parent.remove(environment_panel_loader.widget)
+            L.environment_panel_container.pack_start(environment_panel_loader.widget, True, True, 0)
+            environment_panel_loader.widget.show_all()
+
+    # ------------------------------------------------------------------
+    # Step 9 – Legacy palettes + final data_collector wiring
     # ------------------------------------------------------------------
 
     def _wire_legacy_palettes(self, overlay_widget, palette_manager):

@@ -22,6 +22,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1972-2099
 
 from typing import Dict, Tuple, List, Any, Optional
 import logging
+import math
 from .transition_behavior import TransitionBehavior
 from .spatial_utils import BoundaryValidator
 
@@ -74,10 +75,16 @@ class TimedBehavior(TransitionBehavior):
         #   2. Properties dict: transition.properties['earliest_time'] or ['earliest'] (legacy)
         #   3. Fallback to rate as delay (backward compatibility)
         
-        # Try direct attributes first (JSON loads these at top level)
-        if hasattr(transition, 'earliest_time') or hasattr(transition, 'latest_time'):
-            self.earliest = float(getattr(transition, 'earliest_time', 0.0))
-            self.latest = float(getattr(transition, 'latest_time', float('inf')))
+        # Try direct attributes first (JSON loads these at top level).
+        # IMPORTANT: The .shy serializer writes null for unset timing fields, so
+        # attributes like transition.earliest_time CAN exist with value None.
+        # We must check the VALUE, NOT just hasattr(), otherwise 'None or 0.0'
+        # silently sets earliest=0 → timed transition fires every step like immediate.
+        _earliest_attr = getattr(transition, 'earliest_time', None)
+        _latest_attr = getattr(transition, 'latest_time', None)
+        if _earliest_attr is not None or _latest_attr is not None:
+            self.earliest = float(_earliest_attr) if _earliest_attr is not None else 0.0
+            self.latest = float(_latest_attr) if _latest_attr is not None else float('inf')
         else:
             # Try properties dictionary (legacy or programmatically created)
             props = getattr(transition, 'properties', {})
@@ -195,8 +202,10 @@ class TimedBehavior(TransitionBehavior):
                 else:
                     required = arc.weight  # Normal and SignalFlowArcs need full weight
                     logger.debug(f"    → Normal arc: will consume tokens")
-                
-                if source_place.tokens < required:
+
+                # Hybrid PN: timed transitions are discrete — floor fractional tokens
+                # so that a place with e.g. 1.5 µM contributes 1 countable token.
+                if math.floor(source_place.tokens) < required:
                     return (False, f'insufficient-tokens-P{arc.source_id}')
         
         # NEW: Validate spatial boundary constraints

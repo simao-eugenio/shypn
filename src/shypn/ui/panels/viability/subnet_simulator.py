@@ -185,6 +185,9 @@ class SubnetSimulator:
         self.subnet_model.places = subnet['places']
         self.subnet_model.transitions = subnet['transitions']
         self.subnet_model.arcs = subnet['arcs']
+        # Carry environment events from the full model into the subnet model so
+        # the SimulationController's _evaluate_environment_events picks them up.
+        self.subnet_model.events = list(getattr(base_model, 'events', []) or [])
         
         # Store initial markings
         self.initial_markings = {}

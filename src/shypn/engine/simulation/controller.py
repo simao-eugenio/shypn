@@ -33,6 +33,7 @@ the new architecture.
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
 import logging
+import math
 import random
 import traceback
 from typing import Callable, List, Optional, Dict, Tuple, Any, Set
@@ -261,7 +262,19 @@ class SimulationController(AbstractSimulationController):
         
         # Continuous execution strategy (Phase 2.3.1 extraction)
         self._continuous_executor = ContinuousExecutor(self)
-        
+
+        # ODE acceleration: C-compiled RHS + scipy.solve_ivp (optional).
+        # Lazily initialised on first call to _execute_continuous_transitions.
+        # Falls back to the Python per-transition path when None or not ready.
+        self._ode_accelerator: Optional[Any] = None
+        self._ode_accel_tried: bool = False   # avoid retrying after a failure
+
+        # Propensity acceleration: C-compiled propensity vector for tau-leaping.
+        # Lazily initialised on the first tau-leaping step.
+        # Replaces _evaluate_rate_at_enablement × N × 2 Python eval calls per step.
+        self._propensity_accelerator: Optional[Any] = None
+        self._propensity_accel_tried: bool = False
+
         # Viability checking strategy (Phase 2.3.2 extraction, injectable for testing)
         _vc_factory = viability_checker_factory or ViabilityChecker
         self._viability_checker = _vc_factory(self)
@@ -324,12 +337,25 @@ class SimulationController(AbstractSimulationController):
         self.transition_states.clear()
         self._round_robin_index = 0
         
+        # Reset per-run one-shot warning flags
+        self._livelock_warned = False
+        if hasattr(self, '_large_timestep_warned'):
+            del self._large_timestep_warned
+        
         # Clear thermodynamic validation results
         self.thermodynamic_results = None
         
         # Reset τ-leaping engine (if it exists)
         if hasattr(self, '_tau_leaping_engine'):
             delattr(self, '_tau_leaping_engine')
+
+        # Reset ODE accelerator so it is rebuilt for the new model
+        self._ode_accelerator = None
+        self._ode_accel_tried = False
+
+        # Reset propensity accelerator so it is rebuilt for the new model
+        self._propensity_accelerator = None
+        self._propensity_accel_tried = False
         
         # Reinitialize model adapter with current model
         self.model_adapter = ModelAdapter(self.model, controller=self)
@@ -889,36 +915,50 @@ class SimulationController(AbstractSimulationController):
             # Create threshold evaluator for dynamic threshold support
             evaluator = ThresholdEvaluator(behavior.model)
             context = {'time': self.time}
-            
+
+            # Hybrid PN semantics: discrete transitions (immediate, timed, stochastic)
+            # operate on integer token counts — use floor(tokens) so fractional
+            # concentrations in continuous places are treated as whole-unit counts.
+            # Continuous transitions keep using raw float values for ODE integration.
+            is_discrete_trans = getattr(transition, 'transition_type', 'continuous') in (
+                'immediate', 'timed', 'stochastic'
+            )
+
             for arc in input_arcs:
                 # Check ALL arc types for enablement (normal, test, inhibitor)
                 source_place = behavior._get_place(arc.source_id)
                 if source_place is None:
                     locally_enabled = False
                     break
-                
-                # Evaluate effective threshold (supersedes weight if threshold is set)
-                # This supports dynamic thresholds like "ATP * 0.5" (Example 16)
+
+                # Evaluate effective threshold (τ_t / threshold supersedes weight if set)
                 effective_threshold = evaluator.evaluate(arc, context)
-                
-                # Test arcs (catalysts) use lower threshold for fractional enablement
-                # Allows stochastic reactions to fire even with sub-unity concentrations
-                # This prevents "oscillation trap" where smooth production below 1.0
-                # prevents stochastic transitions from ever enabling
-                if hasattr(arc, 'arc_type') and arc.arc_type == 'test':
-                    # Test arcs: Catalyst presence (lower threshold for fractional concentrations)
-                    effective_threshold = min(effective_threshold, 0.1)  # At least 10% of threshold
-                
+
+                # Test arc sensing threshold semantics (τ_t vs W_t separation).
+                # For continuous/adaptive transitions:
+                #   - If arc.threshold is explicitly set → evaluator already returned it → use it
+                #   - If arc.threshold is None → default τ_t = 0 (presence check, scale-invariant)
+                #     The weight W_t is a kinetic parameter for Φ(t), NOT an enablement floor.
+                # For discrete transitions (stochastic, timed, immediate): integer count semantics
+                #   → evaluator falls back to arc.weight, which is the correct integer minimum.
+                # See doc/foundation/TEST_ARC_SENSING_THRESHOLD_SEPARATION.md for derivation.
+                if hasattr(arc, 'arc_type') and arc.arc_type == 'test' and not is_discrete_trans:
+                    if getattr(arc, 'threshold', None) is None:
+                        effective_threshold = 1e-15  # default τ_t = 0, presence check
+
+                # Hybrid PN: compute tokens visible to this transition type
+                check_tokens = math.floor(source_place.tokens) if is_discrete_trans else source_place.tokens
+
                 # Check based on arc type
                 if isinstance(arc, (InhibitorArc, CurvedInhibitorArc)):
                     # Inhibitor arcs: INVERTED check (enabled when tokens < threshold)
                     # Transition DISABLED when place has too many tokens (negative feedback)
-                    if source_place.tokens >= effective_threshold:
+                    if check_tokens >= effective_threshold:
                         locally_enabled = False
                         break
                 else:
                     # Normal/Test arcs: Standard check (enabled when tokens >= threshold)
-                    if source_place.tokens < effective_threshold:
+                    if check_tokens < effective_threshold:
                         locally_enabled = False
                         break
             state = self._get_or_create_state(transition)
@@ -1198,7 +1238,10 @@ class SimulationController(AbstractSimulationController):
 
         # Update enablement states
         self._update_enablement_states()
-        
+
+        # === PHASE 0b: Evaluate environment events ===
+        self._evaluate_environment_events()
+
         # === PHASE 1: Execute immediate transitions ===
         immediate_fired = self._exhaust_immediate_transitions()
         
@@ -1215,6 +1258,109 @@ class SimulationController(AbstractSimulationController):
         should_continue = self._finalize_step(time_step, tau_leaping_advanced_time)
         
         return should_continue
+
+    def _evaluate_environment_events(self) -> None:
+        """Evaluate user-defined environment events and fire assignments.
+
+        Runs once per simulation step (Phase 0b, after enablement update).
+
+        Event semantics:
+        - Trigger: Python expression evaluated in namespace where model place names
+          are bound to their current token count, and ``t`` is the simulation time.
+        - Edge-triggered: fires exactly once per True→False→True transition of
+          the trigger condition; uses ``self._event_last_triggered`` dict.
+        - Assignments: each key is a place name or id; value is a Python expression
+          giving the new token count (floats allowed for continuous places).
+        - Delay: if > 0, assignment is deferred by ``delay`` time units via
+          ``self._event_pending_assignments`` list.
+
+        Gracefully skips any event whose trigger or assignment fails to evaluate.
+        """
+        # Gather all events from model.events (user-defined) plus pathway_data.events (SBML imports)
+        all_events: list = []
+        if hasattr(self.model, 'events'):
+            all_events.extend(self.model.events)
+        pd = getattr(self, 'pathway_data', None)
+        if pd is not None and hasattr(pd, 'events'):
+            all_events.extend(pd.events)
+
+        if not all_events:
+            return
+
+        # Lazy-init tracking dicts
+        if not hasattr(self, '_event_last_triggered'):
+            self._event_last_triggered: dict = {}
+        if not hasattr(self, '_event_pending_assignments'):
+            self._event_pending_assignments: list = []  # [(fire_at_time, {place_name: expr})]
+
+        lg = logging.getLogger(__name__)
+
+        # Build evaluation namespace: place names/ids → current tokens, 't' → time
+        ns: dict = {'t': self.time}
+        for p in self.model.places:
+            val = float(p.tokens) if hasattr(p, 'tokens') else 0.0
+            ns[p.name] = val
+            ns[str(p.id)] = val
+
+        # --- Process pending deferred assignments ---
+        remaining = []
+        for fire_at, assignments in self._event_pending_assignments:
+            if self.time >= fire_at:
+                self._apply_event_assignments(assignments, ns, lg)
+            else:
+                remaining.append((fire_at, assignments))
+        self._event_pending_assignments = remaining
+
+        # --- Evaluate active event triggers ---
+        for event in all_events:
+            trigger_expr = getattr(event, 'trigger', '')
+            if not trigger_expr:
+                continue
+            try:
+                fired = bool(eval(trigger_expr, {"__builtins__": {}}, ns))  # noqa: S307
+            except Exception as exc:
+                lg.debug(f"[ENV_EVENT] trigger eval failed for event {event.id!r}: {exc}")
+                continue
+
+            prev = self._event_last_triggered.get(event.id, False)
+            self._event_last_triggered[event.id] = fired
+
+            if fired and not prev:
+                # Rising edge → schedule or immediately apply assignments
+                delay = float(getattr(event, 'delay', 0.0))
+                assignments = dict(getattr(event, 'assignments', {}))
+                if delay > 0.0:
+                    self._event_pending_assignments.append((self.time + delay, assignments))
+                    lg.debug(f"[ENV_EVENT] event {event.id!r} triggered, deferred by {delay}")
+                else:
+                    self._apply_event_assignments(assignments, ns, lg)
+                    lg.debug(f"[ENV_EVENT] event {event.id!r} triggered, applied immediately")
+
+    def _apply_event_assignments(self, assignments: dict, ns: dict, lg: Any) -> None:
+        """Apply a set of event assignments to place tokens.
+
+        Args:
+            assignments: Dict mapping place name/id → value expression string
+            ns: Evaluation namespace (place names → values, 't' → time)
+            lg: Logger instance
+        """
+        place_by_name = {p.name: p for p in self.model.places}
+        place_by_id = {str(p.id): p for p in self.model.places}
+
+        for target, expr in assignments.items():
+            # Resolve target place
+            place = place_by_name.get(target) or place_by_id.get(str(target))
+            if place is None:
+                lg.debug(f"[ENV_EVENT] assignment target {target!r} not found in model")
+                continue
+            try:
+                new_val = float(eval(str(expr), {"__builtins__": {}}, ns))  # noqa: S307
+                place.tokens = new_val
+                # Update namespace so later assignments in same event see the change
+                ns[place.name] = new_val
+                ns[str(place.id)] = new_val
+            except Exception as exc:
+                lg.debug(f"[ENV_EVENT] assignment eval failed for {target!r}={expr!r}: {exc}")
 
     def _exhaust_immediate_transitions(self) -> int:
         """Execute all enabled immediate transitions in zero time.
@@ -1240,19 +1386,26 @@ class SimulationController(AbstractSimulationController):
             fired_sequence.append(transition.id)
             self._update_enablement_states()
             
-            # Detect immediate livelock: if we've fired more than 20 times, check for cycles
+            # Detect immediate livelock: if we've fired more than 20 times, check for cycles.
+            # A true livelock requires ≥ 2 distinct transitions forming a cycle that
+            # restores tokens.  A single transition draining its own input place will
+            # always produce a "T1 → T1 → …" sequence but will naturally terminate
+            # once the place is empty — that is NOT a livelock.
             if immediate_fired_total > 20:
                 # Check if we're in a repeating cycle (last 10 match previous 10)
                 if len(fired_sequence) >= 20:
                     recent = fired_sequence[-10:]
                     previous = fired_sequence[-20:-10]
-                    if recent == previous:
-                        logger = logging.getLogger(__name__)
-                        logger.error(
-                            f"LIVELOCK DETECTED: Immediate transitions forming infinite cycle: "
-                            f"{' → '.join(recent)}. "
-                            f"Consider using continuous transitions or adding priorities/guards."
-                        )
+                    if recent == previous and len(set(recent)) >= 2:
+                        # Only log once per simulation run to avoid console spam
+                        if not getattr(self, '_livelock_warned', False):
+                            self._livelock_warned = True
+                            logger = logging.getLogger(__name__)
+                            logger.error(
+                                f"LIVELOCK DETECTED: Immediate transitions forming infinite cycle: "
+                                f"{' → '.join(recent)}. "
+                                f"Consider using continuous transitions or adding priorities/guards."
+                            )
                         # Stop immediate phase to prevent UI freeze
                         break
         
@@ -1330,10 +1483,12 @@ class SimulationController(AbstractSimulationController):
                                     target_place.set_tokens(target_place.tokens + arc.weight)
                                     produced_map[arc.target_id] = arc.weight
                         
-                        # Clear enablement state
+                        # Clear enablement state (delay clock must restart after firing)
                         state = self._get_or_create_state(transition)
                         state.enablement_time = None
                         state.scheduled_time = None
+                        if hasattr(behavior, 'clear_enablement'):
+                            behavior.clear_enablement()
                         
                         # Increment firing count for statistics
                         transition.firing_count += 1
@@ -1358,15 +1513,143 @@ class SimulationController(AbstractSimulationController):
         
         return window_crossing_fired
 
+    def _has_continuous_transitions(self) -> bool:
+        """Return True if the model has at least one continuous transition."""
+        return any(
+            getattr(t, 'transition_type', '') == 'continuous'
+            for t in self.model.transitions
+        )
+
+    def _ensure_ode_accelerator(self) -> None:
+        """Lazily build the ODE accelerator for this model (called once)."""
+        if self._ode_accel_tried:
+            return
+        self._ode_accel_tried = True
+        try:
+            from shypn.engine.acceleration import OdeSystemAccelerator
+            accel = OdeSystemAccelerator(self.model, self._get_behavior)
+            if accel.build():
+                self._ode_accelerator = accel
+                _log = logging.getLogger(__name__)
+                _log.info(
+                    "ODE acceleration active (%d ODE places, %d extras)",
+                    accel._n_ode, accel._n_extra,
+                )
+            else:
+                _log = logging.getLogger(__name__)
+                _log.info("ODE acceleration skipped (no continuous ODE places)")
+        except Exception as exc:
+            _log = logging.getLogger(__name__)
+            _log.warning("ODE acceleration unavailable: %s", exc)
+
+    def _ensure_propensity_accelerator(self) -> None:
+        """Lazily build the propensity accelerator for stochastic transitions.
+
+        Called on the first tau-leaping step.  Compiles a C function that
+        evaluates the entire propensity vector in one call so that both
+        ``LeapSelector`` and ``TauLeapingEngine._sample_firings`` avoid the
+        per-transition Python ``eval()`` / dict-build overhead.
+        """
+        if self._propensity_accel_tried:
+            return
+        self._propensity_accel_tried = True
+        try:
+            from shypn.engine.acceleration import PropensityAccelerator
+            accel = PropensityAccelerator(self.model, self._get_behavior)
+            if accel.build():
+                self._propensity_accelerator = accel
+                _log = logging.getLogger(__name__)
+                _log.info(
+                    "Propensity acceleration active (%d stochastic transitions, "
+                    "%d places)",
+                    accel._n_transitions, accel._n_places,
+                )
+            else:
+                _log = logging.getLogger(__name__)
+                _log.info(
+                    "Propensity acceleration skipped (no stochastic transitions)"
+                )
+        except Exception as exc:
+            _log = logging.getLogger(__name__)
+            _log.warning("Propensity acceleration unavailable: %s", exc)
+
     def _execute_continuous_transitions(self, time_step: float) -> int:
         """Execute continuous transitions with conflict resolution.
-        
+
+        When the ODE accelerator is ready, uses a single scipy.solve_ivp
+        call over the full time_step for all continuous ODE places
+        (compiled C RHS — no Python eval/dict overhead per transition).
+        Falls back to the per-transition Python path on any failure.
+
         Args:
             time_step: The time increment for this step
-            
+
         Returns:
             int: Number of continuous transitions that successfully integrated
-        """
+        """  # noqa: D401
+        # ── Attempt accelerated path ──────────────────────────────────────
+        self._ensure_ode_accelerator()
+        accel = self._ode_accelerator
+        if accel is not None and accel.ready and self._has_continuous_transitions():
+            try:
+                t_start = self.time
+                t_end   = self.time + time_step
+                ok = accel.integrate(t_start, t_end)
+                if ok:
+                    # Count pure-continuous firings and update firing_count
+                    fired_count = 0
+                    for t in self.model.transitions:
+                        if getattr(t, 'transition_type', '') == 'continuous':
+                            behavior = self._get_behavior(t)
+                            if behavior and behavior.can_fire()[0]:
+                                fired_count += 1
+                                t.firing_count += time_step
+                    # ── Still run the Python path for adaptive transitions
+                    # that are currently in continuous mode.  The ODE system
+                    # only includes transition_type=='continuous' nodes; any
+                    # adaptive transition in continuous mode must still be
+                    # executed so tau-leaping (Phase 4) sees correct tokens.
+                    adaptive_continuous = []
+                    for t in self.model.transitions:
+                        if t.transition_type == 'adaptive':
+                            behavior = self._get_behavior(t)
+                            if behavior and hasattr(behavior, 'get_current_mode'):
+                                current_mode = behavior.get_current_mode()
+                                if current_mode is None and hasattr(behavior, '_select_mode'):
+                                    current_mode = behavior._select_mode()
+                                if current_mode == 'continuous':
+                                    adaptive_continuous.append(t)
+                            elif behavior:
+                                from shypn.engine.adaptive_hybrid_behavior import AdaptiveHybridBehavior
+                                if isinstance(behavior, AdaptiveHybridBehavior):
+                                    if behavior._select_mode() == 'continuous':
+                                        adaptive_continuous.append(t)
+                    if adaptive_continuous:
+                        for t in adaptive_continuous:
+                            behavior = self._get_behavior(t)
+                            can_flow, _ = behavior.can_fire()
+                            if can_flow:
+                                ia = behavior.get_input_arcs()
+                                oa = behavior.get_output_arcs()
+                                success, details = behavior.integrate_step(
+                                    dt=time_step, input_arcs=ia, output_arcs=oa
+                                )
+                                if success:
+                                    fired_count += 1
+                                    rate = details.get('rate', 0.0) if details else 0.0
+                                    t.firing_count += abs(rate) * time_step
+                                    if self.data_collector is not None and \
+                                            hasattr(self.data_collector, 'on_transition_fired'):
+                                        self.data_collector.on_transition_fired(t, self.time, details)
+                    return fired_count
+            except Exception as exc:
+                _log = logging.getLogger(__name__)
+                _log.warning(
+                    "ODE accelerator step failed (%s) — falling back to Python",
+                    exc,
+                )
+                # Fall through to Python path
+        # ── Python per-transition fallback (original implementation) ─────
         # Group continuous transitions by locality conflicts and apply firing policies
         # NOTE: Include adaptive transitions ONLY if they're in continuous mode
         continuous_transitions = []
@@ -1475,6 +1758,17 @@ class SimulationController(AbstractSimulationController):
             transition = self._select_transition(enabled_timed)
             self._fire_transition(transition)
             discrete_fired = True
+            # Reset the delay clock so the transition must wait another [earliest, latest]
+            # interval before it can fire again.  Without this, state.enablement_time
+            # stays at the original value and elapsed keeps growing, so can_fire()
+            # returns True on every subsequent step — identical to continuous behaviour.
+            _tid = id(transition)
+            if _tid in self.transition_states:
+                self.transition_states[_tid].enablement_time = None
+                self.transition_states[_tid].scheduled_time = None
+            _behavior = self.behavior_cache.get(_tid)
+            if _behavior is not None and hasattr(_behavior, 'clear_enablement'):
+                _behavior.clear_enablement()
             self._update_enablement_states()
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
@@ -2299,7 +2593,14 @@ class SimulationController(AbstractSimulationController):
         
         # Update model reference
         self.model = new_model
-        
+
+        # Reset accelerators — they are compiled for a specific model structure
+        # and must be rebuilt when the model changes.
+        self._ode_accelerator = None
+        self._ode_accel_tried = False
+        self._propensity_accelerator = None
+        self._propensity_accel_tried = False
+
         # Recreate model adapter with new model
         self.model_adapter = ModelAdapter(new_model, controller=self)
         

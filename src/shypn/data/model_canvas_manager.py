@@ -187,6 +187,10 @@ class ModelCanvasManager:
         
         # Observer pattern for model changes
         self._observers = []  # List of observer callbacks
+
+        # Environment events (user-defined, model-level, not per-SBML-import)
+        # Each element is a shypn.data.pathway.pathway_data.Event instance
+        self.events: list = []
         
         # Arc geometry service (Phase 6 extraction — pure math + arc mutation)
         from shypn.core.services.arc_geometry_service import ArcGeometryService
@@ -936,7 +940,7 @@ class ModelCanvasManager:
             except (AttributeError, TypeError, RuntimeError) as e:
                 logger.warning(f"[LOAD_OBJECTS] Failed to refresh viability panel: {e}")
     
-    def load_objects(self, places=None, transitions=None, arcs=None, modules=None):
+    def load_objects(self, places=None, transitions=None, arcs=None, modules=None, events=None):
         """Load objects into the model in bulk (for import/deserialize operations).
         
         This method ensures all objects are added through proper channels with
@@ -950,6 +954,7 @@ class ModelCanvasManager:
             transitions: List of Transition objects to add (default: None = no transitions)
             arcs: List of Arc objects to add (default: None = no arcs)
             modules: Dict of Module objects to add (default: None = no modules)
+            events: List of Event objects to load (default: None = keep existing)
         
         Example:
             manager.load_objects(
@@ -967,6 +972,10 @@ class ModelCanvasManager:
         transitions = transitions or []
         arcs = arcs or []
         modules = modules or {}
+
+        # Load environment events (replace current list if provided)
+        if events is not None:
+            self.events = list(events)
         
         # Orchestrate loading workflow using extracted helper methods
         self._load_modules(modules)
