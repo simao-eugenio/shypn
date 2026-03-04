@@ -107,7 +107,7 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         runner = ReplicateRunner(model)
         results = runner.run_replicates(
             n=replicates,
-            use_parallel=False,  # Disable stochastic parallelism in workers (ThreadPoolExecutor deadlocks in forked processes)
+            use_parallel=True,   # Safe in forked workers: Phase 4b replaced ThreadPoolExecutor with vectorised numpy (no deadlock risk)
             use_tau_leaping=use_tau_leaping,
             duration=duration,
             termination_condition=termination_condition,
@@ -956,7 +956,7 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with multiprocessing.Pool(processes=n_workers) as pool:
+            with multiprocessing.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1: recycle each worker after one experiment (prevents memory accumulation in long runs)
                 # Submit all experiments with start time tracking
                 async_results = []
                 for args in experiment_args:

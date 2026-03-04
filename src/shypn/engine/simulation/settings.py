@@ -43,7 +43,7 @@ class SimulationSettings:
     DEFAULT_MAX_TAU = 0.1  # Maximum leap size (seconds) - allows reasonable simulation speed
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
-    DEFAULT_USE_JIT_KERNEL = False           # Phase 6: Numba JIT τ-step kernel (opt-in; requires numba>=0.59)
+    DEFAULT_USE_JIT_KERNEL = True            # Phase 6: Numba JIT τ-step kernel — enabled (numba 0.64 installed, kernel cached)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
     # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
