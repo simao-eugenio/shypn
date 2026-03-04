@@ -36,25 +36,57 @@ class SearchableComboBox(Gtk.ComboBox):
         self._store = Gtk.ListStore(str, str)   # (id, display_text)
         super().__init__(model=self._store, has_entry=True)
         self.set_id_column(self._COL_ID)
-        self.set_entry_text_column(self._COL_TEXT)  # also wires built-in popup completion
+        self.set_entry_text_column(self._COL_TEXT)
 
-        # Improve built-in completion: inline prefix fill + popup list
         entry = self.get_child()
-        entry.set_placeholder_text("Search…")
-        completion = entry.get_completion()
-        if completion is None:
-            # Fallback: GTK did not auto-create one via set_entry_text_column
-            completion = Gtk.EntryCompletion()
-            completion.set_model(self._store)
-            completion.set_text_column(self._COL_TEXT)
-            entry.set_completion(completion)
-        completion.set_minimum_key_length(0)
-        completion.set_inline_completion(True)
-        completion.set_inline_selection(True)
+        entry.set_placeholder_text("Type to search…")
+
+        # Build EntryCompletion with case-insensitive substring matching.
+        # GTK may auto-create a completion via set_entry_text_column; replace
+        # it unconditionally so we control the match function.
+        completion = Gtk.EntryCompletion()
+        completion.set_model(self._store)
+        completion.set_text_column(self._COL_TEXT)
+        # Substring, case-insensitive: "temp" matches "Temperature (K)"
+        completion.set_match_func(self._match_func)
+        completion.set_minimum_key_length(1)
+        completion.set_inline_completion(False)   # don't auto-fill — confusing for substrings
         completion.set_popup_completion(True)
+        # When user picks an entry from the completion popup, sync the combo
+        completion.connect("match-selected", self._on_completion_match_selected)
+        entry.set_completion(completion)
+
+        # Also handle Enter: select the first substring match in the store
+        entry.connect("activate", self._on_entry_activate)
 
         if tooltip_text:
             self.set_tooltip_text(tooltip_text)
+
+    # ── Internal helpers ───────────────────────────────────────────────────
+
+    def _match_func(self, completion, key, tree_iter):
+        """Case-insensitive substring match for EntryCompletion."""
+        model = completion.get_model()
+        text = model[tree_iter][self._COL_TEXT]
+        if not text:
+            return False
+        return key.lower() in text.lower()
+
+    def _on_completion_match_selected(self, completion, model, tree_iter):
+        """Sync the ComboBox active item when a completion entry is clicked."""
+        item_id = model[tree_iter][self._COL_ID]
+        self.set_active_id(item_id)
+        return True   # prevent default (which would double-set entry text)
+
+    def _on_entry_activate(self, entry):
+        """On Enter, select the first store row whose text contains the typed key."""
+        key = entry.get_text().lower()
+        if not key:
+            return
+        for row in self._store:
+            if key in row[self._COL_TEXT].lower():
+                self.set_active_id(row[self._COL_ID])
+                break
 
     # ── ComboBoxText-compatible API ────────────────────────────────────────
 
