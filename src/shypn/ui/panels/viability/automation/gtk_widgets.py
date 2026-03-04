@@ -48,8 +48,9 @@ class SearchableComboBox(Gtk.ComboBox):
         entry.connect("changed", self._on_entry_changed)
         entry.connect("activate", self._on_entry_activate)
 
-        # Catch when the user picks an item from the dropdown popup
-        self.connect("changed", self._on_combo_changed)
+        # NOTE: do NOT connect combo.changed — GTK fires it during refilter(),
+        # which would call _commit() after every keystroke and block typing.
+        # Popup-click selections are detected inside _on_entry_changed instead.
 
         if tooltip_text:
             self.set_tooltip_text(tooltip_text)
@@ -65,25 +66,26 @@ class SearchableComboBox(Gtk.ComboBox):
     # ── signal handlers ────────────────────────────────────────────────────
 
     def _on_entry_changed(self, entry):
-        """User is typing: refilter and (re-)open the popup."""
-        if self._busy:
-            return
-        self._filter_key = entry.get_text()
-        self._filter.refilter()
-        if self._filter_key:
-            # Defer popup() so it doesn't fight the keypress event
-            GLib.idle_add(self.popup)
+        """Handle all entry text changes.
 
-    def _on_combo_changed(self, combo):
-        """User clicked an item in the dropdown: commit that selection."""
+        Two cases:
+        - User typed a partial string → refilter and open popup.
+        - GTK filled the entry from a popup click (exact store match) → commit.
+        """
         if self._busy:
             return
-        tree_iter = self.get_active_iter()
-        if tree_iter is None:
-            return
-        item_id   = self._filter[tree_iter][self._COL_ID]
-        item_text = self._filter[tree_iter][self._COL_TEXT]
-        self._commit(item_id, item_text)
+        text = entry.get_text()
+        # Check for exact match: GTK sets the entry to the full item text when
+        # the user clicks a row in the popup.
+        for row in self._store:
+            if row[self._COL_TEXT] == text:
+                self._commit(row[self._COL_ID], row[self._COL_TEXT])
+                return
+        # Partial text — just filter and open the popup
+        self._filter_key = text
+        self._filter.refilter()
+        if text:
+            GLib.idle_add(self.popup)
 
     def _on_entry_activate(self, entry):
         """Enter key: commit the first store row matching the typed text."""
