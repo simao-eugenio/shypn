@@ -65,6 +65,36 @@ def _source_hash(c_source: str) -> str:
     return hashlib.sha256(c_source.encode()).hexdigest()[:16]
 
 
+_ELF_MAGIC = b"\x7fELF"
+
+
+def _is_valid_elf(path: Path) -> bool:
+    """Return True iff *path* looks like a valid ELF shared library.
+
+    Checks:
+    - File exists and is non-empty
+    - Starts with the ELF magic bytes (\x7fELF)
+    - At least one PT_LOAD segment is present (offset 0x18-0x1f in ELF header
+      points to program-header table; we just confirm the file is large enough
+      to plausibly contain one — 4 KB minimum for a real .so)
+
+    The two failure modes seen in practice are:
+    - ``file too short``                  → file exists but has 0–few bytes
+    - ``object file has no loadable segments`` → partial ELF, no PT_LOAD
+
+    Both are caught by the ELF-magic + size check below.
+    """
+    try:
+        size = path.stat().st_size
+        if size < 4096:
+            return False
+        with path.open("rb") as fh:
+            magic = fh.read(4)
+        return magic == _ELF_MAGIC
+    except OSError:
+        return False
+
+
 def _cache_dir(model_hash: str) -> Path:
     # Include the flags tag so any change to _GCC_FLAGS causes a fresh directory
     # (and therefore a fresh compilation) without manual cache clearing.
@@ -117,19 +147,15 @@ def compile_ode_rhs(
     so = _so_path(model_hash)
 
     if so.exists() and not force:
-        _MIN_SO_BYTES = 4096
-        so_size = so.stat().st_size
-        if so_size < _MIN_SO_BYTES:
-            logger.warning(
-                "ODE accel: cached .so at %s is suspiciously small (%d bytes) — "
-                "likely a truncated write from a previous interrupted build. "
-                "Deleting and recompiling.",
-                so, so_size,
-            )
-            so.unlink()
-        else:
+        if _is_valid_elf(so):
             logger.debug("ODE accel: using cached .so at %s", so)
             return so
+        logger.warning(
+            "ODE accel: cached .so at %s appears corrupt (bad ELF / too small). "
+            "Deleting and recompiling.",
+            so,
+        )
+        so.unlink()
 
     # Create cache directory
     cache = _cache_dir(model_hash)
@@ -214,22 +240,15 @@ def compile_c_lib(
     src = cache / f"{lib_name}.c"
 
     if so.exists() and not force:
-        # Guard against truncated/corrupt .so left by an interrupted build.
-        # A valid ELF shared library is always at least a few kilobytes; anything
-        # smaller is a partial write and must be discarded before re-compiling.
-        _MIN_SO_BYTES = 4096
-        so_size = so.stat().st_size
-        if so_size < _MIN_SO_BYTES:
-            logger.warning(
-                "C accel: cached .so at %s is suspiciously small (%d bytes) — "
-                "likely a truncated write from a previous interrupted build. "
-                "Deleting and recompiling.",
-                so, so_size,
-            )
-            so.unlink()
-        else:
+        if _is_valid_elf(so):
             logger.debug("C accel: using cached .so at %s", so)
             return so
+        logger.warning(
+            "C accel: cached .so at %s appears corrupt (bad ELF / too small). "
+            "Deleting and recompiling.",
+            so,
+        )
+        so.unlink()
 
     cache.mkdir(parents=True, exist_ok=True)
     src.write_text(c_source)
