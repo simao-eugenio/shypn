@@ -899,9 +899,17 @@ class BatchExecutor:
             # Determine number of workers
             if n_workers is None:
                 n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
-            
+
+            # Use 'forkserver' context: workers are forked from a clean server
+            # process that was started before GTK/Numba were loaded, so they
+            # inherit no GTK file-descriptors, event-loop handles, or partially
+            # JIT-compiled Numba state.  This is safer and leaner than the
+            # default 'fork' (which copies the entire parent address space,
+            # including all loaded GTK shared-memory segments).
+            _mp_ctx = multiprocessing.get_context('forkserver')
+
             # Create shared progress queue for workers to report back
-            manager = multiprocessing.Manager()
+            manager = _mp_ctx.Manager()
             progress_queue = manager.Queue()
             
             # Prepare experiment arguments for workers
@@ -956,7 +964,7 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with multiprocessing.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1: recycle each worker after one experiment (prevents memory accumulation in long runs)
+            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
                 # Submit all experiments with start time tracking
                 async_results = []
                 for args in experiment_args:
