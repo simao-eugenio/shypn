@@ -850,9 +850,12 @@ class BatchExecutor:
             
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
+                # Use PRIORITY_LOW (300) so all pending experiment_result_callback calls
+                # (scheduled at DEFAULT priority 200) drain first — prevents the run-folder
+                # being reset before the last save callbacks execute.
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
-                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_LOW)
     
     def _execute_batch_parallel(
         self,
@@ -1097,7 +1100,8 @@ class BatchExecutor:
             if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
-                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+                # Use PRIORITY_LOW so pending result callbacks drain first (see sequential path).
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_LOW)
     
     def _run_single_experiment(
         self,
