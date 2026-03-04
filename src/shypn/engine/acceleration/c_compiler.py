@@ -117,8 +117,19 @@ def compile_ode_rhs(
     so = _so_path(model_hash)
 
     if so.exists() and not force:
-        logger.debug("ODE accel: using cached .so at %s", so)
-        return so
+        _MIN_SO_BYTES = 4096
+        so_size = so.stat().st_size
+        if so_size < _MIN_SO_BYTES:
+            logger.warning(
+                "ODE accel: cached .so at %s is suspiciously small (%d bytes) — "
+                "likely a truncated write from a previous interrupted build. "
+                "Deleting and recompiling.",
+                so, so_size,
+            )
+            so.unlink()
+        else:
+            logger.debug("ODE accel: using cached .so at %s", so)
+            return so
 
     # Create cache directory
     cache = _cache_dir(model_hash)
@@ -203,8 +214,22 @@ def compile_c_lib(
     src = cache / f"{lib_name}.c"
 
     if so.exists() and not force:
-        logger.debug("C accel: using cached .so at %s", so)
-        return so
+        # Guard against truncated/corrupt .so left by an interrupted build.
+        # A valid ELF shared library is always at least a few kilobytes; anything
+        # smaller is a partial write and must be discarded before re-compiling.
+        _MIN_SO_BYTES = 4096
+        so_size = so.stat().st_size
+        if so_size < _MIN_SO_BYTES:
+            logger.warning(
+                "C accel: cached .so at %s is suspiciously small (%d bytes) — "
+                "likely a truncated write from a previous interrupted build. "
+                "Deleting and recompiling.",
+                so, so_size,
+            )
+            so.unlink()
+        else:
+            logger.debug("C accel: using cached .so at %s", so)
+            return so
 
     cache.mkdir(parents=True, exist_ok=True)
     src.write_text(c_source)
