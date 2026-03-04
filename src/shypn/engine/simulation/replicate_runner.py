@@ -185,8 +185,18 @@ class ReplicateRunner:
             # Reset model to initial marking (for any place not in initial_marking)
             self._reset_model(self.model)
             
-            # Start data collection
-            controller.data_collector.start_collection()
+            # Start data collection — Phase 5 fast path: pre-allocated float32
+            # numpy buffer (max_steps+1 rows) + skip expensive per-transition
+            # rate evaluation (propensities are already computed by the C
+            # accelerator inside the tau-leaping engine).
+            # Buffer path is disabled for steady_state termination because
+            # the mid-loop convergence check reads place_data directly before
+            # finalize_buf() converts the buffer to the dict format.
+            _use_buf = termination_condition != "steady_state"
+            controller.data_collector.start_collection(
+                n_steps_hint=max_steps + 1 if _use_buf else None,
+                skip_rate_eval=True,
+            )
             # Record initial state at t=0
             controller.data_collector.record_state(controller.time)
             
@@ -400,7 +410,12 @@ class ReplicateRunner:
                 }
             }
         
-        # Compute statistics for each transition (use instantaneous rates from simulation)
+        # Compute statistics for each transition (use instantaneous rates from simulation).
+        # transition_rates is empty ({}) when skip_rate_eval=True (fast-path / batch mode);
+        # in that case skip rate statistics gracefully rather than KeyError.
+        has_rates = bool(successful[0].get('transition_rates'))
+        if not has_rates:
+            transition_ids = []  # nothing to iterate
         for transition_id in transition_ids:
             # Stack rate trajectories into matrix (replicates × time_points)
             # Extract only rate values (second element) from (time, rate) tuples
