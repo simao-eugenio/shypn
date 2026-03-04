@@ -20,6 +20,7 @@ from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCan
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 from .base_results_view import BaseResultsView
+from .gtk_widgets import SearchableComboBox
 from shypn.data.project_models import get_project_manager
 
 
@@ -385,8 +386,9 @@ class ResultsBrowserView(BaseResultsView):
         param_box.pack_start(param_label, False, False, 0)
         
         # Combo to select which parameter is the "dose" (auto-detect from sweep)
-        self.dr_param_combo = Gtk.ComboBoxText()
-        self.dr_param_combo.set_tooltip_text("Select which parameter represents the dose/concentration")
+        self.dr_param_combo = SearchableComboBox(
+            tooltip_text="Select which parameter represents the dose/concentration"
+        )
         self.dr_param_combo.set_margin_end(18)
         param_box.pack_start(self.dr_param_combo, False, False, 0)
         
@@ -1189,7 +1191,9 @@ class ResultsBrowserView(BaseResultsView):
         first_name, first_result = checked[0]
         species_stats = first_result.get('statistics', {}).get('species_statistics', {})
         
-        species_combo = Gtk.ComboBoxText()
+        species_combo = SearchableComboBox(
+            tooltip_text="Type to search, or scroll to browse all species"
+        )
         for species_id in sorted(species_stats.keys()):
             display_name = self._resolve_species_name(species_id)
             species_combo.append(species_id, display_name)
