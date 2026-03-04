@@ -74,8 +74,15 @@ class SearchableComboBox(Gtk.ComboBox):
 
     def _on_completion_match_selected(self, completion, model, tree_iter):
         """Sync the ComboBox active item when a completion entry is clicked."""
-        item_id = model[tree_iter][self._COL_ID]
+        item_id   = model[tree_iter][self._COL_ID]
+        item_text = model[tree_iter][self._COL_TEXT]
         self.set_active_id(item_id)
+        # Also update the entry text — set_active_id alone doesn't always
+        # repaint the embedded entry when returning True
+        entry = self.get_child()
+        if entry is not None:
+            entry.set_text(item_text)
+            entry.set_position(-1)   # move cursor to end
         return True   # prevent default (which would double-set entry text)
 
     def _on_entry_activate(self, entry):
