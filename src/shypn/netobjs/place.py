@@ -676,18 +676,18 @@ class Place(PetriNetObject):
         # Priority: initial_marking (design-time) > marking (legacy compatibility) > tokens (transient)
         if "initial_marking" in data:
             # Modern format: initial_marking is the authoritative baseline
-            place.initial_marking = data["initial_marking"]
+            place.initial_marking = float(data["initial_marking"])
             # Set tokens from saved transient state if available, else use initial_marking
-            place.tokens = data.get("tokens", place.initial_marking)
+            place.tokens = float(data.get("tokens", place.initial_marking))
         elif "marking" in data:
             # Legacy format: marking was used for both (ambiguous)
             # Assume marking is the baseline and use it for both
-            place.initial_marking = data["marking"]
-            place.tokens = data["marking"]
+            place.initial_marking = float(data["marking"])
+            place.tokens = float(data["marking"])
         else:
             # No marking data found - use defaults
-            place.initial_marking = 0
-            place.tokens = 0
+            place.initial_marking = 0.0
+            place.tokens = 0.0
         
         # Restore catalyst flag (for hierarchical layout)
         place.is_catalyst = data.get("is_catalyst", False)

@@ -148,7 +148,31 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                     experiment_params['place_markings'] = snapshot.place_markings
                     experiment_params['transition_rates'] = getattr(snapshot, 'transition_rates', {})
                     experiment_params['arc_weights'] = getattr(snapshot, 'arc_weights', {})
-                
+
+                # Overlay property_overrides onto place_markings so config.csv reflects
+                # the effective values actually used in simulation, not the baseline.
+                # property_overrides uses full paths like "P2.initial_marking"; strip the
+                # dot-suffix to match bare place/transition/arc IDs in the legacy dicts.
+                _prop_overrides = (
+                    snapshot.get('property_overrides', {}) if isinstance(snapshot, dict)
+                    else getattr(snapshot, 'property_overrides', {})
+                )
+                if _prop_overrides:
+                    _eff_markings = dict(experiment_params.get('place_markings', {}))
+                    _eff_rates = dict(experiment_params.get('transition_rates', {}))
+                    _eff_weights = dict(experiment_params.get('arc_weights', {}))
+                    for _path, _val in _prop_overrides.items():
+                        _obj_id = _path.split('.')[0]
+                        if _obj_id in _eff_markings:
+                            _eff_markings[_obj_id] = _val
+                        elif _obj_id in _eff_rates:
+                            _eff_rates[_obj_id] = _val
+                        elif _obj_id in _eff_weights:
+                            _eff_weights[_obj_id] = _val
+                    experiment_params['place_markings'] = _eff_markings
+                    experiment_params['transition_rates'] = _eff_rates
+                    experiment_params['arc_weights'] = _eff_weights
+
                 # Prepare trajectory data for validation checks
                 trajectory_data = {}
                 warnings = []
@@ -390,8 +414,12 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
     debug_log = os.path.expanduser("~/sweep_debug.log")
     
     # DEBUG: Check for swept parameter (works for both dict and object)
+    # Note: swept_param['id'] may carry the full property path (e.g. 'P2.initial_marking');
+    # strip the dot-suffix to get the bare object ID for comparison with place_markings keys.
     if isinstance(swept_param, dict):
-        swept_place_id = swept_param.get('id') if swept_param.get('type') == 'places' else None
+        raw_swept_id = swept_param.get('id', '')
+        bare_swept_id = raw_swept_id.split('.')[0] if raw_swept_id else ''
+        swept_place_id = bare_swept_id if swept_param.get('type') == 'places' and bare_swept_id else None
     else:
         swept_place_id = None
     
