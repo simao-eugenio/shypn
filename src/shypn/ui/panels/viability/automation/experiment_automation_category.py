@@ -1136,8 +1136,10 @@ class ExperimentAutomationCategory:
         Args:
             cancelled: Whether batch was cancelled by user
         """
-        # Close the per-run folder (next run will create a new one)
-        self._current_run_folder = None
+        # NOTE: _current_run_folder is intentionally NOT reset here.
+        # Late-arriving experiment_result_callback idle calls must still find
+        # the correct run folder.  The reset happens at the top of the next
+        # batch run (_current_run_folder = None, line ~600 above).
 
         # Use GLib.idle_add for ALL UI updates from background thread
         def complete_ui_updates():
