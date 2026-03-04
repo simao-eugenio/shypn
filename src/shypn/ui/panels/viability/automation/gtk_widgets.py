@@ -6,14 +6,16 @@ Provides reusable custom widgets that fix known GTK3 UX limitations.
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 
 
 class SearchableComboBox(Gtk.ComboBox):
     """Scrollable, searchable drop-in replacement for Gtk.ComboBoxText.
 
     Typing filters the combo's own dropdown popup in real time (substring,
-    case-insensitive) so clicking any visible item completes the selection.
+    case-insensitive).  Matching items appear at the top of the open popup;
+    clicking any of them completes the selection.  Enter auto-selects the
+    first match.
 
     Public API is fully compatible with Gtk.ComboBoxText:
         append(id_str, text)   — same as ComboBoxText.append(id, text)
@@ -43,10 +45,11 @@ class SearchableComboBox(Gtk.ComboBox):
 
         entry = self.get_child()
         entry.set_placeholder_text("Type to search…")
-        # Filter the popup as the user types
         entry.connect("changed", self._on_entry_changed)
-        # Enter key: commit the first substring match
         entry.connect("activate", self._on_entry_activate)
+
+        # Catch when the user picks an item from the dropdown popup
+        self.connect("changed", self._on_combo_changed)
 
         if tooltip_text:
             self.set_tooltip_text(tooltip_text)
@@ -59,14 +62,28 @@ class SearchableComboBox(Gtk.ComboBox):
         text = model[tree_iter][self._COL_TEXT]
         return bool(text) and self._filter_key.lower() in text.lower()
 
+    # ── signal handlers ────────────────────────────────────────────────────
+
     def _on_entry_changed(self, entry):
+        """User is typing: refilter and (re-)open the popup."""
         if self._busy:
             return
         self._filter_key = entry.get_text()
         self._filter.refilter()
-        # Pop the dropdown open so the user immediately sees the filtered list
         if self._filter_key:
-            self.popup()
+            # Defer popup() so it doesn't fight the keypress event
+            GLib.idle_add(self.popup)
+
+    def _on_combo_changed(self, combo):
+        """User clicked an item in the dropdown: commit that selection."""
+        if self._busy:
+            return
+        tree_iter = self.get_active_iter()
+        if tree_iter is None:
+            return
+        item_id   = self._filter[tree_iter][self._COL_ID]
+        item_text = self._filter[tree_iter][self._COL_TEXT]
+        self._commit(item_id, item_text)
 
     def _on_entry_activate(self, entry):
         """Enter key: commit the first store row matching the typed text."""
@@ -78,11 +95,12 @@ class SearchableComboBox(Gtk.ComboBox):
                 self._commit(row[self._COL_ID], row[self._COL_TEXT])
                 return
 
+    # ── commit helper ───────────────────────────────────────────────────────
+
     def _commit(self, item_id: str, item_text: str) -> None:
-        """Select an item: clear filter, activate row, fill entry text."""
+        """Finalize a selection: clear filter, set active row, fill entry."""
         self._busy = True
         try:
-            # Ensure item is visible before calling set_active_id
             self._filter_key = ""
             self._filter.refilter()
             super().set_active_id(item_id)
