@@ -66,10 +66,19 @@ class SearchableComboBox(Gtk.ComboBox):
         return bool(text) and key.lower() in text.lower()
 
     def _on_match_selected(self, completion, model, tree_iter):
-        """User clicked a row in the completion popup — commit selection."""
-        self._commit(model[tree_iter][self._COL_ID],
-                     model[tree_iter][self._COL_TEXT])
-        return True   # suppress GTK default (avoids double entry.set_text)
+        """User clicked a row in the completion popup — sync combo selection."""
+        item_id   = model[tree_iter][self._COL_ID]
+        item_text = model[tree_iter][self._COL_TEXT]
+        self._busy = True
+        try:
+            super().set_active_id(item_id)
+            entry = self.get_child()
+            if entry is not None:
+                entry.set_text(item_text)
+                entry.set_position(-1)
+        finally:
+            self._busy = False
+        return True   # suppress GTK default (we already set entry text above)
 
     def _on_entry_activate(self, entry):
         """Enter: commit first substring match."""
