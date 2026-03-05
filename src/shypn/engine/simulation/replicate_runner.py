@@ -245,8 +245,17 @@ class ReplicateRunner:
                                 stopped_reason = "steady_state"
                                 break
             except Exception as e:
+                import traceback as _tb
+                import os as _os
+                _err_tb = _tb.format_exc()
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
+                # Always log the first replicate failure to the debug file
+                if i == 0:
+                    _dlog = _os.path.expanduser("~/sweep_debug.log")
+                    with open(_dlog, 'a') as _f:
+                        _f.write(f"[REPLICATE 0 ERROR] {type(e).__name__}: {e}\n")
+                        _f.write(_err_tb)
                 # Store error but continue (include elapsed time even for errors)
                 replicate_elapsed = time.time() - replicate_start_time
                 results.append({

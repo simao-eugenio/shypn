@@ -994,12 +994,16 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             float: Time step in seconds
         """
         return float(self.settings.get_effective_dt())
+
+    def get_progress(self) -> float:
         """Get simulation progress as fraction [0.0, 1.0].
         
         Returns:
             float: Progress fraction
         """
         return float(self.settings.calculate_progress(self.time))
+
+    def _emit_progress_event(self) -> None:
         """Emit simulation.progress event for UI updates.
         
         Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
