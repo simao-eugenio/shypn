@@ -221,14 +221,16 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
         """
         out: ChannelData = {}
         for key, series in channel_data.items():
+            vals = flat.get(key)
+            if vals is None or len(vals) == 0:
+                # Empty channel (fast-path run produced no data for it): skip.
+                continue
             if series and isinstance(series[0], tuple):
-                vals = flat[key]
                 # Reconstruct tuples: (original_time, compressed_value)
                 out[key] = [
                     (series[i][0], float(vals[i]))  # type: ignore[index]
                     for i in indices
                 ]
             else:
-                vals = flat[key]
                 out[key] = [float(vals[i]) for i in indices]
         return out
