@@ -36,7 +36,7 @@ import logging
 import math
 import random
 import traceback
-from typing import Callable, List, Optional, Dict, Tuple, Any, Set
+from typing import Callable, cast, List, Optional, Dict, Tuple, Any, Set
 try:
     from gi.repository import GLib
     GLIB_AVAILABLE = True
@@ -132,7 +132,7 @@ class ModelAdapter:
             float: Current simulation time from controller, or 0.0 if no controller
         """
         if self._controller is not None:
-            return self._controller.time
+            return float(self._controller.time)
         return 0.0
 
     @property
@@ -143,7 +143,7 @@ class ModelAdapter:
             dict: Thermodynamic settings (T, pH, ionic_strength, etc.) or defaults
         """
         if hasattr(self.canvas_manager, 'thermodynamic_settings'):
-            return self.canvas_manager.thermodynamic_settings
+            return cast(Dict[str, Any], self.canvas_manager.thermodynamic_settings)
         # Return defaults if not available
         return {
             'temperature': 298.15,
@@ -159,7 +159,7 @@ class ModelAdapter:
 
 # ==================== Model Accessors (Property Proxies) ====================
 
-class SimulationController(AbstractSimulationController):
+class SimulationController(AbstractSimulationController):  # type: ignore[misc]
     """Controller for Petri net simulation execution.  Sprint 23: implements AbstractSimulationController.
     
     This controller manages the simulation of a Petri net model, handling
@@ -199,7 +199,7 @@ class SimulationController(AbstractSimulationController):
         self.time = 0.0
         self.model_adapter = ModelAdapter(model, controller=self)
         self.step_listeners: List[Any] = []
-        self.data_collector_listeners: List[Callable] = []  # notified when data_collector is replaced
+        self.data_collector_listeners: List[Callable[..., Any]] = []  # notified when data_collector is replaced
         self._running = False
         self._stop_requested = False
         self._timeout_id = None
@@ -209,9 +209,9 @@ class SimulationController(AbstractSimulationController):
         self._round_robin_index = 0
         self.verbose = verbose  # Control debug output
         # Dirty-place index: accelerates per-step enabled-transition scan (Finding #10)
-        self._dirty_since_last_check: set = set()      # accumulated per-step in _fire_transition
-        self._place_to_input_transitions: Dict[str, list] = {}  # place_id → [transitions]
-        self._source_transitions: list = []            # transitions with no input places
+        self._dirty_since_last_check: Set[str] = set()      # accumulated per-step in _fire_transition
+        self._place_to_input_transitions: Dict[str, List[Any]] = {}  # place_id → [transitions]
+        self._source_transitions: List[Any] = []            # transitions with no input places
         
         # Phase 4: Document ID for scoped event emissions (passed at construction)
         self.document_id: int = document_id
@@ -234,7 +234,7 @@ class SimulationController(AbstractSimulationController):
         # === NEW: Mode elimination architecture ===
         # State detection replaces explicit mode checks
         from shypn.engine.simulation.state import SimulationStateDetector
-        self.state_detector = SimulationStateDetector(self)  # type: ignore[arg-type]
+        self.state_detector = SimulationStateDetector(self)
         
         # Buffered settings for atomic parameter updates
         from shypn.engine.simulation.buffered import BufferedSimulationSettings
@@ -715,8 +715,8 @@ class SimulationController(AbstractSimulationController):
         get_enabled_transitions() to skip transitions whose input places did
         not change in the most recent firing step.
         """
-        idx: Dict[str, list] = {}
-        sources: list = []
+        idx: Dict[str, List[Any]] = {}
+        sources: List[Any] = []
         try:
             for transition in self.model.transitions:
                 if getattr(transition, 'is_source', False):
@@ -733,7 +733,7 @@ class SimulationController(AbstractSimulationController):
         self._place_to_input_transitions = idx
         self._source_transitions = sources
 
-    def get_enabled_transitions(self, dirty_places: Optional[set] = None) -> list:
+    def get_enabled_transitions(self, dirty_places: Optional[Set[str]] = None) -> List[Any]:
         """Return currently enabled transitions, using the dirty-place index when possible.
 
         When dirty_places is a non-empty set and the place-transition index has
@@ -750,8 +750,8 @@ class SimulationController(AbstractSimulationController):
             List of Transition objects that are currently enabled.
         """
         if dirty_places and self._place_to_input_transitions:
-            candidates: list = list(self._source_transitions)
-            seen: set = {id(t) for t in candidates}
+            candidates: List[Any] = list(self._source_transitions)
+            seen: Set[int] = {id(t) for t in candidates}
             for pid in dirty_places:
                 for t in self._place_to_input_transitions.get(pid, ()):
                     if id(t) not in seen:
@@ -793,7 +793,7 @@ class SimulationController(AbstractSimulationController):
             behavior = self._get_behavior(transition)
             behavior.disable_accounting()
     
-    def get_accounting_report(self) -> None:
+    def get_accounting_report(self) -> Optional[Any]:
         """Get token accounting report.
         
         Returns:
@@ -875,7 +875,7 @@ class SimulationController(AbstractSimulationController):
         _tid = id(transition)
         if _tid not in self.transition_states:
             self.transition_states[_tid] = TransitionState()
-        return self.transition_states[_tid]
+        return cast(TransitionState, self.transition_states[_tid])
 
     def _update_enablement_states(self) -> None:
         """Update enablement tracking for all transitions.
@@ -993,17 +993,13 @@ class SimulationController(AbstractSimulationController):
         Returns:
             float: Time step in seconds
         """
-        return self.settings.get_effective_dt()
-    
-    def get_progress(self) -> float:
+        return float(self.settings.get_effective_dt())
         """Get simulation progress as fraction [0.0, 1.0].
         
         Returns:
             float: Progress fraction
         """
-        return self.settings.calculate_progress(self.time)
-    
-    def _emit_progress_event(self) -> None:
+        return float(self.settings.calculate_progress(self.time))
         """Emit simulation.progress event for UI updates.
         
         Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
@@ -1029,7 +1025,7 @@ class SimulationController(AbstractSimulationController):
         Returns:
             bool: True if time >= duration
         """
-        return self.settings.is_complete(self.time)
+        return bool(self.settings.is_complete(self.time))
     
     # ========== Strategy Pattern Methods (Week 4 - Phase 4) ==========
     
@@ -1111,7 +1107,7 @@ class SimulationController(AbstractSimulationController):
         self._execution_strategy = strategy
         return strategy
     
-    def list_available_strategies(self) -> List:
+    def list_available_strategies(self) -> List[Any]:
         """Get list of all available execution strategies.
         
         Returns:
@@ -1162,7 +1158,7 @@ class SimulationController(AbstractSimulationController):
     
     # ==================== Observer Pattern (Step Listeners) ====================
 
-    def add_step_listener(self, callback: Callable) -> None:
+    def add_step_listener(self, callback: Callable[..., Any]) -> None:
         """Register a callback to be notified on each simulation step.
         
         Args:
@@ -1172,7 +1168,7 @@ class SimulationController(AbstractSimulationController):
         if callback not in self.step_listeners:
             self.step_listeners.append(callback)
 
-    def remove_step_listener(self, callback: Callable) -> None:
+    def remove_step_listener(self, callback: Callable[..., Any]) -> None:
         """Unregister a step listener callback.
         
         Args:
@@ -1216,14 +1212,15 @@ class SimulationController(AbstractSimulationController):
         # === PHASE 0: Initialization and validation ===
         # Use effective dt if not specified
         if time_step is None:
-            time_step = self.get_effective_dt()
+            time_step = float(self.get_effective_dt())
         
         # STOICHIOMETRY FIX: Clamp time step to not exceed duration
         duration_seconds = self.settings.get_duration_seconds()
         if duration_seconds is not None:
-            remaining_time = duration_seconds - self.time
+            remaining_time = float(duration_seconds) - self.time
             if remaining_time > 0 and time_step > remaining_time:
                 time_step = remaining_time
+        
         
         # Validate time step is non-negative
         if time_step < 0:
@@ -1277,7 +1274,7 @@ class SimulationController(AbstractSimulationController):
         Gracefully skips any event whose trigger or assignment fails to evaluate.
         """
         # Gather all events from model.events (user-defined) plus pathway_data.events (SBML imports)
-        all_events: list = []
+        all_events: List[Any] = []
         if hasattr(self.model, 'events'):
             all_events.extend(self.model.events)
         pd = getattr(self, 'pathway_data', None)
@@ -1289,14 +1286,14 @@ class SimulationController(AbstractSimulationController):
 
         # Lazy-init tracking dicts
         if not hasattr(self, '_event_last_triggered'):
-            self._event_last_triggered: dict = {}
+            self._event_last_triggered: Dict[Any, bool] = {}
         if not hasattr(self, '_event_pending_assignments'):
-            self._event_pending_assignments: list = []  # [(fire_at_time, {place_name: expr})]
+            self._event_pending_assignments: List[Tuple[float, Dict[str, Any]]] = []  # [(fire_at_time, {place_name: expr})]
 
         lg = logging.getLogger(__name__)
 
         # Build evaluation namespace: place names/ids → current tokens, 't' → time
-        ns: dict = {'t': self.time}
+        ns: Dict[str, Any] = {'t': self.time}
         for p in self.model.places:
             val = float(p.tokens) if hasattr(p, 'tokens') else 0.0
             ns[p.name] = val
@@ -1336,7 +1333,7 @@ class SimulationController(AbstractSimulationController):
                     self._apply_event_assignments(assignments, ns, lg)
                     lg.debug(f"[ENV_EVENT] event {event.id!r} triggered, applied immediately")
 
-    def _apply_event_assignments(self, assignments: dict, ns: dict, lg: Any) -> None:
+    def _apply_event_assignments(self, assignments: Dict[str, Any], ns: Dict[str, Any], lg: Any) -> None:
         """Apply a set of event assignments to place tokens.
 
         Args:
@@ -1734,7 +1731,7 @@ class SimulationController(AbstractSimulationController):
 
         return continuous_active
 
-    def _execute_discrete_transitions(self, time_step: float) -> tuple:
+    def _execute_discrete_transitions(self, time_step: float) -> Tuple[bool, bool]:
         """Execute timed and stochastic transitions.
         
         Timed (deterministic) has PRIORITY over Stochastic (probabilistic).
@@ -1876,7 +1873,7 @@ class SimulationController(AbstractSimulationController):
         
         return True
 
-    def _find_enabled_transitions(self) -> List:
+    def _find_enabled_transitions(self) -> List[Any]:
         """Find all transitions that are enabled (can fire).
         
         REFACTORED (Phase 2.3.2): Delegates to ViabilityChecker.
@@ -1901,7 +1898,7 @@ class SimulationController(AbstractSimulationController):
         Returns:
             bool: True if the transition can fire right now.
         """
-        return self._viability_checker.is_enabled(transition)
+        return bool(self._viability_checker.is_enabled(transition))
 
     def _fire_transition(self, transition: Any) -> None:
         """Fire a transition using behavior dispatch.
@@ -1946,7 +1943,7 @@ class SimulationController(AbstractSimulationController):
             state.enablement_time = None
             state.scheduled_time = None
             # Track dirty places for incremental enabled-transition scan
-            _dirty: set = set()
+            _dirty: Set[str] = set()
             for _arc in input_arcs:
                 _pid = getattr(_arc, 'source_id', None)
                 if _pid:
@@ -1969,7 +1966,7 @@ class SimulationController(AbstractSimulationController):
     # Phase 1: Locality Independence Detection (Place-Sharing Analysis)
     # ============================================================================
     
-    def _get_all_places_for_transition(self, transition: Any) -> set:
+    def _get_all_places_for_transition(self, transition: Any) -> Set[Any]:
         """Get all places (input and output) involved in a transition's locality.
         
         This extracts the complete neighborhood of a transition:
@@ -2014,15 +2011,15 @@ class SimulationController(AbstractSimulationController):
     
     def _are_independent(self, t1: Any, t2: Any) -> bool:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.are_independent(t1, t2)
+        return bool(self._conflict_resolver.are_independent(t1, t2))
     
-    def _compute_conflict_sets(self, transitions: List) -> Dict[str, set]:
+    def _compute_conflict_sets(self, transitions: List[Any]) -> Dict[str, Set[Any]]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.compute_conflict_sets(transitions)
+        return cast(Dict[str, Set[Any]], self._conflict_resolver.compute_conflict_sets(transitions))
     
-    def _get_independent_transitions(self, transitions: List) -> List[List]:
+    def _get_independent_transitions(self, transitions: List[Any]) -> List[List[Any]]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.get_independent_groups(transitions)
+        return cast(List[List[Any]], self._conflict_resolver.get_independent_groups(transitions))
 
     # ==================================================================================
     # PHASE 2: MAXIMAL CONCURRENT SET COMPUTATION
@@ -2037,24 +2034,24 @@ class SimulationController(AbstractSimulationController):
     # Dependencies: Uses Phase 1 methods (_compute_conflict_sets, _are_independent)
     # ==================================================================================
 
-    def _find_maximal_concurrent_sets(self, enabled_transitions: List, max_sets: int = 5) -> List[List]:
+    def _find_maximal_concurrent_sets(self, enabled_transitions: List[Any], max_sets: int = 5) -> List[List[Any]]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.find_maximal_concurrent_sets(enabled_transitions, max_sets)
+        return cast(List[List[Any]], self._conflict_resolver.find_maximal_concurrent_sets(enabled_transitions, max_sets))
 
-    def _greedy_maximal_set(self, transitions: List, conflict_sets: dict,
-                           start_index: int = 0) -> List:
+    def _greedy_maximal_set(self, transitions: List[Any], conflict_sets: Dict[Any, Any],
+                           start_index: int = 0) -> List[Any]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver._greedy_maximal_set(transitions, conflict_sets, start_index)
+        return cast(List[Any], self._conflict_resolver._greedy_maximal_set(transitions, conflict_sets, start_index))
 
-    def _sort_by_conflict_degree(self, transitions: List, conflict_sets: dict,
-                                 ascending: bool = True) -> List:
+    def _sort_by_conflict_degree(self, transitions: List[Any], conflict_sets: Dict[Any, Any],
+                                 ascending: bool = True) -> List[Any]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver._sort_by_conflict_degree(transitions, conflict_sets, ascending)
+        return cast(List[Any], self._conflict_resolver._sort_by_conflict_degree(transitions, conflict_sets, ascending))
 
-    def _is_concurrent_set_maximal(self, concurrent_set: List, 
-                                   all_enabled: List, conflict_sets: dict) -> bool:
+    def _is_concurrent_set_maximal(self, concurrent_set: List[Any], 
+                                   all_enabled: List[Any], conflict_sets: Dict[Any, Any]) -> bool:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.is_concurrent_set_maximal(concurrent_set, all_enabled, conflict_sets)
+        return bool(self._conflict_resolver.is_concurrent_set_maximal(concurrent_set, all_enabled, conflict_sets))
 
     # ========================================================================
     # PHASE 3: MAXIMAL STEP EXECUTION
@@ -2063,28 +2060,28 @@ class SimulationController(AbstractSimulationController):
     # Methods: select, validate, snapshot, restore, execute
     # ========================================================================
 
-    def _select_maximal_set(self, maximal_sets: List[List], 
-                           strategy: str = 'largest') -> List:
+    def _select_maximal_set(self, maximal_sets: List[List[Any]], 
+                           strategy: str = 'largest') -> List[Any]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.select_maximal_set(maximal_sets, strategy)
+        return cast(List[Any], self._conflict_resolver.select_maximal_set(maximal_sets, strategy))
 
-    def _validate_all_can_fire(self, transition_set: List) -> bool:
+    def _validate_all_can_fire(self, transition_set: List[Any]) -> bool:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.validate_all_can_fire(transition_set)
+        return bool(self._conflict_resolver.validate_all_can_fire(transition_set))
 
-    def _snapshot_marking(self) -> dict:
+    def _snapshot_marking(self) -> Dict[Any, Any]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver._snapshot_marking()
+        return cast(Dict[Any, Any], self._conflict_resolver._snapshot_marking())
 
-    def _restore_marking(self, snapshot: dict) -> None:
+    def _restore_marking(self, snapshot: Dict[Any, Any]) -> None:
         """Delegate to ConflictResolver."""
         self._conflict_resolver._restore_marking(snapshot)
 
-    def _execute_maximal_step(self, transition_set: List) -> tuple:
+    def _execute_maximal_step(self, transition_set: List[Any]) -> Tuple[Any, ...]:
         """Delegate to ConflictResolver."""
-        return self._conflict_resolver.execute_maximal_step(transition_set)
+        return cast(Tuple[Any, ...], self._conflict_resolver.execute_maximal_step(transition_set))
 
-    def _select_transition(self, enabled_transitions: List) -> Any:
+    def _select_transition(self, enabled_transitions: List[Any]) -> Any:
         """Select one transition from enabled set based on conflict resolution policy.
         
         Uses per-transition firing_policy attribute to determine selection strategy.
@@ -2298,7 +2295,7 @@ class SimulationController(AbstractSimulationController):
             # Unknown policy - default to random
             return random.choice(enabled_transitions)
 
-    def _resolve_continuous_conflicts(self, continuous_enabled: List) -> Tuple[List, List]:
+    def _resolve_continuous_conflicts(self, continuous_enabled: List[Any]) -> Tuple[List[Any], List[Any]]:
         """Resolve continuous transition conflicts using LocalityDetector.
 
         Two transitions belong to the same conflict group when their localities
@@ -2396,7 +2393,7 @@ class SimulationController(AbstractSimulationController):
 
         return solo, preemptive_groups
 
-    def _integrate_preemptive_group(self, group: List, dt: float) -> List:
+    def _integrate_preemptive_group(self, group: List[Any], dt: float) -> List[Any]:
         """Fire a preemptive conflict group with snapshot/apply atomics.
 
         All transitions in *group* evaluate and consume from a shared token
@@ -2423,26 +2420,14 @@ class SimulationController(AbstractSimulationController):
         places_map: Dict[str, Any] = {p.id: p for p in self.model.places}
 
         # Collect every place that any member of this group touches.
-        touched_ids: set = set()
-        for transition, behavior, input_arcs, output_arcs in group:
-            for arc in input_arcs:
-                if hasattr(arc, 'source_id'):
-                    touched_ids.add(arc.source_id)
-                if hasattr(arc, 'target_id'):
-                    touched_ids.add(arc.target_id)
-            for arc in output_arcs:
-                if hasattr(arc, 'source_id'):
-                    touched_ids.add(arc.source_id)
-                if hasattr(arc, 'target_id'):
-                    touched_ids.add(arc.target_id)
-        touched_ids = {pid for pid in touched_ids if pid in places_map}
+        touched_ids: Set[Any] = set()
 
         # Phase 1: snapshot
         snapshot: Dict[str, float] = {pid: places_map[pid].tokens for pid in touched_ids}
 
         # Phase 2: evaluate each transition against the pristine snapshot
         deltas: Dict[str, float] = {pid: 0.0 for pid in touched_ids}
-        results: List = []
+        results: List[Any] = []
 
         for transition, behavior, input_arcs, output_arcs in group:
             # Restore snapshot so this transition sees pre-step values
@@ -2491,9 +2476,7 @@ class SimulationController(AbstractSimulationController):
         Returns:
             bool: True if started successfully, False if already running
         """
-        return self._continuous_executor.run(time_step, max_steps)
-
-    def _simulation_loop(self) -> bool:
+        return bool(self._continuous_executor.run(time_step, max_steps))
         """Internal simulation loop callback.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2505,9 +2488,7 @@ class SimulationController(AbstractSimulationController):
         Returns:
             bool: True to continue, False to stop the timeout
         """
-        return self._continuous_executor._simulation_loop()
-
-    def stop(self) -> None:
+        return bool(self._continuous_executor._simulation_loop())
         """Stop the continuous simulation.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2707,4 +2688,4 @@ class SimulationController(AbstractSimulationController):
         Returns:
             float or None: Duration in seconds, or None if not set
         """
-        return self.settings.get_duration_seconds()
+        return cast(Optional[float], self.settings.get_duration_seconds())
