@@ -173,16 +173,18 @@ def compile_ode_rhs(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
+    # Each worker gets a unique temp file so concurrent compilations never
+    # overwrite each other's in-progress output.  The final rename is atomic
+    # (POSIX rename semantics) so the destination is always a complete ELF.
+    tmp_fd, so_tmp_str = tempfile.mkstemp(suffix=".so.tmp", dir=str(cache))
+    os.close(tmp_fd)
+    so_tmp = Path(so_tmp_str)
+
     def _try_compile(flags: list) -> subprocess.CompletedProcess:
         return subprocess.run(
             [gcc] + flags + ["-o", str(so_tmp), str(src)],
             capture_output=True, text=True,
         )
-
-    # Compile to a temp file first so that concurrent workers never see a
-    # partial ELF at the final path (ctypes.CDLL fails with "file too short"
-    # when it tries to load a .so that gcc is still writing).
-    so_tmp = so.with_suffix(".so.tmp")
 
     cmd_flags = _GCC_FLAGS
     logger.info("ODE accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
@@ -208,8 +210,7 @@ def compile_ode_rhs(
             f"Source preserved at: {src}"
         )
 
-    # Atomic rename: the final path is either absent or a complete .so.
-    # os.replace is atomic on the same filesystem (POSIX rename semantics).
+    # Atomic rename: last writer wins, all produce identical output.
     so_tmp.replace(so)
     logger.info("ODE accel: compiled successfully → %s", so)
     return so
@@ -269,14 +270,17 @@ def compile_c_lib(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
+    # Unique temp file per worker — prevents concurrent workers from
+    # overwriting each other's in-progress output.
+    tmp_fd, so_tmp_str = tempfile.mkstemp(suffix=".so.tmp", dir=str(cache))
+    os.close(tmp_fd)
+    so_tmp = Path(so_tmp_str)
+
     def _try_compile(flags: list) -> subprocess.CompletedProcess:
         return subprocess.run(
             [gcc] + flags + ["-o", str(so_tmp), str(src)],
             capture_output=True, text=True,
         )
-
-    # Compile to a temp file first (atomic rename — prevents "file too short").
-    so_tmp = so.with_suffix(".so.tmp")
 
     cmd_flags = _GCC_FLAGS
     logger.info("C accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
