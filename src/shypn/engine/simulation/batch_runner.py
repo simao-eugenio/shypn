@@ -37,7 +37,7 @@ Date: December 2025
 import time
 import multiprocessing as mp
 import numpy as np
-from typing import Dict, List, Optional, Any, Callable, Set
+from typing import Dict, List, Optional, Any, Callable, Set, Tuple
 from copy import deepcopy
 
 from shypn.engine.simulation.controller import SimulationController
@@ -51,7 +51,7 @@ _FORK_INITIAL_MARKING: Optional[Dict[str, float]] = None
 
 
 def _replicate_range_worker(
-    args: tuple
+    args: Tuple[Any, ...]
 ) -> List[Dict[str, Any]]:
     """Module-level worker function executed in a forked subprocess.
 
@@ -82,14 +82,14 @@ def _replicate_range_worker(
 
     for i in range(start, end):
         try:
-            controller.settings.random_seed = base_seed + i  # type: ignore[attr-defined]
+            controller.settings.random_seed = base_seed + i
 
             runner._reset_model(
                 controller.model,
                 initial_marking,
-                apply_noise=controller.settings.ic_noise_enabled,  # type: ignore[attr-defined]
-                noise_percent=controller.settings.ic_noise_percent,  # type: ignore[attr-defined]
-                noise_places=controller.settings.ic_noise_places,  # type: ignore[attr-defined]
+                apply_noise=controller.settings.ic_noise_enabled,
+                noise_percent=controller.settings.ic_noise_percent,
+                noise_places=controller.settings.ic_noise_places,
                 seed=base_seed + i,
             )
 
@@ -224,7 +224,7 @@ class BatchSimulationRunner:
         # Get base configuration from controller
         settings = controller.settings
         model = controller.model
-        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42  # type: ignore[attr-defined]
+        base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42
         duration = settings.duration if hasattr(settings, 'duration') else 100.0
 
         # Store initial marking for reset between replicates
@@ -288,15 +288,15 @@ class BatchSimulationRunner:
             
             try:
                 # Set unique seed for this replicate
-                replicate_controller.settings.random_seed = base_seed + i  # type: ignore[attr-defined]
+                replicate_controller.settings.random_seed = base_seed + i
                 
                 # Reset model to initial marking with optional noise
                 self._reset_model(
                     model, 
                     initial_marking,
-                    apply_noise=replicate_controller.settings.ic_noise_enabled,  # type: ignore[attr-defined]
-                    noise_percent=replicate_controller.settings.ic_noise_percent,  # type: ignore[attr-defined]
-                    noise_places=replicate_controller.settings.ic_noise_places,  # type: ignore[attr-defined]
+                    apply_noise=replicate_controller.settings.ic_noise_enabled,
+                    noise_percent=replicate_controller.settings.ic_noise_percent,
+                    noise_places=replicate_controller.settings.ic_noise_places,
                     seed=base_seed + i  # Use replicate-specific seed for noise
                 )
                 

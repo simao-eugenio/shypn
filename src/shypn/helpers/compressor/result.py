@@ -17,7 +17,7 @@ ChannelData = Dict[str, List[SeriesItem]]
 
 def _extract_value(item: SeriesItem) -> float:
     """Return the numeric value from a *SeriesItem* (tuple or scalar)."""
-    return float(item[1]) if isinstance(item, tuple) else float(item)  # type: ignore[index]
+    return float(item[1]) if isinstance(item, tuple) else float(item)
 
 
 # ── dataclass ─────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ Checks that total tokens across specified place groups remain constant,
 within a tolerance threshold. Detects numerical drift and token leaks.
 """
 
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Set, Optional, Any
 from .base_validator import BaseValidator, ValidationResult, ValidationStatus
 
 
@@ -62,7 +62,7 @@ class MassConservationValidator(BaseValidator):
         self._max_totals = {}
         self._initialized = False
     
-    def update(self, time: float, places: Dict, transitions: Dict) -> None:
+    def update(self, time: float, places: Dict[str, Any], transitions: Dict[str, Any]) -> None:
         """Update validator with current simulation state.
         
         Args:

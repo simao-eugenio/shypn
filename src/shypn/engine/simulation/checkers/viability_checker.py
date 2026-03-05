@@ -76,7 +76,7 @@ class ViabilityChecker:
         """
         behavior = self.controller._get_behavior(transition)
         can_fire, reason = behavior.can_fire()
-        return can_fire
+        return bool(can_fire)
     
     def is_enabled_with_reason(self, transition: Any) -> Tuple[bool, Optional[str]]:
         """Check if transition is enabled and return reason if not.
@@ -93,7 +93,7 @@ class ViabilityChecker:
         can_fire, reason = behavior.can_fire()
         return can_fire, reason
     
-    def validate_all(self, transition_set: List) -> bool:
+    def validate_all(self, transition_set: List[Any]) -> bool:
         """Check if all transitions in set are currently enabled.
         
         Pre-flight validation before snapshot to avoid rollback overhead.
@@ -180,7 +180,7 @@ class ViabilityChecker:
         
         return True  # All transitions can fire
     
-    def validate_all_with_reasons(self, transition_set: List) -> Tuple[bool, List[str]]:
+    def validate_all_with_reasons(self, transition_set: List[Any]) -> Tuple[bool, List[str]]:
         """Check if all transitions can fire and collect failure reasons.
         
         Args:
@@ -249,7 +249,7 @@ class ViabilityChecker:
         
         return (len(reasons) == 0, reasons)
     
-    def get_enabled_transitions(self) -> List:
+    def get_enabled_transitions(self) -> List[Any]:
         """Get list of all currently enabled transitions.
         
         Returns:
@@ -261,7 +261,7 @@ class ViabilityChecker:
                 enabled.append(transition)
         return enabled
     
-    def get_disabled_transitions_with_reasons(self) -> List[Tuple]:
+    def get_disabled_transitions_with_reasons(self) -> List[Tuple[Any, Optional[str]]]:
         """Get list of disabled transitions with reasons.
         
         Returns:

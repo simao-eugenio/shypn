@@ -5,7 +5,7 @@ Provides SimulationSettings class to encapsulate all timing and execution
 configuration for simulation. Follows OOP principles with validation,
 defaults, and clear separation of concerns.
 """
-from typing import Any, Optional, Set
+from typing import Any, cast, Dict, Optional, Set
 from shypn.utils.time_utils import TimeUnits, TimeConverter, TimeValidator
 
 
@@ -359,7 +359,7 @@ class SimulationSettings:
         """
         if self._duration is None:
             return None
-        return TimeConverter.to_seconds(self._duration, self._time_units)
+        return float(TimeConverter.to_seconds(self._duration, self._time_units))
     
     def clear_duration(self) -> None:
         """Clear duration (run indefinitely)."""
@@ -422,7 +422,7 @@ class SimulationSettings:
         duration_seconds = self.get_duration_seconds()
         dt = self.get_effective_dt()
         
-        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)  # type: ignore[arg-type]
+        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)
         return warning if warning else None
     
     # ========== Progress Tracking ==========
@@ -487,7 +487,7 @@ class SimulationSettings:
     
     # ========== Serialization ==========
     
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Serialize settings to dictionary.
         
         Returns:
@@ -510,7 +510,7 @@ class SimulationSettings:
         }
     
     @classmethod
-    def from_dict(cls, data: dict) -> 'SimulationSettings':
+    def from_dict(cls, data: Dict[str, Any]) -> 'SimulationSettings':
         """Deserialize settings from dictionary.
         
         Args:
@@ -778,11 +778,11 @@ def _add_batch_mode_properties() -> None:
     
     # Recorded objects property
     @property  # type: ignore[misc]
-    def recorded_objects(self: Any) -> set:
+    def recorded_objects(self: Any) -> Set[str]:
         """Get set of object IDs marked for recording."""
         if not hasattr(self, '_recorded_objects'):
             self._recorded_objects = set()
-        return self._recorded_objects
+        return cast(Set[str], self._recorded_objects)
     
     # Batch mode methods
     def add_recorded_object(self: Any, object_id: str) -> None:
@@ -862,14 +862,14 @@ def _add_batch_mode_properties() -> None:
         self._ic_noise_percent = float(value)
     
     @property  # type: ignore[misc]
-    def ic_noise_places(self: Any) -> set:
+    def ic_noise_places(self: Any) -> Set[str]:
         """Get set of place IDs to apply noise to.
         
         If empty, noise is applied to all non-catalyst places.
         """
         if not hasattr(self, '_ic_noise_places'):
             self._ic_noise_places = set()
-        return self._ic_noise_places
+        return cast(Set[str], self._ic_noise_places)
     
     def add_ic_noise_place(self: Any, place_id: str) -> None:
         """Mark a place for initial condition randomization.
