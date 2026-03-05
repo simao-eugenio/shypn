@@ -33,25 +33,31 @@ class SearchableComboBox(Gtk.ComboBox):
 
     def __init__(self, tooltip_text: str = ""):
         self._store       = Gtk.ListStore(str, str)   # (id, display_text)
-        self._selected_id = None   # track selection ourselves
-        self._busy        = False
+        self._selected_id = None
 
-        # Give the combo the store so the dropdown arrow still works
         super().__init__(model=self._store, has_entry=True)
-        # Do NOT call set_id_column / set_entry_text_column — those cause
-        # GTK to overwrite the entry whenever set_active* changes the row.
-        # We manage entry text entirely in _commit().
 
-        # Pack a cell renderer so the dropdown popup can display items.
-        # Gtk.ComboBox (unlike ComboBoxText) does not add one automatically.
-        renderer = Gtk.CellRendererText()
-        self.pack_start(renderer, True)
-        self.add_attribute(renderer, "text", self._COL_TEXT)
+        # Both columns must be set for full popup behaviour:
+        #   set_entry_text_column  — renders text in dropdown popup; keeps
+        #                            entry text in sync when active row changes
+        #                            (GTK reads priv->text_column on entry update)
+        #   set_id_column          — lets GTK commit a clicked popup row as the
+        #                            active selection (without it clicks are lost)
+        self.set_entry_text_column(self._COL_TEXT)
+        self.set_id_column(self._COL_ID)
 
         entry = self.get_child()
         entry.set_placeholder_text("Type to search…")
+        entry.connect("activate", self._on_entry_activate)
 
-        # EntryCompletion: separate popup, substring match, never touches entry
+        # Replace the EntryCompletion that GTK created in gtk_combo_box_constructed
+        # (which has GTK's own match-selected handler that would block ours via
+        # the g_signal_accumulator_true_handled chain) with a fresh one that only
+        # has our substring-match handler.
+        # NOTE: entry.set_completion must come AFTER set_entry_text_column so
+        # that GTK's priv->text_column is configured before our completion is
+        # installed; GTK's entry-sync path uses priv->text_column, not the
+        # completion's text_column, so it keeps working after we swap it out.
         completion = Gtk.EntryCompletion()
         completion.set_model(self._store)
         completion.set_text_column(self._COL_TEXT)
@@ -62,7 +68,8 @@ class SearchableComboBox(Gtk.ComboBox):
         completion.connect("match-selected", self._on_match_selected)
         entry.set_completion(completion)
 
-        entry.connect("activate", self._on_entry_activate)
+        # Track _selected_id for every selection (popup click, set_active*, …)
+        self.connect("changed", self._on_changed)
 
         if tooltip_text:
             self.set_tooltip_text(tooltip_text)
@@ -70,42 +77,40 @@ class SearchableComboBox(Gtk.ComboBox):
     # ── EntryCompletion helpers ────────────────────────────────────────────
 
     def _match_func(self, completion, key, tree_iter):
+        """Substring, case-insensitive match (key is already case-folded by GTK)."""
         text = completion.get_model()[tree_iter][self._COL_TEXT]
         return bool(text) and key.lower() in text.lower()
 
     def _on_match_selected(self, completion, model, tree_iter):
-        """User clicked a row in the completion popup."""
-        self._commit(model[tree_iter][self._COL_ID],
-                     model[tree_iter][self._COL_TEXT])
-        return True   # prevent GTK default (it would set wrong text)
+        """User clicked/Enter-selected a row in the EntryCompletion popup.
+
+        We capture the ID and let the default handler run (return value is
+        implicitly False/None): it sets the entry text to the matched row's
+        text.  GTK's combo entry-changed handler then fires, finds the text
+        in the store, and sets the active row — which in turn emits 'changed'
+        and triggers _on_changed.  No need to call set_active() ourselves.
+        """
+        self._selected_id = model[tree_iter][self._COL_ID]
+        # Return nothing (None → False) so the default EntryCompletion handler
+        # runs and updates the entry text, which chain-triggers active-row sync.
 
     def _on_entry_activate(self, entry):
-        """Enter: commit first substring match."""
+        """Enter key: commit first substring match."""
         key = entry.get_text().lower()
         if not key:
             return
-        for row in self._store:
+        for i, row in enumerate(self._store):
             if key in row[self._COL_TEXT].lower():
-                self._commit(row[self._COL_ID], row[self._COL_TEXT])
+                Gtk.ComboBox.set_active(self, i)
                 return
 
-    # ── core selection ─────────────────────────────────────────────────────
+    # ── Active-row tracking ────────────────────────────────────────────────
 
-    def _commit(self, item_id: str, item_text: str) -> None:
-        """Store selection, update entry text, emit 'changed'."""
-        if self._busy:
-            return
-        self._busy = True
-        try:
-            self._selected_id = item_id
-            entry = self.get_child()
-            if entry is not None:
-                entry.set_text(item_text)
-                entry.set_position(-1)
-            # Emit 'changed' so callers connected to combo.changed() are notified
-            self.emit("changed")
-        finally:
-            self._busy = False
+    def _on_changed(self, combo):
+        """Sync _selected_id on every GTK-side active-row change."""
+        tree_iter = combo.get_active_iter()
+        if tree_iter is not None:
+            self._selected_id = self._store[tree_iter][self._COL_ID]
 
     # ── ComboBoxText-compatible public API ─────────────────────────────────
 
@@ -113,18 +118,15 @@ class SearchableComboBox(Gtk.ComboBox):
         return self._selected_id
 
     def set_active_id(self, item_id: str) -> bool:
-        for row in self._store:
+        for i, row in enumerate(self._store):
             if row[self._COL_ID] == item_id:
-                self._commit(item_id, row[self._COL_TEXT])
+                Gtk.ComboBox.set_active(self, i)
                 return True
         return False
 
     def set_active(self, index: int) -> None:
-        try:
-            row = self._store[index]
-            self._commit(row[self._COL_ID], row[self._COL_TEXT])
-        except IndexError:
-            pass
+        if index >= 0:
+            Gtk.ComboBox.set_active(self, index)
 
     def append(self, id_str: str, text: str) -> None:
         self._store.append([id_str, text])
