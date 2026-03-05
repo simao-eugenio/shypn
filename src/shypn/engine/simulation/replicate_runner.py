@@ -257,6 +257,10 @@ class ReplicateRunner:
                 })
                 continue
             
+            # Flush Phase 5 fast-path numpy buffer into place_data before
+            # harvesting the result dict (no-op if buffer path wasn't used).
+            controller.data_collector.stop_collection()
+
             # Calculate elapsed wall-clock time for this replicate
             replicate_elapsed = time.time() - replicate_start_time
             

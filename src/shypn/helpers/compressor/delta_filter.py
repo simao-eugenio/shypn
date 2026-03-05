@@ -160,10 +160,17 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
             return [0] if n == 1 else [0, n - 1]
 
         # Per-channel normalisation denominator: 1 + observed range.
+        # Guard against zero-length arrays (empty series from fast-path runs).
         denom: Dict[str, float] = {
-            k: 1.0 + float(v.max() - v.min())
+            k: 1.0 + float(v.max() - v.min()) if len(v) > 0 else 1.0
             for k, v in flat.items()
         }
+        # Drop channels whose array is empty so the delta loop never indexes them.
+        flat = {k: v for k, v in flat.items() if len(v) > 0}
+
+        if not flat:
+            # All channels were empty: keep boundary points only.
+            return [0] if n == 1 else [0, n - 1]
 
         kept: List[int] = [0]
         last = 0
