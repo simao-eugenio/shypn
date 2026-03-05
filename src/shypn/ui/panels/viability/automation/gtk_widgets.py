@@ -42,6 +42,12 @@ class SearchableComboBox(Gtk.ComboBox):
         # GTK to overwrite the entry whenever set_active* changes the row.
         # We manage entry text entirely in _commit().
 
+        # Pack a cell renderer so the dropdown popup can display items.
+        # Gtk.ComboBox (unlike ComboBoxText) does not add one automatically.
+        renderer = Gtk.CellRendererText()
+        self.pack_start(renderer, True)
+        self.add_attribute(renderer, "text", self._COL_TEXT)
+
         entry = self.get_child()
         entry.set_placeholder_text("Type to search…")
 
