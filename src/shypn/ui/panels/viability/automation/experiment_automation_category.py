@@ -483,6 +483,9 @@ class ExperimentAutomationCategory:
                 text = self.sweep_builder.replicates_entry.get_text().strip()
                 if text:
                     replicates = int(text)
+                    if replicates <= 0:
+                        print(f"[WARNING] Replicates is {replicates}, using default 3")
+                        replicates = 3
             except Exception as e:
                 print(f"[WARNING] Failed to read replicates: {e}, using default: {replicates}")
         

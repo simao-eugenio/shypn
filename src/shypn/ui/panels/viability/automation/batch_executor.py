@@ -55,6 +55,10 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         snapshot = args['snapshot']
         replicates = args['replicates']
         duration = args['duration']
+        import os as _os
+        _dlog = _os.path.expanduser("~/sweep_debug.log")
+        with open(_dlog, 'a') as _f:
+            _f.write(f"[WORKER START] {name}: replicates={replicates}, duration={duration}\n")
         termination_condition = args['termination_condition']
         subnet_data = args['subnet_data']
         baseline_params = args['baseline_params']
@@ -316,10 +320,17 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     
     except Exception as e:
         import traceback
+        import os as _os
+        tb_str = traceback.format_exc()
+        # Write traceback to debug file (stdout is unreliable in forked workers)
+        _dlog = _os.path.expanduser("~/sweep_debug.log")
+        with open(_dlog, 'a') as _f:
+            _f.write(f"\n[WORKER EXCEPTION] {args.get('name', 'unknown')}: {type(e).__name__}: {e}\n")
+            _f.write(tb_str)
         return {
             'name': args.get('name', 'unknown'),
             'error': f"{type(e).__name__}: {str(e)}",
-            'traceback': traceback.format_exc(),
+            'traceback': tb_str,
             'status': 'failed'
         }
 
@@ -572,6 +583,9 @@ class BatchExecutor:
         """
         if self.is_running:
             raise RuntimeError("Batch execution already in progress")
+        
+        if replicates <= 0:
+            raise ValueError(f"replicates must be >= 1, got {replicates}")
         
         self.is_running = True
         self.is_cancelled = False
@@ -1060,8 +1074,24 @@ class BatchExecutor:
 
                                 self.results[name] = result
 
-                                if progress_callback:
-                                    progress_callback(queue_index, "completed", "100%")
+                                # Check if worker returned an error result
+                                if 'error' in result and result.get('status') == 'failed':
+                                    # Worker raised an exception — log traceback to debug file
+                                    tb = result.get('traceback', '')
+                                    print(f"[PARALLEL] Worker error for '{name}': {result['error']}")
+                                    if tb:
+                                        print(f"[PARALLEL] Worker traceback:\n{tb}")
+                                    import os as _os
+                                    _dlog = _os.path.expanduser("~/sweep_debug.log")
+                                    with open(_dlog, 'a') as _f:
+                                        _f.write(f"\n[PARALLEL ERROR] {name}: {result['error']}\n")
+                                        if tb:
+                                            _f.write(tb)
+                                    if progress_callback:
+                                        progress_callback(queue_index, "failed", result['error'][:100])
+                                else:
+                                    if progress_callback:
+                                        progress_callback(queue_index, "completed", "100%")
 
                                 if experiment_result_callback:
                                     from gi.repository import GLib
