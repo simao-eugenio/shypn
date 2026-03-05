@@ -81,7 +81,7 @@ class ValidatorManager:
         for validator in self._validators:
             validator.reset()
     
-    def update(self, time: float, places: Dict, transitions: Dict) -> None:
+    def update(self, time: float, places: Dict[str, Any], transitions: Dict[str, Any]) -> None:
         """Update all validators with current simulation state.
         
         Args:

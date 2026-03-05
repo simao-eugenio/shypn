@@ -5,7 +5,7 @@ Validates that energy pool dissipation matches expected biological range
 (typically 25-35% dissipation representing metabolic efficiency).
 """
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from .base_validator import BaseValidator, ValidationResult, ValidationStatus
 
 
@@ -31,7 +31,7 @@ class EnergyDissipationValidator(BaseValidator):
         atp_place_id: str = 'P7',
         adp_place_id: str = 'P8',
         pi_place_id: str = 'P9',
-        expected_dissipation_range: tuple = (25.0, 35.0),
+        expected_dissipation_range: Tuple[float, float] = (25.0, 35.0),
         enabled: bool = True
     ):
         """Initialize energy dissipation validator.
@@ -77,7 +77,7 @@ class EnergyDissipationValidator(BaseValidator):
         self._final_adp = None
         self._final_pi = None
     
-    def update(self, time: float, places: Dict, transitions: Dict) -> None:
+    def update(self, time: float, places: Dict[str, Any], transitions: Dict[str, Any]) -> None:
         """Update validator with current simulation state.
         
         Args:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -204,7 +204,7 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
         return kept
 
     @staticmethod
-    def _slice_list(source: List, indices: List[int]) -> List:
+    def _slice_list(source: List[Any], indices: List[int]) -> List[Any]:
         """Return a list containing only the elements at *indices*."""
         return [source[i] for i in indices]
 

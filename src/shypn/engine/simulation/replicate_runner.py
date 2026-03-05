@@ -72,7 +72,7 @@ class ReplicateRunner:
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
         verbose: bool = False,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable[[float], None]] = None
     ) -> List[Dict[str, Any]]:
         """Run n independent stochastic simulation replicates.
         
@@ -168,7 +168,7 @@ class ReplicateRunner:
             
             # ── Reset state for this replicate (controller is reused) ──────
             # Unique seed for reproducible but independent replicates
-            controller.settings.random_seed = seed_base + i  # type: ignore[attr-defined]
+            controller.settings.random_seed = seed_base + i
 
             # Restore model to initial marking
             for place in self.model.places:

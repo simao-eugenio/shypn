@@ -166,12 +166,14 @@ class DataCollector:
 
         # ── Phase 5: fast path — numpy buffer fill ────────────────────────────
         if self._buf_enabled:
+            assert self._t_buf is not None  # allocated when _buf_enabled is set
+            assert self._p_buf is not None
             ptr = self._buf_ptr
             if ptr >= self._buf_cap:
                 # Grow buffer by 50 % to handle underestimated n_steps_hint
                 new_cap = max(self._buf_cap + 64, int(self._buf_cap * 1.5))
-                self._t_buf = np.resize(self._t_buf, new_cap)          # type: ignore[arg-type]
-                new_p = np.empty((new_cap, len(self._rec_places)), dtype=np.float32)
+                self._t_buf = np.resize(self._t_buf, new_cap)
+                new_p: np.ndarray = np.empty((new_cap, len(self._rec_places)), dtype=np.float32)
                 new_p[:self._buf_cap] = self._p_buf
                 self._p_buf = new_p
                 self._buf_cap = new_cap
@@ -295,7 +297,7 @@ class DataCollector:
         self._buf_enabled = False
         self._buf_ptr = 0
     
-    def record_event(self, time: float, event_type: str, data: Optional[dict] = None) -> None:
+    def record_event(self, time: float, event_type: str, data: Optional[Dict[str, Any]] = None) -> None:
         """Record a simulation event (for logging/debugging).
         
         This is used by τ-leaping and other advanced features to log
@@ -310,7 +312,7 @@ class DataCollector:
         # Could extend to store event history if needed
         pass
     
-    def record_firing(self, time: float, transition: Any, consumed: Optional[dict] = None, produced: Optional[dict] = None, mode: Optional[str] = None, firings: int = 1) -> None:
+    def record_firing(self, time: float, transition: Any, consumed: Optional[Dict[str, Any]] = None, produced: Optional[Dict[str, Any]] = None, mode: Optional[str] = None, firings: int = 1) -> None:
         """Record a transition firing event.
         
         Used by τ-leaping and other engines to record firing details.
@@ -444,9 +446,9 @@ class DataCollector:
         exporter = CSVSimulationExporter(self.get_data(), {})
         
         if format == 'wide':
-            return exporter.export_timeseries_wide(filepath)
+            return bool(exporter.export_timeseries_wide(filepath))
         else:  # format == 'long'
-            return exporter.export_timeseries_long(filepath)
+            return bool(exporter.export_timeseries_long(filepath))
     
     def export_json(self, filepath: str, 
                    include_metadata: bool = True,
@@ -468,9 +470,9 @@ class DataCollector:
         from shypn.reporting.exporters.json_simulation_exporter import JSONSimulationExporter
         
         exporter = JSONSimulationExporter(self.get_data(), {}, self.model)
-        return exporter.export(
+        return bool(exporter.export(
             filepath,
             include_metadata=include_metadata,
             include_timeseries=include_timeseries,
             include_statistics=include_statistics
-        )
+        ))
