@@ -429,7 +429,9 @@ class ExperimentAutomationCategory:
                     if value.is_integer():
                         value_str = str(int(value))
                     else:
-                        value_str = f"{value:.2f}"
+                        # Use up to 6 significant figures to avoid naming collisions
+                        # (e.g. 0.449 and 0.450 must not both map to "0.45")
+                        value_str = f"{value:.6g}"
                 else:
                     value_str = str(value)
                 name_parts.append(f"{param['name']}={value_str}")
