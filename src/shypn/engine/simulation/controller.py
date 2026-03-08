@@ -2481,6 +2481,8 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             bool: True if started successfully, False if already running
         """
         return bool(self._continuous_executor.run(time_step, max_steps))
+
+    def _simulation_loop(self) -> bool:
         """Internal simulation loop callback.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2493,6 +2495,8 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             bool: True to continue, False to stop the timeout
         """
         return bool(self._continuous_executor._simulation_loop())
+
+    def stop(self) -> None:
         """Stop the continuous simulation.
         
         REFACTORED (Phase 2.3.1): Delegates to ContinuousExecutor strategy.
@@ -2543,6 +2547,14 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                 place.tokens = place.initial_marking
             else:
                 place.tokens = 0
+
+        # Reset tau-leaping engine's dirty-flag so the next run's first step
+        # does a full y[] sync from model (update_y_from_model) instead of a
+        # partial sync that may miss places whose initial_marking was changed
+        # by the user between runs (e.g. GCSF_external edited via dialog).
+        if hasattr(self, '_tau_leaping_engine'):
+            self._tau_leaping_engine._changed_place_ids = None
+
         # Schedule time-dependent transitions (timed/stochastic) after reset
         self._update_enablement_states()
         self._notify_step_listeners()
