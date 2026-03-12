@@ -4,6 +4,8 @@ This module contains all the action handlers for the main menu bar.
 Keeping menu logic separate from the main loader maintains clean architecture.
 """
 
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gio
 
 

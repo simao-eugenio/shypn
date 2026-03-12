@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from shypn.core.services.abstract_document_serializer import AbstractDocumentSerializer
 
@@ -39,7 +39,7 @@ def get_serializer() -> "DocumentSerializer":
     return _default_serializer
 
 
-class DocumentSerializer(AbstractDocumentSerializer):
+class DocumentSerializer(AbstractDocumentSerializer):  # type: ignore[misc]
     """Stateless serializer for *ModelCanvasManager* documents.
 
     All public methods accept ``manager`` (a :class:`~shypn.data.model_canvas_manager.ModelCanvasManager`
@@ -197,17 +197,17 @@ class DocumentSerializer(AbstractDocumentSerializer):
 
     @staticmethod
     def _should_preserve_transition_color(transition: Any) -> bool:
-        return transition.is_source or transition.is_sink
+        return cast(bool, transition.is_source or transition.is_sink)
 
     @staticmethod
     def _should_preserve_place_color(place: Any) -> bool:
         from shypn.utils.color_schema_manager import ColorSchemaManager
-        return ColorSchemaManager.is_semantic_place_color(place)
+        return cast(bool, ColorSchemaManager.is_semantic_place_color(place))
 
     @staticmethod
     def _should_preserve_arc_color(arc: Any) -> bool:
         from shypn.netobjs.arc import Arc
-        return arc.color != Arc.DEFAULT_COLOR
+        return cast(bool, arc.color != Arc.DEFAULT_COLOR)
 
     def _reset_transition_colors_to_default(self, manager: Any) -> None:
         from shypn.netobjs import Transition

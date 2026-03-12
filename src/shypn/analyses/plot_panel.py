@@ -625,14 +625,20 @@ class AnalysisPlotPanel(Gtk.Box):
             self._full_redraw()
             return
         
-        # Fast update - just update existing line data
+        # Fast update - just update existing line data.
+        # When rate_data is empty (e.g. data_collector was just cleared before a new
+        # Run), explicitly zero-out the line to avoid stale trace data remaining
+        # visible on the canvas — the old guard `if rate_data` would skip the
+        # set_data() call entirely, leaving the previous run's trace on screen.
         for i, obj in enumerate(self.selected_objects):
             rate_data = self._get_rate_data(obj.id)
-            if rate_data and obj.id in self._plot_lines:
-                times = [t for t, r in rate_data]
-                rates = [r for t, r in rate_data]
-                line = self._plot_lines[obj.id]
-                line.set_data(times, rates)
+            if obj.id in self._plot_lines:
+                if rate_data:
+                    times = [t for t, r in rate_data]
+                    rates = [r for t, r in rate_data]
+                else:
+                    times, rates = [], []
+                self._plot_lines[obj.id].set_data(times, rates)
         
         # Update axis limits efficiently
         self.axes.relim()

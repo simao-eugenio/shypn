@@ -55,6 +55,10 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         snapshot = args['snapshot']
         replicates = args['replicates']
         duration = args['duration']
+        import os as _os
+        _dlog = _os.path.expanduser("~/sweep_debug.log")
+        with open(_dlog, 'a') as _f:
+            _f.write(f"[WORKER START] {name}: replicates={replicates}, duration={duration}\n")
         termination_condition = args['termination_condition']
         subnet_data = args['subnet_data']
         baseline_params = args['baseline_params']
@@ -107,7 +111,7 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         runner = ReplicateRunner(model)
         results = runner.run_replicates(
             n=replicates,
-            use_parallel=False,  # Disable stochastic parallelism in workers (ThreadPoolExecutor deadlocks in forked processes)
+            use_parallel=True,   # Safe in forked workers: Phase 4b replaced ThreadPoolExecutor with vectorised numpy (no deadlock risk)
             use_tau_leaping=use_tau_leaping,
             duration=duration,
             termination_condition=termination_condition,
@@ -148,7 +152,31 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                     experiment_params['place_markings'] = snapshot.place_markings
                     experiment_params['transition_rates'] = getattr(snapshot, 'transition_rates', {})
                     experiment_params['arc_weights'] = getattr(snapshot, 'arc_weights', {})
-                
+
+                # Overlay property_overrides onto place_markings so config.csv reflects
+                # the effective values actually used in simulation, not the baseline.
+                # property_overrides uses full paths like "P2.initial_marking"; strip the
+                # dot-suffix to match bare place/transition/arc IDs in the legacy dicts.
+                _prop_overrides = (
+                    snapshot.get('property_overrides', {}) if isinstance(snapshot, dict)
+                    else getattr(snapshot, 'property_overrides', {})
+                )
+                if _prop_overrides:
+                    _eff_markings = dict(experiment_params.get('place_markings', {}))
+                    _eff_rates = dict(experiment_params.get('transition_rates', {}))
+                    _eff_weights = dict(experiment_params.get('arc_weights', {}))
+                    for _path, _val in _prop_overrides.items():
+                        _obj_id = _path.split('.')[0]
+                        if _obj_id in _eff_markings:
+                            _eff_markings[_obj_id] = _val
+                        elif _obj_id in _eff_rates:
+                            _eff_rates[_obj_id] = _val
+                        elif _obj_id in _eff_weights:
+                            _eff_weights[_obj_id] = _val
+                    experiment_params['place_markings'] = _eff_markings
+                    experiment_params['transition_rates'] = _eff_rates
+                    experiment_params['arc_weights'] = _eff_weights
+
                 # Prepare trajectory data for validation checks
                 trajectory_data = {}
                 warnings = []
@@ -292,10 +320,17 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     
     except Exception as e:
         import traceback
+        import os as _os
+        tb_str = traceback.format_exc()
+        # Write traceback to debug file (stdout is unreliable in forked workers)
+        _dlog = _os.path.expanduser("~/sweep_debug.log")
+        with open(_dlog, 'a') as _f:
+            _f.write(f"\n[WORKER EXCEPTION] {args.get('name', 'unknown')}: {type(e).__name__}: {e}\n")
+            _f.write(tb_str)
         return {
             'name': args.get('name', 'unknown'),
             'error': f"{type(e).__name__}: {str(e)}",
-            'traceback': traceback.format_exc(),
+            'traceback': tb_str,
             'status': 'failed'
         }
 
@@ -390,8 +425,12 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
     debug_log = os.path.expanduser("~/sweep_debug.log")
     
     # DEBUG: Check for swept parameter (works for both dict and object)
+    # Note: swept_param['id'] may carry the full property path (e.g. 'P2.initial_marking');
+    # strip the dot-suffix to get the bare object ID for comparison with place_markings keys.
     if isinstance(swept_param, dict):
-        swept_place_id = swept_param.get('id') if swept_param.get('type') == 'places' else None
+        raw_swept_id = swept_param.get('id', '')
+        bare_swept_id = raw_swept_id.split('.')[0] if raw_swept_id else ''
+        swept_place_id = bare_swept_id if swept_param.get('type') == 'places' and bare_swept_id else None
     else:
         swept_place_id = None
     
@@ -544,6 +583,9 @@ class BatchExecutor:
         """
         if self.is_running:
             raise RuntimeError("Batch execution already in progress")
+        
+        if replicates <= 0:
+            raise ValueError(f"replicates must be >= 1, got {replicates}")
         
         self.is_running = True
         self.is_cancelled = False
@@ -822,9 +864,12 @@ class BatchExecutor:
             
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
+                # Use PRIORITY_LOW (300) so all pending experiment_result_callback calls
+                # (scheduled at DEFAULT priority 200) drain first — prevents the run-folder
+                # being reset before the last save callbacks execute.
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
-                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_LOW)
     
     def _execute_batch_parallel(
         self,
@@ -868,9 +913,17 @@ class BatchExecutor:
             # Determine number of workers
             if n_workers is None:
                 n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
-            
+
+            # Use 'forkserver' context: workers are forked from a clean server
+            # process that was started before GTK/Numba were loaded, so they
+            # inherit no GTK file-descriptors, event-loop handles, or partially
+            # JIT-compiled Numba state.  This is safer and leaner than the
+            # default 'fork' (which copies the entire parent address space,
+            # including all loaded GTK shared-memory segments).
+            _mp_ctx = multiprocessing.get_context('forkserver')
+
             # Create shared progress queue for workers to report back
-            manager = multiprocessing.Manager()
+            manager = _mp_ctx.Manager()
             progress_queue = manager.Queue()
             
             # Prepare experiment arguments for workers
@@ -925,7 +978,7 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with multiprocessing.Pool(processes=n_workers) as pool:
+            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
                 # Submit all experiments with start time tracking
                 async_results = []
                 for args in experiment_args:
@@ -1021,8 +1074,24 @@ class BatchExecutor:
 
                                 self.results[name] = result
 
-                                if progress_callback:
-                                    progress_callback(queue_index, "completed", "100%")
+                                # Check if worker returned an error result
+                                if 'error' in result and result.get('status') == 'failed':
+                                    # Worker raised an exception — log traceback to debug file
+                                    tb = result.get('traceback', '')
+                                    print(f"[PARALLEL] Worker error for '{name}': {result['error']}")
+                                    if tb:
+                                        print(f"[PARALLEL] Worker traceback:\n{tb}")
+                                    import os as _os
+                                    _dlog = _os.path.expanduser("~/sweep_debug.log")
+                                    with open(_dlog, 'a') as _f:
+                                        _f.write(f"\n[PARALLEL ERROR] {name}: {result['error']}\n")
+                                        if tb:
+                                            _f.write(tb)
+                                    if progress_callback:
+                                        progress_callback(queue_index, "failed", result['error'][:100])
+                                else:
+                                    if progress_callback:
+                                        progress_callback(queue_index, "completed", "100%")
 
                                 if experiment_result_callback:
                                     from gi.repository import GLib
@@ -1069,7 +1138,8 @@ class BatchExecutor:
             if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
-                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_HIGH_IDLE)
+                # Use PRIORITY_LOW so pending result callbacks drain first (see sequential path).
+                GLib.idle_add(lambda: complete_callback(cancelled=cancelled), priority=GLib.PRIORITY_LOW)
     
     def _run_single_experiment(
         self,

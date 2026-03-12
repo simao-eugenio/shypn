@@ -10,6 +10,8 @@ CSS theming uses Material Design inspired palette for better visibility:
 """
 
 import sys
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
 from pathlib import Path
 from .palette_button import PaletteButton

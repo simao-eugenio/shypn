@@ -5,7 +5,7 @@ Provides SimulationSettings class to encapsulate all timing and execution
 configuration for simulation. Follows OOP principles with validation,
 defaults, and clear separation of concerns.
 """
-from typing import Any, Optional, Set
+from typing import Any, cast, Dict, Optional, Set
 from shypn.utils.time_utils import TimeUnits, TimeConverter, TimeValidator
 
 
@@ -39,10 +39,14 @@ class SimulationSettings:
     # τ-Leaping defaults - ALWAYS ENABLED (it's the stochastic engine, not an option)
     # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
     DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance (controls accuracy)
-    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (lowered for biochemical models)
+    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (fallback when arc table unavailable)
+    DEFAULT_N_CRITICAL = 10  # Cao et al. (2006) N_c: reaction is critical if it can fire fewer
+                              # than this many times before exhausting an input place (L_j < N_c).
+                              # Primary critical-reaction criterion when arc table is available.
     DEFAULT_MAX_TAU = 0.1  # Maximum leap size (seconds) - allows reasonable simulation speed
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
+    DEFAULT_USE_JIT_KERNEL = True            # Phase 6: Numba JIT τ-step kernel — enabled (numba 0.64 installed, kernel cached)
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
     # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
@@ -62,9 +66,11 @@ class SimulationSettings:
         # τ-Leaping settings (τ-leaping is always used for stochastic simulation)
         self._tau_epsilon = self.DEFAULT_TAU_EPSILON
         self._critical_threshold = self.DEFAULT_CRITICAL_THRESHOLD
+        self._n_critical = self.DEFAULT_N_CRITICAL
         self._max_tau = self.DEFAULT_MAX_TAU
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
+        self._use_jit_kernel = self.DEFAULT_USE_JIT_KERNEL
         
         # Batch mode settings (for experiment replication)
         self._batch_mode_enabled = False
@@ -236,7 +242,7 @@ class SimulationSettings:
     
     @property
     def critical_threshold(self) -> float:
-        """Get critical reaction threshold."""
+        """Get critical reaction threshold (propensity-based fallback)."""
         return self._critical_threshold
     
     @critical_threshold.setter
@@ -252,7 +258,25 @@ class SimulationSettings:
         if value <= 0:
             raise ValueError("Critical threshold must be positive")
         self._critical_threshold = value
-    
+
+    @property
+    def n_critical(self) -> int:
+        """Get Cao et al. (2006) N_c critical reaction threshold.
+        
+        A stochastic reaction is classified as critical (handled by exact SSA
+        rather than tau-leaping) if it can fire fewer than n_critical times before
+        exhausting at least one of its input places:
+            L_j = min_i floor(x_i / v_ij) < n_critical
+        Typical value: 10 (Cao et al. recommendation).
+        """
+        return getattr(self, '_n_critical', self.DEFAULT_N_CRITICAL)
+
+    @n_critical.setter
+    def n_critical(self, value: int) -> None:
+        if int(value) < 1:
+            raise ValueError("n_critical must be at least 1")
+        self._n_critical = int(value)
+
     @property
     def max_tau(self) -> float:
         """Get maximum leap size."""
@@ -313,6 +337,29 @@ class SimulationSettings:
         """
         self._use_parallel_stochastic = bool(value)
 
+    @property
+    def use_jit_kernel(self) -> bool:
+        """Get whether the Numba JIT τ-step kernel is enabled.
+
+        When ``True`` and ``numba>=0.59`` is installed, the τ selection
+        and Poisson/Skellam sampling are compiled to native code in a
+        single JIT call, eliminating the Python-loop overhead of
+        ``select_tau()`` and ``_sample_firings()``.  Has no effect if
+        numba is not installed (falls back to the Python path silently).
+
+        Enabled automatically in batch mode via the batch runner.
+        """
+        return self._use_jit_kernel
+
+    @use_jit_kernel.setter
+    def use_jit_kernel(self, value: bool) -> None:
+        """Set JIT kernel mode.
+
+        Args:
+            value: True to enable the Numba JIT τ-step kernel.
+        """
+        self._use_jit_kernel = bool(value)
+
     
     # ========== Duration Management ==========
     
@@ -334,7 +381,7 @@ class SimulationSettings:
         """
         if self._duration is None:
             return None
-        return TimeConverter.to_seconds(self._duration, self._time_units)
+        return float(TimeConverter.to_seconds(self._duration, self._time_units))
     
     def clear_duration(self) -> None:
         """Clear duration (run indefinitely)."""
@@ -397,7 +444,7 @@ class SimulationSettings:
         duration_seconds = self.get_duration_seconds()
         dt = self.get_effective_dt()
         
-        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)  # type: ignore[arg-type]
+        _, warning = TimeValidator.estimate_step_count(duration_seconds, dt)
         return warning if warning else None
     
     # ========== Progress Tracking ==========
@@ -462,7 +509,7 @@ class SimulationSettings:
     
     # ========== Serialization ==========
     
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Serialize settings to dictionary.
         
         Returns:
@@ -478,13 +525,15 @@ class SimulationSettings:
             'use_tau_leaping': True,  # Always enabled (kept for compatibility)
             'tau_epsilon': self._tau_epsilon,
             'critical_threshold': self._critical_threshold,
+            'n_critical': self.n_critical,
             'max_tau': self._max_tau,
             'min_tau': self._min_tau,
-            'use_parallel_stochastic': self._use_parallel_stochastic
+            'use_parallel_stochastic': self._use_parallel_stochastic,
+            'use_jit_kernel': self._use_jit_kernel,
         }
     
     @classmethod
-    def from_dict(cls, data: dict) -> 'SimulationSettings':
+    def from_dict(cls, data: Dict[str, Any]) -> 'SimulationSettings':
         """Deserialize settings from dictionary.
         
         Args:
@@ -520,6 +569,9 @@ class SimulationSettings:
         if 'critical_threshold' in data:
             settings.critical_threshold = data['critical_threshold']
         
+        if 'n_critical' in data:
+            settings.n_critical = data['n_critical']
+        
         if 'max_tau' in data:
             settings.max_tau = data['max_tau']
         
@@ -528,6 +580,9 @@ class SimulationSettings:
         
         if 'use_parallel_stochastic' in data:
             settings.use_parallel_stochastic = data['use_parallel_stochastic']
+
+        if 'use_jit_kernel' in data:
+            settings.use_jit_kernel = data['use_jit_kernel']
         
         return settings
     
@@ -749,11 +804,11 @@ def _add_batch_mode_properties() -> None:
     
     # Recorded objects property
     @property  # type: ignore[misc]
-    def recorded_objects(self: Any) -> set:
+    def recorded_objects(self: Any) -> Set[str]:
         """Get set of object IDs marked for recording."""
         if not hasattr(self, '_recorded_objects'):
             self._recorded_objects = set()
-        return self._recorded_objects
+        return cast(Set[str], self._recorded_objects)
     
     # Batch mode methods
     def add_recorded_object(self: Any, object_id: str) -> None:
@@ -833,14 +888,14 @@ def _add_batch_mode_properties() -> None:
         self._ic_noise_percent = float(value)
     
     @property  # type: ignore[misc]
-    def ic_noise_places(self: Any) -> set:
+    def ic_noise_places(self: Any) -> Set[str]:
         """Get set of place IDs to apply noise to.
         
         If empty, noise is applied to all non-catalyst places.
         """
         if not hasattr(self, '_ic_noise_places'):
             self._ic_noise_places = set()
-        return self._ic_noise_places
+        return cast(Set[str], self._ic_noise_places)
     
     def add_ic_noise_place(self: Any, place_id: str) -> None:
         """Mark a place for initial condition randomization.

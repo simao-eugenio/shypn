@@ -72,7 +72,7 @@ class ReplicateRunner:
         seed_base: int = 42,
         time_units: TimeUnits = TimeUnits.SECONDS,
         verbose: bool = False,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable[[float], None]] = None
     ) -> List[Dict[str, Any]]:
         """Run n independent stochastic simulation replicates.
         
@@ -168,7 +168,7 @@ class ReplicateRunner:
             
             # ── Reset state for this replicate (controller is reused) ──────
             # Unique seed for reproducible but independent replicates
-            controller.settings.random_seed = seed_base + i  # type: ignore[attr-defined]
+            controller.settings.random_seed = seed_base + i
 
             # Restore model to initial marking
             for place in self.model.places:
@@ -185,8 +185,18 @@ class ReplicateRunner:
             # Reset model to initial marking (for any place not in initial_marking)
             self._reset_model(self.model)
             
-            # Start data collection
-            controller.data_collector.start_collection()
+            # Start data collection — Phase 5 fast path: pre-allocated float32
+            # numpy buffer (max_steps+1 rows) + skip expensive per-transition
+            # rate evaluation (propensities are already computed by the C
+            # accelerator inside the tau-leaping engine).
+            # Buffer path is disabled for steady_state termination because
+            # the mid-loop convergence check reads place_data directly before
+            # finalize_buf() converts the buffer to the dict format.
+            _use_buf = termination_condition != "steady_state"
+            controller.data_collector.start_collection(
+                n_steps_hint=max_steps + 1 if _use_buf else None,
+                skip_rate_eval=True,
+            )
             # Record initial state at t=0
             controller.data_collector.record_state(controller.time)
             
@@ -235,8 +245,17 @@ class ReplicateRunner:
                                 stopped_reason = "steady_state"
                                 break
             except Exception as e:
+                import traceback as _tb
+                import os as _os
+                _err_tb = _tb.format_exc()
                 if verbose:
                     print(f"  ERROR in replicate {i}: {e}")
+                # Always log the first replicate failure to the debug file
+                if i == 0:
+                    _dlog = _os.path.expanduser("~/sweep_debug.log")
+                    with open(_dlog, 'a') as _f:
+                        _f.write(f"[REPLICATE 0 ERROR] {type(e).__name__}: {e}\n")
+                        _f.write(_err_tb)
                 # Store error but continue (include elapsed time even for errors)
                 replicate_elapsed = time.time() - replicate_start_time
                 results.append({
@@ -247,6 +266,10 @@ class ReplicateRunner:
                 })
                 continue
             
+            # Flush Phase 5 fast-path numpy buffer into place_data before
+            # harvesting the result dict (no-op if buffer path wasn't used).
+            controller.data_collector.stop_collection()
+
             # Calculate elapsed wall-clock time for this replicate
             replicate_elapsed = time.time() - replicate_start_time
             
@@ -400,7 +423,12 @@ class ReplicateRunner:
                 }
             }
         
-        # Compute statistics for each transition (use instantaneous rates from simulation)
+        # Compute statistics for each transition (use instantaneous rates from simulation).
+        # transition_rates is empty ({}) when skip_rate_eval=True (fast-path / batch mode);
+        # in that case skip rate statistics gracefully rather than KeyError.
+        has_rates = bool(successful[0].get('transition_rates'))
+        if not has_rates:
+            transition_ids = []  # nothing to iterate
         for transition_id in transition_ids:
             # Stack rate trajectories into matrix (replicates × time_points)
             # Extract only rate values (second element) from (time, rate) tuples

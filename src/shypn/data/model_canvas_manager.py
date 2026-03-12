@@ -42,12 +42,23 @@ REFACTORING NOTE: This class now acts as a Facade, delegating to:
 ║ SEE: doc/ADR-002-model-canvas-manager-size.md (when created)              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
-import math
 import json
 import os
+import threading
 import time
 from datetime import datetime
 from typing import Optional
+
+try:
+    import gi
+    gi.require_version('GLib', '2.0')
+    from gi.repository import GLib as _GLib
+    _HAVE_GLIB = True
+except Exception:
+    _GLib = None
+    _HAVE_GLIB = False
+
+_MAIN_THREAD = threading.main_thread()
 from shypn.events import EventBus
 from shypn.core.document_id import doc_id
 from shypn.netobjs import Place, Arc, Transition
@@ -56,8 +67,6 @@ from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelec
 # Import extracted controllers and services
 from shypn.core.controllers import ViewportController, DocumentController
 from shypn.core.services import (
-    screen_to_world as coord_screen_to_world,
-    world_to_screen as coord_world_to_screen,
     mm_to_pixels as coord_mm_to_pixels,
     pixels_to_mm as coord_pixels_to_mm,
     validate_zoom as coord_validate_zoom,
@@ -184,6 +193,9 @@ class ModelCanvasManager:
         
         # Callback to trigger widget redraw (set by UI layer)
         self._redraw_callback = None
+
+        # Coalescing flag: prevents queuing multiple idle_add redraws per simulation step
+        self._redraw_pending = False
         
         # Observer pattern for model changes
         self._observers = []  # List of observer callbacks
@@ -475,103 +487,37 @@ class ModelCanvasManager:
         return self.screen_dpi / 25.4
     
     # ==================== Coordinate Transformations ====================
-    
-    # Helper methods for coordinate transformations (PHASE 1 EXTRACTION)
-    
-    def _calculate_rotation_center(self):
-        """Calculate rotation center in world coordinates.
-        
-        The rotation center is the viewport center transformed to world space.
-        
-        Returns:
-            tuple: (center_world_x, center_world_y)
-        """
-        center_world_x = self.viewport_width / (2.0 * self.zoom) - self.pan_x
-        center_world_y = self.viewport_height / (2.0 * self.zoom) - self.pan_y
-        return center_world_x, center_world_y
-    
-    @staticmethod
-    def _apply_rotation_to_point(x, y, center_x, center_y, cos_angle, sin_angle):
-        """Apply rotation transformation to a point around a center.
-        
-        Args:
-            x, y: Point coordinates
-            center_x, center_y: Rotation center
-            cos_angle, sin_angle: Rotation angle (cosine and sine)
-            
-        Returns:
-            tuple: (rotated_x, rotated_y)
-        """
-        # Translate to origin
-        dx = x - center_x
-        dy = y - center_y
-        
-        # Rotate
-        rotated_dx = dx * cos_angle - dy * sin_angle
-        rotated_dy = dx * sin_angle + dy * cos_angle
-        
-        # Translate back
-        return rotated_dx + center_x, rotated_dy + center_y
-    
+
     def screen_to_world(self, screen_x, screen_y):
         """Convert screen coordinates to world (model) coordinates.
-        
-        Applies transformations in order: zoom/pan inverse, then rotation inverse.
-        This matches the drawing pipeline: zoom/pan → rotation.
-        
-        REFACTORED: Now uses extracted helper methods for rotation calculations.
-        
+
+        Delegates rotation-aware math to ViewportController.
+
         Args:
             screen_x: X coordinate in screen space (pixels).
             screen_y: Y coordinate in screen space (pixels).
-            
+
         Returns:
             tuple: (world_x, world_y) in model coordinate space.
         """
-        # Step 1: Apply zoom/pan inverse transformation (screen → pre-rotation space)
-        pre_rot_x, pre_rot_y = coord_screen_to_world(screen_x, screen_y, self.zoom, self.pan_x, self.pan_y)
-        
-        # Step 2: Apply rotation inverse transformation (pre-rotation → world space)
         rotation = self.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            center_world_x, center_world_y = self._calculate_rotation_center()
-            cos_a = math.cos(-rotation.angle_radians)  # Negative for inverse rotation
-            sin_a = math.sin(-rotation.angle_radians)
-            return self._apply_rotation_to_point(pre_rot_x, pre_rot_y, center_world_x, center_world_y, cos_a, sin_a)
-        else:
-            return pre_rot_x, pre_rot_y
-    
+        return self.viewport_controller.screen_to_world(screen_x, screen_y, rotation)
+
     def world_to_screen(self, world_x, world_y):
         """Convert world (model) coordinates to screen coordinates.
-        
-        Applies transformations in order: rotation, then zoom/pan.
-        This matches the drawing pipeline: zoom/pan → rotation (applied in reverse).
-        
-        REFACTORED: Now uses extracted helper methods for rotation calculations.
-        
+
+        Delegates rotation-aware math to ViewportController.
+
         Args:
             world_x: X coordinate in world space.
             world_y: Y coordinate in world space.
-            
+
         Returns:
             tuple: (screen_x, screen_y) in screen coordinate space (pixels).
         """
-        # Step 1: Apply rotation transformation (world → pre-screen space)
         rotation = self.transformation_manager.get_rotation()
-        if rotation and rotation.angle_degrees != 0:
-            center_world_x, center_world_y = self._calculate_rotation_center()
-            cos_a = math.cos(rotation.angle_radians)
-            sin_a = math.sin(rotation.angle_radians)
-            pre_screen_x, pre_screen_y = self._apply_rotation_to_point(
-                world_x, world_y, center_world_x, center_world_y, cos_a, sin_a
-            )
-        else:
-            pre_screen_x = world_x
-            pre_screen_y = world_y
-        
-        # Step 2: Apply zoom/pan transformation (pre-screen → screen space)
-        return coord_world_to_screen(pre_screen_x, pre_screen_y, self.zoom, self.pan_x, self.pan_y)
-    
+        return self.viewport_controller.world_to_screen(world_x, world_y, rotation)
+
     # ==================== Tool Management ====================
     
     def set_tool(self, tool_name):
@@ -1417,31 +1363,7 @@ class ModelCanvasManager:
         """
         # Delegate to DocumentController
         return self.document_controller.get_all_objects()
-    
-    def find_object_at_position(self, x, y):
-        """Find the topmost object at the given world position.
-        
-        Args:
-            x: X coordinate in world space
-            y: Y coordinate in world space
-            
-        Returns:
-            Place, Transition, Arc, or None: The object at the position, or None
-        """
-        # Delegate to DocumentController
-        return self.document_controller.find_object_at_position(x, y)
-    
-    def clear_all_selections(self):
-        """Clear selection state on all objects.
-        
-        Used when SelectionManager needs to clear all selections.
-        """
-        # Use DocumentController to get all objects, then clear selections
-        for obj in self.document_controller.get_all_objects():
-            obj.selected = False
-        self.mark_dirty()  # Mark document as having unsaved changes
-        self.mark_needs_redraw()  # Trigger canvas redraw to update selection visuals
-    
+
     def clear_all_objects(self):
         """Remove all Petri net objects from the model and reset to new document state.
         
@@ -1757,86 +1679,40 @@ class ModelCanvasManager:
         self._needs_redraw = True
     
     # ==================== Grid Rendering ====================
-    
+
     def get_grid_spacing(self):
         """Get adaptive grid spacing based on current zoom level.
-        
-        Uses DPI-aware physical spacing (1mm base) that adapts at zoom thresholds.
-        Target at 100% zoom: 1mm minor cell, 5mm major cell (every 5th line).
-        
+
+        Delegates DPI-aware zoom-threshold logic to ViewportController.
+
         Returns:
             float: Grid spacing in world coordinates.
         """
-        # Convert base spacing from mm to pixels
-        px_per_mm = self.get_mm_to_pixels()
-        base_px = self.BASE_GRID_SPACING * px_per_mm  # 1mm → pixels
-        
-        # Adaptive grid: spacing adapts based on zoom level
-        # At high zoom (zoomed in), use smaller subdivisions for precision
-        # At low zoom (zoomed out), use larger spacing to avoid clutter
-        # Target: at zoom=1.0, grid spacing = 1mm (major cell = 5mm with GRID_MAJOR_EVERY=5)
-        if self.zoom >= 5.0:
-            return base_px / 5   # Very fine grid (0.2mm, major = 1mm)
-        elif self.zoom >= 2.0:
-            return base_px / 2   # Fine grid (0.5mm, major = 2.5mm)
-        elif self.zoom >= 0.5:
-            return base_px       # Normal grid (1mm, major = 5mm) ← TARGET at zoom=1.0
-        elif self.zoom >= 0.2:
-            return base_px * 2   # Coarse grid (2mm, major = 10mm)
-        else:
-            return base_px * 5   # Very coarse grid (5mm, major = 25mm)
-    
+        return self.viewport_controller.get_grid_spacing(
+            self.get_mm_to_pixels(), self.BASE_GRID_SPACING
+        )
+
     def get_visible_bounds(self):
         """Calculate the visible area in world coordinates.
-        
-        Uses screen_to_world transform to correctly map viewport corners.
-        This ensures grid is regenerated for current view, creating infinite canvas illusion.
-        
-        IMPORTANT: When canvas is rotated, the viewport becomes a rotated rectangle in world space.
-        We calculate the axis-aligned bounding box (AABB) that encompasses all four corners
-        to ensure the grid covers the entire visible area at any rotation angle.
-        
-        This method recalculates bounds on EVERY call, adapting to pan, zoom, and rotation.
-        
+
+        Delegates rotation-aware AABB math to ViewportController.
+
         Returns:
-            tuple: (min_x, min_y, max_x, max_y) in world coordinates (axis-aligned bounding box).
+            tuple: (min_x, min_y, max_x, max_y) in world coordinates.
         """
-        # Transform all four viewport corners to world space
-        # This accounts for rotation - corners form a rotated rectangle in world space
-        top_left = self.screen_to_world(0, 0)
-        top_right = self.screen_to_world(self.viewport_width, 0)
-        bottom_left = self.screen_to_world(0, self.viewport_height)
-        bottom_right = self.screen_to_world(self.viewport_width, self.viewport_height)
-        
-        # Calculate axis-aligned bounding box (AABB) that encompasses all corners
-        # This ensures grid fills the entire rotated viewport
-        all_x = [top_left[0], top_right[0], bottom_left[0], bottom_right[0]]
-        all_y = [top_left[1], top_right[1], bottom_left[1], bottom_right[1]]
-        
-        min_x = min(all_x)
-        max_x = max(all_x)
-        min_y = min(all_y)
-        max_y = max(all_y)
-        
-        return min_x, min_y, max_x, max_y
-    
+        rotation = self.transformation_manager.get_rotation()
+        return self.viewport_controller.get_visible_bounds(rotation)
+
     def get_visible_bounds_no_rotation(self):
         """Calculate the visible area WITHOUT rotation transformation.
-        
-        Used when rotation-independent bounds are needed for specific operations.
-        Grid rendering uses get_visible_bounds() (with rotation) for infinite canvas effect.
-        
+
+        Delegates zoom/pan-only math to ViewportController.
+
         Returns:
             tuple: (min_x, min_y, max_x, max_y) in world coordinates (no rotation).
         """
-        # Apply only zoom/pan transformation (skip rotation)
-        min_x, min_y = coord_screen_to_world(0, 0, self.zoom, self.pan_x, self.pan_y)
-        max_x, max_y = coord_screen_to_world(
-            self.viewport_width, self.viewport_height,
-            self.zoom, self.pan_x, self.pan_y
-        )
-        return min_x, min_y, max_x, max_y
-    
+        return self.viewport_controller.get_visible_bounds_no_rotation()
+
     def draw_grid(self, cr):
         """Draw the grid pattern on the cairo context.
         
@@ -1985,9 +1861,22 @@ class ModelCanvasManager:
     def mark_needs_redraw(self):
         """Mark canvas as needing redraw and trigger widget redraw - internal rendering state."""
         self._needs_redraw = True
-        # Trigger widget redraw if callback is set
+        if not self._redraw_callback:
+            return
+        # GTK queue_draw() is not thread-safe. When called from a simulation thread
+        # (batch runner, engine step), marshal via GLib.idle_add to the main loop.
+        if threading.current_thread() is _MAIN_THREAD:
+            self._redraw_callback()
+        elif _HAVE_GLIB and not self._redraw_pending:
+            self._redraw_pending = True
+            _GLib.idle_add(self._flush_redraw)
+
+    def _flush_redraw(self):
+        """Called on main thread via GLib.idle_add to perform the deferred queue_draw."""
+        self._redraw_pending = False
         if self._redraw_callback:
             self._redraw_callback()
+        return False  # Do not reschedule
     
     def set_redraw_callback(self, callback):
         """Set callback to trigger widget redraw.

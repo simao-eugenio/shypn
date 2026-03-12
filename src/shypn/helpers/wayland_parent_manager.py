@@ -20,6 +20,8 @@ Usage:
 
 import logging
 from typing import Dict, Optional
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
 
 logger = logging.getLogger(__name__)

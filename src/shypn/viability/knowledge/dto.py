@@ -37,7 +37,7 @@ class PlaceDTO:
     """Normalized place data for KB ingestion."""
     place_id: str
     label: str = ""
-    initial_marking: int = 0
+    initial_marking: float = 0.0
     
     # Optional metadata from SBML/KEGG import
     compound_id: Optional[str] = None      # e.g., "C00031"
@@ -75,7 +75,7 @@ class PlaceDTO:
         return cls(
             place_id=str(place_obj.id) if hasattr(place_obj, 'id') else str(place_obj),
             label=str(place_obj.label) if hasattr(place_obj, 'label') else '',
-            initial_marking=int(place_obj.tokens) if hasattr(place_obj, 'tokens') else 0,
+            initial_marking=float(place_obj.tokens) if hasattr(place_obj, 'tokens') else 0.0,
             compound_id=compound_id,
             compound_name=compound_name,
             chebi_id=chebi_id,
@@ -95,7 +95,7 @@ class PlaceDTO:
         return cls(
             place_id=str(data.get('place_id', data.get('id', ''))),
             label=str(data.get('label', data.get('name', ''))),
-            initial_marking=int(data.get('initial_marking', data.get('marking', 0))),
+            initial_marking=float(data.get('initial_marking', data.get('marking', 0.0))),
             compound_id=data.get('compound_id'),
             compound_name=data.get('compound_name'),
             chebi_id=data.get('chebi_id'),

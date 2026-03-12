@@ -27,7 +27,7 @@ __all__ = ["DocumentStateService"]
 logger = logging.getLogger(__name__)
 
 
-class DocumentStateService(AbstractDocumentStateService):
+class DocumentStateService(AbstractDocumentStateService):  # type: ignore[misc]
     """Owns dirty flag, filepath, filename and import state for one document.
 
     Designed for direct composition inside :class:`ModelCanvasManager`:
@@ -166,7 +166,7 @@ class DocumentStateService(AbstractDocumentStateService):
     def get_display_name(self) -> str:
         """Human-readable name: basename if saved, or base filename."""
         if self.has_filepath():
-            return os.path.basename(self._filepath)  # type: ignore[arg-type]
+            return os.path.basename(self._filepath or "")
         return "Untitled" if self._filename == "default" else self._filename
 
     # ------------------------------------------------------------------

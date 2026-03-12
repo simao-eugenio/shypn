@@ -21,6 +21,7 @@ This separation allows:
 The palette directly manages the SimulationController - buttons call controller
 methods directly rather than emitting signals for external handling.
 """
+import logging
 import os
 import gi
 gi.require_version('Gtk', '3.0')
@@ -31,6 +32,8 @@ from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
 from shypn.metadata import SweepHeaderGenerator
 from shypn.helpers.batch_results_saver import save_swiss_palette_batch
+
+logger = logging.getLogger(__name__)
 
 class SimulateToolsPaletteLoader(GObject.GObject):
     """Loader for simulation tools palette - manages [R][P][S][T][⚙] button panel.
@@ -95,6 +98,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         self.time_display_label = None
         self.token_accounting_check = None
         
+        # Guard flag: True while code is programmatically updating UI controls.
+        # Prevents feedback loops where set_active()/set_text() fire 'changed'
+        # handlers that re-write simulation settings (e.g. toggling batch mode
+        # triggering _on_time_units_changed which resets duration to seconds).
+        self._updating_ui = False
+
         # Progress display throttling (prevent unstable updates)
         self._last_progress_update_time = 0.0
         self._progress_update_interval = 0.1  # Update every 100ms max
@@ -378,6 +387,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         Args:
             check_button: GtkCheckButton that was toggled
         """
+        if self._updating_ui:
+            return
         is_enabled = check_button.get_active()
         
         # Enable/disable batch controls
@@ -393,7 +404,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Save to controller settings (session-specific, not saved to model file)
         if self.simulation:
             self.simulation.settings.batch_mode_enabled = is_enabled
-            print(f"✓ Batch mode {'enabled' if is_enabled else 'disabled'}")
+            logger.debug("Batch mode %s", 'enabled' if is_enabled else 'disabled')
     
     def _on_batch_replicates_changed(self, spin_button):
         """Handle batch replicates spinner change with atomic persistence.
@@ -406,7 +417,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         # Save to controller settings (session-specific)
         if self.simulation:
             self.simulation.settings.batch_replicates = value
-            print(f"✓ Batch replicates set to {value}")
+            logger.debug("Batch replicates set to %d", value)
     
     def _on_batch_output_changed(self, file_chooser):
         """Handle batch output folder change with atomic persistence.
@@ -717,6 +728,17 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         Syncs all settings panel controls with current simulation settings.
         """
+        if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
+            return
+        
+        self._updating_ui = True
+        try:
+            self._sync_settings_to_ui_inner()
+        finally:
+            self._updating_ui = False
+    
+    def _sync_settings_to_ui_inner(self):
+        """Inner implementation of _sync_settings_to_ui (called with _updating_ui=True)."""
         if not self.simulation or not hasattr(self, 'settings_revealer') or self.settings_revealer is None:
             return
         
@@ -1101,10 +1123,7 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             self.reset_button.set_sensitive(False)
             self.settings_button.set_sensitive(False)
             
-            # Debug: Verify button state was set
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Button states updated: Stop enabled = {self.stop_button.get_sensitive()}")
+            logger.debug(f"Button states updated: Stop enabled = {self.stop_button.get_sensitive()}")
         elif completed:
             # Completed: only Reset available
             self.run_button.set_sensitive(False)
@@ -1159,7 +1178,46 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             # Normal mode - single simulation
             # Enable smoothing for continuous runs
             self._smooth_time_enabled = True
-            
+
+            # UNCONDITIONAL RESET: Always reset before every Run so that
+            # initial_marking values are applied cleanly regardless of prior
+            # simulation state.  Clicking Run is always "start fresh" semantics;
+            # there is no Resume functionality.  This also covers the edge case
+            # where on_properties_changed already drove time back to 0 (so the
+            # old "time > 0" guard would silently skip the reset even though the
+            # controller's internal state may still be stale).
+            self.simulation.reset()
+
+            # Clear the real-time plot collector so each Run shows a fresh trace.
+            # The engine's DataCollector is already reset inside ContinuousExecutor.run()
+            # via start_collection(), but this palette-side SimulationDataCollector is
+            # separate and accumulates stale entries from previous runs or from the
+            # _notify_step_listeners() call made during reset_for_new_model/reset().
+            # Without this clear, the plot shows old file values at t=0 even after
+            # the user edits a place marking and then clicks Run.
+            if self.data_collector:
+                self.data_collector.clear()
+
+            # RENDERING FIX: Clear the analysis plot canvases so the old trace
+            # (from the previous run) is not displayed at the start of the new run.
+            # data_collector.clear() above removes the raw data but does NOT
+            # blank the matplotlib lines — those are only blanked by clear_plot().
+            # Without this, the old IC value is still visible in the plot at t=0
+            # even after the user edits a place marking and then clicks Run.
+            if hasattr(self, 'model_canvas_loader') and self.model_canvas_loader:
+                drawing_area = self.model_canvas_loader.get_current_drawing_area()
+                if drawing_area and drawing_area in self.model_canvas_loader.overlay_managers:
+                    overlay_manager = self.model_canvas_loader.overlay_managers[drawing_area]
+                    if hasattr(overlay_manager, 'analyses_panel_loader') and overlay_manager.analyses_panel_loader:
+                        analyses_panel = overlay_manager.analyses_panel_loader.panel
+                        if analyses_panel:
+                            if hasattr(analyses_panel, 'transitions_category') and analyses_panel.transitions_category:
+                                analyses_panel.transitions_category.clear_plot()
+                            if hasattr(analyses_panel, 'places_category') and analyses_panel.places_category:
+                                analyses_panel.places_category.clear_plot()
+                            if hasattr(analyses_panel, 'plotting_category') and analyses_panel.plotting_category:
+                                analyses_panel.plotting_category.clear_plot()
+
             started = self.simulation.run()
             
             # Update button states based on actual simulation state
@@ -1340,6 +1398,10 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             import traceback
             traceback.print_exc()
         
+        # Stop any in-progress continuous simulation before starting batch
+        if self.simulation and self.simulation.is_running():
+            self.simulation.stop()
+
         # Disable buttons during batch execution (but preserve object selection/recording marks)
         self._update_button_states(running=True)
         
@@ -1348,7 +1410,13 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         # Create batch runner
         batch_runner = BatchSimulationRunner()
-        
+
+        # Build replicate controller on main thread (GTK-safe) to avoid segfault
+        # from SimulationController C/JIT initialisation in background thread
+        replicate_controller = batch_runner.build_replicate_controller(
+            self.simulation, recorded_objects
+        )
+
         # Set up cancel callback (only if dialog was created)
         if progress_dialog:
             def on_cancel():
@@ -1384,7 +1452,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                     n_replicates=n_replicates,
                     recorded_objects=recorded_objects,
                     progress_callback=progress_callback,
-                    cancellation_check=cancellation_check
+                    cancellation_check=cancellation_check,
+                    replicate_controller=replicate_controller,
                 )
                 
                 # Calculate results
@@ -1397,14 +1466,12 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 else:
                     print(f"✓ Batch complete: {successful}/{n_replicates} successful in {total_time:.1f}s")
                 
-                # Auto-save DISABLED - was causing UI freeze
-                # Results remain in memory for manual export via Analyses panel if needed
-                # try:
-                #     results_folder = self._save_batch_results(results, recorded_objects, n_replicates)
-                # except Exception as save_error:
-                #     print(f"⚠️ Failed to save results: {save_error}")
-                #     import traceback
-                #     traceback.print_exc()
+                # Save results to disk (file I/O only — safe on background thread)
+                try:
+                    results_folder = self._save_batch_results(results, recorded_objects, n_replicates)
+                    logger.info("Batch results saved to %s", results_folder)
+                except Exception as save_error:
+                    logger.warning("Failed to save batch results: %s", save_error)
                 
                 # Re-enable buttons on main thread
                 GLib.idle_add(self._update_button_states, False, True)
@@ -1527,6 +1594,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         Progress bar will recalculate based on new duration.
         Emits 'settings-changed' signal for matplotlib/data collector updates.
         """
+        if self._updating_ui:
+            return
         if self.simulation is None:
             return
         
@@ -1537,6 +1606,8 @@ class SimulateToolsPaletteLoader(GObject.GObject):
             
             duration = float(duration_text)
             if duration <= 0:
+                entry.get_style_context().add_class('error')
+                GLib.timeout_add(2000, self._restore_duration_entry_value, entry)
                 return
             
             # Get current time units
@@ -1546,13 +1617,26 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 
             units = TimeUnits.from_string(units_str)
             
+            # Valid input — clear any previous error styling
+            entry.get_style_context().remove_class('error')
+            
             # Store old duration for comparison
             old_duration = self.simulation.settings.get_duration_seconds() if self.simulation.settings.duration else None
             
-            # Update settings
+            # Update live settings directly (bypasses the buffered-settings system).
             self.simulation.settings.set_duration(duration, units)
             new_duration = self.simulation.settings.get_duration_seconds()
-            
+
+            # CRITICAL: keep any open buffer in sync with the direct live-settings
+            # write above.  Without this, the next buffered commit() for an
+            # unrelated change (dt_auto, time_scale …) calls
+            # _apply_buffer_to_live() with stale duration/time_units, reverting
+            # e.g. an hours setting back to the seconds values that were in the
+            # buffer when it was first created.  This manifests as the "old
+            # token value showing after Run with hours/days duration" bug.
+            if self.buffered_settings:
+                self.buffered_settings.sync_duration_to_buffer()
+
             # If duration changed significantly, update progress display and notify listeners
             if old_duration is None or abs(new_duration - old_duration) > 0.001:
                 self._update_progress_display()
@@ -1560,12 +1644,23 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Emit signal for data collector/matplotlib updates
                 self.emit('settings-changed')
                     
-        except (ValueError, AttributeError) as e:
-            # Invalid input or units not set, ignore silently
-            pass
+        except (ValueError, AttributeError):
+            # Invalid input (e.g. non-numeric text) — mark entry as error
+            entry.get_style_context().add_class('error')
+            GLib.timeout_add(2000, self._restore_duration_entry_value, entry)
     
+    def _restore_duration_entry_value(self, entry):
+        """Restore duration entry to the current valid value after an error."""
+        if self.simulation and self.simulation.settings.duration:
+            d = self.simulation.settings.duration
+            entry.set_text(str(int(d)) if d == int(d) else str(d))
+            entry.get_style_context().remove_class('error')
+        return False  # One-shot timer
+
     def _on_time_units_changed(self, combo):
         """Handle time units combo change - update simulation settings."""
+        if self._updating_ui:
+            return
         # Revalidate duration with new units
         if self.duration_entry:
             self._on_duration_changed(self.duration_entry)
@@ -1581,15 +1676,19 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         if not self.time_units_combo:
             return
         
-        # Clear existing items
-        self.time_units_combo.remove_all()
-        
-        # Add all time units
-        for unit in TimeUnits:
-            self.time_units_combo.append_text(unit.full_name)
-        
-        # Set default to seconds
-        self.time_units_combo.set_active(1)  # SECONDS is index 1
+        self._updating_ui = True
+        try:
+            # Clear existing items
+            self.time_units_combo.remove_all()
+            
+            # Add all time units
+            for unit in TimeUnits:
+                self.time_units_combo.append_text(unit.full_name)
+            
+            # Set default to seconds
+            self.time_units_combo.set_active(1)  # SECONDS is index 1
+        finally:
+            self._updating_ui = False
     
     def _initialize_duration_controls(self):
         """Initialize duration controls with current settings."""
@@ -1609,13 +1708,18 @@ class SimulateToolsPaletteLoader(GObject.GObject):
         
         settings = self.simulation.settings
         if settings.duration:
-            self.duration_entry.set_text(str(settings.duration))
-            
-            # Set combo to current units
-            for i, unit in enumerate(TimeUnits):
-                if unit == settings.time_units:
-                    self.time_units_combo.set_active(i)
-                    break
+            self._updating_ui = True
+            try:
+                d = settings.duration
+                self.duration_entry.set_text(str(int(d)) if d == int(d) else str(d))
+                
+                # Set combo to current units
+                for i, unit in enumerate(TimeUnits):
+                    if unit == settings.time_units:
+                        self.time_units_combo.set_active(i)
+                        break
+            finally:
+                self._updating_ui = False
     
     def _update_progress_display(self):
         """Update progress bar and time display label with smoothing."""

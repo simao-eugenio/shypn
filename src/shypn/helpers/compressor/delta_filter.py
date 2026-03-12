@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -160,10 +160,17 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
             return [0] if n == 1 else [0, n - 1]
 
         # Per-channel normalisation denominator: 1 + observed range.
+        # Guard against zero-length arrays (empty series from fast-path runs).
         denom: Dict[str, float] = {
-            k: 1.0 + float(v.max() - v.min())
+            k: 1.0 + float(v.max() - v.min()) if len(v) > 0 else 1.0
             for k, v in flat.items()
         }
+        # Drop channels whose array is empty so the delta loop never indexes them.
+        flat = {k: v for k, v in flat.items() if len(v) > 0}
+
+        if not flat:
+            # All channels were empty: keep boundary points only.
+            return [0] if n == 1 else [0, n - 1]
 
         kept: List[int] = [0]
         last = 0
@@ -197,7 +204,7 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
         return kept
 
     @staticmethod
-    def _slice_list(source: List, indices: List[int]) -> List:
+    def _slice_list(source: List[Any], indices: List[int]) -> List[Any]:
         """Return a list containing only the elements at *indices*."""
         return [source[i] for i in indices]
 
@@ -214,14 +221,16 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
         """
         out: ChannelData = {}
         for key, series in channel_data.items():
+            vals = flat.get(key)
+            if vals is None or len(vals) == 0:
+                # Empty channel (fast-path run produced no data for it): skip.
+                continue
             if series and isinstance(series[0], tuple):
-                vals = flat[key]
                 # Reconstruct tuples: (original_time, compressed_value)
                 out[key] = [
                     (series[i][0], float(vals[i]))  # type: ignore[index]
                     for i in indices
                 ]
             else:
-                vals = flat[key]
                 out[key] = [float(vals[i]) for i in indices]
         return out

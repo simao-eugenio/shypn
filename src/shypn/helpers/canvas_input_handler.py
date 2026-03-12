@@ -19,23 +19,23 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 try:
-    import gi
+    import gi  # type: ignore[import-untyped]
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
-    from gi.repository import Gdk, GLib, Gtk  # type: ignore[import]
+    from gi.repository import Gdk, GLib, Gtk  # type: ignore[import-untyped]
 except Exception:
     # Allow import without GTK for testing / headless environments.
-    Gdk = None  # type: ignore[assignment]
-    GLib = None  # type: ignore[assignment]
-    Gtk = None  # type: ignore[assignment]
+    Gdk = None
+    GLib = None
+    Gtk = None
 
 try:
-    from shypn.netobjs import Arc, Place, Transition  # type: ignore[import]
+    from shypn.netobjs import Arc, Place, Transition
 except ImportError:
-    Arc = Place = Transition = None  # type: ignore[misc,assignment]
+    Arc = Place = Transition = None
 
 from shypn.helpers.canvas_interaction_context import CanvasInteractionContext
 
@@ -873,8 +873,8 @@ class CanvasInputHandler(AbstractCanvasInputHandler):
                 }
                 if hasattr(arc, 'is_curved') and arc.is_curved:
                     arc_data['is_curved'] = True
-                    arc_data['handle_x'] = arc.handle_x  # type: ignore[attr-defined]
-                    arc_data['handle_y'] = arc.handle_y  # type: ignore[attr-defined]
+                    arc_data['handle_x'] = arc.handle_x
+                    arc_data['handle_y'] = arc.handle_y
                 self._clipboard.append(arc_data)
 
     def paste_selection(
@@ -987,7 +987,7 @@ class CanvasInputHandler(AbstractCanvasInputHandler):
         """Inline snapshot capture (fallback when shypn.edit.snapshots unavailable)."""
         from shypn.netobjs import Place, Transition, Arc
         snaps: List[Any] = []
-        recorded_arc_ids: set = set()
+        recorded_arc_ids: Set[int] = set()
 
         def snap_arc(a: Any) -> Dict[str, Any]:
             return {

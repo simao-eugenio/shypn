@@ -6,7 +6,7 @@ Each validator checks a specific conservation law or thermodynamic criterion.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -36,7 +36,7 @@ class ValidationResult:
     status: ValidationStatus
     message: str
     value: Optional[float] = None
-    expected_range: Optional[tuple] = None
+    expected_range: Optional[Tuple[float, float]] = None
     details: Optional[Dict[str, Any]] = None
     timestamp: Optional[float] = None
     
@@ -85,7 +85,7 @@ class BaseValidator(ABC):
         self._results = []
     
     @abstractmethod
-    def update(self, time: float, places: Dict, transitions: Dict) -> None:
+    def update(self, time: float, places: Dict[str, Any], transitions: Dict[str, Any]) -> None:
         """Update validator with current simulation state.
         
         Called at each recording interval during simulation.

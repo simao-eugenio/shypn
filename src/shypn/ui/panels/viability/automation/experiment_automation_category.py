@@ -429,7 +429,9 @@ class ExperimentAutomationCategory:
                     if value.is_integer():
                         value_str = str(int(value))
                     else:
-                        value_str = f"{value:.2f}"
+                        # Use up to 6 significant figures to avoid naming collisions
+                        # (e.g. 0.449 and 0.450 must not both map to "0.45")
+                        value_str = f"{value:.6g}"
                 else:
                     value_str = str(value)
                 name_parts.append(f"{param['name']}={value_str}")
@@ -483,6 +485,9 @@ class ExperimentAutomationCategory:
                 text = self.sweep_builder.replicates_entry.get_text().strip()
                 if text:
                     replicates = int(text)
+                    if replicates <= 0:
+                        print(f"[WARNING] Replicates is {replicates}, using default 3")
+                        replicates = 3
             except Exception as e:
                 print(f"[WARNING] Failed to read replicates: {e}, using default: {replicates}")
         
@@ -1136,8 +1141,10 @@ class ExperimentAutomationCategory:
         Args:
             cancelled: Whether batch was cancelled by user
         """
-        # Close the per-run folder (next run will create a new one)
-        self._current_run_folder = None
+        # NOTE: _current_run_folder is intentionally NOT reset here.
+        # Late-arriving experiment_result_callback idle calls must still find
+        # the correct run folder.  The reset happens at the top of the next
+        # batch run (_current_run_folder = None, line ~600 above).
 
         # Use GLib.idle_add for ALL UI updates from background thread
         def complete_ui_updates():

@@ -11,12 +11,13 @@ Supports:
 
 import logging
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Set
 
 from .leap_selector import LeapSelector
 from .poisson_sampler import PoissonSampler
 from .skellam_sampler import SkellamSampler
 from .parallel_scheduler import ParallelStochasticScheduler
+from . import jit_kernel as jit_kernel
 
 
 class TauLeapingEngine:
@@ -46,6 +47,8 @@ class TauLeapingEngine:
         max_tau: float = 1.0,
         seed: Optional[int] = None,
         use_parallel: bool = False,
+        use_jit_kernel: bool = False,
+        n_critical: int = 10,
         verbose: bool = True
     ):
         """Initialize τ-leaping engine.
@@ -62,11 +65,13 @@ class TauLeapingEngine:
         self.leap_selector = LeapSelector(
             epsilon=epsilon,
             critical_threshold=critical_threshold,
-            max_tau=max_tau
+            max_tau=max_tau,
+            n_critical=n_critical,
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
         self.skellam_sampler = SkellamSampler(seed=seed)  # For reversible reactions
         self.use_parallel = use_parallel
+        self.use_jit_kernel = use_jit_kernel
         self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
@@ -74,7 +79,13 @@ class TauLeapingEngine:
         
         # Control flag for time advancement (can be disabled for hybrid models)
         self._advance_time = True
-        
+
+        # Phase 2.2: dirty-flag tracking — IDs of places modified by the last
+        # _apply_firings call.  None on the very first step (forces full sync).
+        # Replaces update_y_from_model() on subsequent steps with a partial
+        # update touching only the places whose token counts actually changed.
+        self._changed_place_ids: Optional[Set[str]] = None
+
         self.logger = logging.getLogger(__name__)
         
         # Suppress warnings if not verbose
@@ -122,23 +133,47 @@ class TauLeapingEngine:
         # Compute the full propensity vector via the C accelerator (once per
         # step) so that both select_tau and _sample_firings share the result
         # instead of each calling _evaluate_rate_at_enablement × N.
+        _jit_raw = None  # Phase 6: (a_net, a_fwd, a_rev) raw arrays when JIT is active
         self._accel_props = None
         if hasattr(controller, '_ensure_propensity_accelerator'):
             controller._ensure_propensity_accelerator()
         _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        # Guard: only use a real PropensityAccelerator, not a Mock auto-attribute.
+        # Real accelerators define 'ready' at the class level; Mock's do not.
+        if _prop_accel is not None and getattr(type(_prop_accel), 'ready', None) is None:
+            _prop_accel = None
         if _prop_accel is not None and _prop_accel.ready:
             try:
-                _prop_accel.update_y_from_model()
+                # Phase 2.2: partial y[] update — only sync places that changed
+                # last step; fall back to full update on the first step.
+                if self._changed_place_ids is not None:
+                    _prop_accel.update_y_partial(self._changed_place_ids)
+                else:
+                    _prop_accel.update_y_from_model()
                 _prop_accel.update_thermo_params()
                 _a_net, _a_fwd, _a_rev = _prop_accel.compute(current_time)
-                self._accel_props = {
-                    tid: (
-                        float(_a_net[i]),
-                        float(_a_fwd[i]),
-                        float(_a_rev[i]),
-                    )
-                    for i, tid in enumerate(_prop_accel.transition_ids_order)
-                }
+                # Phase 6: in JIT mode skip the per-step dict build (raw numpy
+                # arrays go directly to the compiled kernel, saving ~29 Python
+                # float() calls and a dict comprehension per step).
+                _use_jit = (
+                    self.use_jit_kernel
+                    and jit_kernel.NUMBA_AVAILABLE
+                    and jit_kernel.tau_step_kernel is not None
+                    and _prop_accel._g_vec is not None
+                    and _prop_accel._stoich_matrix is not None
+                )
+                if _use_jit:
+                    _jit_raw = (_a_net, _a_fwd, _a_rev)
+                    # self._accel_props stays None — not needed in the JIT path
+                else:
+                    self._accel_props = {
+                        tid: (
+                            float(_a_net[i]),
+                            float(_a_fwd[i]),
+                            float(_a_rev[i]),
+                        )
+                        for i, tid in enumerate(_prop_accel.transition_ids_order)
+                    }
             except Exception as _exc:
                 self.logger.debug(
                     "PropensityAccelerator.compute failed (%s); "
@@ -148,13 +183,98 @@ class TauLeapingEngine:
                 self._accel_props = None
         # ──────────────────────────────────────────────────────────────────────
 
-        # Step 1: Select leap size τ
+        # Phase 2.1: pass precomputed arc table to leap selector so
+        # _get_min_input_tokens uses O(k) lookup instead of O(|arcs|) scan.
+        _arc_table_raw = (
+            _prop_accel._input_arc_table
+            if _prop_accel is not None and _prop_accel.ready
+            else None
+        )
+        _arc_table = _arc_table_raw if isinstance(_arc_table_raw, dict) else None
+
+        # Phase 3: pass stoichiometry data so the Cao et al. (2006) full leap
+        # condition can be used instead of the simplified ε/max(a) formula.
+        _cao_data = None
+        if (
+            _prop_accel is not None
+            and _prop_accel.ready
+            and _prop_accel._stoich_matrix is not None
+            and self._accel_props is not None
+        ):
+            _cao_data = (
+                _prop_accel._stoich_matrix,
+                _prop_accel._stoich_matrix_sq,
+                _prop_accel._y_arr,
+                _prop_accel._g_vec,
+                _prop_accel.transition_ids_order,
+            )
+
+        # ── Phase 6: JIT short-circuit ────────────────────────────────────────
+        # Combines Cao τ selection + Poisson/Skellam sampling in a single
+        # Numba-compiled call, bypassing the Python loops in select_tau() and
+        # _sample_firings().  Falls through to the standard path when the JIT
+        # is not active (e.g. numba not installed, first call, accel not ready).
+        if _jit_raw is not None:
+            _a_net_j, _a_fwd_j, _a_rev_j = _jit_raw
+            tau_jit, k_arr_jit = jit_kernel.tau_step_kernel(
+                np.ascontiguousarray(_a_net_j, dtype=np.float64),
+                np.ascontiguousarray(_a_fwd_j, dtype=np.float64),
+                np.ascontiguousarray(_a_rev_j, dtype=np.float64),
+                _prop_accel._g_vec,
+                _prop_accel._y_arr,          # read-only snapshot for ε_i term
+                _prop_accel._stoich_matrix,
+                _prop_accel._stoich_matrix_sq,
+                float(self.leap_selector.critical_threshold),
+                float(self.leap_selector.epsilon),
+                float(self.leap_selector.max_tau),
+                float(self.leap_selector.min_tau),
+                np.int64(getattr(self.leap_selector, 'n_critical', 10)),
+            )
+            if tau_jit == 0.0:
+                self.stats['exact_ssa_fallbacks'] += 1
+                return self._execute_exact_ssa_step(controller, stochastic_transitions)
+            firings_map = self._k_arr_to_firings_map(
+                k_arr_jit, _prop_accel, stochastic_transitions
+            )
+            firings_map = self._apply_inhibitor_constraints(firings_map, stochastic_transitions)
+            self._changed_place_ids = set()
+            total_firings = self._apply_firings_fast(firings_map, controller, _prop_accel)
+            if self._advance_time:
+                controller.time += tau_jit
+            if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
+                self._update_assignment_rules(controller)
+            self.stats['total_leaps'] += 1
+            self.stats['total_firings'] += total_firings
+            self.stats['mean_tau'] = (
+                (self.stats['mean_tau'] * (self.stats['total_leaps'] - 1) + tau_jit)
+                / self.stats['total_leaps']
+            )
+            if hasattr(controller, 'data_collector') and controller.data_collector:
+                controller.data_collector.record_event(
+                    time=controller.time,
+                    event_type='tau_leap',
+                    data={
+                        'tau': tau_jit,
+                        'total_firings': total_firings,
+                        'num_transitions': int(np.count_nonzero(k_arr_jit)),
+                        'leap_info': {'reason': 'jit_kernel'},
+                    },
+                )
+            duration_s = controller.settings.get_duration_seconds()
+            if duration_s is None:
+                return True
+            return controller.time < duration_s
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Step 1: Select leap size τ  (standard Python path)
         tau, leap_info = self.leap_selector.select_tau(
             stochastic_transitions,
             model,
             current_time,
             controller,
             propensity_hint=self._accel_props,
+            arc_table=_arc_table,
+            cao_data=_cao_data,
         )
         
         # Log tau selection for debugging
@@ -182,6 +302,8 @@ class TauLeapingEngine:
         )
         
         # Step 3: Apply firings (consume/produce tokens)
+        # Reset dirty-flag set; _apply_firings will populate it.
+        self._changed_place_ids = set()
         total_firings = self._apply_firings(
             firings_map,
             controller
@@ -192,7 +314,7 @@ class TauLeapingEngine:
             controller.time += tau
         
         # Step 4.5: Update assignment rule-defined species (Option 3)
-        if hasattr(controller, 'enable_assignment_rule_reevaluation') and controller.enable_assignment_rule_reevaluation:
+        if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
             self._update_assignment_rules(controller)
         
         # NOTE: State recording moved to controller.step() to avoid duplicate recording
@@ -221,9 +343,10 @@ class TauLeapingEngine:
         
         # Check if simulation should continue
         # If duration is None, run indefinitely (return True)
-        if controller.settings.duration is None:
+        duration_s = controller.settings.get_duration_seconds()
+        if duration_s is None:
             return True
-        return controller.time < controller.settings.duration
+        return controller.time < duration_s
     
     def _sample_firings(
         self,
@@ -382,51 +505,47 @@ class TauLeapingEngine:
                 f"  Kinetic law: {formula_str[:200]}{'...' if len(formula_str) > 200 else ''}"
             )
         
-        # Sample firings - use Skellam for reversible, Poisson for irreversible
-        for transition, propensity in zip(transitions, propensities):
-            if getattr(transition, '_skellam_reversible', False):
-                # Reversible reaction: use Skellam distribution
-                try:
-                    # Prefer accelerator-provided fwd/rev (both components correct);
-                    # fall back to sign-split heuristic when Python eval was used.
-                    if hasattr(transition, '_accel_fwd_prop'):
-                        forward_prop = transition._accel_fwd_prop
-                        reverse_prop = transition._accel_rev_prop
-                    elif propensity >= 0:
-                        # Net forward (heuristic)
-                        forward_prop = propensity
-                        reverse_prop = 0.0
-                    else:
-                        # Net reverse (heuristic)
-                        forward_prop = 0.0
-                        reverse_prop = abs(propensity)
+        # Phase 4b: Single vectorized Poisson call for all irreversible transitions.
+        # Reversible reactions (Skellam) are sampled individually — they are a small
+        # minority in metabolic/signalling models.  For GATA: ~3 reversible out of 29.
+        _irrev_trans: List[Any] = []
+        _irrev_lam:   List[float] = []
+        for _t, _p in zip(transitions, propensities):
+            if not getattr(_t, '_skellam_reversible', False):
+                _irrev_trans.append(_t)
+                _irrev_lam.append(max(0.0, _p))
+        if _irrev_trans:
+            _lam_arr = np.array(_irrev_lam, dtype=np.float64) * tau
+            _k_arr   = self.poisson_sampler.rng.poisson(lam=_lam_arr)  # ONE C call
+            for _t, _k in zip(_irrev_trans, _k_arr):
+                firings_map[_t] = int(_k)
+            self.stats['irreversible_reactions'] += len(_irrev_trans)
 
-                    firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
-                    firings_map[transition] = firings
-                    self.stats['reversible_reactions'] += 1
-                    
-                except Exception as e:
-                    self.logger.warning(
-                        f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
-                    )
-                    # Fallback to Poisson with clamped propensity
-                    firings = self.poisson_sampler.sample(max(0, propensity), tau)
-                    firings_map[transition] = firings
-                    self.stats['irreversible_reactions'] += 1
-            else:
-                # Irreversible reaction: use Poisson distribution
-                # Clamp negative propensities to zero (shouldn't happen for irreversible)
-                if propensity < 0:
-                    self.logger.warning(
-                        f"Negative propensity for irreversible transition {transition.name}: {propensity}. "
-                        f"Clamping to 0."
-                    )
-                    propensity = 0.0
-                
-                firings = self.poisson_sampler.sample(propensity, tau)
+        # Reversible reactions: individual Skellam sampling
+        for transition, propensity in zip(transitions, propensities):
+            if not getattr(transition, '_skellam_reversible', False):
+                continue
+            try:
+                if hasattr(transition, '_accel_fwd_prop'):
+                    forward_prop = transition._accel_fwd_prop
+                    reverse_prop = transition._accel_rev_prop
+                elif propensity >= 0:
+                    forward_prop = propensity
+                    reverse_prop = 0.0
+                else:
+                    forward_prop = 0.0
+                    reverse_prop = abs(propensity)
+                firings = self.skellam_sampler.sample(forward_prop, reverse_prop, tau)
+                firings_map[transition] = firings
+                self.stats['reversible_reactions'] += 1
+            except Exception as e:
+                self.logger.warning(
+                    f"Skellam sampling failed for {transition.name}: {e}. Using Poisson."
+                )
+                firings = self.poisson_sampler.sample(max(0, propensity), tau)
                 firings_map[transition] = firings
                 self.stats['irreversible_reactions'] += 1
-        
+
         # Apply inhibitor arc constraints to limit firings
         firings_map = self._apply_inhibitor_constraints(firings_map, transitions)
         
@@ -479,10 +598,14 @@ class TauLeapingEngine:
             
             # Find inhibitor arcs (Product → Transition) using defensive pattern
             # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
-            inhibitor_arcs = [arc for arc in input_arcs if 
-                            getattr(arc, 'arc_type', 'normal') == 'inhibitor' or
-                            'inhibitor' in getattr(arc, 'arc_type', 'normal') or
-                            getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal')) == 'inhibitor']
+            def _arc_type_str(arc: Any) -> str:
+                v = getattr(arc, 'arc_type', None)
+                return v if isinstance(v, str) else 'normal'
+
+            inhibitor_arcs = [arc for arc in input_arcs if
+                            _arc_type_str(arc) == 'inhibitor' or
+                            'inhibitor' in _arc_type_str(arc) or
+                            getattr(arc, 'kind', None) == 'inhibitor']
             
             if not inhibitor_arcs:
                 # No inhibitors, use original firings
@@ -563,7 +686,140 @@ class TauLeapingEngine:
             constrained_map[transition] = max_allowed_firings
         
         return constrained_map
-    
+
+    def _k_arr_to_firings_map(
+        self,
+        k_arr: Any,
+        accel: Any,
+        stochastic_transitions: List[Any],
+    ) -> Dict[Any, int]:
+        """Convert a JIT firing-count array to a transition→count dict.
+
+        Maps the integer array aligned with ``accel.transition_ids_order``
+        to ``{transition_obj: num_firings}`` so the existing
+        ``_apply_inhibitor_constraints`` and ``_apply_firings_fast`` machinery
+        can be reused without modification.  Called only in the Phase 6 JIT
+        path.
+
+        Args:
+            k_arr: int64 array of firing counts (JIT kernel output).
+            accel: PropensityAccelerator with ``transition_ids_order``.
+            stochastic_transitions: Transition objects with matching IDs.
+
+        Returns:
+            Dict mapping transition object → integer firing count.
+        """
+        trans_by_id: Dict[str, Any] = {
+            getattr(t, 'id', None): t for t in stochastic_transitions
+        }
+        firings_map: Dict[Any, int] = {}
+        for j, tid in enumerate(accel.transition_ids_order):
+            k = int(k_arr[j])
+            trans = trans_by_id.get(tid)
+            if trans is not None:
+                firings_map[trans] = k
+        return firings_map
+
+    def _apply_firings_fast(
+        self,
+        firings_map: Dict[Any, int],
+        controller: Any,
+        accel: Any,
+    ) -> int:
+        """Vectorised _apply_firings using the stoichiometry matrix (Phase 3).
+
+        Replaces the sequential per-arc ``set_tokens`` loop with a single BLAS
+        ``S @ k`` matrix-vector product, then writes all place tokens back from
+        the ``_y_arr`` buffer.  Consumed/produced maps are derived from the
+        precomputed arc tables so no ``behavior.get_*_arcs()`` calls are needed.
+        """
+        import numpy as np
+
+        n_t = accel._n_transitions
+        k_arr = np.zeros(n_t, dtype=np.float64)
+        tid_to_j: Dict[str, int] = {
+            tid: j for j, tid in enumerate(accel.transition_ids_order)
+        }
+        _in_tbl  = accel._input_arc_table
+        _out_tbl = accel._output_arc_table
+        per_trans: List[Tuple[Any, int, Dict, Dict]] = []
+
+        for transition, num_firings in firings_map.items():
+            if num_firings == 0:
+                continue
+            _tid = getattr(transition, 'id', None)
+
+            # Cap firings using precomputed input arc table (O(k) per transition)
+            in_entries = _in_tbl.get(_tid, [])
+            max_poss = num_firings
+            for _p, _w in in_entries:
+                if _w > 0.0:
+                    max_poss = min(max_poss, int(_p.tokens // _w))
+            actual = max(0, min(num_firings, max_poss))
+            if actual == 0:
+                continue
+
+            consumed_map: Dict[str, float] = {
+                _p.id: _w * actual for _p, _w in in_entries
+            }
+            produced_map: Dict[str, float] = {
+                _p.id: _w * actual for _p, _w in _out_tbl.get(_tid, [])
+            }
+            per_trans.append((transition, actual, consumed_map, produced_map))
+
+            j = tid_to_j.get(_tid)
+            if j is not None:
+                k_arr[j] = float(actual)
+
+        total_firings = sum(act for _, act, _, _ in per_trans)
+
+        if total_firings > 0:
+            # ── Vectorised token update ─────────────────────────────────────
+            delta = accel._stoich_matrix @ k_arr   # shape (n_places,)
+            y = accel._y_arr
+            y += delta
+            np.clip(y, 0.0, None, out=y)
+            # Write back to place objects
+            for pid, idx in accel._all_place_index.items():
+                p = accel._places_by_id.get(pid)
+                if p is not None:
+                    p.tokens = float(y[idx])
+            # ────────────────────────────────────────────────────────────────
+
+        # ── Recording + dirty-flag tracking ─────────────────────────────────
+        _dc = getattr(controller, 'data_collector', None)
+        _listeners = getattr(controller, 'step_listeners', [])
+        for transition, actual, consumed_map, produced_map in per_trans:
+            # Phase 2.2: dirty-flag tracks which places changed
+            if self._changed_place_ids is not None:
+                self._changed_place_ids.update(consumed_map)
+                self._changed_place_ids.update(produced_map)
+            if _dc is not None:
+                _dc.record_firing(
+                    time=controller.time,
+                    transition=transition,
+                    consumed=consumed_map,
+                    produced=produced_map,
+                    mode='tau_leaping',
+                    firings=actual,
+                )
+            if _listeners:
+                details = {
+                    'consumed': consumed_map,
+                    'produced': produced_map,
+                    'mode': 'tau_leaping',
+                    'firings': actual,
+                }
+                for listener in _listeners:
+                    listener_obj = getattr(listener, '__self__', listener)
+                    if hasattr(listener_obj, 'on_transition_fired'):
+                        for _ in range(actual):
+                            listener_obj.on_transition_fired(
+                                transition, controller.time, details
+                            )
+        # ────────────────────────────────────────────────────────────────────
+        return total_firings
+
     def _apply_firings(
         self,
         firings_map: Dict[Any, int],
@@ -578,6 +834,18 @@ class TauLeapingEngine:
         Returns:
             Total number of firings applied
         """
+        # Phase 3: dispatch to vectorised fast path when stoich matrix is ready.
+        _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        # Guard: reject Mock auto-attributes (no class-level 'ready' property)
+        if _prop_accel is not None and getattr(type(_prop_accel), 'ready', None) is None:
+            _prop_accel = None
+        if (
+            _prop_accel is not None
+            and _prop_accel.ready
+            and _prop_accel._stoich_matrix is not None
+        ):
+            return self._apply_firings_fast(firings_map, controller, _prop_accel)
+
         total_firings = 0
         
         for transition, num_firings in firings_map.items():
@@ -620,7 +888,12 @@ class TauLeapingEngine:
                 actual_firings,
                 behavior
             )
-            
+
+            # Phase 2.2: record which place IDs changed for the dirty-flag
+            if self._changed_place_ids is not None:
+                self._changed_place_ids.update(consumed_map)
+                self._changed_place_ids.update(produced_map)
+
             total_firings += actual_firings
             
             # Record firing event in engine's data collector (for reports)
@@ -635,14 +908,15 @@ class TauLeapingEngine:
                 )
             
             # Notify step listeners that have on_transition_fired (for analyses/plotting)
-            if hasattr(controller, 'step_listeners'):
+            _listeners = getattr(controller, 'step_listeners', None)
+            if isinstance(_listeners, (list, tuple)) and _listeners:
                 details = {
                     'consumed': consumed_map,
                     'produced': produced_map,
                     'mode': 'tau_leaping',
                     'firings': actual_firings
                 }
-                for listener in controller.step_listeners:
+                for listener in _listeners:
                     # Listeners are bound methods, check the object they're bound to
                     listener_obj = getattr(listener, '__self__', listener)
                     if hasattr(listener_obj, 'on_transition_fired'):
@@ -783,7 +1057,8 @@ class TauLeapingEngine:
         if not enabled:
             # No enabled transitions - advance time slightly
             controller.time += 0.001
-            return controller.time < controller.settings.duration
+            duration_s = controller.settings.get_duration_seconds()
+            return duration_s is None or controller.time < duration_s
         
         # Select one transition (priority/random based on controller settings)
         transition = controller._select_transition(enabled)
@@ -791,7 +1066,8 @@ class TauLeapingEngine:
         # Fire it using exact SSA
         controller._fire_transition(transition)
         
-        return controller.time < controller.settings.duration
+        duration_s = controller.settings.get_duration_seconds()
+        return duration_s is None or controller.time < duration_s
     
     def _get_behavior(self, transition: Any) -> Optional[Any]:
         """Get behavior object for transition.
@@ -807,9 +1083,12 @@ class TauLeapingEngine:
         Returns:
             Behavior object or None
         """
-        # Preferred: delegate to controller which manages the cache correctly
-        if hasattr(self, '_controller') and hasattr(self._controller, '_get_behavior'):
-            return self._controller._get_behavior(transition)
+        # Preferred: delegate to controller which manages the cache correctly.
+        # Guard: only use the controller method when it is a real class-level
+        # definition (not an auto-attribute generated by unittest.mock.Mock).
+        ctrl = getattr(self, '_controller', None)
+        if ctrl is not None and getattr(type(ctrl), '_get_behavior', None) is not None:
+            return ctrl._get_behavior(transition)
 
         # Fallback: check if transition has behavior attribute (backward compatibility)
         if hasattr(transition, 'behavior'):

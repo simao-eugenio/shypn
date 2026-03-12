@@ -13,20 +13,23 @@ Each category contains:
 Author: Simão Eugénio
 Date: 2025-10-29
 """
-import gi
+from __future__ import annotations
+
+import gi  # type: ignore[import-untyped]
 import logging
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib  # type: ignore[import-untyped]
 from abc import ABCMeta, abstractmethod
+from typing import Any, Callable, Optional
 
 from shypn.ui.category_frame import CategoryFrame
 
 
-class _BasePathwayCategoryMeta(type(CategoryFrame), ABCMeta):
+class _BasePathwayCategoryMeta(type(CategoryFrame), ABCMeta):  # type: ignore[misc]
     pass
 
 
-class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
+class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):  # type: ignore[misc]
     """Base class for pathway operation category controllers.
     
     Each category is responsible for:
@@ -44,7 +47,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     - _on_import_error(): Called when import encounters error
     """
     
-    def __init__(self, category_name, expanded=False):
+    def __init__(self, category_name: str, expanded: bool = False) -> None:
         """Initialize base pathway category.
         
         Args:
@@ -78,7 +81,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
             self.set_content(content_widget)
     
     @abstractmethod
-    def _build_content(self):
+    def _build_content(self) -> Any:
         """Build and return the content widget.
 
         Must be implemented by subclasses.
@@ -104,7 +107,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         current canvas manager's document.
         """
     
-    def _get_status_widget(self):
+    def _get_status_widget(self) -> Any:
         """Get the status label widget for displaying messages.
         
         Should be implemented by subclasses to return their status label.
@@ -118,14 +121,14 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Status Message Helpers (Wayland-safe)
     # ========================================================================
     
-    def _show_status(self, message: str, error: bool = False):
+    def _show_status(self, message: str, error: bool = False) -> None:
         """Show status message in label (Wayland-safe, thread-safe).
 
         Args:
             message: Status message to display
             error: If True, display as error (red text)
         """
-        def _update():
+        def _update() -> None:
             status_widget = self._get_status_widget()
             if not status_widget:
                 return
@@ -135,7 +138,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
                 status_widget.set_markup(f'<span foreground="gray">{message}</span>')
         GLib.idle_add(_update)
     
-    def _show_progress(self, message: str):
+    def _show_progress(self, message: str) -> None:
         """Show progress message with hourglass icon.
 
         Args:
@@ -143,7 +146,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         self._show_status(f"⏳ {message}")
     
-    def _show_success(self, message: str):
+    def _show_success(self, message: str) -> None:
         """Show success message with checkmark icon.
         
         Args:
@@ -151,7 +154,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         self._show_status(f"✅ {message}")
     
-    def _show_error(self, message: str):
+    def _show_error(self, message: str) -> None:
         """Show error message with error icon.
 
         Args:
@@ -159,7 +162,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         self._show_status(f"❌ {message}", error=True)
 
-    def set_parent_window(self, parent_window):
+    def set_parent_window(self, parent_window: Any) -> None:
         """Set parent window for dialogs (Wayland compatibility).
 
         Args:
@@ -167,7 +170,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         self.parent_window = parent_window
 
-    def _on_metadata_expander_toggled(self, expander, param):
+    def _on_metadata_expander_toggled(self, expander: Any, param: Any) -> None:
         """Populate metadata inspector when user expands it.
 
         Args:
@@ -181,7 +184,12 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Threading Helpers (Wayland-safe)
     # ========================================================================
     
-    def _run_in_thread(self, task_func, on_complete=None, on_error=None):
+    def _run_in_thread(
+        self,
+        task_func: Callable[[], Any],
+        on_complete: Optional[Callable[[Any], None]] = None,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
         """Run a blocking task in background thread (Wayland-safe).
         
         Args:
@@ -191,7 +199,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         import threading
         
-        def thread_wrapper():
+        def thread_wrapper() -> None:
             try:
                 result = task_func()
                 if on_complete:
@@ -209,7 +217,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Project Integration
     # ========================================================================
     
-    def set_project(self, project):
+    def set_project(self, project: Any) -> None:
         """Set or update the current project.
         
         Updates UI state based on project availability.
@@ -220,7 +228,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         self.project = project
         self._update_ui_for_project_state()
     
-    def _update_ui_for_project_state(self):
+    def _update_ui_for_project_state(self) -> None:
         """Update UI elements based on project availability.
         
         Subclasses can override to enable/disable controls based on project state.
@@ -228,7 +236,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         pass
     
-    def set_model_canvas(self, model_canvas):
+    def set_model_canvas(self, model_canvas: Any) -> None:
         """Set or update the model canvas / manager.
 
         Args:
@@ -238,7 +246,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         """
         self.model_canvas = model_canvas
     
-    def _get_canvas_loader(self):
+    def _get_canvas_loader(self) -> Any:
         """Get the canvas loader instance (for creating new tabs).
         
         Returns:
@@ -262,7 +270,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         logger.warning(f"_get_canvas_loader: model_canvas has no add_document method (type={type(self.model_canvas).__name__})")
         return None
     
-    def _get_canvas_manager(self):
+    def _get_canvas_manager(self) -> Any:
         """Get the current canvas manager instance consistently.
         
         This method normalizes access to the canvas manager across all
@@ -299,7 +307,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Import Lifecycle (Override in subclasses)
     # ========================================================================
     
-    def _on_import_complete(self, imported_data):
+    def _on_import_complete(self, imported_data: Any) -> None:
         """Called when import completes successfully.
         
         Subclasses can override to perform additional actions.
@@ -315,7 +323,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         if self.parent_panel and hasattr(self.parent_panel, '_on_category_import_complete'):
             self.parent_panel._on_category_import_complete(self, imported_data)
     
-    def _on_import_error(self, error):
+    def _on_import_error(self, error: Exception) -> None:
         """Called when import encounters an error.
         
         Subclasses can override to perform additional actions.
@@ -331,7 +339,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Signal for KEGG/SBML → BRENDA data flow
     # ========================================================================
     
-    def _trigger_import_complete(self, data: dict):
+    def _trigger_import_complete(self, data: dict[str, Any]) -> None:
         """Trigger import complete signal for BRENDA integration.
         
         Args:
@@ -344,7 +352,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
     # Shared simulation helpers (used by BRENDA, SABIO-RK, and similar)
     # ========================================================================
 
-    def _reset_simulation_after_parameter_changes(self):
+    def _reset_simulation_after_parameter_changes(self) -> None:
         """Reset the simulation after enrichment parameters have been applied.
 
         When parameters are applied to transitions (e.g. via BRENDA or SABIO-RK
@@ -388,7 +396,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
                 "Error resetting simulation after %s parameter changes: %s",
                 source, e, exc_info=True)
 
-    def _open_sbml_file_dialog(self, entry_widget):
+    def _open_sbml_file_dialog(self, entry_widget: Any) -> None:
         """Open a Wayland-safe SBML file chooser and populate *entry_widget*.
 
         Shared by SBML and BiGG import categories which both load local
@@ -434,7 +442,7 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         # Wayland-safe async pattern (nested main loop)
         result_container = [None]
 
-        def on_response(dlg, response_id):
+        def on_response(dlg: Any, response_id: int) -> None:
             if response_id == Gtk.ResponseType.OK:
                 result_container[0] = dlg.get_filename()
             dlg.destroy()
@@ -457,5 +465,5 @@ class BasePathwayCategory(CategoryFrame, metaclass=_BasePathwayCategoryMeta):
         Returns:
             bool: True if expanded, False if collapsed
         """
-        return self.expanded
+        return bool(self.expanded)
 

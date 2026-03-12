@@ -9,6 +9,8 @@ CSS styling is applied via class names:
     - 'palette-button-active' added when toggled on
 """
 
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 

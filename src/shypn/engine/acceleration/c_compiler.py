@@ -23,15 +23,39 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Compiler flags:  -O3 for max speed, -ffast-math for Arrhenius exp() speed
+# Compiler flags:
+#   -O3             maximum optimisation
+#   -march=native   enable AVX2/FMA auto-vectorisation on the build machine
+#   -funroll-loops  unroll the fixed-size propensity / ODE loops
+#   -ffast-math     allow reassociation / fast exp() — safe for rate expressions
 _GCC_FLAGS = [
     "-O3",
+    "-march=native",
+    "-funroll-loops",
     "-ffast-math",
     "-fPIC",
     "-shared",
     "-std=c99",
     "-lm",
 ]
+
+# Fallback flags used when -march=native is not supported by the host gcc
+# (e.g. cross-compilation or very old gcc versions).
+_GCC_FLAGS_SAFE = [
+    "-O3",
+    "-funroll-loops",
+    "-ffast-math",
+    "-fPIC",
+    "-shared",
+    "-std=c99",
+    "-lm",
+]
+
+# A short tag derived from the active flags set.
+# Embedding this in the cache directory name ensures that changing flags
+# (e.g. adding -march=native) triggers automatic recompilation instead of
+# silently reusing a stale .so built with different flags.
+_FLAGS_HASH: str = hashlib.md5(" ".join(_GCC_FLAGS).encode()).hexdigest()[:6]
 
 _CACHE_BASE = Path.home() / ".cache" / "shypn" / "ode_accel"
 
@@ -41,8 +65,40 @@ def _source_hash(c_source: str) -> str:
     return hashlib.sha256(c_source.encode()).hexdigest()[:16]
 
 
+_ELF_MAGIC = b"\x7fELF"
+
+
+def _is_valid_elf(path: Path) -> bool:
+    """Return True iff *path* looks like a valid ELF shared library.
+
+    Checks:
+    - File exists and is non-empty
+    - Starts with the ELF magic bytes (\x7fELF)
+    - At least one PT_LOAD segment is present (offset 0x18-0x1f in ELF header
+      points to program-header table; we just confirm the file is large enough
+      to plausibly contain one — 4 KB minimum for a real .so)
+
+    The two failure modes seen in practice are:
+    - ``file too short``                  → file exists but has 0–few bytes
+    - ``object file has no loadable segments`` → partial ELF, no PT_LOAD
+
+    Both are caught by the ELF-magic + size check below.
+    """
+    try:
+        size = path.stat().st_size
+        if size < 4096:
+            return False
+        with path.open("rb") as fh:
+            magic = fh.read(4)
+        return magic == _ELF_MAGIC
+    except OSError:
+        return False
+
+
 def _cache_dir(model_hash: str) -> Path:
-    return _CACHE_BASE / model_hash
+    # Include the flags tag so any change to _GCC_FLAGS causes a fresh directory
+    # (and therefore a fresh compilation) without manual cache clearing.
+    return _CACHE_BASE / f"{model_hash}_{_FLAGS_HASH}"
 
 
 def _so_path(model_hash: str) -> Path:
@@ -91,8 +147,15 @@ def compile_ode_rhs(
     so = _so_path(model_hash)
 
     if so.exists() and not force:
-        logger.debug("ODE accel: using cached .so at %s", so)
-        return so
+        if _is_valid_elf(so):
+            logger.debug("ODE accel: using cached .so at %s", so)
+            return so
+        logger.warning(
+            "ODE accel: cached .so at %s appears corrupt (bad ELF / too small). "
+            "Deleting and recompiling.",
+            so,
+        )
+        so.unlink()
 
     # Create cache directory
     cache = _cache_dir(model_hash)
@@ -110,20 +173,45 @@ def compile_ode_rhs(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
-    cmd = [gcc] + _GCC_FLAGS + ["-o", str(so), str(src)]
-    logger.info("ODE accel: compiling %s …", src.name)
-    logger.debug("ODE accel: cmd = %s", " ".join(cmd))
+    # Each worker gets a unique temp file so concurrent compilations never
+    # overwrite each other's in-progress output.  The final rename is atomic
+    # (POSIX rename semantics) so the destination is always a complete ELF.
+    tmp_fd, so_tmp_str = tempfile.mkstemp(suffix=".so.tmp", dir=str(cache))
+    os.close(tmp_fd)
+    so_tmp = Path(so_tmp_str)
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    def _try_compile(flags: list) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [gcc] + flags + ["-o", str(so_tmp), str(src)],
+            capture_output=True, text=True,
+        )
+
+    cmd_flags = _GCC_FLAGS
+    logger.info("ODE accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
+    result = _try_compile(cmd_flags)
+
+    # If -march=native caused a failure (rare: old gcc or cross-compile env),
+    # retry with the safe fallback flags before giving up.
+    if result.returncode != 0 and "-march=native" in cmd_flags:
+        logger.warning(
+            "ODE accel: compilation with -march=native failed; retrying with safe flags.\n%s",
+            result.stderr,
+        )
+        cmd_flags = _GCC_FLAGS_SAFE
+        result = _try_compile(cmd_flags)
+
     if result.returncode != 0:
         # Preserve source for debugging
         logger.error("ODE accel: compilation FAILED\n%s", result.stderr)
+        so_tmp.unlink(missing_ok=True)
         raise RuntimeError(
             f"gcc compilation failed (exit {result.returncode}):\n"
             f"{result.stderr}\n"
             f"Source preserved at: {src}"
         )
 
+    # Atomic rename: last writer wins, all produce identical output.
+    so_tmp.replace(so)
     logger.info("ODE accel: compiled successfully → %s", so)
     return so
 
@@ -162,8 +250,15 @@ def compile_c_lib(
     src = cache / f"{lib_name}.c"
 
     if so.exists() and not force:
-        logger.debug("C accel: using cached .so at %s", so)
-        return so
+        if _is_valid_elf(so):
+            logger.debug("C accel: using cached .so at %s", so)
+            return so
+        logger.warning(
+            "C accel: cached .so at %s appears corrupt (bad ELF / too small). "
+            "Deleting and recompiling.",
+            so,
+        )
+        so.unlink()
 
     cache.mkdir(parents=True, exist_ok=True)
     src.write_text(c_source)
@@ -175,19 +270,40 @@ def compile_c_lib(
             "(e.g. 'sudo apt install gcc' on Debian/Ubuntu)."
         )
 
-    cmd = [gcc] + _GCC_FLAGS + ["-o", str(so), str(src)]
-    logger.info("C accel: compiling %s …", src.name)
-    logger.debug("C accel: cmd = %s", " ".join(cmd))
+    # Unique temp file per worker — prevents concurrent workers from
+    # overwriting each other's in-progress output.
+    tmp_fd, so_tmp_str = tempfile.mkstemp(suffix=".so.tmp", dir=str(cache))
+    os.close(tmp_fd)
+    so_tmp = Path(so_tmp_str)
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    def _try_compile(flags: list) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [gcc] + flags + ["-o", str(so_tmp), str(src)],
+            capture_output=True, text=True,
+        )
+
+    cmd_flags = _GCC_FLAGS
+    logger.info("C accel: compiling %s (flags: %s) …", src.name, " ".join(cmd_flags))
+    result = _try_compile(cmd_flags)
+
+    if result.returncode != 0 and "-march=native" in cmd_flags:
+        logger.warning(
+            "C accel: compilation with -march=native failed; retrying with safe flags.\n%s",
+            result.stderr,
+        )
+        cmd_flags = _GCC_FLAGS_SAFE
+        result = _try_compile(cmd_flags)
+
     if result.returncode != 0:
         logger.error("C accel: compilation FAILED\n%s", result.stderr)
+        so_tmp.unlink(missing_ok=True)
         raise RuntimeError(
             f"gcc compilation failed (exit {result.returncode}):\n"
             f"{result.stderr}\n"
             f"Source preserved at: {src}"
         )
 
+    so_tmp.replace(so)
     logger.info("C accel: compiled successfully → %s", so)
     return so
 

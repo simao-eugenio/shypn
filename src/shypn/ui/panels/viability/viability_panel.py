@@ -1174,6 +1174,7 @@ class ViabilityPanel(Gtk.Box):
                 for place in model.places:
                     if place.id == place_id:
                         place.tokens = new_marking
+                        place.initial_marking = new_marking
                         break
             
             # Auto-sync baseline to automation (no manual sync needed)

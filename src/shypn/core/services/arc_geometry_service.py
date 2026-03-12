@@ -196,7 +196,7 @@ def get_arc_offset_for_rendering(arc: Any, all_arcs: List[Any]) -> float:
     return calculate_arc_offset(arc, parallels)
 
 
-def separate_parallel_arcs_by_direction(arc: Any, parallels: List[Any]) -> tuple:
+def separate_parallel_arcs_by_direction(arc: Any, parallels: List[Any]) -> Tuple[List[Any], List[Any]]:
     """Separate parallel arcs into same-direction and opposite-direction groups.
     
     Args:
@@ -470,8 +470,8 @@ class ArcGeometryService(AbstractArcGeometryService):
         Returns:
             True if converted, False if already curved.
         """
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc  # type: ignore[import]
-        from shypn.utils.arc_transform import make_curved  # type: ignore[import]
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc
+        from shypn.utils.arc_transform import make_curved
 
         if isinstance(arc, Arc) and not isinstance(arc, (CurvedArc, CurvedInhibitorArc)):
             curved = make_curved(arc)
@@ -485,8 +485,8 @@ class ArcGeometryService(AbstractArcGeometryService):
         self, new_arc: Any, opposite_arc: Any
     ) -> None:
         """Curve both arcs in an opposite-direction pair with perpendicular offsets."""
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc  # type: ignore[import]
-        from shypn.utils.arc_transform import make_curved  # type: ignore[import]
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
+        from shypn.utils.arc_transform import make_curved
 
         (offset1, offset2) = self._calculate_perpendicular_offset(new_arc, opposite_arc)
 
@@ -508,8 +508,8 @@ class ArcGeometryService(AbstractArcGeometryService):
         self, new_arc: Any, parallels: List[Any]
     ) -> None:
         """Curve all same-direction parallels (and *new_arc* itself)."""
-        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc  # type: ignore[import]
-        from shypn.utils.arc_transform import make_curved  # type: ignore[import]
+        from shypn.netobjs import Arc, CurvedArc, CurvedInhibitorArc, InhibitorArc
+        from shypn.utils.arc_transform import make_curved
 
         for p in parallels:
             if isinstance(p, (Arc, InhibitorArc)) and not isinstance(

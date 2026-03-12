@@ -10,7 +10,7 @@ __all__ = ["CanvasRenderer"]
 
 import math
 import logging
-from typing import Any
+from typing import Any, Dict
 
 from shypn.canvas.abstract_canvas_renderer import AbstractCanvasRenderer
 
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 try:
     from shypn.netobjs import Place, Transition
 except Exception:  # pragma: no cover
-    Place = Transition = None  # type: ignore[assignment,misc]
+    Place = Transition = None
 
 
-class CanvasRenderer(AbstractCanvasRenderer):
+class CanvasRenderer(AbstractCanvasRenderer):  # type: ignore[misc]
     """Stateless-ish renderer; only dependency is the shared *canvas_ctx* dict.
 
     Args:
@@ -32,7 +32,7 @@ class CanvasRenderer(AbstractCanvasRenderer):
 
     __slots__ = ("_canvas_ctx",)
 
-    def __init__(self, canvas_ctx: dict) -> None:
+    def __init__(self, canvas_ctx: Dict[Any, Any]) -> None:
         self._canvas_ctx = canvas_ctx
 
     # ------------------------------------------------------------------
@@ -159,7 +159,7 @@ class CanvasRenderer(AbstractCanvasRenderer):
     def render_arc_preview(
         self,
         cr: Any,
-        arc_state: dict,
+        arc_state: Dict[str, Any],
         manager: Any,
     ) -> None:
         """Draw orange preview line + arrowhead for in-progress arc creation."""

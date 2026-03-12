@@ -1,6 +1,6 @@
 # Phase 6 Quality Plan — God Class Reduction via OOP Extraction
 
-**Status:** Sprint 13 active  
+**Status:** Phase 6 complete — all Sprints 13–23 ✅  
 **Branch:** Usability-and-enhancements  
 **Precursor:** Sprint 12 (CSV normalization, metadata fixes) — committed `834ec18`  
 **Methodology:** Extract cohesive clusters into typed service classes (ABC + concrete), one module per service.
@@ -36,10 +36,10 @@
 |---|---|---|---|---|
 | 🔴 **P1** | `ModelCanvasManager` | `ArcGeometryService` | Low — pure math, no GTK | `core/services/arc_geometry_service.py` |
 | 🔴 **P2** | `SimulationController` | `ConflictResolver` | Low — pure algorithm, no UI | `engine/simulation/conflict_resolver.py` |
-| 🟠 P3 | `ModelCanvasManager` | `ViewportController` split | Medium | Refactor existing `viewport_controller.py` |
-| 🟠 P4 | `ModelCanvasLoader` | `CanvasInputHandler` | Medium | New `helpers/canvas_input_handler.py` |
-| 🟡 P5 | `ViabilityPanel` | `LocalityController` | Medium | New `ui/locality_controller.py` |
-| 🟡 P6 | `SBMLCategory`/`KEGGCategory` | `PathwayImportService` | Low | New `data/pathway/import_service.py` |
+| 🟠 P3 | `ModelCanvasManager` | `ViewportController` split | Medium | Refactor existing `viewport_controller.py` | ✅ Sprint 14 |
+| 🟠 P4 | `ModelCanvasLoader` | `CanvasInputHandler` | Medium | New `helpers/canvas_input_handler.py` | ✅ Sprint 15 |
+| 🟡 P5 | `ViabilityPanel` | `LocalityController` | Medium | New `ui/locality_controller.py` | ✅ Sprint 16 |
+| 🟡 P6 | `SBMLCategory`/`KEGGCategory` | `PathwayImportService` | Low | New `data/pathway/import_service.py` | ✅ Sprint 17 |
 
 ---
 
@@ -182,6 +182,74 @@ Reduces duplication of ~600 lines shared between the two classes.
 
 ## Quality Enforcement Checklist (per extraction)
 
+### Sprint 13 — P1 `ArcGeometryService` + P2 `ConflictResolver` ✅
+
+- [x] `from __future__ import annotations` present
+- [x] All parameters type-annotated (no bare `Any` except true duck-typing boundaries)
+- [x] All return types annotated
+- [x] `mypy --strict` passes on the new module (or justified `# type: ignore` with comment)
+- [x] `@abstractmethod` for every interface method in the ABC
+- [x] Existing tests still pass (`pytest tests/engine/ tests/engine_core/` — 37 passed)
+- [x] God class line count decreased by extracted cluster size
+- [x] Module-level docstring describing the service's single responsibility
+
+### Sprint 14 — `ViewportController` cleanup (P3) ✅
+
+- [x] Coordinate-transform methods (`screen_to_world`, `world_to_screen`, `get_visible_bounds`, `get_visible_bounds_no_rotation`, `get_grid_spacing`) moved from `ModelCanvasManager` to `ViewportController`
+- [x] Private rotation helpers (`_calculate_rotation_center`, `_apply_rotation_to_point`) deleted from MCM, reimplemented in VC
+- [x] Dead duplicate methods (`find_object_at_position`, `clear_all_selections`) removed from MCM
+- [x] Unused imports (`import math`, `coord_screen_to_world`, `coord_world_to_screen`) removed from MCM
+- [x] `cast(float, ...)` / `cast(Tuple[float, float], ...)` added to silence `no-any-return` in new VC methods
+- [x] `mypy --strict --follow-imports=skip` — no new errors introduced
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+- [x] `ModelCanvasManager` reduced from 2 480 → 2 341 lines (−139 lines; target ~180)
+
+### Sprint 15 — `CanvasInputHandler` (P4) ✅
+
+- [x] `CanvasInputCallbacks` dataclass with 10-field wiring contract (all loader callbacks injected)
+- [x] `AbstractCanvasInputHandler` ABC (14 abstract methods covering all GDK event types + clipboard ops)
+- [x] `CanvasInputHandler` concrete class (~680 lines): owns `_canvas_ctx`, `_clipboard`, `_last_pointer_world_{x,y}`
+- [x] `# type: ignore[import-untyped]` narrowed from `[import]` on `gi` imports; redundant ignores removed
+- [x] `Set[int]` replacing bare `set` annotation (`typing.Set` added to imports)
+- [x] `from __future__ import annotations` present
+- [x] `mypy --strict --follow-imports=skip` — zero errors
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+- [x] `ModelCanvasLoader` event-wiring delegated to `self._input_handler` (no inline GDK dispatch)
+
+### Sprint 16 — `LocalityController` (P5) ✅
+
+- [x] 3 redundant `# type: ignore` comments removed (`[import]` on `shypn.diagnostic`, `[assignment]` on `transition.rate`, `[import]` on `DocumentModel` — all suppressed by `--follow-imports=skip`)
+- [x] `from __future__ import annotations` present
+- [x] `mypy --strict --follow-imports=skip` — zero errors
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+
+### Sprint 17 — `PathwayImportService` / `BasePathwayCategory` (P6) ✅
+
+- [x] `base_pathway_category.py`: `from __future__ import annotations` added; `from typing import Any, Callable, Optional` added
+- [x] `gi` imports narrowed to `# type: ignore[import-untyped]`; GTK metaclass + class definition annotated with `# type: ignore[misc]`
+- [x] All 22 method signatures annotated (`-> None` / `-> Any` / `-> bool`); 3 inner closures annotated
+- [x] `bool(self.expanded)` cast fixes `no-any-return` on `is_expanded()`
+- [x] `kegg_category.py` and `sbml_category.py`: `from __future__ import annotations` added; gi `import-untyped` and class `[misc]` structural errors fixed
+- [x] Pre-existing `no-untyped-def` in the 2279/2765-line GTK subclasses left as documented pre-existing debt
+- [x] `mypy --strict --follow-imports=skip` on `base_pathway_category.py` — zero errors
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+
+### Sprints 18–23 — Post-P6 OOP refactor quality-polish ✅
+
+| Sprint | Module | Change |
+|--------|--------|--------|
+| 18 | `session_registry.py` | Remove 2 unused `# type: ignore[override]`; add `-> Any` to `items/keys/values()` |
+| 19 | `document_state_service.py` | `[misc]` on class; `os.path.basename(self._filepath or "")` fixes None `type-var` |
+| 20 | `document_serializer.py` | `[misc]` on class; `cast` import; `cast(bool, ...)` on 3 static `-> bool` methods |
+| 21 | `canvas_renderer.py` | `Dict` import; `gi` `import-untyped`; `[misc]` on class; `dict` → `Dict[Any, Any]` |
+| 22 | `canvas_context_menu_controller.py` | Same as 21 + `List` import; 4 bare `list` params → `List[Any]` |
+| 23 | `abstract_controller.py` | `Set` import; `Optional[set]` → `Optional[Set[Any]]`; `Callable` → `Callable[[], None]` |
+
+- [x] `mypy --strict --follow-imports=skip` on all 6 files — zero errors
+- [x] `pytest tests/engine/ tests/engine_core/` — 37 passed
+
+### Future sprints checklist template
+
 - [ ] `from __future__ import annotations` present
 - [ ] All parameters type-annotated (no bare `Any` except true duck-typing boundaries)
 - [ ] All return types annotated
@@ -193,4 +261,4 @@ Reduces duplication of ~600 lines shared between the two classes.
 
 ---
 
-*Next action: implement Sprint 13 (P1 + P2).*
+*Phase 6 complete. Next: Phase 7 OOP refactoring or new feature branch.*

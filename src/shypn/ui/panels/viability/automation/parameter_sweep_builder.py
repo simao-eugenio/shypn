@@ -15,6 +15,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from shypn.utils.safe_eval import safe_eval_numeric
+from shypn.ui.panels.viability.automation.gtk_widgets import SearchableComboBox as _SearchableComboBox
 
 
 class ParameterSweepBuilder(Gtk.Box):
@@ -128,8 +129,9 @@ class ParameterSweepBuilder(Gtk.Box):
         name_label.set_xalign(0)
         name_box.pack_start(name_label, False, False, 0)
         
-        self.name_combo = Gtk.ComboBoxText()
-        self.name_combo.set_tooltip_text("Load a model with subnet parameters to see available parameters")
+        self.name_combo = _SearchableComboBox(
+            tooltip_text="Load a model with subnet parameters to see available parameters"
+        )
         name_box.pack_start(self.name_combo, True, True, 0)
         
         add_single_button = Gtk.Button(label="Add")
@@ -197,8 +199,9 @@ class ParameterSweepBuilder(Gtk.Box):
         param_label.set_xalign(0)
         add_param_box.pack_start(param_label, False, False, 0)
         
-        self.factorial_add_combo = Gtk.ComboBoxText()
-        self.factorial_add_combo.set_tooltip_text("Select parameter to add to factorial design")
+        self.factorial_add_combo = _SearchableComboBox(
+            tooltip_text="Select parameter to add to factorial design"
+        )
         add_param_box.pack_start(self.factorial_add_combo, True, True, 0)
         
         add_button = Gtk.Button(label="Add")
@@ -793,82 +796,124 @@ class ParameterSweepBuilder(Gtk.Box):
     
     def _calculate_time_estimate(self, experiment_count):
         """Calculate estimated execution time for experiments.
-        
+
+        Uses actual wall-clock timing from previously completed experiments to
+        calibrate the per-replicate cost.  Falls back to a step-count heuristic
+        when no history is available.
+
         Args:
             experiment_count: Number of experiments to run
-            
+
         Returns:
             str: Formatted time estimate (e.g., "2h 15m") or None if cannot calculate
         """
+        import math
+        import os
+
         try:
-            # Get replicates and duration
             replicates = int(self.replicates_entry.get_text().strip() or "3")
             duration = float(self.duration_entry.get_text().strip() or "60.0")
-            
-            # Get parallel execution setting from parent category's queue view
+
+            # -- Parallel mode flag ------------------------------------------------
             use_parallel = False
-            if (hasattr(self, 'parent_category') and self.parent_category and 
-                hasattr(self.parent_category, 'queue_view') and self.parent_category.queue_view):
+            if (hasattr(self, 'parent_category') and self.parent_category and
+                    hasattr(self.parent_category, 'queue_view') and
+                    self.parent_category.queue_view):
                 queue_view = self.parent_category.queue_view
                 if hasattr(queue_view, 'parallel_checkbox'):
                     use_parallel = queue_view.parallel_checkbox.get_active()
-            
-            # Estimate is based on step count, not simulated duration.
-            #
-            # In auto-dt mode: dt = duration / 10000 (DEFAULT_STEPS_TARGET), so
-            # n_steps = 10000 ALWAYS regardless of duration. A 60s run and a 7200s
-            # run both execute exactly 10000 steps and take the same wall-clock time.
-            # Estimating as (duration × factor) would over-predict by 120× for 7200s.
-            #
-            # Empirical cost per step measured at 60s auto-dt (3 reps × 148.9s):
-            #   sequential: 148.9 / (3 × 10000) ≈ 0.00496 s/step
-            #   parallel:   2.41 × 60 / 10000  ≈ 0.01446 s/step
-            DEFAULT_STEPS_TARGET = 10000
-            dt_is_auto = not (hasattr(self, 'sweep_dt_manual_radio') and
-                              self.sweep_dt_manual_radio.get_active())
-            if dt_is_auto:
-                n_steps = DEFAULT_STEPS_TARGET
-            else:
-                try:
-                    dt_manual = float(self.sweep_dt_manual_entry.get_text().strip() or "0.01")
-                    n_steps = int(duration / dt_manual) if dt_manual > 0 else DEFAULT_STEPS_TARGET
-                except (ValueError, AttributeError):
+
+            # -- Calibrated cost per replicate from completed results ---------------
+            secs_per_rep = self._calibrated_secs_per_replicate()
+            calibrated = secs_per_rep is not None
+
+            # -- Fallback: step-count heuristic ------------------------------------
+            if secs_per_rep is None:
+                # In auto-dt / tau-leaping mode the engine always targets
+                # DEFAULT_STEPS_TARGET steps regardless of simulated duration.
+                # Using duration directly would over-predict dramatically for long runs.
+                DEFAULT_STEPS_TARGET = 10_000
+                dt_is_auto = not (hasattr(self, 'sweep_dt_manual_radio') and
+                                  self.sweep_dt_manual_radio.get_active())
+                if dt_is_auto:
                     n_steps = DEFAULT_STEPS_TARGET
+                else:
+                    try:
+                        dt_manual = float(
+                            self.sweep_dt_manual_entry.get_text().strip() or "0.01"
+                        )
+                        n_steps = (
+                            int(duration / dt_manual) if dt_manual > 0
+                            else DEFAULT_STEPS_TARGET
+                        )
+                    except (ValueError, AttributeError):
+                        n_steps = DEFAULT_STEPS_TARGET
 
-            # s/step constants derived from the same 60 s benchmark
-            cost_per_step = 0.01446 if use_parallel else 0.00496
+                # Empirical s/step from a single 60 s benchmark (conservative upper bound)
+                cost_per_step = 0.01446 if use_parallel else 0.00496
+                secs_per_rep = n_steps * cost_per_step
 
-            # Calculate time per experiment (replicates run sequentially within each experiment)
-            time_per_experiment = replicates * n_steps * cost_per_step
-            
-            # Calculate total time based on execution mode
+            # -- Total time --------------------------------------------------------
+            time_per_experiment = replicates * secs_per_rep
+
             if use_parallel:
-                # Parallel mode: all experiments run simultaneously (limited by CPU cores)
-                # Estimate assumes sufficient cores; otherwise time will be proportionally higher
-                total_seconds = time_per_experiment
+                # Each batch runs min(cpu_cores, experiments) jobs simultaneously.
+                cpu_cores = os.cpu_count() or 4
+                batches = math.ceil(experiment_count / cpu_cores)
+                total_seconds = batches * time_per_experiment
             else:
-                # Sequential mode: experiments run one after another
-                total_seconds = time_per_experiment * experiment_count
-            
-            # Format the time estimate
+                total_seconds = experiment_count * time_per_experiment
+
+            # -- Format ------------------------------------------------------------
+            suffix = "" if calibrated else " (est.)"
+
             hours = int(total_seconds // 3600)
             minutes = int((total_seconds % 3600) // 60)
             seconds = int(total_seconds % 60)
-            
+
             if hours > 0:
-                if minutes > 0:
-                    return f"{hours}h {minutes}m"
-                else:
-                    return f"{hours}h"
+                formatted = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
             elif minutes > 0:
-                if seconds > 30:  # Round up if > 30 seconds
+                if seconds > 30:
                     minutes += 1
-                return f"{minutes}m"
+                formatted = f"{minutes}m"
             else:
-                return f"{seconds}s"
-            
+                formatted = f"{seconds}s"
+
+            return formatted + suffix
+
         except Exception:
-            # If we can't calculate, just return None (preview will show without time)
+            return None
+
+    def _calibrated_secs_per_replicate(self):
+        """Return mean wall-clock seconds per replicate from recent completed results.
+
+        Looks at the last 20 successful experiments stored in the parent category's
+        batch executor.  Returns None when no usable timing data is available.
+        """
+        try:
+            executor = (
+                self.parent_category.batch_executor
+                if (hasattr(self, 'parent_category') and self.parent_category and
+                    hasattr(self.parent_category, 'batch_executor'))
+                else None
+            )
+            if executor is None:
+                return None
+
+            results = getattr(executor, 'results', {})
+            if not results:
+                return None
+
+            samples = []
+            for result in list(results.values())[-20:]:   # use at most last 20
+                elapsed = result.get('elapsed_time', 0.0)
+                n_reps = result.get('n_replicates', 0) or 0
+                if elapsed > 0 and n_reps > 0:
+                    samples.append(elapsed / n_reps)
+
+            return sum(samples) / len(samples) if samples else None
+        except Exception:
             return None
     
     def _on_generate_clicked(self, button):
@@ -1097,7 +1142,7 @@ class ParameterSweepBuilder(Gtk.Box):
             raw_tokens = re.split(r'[,;\s]+', text)
             values = []
             for token in raw_tokens:
-                token = token.strip().rstrip('.,;')
+                token = token.strip().strip('"\'').strip().rstrip('.,;')
                 if token:
                     try:
                         values.append(float(token))

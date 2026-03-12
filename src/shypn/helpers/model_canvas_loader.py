@@ -3491,6 +3491,35 @@ class ModelCanvasLoader:
                 # This ensures the observer pattern properly handles property changes
                 manager._notify_observers('modified', obj)
             
+            # BUG-3 FIX: Notify manager observers for Place and Arc changes.
+            # Previously only Transition edits were forwarded to the observer chain;
+            # Place and Arc edits were invisible to subscribers (environment panel,
+            # viability subsystem, etc.).
+            if isinstance(obj, (Place, Arc)):
+                controller = self.get_canvas_controller(drawing_area)
+                if controller:
+                    if hasattr(controller, 'model_adapter') and controller.model_adapter:
+                        controller.model_adapter.invalidate_caches()
+                    if isinstance(obj, Place) and not controller._running:
+                        if controller.time > 0:
+                            # Simulation has previously run: do a full reset so that
+                            # time resets to 0, caches clear, and all places are
+                            # restored to their (just-updated) initial_marking values.
+                            controller.reset()
+                            # Also clear the palette-side data collector
+                            if self.overlay_managers.get(drawing_area):
+                                ovm = self.overlay_managers[drawing_area]
+                                sim_palette = ovm.get_palette('simulate_tools') if hasattr(ovm, 'get_palette') else None
+                                if sim_palette and hasattr(sim_palette, 'data_collector') and sim_palette.data_collector:
+                                    sim_palette.data_collector.clear()
+                        else:
+                            # time == 0: no prior run, but still force-sync tokens to
+                            # initial_marking so the canvas and pre-run state are correct.
+                            # _apply_changes() already set both; this is a safety guard.
+                            if hasattr(obj, 'initial_marking'):
+                                obj.tokens = obj.initial_marking
+                manager._notify_observers('modified', obj)
+
             if isinstance(obj, (Place, Transition)) and self.right_panel_loader:
                 if hasattr(self.right_panel_loader, 'place_panel') and self.right_panel_loader.place_panel:
                     if isinstance(obj, Place):
