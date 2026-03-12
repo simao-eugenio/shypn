@@ -119,7 +119,9 @@ class PlacePropDialogLoader(GObject.GObject):
             # Name is editable - user-created alias
         tokens_entry = self.builder.get_object('prop_place_tokens_entry')
         if tokens_entry and hasattr(self.place_obj, 'tokens'):
-            tokens_entry.set_text(str(self.place_obj.tokens))
+            # Show initial_marking (design-time baseline), not post-simulation tokens
+            initial_val = getattr(self.place_obj, 'initial_marking', self.place_obj.tokens)
+            tokens_entry.set_text(str(initial_val))
         radius_entry = self.builder.get_object('prop_place_radius_entry')
         if radius_entry and hasattr(self.place_obj, 'radius'):
             radius_entry.set_text(str(self.place_obj.radius))
@@ -214,15 +216,12 @@ class PlacePropDialogLoader(GObject.GObject):
                         tokens_value = float(tokens_text)
                     else:
                         tokens_value = int(tokens_text)
-                    # CRITICAL: Only update current tokens, NOT initial_marking
-                    # initial_marking is static design-time data (loaded from file)
-                    # tokens is transient runtime data (current state)
-                    # When setting initial state, initial_marking should be set explicitly elsewhere
-                    self.place_obj.tokens = max(0, tokens_value)
-                    # ALSO update initial_marking so this becomes the new baseline
-                    # This makes sense semantically: user editing tokens in properties
-                    # is setting the "initial state" for this place
-                    self.place_obj.initial_marking = self.place_obj.tokens
+                    new_tokens = max(0, tokens_value)
+                    # Update both the design-time baseline and the runtime value.
+                    # The dialog always shows initial_marking (set in _populate_fields),
+                    # so whatever the user types here IS the new initial marking.
+                    self.place_obj.initial_marking = new_tokens
+                    self.place_obj.tokens = new_tokens
             except ValueError as e:
                 self.logger.debug(f"Invalid tokens value: {e}")
                 pass

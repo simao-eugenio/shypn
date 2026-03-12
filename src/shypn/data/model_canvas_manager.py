@@ -44,9 +44,21 @@ REFACTORING NOTE: This class now acts as a Facade, delegating to:
 """
 import json
 import os
+import threading
 import time
 from datetime import datetime
 from typing import Optional
+
+try:
+    import gi
+    gi.require_version('GLib', '2.0')
+    from gi.repository import GLib as _GLib
+    _HAVE_GLIB = True
+except Exception:
+    _GLib = None
+    _HAVE_GLIB = False
+
+_MAIN_THREAD = threading.main_thread()
 from shypn.events import EventBus
 from shypn.core.document_id import doc_id
 from shypn.netobjs import Place, Arc, Transition
@@ -181,6 +193,9 @@ class ModelCanvasManager:
         
         # Callback to trigger widget redraw (set by UI layer)
         self._redraw_callback = None
+
+        # Coalescing flag: prevents queuing multiple idle_add redraws per simulation step
+        self._redraw_pending = False
         
         # Observer pattern for model changes
         self._observers = []  # List of observer callbacks
@@ -1846,9 +1861,22 @@ class ModelCanvasManager:
     def mark_needs_redraw(self):
         """Mark canvas as needing redraw and trigger widget redraw - internal rendering state."""
         self._needs_redraw = True
-        # Trigger widget redraw if callback is set
+        if not self._redraw_callback:
+            return
+        # GTK queue_draw() is not thread-safe. When called from a simulation thread
+        # (batch runner, engine step), marshal via GLib.idle_add to the main loop.
+        if threading.current_thread() is _MAIN_THREAD:
+            self._redraw_callback()
+        elif _HAVE_GLIB and not self._redraw_pending:
+            self._redraw_pending = True
+            _GLib.idle_add(self._flush_redraw)
+
+    def _flush_redraw(self):
+        """Called on main thread via GLib.idle_add to perform the deferred queue_draw."""
+        self._redraw_pending = False
         if self._redraw_callback:
             self._redraw_callback()
+        return False  # Do not reschedule
     
     def set_redraw_callback(self, callback):
         """Set callback to trigger widget redraw.

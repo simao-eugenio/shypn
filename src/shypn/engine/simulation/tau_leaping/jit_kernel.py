@@ -60,12 +60,22 @@ try:
         y_snap,             # float64[n_places] — place populations (read-only snapshot)
         S,                  # float64[n_places, n_trans] — stoichiometry matrix
         S_sq,               # float64[n_places, n_trans] — S element-wise squared
-        critical_threshold, # float — propensity below this → critical (skip)
+        critical_threshold, # float — legacy propensity threshold (kept for compat)
         epsilon,            # float — Cao ε parameter
         max_tau,            # float — upper bound on τ
         min_tau,            # float — lower bound on τ (numerical floor)
+        n_critical,         # int64 — Cao N_c: reaction j is critical if it can
+                            #   fire fewer than n_critical times before exhausting
+                            #   an input place: L_j = min_i floor(x_i/|v_ij|) < n_c
     ):
         """JIT-compiled τ selection + Poisson/Skellam sampling.
+
+        Critical-reaction classification uses the Cao et al. (2006) N_c criterion:
+        reaction j is critical if L_j = min_i floor(x_i / |v_ij|) < n_critical,
+        where the minimum is over all places i consumed by j (S[i,j] < 0).
+        This is more principled than the legacy propensity threshold because it
+        directly measures how many more firings are possible before a species is
+        exhausted, regardless of the absolute propensity magnitude.
 
         Returns
         -------
@@ -76,12 +86,23 @@ try:
             Sampled firing counts aligned with the stoichiometry matrix columns.
         """
         n_trans = S.shape[1]
+        n_places = S.shape[0]
 
-        # ── 1. Build non-critical propensity vector ────────────────────────────
+        # ── 1. Build non-critical propensity vector using Cao N_c criterion ───
         a_nc = np.empty(n_trans, dtype=np.float64)
         any_nc = False
         for j in range(n_trans):
-            if a_net[j] >= critical_threshold:
+            # Compute L_j: minimum firings possible before exhausting any input
+            lj = n_critical  # start at n_critical; min'ed down below
+            for i in range(n_places):
+                if S[i, j] < 0.0:  # consuming arc: place i is consumed by j
+                    v_ij = -S[i, j]  # positive stoichiometric weight
+                    if v_ij > 0.0:
+                        firings_possible = int(y_snap[i] / v_ij)
+                        if firings_possible < lj:
+                            lj = firings_possible
+            # Non-critical: can fire >= n_critical times without exhausting input
+            if lj >= n_critical:
                 a_nc[j] = a_net[j]
                 any_nc = True
             else:
@@ -93,7 +114,6 @@ try:
 
         # ── 2. Cao et al. (2006) τ selection ──────────────────────────────────
         # For each place i, bound τ by ε_i / |μ_i| and ε_i² / σ²_i.
-        n_places = S.shape[0]
         tau = max_tau
 
         for i in range(n_places):

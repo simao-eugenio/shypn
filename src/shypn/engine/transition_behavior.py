@@ -67,6 +67,10 @@ class TransitionBehavior(ABC):
         self._last_consumed: Dict[int, float] = {}
         self._last_produced: Dict[int, float] = {}
         self._accounting_enabled = False
+        
+        # Arc caches — built on first access; arc topology is static during simulation.
+        self._input_arcs_cache: Optional[List] = None
+        self._output_arcs_cache: Optional[List] = None
     
     # ============================================================================
     # Abstract Methods (Must be implemented by subclasses)
@@ -238,6 +242,9 @@ class TransitionBehavior(ABC):
         Raises:
             AttributeError: If model doesn't have arcs attribute
         """
+        if self._input_arcs_cache is not None:
+            return self._input_arcs_cache
+        
         if not hasattr(self.model, 'arcs'):
             raise AttributeError(
                 f"Model {self.model} does not have 'arcs' attribute. "
@@ -292,6 +299,7 @@ class TransitionBehavior(ABC):
                 # Arc target is not comparable
                 pass
         
+        self._input_arcs_cache = result
         return result
     
     def get_output_arcs(self) -> List:
@@ -303,6 +311,9 @@ class TransitionBehavior(ABC):
         Raises:
             AttributeError: If model doesn't have arcs attribute
         """
+        if self._output_arcs_cache is not None:
+            return self._output_arcs_cache
+
         if not hasattr(self.model, 'arcs'):
             raise AttributeError(
                 f"Model {self.model} does not have 'arcs' attribute. "
@@ -357,6 +368,7 @@ class TransitionBehavior(ABC):
                 # Arc source is not comparable
                 pass
         
+        self._output_arcs_cache = result
         return result
     
     def _get_place(self, place_id: Any) -> Any:

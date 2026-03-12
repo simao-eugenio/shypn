@@ -75,6 +75,16 @@ class ContinuousBehavior(TransitionBehavior):
         self._rate_function_failed = False
         self._rate_function_error: Optional[str] = None
         
+        # Static evaluation context cache — built once on first evaluate_rate call.
+        # Contains FUNCTION_CATALOG + thermodynamic settings + kinetic params (all static
+        # during simulation). Only place token values are added dynamically per call.
+        self._static_context_cache: Optional[Dict] = None
+        
+        # Pre-identified thermodynamic override places (built alongside static context).
+        # Avoids str.lower() on all places every step.
+        self._thermo_temp_place_ids: Optional[List] = None  # temperature places
+        self._thermo_ph_place_ids: Optional[List] = None    # pH places
+        
         # Initialize spatial property integration utilities
         self.boundary_validator = BoundaryValidator(model)
         self.gradient_modulator = GradientModulator()
@@ -187,110 +197,88 @@ class ContinuousBehavior(TransitionBehavior):
         # Format: "a * P1 + b * P2" or "min(c, P1)" or "sigmoid(time, 10, 0.5)" etc.
         def evaluate_rate(places: Dict[int, Any], time: float) -> float:
             try:
-                # Build evaluation context with full support
-                context: Dict[Any, Any] = {
-                    'time': time,
-                    't': time,  # Alias
-                    'min': min,
-                    'max': max,
-                    'abs': abs,
-                    'math': math,
-                    'np': np,
-                    'numpy': np,
-                }
-                
-                # Add all catalog functions to context
-                context.update(FUNCTION_CATALOG)
-                
-                # THERMODYNAMIC INTEGRATION: Add thermodynamic settings as special variables
-                # This allows rate_functions to use T, pH, etc. dynamically
-                if hasattr(self.model, 'thermodynamic_settings'):
-                    settings = self.model.thermodynamic_settings
-                    # Standard thermodynamic variables
-                    # NOTE: Internal storage is Kelvin, but users can use celsius=True in functions
-                    context['T'] = settings.get('temperature', 298.15)  # Kelvin
-                    context['Temperature'] = context['T']
-                    context['T_celsius'] = context['T'] - 273.15  # Celsius for convenience
-                    context['pH'] = settings.get('ph', 7.0)
-                    context['ionic_strength'] = settings.get('ionic_strength', 0.1)
-                    context['I'] = context['ionic_strength']  # Shorthand
+                # --- Static context (built once, reused every call) ---
+                if self._static_context_cache is None:
+                    static: Dict[Any, Any] = {
+                        'min': min, 'max': max, 'abs': abs,
+                        'math': math, 'np': np, 'numpy': np,
+                    }
+                    static.update(FUNCTION_CATALOG)
                     
-                    # Gas constant and physical constants
-                    context['R'] = 0.008314  # kJ/(mol·K)
-                    context['R_SI'] = 8.314  # J/(mol·K)
-                    context['F'] = 96485  # Faraday constant, C/mol
-                
-                # Add SBML parameters from kinetic_metadata (if available)
-                params = {}  # Initialize params dict
-                if hasattr(self.transition, 'kinetic_metadata') and self.transition.kinetic_metadata:
-                    if hasattr(self.transition.kinetic_metadata, 'parameters'):
-                        # Add all kinetic parameters (kf_0, kr_0, Vmax, Km, etc.)
+                    # Thermodynamic settings (static during simulation)
+                    if hasattr(self.model, 'thermodynamic_settings'):
+                        ts = self.model.thermodynamic_settings
+                        T = ts.get('temperature', 298.15)
+                        static['T'] = T
+                        static['Temperature'] = T
+                        static['T_celsius'] = T - 273.15
+                        static['pH'] = ts.get('ph', 7.0)
+                        static['ionic_strength'] = ts.get('ionic_strength', 0.1)
+                        static['I'] = static['ionic_strength']
+                        static['R'] = 0.008314
+                        static['R_SI'] = 8.314
+                        static['F'] = 96485
+                    
+                    # Kinetic parameters from SBML metadata (static)
+                    if (hasattr(self.transition, 'kinetic_metadata')
+                            and self.transition.kinetic_metadata
+                            and hasattr(self.transition.kinetic_metadata, 'parameters')):
                         params = self.transition.kinetic_metadata.parameters.copy()
-                        
-                # Normalize compartment volumes for token-based simulation
-                # In SBML, compartment sizes (comp1, comp2, etc.) are in liters
-                # but for discrete token simulations, we use normalized volumes
-                # Set all comp* parameters to 1.0 to avoid scaling issues
-                for key in list(params.keys()):
-                    if key.startswith('comp') and len(key) > 4 and key[4:].isdigit():
-                        # This is a compartment parameter (comp1, comp2, etc.)
-                        params[key] = 1.0  # Normalize for token-based simulation
-                
-                context.update(params)
-                
-                # Add place tokens for evaluation context
-                # Keys in places dict are internal IDs (P1, P2, P7, P8, etc.)
-                # Add both by ID and by user-defined name (without prefix)
-                for place_id, place in places.items():
-                    # Get tokens safely - handle both direct attribute and method
-                    if hasattr(place, 'tokens'):
-                        tokens = place.tokens
-                    elif hasattr(place, 'marking'):
-                        tokens = place.marking
-                    else:
-                        # Fallback - assume 0 tokens if attribute missing
-                        tokens = 0
+                        for key in list(params.keys()):
+                            if key.startswith('comp') and len(key) > 4 and key[4:].isdigit():
+                                params[key] = 1.0
+                        static.update(params)
                     
-                    # Use max() to ensure at least epsilon value to prevent division by zero
+                    self._static_context_cache = static
+                    
+                    # Pre-identify thermodynamic override places (once)
+                    temp_ids: List = []
+                    ph_ids: List = []
+                    all_places = getattr(self.model, 'places', {})
+                    places_iter = all_places.values() if isinstance(all_places, dict) else all_places
+                    for p in places_iter:
+                        pname = getattr(p, 'name', '') or ''
+                        pname_lo = pname.lower()
+                        if 'temperature' in pname_lo:
+                            temp_ids.append(p.id)
+                        elif 'ph' in pname_lo and 'gradient' not in pname_lo:
+                            ph_ids.append(p.id)
+                    self._thermo_temp_place_ids = temp_ids
+                    self._thermo_ph_place_ids = ph_ids
+                
+                # --- Dynamic context (time + place tokens) ---
+                context = self._static_context_cache.copy()
+                context['time'] = time
+                context['t'] = time
+                
+                for place_id, place in places.items():
+                    tokens = getattr(place, 'tokens', None)
+                    if tokens is None:
+                        tokens = getattr(place, 'marking', 0)
                     tokens_safe = max(float(tokens), 1e-10)
-                    
-                    # Add by internal ID (P1, P2, P7, P8, etc.)
-                    # IDs are system-generated and always have the prefix
                     context[place_id] = tokens_safe
-                    
-                    # ALSO add by user-defined name (ATP_pool, Drug_ext, etc.)
-                    # Names are user-controlled aliases - use as-is WITHOUT prefix
-                    if hasattr(place, 'name') and place.name:
-                        context[place.name] = tokens_safe
+                    pname = getattr(place, 'name', None)
+                    if pname:
+                        context[pname] = tokens_safe
                 
-                # DYNAMIC THERMODYNAMIC STATE: If thermodynamic places exist, they override settings
-                # This makes temperature, pH, etc. dynamic state variables (more realistic)
-                for place_id, place in places.items():
-                    if not hasattr(place, 'name'):
+                # Dynamic thermodynamic overrides (only thermodynamic places)
+                for tid in self._thermo_temp_place_ids:  # type: ignore[union-attr]
+                    if tid not in places:
                         continue
-                    place_name = place.name
-                    tokens = context.get(place_name, 0)
-                    
-                    # Temperature place overrides static setting
-                    # Support both Kelvin and Celsius units based on place name
-                    if 'temperature' in place_name.lower():
-                        # If place name suggests Celsius
-                        if 'celsius' in place_name.lower() or 'celcius' in place_name.lower():
-                            context['T_celsius'] = tokens
-                            context['T'] = tokens + 273.15  # Convert to Kelvin
-                            context['Temperature'] = context['T']
-                        # Otherwise assume Kelvin (standard for thermodynamics)
-                        else:
-                            context['T'] = tokens
-                            context['Temperature'] = tokens
-                            context['T_celsius'] = tokens - 273.15
-                    # pH places (could be pH_gradient, pH_cytoplasm, etc.)
-                    elif 'ph' in place_name.lower() and 'gradient' not in place_name.lower():
-                        context['pH'] = tokens
-                    # H+ concentration place (convert to pH)
-                    elif place_name.lower() in ['h+', 'h_plus', 'h+_concentration']:
-                        # User can use concentration_to_ph() function in rate_function
-                        pass
+                    tokens = context.get(tid, 0)
+                    pname = getattr(places[tid], 'name', '') or ''
+                    pname_lo = pname.lower()
+                    if 'celsius' in pname_lo or 'celcius' in pname_lo:
+                        context['T_celsius'] = tokens
+                        context['T'] = tokens + 273.15
+                        context['Temperature'] = context['T']
+                    else:
+                        context['T'] = tokens
+                        context['Temperature'] = tokens
+                        context['T_celsius'] = tokens - 273.15
+                for pid in self._thermo_ph_place_ids:  # type: ignore[union-attr]
+                    if pid in places:
+                        context['pH'] = context.get(pid, 0)
                 
                 # Evaluate expression safely (replaces eval() for security)
                 result = safe_eval_numeric(expr_processed, context, allow_math=True)

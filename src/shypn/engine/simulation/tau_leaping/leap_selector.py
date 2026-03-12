@@ -51,15 +51,22 @@ class LeapSelector:
         epsilon: float = 0.03,
         critical_threshold: float = 10.0,
         max_tau: float = 1.0,
-        min_tau: float = 1e-6
+        min_tau: float = 1e-6,
+        n_critical: int = 10,
     ):
         """Initialize leap selector.
         
         Args:
             epsilon: Leap condition tolerance (0 < ε ≤ 1). Smaller = more accurate.
-            critical_threshold: Propensity below this is "critical" (exact SSA)
+            critical_threshold: Propensity below this is "critical" (exact SSA).
+                Used as fallback when the arc table is unavailable.
             max_tau: Maximum allowed leap size
             min_tau: Minimum allowed leap size (numerical stability)
+            n_critical: Cao et al. (2006) N_c threshold. A reaction is critical
+                if it can fire fewer than n_critical times before exhausting at
+                least one of its input places (L_j < n_critical). This is the
+                primary critical-reaction criterion when the arc table is available.
+                Typical value: 10 (Cao et al. recommendation).
         """
         if not 0 < epsilon <= 1:
             raise ValueError(f"Epsilon must be in (0, 1]: {epsilon}")
@@ -70,6 +77,7 @@ class LeapSelector:
         self.critical_threshold = critical_threshold
         self.max_tau = max_tau
         self.min_tau = min_tau
+        self.n_critical = int(n_critical)
         
         self.logger = logging.getLogger(__name__)
     
@@ -101,7 +109,16 @@ class LeapSelector:
         if not transitions:
             return self.max_tau, {'reason': 'no_stochastic_transitions'}
         
-        # Calculate propensities for all transitions
+        # Calculate propensities for all transitions and classify critical reactions.
+        #
+        # Primary criterion (Cao et al., 2006, Section III.B):
+        #   Reaction j is CRITICAL if it can fire fewer than n_critical times before
+        #   exhausting at least one input place:
+        #       L_j = min_i floor(x_i / v_ij)  <  n_critical
+        #   Use this when the arc_table (token-count information) is available.
+        #
+        # Fallback criterion (propensity-based):
+        #   When arc_table is absent, fall back to: propensity < critical_threshold.
         propensities = []
         critical_transitions = []
         
@@ -111,25 +128,38 @@ class LeapSelector:
             if _hint is not None:
                 propensity = _hint[0]   # net propensity
                 propensities.append(propensity)
-                if propensity < self.critical_threshold:
-                    critical_transitions.append((transition.name, propensity))
-                continue
+            else:
+                behavior = self._get_behavior(transition)
+                if behavior is None:
+                    continue
+                try:
+                    propensity = behavior._evaluate_rate_at_enablement(current_time)
+                except Exception as e:
+                    self.logger.warning(f"Could not evaluate propensity for {transition.name}: {e}")
+                    propensity = getattr(behavior, 'rate', 1.0)
+                propensities.append(propensity)
 
-            behavior = self._get_behavior(transition)
-            if behavior is None:
-                continue
+            # Classify as critical using Cao et al. N_c criterion when arc_table
+            # is available; otherwise fall back to propensity threshold.
+            is_critical: bool
+            _tid = getattr(transition, 'id', None)
+            if arc_table is not None and _tid is not None:
+                entries = arc_table.get(_tid, [])
+                if entries:
+                    # L_j = min over consuming input places of floor(tokens / weight)
+                    lj = self.n_critical  # pessimistic start; will be min'ed down
+                    for _p, _w in entries:
+                        if _w > 0.0 and hasattr(_p, 'tokens'):
+                            lj = min(lj, int(_p.tokens // _w))
+                    is_critical = lj < self.n_critical
+                else:
+                    # Source transition (no input arcs): never exhausts a place
+                    is_critical = False
+            else:
+                # Fallback: propensity-based criterion
+                is_critical = propensity < self.critical_threshold
 
-            # Get propensity (rate at current state)
-            try:
-                propensity = behavior._evaluate_rate_at_enablement(current_time)
-            except Exception as e:
-                self.logger.warning(f"Could not evaluate propensity for {transition.name}: {e}")
-                propensity = getattr(behavior, 'rate', 1.0)
-
-            propensities.append(propensity)
-            
-            # Check if critical (low propensity)
-            if propensity < self.critical_threshold:
+            if is_critical:
                 critical_transitions.append((transition.name, propensity))
         
         # If all transitions are critical, use exact SSA (tau = 0)
@@ -249,7 +279,8 @@ class LeapSelector:
             return min_tokens if min_tokens != float('inf') else 0.0
 
         # Fallback: O(|arcs|) scan when no table available
-        input_arcs = [arc for arc in model.arcs 
+        model_arcs = getattr(model, 'arcs', None) or []
+        input_arcs = [arc for arc in model_arcs
                      if arc.target == transition and hasattr(arc, 'source')]
         
         if not input_arcs:
@@ -379,10 +410,12 @@ class LeapSelector:
         Returns:
             Behavior object or None
         """
-        # Use controller's behavior cache if available
-        if hasattr(self, '_controller') and self._controller and hasattr(self._controller, 'behavior_cache'):
-            return self._controller.behavior_cache.get(transition.id)
-        
+        # Use controller's behavior cache if available (only when it's a real dict)
+        if hasattr(self, '_controller') and self._controller:
+            cache = getattr(self._controller, 'behavior_cache', None)
+            if isinstance(cache, dict):
+                return cache.get(getattr(transition, 'id', None))
+
         # Fallback to transition.behavior attribute
         if hasattr(transition, 'behavior'):
             return transition.behavior

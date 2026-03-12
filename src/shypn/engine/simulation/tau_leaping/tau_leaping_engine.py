@@ -48,6 +48,7 @@ class TauLeapingEngine:
         seed: Optional[int] = None,
         use_parallel: bool = False,
         use_jit_kernel: bool = False,
+        n_critical: int = 10,
         verbose: bool = True
     ):
         """Initialize τ-leaping engine.
@@ -64,7 +65,8 @@ class TauLeapingEngine:
         self.leap_selector = LeapSelector(
             epsilon=epsilon,
             critical_threshold=critical_threshold,
-            max_tau=max_tau
+            max_tau=max_tau,
+            n_critical=n_critical,
         )
         self.poisson_sampler = PoissonSampler(seed=seed)
         self.skellam_sampler = SkellamSampler(seed=seed)  # For reversible reactions
@@ -136,6 +138,10 @@ class TauLeapingEngine:
         if hasattr(controller, '_ensure_propensity_accelerator'):
             controller._ensure_propensity_accelerator()
         _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        # Guard: only use a real PropensityAccelerator, not a Mock auto-attribute.
+        # Real accelerators define 'ready' at the class level; Mock's do not.
+        if _prop_accel is not None and getattr(type(_prop_accel), 'ready', None) is None:
+            _prop_accel = None
         if _prop_accel is not None and _prop_accel.ready:
             try:
                 # Phase 2.2: partial y[] update — only sync places that changed
@@ -179,11 +185,12 @@ class TauLeapingEngine:
 
         # Phase 2.1: pass precomputed arc table to leap selector so
         # _get_min_input_tokens uses O(k) lookup instead of O(|arcs|) scan.
-        _arc_table = (
+        _arc_table_raw = (
             _prop_accel._input_arc_table
             if _prop_accel is not None and _prop_accel.ready
             else None
         )
+        _arc_table = _arc_table_raw if isinstance(_arc_table_raw, dict) else None
 
         # Phase 3: pass stoichiometry data so the Cao et al. (2006) full leap
         # condition can be used instead of the simplified ε/max(a) formula.
@@ -221,6 +228,7 @@ class TauLeapingEngine:
                 float(self.leap_selector.epsilon),
                 float(self.leap_selector.max_tau),
                 float(self.leap_selector.min_tau),
+                np.int64(getattr(self.leap_selector, 'n_critical', 10)),
             )
             if tau_jit == 0.0:
                 self.stats['exact_ssa_fallbacks'] += 1
@@ -233,10 +241,7 @@ class TauLeapingEngine:
             total_firings = self._apply_firings_fast(firings_map, controller, _prop_accel)
             if self._advance_time:
                 controller.time += tau_jit
-            if (
-                hasattr(controller, 'enable_assignment_rule_reevaluation')
-                and controller.enable_assignment_rule_reevaluation
-            ):
+            if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
                 self._update_assignment_rules(controller)
             self.stats['total_leaps'] += 1
             self.stats['total_firings'] += total_firings
@@ -255,9 +260,10 @@ class TauLeapingEngine:
                         'leap_info': {'reason': 'jit_kernel'},
                     },
                 )
-            if controller.settings.duration is None:
+            duration_s = controller.settings.get_duration_seconds()
+            if duration_s is None:
                 return True
-            return controller.time < controller.settings.duration
+            return controller.time < duration_s
         # ─────────────────────────────────────────────────────────────────────
 
         # Step 1: Select leap size τ  (standard Python path)
@@ -308,7 +314,7 @@ class TauLeapingEngine:
             controller.time += tau
         
         # Step 4.5: Update assignment rule-defined species (Option 3)
-        if hasattr(controller, 'enable_assignment_rule_reevaluation') and controller.enable_assignment_rule_reevaluation:
+        if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
             self._update_assignment_rules(controller)
         
         # NOTE: State recording moved to controller.step() to avoid duplicate recording
@@ -337,9 +343,10 @@ class TauLeapingEngine:
         
         # Check if simulation should continue
         # If duration is None, run indefinitely (return True)
-        if controller.settings.duration is None:
+        duration_s = controller.settings.get_duration_seconds()
+        if duration_s is None:
             return True
-        return controller.time < controller.settings.duration
+        return controller.time < duration_s
     
     def _sample_firings(
         self,
@@ -591,10 +598,14 @@ class TauLeapingEngine:
             
             # Find inhibitor arcs (Product → Transition) using defensive pattern
             # FIXED v2.1.2: Detect ALL inhibitor arc variants (includes curved_inhibitor_arc)
-            inhibitor_arcs = [arc for arc in input_arcs if 
-                            getattr(arc, 'arc_type', 'normal') == 'inhibitor' or
-                            'inhibitor' in getattr(arc, 'arc_type', 'normal') or
-                            getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal')) == 'inhibitor']
+            def _arc_type_str(arc: Any) -> str:
+                v = getattr(arc, 'arc_type', None)
+                return v if isinstance(v, str) else 'normal'
+
+            inhibitor_arcs = [arc for arc in input_arcs if
+                            _arc_type_str(arc) == 'inhibitor' or
+                            'inhibitor' in _arc_type_str(arc) or
+                            getattr(arc, 'kind', None) == 'inhibitor']
             
             if not inhibitor_arcs:
                 # No inhibitors, use original firings
@@ -825,6 +836,9 @@ class TauLeapingEngine:
         """
         # Phase 3: dispatch to vectorised fast path when stoich matrix is ready.
         _prop_accel = getattr(controller, '_propensity_accelerator', None)
+        # Guard: reject Mock auto-attributes (no class-level 'ready' property)
+        if _prop_accel is not None and getattr(type(_prop_accel), 'ready', None) is None:
+            _prop_accel = None
         if (
             _prop_accel is not None
             and _prop_accel.ready
@@ -894,14 +908,15 @@ class TauLeapingEngine:
                 )
             
             # Notify step listeners that have on_transition_fired (for analyses/plotting)
-            if hasattr(controller, 'step_listeners'):
+            _listeners = getattr(controller, 'step_listeners', None)
+            if isinstance(_listeners, (list, tuple)) and _listeners:
                 details = {
                     'consumed': consumed_map,
                     'produced': produced_map,
                     'mode': 'tau_leaping',
                     'firings': actual_firings
                 }
-                for listener in controller.step_listeners:
+                for listener in _listeners:
                     # Listeners are bound methods, check the object they're bound to
                     listener_obj = getattr(listener, '__self__', listener)
                     if hasattr(listener_obj, 'on_transition_fired'):
@@ -1042,7 +1057,8 @@ class TauLeapingEngine:
         if not enabled:
             # No enabled transitions - advance time slightly
             controller.time += 0.001
-            return controller.time < controller.settings.duration
+            duration_s = controller.settings.get_duration_seconds()
+            return duration_s is None or controller.time < duration_s
         
         # Select one transition (priority/random based on controller settings)
         transition = controller._select_transition(enabled)
@@ -1050,7 +1066,8 @@ class TauLeapingEngine:
         # Fire it using exact SSA
         controller._fire_transition(transition)
         
-        return controller.time < controller.settings.duration
+        duration_s = controller.settings.get_duration_seconds()
+        return duration_s is None or controller.time < duration_s
     
     def _get_behavior(self, transition: Any) -> Optional[Any]:
         """Get behavior object for transition.
@@ -1066,9 +1083,12 @@ class TauLeapingEngine:
         Returns:
             Behavior object or None
         """
-        # Preferred: delegate to controller which manages the cache correctly
-        if hasattr(self, '_controller') and hasattr(self._controller, '_get_behavior'):
-            return self._controller._get_behavior(transition)
+        # Preferred: delegate to controller which manages the cache correctly.
+        # Guard: only use the controller method when it is a real class-level
+        # definition (not an auto-attribute generated by unittest.mock.Mock).
+        ctrl = getattr(self, '_controller', None)
+        if ctrl is not None and getattr(type(ctrl), '_get_behavior', None) is not None:
+            return ctrl._get_behavior(transition)
 
         # Fallback: check if transition has behavior attribute (backward compatibility)
         if hasattr(transition, 'behavior'):

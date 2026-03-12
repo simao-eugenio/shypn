@@ -11,6 +11,8 @@ Displays extracted SBML information in a tree view:
 Allows users to click on items to highlight corresponding elements in the canvas.
 """
 
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Pango
 import logging
 

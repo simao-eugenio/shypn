@@ -38,9 +38,73 @@ import time
 import multiprocessing as mp
 import numpy as np
 from typing import Dict, List, Optional, Any, Callable, Set, Tuple
-from copy import deepcopy
+from copy import deepcopy, copy as shallow_copy
 
 from shypn.engine.simulation.controller import SimulationController
+
+
+def _create_sim_model_proxy(model: Any) -> Any:
+    """Return a simulation-safe proxy of *model* with isolated place tokens.
+
+    Creates **shallow copies** of every Place so the background simulation
+    thread can write ``place.tokens`` without racing against the GTK main
+    thread's canvas repaints (which also read ``place.tokens`` from the live
+    model).
+
+    * **Places** – each copy is a new Python object with its own ``tokens``
+      float; all other attributes are shared (they are read-only during sim).
+    * **Arcs** – shallow-copied and their ``source`` / ``target`` endpoints
+      are re-wired to the copied Place objects where applicable.
+    * **Transitions** – shared with the original (read-only during sim).
+    * **Everything else** – forwarded to the original via ``__getattr__``.
+
+    Returns a lightweight proxy object presenting the same interface as the
+    original model for use by ``SimulationController`` and its accelerators.
+    """
+    # 1. Shallow-copy every Place → each copy has its own ``tokens`` float.
+    place_copies: Dict[str, Any] = {}
+    for p in getattr(model, 'places', []):
+        pc = shallow_copy(p)
+        place_copies[p.id] = pc
+
+    # 2. Shallow-copy every Arc; re-wire Place endpoints to the copies.
+    arc_copies: List[Any] = []
+    for arc in getattr(model, 'arcs', []):
+        ac = shallow_copy(arc)
+        src = getattr(ac, 'source', None)
+        tgt = getattr(ac, 'target', None)
+        if src is not None and hasattr(src, 'tokens') and getattr(src, 'id', None) in place_copies:
+            ac.source = place_copies[src.id]
+        if tgt is not None and hasattr(tgt, 'tokens') and getattr(tgt, 'id', None) in place_copies:
+            ac.target = place_copies[tgt.id]
+        arc_copies.append(ac)
+
+    _places_list = list(place_copies.values())
+    _transitions = getattr(model, 'transitions', [])  # shared, read-only
+
+    class _SimModelProxy:
+        """Lightweight model proxy for isolated batch simulation.
+
+        Presents the same interface as the real model but owns its Place
+        objects so the background thread never writes to the live model.
+        """
+
+        def __init__(self) -> None:
+            self.places = _places_list
+            self.transitions = _transitions
+            self.arcs = arc_copies
+
+        def register_observer(self, cb: Any) -> None:
+            pass  # Suppress: proxy is background-thread-only
+
+        def unregister_observer(self, cb: Any) -> None:
+            pass
+
+        def __getattr__(self, name: str) -> Any:  # fallback for all other attrs
+            return getattr(model, name)
+
+    return _SimModelProxy()
+
 
 # ---------------------------------------------------------------------------
 # Module-level state for fork-based worker (set before forking, never pickled)
@@ -182,13 +246,83 @@ class BatchSimulationRunner:
         self.parallel_threshold: int = 12
         self.max_parallel_workers: int = min(mp.cpu_count(), 16)
         
+    def build_replicate_controller(
+        self,
+        controller: SimulationController,
+        recorded_objects: Set[str],
+    ) -> 'SimulationController':
+        """Create and configure the reusable replicate controller.
+
+        Must be called on the **main thread** (before any background thread is
+        started) because SimulationController initialisation may compile C/JIT
+        accelerators that are not thread-safe when GTK is running.
+
+        Args:
+            controller: The live controller whose settings and model to copy.
+            recorded_objects: Set of place/transition IDs to record.
+
+        Returns:
+            A fully configured SimulationController ready for batch stepping.
+        """
+        from shypn.core.value_objects import RecordingConfig
+        recording_config = RecordingConfig.step_based(
+            interval=100, recorded_objects=recorded_objects
+        )
+
+        # ── Isolated model proxy ──────────────────────────────────────────────
+        # The background thread writes place.tokens (via TauLeapingEngine and
+        # _reset_model).  If it used the live controller.model, those writes
+        # would race with the GTK canvas thread reading place.tokens during
+        # repaints → SIGSEGV in the main thread with no Python frames.
+        #
+        # _create_sim_model_proxy() shallow-copies every Place object so the
+        # background thread has its own token storage.  Arcs are re-wired to
+        # the copies; Transitions are shared (read-only during simulation).
+        sim_model = _create_sim_model_proxy(controller.model)
+
+        replicate_controller = SimulationController(
+            sim_model, verbose=False, recording_config=recording_config
+        )
+        # Copy all simulation settings (duration, dt, tau params, noise, etc.)
+        # from the live controller.  SimulationController.__init__ creates a
+        # fresh default SimulationSettings, so without this copy the batch
+        # would run with wrong duration / dt values.
+        replicate_controller.settings = deepcopy(controller.settings)
+        # _ensure_ode_accelerator() and _ensure_propensity_accelerator() both
+        # call ctypes.CDLL() to load a compiled .so.  Loading a shared library
+        # from a background thread while GTK is running can cause a segfault
+        # (the .so global constructors may interact with GTK's internal state).
+        # Forcing the load here — on the main thread — makes every subsequent
+        # call inside the batch worker thread a no-op (flags are already True).
+        replicate_controller._ensure_ode_accelerator()
+        replicate_controller._ensure_propensity_accelerator()
+
+        # Pre-create the TauLeapingEngine so that the first step in the
+        # background thread does NOT allocate/initialise it.
+        if not hasattr(replicate_controller, '_tau_leaping_engine'):
+            from shypn.engine.simulation.tau_leaping import TauLeapingEngine
+            s = replicate_controller.settings
+            replicate_controller._tau_leaping_engine = TauLeapingEngine(
+                epsilon=s.tau_epsilon,
+                critical_threshold=s.critical_threshold,
+                max_tau=s.max_tau,
+                seed=None,
+                use_parallel=s.use_parallel_stochastic,
+                use_jit_kernel=getattr(s, 'use_jit_kernel', False),
+                verbose=False,
+            )
+            replicate_controller._tau_leaping_engine.leap_selector.min_tau = s.min_tau
+
+        return replicate_controller
+
     def run_batch(
         self,
         controller: SimulationController,
         n_replicates: int,
         recorded_objects: Set[str],
         progress_callback: Optional[Callable[[int, int, float, str], None]] = None,
-        cancellation_check: Optional[Callable[[], bool]] = None
+        cancellation_check: Optional[Callable[[], bool]] = None,
+        replicate_controller: Optional['SimulationController'] = None,
     ) -> List[Dict[str, Any]]:
         """Run batch of simulation replicates with selective recording.
         
@@ -225,7 +359,9 @@ class BatchSimulationRunner:
         settings = controller.settings
         model = controller.model
         base_seed = settings.random_seed if hasattr(settings, 'random_seed') else 42
-        duration = settings.duration if hasattr(settings, 'duration') else 100.0
+        # Use get_duration_seconds() to correctly convert the raw duration value
+        # to seconds regardless of the selected time unit (ms/s/min/h/days).
+        duration = settings.get_duration_seconds() if hasattr(settings, 'get_duration_seconds') else (settings.duration if hasattr(settings, 'duration') else 100.0)
 
         # Store initial marking for reset between replicates
         initial_marking = {place.id: place.tokens for place in model.places}
@@ -251,34 +387,14 @@ class BatchSimulationRunner:
                 start_time=start_time,
             )
         
-        # PERFORMANCE FIX: Create controller ONCE, reuse for all replicates
-        # Creating 100 controllers = 100× behavior initialization overhead = 2× slowdown
-        # verbose=False: No debug output
-        # RecordingConfig with step_based: Record every 100th step for batch efficiency
-        # For 500s simulation with dt=0.01: 50k steps → 500 data points (vs 50k with interval=1)
-        # This reduces memory overhead by 100× and speeds up batch execution by ~2×
-        from shypn.core.value_objects import RecordingConfig
-        
-        recording_config = RecordingConfig.step_based(interval=100, recorded_objects=recorded_objects)
-        replicate_controller = SimulationController(model, verbose=False, recording_config=recording_config)
-        
-        # Copy settings from original controller (only needs to happen once)
-        replicate_controller.settings = deepcopy(settings)
-        
-        # Update DataCollector's recorded_objects to match settings
-        # If recorded_objects is empty, DataCollector will record ALL objects
-        replicate_controller.data_collector.recorded_objects = recorded_objects
-        
-        # PERFORMANCE: Enable time-based recording for smoother data density
-        # Record every 0.5 seconds of simulation time instead of every Nth step
-        replicate_controller.data_collector.time_based_recording = True
-        replicate_controller.data_collector.recording_time_interval = 0.5  # seconds
-        
-        # τ-leaping is always active (use_tau_leaping setter is a no-op by design).
-        # All other settings (tau_epsilon, max_tau, use_parallel_stochastic, etc.) are
-        # preserved from the user's controller settings via the deepcopy above.
-        replicate_controller.settings.use_tau_leaping = True
-        replicate_controller.settings.use_jit_kernel = True  # Phase 6: enable JIT in batch
+        # Build replicate controller if not supplied by caller.
+        # IMPORTANT: if running inside a GUI (GTK) application, the caller
+        # should pass a pre-built controller created on the main thread via
+        # build_replicate_controller(), because SimulationController
+        # initialisation can compile C/JIT accelerators that are not safe to
+        # run from a background thread while GTK is active.
+        if replicate_controller is None:
+            replicate_controller = self.build_replicate_controller(controller, recorded_objects)
         
         for i in range(n_replicates):
             # Check for cancellation before starting replicate
@@ -288,11 +404,33 @@ class BatchSimulationRunner:
             
             try:
                 # Set unique seed for this replicate
-                replicate_controller.settings.random_seed = base_seed + i
-                
-                # Reset model to initial marking with optional noise
+                _rep_seed = base_seed + i
+                replicate_controller.settings.random_seed = _rep_seed
+
+                # Re-seed all three RNG sources so every replicate is fully
+                # reproducible regardless of which sampling path is active:
+                #   1. PoissonSampler.rng  — numpy default_rng (Python path)
+                #   2. SkellamSampler.rng  — numpy default_rng (reversible reactions)
+                #   3. Numba JIT RNG       — internal np.random state inside the
+                #      compiled kernel; seed_kernel() must be called explicitly
+                #      because the Numba RNG is separate from the Python RNG.
+                _engine = getattr(replicate_controller, '_tau_leaping_engine', None)
+                if _engine is not None:
+                    import numpy as _np
+                    _engine.poisson_sampler.rng = _np.random.default_rng(_rep_seed)
+                    _engine.skellam_sampler.rng = _np.random.default_rng(_rep_seed + 1)
+                    if _engine.use_jit_kernel:
+                        from shypn.engine.simulation.tau_leaping.jit_kernel import (
+                            NUMBA_AVAILABLE, seed_kernel,
+                        )
+                        if NUMBA_AVAILABLE and seed_kernel is not None:
+                            seed_kernel(_rep_seed)
+
+                # Reset the PROXY model to initial marking with optional noise.
+                # Must use replicate_controller.model (the isolated proxy) so that
+                # token writes stay off the live model and don't race with GTK repaints.
                 self._reset_model(
-                    model, 
+                    replicate_controller.model,
                     initial_marking,
                     apply_noise=replicate_controller.settings.ic_noise_enabled,
                     noise_percent=replicate_controller.settings.ic_noise_percent,

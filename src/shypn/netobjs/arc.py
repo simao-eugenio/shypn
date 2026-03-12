@@ -15,6 +15,7 @@ See doc/COLOR_NORMALIZATION.md for details.
 """
 import logging
 import math
+import functools
 from typing import Any, List, Optional, Tuple
 from shypn.netobjs.petri_net_object import PetriNetObject
 
@@ -137,7 +138,7 @@ class Arc(PetriNetObject):
         """Get target object ID (for behavior compatibility)."""
         return self.target.id
     
-    @property
+    @functools.cached_property
     def arc_type(self) -> str:
         """Get the arc type identifier.
         

@@ -11,10 +11,14 @@ Architecture:
 - HeaderBar toggle buttons control panel attach/detach behavior
 - Attached panels appear at extreme left of main window
 """
+import faulthandler
 import os
 import sys
 import logging
 import warnings
+
+# Dump Python-level traceback to stderr on SIGSEGV / SIGFPE / SIGABRT
+faulthandler.enable()
 
 # Configure logging to show only warnings and errors
 logging.basicConfig(
@@ -49,6 +53,55 @@ if not _display_available:
         file=sys.stderr
     )
     sys.exit(1)
+
+# Suppress "Error creating proxy: Could not connect: Connection refused" messages.
+# These come from GLib/GIO C code (AT-SPI, IBus, dconf, xdg-desktop-portal, GVfs)
+# writing directly to fd 2 — env vars alone are not sufficient when the D-Bus session
+# socket exists but services are absent.  Redirect fd 2 through a pipe and filter
+# matching lines in a background thread; all other output passes through unchanged.
+import threading as _threading
+
+def _install_proxy_error_filter():
+	_SKIP = b'Error creating proxy: Could not connect'
+	_r, _w = os.pipe()
+	_orig = os.dup(2)
+	os.dup2(_w, 2)
+	os.close(_w)
+
+	def _run():
+		buf = b''
+		try:
+			src = open(_r, 'rb', buffering=0)
+			dst = open(_orig, 'wb', buffering=0)
+			while True:
+				chunk = src.read(256)
+				if not chunk:
+					break
+				buf += chunk
+				while b'\n' in buf:
+					line, buf = buf.split(b'\n', 1)
+					if _SKIP not in line:
+						dst.write(line + b'\n')
+						dst.flush()
+		except Exception:
+			pass
+		finally:
+			try:
+				if buf and _SKIP not in buf:
+					open(_orig, 'wb', buffering=0).write(buf)
+			except Exception:
+				pass
+
+	_threading.Thread(target=_run, daemon=True, name='stderr-proxy-filter').start()
+
+_install_proxy_error_filter()
+del _install_proxy_error_filter
+
+# Keep env vars as belt-and-suspenders to reduce the volume hitting the filter
+if 'NO_AT_BRIDGE' not in os.environ:
+	os.environ['NO_AT_BRIDGE'] = '1'
+if 'GTK_USE_PORTAL' not in os.environ:
+	os.environ['GTK_USE_PORTAL'] = '0'
 
 import gi
 gi.require_version('Gtk', '3.0')
