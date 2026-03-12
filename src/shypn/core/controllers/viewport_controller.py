@@ -461,7 +461,7 @@ class ViewportController(AbstractViewportController):
     def save_view_state_to_file(self):
         """Save current view state (pan and zoom) to file.
         
-        Saves to model's directory as .view_state_{basename}.json
+        Saves inside a .shypn/ subdirectory next to the model file,
         or to ~/.shypn/{filename}_view.json for unsaved models.
         This preserves user's view position across sessions.
         """
@@ -473,13 +473,15 @@ class ViewportController(AbstractViewportController):
         
         # Determine state file location based on model filepath
         if self.model_filepath:
-            # Save in model's directory
+            # Save in .shypn/ subdirectory next to the model
             model_dir = os.path.dirname(self.model_filepath)
             basename = os.path.basename(self.model_filepath)
             # Remove .shy extension if present
             if basename.endswith('.shy'):
                 basename = basename[:-4]
-            state_file = os.path.join(model_dir, f".view_state_{basename}.json")
+            meta_dir = os.path.join(model_dir, '.shypn')
+            os.makedirs(meta_dir, exist_ok=True)
+            state_file = os.path.join(meta_dir, f"{basename}.view_state.json")
         else:
             # Unsaved model - use ~/.shypn config directory
             config_dir = os.path.expanduser('~/.shypn')
@@ -487,7 +489,6 @@ class ViewportController(AbstractViewportController):
             state_file = os.path.join(config_dir, f"{self.filename}_view.json")
         
         try:
-            os.makedirs(os.path.dirname(state_file), exist_ok=True)
             with open(state_file, 'w') as f:
                 json.dump(view_state, f, indent=2)
         except (OSError, IOError, PermissionError, TypeError) as e:
@@ -503,13 +504,14 @@ class ViewportController(AbstractViewportController):
         """
         # Determine state file location based on model filepath
         if self.model_filepath:
-            # Load from model's directory
+            # Load from .shypn/ subdirectory next to the model
             model_dir = os.path.dirname(self.model_filepath)
             basename = os.path.basename(self.model_filepath)
             # Remove .shy extension if present
             if basename.endswith('.shy'):
                 basename = basename[:-4]
-            state_file = os.path.join(model_dir, f".view_state_{basename}.json")
+            meta_dir = os.path.join(model_dir, '.shypn')
+            state_file = os.path.join(meta_dir, f"{basename}.view_state.json")
         else:
             # Unsaved model - try ~/.shypn config directory
             config_dir = os.path.expanduser('~/.shypn')

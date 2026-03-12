@@ -24,6 +24,32 @@ import ast
 import math
 from typing import Dict, Any, Optional, Union
 
+# Module-level cache: expression string → compiled code object.
+# AST validation runs once per unique expression, then the compiled bytecode is reused.
+_COMPILED_EXPR_CACHE: dict = {}
+
+# Pre-built base namespaces reused across every call (never mutated — always .copy()-ed).
+_BASE_MATH_NS: dict = {
+    "__builtins__": {},
+    'abs': abs, 'min': min, 'max': max,
+    'round': round, 'int': int, 'float': float,
+    'sum': sum, 'len': len,
+    'math': math,
+}
+_BASE_NO_MATH_NS: dict = {"__builtins__": {}}
+
+
+def _get_compiled(expr: str) -> object:
+    """Return the compiled bytecode for *expr*, parsing/validating only on first use."""
+    cached = _COMPILED_EXPR_CACHE.get(expr)
+    if cached is not None:
+        return cached
+    tree = ast.parse(expr, mode='eval')
+    SafeExpressionValidator().visit(tree)
+    compiled = compile(tree, '<safe_eval>', 'eval')
+    _COMPILED_EXPR_CACHE[expr] = compiled
+    return compiled
+
 
 class SafeExpressionValidator(ast.NodeVisitor):
     """AST visitor to validate expression safety.
@@ -177,40 +203,13 @@ def safe_eval_numeric(
         - Restricted namespace
     """
     try:
-        # Parse expression to AST
-        tree = ast.parse(expr, mode='eval')
+        compiled = _get_compiled(expr)
         
-        # Validate AST for safety
-        validator = SafeExpressionValidator()
-        validator.visit(tree)
-        
-        # Compile to bytecode
-        compiled = compile(tree, '<safe_eval>', 'eval')
-        
-        # Build safe execution namespace
-        safe_namespace = {
-            "__builtins__": {},  # No builtins by default
-        }
-        
-        # Add math functions if allowed
-        if allow_math:
-            safe_namespace.update({
-                'abs': abs,
-                'min': min,
-                'max': max,
-                'round': round,
-                'int': int,
-                'float': float,
-                'sum': sum,
-                'len': len,
-                'math': math,  # math module for sin, cos, sqrt, etc.
-            })
-        
-        # Add user context
-        safe_namespace.update(context)
-        
-        # Execute and convert to float
-        result = eval(compiled, safe_namespace)
+        # Use context directly as locals — no per-call dict merge.
+        # _BASE_MATH_NS / _BASE_NO_MATH_NS (globals) provides math builtins and
+        # disables __builtins__; context (locals) provides place tokens + params.
+        globals_ns = _BASE_MATH_NS if allow_math else _BASE_NO_MATH_NS
+        result = eval(compiled, globals_ns, context)
         return float(result)
         
     except (SyntaxError, ValueError) as e:
@@ -251,26 +250,8 @@ def safe_eval_bool(
         False
     """
     try:
-        # Parse and validate
-        tree = ast.parse(expr, mode='eval')
-        validator = SafeExpressionValidator()
-        validator.visit(tree)
-        compiled = compile(tree, '<safe_eval>', 'eval')
-        
-        # Evaluate with math functions
-        safe_namespace = {
-            "__builtins__": {},
-            'abs': abs,
-            'min': min,
-            'max': max,
-            'round': round,
-            'int': int,
-            'float': float,
-            'math': math,
-        }
-        safe_namespace.update(context)
-        
-        result = eval(compiled, safe_namespace)
+        compiled = _get_compiled(expr)
+        result = eval(compiled, _BASE_MATH_NS, context)
         return bool(result)
         
     except Exception as e:

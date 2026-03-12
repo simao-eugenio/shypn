@@ -1,6 +1,8 @@
 """Files panel controller."""
 
 import sys
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from .base_panel import BasePanel
 

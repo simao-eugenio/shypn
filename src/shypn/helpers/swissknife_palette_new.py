@@ -17,6 +17,8 @@ Parameter panels now slide UP above sub-palettes, maintaining constant
 114px main palette height (50px sub-palette + 64px buttons).
 """
 
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GObject
 
 from shypn.helpers.swissknife_palette_ui import SwissKnifePaletteUI

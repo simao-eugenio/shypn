@@ -182,6 +182,22 @@ class BufferedSimulationSettings:
                 # Validation failed - rollback
                 return False
     
+    def sync_duration_to_buffer(self) -> None:
+        """Sync duration and time_units from live settings into any open buffer.
+        
+        Must be called whenever duration/time_units are written **directly** to
+        live settings (bypassing the buffer), e.g. from _on_duration_changed in
+        the palette loader.  Without this, a later commit() for an unrelated
+        buffered change (dt_auto, time_scale, …) will call _apply_buffer_to_live()
+        which overwrites live.duration / live.time_units with the stale values
+        that were in the buffer before the direct write, effectively reverting the
+        user's unit-change from e.g. hours back to the previously buffered seconds.
+        """
+        with self._lock:
+            if self._buffer is not None:
+                self._buffer.duration = self._live.duration
+                self._buffer.time_units = self._live.time_units
+
     def rollback(self) -> None:
         """Discard uncommitted changes, restore buffer to live values.
         
@@ -400,8 +416,8 @@ class BufferedSimulationSettings:
     def _get_settings_filepath(self) -> Optional[str]:
         """Get the filepath for persisting settings.
         
-        Settings are saved as .settings_{model_name}.json next to the model file,
-        similar to how view state is saved. For unsaved models, uses ~/.config/shypn/
+        Settings are saved inside a .shypn/ subdirectory next to the model file,
+        keeping the model directory clean. For unsaved models, uses ~/.config/shypn/
         
         Returns:
             str: Settings file path, or None if cannot determine
@@ -416,7 +432,7 @@ class BufferedSimulationSettings:
             os.makedirs(config_dir, exist_ok=True)
             return os.path.join(config_dir, 'default_settings.json')
         
-        # Model has filepath - save settings next to it
+        # Model has filepath - save into a .shypn/ subdirectory
         model_dir = os.path.dirname(self._model.filepath)
         basename = os.path.basename(self._model.filepath)
         
@@ -424,7 +440,9 @@ class BufferedSimulationSettings:
         if basename.endswith('.shy'):
             basename = basename[:-4]
         
-        return os.path.join(model_dir, f".settings_{basename}.json")
+        meta_dir = os.path.join(model_dir, '.shypn')
+        os.makedirs(meta_dir, exist_ok=True)
+        return os.path.join(meta_dir, f"{basename}.settings.json")
     
     def _save_to_disk(self) -> None:
         """Atomically save settings to disk.

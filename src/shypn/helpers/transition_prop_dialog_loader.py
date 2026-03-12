@@ -62,7 +62,12 @@ class TransitionPropDialogLoader(GObject.GObject):
         self.dialog = None
         self.color_picker = None
         self.locality_widget = None
-        
+
+        # Snapshot of original transition_type for Cancel rollback (BUG-1 fix).
+        # _on_type_changed mutates transition_obj.transition_type immediately for
+        # field-visibility purposes; we restore it if the user cancels.
+        self._original_transition_type = getattr(transition_obj, 'transition_type', 'continuous')
+
         # Load and setup
         self._load_ui()
         self._setup_color_picker()
@@ -631,7 +636,12 @@ class TransitionPropDialogLoader(GObject.GObject):
                 if self.persistency_manager:
                     self.persistency_manager.mark_dirty()
                 self.emit('properties-changed')
-        
+        else:
+            # BUG-1 FIX: _on_type_changed prematurely mutated transition_type for
+            # field-visibility purposes.  Restore the original value on Cancel so
+            # the object is left exactly as it was before the dialog was opened.
+            self.transition_obj.transition_type = self._original_transition_type
+
         # Don't destroy here - let explicit destroy() method handle it
     
     def _apply_changes(self):

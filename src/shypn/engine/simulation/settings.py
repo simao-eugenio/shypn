@@ -39,7 +39,10 @@ class SimulationSettings:
     # τ-Leaping defaults - ALWAYS ENABLED (it's the stochastic engine, not an option)
     # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
     DEFAULT_TAU_EPSILON = 0.03  # 3% leap condition tolerance (controls accuracy)
-    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (lowered for biochemical models)
+    DEFAULT_CRITICAL_THRESHOLD = 0.01  # Propensity threshold for critical reactions (fallback when arc table unavailable)
+    DEFAULT_N_CRITICAL = 10  # Cao et al. (2006) N_c: reaction is critical if it can fire fewer
+                              # than this many times before exhausting an input place (L_j < N_c).
+                              # Primary critical-reaction criterion when arc table is available.
     DEFAULT_MAX_TAU = 0.1  # Maximum leap size (seconds) - allows reasonable simulation speed
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
@@ -63,6 +66,7 @@ class SimulationSettings:
         # τ-Leaping settings (τ-leaping is always used for stochastic simulation)
         self._tau_epsilon = self.DEFAULT_TAU_EPSILON
         self._critical_threshold = self.DEFAULT_CRITICAL_THRESHOLD
+        self._n_critical = self.DEFAULT_N_CRITICAL
         self._max_tau = self.DEFAULT_MAX_TAU
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
@@ -238,7 +242,7 @@ class SimulationSettings:
     
     @property
     def critical_threshold(self) -> float:
-        """Get critical reaction threshold."""
+        """Get critical reaction threshold (propensity-based fallback)."""
         return self._critical_threshold
     
     @critical_threshold.setter
@@ -254,7 +258,25 @@ class SimulationSettings:
         if value <= 0:
             raise ValueError("Critical threshold must be positive")
         self._critical_threshold = value
-    
+
+    @property
+    def n_critical(self) -> int:
+        """Get Cao et al. (2006) N_c critical reaction threshold.
+        
+        A stochastic reaction is classified as critical (handled by exact SSA
+        rather than tau-leaping) if it can fire fewer than n_critical times before
+        exhausting at least one of its input places:
+            L_j = min_i floor(x_i / v_ij) < n_critical
+        Typical value: 10 (Cao et al. recommendation).
+        """
+        return getattr(self, '_n_critical', self.DEFAULT_N_CRITICAL)
+
+    @n_critical.setter
+    def n_critical(self, value: int) -> None:
+        if int(value) < 1:
+            raise ValueError("n_critical must be at least 1")
+        self._n_critical = int(value)
+
     @property
     def max_tau(self) -> float:
         """Get maximum leap size."""
@@ -503,6 +525,7 @@ class SimulationSettings:
             'use_tau_leaping': True,  # Always enabled (kept for compatibility)
             'tau_epsilon': self._tau_epsilon,
             'critical_threshold': self._critical_threshold,
+            'n_critical': self.n_critical,
             'max_tau': self._max_tau,
             'min_tau': self._min_tau,
             'use_parallel_stochastic': self._use_parallel_stochastic,
@@ -545,6 +568,9 @@ class SimulationSettings:
         
         if 'critical_threshold' in data:
             settings.critical_threshold = data['critical_threshold']
+        
+        if 'n_critical' in data:
+            settings.n_critical = data['n_critical']
         
         if 'max_tau' in data:
             settings.max_tau = data['max_tau']

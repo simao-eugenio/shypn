@@ -35,6 +35,7 @@ the new architecture.
 import logging
 import math
 import random
+import threading
 import traceback
 from typing import Callable, cast, List, Optional, Dict, Tuple, Any, Set
 try:
@@ -1009,17 +1010,26 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         Week 1 - Phase 4: EventBus integration for decoupled progress tracking.
         Analyses panel and other observers subscribe to this event.
         """
-        if self.document_id is None:
+        if not self.document_id:  # None or 0 (default) → no real UI context
             return  # No document context, skip event
         
         try:
             progress = self.get_progress()
-            EventBus.emit('simulation.progress', {
+            event_data = {
                 'time': self.time,
                 'progress': progress,
                 'duration': self.settings.duration,
                 'is_complete': self.is_simulation_complete()
-            }, document_id=self.document_id)
+            }
+            doc_id = self.document_id
+            if threading.current_thread() is not threading.main_thread():
+                try:
+                    from gi.repository import GLib
+                    GLib.idle_add(lambda: EventBus.emit('simulation.progress', event_data, document_id=doc_id) or False)
+                except ImportError:
+                    EventBus.emit('simulation.progress', event_data, document_id=doc_id)
+            else:
+                EventBus.emit('simulation.progress', event_data, document_id=doc_id)
         except (TypeError, AttributeError, RuntimeError) as e:
             logging.getLogger(__name__).debug(f"Event emission failed during simulation: {e}")
     
@@ -1774,8 +1784,23 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         
         # Phase 2b: Stochastic transitions (PROBABILISTIC - LOWER PRIORITY)
         if not discrete_fired:
-            stochastic_transitions = [t for t in self.model.transitions 
-                                     if t.transition_type in ('stochastic', 'adaptive')]
+            # Build stochastic list: include `stochastic` transitions always, but
+            # include `adaptive` transitions ONLY when they are in stochastic mode.
+            # Adaptive transitions currently in continuous mode are already fired by
+            # the ODE phase (Phase 3); re-including them here would double-count their
+            # effect (ODE integrate_step + Poisson sample), producing incorrect dynamics.
+            stochastic_transitions = []
+            for _t in self.model.transitions:
+                if _t.transition_type == 'stochastic':
+                    stochastic_transitions.append(_t)
+                elif _t.transition_type == 'adaptive':
+                    _beh = self._get_behavior(_t)
+                    if _beh is not None:
+                        _mode = getattr(_beh, '_current_mode', None)
+                        if _mode is None and hasattr(_beh, '_select_mode'):
+                            _mode = _beh._select_mode()
+                        if _mode == 'stochastic':
+                            stochastic_transitions.append(_t)
             
             # Check structural enabling (sufficient tokens)
             enabled_stochastic = []
@@ -1806,14 +1831,22 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                         seed=None,
                         use_parallel=self.settings.use_parallel_stochastic,
                         use_jit_kernel=getattr(self.settings, 'use_jit_kernel', False),
-                        verbose=self.verbose
+                        verbose=self.verbose,
+                        n_critical=getattr(self.settings, 'n_critical', 10),
                     )
                     self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
                 
-                # Determine if this is a pure stochastic model
+                # Determine if this is a pure stochastic model.
+                # A model is "pure stochastic" when every transition is either
+                # stochastic or adaptive-in-stochastic-mode (i.e., no continuous ODE
+                # transitions exist).  Adaptive transitions currently in continuous mode
+                # do NOT count as stochastic for this decision.
                 is_pure_stochastic = all(
-                    t.transition_type in ('stochastic', 'adaptive')
-                    for t in self.model.transitions 
+                    t.transition_type == 'stochastic' or (
+                        t.transition_type == 'adaptive' and
+                        t in stochastic_transitions  # already filtered to stochastic-mode adaptives
+                    )
+                    for t in self.model.transitions
                     if hasattr(t, 'transition_type')
                 )
                 

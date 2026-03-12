@@ -371,11 +371,11 @@ class ArcPropDialogLoader(GObject.GObject):
                 # This allows successive transformations (e.g., normal → test → inhibitor)
                 # without the dialog operating on stale/removed arc references
                 self.arc_obj = new_arc
-                
-                # Refresh dialog fields to show new arc's properties (color, type, etc.)
-                self._populate_fields()
-                
-                return  # Transformation complete - don't apply other changes
+
+                # BUG-2 FIX: Do NOT return early.  Fall through so that any other
+                # field edits (name, weight, colour, threshold) the user made in the
+                # same dialog session are applied to the newly-created arc object.
+                # (The previous early-return silently discarded those edits.)
         
         # No type change - apply all property changes to existing arc
         

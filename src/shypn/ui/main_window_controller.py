@@ -1,6 +1,8 @@
 """Main window controller with Master Palette integration."""
 
 import sys
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, GObject
 from shypn.ui.panels import (
     FilesPanelController,

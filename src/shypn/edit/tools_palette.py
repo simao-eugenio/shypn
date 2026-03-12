@@ -5,6 +5,8 @@ import sys
 from shypn.edit.base_edit_palette import BaseEditPalette
 
 try:
+    import gi
+    gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk
 except ImportError as e:
     print(f'ERROR: GTK3 not available: {e}', file=sys.stderr)
