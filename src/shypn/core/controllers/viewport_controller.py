@@ -14,10 +14,13 @@ Module structure:
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, cast
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractViewportController(ABC):

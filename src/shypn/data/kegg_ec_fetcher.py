@@ -17,6 +17,7 @@ Example:
 import logging
 import requests
 import json
+import urllib.error
 import concurrent.futures
 from typing import List, Optional, Dict, Callable
 from pathlib import Path

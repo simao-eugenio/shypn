@@ -5,9 +5,18 @@ must implement. Each processor takes a DocumentModel and optionally a
 KEGGPathway, performs some enhancement, and returns the modified document.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import TYPE_CHECKING, Optional, Dict, Any
 import logging
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway
+    from shypn.pathway.options import EnhancementOptions
+
+
 
 
 logger = logging.getLogger(__name__)

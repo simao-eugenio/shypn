@@ -16,11 +16,17 @@ The controller integrates with the project system to track:
 - Source citations and confidence
 """
 
+import logging
 import os
 import json
 import re
+import urllib.error
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+
+import requests
+
+logger = logging.getLogger(__name__)
 
 from ..data.enrichment_document import EnrichmentDocument
 from ..data.project_models import Project

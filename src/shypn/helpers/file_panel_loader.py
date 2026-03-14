@@ -13,8 +13,11 @@ Architecture:
       ├── ProjectInfoController: Project details display (Project Info category)
       └── ProjectActionsController: Project actions (Project Actions category)
 """
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 try:
     import gi

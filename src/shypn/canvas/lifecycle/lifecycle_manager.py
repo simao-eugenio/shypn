@@ -11,14 +11,19 @@ This ensures that global components (SwissKnifePalette, SimulationController)
 are properly isolated per canvas and synchronized with canvas/document state.
 """
 
+from __future__ import annotations
 import logging
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from .canvas_context import CanvasContext
 from .id_scope_manager import IDScopeManager
+
+
+if TYPE_CHECKING:
+    from shypn.data.model_canvas_manager import ModelCanvasManager
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -329,6 +334,8 @@ class CanvasLifecycleManager:
         logger.debug("  Initializing transition states...")
         logger.debug(f"[LIFECYCLE] Initializing transition states for {len(context.document_model.transitions)} transitions")
         from shypn.engine.simulation.controller import TransitionState
+
+
         
         source_count = 0
         for transition in context.document_model.transitions:

@@ -48,9 +48,14 @@ See doc/PHASE_3_QUALITY_PLAN.md for design rationale.
 See doc/SIGNAL_HIERARCHICAL_FORMALISM.md for SHPN arc semantics.
 """
 
-from typing import Optional, List, Tuple, Union, Any, Dict
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional, List, Tuple, Union, Any, Dict
 from shypn.netobjs.place import Place
 from shypn.netobjs.transition import Transition
+
+
+if TYPE_CHECKING:
+    from shypn.netobjs.arc import Arc
 
 
 class ArcBuilder:
@@ -720,6 +725,8 @@ class ArcBuilder:
         except (ImportError, AttributeError, RuntimeError) as e:
             # Fallback if IDManager not available or fails
             import logging
+
+
             logging.getLogger(__name__).debug(f"IDManager unavailable, using fallback ID generation: {e}")
             source_id = getattr(source, 'id', str(source))
             target_id = getattr(target, 'id', str(target))

@@ -10,12 +10,20 @@ Holds all components associated with a specific canvas instance:
 - Metadata (creation time, file path, etc.)
 """
 
+from __future__ import annotations
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.controller import SimulationController
+    from shypn.helpers.swissknife_palette import SwissKnifePalette
+    from shypn.data.model_canvas_manager import ModelCanvasManager
 
 
 @dataclass
@@ -76,6 +84,8 @@ class CanvasContext:
         """Get display name for this canvas (for tab labels)."""
         if self.file_path:
             import os
+
+
             return os.path.basename(self.file_path)
         else:
             return "Untitled"

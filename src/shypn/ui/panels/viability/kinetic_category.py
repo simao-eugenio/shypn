@@ -18,8 +18,11 @@ Date: November 10, 2025
 """
 
 import gi
+import logging
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+
+logger = logging.getLogger(__name__)
 
 from .base_category import BaseViabilityCategory
 from .viability_dataclasses import Issue, Suggestion

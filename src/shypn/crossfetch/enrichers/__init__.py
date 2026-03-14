@@ -15,9 +15,9 @@ from .annotation_enricher import AnnotationEnricher, ConflictResolutionStrategy
 from .coordinate_enricher import CoordinateEnricher
 
 # Helper modules (not exported but available internally)
-from . import sbml_id_mapper
-from . import sbml_layout_writer
-from . import coordinate_transformer
+from . import sbml_id_mapper  # noqa: F401
+from . import sbml_layout_writer  # noqa: F401
+from . import coordinate_transformer  # noqa: F401
 
 __all__ = [
     # Base classes

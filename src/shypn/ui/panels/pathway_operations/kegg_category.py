@@ -730,9 +730,10 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                 self.logger.error(f"Failed to parse KGML for preview: {e}")
                 import traceback
                 traceback.print_exc()
+                error_msg = str(e)
                 def show_error():
                     buffer = self.preview_text.get_buffer()
-                    buffer.set_text(f"Error parsing KGML file:\\n{str(e)}")
+                    buffer.set_text(f"Error parsing KGML file:\\n{error_msg}")
                     return False
                 GLib.idle_add(show_error)
         # Run parse in background thread to avoid UI freeze

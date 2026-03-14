@@ -9,7 +9,10 @@ Lifecycle Integration:
 - Operations pushed immediately after completion (e.g., MoveOperation after drag)
 """
 
+import logging
 from typing import List, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class UndoManager:

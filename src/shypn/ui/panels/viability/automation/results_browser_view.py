@@ -2127,23 +2127,6 @@ class ResultsBrowserView(BaseResultsView):
             name: Experiment name
             result: Result dictionary with statistics
         """
-        try:
-            import numpy as np
-        except ImportError:
-            dialog = Gtk.MessageDialog(
-                transient_for=self.get_toplevel(),
-                flags=0,
-                message_type=Gtk.MessageType.ERROR,
-                buttons=Gtk.ButtonsType.OK,
-                text="NumPy not available"
-            )
-            dialog.format_secondary_text(
-                "Install numpy to use plotting: pip install numpy"
-            )
-            dialog.run()
-            dialog.destroy()
-            return
-        
         # Check for error
         if "error" in result:
             dialog = Gtk.MessageDialog(

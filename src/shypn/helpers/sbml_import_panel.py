@@ -593,8 +593,9 @@ class SBMLImportPanel:
             GLib.idle_add(update_ui_success)
             
         except Exception as e:
+            error_msg = str(e)
             def show_error():
-                self._show_status(f"Fetch error: {str(e)}", error=True)
+                self._show_status(f"Fetch error: {error_msg}", error=True)
                 if self.sbml_fetch_button:
                     self.sbml_fetch_button.set_sensitive(True)
                 self._fetch_in_progress = False

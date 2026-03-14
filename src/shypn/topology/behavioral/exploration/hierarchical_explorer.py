@@ -149,7 +149,8 @@ class HierarchicalExplorer(StateSpaceExplorer):
         )
         
         state_counter = len(states)
-        
+        layer_states: list = []
+
         # Phase 2+: Explore higher layers from stable lower layer states
         for layer in range(1, max(self.layer_groups.keys()) + 1):
             if state_counter >= max_states:

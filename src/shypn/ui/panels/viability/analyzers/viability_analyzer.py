@@ -24,6 +24,8 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 import logging
 
+logger = logging.getLogger(__name__)
+
 # Import specialized analyzers
 from ..analysis import LocalityAnalyzer, DependencyAnalyzer, BoundaryAnalyzer, ConservationAnalyzer
 from ..data.data_puller import DataPuller

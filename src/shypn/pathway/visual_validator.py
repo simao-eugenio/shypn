@@ -9,10 +9,17 @@ This is an experimental processor that requires image processing
 libraries and pathway images.
 """
 
-from typing import Optional
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
 import logging
 
 from shypn.pathway.base import PostProcessorBase
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway
+    from shypn.pathway.options import EnhancementOptions
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +89,9 @@ class VisualValidator(PostProcessorBase):
         
         # Check if Pillow is available
         try:
-            import PIL
+            import PIL  # noqa: F401
+
+
         except ImportError:
             self.logger.warning("Not applicable: Pillow (PIL) not installed")
             return False

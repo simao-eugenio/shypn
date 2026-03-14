@@ -92,7 +92,7 @@ class SBMLLayoutResolver:
             return None
         
         try:
-            import libsbml
+            import libsbml  # noqa: F401
             
             document = self.pathway.sbml_document
             model = document.getModel()
