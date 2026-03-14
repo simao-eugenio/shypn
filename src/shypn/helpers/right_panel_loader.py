@@ -13,7 +13,7 @@ import sys
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
     print('ERROR: GTK3 not available in right_panel loader:', e, file=sys.stderr)
     sys.exit(1)

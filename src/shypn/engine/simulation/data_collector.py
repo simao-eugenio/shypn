@@ -256,7 +256,6 @@ class DataCollector:
                             rate = 0.0
                 except Exception as e:
                     # If rate evaluation fails, log the error and use 0.0
-                    import logging
                     logger = logging.getLogger(__name__)
                     if not hasattr(self, '_rate_eval_errors'):
                         self._rate_eval_errors: Set[Any] = set()

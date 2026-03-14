@@ -94,7 +94,7 @@ class KEGGNameEnricher:
         'C00022': 'Pyruvate',
         'C00186': 'Lactate',       # (S)-Lactate
         'C00025': 'Glutamate',     # L-Glutamate
-        'C00026': 'Ketoglutarate', # 2-Oxoglutarate
+        'C00026': 'Ketoglutarate',  # 2-Oxoglutarate (was duplicate — see Akg below)
         'C00036': 'Oxaloacetate',
         'C00042': 'Succinate',
         'C00122': 'Fumarate',
@@ -103,7 +103,7 @@ class KEGGNameEnricher:
         'C00311': 'Isocitrate',
         'C00417': 'Isocitrate',    # cis-Aconitate
         'C00091': 'SuccinylCoA',
-        'C00026': 'Akg',           # Alpha-ketoglutarate
+        # 'C00026': 'Akg',  # Duplicate key removed; 'Ketoglutarate' entry above wins
     }
     
     # Common enzyme abbreviations (same as reaction_mapper.py)
