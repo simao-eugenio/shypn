@@ -343,20 +343,17 @@ class ExperimentAutomationCategory:
                 self._show_error("No baseline experiment. Please load a subnet via right-click transition first.")
                 return
         
-        # Ensure we have a valid baseline with data
+        # Always re-sync the baseline from the current TreeViews before generating.
+        # This ensures any parameter changes made in the viability panel (e.g. GCSF)
+        # after the initial baseline capture are picked up.
         base_snapshot = self.experiment_manager.get_active_snapshot()
         if base_snapshot:
-            # Check if baseline is empty (no parameters captured)
-            if (not base_snapshot.place_markings and 
-                not base_snapshot.transition_rates and 
-                not base_snapshot.arc_weights):
-                # Recapture from current TreeViews
-                if self.parent_panel and hasattr(self.parent_panel, 'places_store'):
-                    base_snapshot.capture_from_treeviews(
-                        self.parent_panel.places_store,
-                        self.parent_panel.transitions_store,
-                        self.parent_panel.arcs_store
-                    )
+            if self.parent_panel and hasattr(self.parent_panel, 'places_store'):
+                base_snapshot.capture_from_treeviews(
+                    self.parent_panel.places_store,
+                    self.parent_panel.transitions_store,
+                    self.parent_panel.arcs_store
+                )
         
         try:
             # Store baseline snapshot count
@@ -776,18 +773,59 @@ class ExperimentAutomationCategory:
                 import traceback
                 traceback.print_exc()
         
-        # NEW: Auto-save experiment results (Phase 3 normalization)
-        try:
-            self._auto_save_experiment(name, result)
-        except Exception as e:
-            print(f"[WARNING] Failed to auto-save experiment '{name}': {e}")
-            import traceback
-            traceback.print_exc()
+        # NEW: Auto-save experiment results (Phase 3 normalization).
+        # CRITICAL: run in a background thread so disk I/O never blocks the
+        # GTK main thread (blocking caused the app to be killed by the session
+        # manager when 600 fsyncs accumulated in the GTK loop).
+        #
+        # GTK IS NOT THREAD-SAFE.  All GObject / widget accesses MUST happen
+        # here (GTK main thread) BEFORE the thread starts.  The thread only
+        # receives plain Python values (strings, dicts, Path) — it never
+        # touches self.parent_panel or calls self._get_project_folder().
+        import threading as _threading
+        _run_folder_snapshot = self._current_run_folder          # Path or None
+        _project_folder_snapshot = self._get_project_folder()   # str or None
+        _id_to_name_snapshot: dict = {}
+        _names_csv_rows_snapshot: list = []
+        _subnet_mdl = getattr(self.parent_panel, 'subnet_model', None)
+        if _subnet_mdl is not None:
+            for _xp in getattr(_subnet_mdl, 'places', []):
+                _id_to_name_snapshot[_xp.id] = getattr(_xp, 'name', _xp.id)
+                _names_csv_rows_snapshot.append(
+                    (_xp.id, getattr(_xp, 'name', _xp.id), 'place')
+                )
+            for _xt in getattr(_subnet_mdl, 'transitions', []):
+                _id_to_name_snapshot[_xt.id] = getattr(_xt, 'name', _xt.id)
+                _names_csv_rows_snapshot.append(
+                    (_xt.id, getattr(_xt, 'name', _xt.id), 'transition')
+                )
+        _save_thread = _threading.Thread(
+            target=self._auto_save_experiment,
+            args=(name, result, _run_folder_snapshot,
+                  _project_folder_snapshot, _id_to_name_snapshot,
+                  _names_csv_rows_snapshot),
+            daemon=True,
+            name=f'auto-save-{name[:40]}',
+        )
+        _save_thread.start()
     
-    def _auto_save_experiment(self, name: str, result: dict):
+    def _auto_save_experiment(
+        self,
+        name: str,
+        result: dict,
+        run_folder=None,
+        project_folder: str = None,
+        id_to_name: dict = None,
+        names_csv_rows: list = None,
+    ):
         """Auto-save experiment results to disk — all CSV format for easy analysis.
 
         Saves to: {project}/experiments/results/experiment_{name}_{timestamp}/
+
+        THREAD-SAFETY: this method is called from a background thread.
+        It must never access self.parent_panel or any GTK/GObject attribute.
+        All GTK-owned data (project_folder, id_to_name, names_csv_rows) must
+        be passed in as plain Python values captured in the GTK main thread.
 
         Creates:
         - results.csv          : Mean + std trajectories per species over time
@@ -804,9 +842,18 @@ class ExperimentAutomationCategory:
         Args:
             name: Experiment name
             result: Result dictionary with statistics and metadata
+            run_folder: Per-run Path captured in GTK thread.
+            project_folder: Project base path string captured in GTK thread.
+            id_to_name: {id: name} dict captured in GTK thread.
+            names_csv_rows: List of (id, name, type) tuples for names.csv.
         """
         import csv as csv_mod
         import os as _os
+
+        if id_to_name is None:
+            id_to_name = {}
+        if names_csv_rows is None:
+            names_csv_rows = []
 
         def _fsync(path):
             """Flush OS buffers for path to guarantee data is on disk."""
@@ -817,15 +864,18 @@ class ExperimentAutomationCategory:
             except OSError:
                 pass
 
-        # Determine project folder
-        project_folder = self._get_project_folder()
+        # project_folder is passed in (captured in GTK thread — NOT safe to
+        # call self._get_project_folder() here because it touches GTK objects).
         if not project_folder:
             return
 
+        # run_folder is also passed in; no self attribute access needed.
+        effective_run_folder = run_folder  # already captured; may be None
+
         # Create saver — nest inside per-run folder if one was created for this batch
-        if self._current_run_folder is not None:
+        if effective_run_folder is not None:
             saver = BatchResultsSaver(
-                base_path=str(self._current_run_folder),
+                base_path=str(effective_run_folder),
                 subfolder='',
                 batch_prefix='experiment'
             )
@@ -835,6 +885,7 @@ class ExperimentAutomationCategory:
                 subfolder='experiments/results',
                 batch_prefix='experiment'
             )
+
 
         # Create timestamped folder
         safe_name = name.replace(' ', '_').replace('/', '_')
@@ -860,16 +911,9 @@ class ExperimentAutomationCategory:
             # Build {replicate_id: CompressionResult} for fast lookup
             compressed_by_id = {cr.replicate_id: cr for cr in compressed_trajectories}
 
-            # Build id→name lookup once — reused across replicates.csv,
-            # mean_final_state.csv, and replicates_trajectories/ so the
-            # subnet model is queried only once per save.
-            _id_to_name_early: dict = {}
-            _subnet_mdl = getattr(self.parent_panel, 'subnet_model', None)
-            if _subnet_mdl is not None:
-                for _xp in getattr(_subnet_mdl, 'places', []):
-                    _id_to_name_early[_xp.id] = getattr(_xp, 'name', _xp.id)
-                for _xt in getattr(_subnet_mdl, 'transitions', []):
-                    _id_to_name_early[_xt.id] = getattr(_xt, 'name', _xt.id)
+            # id→name mapping was captured before this thread started (GTK main
+            # thread); use it directly — do NOT access self.parent_panel here.
+            _id_to_name_early: dict = id_to_name
             # Reverse lookup: resolve place IDs for fate-determining markers
             _name_to_pid = {v: k for k, v in _id_to_name_early.items()}
             _gata1_pid = _name_to_pid.get('GATA1_Protein_nuc', 'P17')
@@ -1003,17 +1047,13 @@ class ExperimentAutomationCategory:
 
         # ── names.csv ── place/transition ID → human-readable name lookup
         # Allows analysis scripts to replace P17 → GATA1_Protein_nuc without
-        # loading the full model.
+        # loading the full model.  Data captured in GTK thread (names_csv_rows).
         try:
-            subnet_model = getattr(self.parent_panel, 'subnet_model', None)
-            if subnet_model is not None:
+            if names_csv_rows:
                 with open(batch_path / 'names.csv', 'w', newline='') as f:
                     writer = csv_mod.writer(f)
                     writer.writerow(['id', 'name', 'type'])
-                    for p in getattr(subnet_model, 'places', []):
-                        writer.writerow([p.id, getattr(p, 'name', p.id), 'place'])
-                    for t in getattr(subnet_model, 'transitions', []):
-                        writer.writerow([t.id, getattr(t, 'name', t.id), 'transition'])
+                    writer.writerows(names_csv_rows)
                 _fsync(batch_path / 'names.csv')
         except Exception as e:
             save_errors.append(f'names.csv: {e}')
@@ -1088,7 +1128,10 @@ class ExperimentAutomationCategory:
                         status=_status,
                         id_to_name=_id_to_name or None,
                     )
-                    _fsync(csv_path)
+                    # NOTE: No per-file fsync here — 200 fsyncs in the main/save
+                    # thread would block for tens of seconds on Hyper-V virtual
+                    # disks, causing the app to appear frozen and be killed.
+                    # The OS page-cache flushes these files within seconds anyway.
                 print(f'[AUTO-SAVE] Saved {len(compressed_trajectories)} compressed trajectories → {traj_dir.name}/')
         except Exception as e:
             save_errors.append(f'replicates_trajectories/: {e}')

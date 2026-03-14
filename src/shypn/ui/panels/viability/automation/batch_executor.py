@@ -50,6 +50,14 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 pass  # Ignore queue errors (non-fatal)
     
     try:
+        # Send an immediate heartbeat so the zombie-silence clock resets to the
+        # moment this worker actually starts executing, not the submission time.
+        # Without this, conditions that spent time queued in the pool's task
+        # queue (waiting for a free worker slot) would accumulate "silent" time
+        # counted from submission, falsely triggering zombie detection before
+        # any replicate has a chance to run.
+        worker_progress_callback(0.0)
+
         # Extract arguments
         name = args['name']
         snapshot = args['snapshot']
