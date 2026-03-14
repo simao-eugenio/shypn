@@ -7,7 +7,6 @@ DocumentModel objects by adding missing information from external sources.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Dict, Any, List
-from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)

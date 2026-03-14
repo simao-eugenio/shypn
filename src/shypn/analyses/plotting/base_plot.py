@@ -20,7 +20,7 @@ warnings.filterwarnings('ignore', category=matplotlib._api.deprecation.Matplotli
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
-from typing import List, Optional, Tuple, Dict
+from typing import Dict
 
 
 class BasePlot(Gtk.Box):

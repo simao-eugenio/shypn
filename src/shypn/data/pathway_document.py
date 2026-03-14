@@ -11,7 +11,6 @@ Classes:
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from pathlib import Path
 
 
 class PathwayDocument:

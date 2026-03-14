@@ -9,11 +9,10 @@ Author: Shypn Development Team
 Date: October 2025
 """
 
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any
 from pathlib import Path
 from datetime import datetime
 import logging
-import shutil
 
 from .json_metadata_manager import JSONMetadataManager
 

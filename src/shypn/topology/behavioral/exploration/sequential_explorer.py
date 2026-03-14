@@ -4,7 +4,7 @@ This module implements the classic breadth-first search algorithm
 for reachability analysis. Used as baseline and fallback strategy.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 from collections import deque
 
 from .base_explorer import StateSpaceExplorer

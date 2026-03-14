@@ -17,9 +17,7 @@ This follows the MVC pattern:
 """
 import os
 import sys
-import time
 import logging
-from typing import Optional
 
 try:
     import gi

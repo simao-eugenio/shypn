@@ -17,7 +17,6 @@ import os
 import sys
 import logging
 import threading
-from typing import Optional
 
 try:
     import gi

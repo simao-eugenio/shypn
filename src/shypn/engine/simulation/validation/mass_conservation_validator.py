@@ -5,7 +5,7 @@ Checks that total tokens across specified place groups remain constant,
 within a tolerance threshold. Detects numerical drift and token leaks.
 """
 
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, Set, Optional, Any
 from .base_validator import BaseValidator, ValidationResult, ValidationStatus
 
 

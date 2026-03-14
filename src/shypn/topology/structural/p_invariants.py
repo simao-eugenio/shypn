@@ -6,7 +6,6 @@ from scipy import linalg
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
-from ..base.exceptions import TopologyAnalysisError
 
 
 class PInvariantAnalyzer(TopologyAnalyzer):

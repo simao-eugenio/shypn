@@ -9,7 +9,7 @@ Date: October 2025
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class SBMLIDMapper:

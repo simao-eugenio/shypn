@@ -17,7 +17,7 @@ import matplotlib
 matplotlib.use('GTK3Agg')
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.figure import Figure
-from typing import List, Any, Optional, Tuple
+from typing import List, Any, Tuple
 
 class AnalysisPlotPanel(Gtk.Box):
     """Base class for rate-based analysis plotting panels.

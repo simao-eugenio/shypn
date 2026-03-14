@@ -8,7 +8,6 @@ The panel can exist in two states:
   - Detached: standalone floating window
   - Attached: content embedded in main window container (extreme right)
 """
-import os
 import sys
 
 try:

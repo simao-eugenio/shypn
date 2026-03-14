@@ -6,7 +6,7 @@ raw data, and aggregated statistics.
 """
 
 import json
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 from .base_cache_manager import BaseCacheManager

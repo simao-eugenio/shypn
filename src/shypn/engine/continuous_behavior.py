@@ -20,7 +20,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 """
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
-from shypn.utils.safe_eval import safe_eval_numeric, preprocess_expression
+from shypn.utils.safe_eval import safe_eval_numeric
 import logging
 import math
 import numpy as np

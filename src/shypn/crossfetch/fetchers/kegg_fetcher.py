@@ -8,7 +8,7 @@ Date: October 2025
 """
 
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, List
 import logging
 
 from .base_fetcher import BaseFetcher

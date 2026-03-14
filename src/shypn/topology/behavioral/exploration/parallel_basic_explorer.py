@@ -5,7 +5,7 @@ with work-stealing load balancing. Workers atomically claim states and
 explore them concurrently.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import multiprocessing
 import queue
 import time

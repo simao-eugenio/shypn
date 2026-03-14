@@ -8,7 +8,7 @@ Follows clean architecture with separate concerns:
 - TimeFormatter: Display formatting logic
 """
 from enum import Enum
-from typing import Dict, Tuple
+from typing import Tuple
 
 
 class TimeUnits(Enum):

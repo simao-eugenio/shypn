@@ -6,7 +6,7 @@ Provides common functionality for logging, error handling, and validation.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar, List
+from typing import Generic, TypeVar, List
 import logging
 
 T = TypeVar('T')

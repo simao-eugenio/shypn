@@ -9,7 +9,7 @@ because API queries are slow and should be opt-in.
 
 import re
 import time
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, Optional
 from dataclasses import dataclass
 
 from shypn.importer.kegg.api_client import KEGGAPIClient

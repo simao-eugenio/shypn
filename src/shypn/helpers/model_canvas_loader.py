@@ -18,7 +18,6 @@ Future extensions:
 """
 import os
 import sys
-import math
 import logging
 from typing import Optional
 from shypn.helpers.canvas_interaction_context import CanvasInteractionContext
@@ -31,8 +30,7 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
-    from gi.repository import Gtk, Gdk, Gio, GLib
-    import time
+    from gi.repository import Gtk, Gdk, GLib
 except Exception as e:
     print('ERROR: GTK3 not available in model_canvas loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -3647,7 +3645,6 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        from shypn.netobjs import Transition
         old_type = getattr(transition, 'transition_type', 'continuous')
         if old_type == new_type:
             return

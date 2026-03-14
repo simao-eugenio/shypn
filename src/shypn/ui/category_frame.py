@@ -14,7 +14,7 @@ from typing import Optional, Callable, List, Tuple
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
     print(f'ERROR: GTK3 not available in category_frame: {e}', file=sys.stderr)
     sys.exit(1)

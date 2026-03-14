@@ -13,7 +13,6 @@ import statistics
 import math
 import json
 from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime
 
 from ..database.heuristic_db import HeuristicDatabase
 

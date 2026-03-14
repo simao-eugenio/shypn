@@ -27,9 +27,7 @@ Implementation approach:
 - Efficient marking representation and comparison
 """
 
-from typing import Any, Dict, List, Set, Optional, Tuple
-import numpy as np
-from collections import deque
+from typing import Any, Dict, List, Optional
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult

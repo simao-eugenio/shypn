@@ -42,7 +42,6 @@ except ImportError:
     logging.warning("libsbml not available. SBML enrichment will not work.")
 
 from shypn.crossfetch.core.enrichment_pipeline import EnrichmentPipeline
-from shypn.crossfetch.models.fetch_result import FetchResult
 
 logger = logging.getLogger(__name__)
 
@@ -549,7 +548,6 @@ class SBMLEnricher:
         Returns:
             KEGG organism code (e.g., "hsa", "sce", "eco") or None
         """
-        import re
         
         # Common organism mappings
         organism_map = {

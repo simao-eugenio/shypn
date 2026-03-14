@@ -568,7 +568,6 @@ class TauLeapingEngine:
         Returns:
             Modified firings_map with inhibitor constraints applied
         """
-        from shypn.netobjs.inhibitor_arc import InhibitorArc
         from shypn.utils.threshold_evaluator import ThresholdEvaluator
         import sys
         

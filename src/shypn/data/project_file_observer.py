@@ -9,7 +9,6 @@ Classes:
     ProjectFileHandler: Handles file system events
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -25,7 +24,6 @@ except ImportError:
     FileSystemEvent = object
 
 from .pathway_document import PathwayDocument
-from .enrichment_document import EnrichmentDocument
 
 
 class ProjectFileHandler(FileSystemEventHandler):

@@ -16,7 +16,6 @@ import sys
 import time
 import logging
 import threading
-from typing import Optional, Dict, Any
 import gi  # type: ignore[import-untyped]
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')

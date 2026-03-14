@@ -14,7 +14,6 @@ import logging
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
 except Exception as e:
     logging.getLogger(__name__).error('GTK3 not available in canvas_overlay_manager: %s', e)
     sys.exit(1)

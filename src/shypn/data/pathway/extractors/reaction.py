@@ -5,7 +5,6 @@ Extracts reactions from SBML model.
 """
 
 from typing import List, Optional
-import logging
 import re
 
 try:

@@ -32,7 +32,7 @@ class TimeSeriesPlot(BasePlot):
         colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', 
                  '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b']
         
-        from shypn.netobjs import Place, Transition
+        from shypn.netobjs import Transition
         
         # Separate transitions and places (mirroring Transitions category behavior)
         transitions = []

@@ -8,7 +8,7 @@ Implements manuscript equation (5):
 ATP_consumed = 2×N_PEPT1 + 1×N_ABC + 0.5×N_facilitated + 4×N_proteasomal + 1×N_lysosomal
 """
 
-from typing import Any, Dict, Set
+from typing import Any, Dict
 from .base_validator import BaseValidator, ValidationResult, ValidationStatus
 
 

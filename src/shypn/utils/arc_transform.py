@@ -186,8 +186,6 @@ def convert_to_normal(arc):
     Returns:
         Arc or CurvedArc: Normal version of the arc
     """
-    from shypn.netobjs.place import Place
-    from shypn.netobjs.transition import Transition
     
     # Check if it's curved
     is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc))

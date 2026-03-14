@@ -10,9 +10,8 @@ Decision Tree:
     4. Default → Hierarchical
 """
 
-from typing import Dict, Optional
+from typing import Dict
 import networkx as nx
-from .base import LayoutAlgorithm
 from .hierarchical import HierarchicalLayout
 from .force_directed import ForceDirectedLayout
 from .circular import CircularLayout

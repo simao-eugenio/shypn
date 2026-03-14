@@ -15,12 +15,11 @@ Architecture:
 """
 import os
 import sys
-from pathlib import Path
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, Gdk, GLib
+    from gi.repository import Gtk, Gdk
 except Exception as e:
     print('ERROR: GTK3 not available in file_panel loader:', e, file=sys.stderr)
     sys.exit(1)

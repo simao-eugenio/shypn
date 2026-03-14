@@ -12,10 +12,10 @@ available data using a tiered strategy:
 Core Principle: "Import as-is for curated models, enhance only when data is missing"
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 import logging
 
-from .assignment_result import AssignmentResult, ConfidenceLevel, AssignmentSource
+from .assignment_result import AssignmentResult, ConfidenceLevel
 from .metadata import KineticsMetadata
 from .factory import EstimatorFactory
 

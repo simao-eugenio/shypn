@@ -9,7 +9,6 @@ Provides common functionality:
 - Dirty state tracking
 """
 
-import os
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any

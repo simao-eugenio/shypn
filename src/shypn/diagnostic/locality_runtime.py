@@ -25,7 +25,7 @@ Example:
     can_fire, reason = runtime.check_enablement(locality)
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple
 
 
 class LocalityRuntimeAnalyzer:

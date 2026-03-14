@@ -15,7 +15,6 @@ Author: SHYPN Development Team
 Date: 2026-01-06
 """
 import sys
-import logging
 
 try:
     import gi

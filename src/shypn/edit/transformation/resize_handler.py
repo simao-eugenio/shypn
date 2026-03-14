@@ -6,7 +6,6 @@ Places (by changing radius) and Transitions (by changing width/height)
 through interactive handle dragging.
 """
 
-import math
 from typing import Optional, Dict, Any
 
 from shypn.edit.transformation.transform_handler import TransformHandler

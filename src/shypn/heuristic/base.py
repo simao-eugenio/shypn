@@ -5,7 +5,7 @@ Defines the interface for all kinetic estimators.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any
 import logging
 
 

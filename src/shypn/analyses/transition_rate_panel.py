@@ -358,7 +358,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         - Sigmoid: X-axis 0 to 2×center, show inflection point
         - Exponential: Extended X-axis for full curve visualization
         """
-        import re
         
         # Only apply to continuous transitions with rate functions
         for obj in self.selected_objects:
@@ -783,7 +782,6 @@ class TransitionRatePanel(AnalysisPlotPanel):
         import gi
         gi.require_version('Gtk', '3.0')
         from gi.repository import Gtk
-        import matplotlib.colors as mcolors
         
         # Clear existing list
         for child in self.objects_listbox.get_children():

@@ -14,7 +14,6 @@ from pathlib import Path
 
 from .base_category import BaseReportCategory
 from .widgets import SpeciesConcentrationTable, ReactionActivityTable
-from shypn.helpers.batch_results_saver import BatchResultsSaver
 from shypn.data.project_models import get_project_manager
 
 

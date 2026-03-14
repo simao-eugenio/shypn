@@ -4,7 +4,7 @@ Analyzes fix dependencies and orders them for optimal application.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Tuple
 from collections import defaultdict
 
 from shypn.ui.panels.viability.investigation import Suggestion

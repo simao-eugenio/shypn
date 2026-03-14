@@ -9,9 +9,8 @@ The loader is completely generic and contains NO business logic.
 All behavior is implemented in the panel classes themselves.
 """
 
-import os
 from pathlib import Path
-from typing import Type, Any
+from typing import Type
 
 import gi
 gi.require_version('Gtk', '3.0')

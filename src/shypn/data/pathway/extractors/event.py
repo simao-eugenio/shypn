@@ -5,7 +5,6 @@ Extracts SBML events for experimental perturbations.
 """
 
 from typing import List, Optional
-import logging
 
 try:
     import libsbml

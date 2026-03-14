@@ -14,7 +14,7 @@ Follows CategoryFrame pattern - SABIO-RK is a free public database.
 import sys
 import logging
 import threading
-from typing import Optional, Dict, List, Any
+from typing import Dict, List, Any
 
 try:
     import gi

@@ -6,7 +6,6 @@ and logging. All BiGG services should extend this class.
 
 from abc import ABC, abstractmethod
 import logging
-from typing import Optional
 
 
 class BiGGServiceError(Exception):

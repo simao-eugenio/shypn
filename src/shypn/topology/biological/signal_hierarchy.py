@@ -34,7 +34,7 @@ Author: GitHub Copilot & Eugênio Simão
 Date: December 26, 2025
 """
 
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, List
 from collections import defaultdict, deque
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer

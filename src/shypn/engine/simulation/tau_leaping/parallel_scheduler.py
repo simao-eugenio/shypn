@@ -16,7 +16,7 @@ References:
 """
 
 import logging
-from typing import List, Dict, Any, Set, Tuple, Optional
+from typing import List, Dict, Any, Set, Optional
 import numpy as np
 import os
 

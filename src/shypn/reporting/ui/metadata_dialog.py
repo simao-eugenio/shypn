@@ -10,8 +10,8 @@ Date: 2025-11-15
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
-from typing import Optional, Callable
+from gi.repository import Gtk
+from typing import Optional
 
 from ..metadata import ModelMetadata
 

@@ -1,5 +1,5 @@
 """Level 1: Locality analyzer - analyze single locality issues."""
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from .base_analyzer import BaseAnalyzer
 from ..investigation import Issue, Suggestion
 

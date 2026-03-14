@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import BaseTrajectoryCompressor
-from .result import ChannelData, CompressionResult, SeriesItem, _extract_value
+from .result import ChannelData, CompressionResult, _extract_value
 
 
 @dataclass

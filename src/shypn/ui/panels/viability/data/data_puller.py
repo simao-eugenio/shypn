@@ -3,7 +3,7 @@
 This module pulls data from the knowledge base and simulation
 on-demand, without any reactive observers or automatic updates.
 """
-from typing import Optional, Set, List, Dict, Any
+from typing import Optional, Set, List, Dict
 from dataclasses import dataclass
 
 

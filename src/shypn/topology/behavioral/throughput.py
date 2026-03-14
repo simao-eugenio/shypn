@@ -4,8 +4,7 @@ This module analyzes the throughput characteristics of Petri nets,
 measuring transition firing rates, token flow, and system capacity.
 """
 
-from typing import Dict, List, Set, Tuple, Optional, Any
-from collections import defaultdict, deque
+from typing import Dict, List, Optional, Any
 import logging
 import statistics
 

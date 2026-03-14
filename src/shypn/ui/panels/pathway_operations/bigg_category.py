@@ -12,7 +12,6 @@ import threading
 from typing import Optional
 
 from shypn.ui.panels.pathway_operations.base_pathway_category import BasePathwayCategory
-from shypn.data.project_models import get_project_manager
 from shypn.importer.bigg.bigg_model_fetcher import BiGGModelFetcher, BiGGModelInfo
 from shypn.importer.bigg.bigg_downloader import BiGGDownloader
 from shypn.importer.bigg.bigg_signal_classifier import BiGGSignalClassifier

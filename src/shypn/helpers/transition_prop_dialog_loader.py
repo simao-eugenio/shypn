@@ -5,8 +5,6 @@ Loads and manages the Transition properties dialog UI.
 Follows project pattern: thin loader with business logic in data layer.
 """
 import os
-import sys
-import numpy as np
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
@@ -560,7 +558,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Validate that function names (if any) exist in the catalog
         try:
             import ast
-            import re
             from shypn.engine import function_catalog
             
             # Parse the expression to extract function calls

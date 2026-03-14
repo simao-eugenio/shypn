@@ -17,13 +17,11 @@ Author: Simão Eugénio
 Date: November 20, 2025
 """
 
-from typing import Dict, List, Tuple, Optional, Set, Any
+from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass
-import re
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
-from shypn.topology.base.exceptions import TopologyAnalysisError
 
 
 @dataclass

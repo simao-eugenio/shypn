@@ -7,8 +7,7 @@ Subclasses implement source-specific caching logic for SABIO-RK, BRENDA, etc.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+from typing import Dict, Optional, Any
 
 
 class BaseCacheManager(ABC):

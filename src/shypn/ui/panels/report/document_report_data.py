@@ -126,7 +126,6 @@ class DocumentReportData:
         if not self.has_simulation_data():
             return None
         
-        from datetime import datetime
         
         time_str = self.last_simulation_time.strftime("%Y-%m-%d %H:%M:%S") if self.last_simulation_time else "Unknown"
         

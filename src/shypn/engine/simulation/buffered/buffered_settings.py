@@ -16,7 +16,6 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from shypn.engine.simulation.settings import SimulationSettings
-from shypn.utils.time_utils import TimeUnits, TimeValidator
 from .base import ValidationError, ChangeListener
 
 logger = logging.getLogger(__name__)

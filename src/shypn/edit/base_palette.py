@@ -17,7 +17,6 @@ Architecture:
 
 from abc import ABC, abstractmethod, ABCMeta
 from gi.repository import GObject, Gtk, Gdk
-import sys
 
 
 # Custom metaclass combining GObject and ABC

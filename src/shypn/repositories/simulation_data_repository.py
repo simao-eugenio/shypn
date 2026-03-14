@@ -7,14 +7,12 @@ Manages trajectory data, batch experiment results, and analysis cache.
 Part of Phase 3.2: Repository Pattern Implementation.
 """
 
-import pickle
 import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from shypn.repositories.base_repository import (
     BaseRepository,
-    EntityNotFoundError,
     RepositoryIOError
 )
 
@@ -193,7 +191,7 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
     Directory structure:
         data/
         ├── trajectories/
-        │   ├── {simulation_id}.pkl
+        │   ├── {simulation_id}.json
         │   └── ...
         └── batch/
             ├── {experiment_id}.json.gz
@@ -260,8 +258,8 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
         file_path = self._get_trajectory_path(trajectory.simulation_id)
         
         try:
-            with open(file_path, 'wb') as f:
-                pickle.dump(trajectory, f, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(trajectory.to_dict(), f)
             return True
         except Exception as e:
             raise RepositoryIOError('save_trajectory', f"Failed to save {file_path}: {e}")
@@ -284,8 +282,8 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
             return None
         
         try:
-            with open(file_path, 'rb') as f:
-                return pickle.load(f)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return SimulationTrajectory.from_dict(json.load(f))
         except Exception as e:
             raise RepositoryIOError('load_trajectory', f"Failed to load {file_path}: {e}")
     
@@ -318,7 +316,7 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
         Returns:
             List of simulation IDs
         """
-        pattern = f"{model_id}_*.pkl" if model_id else "*.pkl"
+        pattern = f"{model_id}_*.json" if model_id else "*.json"
         return [
             path.stem
             for path in self._trajectories_path.glob(pattern)
@@ -494,7 +492,7 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
         }
         
         # Count trajectories
-        for file_path in self._trajectories_path.glob('*.pkl'):
+        for file_path in self._trajectories_path.glob('*.json'):
             if file_path.is_file():
                 stats['trajectories_count'] += 1
                 stats['trajectories_bytes'] += file_path.stat().st_size
@@ -524,7 +522,7 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
         deleted_count = 0
         
         # Clean trajectories
-        for file_path in self._trajectories_path.glob('*.pkl'):
+        for file_path in self._trajectories_path.glob('*.json'):
             if file_path.stat().st_mtime < cutoff_time:
                 try:
                     file_path.unlink()
@@ -554,7 +552,7 @@ class SimulationDataRepository(BaseRepository[SimulationTrajectory]):
         Returns:
             Path to trajectory file
         """
-        return self._trajectories_path / f"{simulation_id}.pkl"
+        return self._trajectories_path / f"{simulation_id}.json"
     
     def _get_batch_path(self, experiment_id: str) -> Path:
         """Get file path for batch results.

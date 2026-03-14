@@ -7,12 +7,12 @@ Author: Simão Eugénio
 Date: February 3, 2026
 """
 
-from typing import Dict, List, Set, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any, Optional
 from collections import deque
 import logging
 import time
 
-from .base_explorer import StateSpaceExplorer, WorkQueue
+from .base_explorer import StateSpaceExplorer
 from .signal_layer_detector import SignalLayerDetector
 from .transition_partitioner import TransitionPartitioner
 

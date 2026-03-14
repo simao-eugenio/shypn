@@ -5,7 +5,6 @@ Extracts MIRIAM annotations from SBML elements.
 """
 
 from typing import Dict, Optional, Tuple
-import logging
 import re
 
 try:

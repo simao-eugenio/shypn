@@ -6,8 +6,7 @@ from gi.repository import Gtk
 
 from typing import Optional, Callable
 from shypn.ui.panels.viability.investigation import (
-    SubnetInvestigation, LocalityInvestigation, Suggestion, 
-    BoundaryAnalysis, ConservationAnalysis
+    SubnetInvestigation, LocalityInvestigation, Suggestion
 )
 from shypn.ui.panels.viability.ui.issue_widgets import IssueList, IssueSummary
 from shypn.ui.panels.viability.ui.suggestion_widgets import SuggestionList

@@ -151,7 +151,6 @@ class DeleteOperation:
 
 	def apply_redo(self, manager):
 		"""Delete the objects again via facade cascade methods."""
-		from shypn.netobjs import Place, Transition, Arc
 		# Delete nodes first (cascade removes attached arcs) then standalone arcs
 		# Collect node IDs to delete
 		place_ids = {s.get('id') for s in self.snapshots if s.get('kind') == 'place'}

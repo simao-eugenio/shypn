@@ -26,7 +26,7 @@ Design Principles:
 - Quantitative metrics (independence score, coupling strength)
 """
 
-from typing import List, Dict, Set, Tuple, Optional, Any
+from typing import List, Dict, Set, Tuple, Any
 from collections import defaultdict
 import logging
 

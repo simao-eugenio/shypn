@@ -25,12 +25,11 @@ import logging
 import os
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GObject, GLib
+from gi.repository import Gtk, GObject, GLib
 from shypn.engine.simulation import SimulationController
 from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.analyses import SimulationDataCollector
 from shypn.utils.time_utils import TimeUnits, TimeFormatter
-from shypn.metadata import SweepHeaderGenerator
 from shypn.helpers.batch_results_saver import save_swiss_palette_batch
 
 logger = logging.getLogger(__name__)
@@ -1580,7 +1579,6 @@ class SimulateToolsPaletteLoader(GObject.GObject):
                 # Notify user if simulation was running
                 pass
         except Exception as e:
-            import sys
             import traceback
             traceback.print_exc()
         finally:

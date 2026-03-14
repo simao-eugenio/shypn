@@ -26,7 +26,7 @@ Example:
         pass
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
 

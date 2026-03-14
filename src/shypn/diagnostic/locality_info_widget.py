@@ -16,7 +16,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, Pango
 
-from .locality_detector import Locality, LocalityDetector
+from .locality_detector import LocalityDetector
 from .locality_analyzer import LocalityAnalyzer
 from .locality_runtime import LocalityRuntimeAnalyzer
 

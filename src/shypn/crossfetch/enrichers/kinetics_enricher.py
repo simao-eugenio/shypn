@@ -10,10 +10,10 @@ Author: Shypn Development Team
 Date: October 2025
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 from enum import Enum
 
-from .base_enricher import EnricherBase, EnrichmentResult, EnrichmentChange
+from .base_enricher import EnricherBase, EnrichmentResult
 from ..models import FetchResult, FetchStatus
 
 

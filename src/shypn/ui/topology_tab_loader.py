@@ -20,7 +20,7 @@ Date: 2025-10-19
 """
 
 import os
-from typing import Optional, Dict, Any
+from typing import Optional
 from abc import ABC, abstractmethod
 
 import gi
@@ -815,7 +815,6 @@ class ArcTopologyTabLoader(TopologyTabLoader):
             return
         
         try:
-            from shypn.topology.graph import CycleAnalyzer, PathAnalyzer
             
             # Arc endpoint info
             if self.arc_info_label:

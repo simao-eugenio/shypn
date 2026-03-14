@@ -1,6 +1,6 @@
 """Centrality analysis for Petri nets."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import networkx as nx
 
 from ..base.topology_analyzer import TopologyAnalyzer

@@ -12,7 +12,7 @@ Date: January 22, 2026 (Refactored to BaseResultsView)
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 import os
 import matplotlib
 matplotlib.use('GTK3Agg')
@@ -1138,7 +1138,6 @@ class ResultsBrowserView(BaseResultsView):
         Creates a single plot with multiple trajectories, color-coded by
         experiment name or swept parameter value.
         """
-        import numpy as np
         
         # Get checked experiments
         checked = self.get_checked_results()

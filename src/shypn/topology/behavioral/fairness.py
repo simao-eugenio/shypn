@@ -26,8 +26,7 @@ Implementation approach:
 - Classify fairness level (strong/weak/none)
 """
 
-from typing import Any, Dict, List, Set, Optional, Tuple
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult

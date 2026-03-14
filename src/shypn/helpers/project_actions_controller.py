@@ -10,13 +10,11 @@ This follows the OOP principle of separating concerns:
 - ProjectManager: Data model and persistence layer
 """
 
-import os
 import sys
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
 except Exception as e:
     print('ERROR: GTK3 not available in project_actions_controller:', e, file=sys.stderr)
     sys.exit(1)

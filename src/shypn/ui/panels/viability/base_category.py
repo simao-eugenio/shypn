@@ -11,7 +11,7 @@ Date: November 10, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
-from typing import Optional, List, Dict, Any
+from typing import List
 
 from shypn.ui.category_frame import CategoryFrame
 from .viability_dataclasses import Issue, Suggestion, Change

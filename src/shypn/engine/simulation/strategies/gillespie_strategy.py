@@ -17,7 +17,7 @@ coupled chemical reactions. J. Phys. Chem., 81(25), 2340-2361.
 
 import random
 import math
-from typing import Any, Optional, List
+from typing import Any, List
 from .base_strategy import SimulationStrategy
 
 

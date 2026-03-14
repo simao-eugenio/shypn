@@ -1,7 +1,7 @@
 """Main pathway converter implementation."""
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 if TYPE_CHECKING:
     from shypn.pathway.options import EnhancementOptions
 from shypn.data.canvas.document_model import DocumentModel
@@ -9,7 +9,7 @@ from shypn.netobjs import Place, Transition, Arc
 from shypn.netobjs.test_arc import TestArc
 from shypn.netobjs.inhibitor_arc import InhibitorArc
 from .converter_base import ConversionStrategy, ConversionOptions
-from .models import KEGGPathway, KEGGEntry
+from .models import KEGGPathway
 from shypn.crossfetch.inference import HeuristicInferenceEngine
 from shypn.crossfetch.models import TransitionType
 from shypn.data.kegg_ec_fetcher import fetch_ec_numbers_parallel

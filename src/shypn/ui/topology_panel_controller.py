@@ -10,7 +10,6 @@ Author: Simão Eugénio
 Date: 2025-10-20
 """
 
-import sys
 import threading
 from typing import Dict, Optional
 

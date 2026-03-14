@@ -9,7 +9,7 @@ Author: Simão Eugénio
 Date: 2025-11-15
 """
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from pathlib import Path
 
 from .model_metadata import ModelMetadata

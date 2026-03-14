@@ -11,7 +11,6 @@ References:
     selection for the tau-leaping simulation method. J. Chem. Phys., 124(4).
 """
 
-import math
 import numpy as np
 from typing import Dict, List, Tuple, Any, Optional
 import logging

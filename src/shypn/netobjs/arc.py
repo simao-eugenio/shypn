@@ -16,7 +16,7 @@ See doc/COLOR_NORMALIZATION.md for details.
 import logging
 import math
 import functools
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 from shypn.netobjs.petri_net_object import PetriNetObject
 
 logger = logging.getLogger(__name__)
@@ -304,7 +304,6 @@ class Arc(PetriNetObject):
             ValueError: If source and target are of the same type
         """
         from shypn.netobjs.place import Place
-        from shypn.netobjs.transition import Transition
         
         source_is_place = isinstance(source, Place)
         target_is_place = isinstance(target, Place)

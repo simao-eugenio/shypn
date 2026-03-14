@@ -23,7 +23,6 @@ from dataclasses import dataclass
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
-from shypn.topology.base.exceptions import TopologyAnalysisError
 
 
 @dataclass

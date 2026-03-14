@@ -21,7 +21,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from .pathway_document import PathwayDocument
-from .enrichment_document import EnrichmentDocument
 from .project_pathway_manager import ProjectPathwayManager
 
 

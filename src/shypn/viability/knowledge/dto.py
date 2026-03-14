@@ -22,7 +22,7 @@ Date: November 11, 2025
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List
 import logging
 
 logger = logging.getLogger(__name__)

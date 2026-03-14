@@ -5,10 +5,9 @@ Stores fetched compounds to minimize API calls and enable offline usage.
 """
 
 import sqlite3
-import os
 from typing import Optional, Dict, List, Any
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime
 import logging
 

@@ -1511,7 +1511,6 @@ class PlacePropDialogLoader(GObject.GObject):
                 # This gives Wayland compositor time to complete the state transition
                 if is_maximized or is_fullscreen or is_tiled:
                     logger.debug("[DIALOG WAYLAND] Window in special state; delaying transient assignment 100ms")
-                    from gi.repository import GLib
                     import time
                     time.sleep(0.1)  # 100ms delay to let compositor settle
             

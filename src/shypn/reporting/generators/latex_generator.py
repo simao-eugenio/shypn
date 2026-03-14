@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from typing import Dict, Any
-import re
 
 from .base_generator import BaseDocumentGenerator, DocumentType
 

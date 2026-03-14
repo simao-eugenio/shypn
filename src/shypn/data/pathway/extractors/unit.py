@@ -5,7 +5,6 @@ Extracts SBML unit definitions for parameter normalization.
 """
 
 from typing import Dict, Optional
-import logging
 
 try:
     import libsbml
