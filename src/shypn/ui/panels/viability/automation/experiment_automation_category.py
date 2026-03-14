@@ -77,6 +77,13 @@ class ExperimentAutomationCategory:
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
         self._processing_updates = set()  # Set of queue_index currently being processed
         self._idle_handler_active = False  # Flag to ensure only one idle handler runs at a time
+
+        # Limit concurrent auto-save I/O threads so disk writes don't compete
+        # with worker processes for CPU/IO.  At most 2 save threads run at once;
+        # extras block until a slot is free (they are daemon threads so they
+        # never prevent the app from exiting).
+        import threading as _threading
+        self._auto_save_semaphore = _threading.Semaphore(2)
         
         # Build UI
         self._build_frame(expanded)
@@ -799,11 +806,22 @@ class ExperimentAutomationCategory:
                 _names_csv_rows_snapshot.append(
                     (_xt.id, getattr(_xt, 'name', _xt.id), 'transition')
                 )
+        _sem = self._auto_save_semaphore
+
+        def _throttled_save():
+            _sem.acquire()
+            try:
+                self._auto_save_experiment(
+                    name, result, _run_folder_snapshot,
+                    _project_folder_snapshot, _id_to_name_snapshot,
+                    _names_csv_rows_snapshot,
+                )
+            finally:
+                _sem.release()
+
         _save_thread = _threading.Thread(
-            target=self._auto_save_experiment,
-            args=(name, result, _run_folder_snapshot,
-                  _project_folder_snapshot, _id_to_name_snapshot,
-                  _names_csv_rows_snapshot),
+            target=_throttled_save,
+            args=(),
             daemon=True,
             name=f'auto-save-{name[:40]}',
         )
@@ -856,11 +874,14 @@ class ExperimentAutomationCategory:
             names_csv_rows = []
 
         def _fsync(path):
-            """Flush OS buffers for path to guarantee data is on disk."""
+            """Flush write buffers for path.  No OS-level fsync to avoid
+            blocking the save thread (and stalling CPU/IO) when many
+            experiments complete in parallel.  The OS page cache writes
+            data within seconds anyway; the .complete sentinel already
+            guarantees that absence = partial save."""
             try:
                 with open(path, 'a') as fh:
                     fh.flush()
-                    _os.fsync(fh.fileno())
             except OSError:
                 pass
 
