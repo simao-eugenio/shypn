@@ -2694,30 +2694,47 @@ class ResultsBrowserView(BaseResultsView):
         
         Parses experiment names to find varying parameters and populates
         the dose parameter combo box for dose-response analysis.
+
+        Optimised: only rescans and repopulates when the parameter set actually
+        changes (avoids O(N²) work — previously called on every add_result).
         """
-        # Extract all parameters from experiment names
-        # Format: "param1=val1_param2=val2_..."
-        all_params = set()
-        
+        # Only look at the most recently added row (last row in the store).
+        # Parameters are stable once added, so we only need to check whether
+        # the new name introduces a new parameter key.  If not, skip entirely.
+        n_rows = len(self.results_store)
+        if n_rows == 0:
+            return
+
+        last_row = self.results_store[n_rows - 1]
+        last_name = last_row[1]
+        new_params = set()
+        for part in last_name.split('_'):
+            if '=' in part:
+                new_params.add(part.split('=', 1)[0])
+
+        # Maintain a cached set of all known params to detect changes
+        known = getattr(self, '_dr_known_params', set())
+        if not new_params - known:
+            # No new parameter keys — skip the expensive clear/repopulate
+            return
+
+        # New parameters appeared — do a full rescan and repopulate combo
+        known = known | new_params
+        self._dr_known_params = known
+
+        all_params: set = set()
         for row in self.results_store:
-            name = row[1]  # Column 1 = name
+            name = row[1]
             for part in name.split('_'):
                 if '=' in part:
-                    param_name = part.split('=', 1)[0]
-                    all_params.add(param_name)
-        
-        # Update combo if parameters found
+                    all_params.add(part.split('=', 1)[0])
+
         if all_params and hasattr(self, 'dr_param_combo'):
-            # Store current selection
             current_selection = self.dr_param_combo.get_active_text()
-            
-            # Clear and repopulate
             self.dr_param_combo.remove_all()
             for param in sorted(all_params):
                 self.dr_param_combo.append_text(param)
-            
-            # Restore selection if still valid, otherwise select first
             if current_selection and current_selection in all_params:
                 self.dr_param_combo.set_active_id(current_selection)
-            elif len(all_params) > 0:
+            elif all_params:
                 self.dr_param_combo.set_active(0)

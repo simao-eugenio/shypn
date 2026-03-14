@@ -414,10 +414,11 @@ class ModelCanvasManager:
     def _suppress_callbacks(self, value: bool) -> None:
         self._state_svc.suppress_callbacks = value
 
-
+    @property
+    def thermodynamic_settings(self):
         """Get thermodynamic settings dictionary (delegates to DocumentModel)."""
         return self._document_model.thermodynamic_settings
-    
+
     @property
     def compound_mappings(self):
         """Get compound mappings dictionary (delegates to DocumentModel)."""

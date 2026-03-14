@@ -27,6 +27,21 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     Returns:
         Result dictionary
     """
+    # Limit numpy/BLAS internal thread count to 1 per worker process.
+    # Without this, each worker spawns BLAS threads equal to cpu_count, so
+    # (cpu_count-1) workers × cpu_count BLAS threads = N² thread explosion
+    # that saturates all cores and makes the app unresponsive at ~60%.
+    import os as _os
+    _os.environ.setdefault("OMP_NUM_THREADS", "1")
+    _os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    _os.environ.setdefault("MKL_NUM_THREADS", "1")
+    _os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+    try:
+        import numpy as _np
+        _np.set_num_threads(1)  # NumPy 2.0+; silently ignored on older versions
+    except (AttributeError, ImportError):
+        pass
+
     from shypn.data.canvas.document_model import DocumentModel
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
     
@@ -917,7 +932,11 @@ class BatchExecutor:
         try:
             # Determine number of workers
             if n_workers is None:
-                n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
+                # Use half the logical cores: leaves the rest for the GTK UI
+                # thread, auto-save I/O threads, and OS scheduling.  Using
+                # (cpu_count - 1) caused CPU saturation when BLAS operations
+                # inside worker processes also tried to use all cores.
+                n_workers = max(1, multiprocessing.cpu_count() // 2)
 
             # Use 'forkserver' context: workers are forked from a clean server
             # process that was started before GTK/Numba were loaded, so they
