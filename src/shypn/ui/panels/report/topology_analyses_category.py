@@ -4,7 +4,6 @@
 Displays network structure and connectivity analysis results.
 Refactored to use table-based layout for better data presentation and organization.
 """
-import sys
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Pango

@@ -13,7 +13,6 @@ Key principles:
 """
 
 from typing import Set, List, Optional, Tuple, TYPE_CHECKING
-from shypn.netobjs.petri_net_object import PetriNetObject
 
 if TYPE_CHECKING:
     from shypn.netobjs.place import Place

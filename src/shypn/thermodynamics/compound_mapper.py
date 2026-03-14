@@ -4,7 +4,7 @@ Provides lookup between human-readable compound names and database identifiers
 (KEGG, BiGG, ChEBI). Enables auto-suggestion in property dialogs.
 """
 
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, List, Tuple
 
 
 class CompoundMapper:

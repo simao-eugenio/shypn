@@ -42,7 +42,6 @@ REFACTORING NOTE: This class now acts as a Facade, delegating to:
 ║ SEE: doc/ADR-002-model-canvas-manager-size.md (when created)              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
-import json
 import os
 import threading
 import time
@@ -61,33 +60,17 @@ except Exception:
 _MAIN_THREAD = threading.main_thread()
 from shypn.events import EventBus
 from shypn.core.document_id import doc_id
-from shypn.netobjs import Place, Arc, Transition
 from shypn.edit import SelectionManager, ObjectEditingTransforms, RectangleSelection
 
 # Import extracted controllers and services
 from shypn.core.controllers import ViewportController, DocumentController
-from shypn.core.services import (
-    mm_to_pixels as coord_mm_to_pixels,
-    pixels_to_mm as coord_pixels_to_mm,
-    validate_zoom as coord_validate_zoom,
-)
 from shypn.rendering import (
     draw_grid as render_draw_grid,
-    get_adaptive_grid_spacing,
     GRID_STYLE_LINE,
     GRID_STYLE_DOT,
     GRID_STYLE_CROSS,
-    BASE_GRID_SPACING,
-    GRID_MAJOR_EVERY,
 )
 from shypn.core.canvas_transformations import TransformationManager
-from shypn.core.services import (
-    detect_parallel_arcs as arc_detect_parallel,
-    calculate_arc_offset as arc_calculate_offset,
-    count_parallel_arcs as arc_count_parallel,
-    has_parallel_arcs as arc_has_parallel,
-    get_arc_offset_for_rendering as arc_get_offset_for_rendering,
-)
 from shypn.core.services.document_state_service import DocumentStateService
 from shypn.core.services.document_serializer import get_serializer as _get_doc_serializer
 

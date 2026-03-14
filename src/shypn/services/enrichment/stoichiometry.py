@@ -21,7 +21,7 @@ from shypn.data.canvas.document_model import DocumentModel
 from shypn.importer.kegg.api_client import KEGGAPIClient
 from .base import BaseEnricher, EnrichmentResult
 from .rate_inhibition_extractor import RateInhibitionExtractor
-from .signal_source_sink_builder import SignalSourceSinkBuilder, SignalSourceSinkStats
+from .signal_source_sink_builder import SignalSourceSinkBuilder
 from .obsolete_reactions import is_obsolete, get_current_reaction, get_obsolescence_reason, suggest_alternatives
 
 import logging

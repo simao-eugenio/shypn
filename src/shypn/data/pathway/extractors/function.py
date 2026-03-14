@@ -5,7 +5,7 @@ Extracts SBML function definitions (user-defined functions in MathML).
 Parses lambda expressions and stores them for formula expansion.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 import re
 
 try:

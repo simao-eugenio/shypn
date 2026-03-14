@@ -5,11 +5,11 @@ refinement. Preserves the overall structure from the pathway image while
 improving spacing.
 """
 
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, List, Tuple
 import logging
 import math
 
-from shypn.pathway.base import PostProcessorBase, ProcessorError
+from shypn.pathway.base import PostProcessorBase
 
 
 logger = logging.getLogger(__name__)

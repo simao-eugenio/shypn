@@ -15,7 +15,6 @@ Legacy extractor classes moved to extractors/ subpackage for modularity.
 from typing import Optional, Dict, List, Any
 from pathlib import Path
 import logging
-import math
 from shypn.utils.safe_eval import safe_eval_numeric
 
 try:
@@ -24,7 +23,6 @@ except ImportError:
     libsbml = None
     logging.warning("libsbml not available. SBML parsing will not work.")
 
-from .converters import UnitConverter, ConcentrationCalculator
 from .extractors import (
     SpeciesExtractor,
     ReactionExtractor,
@@ -41,10 +39,8 @@ from .pathway_data import (
     PathwayData, 
     Species, 
     Reaction,
-    Event,
     Annotation,
-    Compartment,
-    UnitDefinition
+    Compartment
 )
 
 
@@ -470,7 +466,6 @@ class SBMLParser:
                     
                     # Try to evaluate
                     import math
-                    import numpy as np
                     safe_context = {
                         "__builtins__": {},
                         "sqrt": math.sqrt,

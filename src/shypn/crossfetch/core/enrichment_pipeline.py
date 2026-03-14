@@ -8,15 +8,14 @@ Author: Shypn Development Team
 Date: October 2025
 """
 
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
 
 from ..models import (
     EnrichmentRequest,
     FetchResult,
-    DataType,
-    FetchStatus
+    DataType
 )
 from ..fetchers import BaseFetcher, KEGGFetcher, BioModelsFetcher, ReactomeFetcher
 from ..enrichers import (

@@ -14,7 +14,7 @@ Algorithm:
     4. Optionally arrange in concentric rings for complex cycles
 """
 
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List
 import networkx as nx
 import math
 from .base import LayoutAlgorithm

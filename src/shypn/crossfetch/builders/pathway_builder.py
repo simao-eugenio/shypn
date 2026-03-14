@@ -13,7 +13,7 @@ The builder maintains ID counters and naming conventions (P1, P2, T1, T2, A1, A2
 """
 
 import logging
-from typing import List, Dict, Set, Tuple, Optional, Any
+from typing import List, Dict, Set, Optional, Any
 from dataclasses import dataclass
 
 from shypn.netobjs.place import Place

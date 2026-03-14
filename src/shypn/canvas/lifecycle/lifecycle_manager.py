@@ -15,7 +15,7 @@ import logging
 from typing import Dict, Optional
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 
 from .canvas_context import CanvasContext
 from .id_scope_manager import IDScopeManager

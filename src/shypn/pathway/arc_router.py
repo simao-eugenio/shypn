@@ -11,7 +11,7 @@ Implementation Strategy:
     5. Store control points in Arc objects
 """
 
-from typing import Optional, List, Tuple, Dict, Set
+from typing import Optional, List, Tuple, Dict
 import logging
 import math
 

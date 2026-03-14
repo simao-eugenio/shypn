@@ -20,7 +20,7 @@ import os
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 
 from ..data.enrichment_document import EnrichmentDocument
 from ..data.project_models import Project

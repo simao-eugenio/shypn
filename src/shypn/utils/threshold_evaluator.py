@@ -28,9 +28,8 @@ See Also:
     - doc/foundation/DUAL_LAYER_INHIBITION.md - Multi-level inhibition patterns
 """
 
-from typing import Dict, Any, Union, Callable
+from typing import Dict, Any
 import math
-import re
 
 from shypn.utils.safe_eval import safe_eval_numeric, safe_eval_function
 

@@ -5,7 +5,7 @@ particularly useful for unbounded nets where the reachability graph is infinite.
 Uses omega (ω) symbols to represent unbounded places.
 """
 
-from typing import Dict, List, Set, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 import logging
 

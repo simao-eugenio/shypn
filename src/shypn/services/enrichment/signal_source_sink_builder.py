@@ -25,7 +25,7 @@ References:
 """
 
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 from shypn.netobjs.place import Place

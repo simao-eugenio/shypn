@@ -5,7 +5,7 @@ This module provides utilities to verify that all components are using
 compatible API versions, preventing runtime errors due to version mismatches.
 """
 
-from typing import Tuple, Optional
+from typing import Tuple
 import logging
 import warnings
 

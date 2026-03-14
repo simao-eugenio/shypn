@@ -9,7 +9,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ..base import CompoundDataProviderBase
 from ..models import CompoundThermodynamics

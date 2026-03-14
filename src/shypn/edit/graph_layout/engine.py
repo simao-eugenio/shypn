@@ -23,9 +23,8 @@ Usage:
     >>> print(result['reason'])     # Explains why
 """
 
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List
 import networkx as nx
-from .base import LayoutAlgorithm
 from .hierarchical import HierarchicalLayout
 from .force_directed import ForceDirectedLayout
 from .circular import CircularLayout

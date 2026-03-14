@@ -50,25 +50,20 @@ Date: November 12, 2025 (Refactored)
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
-from gi.repository import Gtk, GLib, Pango
-import re
+from gi.repository import Gtk, Pango
 
 from shypn.utils.safe_eval import safe_eval_numeric
-from .data.data_puller import DataPuller
-from .data.data_cache import CachedDataPuller, DataCache
+from .data.data_cache import DataCache
 from .subnet_builder import SubnetBuilder
-from .investigation import Investigation
 from .analysis import LocalityAnalyzer, DependencyAnalyzer, BoundaryAnalyzer, ConservationAnalyzer
-from .fixes import FixSequencer, FixApplier, FixPredictor
-from .ui.subnet_view import SubnetView
-from .ui.investigation_view import InvestigationView
+from .fixes import FixSequencer
 from .experiment_manager import ExperimentManager
 from .subnet_simulator import SubnetSimulator
 from .ui.simulation_control_toolbar import SimulationControlToolbar
 from .ui.subnet_parameters_view import SubnetParametersView
 
 # Phase 2.2 Extracted Analyzers
-from .analyzers import ViabilityAnalyzer, AnalysisResult
+from .analyzers import ViabilityAnalyzer
 
 # Phase 6 Sprint 16 — locality model-assembly service
 from .locality_controller import LocalityController
@@ -857,7 +852,7 @@ class ViabilityPanel(Gtk.Box):
         data = self.selected_localities[transition_id]
         
         # Reset colors - fetch objects from CURRENT model
-        from shypn.netobjs import Place, Transition, Arc
+        from shypn.netobjs import Arc
         
         # Get current model to fetch fresh object references
         model = self._get_current_model()
@@ -1775,7 +1770,7 @@ class ViabilityPanel(Gtk.Box):
         Clears all localities and resets the entire panel state.
         """
         # Reset colors - fetch objects from CURRENT model
-        from shypn.netobjs import Place, Transition, Arc
+        from shypn.netobjs import Arc
         
         # Get current model to fetch fresh object references
         model = self._get_current_model()
@@ -1904,7 +1899,7 @@ class ViabilityPanel(Gtk.Box):
         Args:
             obj: Place or Transition object
         """
-        from shypn.netobjs import Transition, Place
+        from shypn.netobjs import Transition
         
         if isinstance(obj, Transition):
             # Add to viability panel - this handles ALL coloring (transition + locality)
@@ -1979,7 +1974,7 @@ class ViabilityPanel(Gtk.Box):
         logging.getLogger(__name__).debug("[VIABILITY_CLEAR] Clearing panel data for new document")
         
         # Reset colors before clearing (in case previous document had colored objects)
-        from shypn.netobjs import Place, Transition, Arc
+        from shypn.netobjs import Place, Arc
         model = self._get_current_model()
         if model:
             for transition_id in self.selected_localities.keys():

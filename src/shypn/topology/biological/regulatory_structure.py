@@ -29,7 +29,7 @@ Author: GitHub Copilot
 Date: October 31, 2025
 """
 
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, List, Optional
 from collections import defaultdict
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer

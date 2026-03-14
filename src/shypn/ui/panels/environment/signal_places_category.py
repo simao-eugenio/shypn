@@ -15,7 +15,6 @@ All subscriptions are scoped to the document_id so multiple open documents
 stay isolated.
 """
 import logging
-import sys
 
 import gi
 gi.require_version('Gtk', '3.0')

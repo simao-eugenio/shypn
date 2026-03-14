@@ -18,7 +18,6 @@ Date: February 14, 2026
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, Any, List
 from enum import Enum
-import math
 
 
 class ThermodynamicSource(Enum):

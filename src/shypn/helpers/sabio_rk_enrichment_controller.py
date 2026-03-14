@@ -11,7 +11,6 @@ Architecture:
 - Override Logic: Respect SBML curated data, override KEGG heuristics
 """
 
-import sys
 import logging
 from typing import Optional, Dict, List, Any, Tuple
 

@@ -8,7 +8,6 @@ This module handles saving and restoring:
 Settings are stored in ~/.config/shypn/workspace.json
 """
 import os
-import sys
 import logging
 import json
 import time

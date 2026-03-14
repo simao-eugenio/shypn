@@ -10,7 +10,7 @@ Implementation uses NumPy's optimized Poisson generator for performance.
 """
 
 import numpy as np
-from typing import Any, Union, List, Optional
+from typing import Any, List, Optional
 
 
 class PoissonSampler:

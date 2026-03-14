@@ -10,7 +10,7 @@ Usage:
     spin.set_debounced_callback(lambda widget: print(f"Final value: {widget.get_value()}"))
 """
 
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 import gi
 
 gi.require_version('Gtk', '3.0')

@@ -19,7 +19,6 @@ import sys
 import time
 import threading
 import logging
-from typing import Optional
 
 try:
     import gi  # type: ignore[import-untyped]

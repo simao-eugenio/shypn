@@ -10,7 +10,6 @@ Author: Simão Eugénio
 Date: 2025-10-22
 """
 
-import sys
 from pathlib import Path
 
 import gi

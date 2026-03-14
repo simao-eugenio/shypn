@@ -19,8 +19,8 @@ Author: Simão Eugénio
 Date: November 10, 2025
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Callable, Any, Optional
+from dataclasses import dataclass
+from typing import Dict, List, Callable, Any
 from datetime import datetime
 
 # Import pattern recognition engine

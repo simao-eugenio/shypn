@@ -10,7 +10,7 @@ Data collected:
 The data is stored in memory-efficient structures optimized for rate calculations.
 """
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Any
 
 class SimulationDataCollector:
     """Collects raw simulation data for rate-based analysis.

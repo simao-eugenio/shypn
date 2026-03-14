@@ -1,11 +1,10 @@
 """Cycle detection for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import networkx as nx
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
-from ..base.exceptions import TopologyAnalysisError
 
 
 class CycleAnalyzer(TopologyAnalyzer):

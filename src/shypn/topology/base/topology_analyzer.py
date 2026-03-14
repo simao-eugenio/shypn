@@ -1,7 +1,7 @@
 """Abstract base class for topology analyzers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import time
 
 from .analysis_result import AnalysisResult

@@ -13,7 +13,6 @@ from gi.repository import Gtk
 from shypn.engine.simulation.settings import SimulationSettings
 from shypn.engine.simulation.buffered import BufferedSimulationSettings
 from shypn.engine.simulation.conflict_policy import ConflictResolutionPolicy
-from shypn.utils.time_utils import TimeUnits
 
 
 class SimulationSettingsDialog(Gtk.Dialog):

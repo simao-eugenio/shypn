@@ -1,6 +1,6 @@
 """Community detection analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Optional, Set
 import networkx as nx
 from networkx.algorithms import community
 

@@ -5,7 +5,7 @@ extracted from KGML (KEGG Markup Language) XML files.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 
 
 @dataclass

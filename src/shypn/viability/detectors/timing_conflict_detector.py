@@ -32,7 +32,7 @@ Repair Suggestions:
     4. Adjust timing windows (make them shorter or zero)
 """
 
-from typing import List, Dict, Any, Set, Tuple
+from typing import List
 from ..issue import ViabilityIssue
 
 

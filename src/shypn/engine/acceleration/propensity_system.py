@@ -55,7 +55,6 @@ from .codegen import (
     CONSTANT_VALUES,
     THERMO_LOCALS,
     TranspileError,
-    collect_names,
     preprocess_expr,
     transpile_expression,
 )

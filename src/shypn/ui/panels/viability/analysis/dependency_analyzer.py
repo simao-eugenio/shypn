@@ -1,7 +1,7 @@
 """Level 2: Dependency analyzer - analyze inter-locality flow dependencies."""
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any
 from .base_analyzer import BaseAnalyzer
-from ..investigation import Issue, Suggestion, Subnet, Dependency
+from ..investigation import Issue, Suggestion, Subnet
 
 
 class DependencyAnalyzer(BaseAnalyzer):

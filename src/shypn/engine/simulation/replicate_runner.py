@@ -28,7 +28,6 @@ import time
 import numpy as np
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any, Union
-from copy import deepcopy
 
 from shypn.engine.simulation.controller import SimulationController
 from shypn.engine.simulation.settings import SimulationSettings
@@ -491,7 +490,6 @@ class ReplicateRunner:
             format: 'wide' (one column per species) or 'long' (tidy format)
             include_transitions: Include transition firing counts
         """
-        import csv
         
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)

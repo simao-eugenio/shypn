@@ -12,7 +12,6 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 import logging
-from typing import Optional, Dict, Any
 
 from .base_pathway_category import BasePathwayCategory
 from shypn.crossfetch.controllers import HeuristicParametersController

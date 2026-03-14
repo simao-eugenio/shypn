@@ -21,7 +21,7 @@ from typing import List
 
 from .base_category import BaseViabilityCategory
 from .multi_domain_engine import MultiDomainEngine
-from .viability_dataclasses import Issue, Suggestion, MultiDomainSuggestion
+from .viability_dataclasses import Issue, Suggestion
 
 
 class DiagnosisCategory(BaseViabilityCategory):

@@ -30,7 +30,6 @@ Implementation approach:
 
 from typing import Any, Dict, List, Set, Optional
 from itertools import combinations
-import numpy as np
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult

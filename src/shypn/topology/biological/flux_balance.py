@@ -20,8 +20,7 @@ Date: November 20, 2025
 """
 
 import numpy as np
-from typing import Any, Dict, List, Set, Tuple, Optional
-from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult

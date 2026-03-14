@@ -18,7 +18,6 @@ Date: October 31, 2025
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
 
 from shypn.ui.panels.topology.base_topology_category import BaseTopologyCategory
 from shypn.topology.biological.dependency_coupling import DependencyAndCouplingAnalyzer

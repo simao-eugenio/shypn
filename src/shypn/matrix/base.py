@@ -26,7 +26,7 @@ Incidence Matrix:
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple
 import numpy as np
 
 

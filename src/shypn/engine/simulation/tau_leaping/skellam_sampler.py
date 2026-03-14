@@ -21,7 +21,6 @@ References:
 
 import numpy as np
 from typing import Tuple, Optional
-import logging
 
 
 class SkellamSampler:

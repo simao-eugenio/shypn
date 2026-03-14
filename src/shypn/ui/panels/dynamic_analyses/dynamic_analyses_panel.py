@@ -9,7 +9,6 @@ This panel contains three categories:
 Author: Simão Eugénio
 Date: 2025-10-29
 """
-import sys
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk

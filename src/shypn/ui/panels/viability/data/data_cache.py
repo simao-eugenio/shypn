@@ -3,8 +3,8 @@
 This module provides caching for KB and simulation data queries
 to avoid repeated lookups. Cache can be invalidated when model changes.
 """
-from typing import Optional, Set, List, Dict, Any
-from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any
+from dataclasses import dataclass
 from time import time
 
 

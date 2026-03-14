@@ -52,7 +52,6 @@ class ArcTransformHandler(TransformHandler):
             True if object is an Arc
         """
         from shypn.netobjs import Arc
-        from shypn.netobjs.curved_arc import CurvedArc
         # Support both Arc (with is_curved) and CurvedArc (separate class)
         return isinstance(obj, Arc)
     

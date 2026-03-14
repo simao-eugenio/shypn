@@ -28,7 +28,7 @@ Date: November 20, 2025
 """
 
 import re
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, Optional
 from collections import defaultdict
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer

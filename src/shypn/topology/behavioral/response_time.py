@@ -5,8 +5,8 @@ measuring latency between events, transition firing sequences, and
 end-to-end delays.
 """
 
-from typing import Dict, List, Set, Tuple, Optional, Any
-from collections import defaultdict, deque
+from typing import Dict, List, Tuple, Optional
+from collections import deque
 import logging
 import statistics
 

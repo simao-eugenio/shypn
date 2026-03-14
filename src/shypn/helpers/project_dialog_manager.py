@@ -7,17 +7,16 @@ project operations like creating, opening, closing, and exporting projects.
 
 import os
 import sys
-from pathlib import Path
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
     print('ERROR: GTK3 not available in project_dialog_manager:', e, file=sys.stderr)
     sys.exit(1)
 
-from shypn.data.project_models import Project, get_project_manager
+from shypn.data.project_models import get_project_manager
 
 
 class ProjectDialogManager:

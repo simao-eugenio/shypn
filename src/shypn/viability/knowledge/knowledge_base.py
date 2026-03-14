@@ -29,18 +29,12 @@ from .data_structures import (
 )
 
 from .dto import (
-    PlaceDTO,
-    TransitionDTO,
-    ArcDTO,
     SimulationResultDTO,
     normalize_places,
     normalize_transitions,
     normalize_arcs
 )
 
-import json
-from typing import Any
-from pathlib import Path
 
 from .data_structures import (
     Issue,

@@ -6,7 +6,7 @@ supporting both expression-based and catalog function formats.
 
 import re
 import logging
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict
 
 
 logger = logging.getLogger(__name__)

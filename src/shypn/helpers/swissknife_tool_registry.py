@@ -8,7 +8,7 @@ Tools are simple button wrappers that emit activation signals.
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject, GdkPixbuf
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import os
 
 

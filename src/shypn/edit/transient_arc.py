@@ -23,7 +23,7 @@ TransientArc does NOT:
 - Persist to disk
 """
 import math
-from typing import Tuple, Optional
+from typing import Optional
 
 
 class TransientArc:

@@ -3,7 +3,7 @@
 
 Calculates metrics for each place based on collected time-series data.
 """
-from typing import Any, List, Optional
+from typing import Any, List
 import statistics
 from dataclasses import dataclass
 

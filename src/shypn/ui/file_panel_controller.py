@@ -12,15 +12,13 @@ Author: Simão Eugénio
 Date: 2025-10-22
 """
 
-import os
-import sys
 import logging
 from pathlib import Path
 from typing import Optional
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, Pango
+from gi.repository import Gtk, Pango
 
 
 class FilePanelController:

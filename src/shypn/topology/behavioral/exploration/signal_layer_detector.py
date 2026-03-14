@@ -7,11 +7,10 @@ Author: Simão Eugénio
 Date: February 3, 2026
 """
 
-from typing import Dict, List, Set, Tuple, Any, Optional
+from typing import Dict, List, Set, Any, Optional
 from collections import defaultdict, deque
 import logging
 import hashlib
-import json
 
 logger = logging.getLogger(__name__)
 

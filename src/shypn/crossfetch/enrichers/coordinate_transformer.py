@@ -10,7 +10,7 @@ Date: October 2025
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 
 class CoordinateTransformer:

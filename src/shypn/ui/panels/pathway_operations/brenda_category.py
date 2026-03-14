@@ -11,11 +11,9 @@ It handles:
 
 Follows the CategoryFrame pattern and respects model curation integrity.
 """
-import os
 import sys
-import threading
 import logging
-from typing import Optional, Dict, List, Any
+from typing import Dict, List, Any
 
 try:
     import gi

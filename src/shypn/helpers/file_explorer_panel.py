@@ -32,7 +32,7 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
-    from gi.repository import Gtk, GLib, Pango, Gio, Gdk
+    from gi.repository import Gtk, GLib, Pango, Gdk
 except Exception as e:
     print(f'ERROR: GTK3 not available in file_explorer_panel: {e}', file=sys.stderr)
     sys.exit(1)
@@ -2117,7 +2117,6 @@ class FileExplorerPanel:
         Args:
             persistency: NetObjPersistency instance from main application
         """
-        from shypn.file import NetObjPersistency
         self.persistency = persistency
         persistency.on_file_saved = self._on_file_saved_callback
         persistency.on_file_loaded = self._on_file_loaded_callback

@@ -22,7 +22,6 @@ API Documentation: https://www.ebi.ac.uk/biomodels/docs/
 
 from typing import Dict, Any, List, Optional
 import time
-from pathlib import Path
 
 # Import will be needed when requests is available
 # import requests
