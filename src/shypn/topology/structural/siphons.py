@@ -121,7 +121,7 @@ class SiphonAnalyzer(TopologyAnalyzer):
             return AnalysisResult(
                 success=False,
                 errors=[
-                    f"⛔ Model too large for siphon analysis",
+                    "⛔ Model too large for siphon analysis",
                     f"   Places: {n_places} (maximum: {MAX_PLACES_SAFE})",
                     f"   Estimated operations: > 10^{int(n_places * 0.3)} (exponential)",
                     "",

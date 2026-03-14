@@ -1038,7 +1038,7 @@ class DiagnosisCategory(BaseViabilityCategory):
                     category="biological",
                     severity="info",
                     title=f"{place_name} not mapped to compound",
-                    description=f"Place lacks biological compound annotation",
+                    description="Place lacks biological compound annotation",
                     element_id=place_id,
                     element_type="place",
                     locality_id=self.selected_locality_id
@@ -1081,7 +1081,7 @@ class DiagnosisCategory(BaseViabilityCategory):
                     category="kinetic",
                     severity="warning",
                     title=f"{trans_name} has no firing rate",
-                    description=f"Transition lacks kinetic parameters for timed simulation",
+                    description="Transition lacks kinetic parameters for timed simulation",
                     element_id=trans_id,
                     element_type="transition",
                     locality_id=self.selected_locality_id

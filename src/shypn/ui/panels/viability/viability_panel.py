@@ -1177,6 +1177,9 @@ class ViabilityPanel(Gtk.Box):
                         place.initial_marking = new_marking
                         break
             
+            # Redraw canvas so marking annotation updates immediately
+            self._trigger_canvas_redraw()
+
             # Auto-sync baseline to automation (no manual sync needed)
             self._auto_sync_baseline_to_automation()
         except ValueError:
@@ -1239,6 +1242,9 @@ class ViabilityPanel(Gtk.Box):
                         arc.weight = new_weight
                         break
             
+            # Redraw canvas so arc weight annotation updates immediately
+            self._trigger_canvas_redraw()
+
             # Auto-sync baseline to automation (no manual sync needed)
             self._auto_sync_baseline_to_automation()
         except ValueError:
@@ -1493,7 +1499,7 @@ class ViabilityPanel(Gtk.Box):
         
         # Changes
         changes_label = Gtk.Label()
-        changes_label.set_markup(f"<b>Changes:</b>")
+        changes_label.set_markup("<b>Changes:</b>")
         changes_label.set_halign(Gtk.Align.START)
         content.pack_start(changes_label, False, False, 0)
         
@@ -1517,7 +1523,7 @@ class ViabilityPanel(Gtk.Box):
         # Warnings
         if prediction.has_warnings():
             warnings_label = Gtk.Label()
-            warnings_label.set_markup(f"<b>Warnings:</b>")
+            warnings_label.set_markup("<b>Warnings:</b>")
             warnings_label.set_halign(Gtk.Align.START)
             content.pack_start(warnings_label, False, False, 0)
             

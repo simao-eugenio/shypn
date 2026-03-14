@@ -300,7 +300,7 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
             str: Formatted summary
         """
         lines = [
-            f"Stoichiometric Consistency Analysis:",
+            "Stoichiometric Consistency Analysis:",
             f"  Places: {statistics['num_places']}",
             f"  Transitions: {statistics['num_transitions']}",
             f"  Matrix rank: {statistics['matrix_rank']}",
@@ -311,9 +311,9 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
         ]
         
         if statistics['is_consistent']:
-            lines.append(f"\n✓ Stoichiometric matrix is consistent")
+            lines.append("\n✓ Stoichiometric matrix is consistent")
         else:
-            lines.append(f"\n⚠️ Matrix rank exceeds dimensions (inconsistent)")
+            lines.append("\n⚠️ Matrix rank exceeds dimensions (inconsistent)")
         
         if statistics['num_blocked_transitions'] > 0:
             lines.append(f"⚠️ {statistics['num_blocked_transitions']} transition(s) have no stoichiometric effect")

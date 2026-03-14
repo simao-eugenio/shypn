@@ -571,7 +571,7 @@ class TopologyPanelController:
         invariants = result.get('invariants', [])
         count = len(invariants)
         
-        lines = [f"<b>P-Invariants Analysis Results</b>\n"]
+        lines = ["<b>P-Invariants Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> invariant{'s' if count != 1 else ''}\n")
         
         if count > 0:
@@ -598,7 +598,7 @@ class TopologyPanelController:
         invariants = result.get('invariants', [])
         count = len(invariants)
         
-        lines = [f"<b>T-Invariants Analysis Results</b>\n"]
+        lines = ["<b>T-Invariants Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> invariant{'s' if count != 1 else ''}\n")
         
         if count > 0:
@@ -625,7 +625,7 @@ class TopologyPanelController:
         siphons = result.get('siphons', [])
         count = len(siphons)
         
-        lines = [f"<b>Siphons Analysis Results</b>\n"]
+        lines = ["<b>Siphons Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> siphon{'s' if count != 1 else ''}\n")
         
         if count > 0:
@@ -650,7 +650,7 @@ class TopologyPanelController:
         traps = result.get('traps', [])
         count = len(traps)
         
-        lines = [f"<b>Traps Analysis Results</b>\n"]
+        lines = ["<b>Traps Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> trap{'s' if count != 1 else ''}\n")
         
         if count > 0:
@@ -677,7 +677,7 @@ class TopologyPanelController:
         longest_length = result.get('longest_length', 0)
         truncated = result.get('truncated', False)
         
-        lines = [f"<b>Elementary Cycles Analysis Results</b>\n"]
+        lines = ["<b>Elementary Cycles Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> cycle{'s' if count != 1 else ''}")
         if longest_length > 0:
             lines.append(f"Longest: <b>{longest_length}</b> nodes")
@@ -719,7 +719,7 @@ class TopologyPanelController:
             length = result.get('length', 0)
             exists = result.get('exists', True)
             
-            lines = [f"<b>Path Analysis Results</b>\n"]
+            lines = ["<b>Path Analysis Results</b>\n"]
             if exists:
                 names = path.get('names', [])
                 place_count = path.get('place_count', 0)
@@ -738,7 +738,7 @@ class TopologyPanelController:
             paths = result.get('paths', [])
             count = result.get('count', len(paths))
             
-            lines = [f"<b>Path Analysis Results</b>\n"]
+            lines = ["<b>Path Analysis Results</b>\n"]
             lines.append(f"Found: <b>{count}</b> path{'s' if count != 1 else ''}\n")
             
             if paths:
@@ -768,7 +768,7 @@ class TopologyPanelController:
         max_degree = result.get('max_degree', 0)
         avg_degree = result.get('avg_degree', 0)
         
-        lines = [f"<b>Network Hubs Analysis Results</b>\n"]
+        lines = ["<b>Network Hubs Analysis Results</b>\n"]
         lines.append(f"Found: <b>{count}</b> hub{'s' if count != 1 else ''}")
         lines.append(f"Max degree: <b>{max_degree}</b>")
         lines.append(f"Avg degree: <b>{avg_degree:.1f}</b>\n")
@@ -801,7 +801,7 @@ class TopologyPanelController:
         is_bounded = result.get('is_bounded', True)
         deadlock_states = result.get('deadlock_states', [])
         
-        lines = [f"<b>Reachability Analysis Results</b>\n"]
+        lines = ["<b>Reachability Analysis Results</b>\n"]
         lines.append(f"Reachable states: <b>{total_states}</b>")
         lines.append(f"State transitions: <b>{total_transitions}</b>")
         lines.append(f"Max depth: <b>{max_depth}</b>")
@@ -838,7 +838,7 @@ class TopologyPanelController:
         place_bounds = result.get('place_bounds', {})
         overflow_risk = result.get('overflow_risk', False)
         
-        lines = [f"<b>Boundedness Analysis Results</b>\n"]
+        lines = ["<b>Boundedness Analysis Results</b>\n"]
         
         if is_bounded:
             if is_safe:
@@ -865,7 +865,7 @@ class TopologyPanelController:
         
         if place_bounds and is_bounded:
             max_bound = max(place_bounds.values()) if place_bounds else 0
-            lines.append(f"\n<b>Place Bounds:</b>")
+            lines.append("\n<b>Place Bounds:</b>")
             lines.append(f"Maximum tokens: <b>{max_bound}</b>")
             
             # Show places with highest bounds
@@ -889,7 +889,7 @@ class TopologyPanelController:
         live_transitions = result.get('live_transitions', [])
         total_transitions = result.get('total_transitions', 0)
         
-        lines = [f"<b>Liveness Analysis Results</b>\n"]
+        lines = ["<b>Liveness Analysis Results</b>\n"]
         
         if is_live:
             lines.append("<b>✓ Net is LIVE</b>")
@@ -944,10 +944,10 @@ class TopologyPanelController:
         severity = result.get('severity', 'none')
         recovery_suggestions = result.get('recovery_suggestions', [])
         
-        lines = [f"<b>Deadlock Detection Results</b>\n"]
+        lines = ["<b>Deadlock Detection Results</b>\n"]
         
         if has_deadlock:
-            lines.append(f"<b>⚠ DEADLOCK DETECTED</b>")
+            lines.append("<b>⚠ DEADLOCK DETECTED</b>")
             lines.append(f"Type: <b>{deadlock_type.upper()}</b>")
             lines.append(f"Severity: <b>{severity.upper()}</b>\n")
         else:
@@ -1008,7 +1008,7 @@ class TopologyPanelController:
         fairness_violations = result.get('fairness_violations', [])
         total_transitions = result.get('total_transitions', 0)
         
-        lines = [f"<b>Fairness Analysis Results</b>\n"]
+        lines = ["<b>Fairness Analysis Results</b>\n"]
         
         if is_fair:
             lines.append(f"<b>✓ Net has {fairness_level.upper()} FAIRNESS</b>")

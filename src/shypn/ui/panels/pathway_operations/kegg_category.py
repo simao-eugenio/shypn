@@ -998,13 +998,13 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
             canvas_manager = self._get_canvas_manager()
             if canvas_loader or canvas_manager:
                 if canvas_loader:
-                    self.logger.info(f"Auto-load: Using canvas loader")
+                    self.logger.info("Auto-load: Using canvas loader")
                 if canvas_manager:
-                    self.logger.info(f"Auto-load: Using canvas manager")
+                    self.logger.info("Auto-load: Using canvas manager")
                 # Handle both cases
                 if canvas_loader:
                     # It's a loader - can create new document
-                    self.logger.info(f"Auto-load: Detected canvas loader")
+                    self.logger.info("Auto-load: Detected canvas loader")
                 elif canvas_manager:
                     # Direct manager reference
                     self.logger.warning("Auto-load: Direct canvas manager provided (expected loader)")
@@ -1315,7 +1315,7 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                 except Exception as e:
                     self.logger.warning(f"Could not serialize KEGG PathwayData: {e}")
             document_model.save_to_file(model_filepath)
-            self.logger.info(f"Model saved successfully")
+            self.logger.info("Model saved successfully")
             # 3. Create PathwayDocument with metadata
             from shypn.data.pathway_document import PathwayDocument
             pathway_doc = PathwayDocument(
@@ -1338,7 +1338,7 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
             # Register with project and save
             self.project.add_pathway(pathway_doc)
             self.project.save()
-            self.logger.info(f"Pathway metadata saved to project")
+            self.logger.info("Pathway metadata saved to project")
             return model_filepath
         except Exception as save_error:
             import traceback
@@ -1516,7 +1516,7 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                 f'({arcs_added} arcs) in {result.duration_seconds:.0f}s</span>'
             )
             # Update main status with detailed statistics
-            status_msg = f"✅ Stoichiometry enrichment complete!\n"
+            status_msg = "✅ Stoichiometry enrichment complete!\n"
             status_msg += f"Reactions enriched: {reactions_enriched}\n"
             status_msg += f"Places added: {places_added}\n"
             status_msg += f"Arcs added: {arcs_added}\n"
@@ -1716,15 +1716,15 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                 ])
                 self.metadata_store.append(stats_root, [
                     "📍", "Total Entries", str(len(pathway.entries)),
-                    "stat", "", f"Total nodes in pathway"
+                    "stat", "", "Total nodes in pathway"
                 ])
                 self.metadata_store.append(stats_root, [
                     "🔶", "Total Reactions", str(len(pathway.reactions)),
-                    "stat", "", f"Metabolic reactions"
+                    "stat", "", "Metabolic reactions"
                 ])
                 self.metadata_store.append(stats_root, [
                     "🔗", "Total Relations", str(len(pathway.relations)),
-                    "stat", "", f"Regulatory interactions"
+                    "stat", "", "Regulatory interactions"
                 ])
                 # Entry type breakdown
                 entry_types = pathway.count_entry_types()
@@ -1767,7 +1767,7 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                             self.metadata_store.append(entry_iter, [
                                 "📍", "Position",
                                 f"({entry.graphics.x:.0f}, {entry.graphics.y:.0f})",
-                                "position", "", f"Canvas coordinates"
+                                "position", "", "Canvas coordinates"
                             ])
                         if entry.reaction:
                             self.metadata_store.append(entry_iter, [
@@ -2012,7 +2012,7 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
             if parsed_pathway.link:
                 self.metadata_store.append(info_root, [
                     "🔗", "KEGG Link", parsed_pathway.link,
-                    "text", "", f"Link to KEGG database entry"
+                    "text", "", "Link to KEGG database entry"
                 ])
             # Entries section
             if parsed_pathway.entries:
@@ -2205,17 +2205,17 @@ class KEGGCategory(BasePathwayCategory):  # type: ignore[misc]
                 ])
                 # Update preview text
                 preview_lines = [
-                    f"=== KEGG PATHWAY INFO ===",
+                    "=== KEGG PATHWAY INFO ===",
                     f"Pathway ID: {pathway_dict.get('pathway_id', 'Unknown')}",
                     f"Name: {pathway_dict.get('name', 'Unnamed')}",
                     f"Organism: {pathway_dict.get('organism', 'Unknown')}",
-                    f"",
-                    f"=== STATISTICS ===",
+                    "",
+                    "=== STATISTICS ===",
                     f"Entries: {pathway_dict.get('entries_count', 0)}",
                     f"Reactions: {pathway_dict.get('reactions_count', 0)}",
                     f"Relations: {pathway_dict.get('relations_count', 0)}",
-                    f"",
-                    f"=== CONVERSION ===",
+                    "",
+                    "=== CONVERSION ===",
                     f"Coordinate Scale: {pathway_dict.get('coordinate_scale', 2.5)}x",
                 ]
                 buffer = self.preview_text.get_buffer()

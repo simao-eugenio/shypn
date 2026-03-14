@@ -276,7 +276,7 @@ class JSONMetadataManager(BaseMetadataManager):
             # Write new metadata
             self._write_json(data)
             
-            self.logger.info(f"Imported metadata from dictionary")
+            self.logger.info("Imported metadata from dictionary")
             return True
         
         except Exception as e:

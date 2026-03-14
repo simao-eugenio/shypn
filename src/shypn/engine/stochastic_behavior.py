@@ -896,7 +896,7 @@ class StochasticBehavior(TransitionBehavior):
                     # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
                     # Inhibitor arcs DO consume tokens when threshold permits transition to fire
                     if arc_type == 'test':
-                        logger.debug(f"    → SKIP consumption (test arc - catalyst)")
+                        logger.debug("    → SKIP consumption (test arc - catalyst)")
                         continue
                     
                     logger.debug(f"    → CONSUMING {burst * arc.weight} tokens")

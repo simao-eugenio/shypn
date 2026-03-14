@@ -39,22 +39,10 @@ from .dto import (
 )
 
 import json
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any
 from pathlib import Path
 
 from .data_structures import (
-    PlaceKnowledge,
-    TransitionKnowledge,
-    ArcKnowledge,
-    PInvariant,
-    TInvariant,
-    Siphon,
-    PathwayInfo,
-    CompoundInfo,
-    ReactionInfo,
-    KineticParams,
-    SimulationTrace,
     Issue,
     RepairSuggestion
 )
@@ -852,7 +840,7 @@ class ModelKnowledgeBase:
                     # Empty siphon needs tokens to prevent deadlock
                     tokens = 5  # Conservative initial value
                     confidence = 0.8
-                    reasoning = f"Place in empty siphon (deadlock risk)"
+                    reasoning = "Place in empty siphon (deadlock risk)"
                     suggestions.append((tokens, confidence, reasoning))
         
         # STRATEGY 3: Check if downstream transitions are dead
@@ -868,7 +856,7 @@ class ModelKnowledgeBase:
             if has_dead_output and place.current_marking == 0:
                 tokens = 3
                 confidence = 0.6
-                reasoning = f"Feeds dead transitions, may need substrate"
+                reasoning = "Feeds dead transitions, may need substrate"
                 suggestions.append((tokens, confidence, reasoning))
         
         # Return highest confidence suggestion
@@ -896,7 +884,7 @@ class ModelKnowledgeBase:
         # Check if we have stoichiometry from reaction data
         if arc.stoichiometry and arc.stoichiometry > 0:
             confidence = 0.9  # High confidence from explicit data
-            reasoning = f"From reaction stoichiometry"
+            reasoning = "From reaction stoichiometry"
             return (arc.stoichiometry, confidence, reasoning)
         
         # Check reaction data for stoichiometry
@@ -912,14 +900,14 @@ class ModelKnowledgeBase:
                     for compound_id, coeff in reaction.substrates:
                         if compound_id == place.compound_id:
                             confidence = 0.8
-                            reasoning = f"From KEGG reaction stoichiometry"
+                            reasoning = "From KEGG reaction stoichiometry"
                             return (coeff, confidence, reasoning)
                     
                     # Search in products
                     for compound_id, coeff in reaction.products:
                         if compound_id == place.compound_id:
                             confidence = 0.8
-                            reasoning = f"From KEGG reaction stoichiometry"
+                            reasoning = "From KEGG reaction stoichiometry"
                             return (coeff, confidence, reasoning)
         
         # Default: assume weight = 1

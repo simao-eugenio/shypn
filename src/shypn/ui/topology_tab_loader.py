@@ -416,7 +416,7 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                         paths = path_result.data['paths']
                         path_count = len(paths)
                         if path_count >= 50:
-                            text = f"≥50 paths pass through this place\n(limited to first 50)"
+                            text = "≥50 paths pass through this place\n(limited to first 50)"
                         else:
                             avg_length = sum(len(p) for p in paths) / len(paths) if paths else 0
                             text = f"{path_count} path(s) pass through this place\n"
@@ -494,14 +494,14 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                     place_unbounded = self.element_id in unbounded_places
                     
                     if place_unbounded:
-                        text_parts.append(f"⚠ Unbounded Place")
+                        text_parts.append("⚠ Unbounded Place")
                         text_parts.append("This place can accumulate unlimited tokens")
                     else:
                         if is_bounded:
                             text_parts.append(f"✓ Bounded (k={k_bound})")
                             text_parts.append(f"Maximum tokens: {k_bound}")
                         else:
-                            text_parts.append(f"✓ Bounded (net analysis)")
+                            text_parts.append("✓ Bounded (net analysis)")
                     text_parts.append("")
             except Exception as e:
                 text_parts.append(f"Boundedness: Error - {str(e)[:50]}")
@@ -521,12 +521,12 @@ class PlaceTopologyTabLoader(TopologyTabLoader):
                         place_id_str = str(self.element_id)
                         if place_id_str in deadlock_marking:
                             tokens_at_deadlock = deadlock_marking[place_id_str]
-                            text_parts.append(f"⚠ Involved in Deadlock")
+                            text_parts.append("⚠ Involved in Deadlock")
                             text_parts.append(f"Tokens at deadlock: {tokens_at_deadlock}")
                         else:
-                            text_parts.append(f"⚠ Net can deadlock (but not this place)")
+                            text_parts.append("⚠ Net can deadlock (but not this place)")
                     else:
-                        text_parts.append(f"✓ Deadlock-Free")
+                        text_parts.append("✓ Deadlock-Free")
                     text_parts.append("")
             except Exception as e:
                 text_parts.append(f"Deadlock: Error - {str(e)[:50]}")
@@ -635,7 +635,7 @@ class TransitionTopologyTabLoader(TopologyTabLoader):
                         paths = path_result.data['paths']
                         path_count = len(paths)
                         if path_count >= 50:
-                            text = f"≥50 paths pass through this transition\n(limited to first 50)"
+                            text = "≥50 paths pass through this transition\n(limited to first 50)"
                         else:
                             avg_length = sum(len(p) for p in paths) / len(paths) if paths else 0
                             text = f"{path_count} path(s) pass through this transition\n"
@@ -743,14 +743,14 @@ class TransitionTopologyTabLoader(TopologyTabLoader):
                     trans_violations = [v for v in violations if v.get('transition') == trans_id_str]
                     
                     if trans_conflicts:
-                        text_parts.append(f"⚠ In Conflict Set")
+                        text_parts.append("⚠ In Conflict Set")
                         text_parts.append(f"Conflicts with {len(trans_conflicts[0].get('transitions', [])) - 1} other transition(s)")
                         
                         if trans_violations:
                             starvation_risk = trans_violations[0].get('starvation_risk', 'unknown')
                             text_parts.append(f"Starvation risk: {starvation_risk}")
                     else:
-                        text_parts.append(f"✓ No Conflicts Detected")
+                        text_parts.append("✓ No Conflicts Detected")
                     
                     text_parts.append(f"Net fairness: {fairness_class}")
                     text_parts.append("")
@@ -771,12 +771,12 @@ class TransitionTopologyTabLoader(TopologyTabLoader):
                     is_disabled = trans_id_str in disabled_transitions
                     
                     if is_disabled:
-                        text_parts.append(f"⚠ Structurally Disabled")
+                        text_parts.append("⚠ Structurally Disabled")
                         text_parts.append("This transition can never fire")
                     elif can_deadlock:
-                        text_parts.append(f"⚠ Net can deadlock")
+                        text_parts.append("⚠ Net can deadlock")
                     else:
-                        text_parts.append(f"✓ Deadlock-Free")
+                        text_parts.append("✓ Deadlock-Free")
             except Exception as e:
                 text_parts.append(f"Deadlock: Error - {str(e)[:50]}")
             

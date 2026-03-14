@@ -1101,7 +1101,7 @@ class BRENDACategory(BasePathwayCategory):
         self.logger.info(f"[QUERY_ALL_COMPLETE] Transitions queried: {transitions_queried}")
         
         if not results:
-            self.logger.warning(f"[QUERY_ALL_COMPLETE] No results found!")
+            self.logger.warning("[QUERY_ALL_COMPLETE] No results found!")
             
             # Show helpful error dialog explaining the issue
             error_message = (
@@ -1241,7 +1241,7 @@ class BRENDACategory(BasePathwayCategory):
         total_param_count = len(results.get('parameters', []))
         
         if total_param_count == 0:
-            self.results_count_label.set_markup(f"<i>0 results</i>")
+            self.results_count_label.set_markup("<i>0 results</i>")
             return
         
         # Import filter for quality scoring
@@ -1531,7 +1531,7 @@ class BRENDACategory(BasePathwayCategory):
             
             # CRITICAL: Update controller's canvas reference to ensure it has current model
             # This is essential in case user switched tabs or models since the last query
-            self.logger.info(f"[BATCH_APPLY] Updating controller's model canvas reference...")
+            self.logger.info("[BATCH_APPLY] Updating controller's model canvas reference...")
             self.brenda_controller.set_model_canvas(self.model_canvas_manager)
             
             # Start enrichment session
@@ -1614,7 +1614,7 @@ class BRENDACategory(BasePathwayCategory):
             if applied_count > 0:
                 if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'mark_dirty'):
                     self.model_canvas_manager.mark_dirty()
-                    self.logger.info(f"[BATCH_APPLY] ✓ Marked model as dirty")
+                    self.logger.info("[BATCH_APPLY] ✓ Marked model as dirty")
             
             # CRITICAL: Reset simulation state after applying parameters
             # This clears cached behaviors that might have old parameter values
@@ -1827,7 +1827,7 @@ class BRENDACategory(BasePathwayCategory):
             
             # CRITICAL: Update controller's canvas reference to ensure it has current model
             # This is essential in case user switched tabs or models since the last query
-            self.logger.info(f"[SINGLE_APPLY] Updating controller's model canvas reference...")
+            self.logger.info("[SINGLE_APPLY] Updating controller's model canvas reference...")
             self.brenda_controller.set_model_canvas(self.model_canvas_manager)
             
             # Start enrichment session
@@ -1883,7 +1883,7 @@ class BRENDACategory(BasePathwayCategory):
             
             # VERIFICATION: Check if rate_function was actually set
             # IMPORTANT: Re-fetch the transition from canvas manager to ensure we check the updated object
-            self.logger.info(f"[SINGLE_APPLY] ========== VERIFICATION ==========")
+            self.logger.info("[SINGLE_APPLY] ========== VERIFICATION ==========")
             self.logger.info(f"[SINGLE_APPLY] Re-fetching transition {transition.id} from canvas manager...")
             
             # Get fresh transition object from canvas manager
@@ -1912,13 +1912,13 @@ class BRENDACategory(BasePathwayCategory):
                     self.logger.info(f"[SINGLE_APPLY]   rate_function_source: {rate_source}")
                     
                     if rate_func:
-                        self.logger.info(f"[SINGLE_APPLY] ✓ Rate function successfully applied!")
+                        self.logger.info("[SINGLE_APPLY] ✓ Rate function successfully applied!")
                     else:
-                        self.logger.warning(f"[SINGLE_APPLY] ✗ Rate function is None or empty!")
+                        self.logger.warning("[SINGLE_APPLY] ✗ Rate function is None or empty!")
                 else:
-                    self.logger.warning(f"[SINGLE_APPLY] ✗ properties exists but is empty/None!")
+                    self.logger.warning("[SINGLE_APPLY] ✗ properties exists but is empty/None!")
             else:
-                self.logger.warning(f"[SINGLE_APPLY] ✗ Transition has no properties attribute!")
+                self.logger.warning("[SINGLE_APPLY] ✗ Transition has no properties attribute!")
             
             trans_type = getattr(verified_transition, 'transition_type', 'unknown')
             self.logger.info(f"[SINGLE_APPLY]   transition_type: {trans_type}")
@@ -1929,7 +1929,7 @@ class BRENDACategory(BasePathwayCategory):
                 self.logger.info(f"[SINGLE_APPLY]   metadata.km: {km_value}")
                 self.logger.info(f"[SINGLE_APPLY]   metadata.vmax: {vmax_value}")
             
-            self.logger.info(f"[SINGLE_APPLY] =====================================")
+            self.logger.info("[SINGLE_APPLY] =====================================")
             
             # Finish enrichment session
             self.brenda_controller.finish_enrichment()
@@ -1937,7 +1937,7 @@ class BRENDACategory(BasePathwayCategory):
             # Mark model as dirty (modified) so changes are saved
             if self.model_canvas_manager and hasattr(self.model_canvas_manager, 'mark_dirty'):
                 self.model_canvas_manager.mark_dirty()
-                self.logger.info(f"[SINGLE_APPLY] ✓ Marked model as dirty")
+                self.logger.info("[SINGLE_APPLY] ✓ Marked model as dirty")
             
             # CRITICAL: Reset simulation state after applying parameters
             self._reset_simulation_after_parameter_changes()

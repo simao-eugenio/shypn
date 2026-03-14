@@ -376,7 +376,7 @@ class BatchResultsSaver:
         print(f"✓ Created batch folder: {batch_path}")
 
         self.save_config(n_replicates, list(recorded_objects), settings)
-        print(f"✓ Saved config.json")
+        print("✓ Saved config.json")
 
         # ── 2. Build metadata context (for summary / legacy callers) ──────────
         if metadata_context is None and model:
@@ -450,7 +450,7 @@ class BatchResultsSaver:
 
         # ── 7. summary.json ───────────────────────────────────────────────────
         self.save_summary(results, recorded_objects, n_replicates)
-        print(f"✓ Saved summary.json")
+        print("✓ Saved summary.json")
 
         return batch_path
     

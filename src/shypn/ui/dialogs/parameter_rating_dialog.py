@@ -11,7 +11,7 @@ Date: 2025-11-16
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
-from gi.repository import Gtk, Pango, Pango
+from gi.repository import Gtk, Pango
 from typing import Optional, Dict, Any
 
 

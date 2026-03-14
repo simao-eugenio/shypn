@@ -320,7 +320,7 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         See: doc/CRITICAL_SIMULATION_INIT_IMPORT_BUG.md
         """
         logger = logging.getLogger(__name__)
-        logger.info(f"Resetting SimulationController for new model load")
+        logger.info("Resetting SimulationController for new model load")
         
         # Reset simulation state
         self.time = 0.0
@@ -385,7 +385,7 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         if hasattr(self, 'buffered_settings'):
             self.buffered_settings.rollback()
         
-        logger.info(f"SimulationController reset complete - ready for new model")
+        logger.info("SimulationController reset complete - ready for new model")
     
     @property
     def on_simulation_complete(self) -> Optional[Any]:

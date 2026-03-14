@@ -500,7 +500,7 @@ class BaseViabilityCategory:
             text=f"Apply {len(selected_issues)} selected suggestion(s)?"
         )
         dialog.format_secondary_text(
-            f"This will apply the selected suggestions to fix the model.\n"
+            "This will apply the selected suggestions to fix the model.\n"
             "This action can be undone."
         )
         
@@ -521,7 +521,7 @@ class BaseViabilityCategory:
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"Repair Complete"
+                text="Repair Complete"
             )
             result_dialog.format_secondary_text(
                 f"Successfully applied {applied_count} suggestion(s)."

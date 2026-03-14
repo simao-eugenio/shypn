@@ -278,7 +278,7 @@ class FixPredictor:
                         change_type=ChangeType.RATE,
                         old_value=getattr(source, 'rate', 1.0),
                         new_value=getattr(source, 'rate', 1.0) * 1.5,
-                        description=f"Adjust producer rate"
+                        description="Adjust producer rate"
                     )
                     prediction.direct_changes.append(change)
             
@@ -290,7 +290,7 @@ class FixPredictor:
                         change_type=ChangeType.RATE,
                         old_value=getattr(target, 'rate', 1.0),
                         new_value=getattr(target, 'rate', 1.0) * 1.5,
-                        description=f"Adjust consumer rate"
+                        description="Adjust consumer rate"
                     )
                     prediction.direct_changes.append(change)
     
@@ -426,11 +426,11 @@ class FixPredictor:
                                                ChangeType.REMOVE_ELEMENT,
                                                ChangeType.TOPOLOGY]]
         if topology_changes:
-            warnings.append(f"⚠️  Topology change: affects model structure")
+            warnings.append("⚠️  Topology change: affects model structure")
         
         # Warn about high risk
         if prediction.risk_level == "high":
-            warnings.append(f"⚠️  HIGH RISK: consider testing in isolation first")
+            warnings.append("⚠️  HIGH RISK: consider testing in isolation first")
         
         return warnings
     

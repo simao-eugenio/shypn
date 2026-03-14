@@ -428,7 +428,7 @@ class SBMLKineticsIntegrationService:
                     )
                     
                     self.logger.debug(
-                        f"  Reversible reaction - marked in properties (net rate formula)"
+                        "  Reversible reaction - marked in properties (net rate formula)"
                     )
                     
                     # Validate thermodynamic consistency of reversible reaction

@@ -259,8 +259,8 @@ class ContextMenuHandler:
         
         # If still no locality detector (no model), add simple menu item
         if not self.locality_detector:
-            logger.warning(f"[CTX_MENU] No locality detector - model is None")
-            menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
+            logger.warning("[CTX_MENU] No locality detector - model is None")
+            menu_item = Gtk.MenuItem(label="Add to Transition Analysis")
             menu_item.connect("activate", 
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
             menu_item.show()
@@ -274,8 +274,8 @@ class ContextMenuHandler:
         
         if not locality.is_valid:
             # No valid locality, add simple menu item
-            logger.debug(f"[CTX_MENU] Invalid locality - adding transition only (no locality)")
-            menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
+            logger.debug("[CTX_MENU] Invalid locality - adding transition only (no locality)")
+            menu_item = Gtk.MenuItem(label="Add to Transition Analysis")
             menu_item.connect("activate", 
                             lambda w: self._on_add_to_analysis_clicked(transition, panel))
             menu_item.show()
@@ -285,7 +285,7 @@ class ContextMenuHandler:
         # Create menu item that automatically adds transition + locality
         locality_count = locality.place_count
         logger.debug(f"[CTX_MENU] Valid locality with {locality_count} places - will add transition+locality")
-        menu_item = Gtk.MenuItem(label=f"Add to Transition Analysis")
+        menu_item = Gtk.MenuItem(label="Add to Transition Analysis")
         menu_item.connect("activate",
                          lambda w: self._add_transition_with_locality(transition, locality, panel))
         menu_item.show()
@@ -322,15 +322,15 @@ class ContextMenuHandler:
         # Add locality places if panel supports it
         # (these places will also get their border colors set automatically)
         if hasattr(panel, 'add_locality_places'):
-            logger.debug(f"[CTX_MENU] Panel has add_locality_places method, calling it now...")
+            logger.debug("[CTX_MENU] Panel has add_locality_places method, calling it now...")
             panel.add_locality_places(transition, locality)
-            logger.debug(f"[CTX_MENU] panel.add_locality_places() completed successfully")
+            logger.debug("[CTX_MENU] panel.add_locality_places() completed successfully")
         else:
             logger.warning(f"[CTX_MENU] Panel missing add_locality_places method! Panel type: {type(panel)}")
         
         # Also add to plotting panel (which will detect locality automatically)
         if self.diagnostics_panel:
-            logger.debug(f"[CTX_MENU] Also adding transition to plotting panel (locality will be detected automatically)")
+            logger.debug("[CTX_MENU] Also adding transition to plotting panel (locality will be detected automatically)")
             self.diagnostics_panel.set_transition(transition)
         
         # Request canvas redraw to show new border colors

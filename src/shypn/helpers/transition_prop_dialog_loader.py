@@ -636,6 +636,20 @@ class TransitionPropDialogLoader(GObject.GObject):
                 if self.persistency_manager:
                     self.persistency_manager.mark_dirty()
                 self.emit('properties-changed')
+                # Notify panels of transition property change
+                try:
+                    from shypn.events import EventBus
+                    from shypn.core.document_id import doc_id
+                    drawing_area = None
+                    if self.model and hasattr(self.model, '_drawing_area'):
+                        drawing_area = self.model._drawing_area
+                    if drawing_area is not None:
+                        EventBus.emit('model.transition.modified',
+                                      {'object': self.transition_obj,
+                                       'object_id': self.transition_obj.id},
+                                      document_id=doc_id(drawing_area))
+                except Exception:
+                    pass
         else:
             # BUG-1 FIX: _on_type_changed prematurely mutated transition_type for
             # field-visibility purposes.  Restore the original value on Cancel so
@@ -1306,7 +1320,7 @@ class TransitionPropDialogLoader(GObject.GObject):
             if confidence_str:
                 confidence_label.set_text(f"Confidence: {confidence_str}")
             else:
-                confidence_label.set_text(f"Confidence: N/A")
+                confidence_label.set_text("Confidence: N/A")
         
         if rate_type_label:
             if not rate_type and hasattr(self.transition_obj, 'properties'):

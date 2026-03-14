@@ -117,7 +117,7 @@ class TrapAnalyzer(TopologyAnalyzer):
             return AnalysisResult(
                 success=False,
                 errors=[
-                    f"⛔ Model too large for trap analysis",
+                    "⛔ Model too large for trap analysis",
                     f"   Places: {n_places} (maximum: {MAX_PLACES_SAFE})",
                     f"   Estimated operations: > 10^{int(n_places * 0.3)} (exponential)",
                     "",

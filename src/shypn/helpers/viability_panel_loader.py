@@ -437,6 +437,15 @@ class ViabilityPanelLoader:
         """
         EventBus.subscribe('document.focused', self._on_document_focused)
         EventBus.subscribe('file.saved', self._on_file_saved)
+        if self.document_id:
+            EventBus.subscribe('model.changed', self._on_model_changed,
+                               document_id=self.document_id)
+
+    def _on_model_changed(self, data):
+        """Refresh subnet parameters when interactive model changes occur (e.g. property dialog save)."""
+        if self.panel and self.widget.get_visible():
+            if hasattr(self.panel, '_refresh_subnet_parameters'):
+                GLib.idle_add(self.panel._refresh_subnet_parameters)
     
     def _on_document_focused(self, data):
         """Handle document.focused events for automatic panel swapping.
@@ -507,6 +516,11 @@ class ViabilityPanelLoader:
         # Unsubscribe from EventBus
         EventBus.unsubscribe('document.focused', self._on_document_focused)
         EventBus.unsubscribe('file.saved', self._on_file_saved)
+        if self.document_id:
+            try:
+                EventBus.unsubscribe('model.changed', self._on_model_changed)
+            except Exception:
+                pass
         # Clean up panel
         if self.panel and hasattr(self.panel, 'cleanup'):
             self.panel.cleanup()

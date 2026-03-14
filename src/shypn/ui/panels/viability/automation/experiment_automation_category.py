@@ -1426,8 +1426,6 @@ class ExperimentAutomationCategory:
             name: Experiment name
             result: Result dictionary with full experiment data
         """
-        import json
-        from datetime import datetime
         
         # Prepare comprehensive export data
         export_data = {

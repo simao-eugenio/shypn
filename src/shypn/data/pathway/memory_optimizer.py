@@ -257,17 +257,17 @@ if __name__ == "__main__":
     
     # e_coli_core
     est = estimate_memory_requirements(72, 95)
-    print(f"E. coli core (72 species, 95 reactions):")
+    print("E. coli core (72 species, 95 reactions):")
     print(f"  Estimated memory: {est['estimated_memory_mb']} MB")
     print(f"  Recommendation: {est['recommendation']}")
     print()
     
     # iJO1366
     est = estimate_memory_requirements(1805, 2583)
-    print(f"E. coli iJO1366 (1805 species, 2583 reactions):")
+    print("E. coli iJO1366 (1805 species, 2583 reactions):")
     print(f"  Estimated memory: {est['estimated_memory_mb']} MB")
     print(f"  Estimated arcs: {est['estimated_arcs']}")
-    print(f"  Breakdown:")
+    print("  Breakdown:")
     for key, value in est['breakdown'].items():
         print(f"    {key}: {value} MB")
     print(f"  Recommendation: {est['recommendation']}")

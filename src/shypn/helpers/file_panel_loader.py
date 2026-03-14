@@ -401,7 +401,7 @@ class FilePanelLoader:
                 flags=0,
                 message_type=Gtk.MessageType.QUESTION,
                 buttons=Gtk.ButtonsType.YES_NO,
-                text=f"Open Project?"
+                text="Open Project?"
             )
             dialog.format_secondary_text(
                 f"Do you want to open the project '{project_name}'?\n\n"
@@ -420,7 +420,7 @@ class FilePanelLoader:
                 flags=0,
                 message_type=Gtk.MessageType.QUESTION,
                 buttons=Gtk.ButtonsType.YES_NO,
-                text=f"Create Project?"
+                text="Create Project?"
             )
             dialog.format_secondary_text(
                 f"The folder '{folder_name}' is not a SHYpn project yet.\n\n"

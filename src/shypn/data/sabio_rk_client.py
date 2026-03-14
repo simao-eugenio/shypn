@@ -22,6 +22,7 @@ Performance Notes:
 import sys
 import logging
 import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import fromstring as _safe_fromstring
 from typing import Optional, Dict, List, Any
 from urllib.parse import quote
 
@@ -106,7 +107,7 @@ class SabioRKClient:
                 if organism:
                     self.logger.info(f"[SABIO-RK] Even with organism '{organism}', this enzyme is heavily studied")
                 else:
-                    self.logger.info(f"[SABIO-RK] Try specifying organism filter to reduce results")
+                    self.logger.info("[SABIO-RK] Try specifying organism filter to reduce results")
                 return None
             elif count > 100:
                 # Warn about large result sets (100-200) but still attempt fetch
@@ -153,7 +154,7 @@ class SabioRKClient:
             encoded_query = quote(query)
             url = f"{self.base_url}/searchKineticLaws/count?q={encoded_query}&format=txt"
             
-            self.logger.debug(f"[SABIO-RK] Counting results...")
+            self.logger.debug("[SABIO-RK] Counting results...")
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             
@@ -245,7 +246,7 @@ class SabioRKClient:
                 if organism:
                     self.logger.info(f"[SABIO-RK] Even with organism '{organism}', too many results")
                 else:
-                    self.logger.info(f"[SABIO-RK] Try specifying organism filter to reduce results")
+                    self.logger.info("[SABIO-RK] Try specifying organism filter to reduce results")
                 return None
             elif count > 100:
                 self.logger.warning(f"[SABIO-RK] Reaction {kegg_reaction_id}: {count} results - LARGE, may be slow")
@@ -290,7 +291,7 @@ class SabioRKClient:
         """
         try:
             # Parse XML
-            root = ET.fromstring(sbml_text)
+            root = _safe_fromstring(sbml_text)
             
             # SABIO-RK returns SBML Level 3 Version 1
             # Define SBML namespaces for both Level 2 and Level 3

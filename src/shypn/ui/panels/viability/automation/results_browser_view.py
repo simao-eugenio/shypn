@@ -764,7 +764,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"3D+ Factorial Data Detected"
+                text="3D+ Factorial Data Detected"
             )
             dialog.format_secondary_text(
                 f"Found {len(param_names)} parameters: {', '.join(param_names)}\n\n"
@@ -1017,9 +1017,9 @@ class ResultsBrowserView(BaseResultsView):
                 )
                 
                 if result_stats['significant']:
-                    results_text += f"  <span foreground='green'>✓ Significant difference detected (p &lt; 0.05)</span>"
+                    results_text += "  <span foreground='green'>✓ Significant difference detected (p &lt; 0.05)</span>"
                 else:
-                    results_text += f"  <span foreground='orange'>✗ No significant difference (p ≥ 0.05)</span>"
+                    results_text += "  <span foreground='orange'>✗ No significant difference (p ≥ 0.05)</span>"
             
             else:
                 # One-way ANOVA with Tukey HSD
@@ -1061,7 +1061,7 @@ class ResultsBrowserView(BaseResultsView):
                 )
                 
                 if anova['significant']:
-                    results_text += f"<b><span foreground='green'>✓ Significant differences detected (p &lt; 0.05)</span></b>\n\n"
+                    results_text += "<b><span foreground='green'>✓ Significant differences detected (p &lt; 0.05)</span></b>\n\n"
                     
                     # Show Tukey HSD results
                     if 'tukey' in summary:
@@ -1078,7 +1078,7 @@ class ResultsBrowserView(BaseResultsView):
                             )
                         results_text += "".join(comparison_parts)
                 else:
-                    results_text += f"<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
+                    results_text += "<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
             
             # Display results in dialog
             results_dialog = Gtk.MessageDialog(
@@ -1726,14 +1726,14 @@ class ResultsBrowserView(BaseResultsView):
         
         # Build statistics text
         text = f"<b>{name}</b>\n\n"
-        text += f"<b>Execution:</b>\n"
+        text += "<b>Execution:</b>\n"
         text += f"  Replicates: {n_reps}\n"
         text += f"  Execution Time: {elapsed:.2f}s\n\n"
         
         # Display species statistics if available
         species_stats = stats.get('species_statistics', {})
         if species_stats:
-            text += f"<b>Species Statistics:</b>\n"
+            text += "<b>Species Statistics:</b>\n"
             # Show first few species as examples
             species_list = list(species_stats.keys())[:3]
             for species_id in species_list:
@@ -1960,7 +1960,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"Batch Export Complete"
+                text="Batch Export Complete"
             )
             dialog.format_secondary_text(
                 f"Exported {success_count} CSV files to:\n{directory}"
@@ -2021,7 +2021,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"Batch Export Complete"
+                text="Batch Export Complete"
             )
             dialog.format_secondary_text(
                 f"Exported {success_count} JSON files to:\n{directory}"

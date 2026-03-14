@@ -297,7 +297,7 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Trigger object's on_changed callback to notify the canvas
         if hasattr(obj, 'on_changed') and obj.on_changed:
-            logger.debug(f"[COLOR_PLACE] Calling on_changed callback")
+            logger.debug("[COLOR_PLACE] Calling on_changed callback")
             obj.on_changed()
         else:
             logger.warning(f"[COLOR_PLACE] No on_changed callback for {type(obj).__name__} {obj.id}!")
@@ -309,10 +309,10 @@ class AnalysisPlotPanel(Gtk.Box):
         
         # Trigger canvas redraw to show the new border color
         if self._model_manager:
-            logger.debug(f"[COLOR_PLACE] Calling mark_needs_redraw()")
+            logger.debug("[COLOR_PLACE] Calling mark_needs_redraw()")
             self._model_manager.mark_needs_redraw()
         else:
-            logger.warning(f"[COLOR_PLACE] No model_manager, cannot trigger redraw!")
+            logger.warning("[COLOR_PLACE] No model_manager, cannot trigger redraw!")
 
 
     def remove_object(self, obj: Any):
