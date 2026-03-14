@@ -278,7 +278,7 @@ class SBMLValidator:
             
             # Check for persistent triggers
             trigger = event.getTrigger()
-            if trigger and trigger.getPersistent() == False:
+            if trigger and not trigger.getPersistent():
                 complex_events.append(f"{event.getId()} (non-persistent trigger)")
         
         if complex_events:

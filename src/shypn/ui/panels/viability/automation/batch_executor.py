@@ -427,7 +427,6 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         return
     
     # Apply place markings (LEGACY - for backward compatibility)
-    import os
     debug_log = os.path.expanduser("~/sweep_debug.log")
     
     # DEBUG: Check for swept parameter (works for both dict and object)
