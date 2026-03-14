@@ -996,20 +996,20 @@ class SBMLImportPanel:
             elif user_choice == 'convert_continuous':
                 # Store choice for later application during conversion
                 parsed_pathway.metadata['user_choice_transition_type'] = 'continuous'
-                self._show_status(f"✅ Parsed (will convert to continuous mode)")
+                self._show_status("✅ Parsed (will convert to continuous mode)")
             elif user_choice == 'convert_hybrid':
                 parsed_pathway.metadata['user_choice_transition_type'] = 'hybrid'
-                self._show_status(f"✅ Parsed (will use hybrid mode)")
+                self._show_status("✅ Parsed (will use hybrid mode)")
             else:  # proceed_anyway
                 parsed_pathway.metadata['user_choice_transition_type'] = 'stochastic'
-                self._show_status(f"✅ Parsed (stochastic mode - may fail during simulation)")
+                self._show_status("✅ Parsed (stochastic mode - may fail during simulation)")
         else:
             # Show warnings if any (other types)
             if validation_result.warnings:
                 warning_count = len(validation_result.warnings)
                 self._show_status(f"✅ Parsed with {warning_count} warning(s)")
             else:
-                self._show_status(f"✅ Parsed and validated successfully")
+                self._show_status("✅ Parsed and validated successfully")
         
         # Update preview with pathway info
         self._update_preview()

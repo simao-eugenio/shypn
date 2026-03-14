@@ -1103,7 +1103,7 @@ class ModelCanvasManager:
         controller = canvas_loader.simulation_controllers.get(drawing_area)
         if controller:
             manager._initialize_transition_states(controller)
-            logger.info(f"✅ Simulation controller reset and initialized after load_objects()")
+            logger.info("✅ Simulation controller reset and initialized after load_objects()")
             logger.info(f"   Controller has {len(controller.step_listeners)} step listeners")
             return True
         else:

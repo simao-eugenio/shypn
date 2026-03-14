@@ -76,6 +76,14 @@ class EnvironmentPanelLoader(PerDocumentPanelLoader):
         super().initialize()
         # Subscribe to document.focused for per-document panel swapping
         EventBus.subscribe('document.focused', self._on_document_focused)
+        if self.document_id:
+            EventBus.subscribe('model.changed', self._on_model_changed,
+                               document_id=self.document_id)
+
+    def _on_model_changed(self, data: dict) -> None:
+        """Refresh environment panel when interactive model changes occur (e.g. property dialog save)."""
+        if self.panel is not None:
+            GLib.idle_add(self.panel.refresh)
 
     def _on_document_focused(self, data: dict) -> None:
         """Swap this panel in/out of its container when document focus changes."""
@@ -147,6 +155,11 @@ class EnvironmentPanelLoader(PerDocumentPanelLoader):
             EventBus.unsubscribe('document.focused', self._on_document_focused)
         except Exception:
             pass
+        if self.document_id:
+            try:
+                EventBus.unsubscribe('model.changed', self._on_model_changed)
+            except Exception:
+                pass
         if self.panel is not None:
             try:
                 EventBus.clear_document(self.document_id)

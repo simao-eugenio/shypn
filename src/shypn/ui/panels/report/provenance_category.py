@@ -143,7 +143,7 @@ class ProvenanceCategory(BaseReportCategory):
         converted_count = len([p for p in pathways if p.model_id])
         enriched_count = len([p for p in pathways if p.enrichments])
         
-        summary = f"✓ Data Retrieved Successfully\n\n"
+        summary = "✓ Data Retrieved Successfully\n\n"
         summary += f"Total Pathways: {len(pathways)}\n"
         summary += f"  • KEGG: {kegg_count}\n"
         summary += f"  • SBML: {sbml_count}\n"
@@ -182,7 +182,7 @@ class ProvenanceCategory(BaseReportCategory):
             if pathway.model_id:
                 lines.append(f"   → Converted to model: {pathway.model_id}")
             else:
-                lines.append(f"   → Not yet converted")
+                lines.append("   → Not yet converted")
             
             if pathway.enrichments:
                 lines.append(f"   → Enrichments applied: {len(pathway.enrichments)}")

@@ -479,7 +479,7 @@ class BRENDAEnrichmentController:
             parameters: Dict with km, kcat, vmax, ki values
             override: If True, overwrite existing rate functions (use for BRENDA-enriched models)
         """
-        print(f"\n[BRENDA_MM] ========== RATE FUNCTION GENERATOR CALLED ==========")
+        print("\n[BRENDA_MM] ========== RATE FUNCTION GENERATOR CALLED ==========")
         
         if transition is None:
             return

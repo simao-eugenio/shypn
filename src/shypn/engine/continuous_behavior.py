@@ -290,7 +290,7 @@ class ContinuousBehavior(TransitionBehavior):
                     self._rate_function_error = str(exc)
                     
                     # FAIL LOUDLY - print error once
-                    print(f"\n❌ Rate Function Error - Simulation Stopped")
+                    print("\n❌ Rate Function Error - Simulation Stopped")
                     print(f"   Transition: {self.transition.name} ({self.transition.id})")
                     print(f"   Expression: {expr}")
                     print(f"   Error: {exc}")
@@ -322,7 +322,7 @@ class ContinuousBehavior(TransitionBehavior):
                         except (ImportError, AttributeError, KeyError) as e:
                             logger.debug(f"Skipping function suggestion: {e}")
                     
-                    print(f"\n   Fix the rate expression before running simulation.\n")
+                    print("\n   Fix the rate expression before running simulation.\n")
                 
                 # Raise error to stop simulation
                 raise RuntimeError(

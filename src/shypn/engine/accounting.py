@@ -437,7 +437,7 @@ class TokenAccountingAuditor:
         
         # Statistics
         stats = report['statistics']
-        print(f"\nStatistics:")
+        print("\nStatistics:")
         print(f"  Total Firings: {stats['total_firings']}")
         print(f"  Total Consumed: {stats['total_consumed']:.2f}")
         print(f"  Total Produced: {stats['total_produced']:.2f}")
@@ -445,13 +445,13 @@ class TokenAccountingAuditor:
         print(f"  Violations: {stats['num_violations']}")
         
         # Token inventory
-        print(f"\nToken Inventory:")
+        print("\nToken Inventory:")
         print(f"  Initial: {sum(report['initial_tokens'].values()):.2f}")
         print(f"  Current: {sum(report['current_tokens'].values()):.2f}")
         print(f"  Expected: {sum(report['initial_tokens'].values()) + stats['net_change']:.2f}")
         
         # Per-place details
-        print(f"\nPer-Place Details:")
+        print("\nPer-Place Details:")
         for place_id in sorted(report['initial_tokens'].keys()):
             initial = report['initial_tokens'][place_id]
             current = report['current_tokens'][place_id]
@@ -472,7 +472,7 @@ class TokenAccountingAuditor:
                 
         # Transition summary
         if report['transition_summary']:
-            print(f"\nPer-Transition Summary:")
+            print("\nPer-Transition Summary:")
             for trans_id, summary in sorted(report['transition_summary'].items()):
                 print(f"  {trans_id}:")
                 print(f"    Firings: {summary['firings']}")

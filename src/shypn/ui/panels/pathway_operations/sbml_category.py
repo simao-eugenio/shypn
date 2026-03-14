@@ -909,7 +909,6 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
                 GLib.idle_add(self._show_parse_error, str(e))
         
         # Parse in background thread to avoid UI freeze
-        import threading
         thread = threading.Thread(target=parse_in_thread, daemon=True)
         thread.start()
     
@@ -1841,7 +1840,7 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
             self.project.add_pathway(pathway_doc)
             self.project.save()
             
-            self.logger.info(f"Pathway metadata saved to project")
+            self.logger.info("Pathway metadata saved to project")
             self.logger.info(f"Files saved - SBML: {dest_sbml_path}, Model: {model_filepath}")
             
             # Verify both files exist
@@ -2027,7 +2026,7 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
                 
                 # === METADATA ===
                 lines.append("=== METADATA ===")
-                lines.append(f"Source: SBML File")
+                lines.append("Source: SBML File")
                 
                 # Notes (if available)
                 notes = None
@@ -2431,7 +2430,7 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
             controller: SimulationController instance
         """
         self.controller = controller
-        self.logger.debug(f"Controller set for thermodynamic validation")
+        self.logger.debug("Controller set for thermodynamic validation")
     
     def on_tab_switched(self):
         """Called when the user switches to a different model tab.
@@ -2551,19 +2550,19 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
             
             # Update preview text
             preview_lines = [
-                f"=== MODEL INFO ===",
+                "=== MODEL INFO ===",
                 f"Name: {pathway_stub.name}",
                 f"Organism: {pathway_stub.organism}",
-                f"",
-                f"=== STATISTICS ===",
+                "",
+                "=== STATISTICS ===",
                 f"Species: {pathway_stub.species_count}",
                 f"Reactions: {pathway_stub.reactions_count}",
                 f"Parameters: {len(pathway_stub.parameters)}",
                 f"Compartments: {len(pathway_stub.compartments_enhanced)}",
                 f"Events: {pathway_stub.events_count}",
-                f"",
-                f"=== SOURCE ===",
-                f"Type: SBML Import",
+                "",
+                "=== SOURCE ===",
+                "Type: SBML Import",
                 f"Original File: {document.metadata.get('original_file', 'Unknown')}",
             ]
             
@@ -2575,7 +2574,7 @@ class SBMLCategory(BasePathwayCategory):  # type: ignore[misc]
             from gi.repository import GLib
             GLib.idle_add(update_preview)
             
-            self.logger.info(f"✅ SBML Metadata Inspector populated from saved data")
+            self.logger.info("✅ SBML Metadata Inspector populated from saved data")
             
         except Exception as e:
             self.logger.error(f"Failed to load PathwayData from metadata: {e}")

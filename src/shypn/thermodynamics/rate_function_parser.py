@@ -390,7 +390,7 @@ class RateFunctionParser:
         if properties and isinstance(properties, dict):
             self.logger.info(f"  Checking properties dict: {list(properties.keys())}")
             if properties.get('is_reversible'):
-                self.logger.info(f"  → REVERSIBLE (is_reversible flag)")
+                self.logger.info("  → REVERSIBLE (is_reversible flag)")
                 return True
             
             k_r = properties.get('k_reverse')
@@ -422,11 +422,11 @@ class RateFunctionParser:
         if rate_func:
             # Simple heuristic: contains minus sign (net rate) or explicit k_r
             if '-' in rate_func or 'k_r' in rate_func.lower() or 'reverse' in rate_func.lower():
-                self.logger.info(f"  → REVERSIBLE (rate_function contains '-' or 'k_r')")
+                self.logger.info("  → REVERSIBLE (rate_function contains '-' or 'k_r')")
                 return True
         
 
-        self.logger.info(f"  → NOT REVERSIBLE")
+        self.logger.info("  → NOT REVERSIBLE")
         return False
         
         # Also check in properties if not found as attribute

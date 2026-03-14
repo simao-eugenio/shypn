@@ -3529,6 +3529,17 @@ class ModelCanvasLoader:
                     if isinstance(obj, Transition):
                         if obj in self.right_panel_loader.transition_panel.selected_objects:
                             self.right_panel_loader.transition_panel.needs_update = True
+
+            # Notify all analysis panels (viability, topology, environment, report)
+            # that a model property was interactively changed.
+            try:
+                from shypn.core.document_id import doc_id
+                EventBus.emit('model.changed',
+                              {'object': obj, 'change_type': 'property'},
+                              document_id=doc_id(drawing_area))
+            except Exception:
+                pass
+
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         # Show dialog

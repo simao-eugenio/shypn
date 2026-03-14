@@ -118,7 +118,7 @@ class TransitionPartitioner:
         try:
             # Hash the signal layer assignment
             assignment_str = json.dumps(self.signal_layers, sort_keys=True)
-            return hashlib.md5(assignment_str.encode()).hexdigest()
+            return hashlib.md5(assignment_str.encode(), usedforsecurity=False).hexdigest()
         except (TypeError, ValueError) as e:
             logger.warning(f"Could not compute assignment hash: {e}")
             return ""

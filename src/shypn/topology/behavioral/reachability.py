@@ -132,7 +132,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             return AnalysisResult(
                 success=False,
                 errors=[
-                    f"⛔ Model likely has huge state space",
+                    "⛔ Model likely has huge state space",
                     f"   Places: {n_places}, Transitions: {n_transitions}",
                     f"   Estimated states: {estimated_states:,} (may be conservative)",
                     "",

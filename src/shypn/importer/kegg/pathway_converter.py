@@ -1585,8 +1585,8 @@ def convert_pathway_enhanced(pathway: KEGGPathway,
             import logging
             logger = logging.getLogger("KEGGConverter")
             logger.info("Applying signal classification to KEGG pathway...")
-            logger.info(f"Note: KEGG models have limited kinetic metadata. "
-                       f"Classification uses name patterns and topology primarily.")
+            logger.info("Note: KEGG models have limited kinetic metadata. "
+                       "Classification uses name patterns and topology primarily.")
             
             # Create model wrapper for classifier
             class ModelWrapper:

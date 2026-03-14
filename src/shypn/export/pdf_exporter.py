@@ -99,7 +99,9 @@ class PDFExporter(BaseExporter):
             raise ExportError(f"Cairo rendering error: {e}") from e
         except IOError as e:
             raise ExportError(f"File write error: {e}") from e
-        except (AttributeError, ValueError, TypeError) as e:
+        except ExportError:
+            raise
+        except Exception as e:
             raise ExportError(f"Unexpected error during PDF export: {e}") from e
     
     def export_with_options(self, manager, filepath: str, 

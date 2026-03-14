@@ -198,10 +198,10 @@ class TimedBehavior(TransitionBehavior):
                 
                 if kind != 'normal' or arc_type in ('inhibitor', 'test'):
                     required = arc.weight  # Just check presence for test arcs
-                    logger.debug(f"    → Test/Inhibitor arc: only checking presence")
+                    logger.debug("    → Test/Inhibitor arc: only checking presence")
                 else:
                     required = arc.weight  # Normal and SignalFlowArcs need full weight
-                    logger.debug(f"    → Normal arc: will consume tokens")
+                    logger.debug("    → Normal arc: will consume tokens")
 
                 # Hybrid PN: timed transitions are discrete — floor fractional tokens
                 # so that a place with e.g. 1.5 µM contributes 1 countable token.
@@ -296,7 +296,7 @@ class TimedBehavior(TransitionBehavior):
                     # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
                     # Inhibitor arcs DO consume tokens when threshold permits transition to fire
                     if arc_type == 'test':
-                        logger.debug(f"    → SKIP consumption (test arc - catalyst)")
+                        logger.debug("    → SKIP consumption (test arc - catalyst)")
                         continue
                     
                     source_place = arc.source

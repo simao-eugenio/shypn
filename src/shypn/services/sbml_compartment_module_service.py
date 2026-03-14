@@ -977,7 +977,7 @@ f"Classified {place.name} as {signal_type if isinstance(signal_type, str) else s
         if validation:
             score = validation.get('independence_score', 0)
             violations = validation.get('violations', [])
-            lines.append(f"\nValidation:")
+            lines.append("\nValidation:")
             lines.append(f"  Independence Score: {score:.1%}")
             lines.append(f"  Violations: {len(violations)}")
         

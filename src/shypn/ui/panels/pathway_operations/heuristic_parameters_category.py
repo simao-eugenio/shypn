@@ -524,7 +524,7 @@ class HeuristicParametersCategory(BasePathwayCategory):
             
             # Find simulation controller for this drawing area
             if hasattr(self.model_canvas_loader, 'simulation_controllers'):
-                self.logger.info(f"[RESET] simulation_controllers attribute exists")
+                self.logger.info("[RESET] simulation_controllers attribute exists")
                 self.logger.info(f"[RESET] Available controllers: {list(self.model_canvas_loader.simulation_controllers.keys())}")
                 
                 if drawing_area in self.model_canvas_loader.simulation_controllers:

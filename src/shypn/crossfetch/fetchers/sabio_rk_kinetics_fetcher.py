@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import fromstring as _safe_fromstring
 from datetime import datetime
 
 from .base_fetcher import BaseFetcher
@@ -75,7 +76,7 @@ class SabioRKKineticsFetcher(BaseFetcher):
                 xml_content = response.read().decode('utf-8')
             
             # Parse SBML
-            root = ET.fromstring(xml_content)
+            root = _safe_fromstring(xml_content)
             
             # Extract parameters
             parameters = self._parse_sbml_parameters(root, ec_number, organism)

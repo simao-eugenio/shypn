@@ -58,7 +58,7 @@ class HTMLGenerator(BaseDocumentGenerator):
         # Title
         model_name = html.escape(metadata.get("basic", {}).get("model_name", "Untitled Model"))
         html_parts.append(f'<h1 class="title">{model_name}</h1>')
-        html_parts.append(f'<p class="subtitle">Technical Report</p>')
+        html_parts.append('<p class="subtitle">Technical Report</p>')
         html_parts.append(f'<p class="generation-date">Generated: {generation_date}</p>')
         
         # Basic Information
@@ -555,7 +555,7 @@ class HTMLGenerator(BaseDocumentGenerator):
         model_data = report_data.get('model', {})
         if model_data and model_data.get('has_data'):
             structure = model_data.get('structure', {})
-            html_parts.append(f'<p><strong>Model Structure:</strong> ')
+            html_parts.append('<p><strong>Model Structure:</strong> ')
             html_parts.append(f'{structure.get("places_count", 0)} species, ')
             html_parts.append(f'{structure.get("transitions_count", 0)} reactions, ')
             html_parts.append(f'{structure.get("arcs_count", 0)} connections</p>')
@@ -564,7 +564,7 @@ class HTMLGenerator(BaseDocumentGenerator):
         topology_data = report_data.get('topology', {})
         if topology_data and topology_data.get('has_data'):
             stats = topology_data.get('statistics', {})
-            html_parts.append(f'<p><strong>Topology Analysis:</strong> ')
+            html_parts.append('<p><strong>Topology Analysis:</strong> ')
             html_parts.append(f'{stats.get("p_invariants", 0)} P-invariants, ')
             html_parts.append(f'{stats.get("t_invariants", 0)} T-invariants, ')
             status = topology_data.get('status', 'analyzed')
@@ -577,7 +577,7 @@ class HTMLGenerator(BaseDocumentGenerator):
             species_count = len(sim_data.get('species', []))
             reactions_count = len(sim_data.get('reactions', []))
             if species_count > 0 or reactions_count > 0:
-                html_parts.append(f'<p><strong>Simulation Data:</strong> ')
+                html_parts.append('<p><strong>Simulation Data:</strong> ')
                 if species_count > 0:
                     html_parts.append(f'{species_count} species tracked')
                 if reactions_count > 0:
@@ -734,13 +734,13 @@ class HTMLGenerator(BaseDocumentGenerator):
             if time_step is not None:
                 html_parts.append(f'<tr><th>Time Step (dt)</th><td>{time_step:.4f} s</td></tr>')
             else:
-                html_parts.append(f'<tr><th>Time Step (dt)</th><td>Not set</td></tr>')
+                html_parts.append('<tr><th>Time Step (dt)</th><td>Not set</td></tr>')
             
             target_duration = sim_params.get('target_duration')
             if target_duration is not None:
                 html_parts.append(f'<tr><th>Target Duration</th><td>{target_duration:.2f} s</td></tr>')
             else:
-                html_parts.append(f'<tr><th>Target Duration</th><td>Not set</td></tr>')
+                html_parts.append('<tr><th>Target Duration</th><td>Not set</td></tr>')
             
             actual_duration = sim_params.get('actual_duration', 0)
             html_parts.append(f'<tr><th>Actual Duration</th><td>{actual_duration:.2f} s</td></tr>')

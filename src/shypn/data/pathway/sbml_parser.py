@@ -108,7 +108,7 @@ class SBMLParser:
             for i in range(document.getNumErrors()):
                 error = document.getError(i)
                 errors.append(f"  - {error.getMessage()}")
-            raise ValueError(f"SBML parsing errors:\n" + "\n".join(errors))
+            raise ValueError("SBML parsing errors:\n" + "\n".join(errors))
         
         # Get model
         model = document.getModel()
@@ -659,7 +659,7 @@ class SBMLParser:
             for i in range(document.getNumErrors()):
                 error = document.getError(i)
                 errors.append(f"  - {error.getMessage()}")
-            raise ValueError(f"SBML parsing errors:\n" + "\n".join(errors))
+            raise ValueError("SBML parsing errors:\n" + "\n".join(errors))
         
         model = document.getModel()
         if model is None:

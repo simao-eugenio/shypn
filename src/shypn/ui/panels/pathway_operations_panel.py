@@ -381,7 +381,7 @@ class PathwayOperationsPanel(Gtk.Box):
             content = info_bar.get_content_area()
             message = Gtk.Label()
             if count == 1:
-                message.set_markup(f"<b>✓ Executed 1 pending action</b>")
+                message.set_markup("<b>✓ Executed 1 pending action</b>")
             else:
                 message.set_markup(f"<b>✓ Executed {count} pending actions</b>")
             content.add(message)

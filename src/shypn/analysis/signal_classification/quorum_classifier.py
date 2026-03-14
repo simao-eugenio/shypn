@@ -155,7 +155,7 @@ class QuorumSignalClassifier(BaseSignalClassifier):
             # Threshold activation: if place > threshold
             if (f'{place_name} >' in rate_func or 
                 f'{place_name} <' in rate_func or
-                f'/ (K' in rate_func):
+                '/ (K' in rate_func):
                 threshold_count += 1
         
         # Strong evidence of regulatory use (typical for quorum signals)

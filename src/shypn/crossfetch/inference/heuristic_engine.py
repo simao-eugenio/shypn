@@ -1650,10 +1650,10 @@ class HeuristicInferenceEngine:
         locality_score = stoich['locality_score']
         if locality_score > 10:  # High concentration of substrates
             vmax *= 1.3  # Faster reaction with abundant substrates
-            notes += f" | High substrate locality (×1.3 Vmax)"
+            notes += " | High substrate locality (×1.3 Vmax)"
         elif locality_score < 1:  # Low substrate availability
             vmax *= 0.7
-            notes += f" | Low substrate locality (×0.7 Vmax)"
+            notes += " | Low substrate locality (×0.7 Vmax)"
         
         return ContinuousParameters(
             biological_semantics=params.biological_semantics,
@@ -1718,10 +1718,10 @@ class HeuristicInferenceEngine:
         locality_score = stoich['locality_score']
         if locality_score > 10:
             lambda_param *= 1.5  # More molecules → More frequent reactions
-            notes += f" | High locality (×1.5 rate)"
+            notes += " | High locality (×1.5 rate)"
         elif locality_score < 1:
             lambda_param *= 0.5
-            notes += f" | Low locality (×0.5 rate)"
+            notes += " | Low locality (×0.5 rate)"
         
         return StochasticParameters(
             biological_semantics=params.biological_semantics,

@@ -300,10 +300,10 @@ class BRENDAAPIClient:
                 self.logger.info(f"[BRENDA_RAW] EC {ec_number} response preview: {result_str}")
             else:
                 self.logger.warning(f"[BRENDA_RAW] EC {ec_number} returned None/empty response")
-                self.logger.warning(f"[BRENDA_RAW] This likely means:")
+                self.logger.warning("[BRENDA_RAW] This likely means:")
                 self.logger.warning(f"[BRENDA_RAW]   1. BRENDA database has no Km data for EC {ec_number}")
-                self.logger.warning(f"[BRENDA_RAW]   2. Your account lacks SOAP API data access (free academic accounts)")
-                self.logger.warning(f"[BRENDA_RAW]   3. EC number is invalid or obsolete")
+                self.logger.warning("[BRENDA_RAW]   2. Your account lacks SOAP API data access (free academic accounts)")
+                self.logger.warning("[BRENDA_RAW]   3. EC number is invalid or obsolete")
             
             # Parse result
             parsed = self._parse_km_response(result)

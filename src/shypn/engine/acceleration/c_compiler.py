@@ -55,7 +55,7 @@ _GCC_FLAGS_SAFE = [
 # Embedding this in the cache directory name ensures that changing flags
 # (e.g. adding -march=native) triggers automatic recompilation instead of
 # silently reusing a stale .so built with different flags.
-_FLAGS_HASH: str = hashlib.md5(" ".join(_GCC_FLAGS).encode()).hexdigest()[:6]
+_FLAGS_HASH: str = hashlib.md5(" ".join(_GCC_FLAGS).encode(), usedforsecurity=False).hexdigest()[:6]
 
 _CACHE_BASE = Path.home() / ".cache" / "shypn" / "ode_accel"
 

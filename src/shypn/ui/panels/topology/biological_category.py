@@ -459,7 +459,7 @@ class BiologicalCategory(BaseTopologyCategory):
                 arc_id = issue.get('arc_id', '')
 
                 rows.append((
-                    f'⚠️ Validation Issue',
+                    '⚠️ Validation Issue',
                     issue_type.replace('_', ' ').title(),
                     message[:60],
                     0.5,

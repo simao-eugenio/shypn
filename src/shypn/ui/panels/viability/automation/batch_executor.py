@@ -355,7 +355,6 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
     from .property_path_parser import parse_property_path, apply_property_to_object, resolve_object
     
     # DEBUG: File-based logging for worker process
-    import os
     debug_log = os.path.expanduser("~/sweep_debug.log")
     
     if not snapshot:

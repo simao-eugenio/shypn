@@ -190,6 +190,11 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         """
         # Unsubscribe from EventBus
         EventBus.unsubscribe('document.focused', self._on_document_focused)
+        if self.document_id:
+            try:
+                EventBus.unsubscribe('model.changed', self._on_model_changed)
+            except Exception:
+                pass
         
         # Clear all results
         if self.panel and hasattr(self.panel, 'clear_all_results'):
@@ -203,6 +208,14 @@ class TopologyPanelLoader(PerDocumentPanelLoader):
         super().initialize()
         # Subscribe to document.focused events for automatic tab switching
         EventBus.subscribe('document.focused', self._on_document_focused)
+        if self.document_id:
+            EventBus.subscribe('model.changed', self._on_model_changed,
+                               document_id=self.document_id)
+
+    def _on_model_changed(self, data):
+        """Refresh topology panel when interactive model changes occur (e.g. property dialog save)."""
+        if self.panel:
+            GLib.idle_add(self.panel.refresh)
     
     def _on_document_focused(self, data):
         """Handle document.focused events for automatic panel swapping.

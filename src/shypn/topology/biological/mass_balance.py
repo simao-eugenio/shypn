@@ -422,7 +422,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         rate = statistics['balance_rate'] * 100
         
         lines = [
-            f"Mass Balance Analysis Summary:",
+            "Mass Balance Analysis Summary:",
             f"  Total transitions: {total}",
             f"  Balanced: {balanced} ({rate:.1f}%)",
             f"  Unbalanced: {unbalanced}",
@@ -436,7 +436,7 @@ class MassBalanceAnalyzer(TopologyAnalyzer):
         elif incomplete > 0:
             lines.append(f"\n⚠️ {incomplete} reaction(s) cannot be verified (missing formulas)")
         else:
-            lines.append(f"\n✓ All reactions are balanced")
+            lines.append("\n✓ All reactions are balanced")
         
         return "\n".join(lines)
     

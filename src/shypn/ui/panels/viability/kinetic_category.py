@@ -227,7 +227,7 @@ class KineticCategory(BaseViabilityCategory):
                     category="kinetic",
                     parameters={'rate': 10.0},
                     confidence=0.4,
-                    reasoning=f"Increase rate to enable firing (verify structural connectivity first)",
+                    reasoning="Increase rate to enable firing (verify structural connectivity first)",
                     preview_elements=[first_trans]
                 )
                 issue.suggestions = [suggestion]

@@ -361,7 +361,7 @@ class CompoundDatabase:
                         api_notes = None
                 else:
                     # API unavailable (SSL, network, etc)
-                    logger.warning(f"eQuilibrator API unavailable")
+                    logger.warning("eQuilibrator API unavailable")
                     api_notes = None
                     
             except ImportError as e:
@@ -373,13 +373,13 @@ class CompoundDatabase:
         
         elif source == "brenda":
             # BRENDA support planned for Week 3
-            logger.info(f"BRENDA support not yet implemented (Week 3)")
+            logger.info("BRENDA support not yet implemented (Week 3)")
             api_notes = None
         
         # If API fetch failed, return None (user can enter manually)
         if delta_g_formation is None:
             logger.warning(f"No thermodynamic data available for {compound_id} from {source}")
-            logger.info(f"User can enter data manually or try different compound ID")
+            logger.info("User can enter data manually or try different compound ID")
             return None
         
         # Build complete response

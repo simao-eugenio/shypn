@@ -130,7 +130,7 @@ class SignalLayerDetector:
             arcs_count = len(self.model.arcs) if hasattr(self.model, 'arcs') else 0
             
             model_signature = f"{places_count}:{trans_count}:{arcs_count}"
-            return hashlib.md5(model_signature.encode()).hexdigest()
+            return hashlib.md5(model_signature.encode(), usedforsecurity=False).hexdigest()
         except Exception as e:
             logger.warning(f"Could not compute model hash: {e}")
             return ""

@@ -89,6 +89,9 @@ class ReportPanelLoader:
         
         # Subscribe to document.focused events for automatic tab switching
         EventBus.subscribe('document.focused', self._on_document_focused)
+        if self.document_id:
+            EventBus.subscribe('model.changed', self._on_model_changed,
+                               document_id=self.document_id)
         
         self.logger.info("Report panel loaded")
         
@@ -379,12 +382,23 @@ class ReportPanelLoader:
             # This is NOT our document - hide
             self.widget.hide()
     
+    def _on_model_changed(self, data):
+        """Refresh report when interactive model changes occur (e.g. property dialog save)."""
+        if self.panel and hasattr(self.panel, 'refresh_all'):
+            from gi.repository import GLib
+            GLib.idle_add(self.panel.refresh_all)
+
     def cleanup(self):
         """Clean up resources."""
         self.logger.info("Cleaning up Report Panel loader")
         
         # Unsubscribe from EventBus
         EventBus.unsubscribe('document.focused', self._on_document_focused)
+        if self.document_id:
+            try:
+                EventBus.unsubscribe('model.changed', self._on_model_changed)
+            except Exception:
+                pass
         
         if self.panel and hasattr(self.panel, 'cleanup'):
             self.panel.cleanup()

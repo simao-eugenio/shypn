@@ -182,7 +182,7 @@ class AnalysesPanelLoader(PerDocumentPanelLoader):
             self.panel.context_menu_handler = handler
             logger.debug(f"[ANALYSES_PANEL] Context menu handler set on panel: place_panel={handler.place_panel is not None}, transition_panel={handler.transition_panel is not None}")
         else:
-            logger.warning(f"[ANALYSES_PANEL] Cannot set context menu handler: panel is None")
+            logger.warning("[ANALYSES_PANEL] Cannot set context menu handler: panel is None")
     
     # ========================================================================
     # Legacy Compatibility Layer
