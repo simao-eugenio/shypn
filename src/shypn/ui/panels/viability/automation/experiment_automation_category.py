@@ -1169,6 +1169,34 @@ class ExperimentAutomationCategory:
             (batch_path / '.partial').write_text('\n'.join(save_errors))
             print(f'[AUTO-SAVE] ⚠️  Partial save for "{name}": {save_errors}')
 
+        # ── Memory cleanup ──────────────────────────────────────────────────
+        # Both heavy fields are now on disk; drop them from the in-memory
+        # result dict so Python can reclaim the RAM.
+        #
+        # • compressed_trajectories : 100 reps × ~1 400 kept-points (at 5 s
+        #   min_gap) × 30 channels × ~30 B each ≈ 120 MB as Python lists.
+        # • species_statistics       : 29 places × 8 arrays × 10 001 floats
+        #   ≈ 64 MB as Python boxed floats.
+        #
+        # Replace species_statistics with a tiny final-value summary so
+        # subsequent get_result() calls still return sensible numbers.
+        result.pop('compressed_trajectories', None)
+        _stats = result.get('statistics')
+        if _stats:
+            _ss = _stats.get('species_statistics', {})
+            if _ss:
+                _final = {}
+                for _sid, _sdata in _ss.items():
+                    _final[_sid] = {
+                        'mean_final': (_sdata.get('mean')  or [None])[-1],
+                        'std_final':  (_sdata.get('std')   or [None])[-1],
+                        'min_final':  (_sdata.get('min')   or [None])[-1],
+                        'max_final':  (_sdata.get('max')   or [None])[-1],
+                    }
+                _stats['species_statistics'] = _final
+            _stats.pop('time_points', None)
+        import gc as _save_gc; _save_gc.collect()
+
     def _get_project_folder(self) -> str:
         """Get current project folder path for auto-save.
         
