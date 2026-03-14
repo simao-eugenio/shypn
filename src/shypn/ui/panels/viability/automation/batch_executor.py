@@ -303,23 +303,34 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
             }
 
             # Compress raw trajectories with δ-filter before discarding raw data.
+            # min_gap default: 5.0 s — on a 0.72 s SSA step almost every step
+            # triggers the delta-filter (discrete token changes hit the 2% threshold
+            # at molecule-scale); a 5 s minimum gap lifts compression from ~2× to
+            # ~7×, reducing compressed_trajectories size before IPC pickle.
             worker_compressed: list = []
+            _n_replicates_count = len(results)  # save before del
             try:
                 from shypn.helpers.compressor import DeltaFilterCompressor
                 _cmp = DeltaFilterCompressor(
                     epsilon=args.get('compressor_epsilon', 0.02),
                     max_gap=args.get('compressor_max_gap', 300.0),
-                    min_gap=args.get('compressor_min_gap', 0.0),
+                    min_gap=args.get('compressor_min_gap', 5.0),
                 )
                 worker_compressed = _cmp.compress_batch(results)
             except Exception as _ce:
                 print(f'[WORKER] Warning: trajectory compression failed: {_ce}')
 
+            # Free raw trajectory data (~100–250 MB) before building the return
+            # dict, which is pickled for IPC.  Without this explicit delete the
+            # raw results list stays in scope during pickling, doubling peak RAM.
+            del results
+            import gc as _worker_gc; _worker_gc.collect()
+
             return {
                 'name': name,
                 'snapshot_index': args['snapshot_index'],
                 'statistics': statistics,
-                'n_replicates': len(results),
+                'n_replicates': _n_replicates_count,
                 'duration': elapsed_time,
                 'elapsed_time': elapsed_time,
                 'status': 'success',
@@ -932,10 +943,11 @@ class BatchExecutor:
         try:
             # Determine number of workers
             if n_workers is None:
-                # Use half the logical cores: leaves the rest for the GTK UI
-                # thread, auto-save I/O threads, and OS scheduling.  Using
-                # (cpu_count - 1) caused CPU saturation when BLAS operations
-                # inside worker processes also tried to use all cores.
+                # Use half the logical cores (= physical core count on HT
+                # systems).  The other half covers: GTK UI thread, VS Code,
+                # auto-save I/O threads, OS scheduling.  cpu_count-1 left only
+                # 1 logical core for everything else and caused app + IDE
+                # crashes under sustained parallel load.
                 n_workers = max(1, multiprocessing.cpu_count() // 2)
 
             # Use 'forkserver' context: workers are forked from a clean server
@@ -1003,16 +1015,24 @@ class BatchExecutor:
             # interrupted.
             
             with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
-                # Submit all experiments with start time tracking
+                # Submit all experiments with start time tracking.
+                # The first n_workers slots are picked up immediately; the rest
+                # wait in the pool's internal task queue.  Reflect that in the
+                # UI: mark the first n_workers as "running" and the remainder
+                # as "queued".  They are promoted to "running" on first heartbeat.
                 async_results = []
-                for args in experiment_args:
+                already_started: set = set()
+                for i, args in enumerate(experiment_args):
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
                     start_time = time.time()
                     async_results.append((args['queue_index'], args['name'], async_result, start_time))
 
-                    # Set initial running status when experiment is submitted
                     if progress_callback:
-                        progress_callback(args['queue_index'], "running", "0%")
+                        if i < n_workers:
+                            progress_callback(args['queue_index'], "running", "0%")
+                            already_started.add(args['queue_index'])
+                        else:
+                            progress_callback(args['queue_index'], "pending", "pending")
 
                 # Zombie detection: kill a worker only when it goes SILENT, not merely slow.
                 # A legitimate computation that takes longer than any estimate must not be
@@ -1049,6 +1069,10 @@ class BatchExecutor:
                                 queue_idx, progress_fraction = progress_queue.get_nowait()
                                 last_heartbeat[queue_idx] = current_time  # worker is alive
                                 if progress_callback:
+                                    # First heartbeat from a queued experiment → promote to running
+                                    if queue_idx not in already_started:
+                                        already_started.add(queue_idx)
+                                        progress_callback(queue_idx, "running", "0%")
                                     progress_pct = int(progress_fraction * 100)
                                     progress_callback(queue_idx, "running", f"{progress_pct}%")
                             except (OSError, EOFError, ValueError) as e:
@@ -1158,7 +1182,14 @@ class BatchExecutor:
             # Reset execution state
             self.is_running = False
             self.current_experiment = None
-            
+
+            # Prompt Python to release memory accumulated during the batch.
+            # self.results entries have already been forwarded to the UI via
+            # experiment_result_callback and heavy fields stripped by the
+            # auto-save thread; a GC pass here reclaims any residual objects
+            # (numpy temporaries, closed-over lambda refs, etc.).
+            import gc as _batch_gc; _batch_gc.collect()
+
             if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
