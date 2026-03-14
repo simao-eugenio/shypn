@@ -69,7 +69,7 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
         try:
             # Check if scipy is available
             try:
-                from scipy.optimize import linprog
+                from scipy.optimize import linprog  # noqa: F401
                 has_scipy = True
             except ImportError:
                 has_scipy = False

@@ -11,9 +11,12 @@ Author: Simão Eugénio
 Date: November 11, 2025
 """
 
+import logging
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class PatternType(Enum):

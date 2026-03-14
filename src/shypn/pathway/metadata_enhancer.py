@@ -8,10 +8,17 @@ Enriches Petri net elements with additional metadata from KEGG pathway:
 - Compartment detection
 """
 
-from typing import Optional, Dict, List
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional, Dict, List
 import logging
 
 from shypn.pathway.base import PostProcessorBase
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway, KEGGEntry, KEGGReaction
+    from shypn.pathway.options import EnhancementOptions
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +37,8 @@ class MetadataEnhancer(PostProcessorBase):
     Example:
         from shypn.pathway.metadata_enhancer import MetadataEnhancer
         from shypn.pathway.options import EnhancementOptions
+
+
         
         options = EnhancementOptions(
             metadata_extract_names=True,

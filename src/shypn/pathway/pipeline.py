@@ -4,12 +4,18 @@ This module implements the pipeline that chains multiple enhancement
 processors together and manages their execution.
 """
 
-from typing import List, Optional, Dict, Any
+from __future__ import annotations
+from typing import TYPE_CHECKING, List, Optional, Dict, Any
 import logging
 import time
 
 from shypn.pathway.base import PostProcessorBase, ProcessorError
 from shypn.pathway.options import EnhancementOptions
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +35,8 @@ class EnhancementPipeline:
         from shypn.pathway import EnhancementPipeline, EnhancementOptions
         from shypn.pathway.layout_optimizer import LayoutOptimizer
         from shypn.pathway.arc_router import ArcRouter
+
+
         
         options = EnhancementOptions()
         pipeline = EnhancementPipeline(options)

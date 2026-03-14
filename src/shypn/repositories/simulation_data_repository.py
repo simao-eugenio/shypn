@@ -8,6 +8,7 @@ Part of Phase 3.2: Repository Pattern Implementation.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -15,6 +16,8 @@ from shypn.repositories.base_repository import (
     BaseRepository,
     RepositoryIOError
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SimulationTrajectory:

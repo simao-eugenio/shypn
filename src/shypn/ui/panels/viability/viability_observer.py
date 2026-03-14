@@ -27,9 +27,6 @@ from datetime import datetime
 try:
     from shypn.viability.pattern_recognition import (
         PatternRecognitionEngine,
-        PatternType,
-        Pattern,
-        RepairSuggestion
     )
     PATTERN_ENGINE_AVAILABLE = True
 except ImportError:

@@ -8,9 +8,14 @@ Classes:
     PathwayDocument: Represents an imported pathway with metadata and enrichments
 """
 
+from __future__ import annotations
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Any
+
+
+if TYPE_CHECKING:
+    from shypn.data.enrichment_document import EnrichmentDocument
 
 
 class PathwayDocument:
@@ -109,6 +114,8 @@ class PathwayDocument:
         """
         # Import here to avoid circular dependency
         from .enrichment_document import EnrichmentDocument
+
+
         
         doc = cls(
             id=data.get('id'),

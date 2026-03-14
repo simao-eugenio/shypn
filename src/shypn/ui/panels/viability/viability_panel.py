@@ -2564,6 +2564,7 @@ class ViabilityPanel(Gtk.Box):
     
     # Context menu handlers moved to SubnetParametersView class
     # These stub methods exist for backward compatibility but delegate to SubnetParametersView
+    def _on_places_table_button_press(self, treeview, event):
         """Handle right-click on places table to show context menu."""
         if event.button == 3:  # Right-click
             # Get clicked row

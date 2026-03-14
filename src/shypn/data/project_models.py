@@ -10,18 +10,23 @@ Classes:
     ModelDocument: Represents an individual Petri net model within a project
 """
 
+from __future__ import annotations
 import logging
 import os
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 from .pathway_document import PathwayDocument
 from .project_pathway_manager import ProjectPathwayManager
+
+
+if TYPE_CHECKING:
+    from shypn.data.project_file_observer import ProjectFileObserver
 
 
 class ModelDocument:
@@ -1132,6 +1137,8 @@ class ProjectManager:
         
         # Create ZIP archive
         import shutil
+
+
         try:
             # shutil.make_archive expects base name without extension
             base_name = archive_path.rsplit('.zip', 1)[0] if archive_path.endswith('.zip') else archive_path

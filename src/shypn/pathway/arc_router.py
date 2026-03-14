@@ -11,11 +11,18 @@ Implementation Strategy:
     5. Store control points in Arc objects
 """
 
-from typing import Optional, List, Tuple, Dict
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional, List, Tuple, Dict
 import logging
 import math
 
 from shypn.pathway.base import PostProcessorBase
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway
+    from shypn.pathway.options import EnhancementOptions
 
 
 logger = logging.getLogger(__name__)
@@ -97,6 +104,8 @@ class ArcRouter(PostProcessorBase):
             dict: Mapping from (source_id, source_type, target_id, target_type) to list of Arc objects
         """
         from shypn.netobjs.place import Place
+
+
         
         groups = {}
         for arc in arcs:

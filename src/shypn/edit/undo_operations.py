@@ -4,7 +4,10 @@ Currently implements MoveOperation for object position changes.
 DeleteOperation stub included for future expansion.
 """
 
+import logging
 from typing import Dict, Tuple, List
+
+logger = logging.getLogger(__name__)
 
 
 class MoveOperation:

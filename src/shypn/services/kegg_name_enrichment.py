@@ -9,6 +9,7 @@ because API queries are slow and should be opt-in.
 
 import re
 import time
+import urllib.error
 from typing import Dict, Optional
 from dataclasses import dataclass
 

@@ -71,7 +71,7 @@ class CoordinateEnricher(EnricherBase):
         changes = []
         
         try:
-            import libsbml
+            import libsbml  # noqa: F401
             
             # Extract coordinate data from fetch result
             coord_data = fetch_result.data

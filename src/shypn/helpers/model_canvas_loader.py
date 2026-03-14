@@ -45,7 +45,7 @@ except ImportError as e:
     print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr, flush=True)
     ModuleRenderer = None
 try:
-    from shypn.netobjs import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc  # noqa: F401
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
     sys.exit(1)
@@ -55,20 +55,18 @@ except ImportError as e:
     print(f'ERROR: Cannot import CanvasOverlayManager: {e}', file=sys.stderr)
     sys.exit(1)
 try:
-    from shypn.edit.palette_manager import PaletteManager
-    from shypn.edit.tools_palette_new import ToolsPalette
-    from shypn.edit.operations_palette_new import OperationsPalette
+    from shypn.edit.tools_palette_new import ToolsPalette  # noqa: F401
+    from shypn.edit.operations_palette_new import OperationsPalette  # noqa: F401
     # SwissKnifePalette - unified palette replacing ToolsPalette + OperationsPalette
     # PHASE 3 COMPLETE: Using new modular architecture with constant height + parameter panels
-    from shypn.helpers.swissknife_palette_new import SwissKnifePalette
-    from shypn.helpers.swissknife_tool_registry import ToolRegistry
+    from shypn.helpers.swissknife_palette_new import SwissKnifePalette  # noqa: F401
 except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
 # Import simulation controller for state-based permissions
 try:
-    from shypn.engine.simulation.controller import SimulationController
+    from shypn.engine.simulation.controller import SimulationController  # noqa: F401
     # Import IDManager lifecycle integration
     from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
 except ImportError as e:
@@ -560,6 +558,7 @@ class ModelCanvasLoader:
                 # doesn't exist in canvas_managers yet when this hook fires.
 
                 # Ensure lifecycle active canvas and ID scope are set
+                drawing_area = self._get_drawing_area_from_page(child)
                 if drawing_area:
                     if self.lifecycle_adapter:
                         try:
