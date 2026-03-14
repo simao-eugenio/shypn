@@ -943,12 +943,11 @@ class BatchExecutor:
         try:
             # Determine number of workers
             if n_workers is None:
-                # Use half the logical cores (= physical core count on HT
-                # systems).  The other half covers: GTK UI thread, VS Code,
-                # auto-save I/O threads, OS scheduling.  cpu_count-1 left only
-                # 1 logical core for everything else and caused app + IDE
-                # crashes under sustained parallel load.
-                n_workers = max(1, multiprocessing.cpu_count() // 2)
+                # Reserve 2 logical cores for the GTK UI thread, VS Code, OS
+                # scheduler, and auto-save I/O threads; give the rest to sweep
+                # workers.  On a 12-logical-core machine this yields 10 workers
+                # while keeping the app responsive.
+                n_workers = max(1, multiprocessing.cpu_count() - 2)
 
             # Use 'forkserver' context: workers are forked from a clean server
             # process that was started before GTK/Numba were loaded, so they
