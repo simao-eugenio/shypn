@@ -957,9 +957,14 @@ class BatchExecutor:
             # including all loaded GTK shared-memory segments).
             _mp_ctx = multiprocessing.get_context('forkserver')
 
-            # Create shared progress queue for workers to report back
-            manager = _mp_ctx.Manager()
-            progress_queue = manager.Queue()
+            # Create shared progress queue for workers to report back.
+            # Use a plain multiprocessing.Queue (OS pipe) rather than a
+            # manager.Queue() proxy.  manager.Queue() requires a separate
+            # Manager server process; if that process is OOM-killed the
+            # workers silently lose the ability to send heartbeats, causing
+            # false zombie timeouts after ZOMBIE_SILENCE_S.  A plain Queue
+            # survives as long as either end is alive.
+            progress_queue = _mp_ctx.Queue(maxsize=0)  # unbounded
             
             # Prepare experiment arguments for workers
             experiment_args = []
@@ -1013,7 +1018,8 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
+            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as _initial_pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
+                pool = _initial_pool  # may be replaced after zombie restart
                 # Submit all experiments with start time tracking.
                 # The first n_workers slots are picked up immediately; the rest
                 # wait in the pool's internal task queue.  Reflect that in the
@@ -1084,18 +1090,33 @@ class BatchExecutor:
 
                     # Check completed experiments and detect zombies
                     still_running = []
+                    zombie_detected = False
                     for queue_index, name, async_result, start_time in async_results:
                         elapsed = current_time - start_time
                         silence = current_time - last_heartbeat.get(queue_index, start_time)
 
                         if silence > ZOMBIE_SILENCE_S:
-                            # ZOMBIE DETECTED: worker has been silent too long
+                            # ZOMBIE DETECTED: worker has been silent too long.
+                            # Kill both the hung worker process (releasing its RAM
+                            # and CPU) and the pool so remaining pending experiments
+                            # can be dispatched to fresh workers.
+                            zombie_detected = True
                             print(
                                 f"[BATCH] ⚠️ ZOMBIE: {name} silent for {silence:.0f}s "
                                 f"(threshold {ZOMBIE_SILENCE_S:.0f}s, total elapsed {elapsed:.0f}s)"
                             )
+                            # Attempt to SIGKILL individual worker process.
+                            # multiprocessing.pool does not expose per-task PIDs
+                            # directly, but the worker's OS pid is accessible via
+                            # pool._pool list.  As a robust fallback we terminate the
+                            # whole pool; it gets recreated below.
                             try:
-                                pass  # Cannot kill individual async_result; pool.terminate() below
+                                import os as _os, signal as _signal
+                                for _w in pool._pool:
+                                    try:
+                                        _os.kill(_w.pid, _signal.SIGKILL)
+                                    except (ProcessLookupError, PermissionError):
+                                        pass
                             except (AttributeError, OSError):
                                 pass
 
@@ -1162,6 +1183,32 @@ class BatchExecutor:
                             still_running.append((queue_index, name, async_result, start_time))
 
                     async_results = still_running
+
+                    # If zombies were killed above, the pool's worker processes are
+                    # gone.  The pool object itself is now broken and will never
+                    # dispatch the remaining async_results.  Terminate it cleanly,
+                    # restart with fresh workers, and re-submit the still-pending
+                    # experiments so they get a chance to complete.
+                    if zombie_detected and async_results and not self.is_cancelled:
+                        print(
+                            f"[BATCH] Restarting pool after zombie kill "
+                            f"({len(async_results)} experiments remain)"
+                        )
+                        try:
+                            pool.terminate()
+                            pool.join()
+                        except Exception:
+                            pass
+                        pool = _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1)
+                        # Re-submit remaining experiments to the fresh pool.
+                        resubmitted = []
+                        for queue_index, name, _old_result, start_time in async_results:
+                            matching = [a for a in experiment_args if a['queue_index'] == queue_index]
+                            if matching:
+                                new_result = pool.apply_async(_worker_run_experiment, (matching[0],))
+                                last_heartbeat[queue_index] = time.time()  # reset silence clock
+                                resubmitted.append((queue_index, name, new_result, time.time()))
+                        async_results = resubmitted
                 
                 # Handle cancellation
                 if self.is_cancelled:
@@ -1172,6 +1219,15 @@ class BatchExecutor:
                     for queue_index, name, async_result, start_time in async_results:
                         if progress_callback:
                             progress_callback(queue_index, "cancelled", "Cancelled")
+
+            # If pool was replaced after a zombie restart, the new pool was not
+            # managed by the `with` block; terminate it now.
+            if pool is not _initial_pool:
+                try:
+                    pool.terminate()
+                    pool.join()
+                except Exception:
+                    pass
         
         except Exception as e:
             import traceback
