@@ -131,6 +131,11 @@ class PropensityAccelerator:
         a_net, a_fwd, a_rev = accel.compute(current_time)
     """
 
+    # Class-level flag: prune the on-disk cache at most once per interpreter
+    # session (avoids repeated filesystem scans when many instances are created,
+    # as happens in parallel sweep workers).
+    _cache_pruned: bool = False
+
     def __init__(self, model: Any, get_behavior: Callable[[Any], Any]) -> None:
         self._model = model
         self._get_behavior = get_behavior
@@ -201,6 +206,15 @@ class PropensityAccelerator:
         Returns True on success, False on any failure.
         """
         try:
+            # Prune stale cache entries once per interpreter session so the
+            # ~/.cache/shypn/ode_accel/ directory does not grow unboundedly.
+            if not PropensityAccelerator._cache_pruned:
+                PropensityAccelerator._cache_pruned = True
+                try:
+                    from shypn.engine.acceleration.c_compiler import prune_cache
+                    prune_cache()
+                except Exception:
+                    pass
             self._analyse_model()
             if not self._specs:
                 logger.debug(
@@ -217,7 +231,24 @@ class PropensityAccelerator:
                 lib_name="propensity_fn",
                 model_hash=self._model_hash,
             )
-            self._load_so(so_path)
+            try:
+                self._load_so(so_path)
+            except (OSError, AttributeError) as load_exc:
+                # .so exists but symbol is missing or the file is corrupt
+                # (e.g. a previous process crashed mid-rename).  Delete and
+                # force a fresh compilation, then try once more.
+                logger.warning(
+                    "PropensityAccelerator: cached .so failed to load (%s); "
+                    "deleting and recompiling …", load_exc,
+                )
+                so_path.unlink(missing_ok=True)
+                so_path = compile_c_lib(
+                    self._c_source,
+                    lib_name="propensity_fn",
+                    model_hash=self._model_hash,
+                    force=True,
+                )
+                self._load_so(so_path)  # re-raise if still broken
             self._alloc_arrays()
             self.ready = True
             logger.info(
