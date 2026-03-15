@@ -34,7 +34,9 @@ base / v2 / v3
     │    → 100% ERY all conditions: GCSF was 0.001 (model default), not 1.1
     │    → Myeloid pathway structurally disabled; EPO* unresolvable
     │    → Secondary finding: pH↑ increases GATA1 stochastic noise (CV 19→32%)
-    │  NEXT: Phase G-v5 — same grid with GCSF=1.1 explicit + 21600s duration
+    │  Phase G-v5 (invalidated, pre-run): EPO range 0.43–0.45 entirely below EPO*≈0.52
+    │    → at GCSF=1.1, EPO<EPO* → all MYE-biased by construction (same failure, opposite sign)
+    │  NEXT: Phase G-v6 — EPO 0.30–1.10 (straddles EPO*≈0.52), GCSF=1.1, 21600s
     ▼
  v6 (active)```
 
@@ -71,6 +73,7 @@ base / v2 / v3
 | **GCSF must be set EXPLICITLY as a property sweep override** — if omitted the model default (0.001) is used, giving GCSFR_bound≈0.005, disabling myeloid fate, yielding 100% ERY across all EPO levels regardless of pH | run_20260315_113546 (Phase G-v4b): 21 conditions × 100 reps = 100% ERY at every tested point | v6 |
 | At GCSF=0.001, P(ERY) cannot be used to locate EPO* — the system is always in the ERY basin by construction, not by decision | run_20260315_113546 analysis: GCSFR_bound=0.004–0.005, T26 factor≈2.7 throughout | v6 |
 | pH↑ amplifies stochastic noise in GATA1_nuc (CV: 19–23% at pH=7.0 → 27–32% at pH=8.0) — real coupling independent of GCSF; pH effect on mean GATA1 is sub-sigma at N=100 (Δ/σ=0.3–0.7) | run_20260315_113546: detectable trend but not statistically significant at N=100 | v6 |
+| **EPO range must straddle EPO*** — at GCSF=1.1, net-flux balance EPO*≈0.52 mM; any EPO sweep entirely below EPO* gives all-MYE by construction (and entirely above gives all-ERY); confirmed by rate-function analysis: EPO=0.43–0.45 vs GCSF=1.1 gives PU1/GATA1=1.08–1.11× throughout | Phase G-v5 pre-run analysis (2026-03-15): EPOR_b=50×EPO/(10+EPO), GCSFR_b=4.93, net_gata1=0.08×t(b)/d(b); transition at EPO≈0.52 | v6 |
 
 ---
 
@@ -82,8 +85,8 @@ base / v2 / v3
 | RQ-v6-2 | Is MYELOID commitment accessible at equal EPO=GCSF=1.0? | Same batch — look for PU1_nuc/GATA1_nuc >1.5 | ⬜ pending |
 | RQ-v6-3 | Does the 2:1 ERY:MYELOID bias persist in v6, or does Km_self=1 equalize it? | Compare ERY/MYELOID counts in v6 batch | ⬜ pending |
 | RQ-v6-4 | Does the limit cycle period change with Km_self=1? | Count entry/exit cycles in v6 batch trajectories | ⬜ pending |
-| RQ-v6-5 | What is the minimum EPO:GCSF ratio for reliable >50% ERY? | **Phase G-v5** — 8 EPO × 3 pH × N=100, GCSF=1.1, 21600 s | 📋 next run |
-| RQ-pH | Is EPO* detectably shifted across pH 7.0–8.0? | **Phase G-v5** — same batch; requires MYELOID outcomes to exist | 📋 next run |
+| RQ-v6-5 | What is EPO*(pH) — the EPO level giving P(ERY)=0.5 per pH level? | **Phase G-v6** — 8 EPO (0.30–1.10, straddles EPO*≈0.52) × 3 pH × N=100, GCSF=1.1, 21600 s | 📋 next run |
+| RQ-pH | Is EPO* detectably shifted across pH 7.0–8.0? | **Phase G-v6** — same batch; requires MYELOID outcomes to exist | 📋 next run |
 | RQ-pH-noise | Does pH↑ systematically increase GATA1_nuc stochastic noise (CV)? | **Answered (partial):** yes, 19–23% → 27–32% from pH 7→8; needs MYELOID-accessible conditions to confirm this is not a GCSF=0 artifact | ✅ partial |
 | RQ-EC | Is energy charge fate-independent in v6? | Energy analysis on any v6 batch | ✅ confirmed — EC≈0.940 insensitive to EPO 0.395–0.46 × pH 7–8 |
 

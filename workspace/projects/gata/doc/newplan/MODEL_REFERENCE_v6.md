@@ -171,23 +171,59 @@ At GCSF=0.001, GCSFR_bound ≈ 0.004–0.005 throughout all replicates. T26 PU1-
 
 ---
 
-### Phase G-v5 — Corrected EPO*(pH) Sweep with GCSF=1.1
+### Phase G-v5 — ⚠️ INVALIDATED (2026-03-15, pre-run analysis)
+
+**Status:** Cancelled before execution.  
+**Invalidation reason:** Protocol error in EPO range.
+
+**What went wrong:**  
+At GCSF=1.1, the net-flux balance point (EPO*) is ≈ **0.52 mM** (derived from rate function analysis).  
+The planned EPO range 0.430–0.451 lies entirely **below** EPO*, where PU1 net flux exceeds GATA1 net flux by 8–11× throughout. Result: structurally MYE-biased all conditions — same failure mode as Phase G-v4b but reversed sign.
+
+**Net flux analysis (GCSF=1.1, receptor kinetics):**
+
+| EPO (mM) | GATA1_net | PU1_net | PU1/GATA1 | Expected |
+|---|---|---|---|---|
+| 0.43 | 0.0911 | 0.1010 | 1.11× | MYE-biased |
+| 0.45 | 0.0932 | 0.1010 | 1.08× | MYE-biased |
+| **0.52** | **0.1011** | **0.1010** | **≈1.00×** | **Transition** |
+| 0.65 | 0.1082 | 0.1010 | 0.93× | ERY-biased |
+| 1.10 | 0.1278 | 0.1010 | 0.79× | ERY-biased |
+
+Method: EPOR_bound = 50×EPO/(10+EPO); GCSFR_bound = 50×1.1/(10.06+1.1) = 4.93; net_flux = basal × t_factor(b)/d_factor(b) where t_factor(b)=1+2b/(5+b), d_factor(b)=1+2(1−b/(0.5+b)).
+
+---
+
+### Phase G-v6 — Corrected EPO*(pH) Sweep — EPO range straddles EPO*
 
 **Status:** 📋 Planned — next run  
 **Date:** TBD  
-**Fixes from Phase G-v4b:**
-1. GCSF_external fixed at **1.1** (as originally specified — enables myeloid fate)
-2. Duration extended to **21600 s** (6 h) to allow steady state
-3. EPO range widened to ensure the P(ERY) sigmoid is fully traversed
-4. N=100 retained for this first corrected run; upgrade to 500 once EPO* is located
+**Fixes from Phase G-v5:**
+1. EPO range expanded to **straddle EPO*≈0.52** (previously entire range was below EPO* on MYE side)
+2. GCSF_external fixed at **1.1** (must be explicit property override — never rely on model default)
+3. Duration **21600 s** (6 h) to allow steady state — not 7200 s
+4. N=100 for first corrected run; upgrade to 500 once P(ERY) sigmoid is located
+
+**Net flux prediction (GCSF=1.1 fixed):**
+
+| EPO (mM) | GATA1/PU1 bias | P(ERY) estimate |
+|---|---|---|
+| 0.30 | PU1 wins (−0.19×) | ~20% |
+| 0.40 | PU1 wins (−0.10×) | ~35% |
+| 0.47 | PU1 wins (−0.02×) | ~47% |
+| **0.52** | **Balanced** | **~50%** |
+| 0.57 | GATA1 wins (+0.04×) | ~53% |
+| 0.65 | GATA1 wins (+0.07×) | ~59% |
+| 0.80 | GATA1 wins (+0.16×) | ~68% |
+| 1.10 | GATA1 wins (+0.27×) | ~79% |
 
 **Protocol:**
 
 | Parameter | Values |
 |---|---|
-| EPO_external (mM) | 0.430, 0.433, 0.436, 0.439, 0.442, 0.445, 0.448, 0.451 (8 values, 3 mM steps) |
+| EPO_external (mM) | 0.30, 0.40, 0.47, 0.52, 0.57, 0.65, 0.80, 1.10 (8 values straddling EPO*≈0.52) |
 | pH_nucleus | 7.0, 7.5, 8.0 (3 values) |
-| GCSF_external (mM) | **1.1 (fixed — MUST be set explicitly as property override)** |
+| GCSF_external (mM) | **1.1 (fixed — MUST be set explicitly as property override, NOT model default)** |
 | Replicates / condition | 100 |
 | Total replicates | 2400 (8 × 3 × 100) |
 | Duration | **21600 s (6 h)** |
@@ -198,6 +234,8 @@ At GCSF=0.001, GCSFR_bound ≈ 0.004–0.005 throughout all replicates. T26 PU1-
 - [ ] Verify `GCSF_external` appears explicitly in the property sweep overrides (not relying on model default)
 - [ ] Confirm `final_GCSF_external` ≈ 1.1 in first completed experiment's `mean_final_state.csv`
 - [ ] Confirm `final_GCSFR_bound` > 0.3 in at least one replicate (`replicates.csv`)
+- [ ] After first ~10 replicates of EPO=0.30 condition: confirm some replicates show MYELOID outcome; if all still ERY → stop, investigate
+- [ ] After first ~10 replicates of EPO=1.10 condition: confirm some replicates show ERY outcome; if all still MYE → stop, investigate
 - [ ] If all first 10 replicates still give ERY, **stop the sweep** — something is wrong
 
 **Expected outcomes with GCSF=1.1:**
