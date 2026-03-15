@@ -320,3 +320,56 @@ def clear_cache(model_hash: Optional[str] = None) -> None:
     else:
         if _CACHE_BASE.exists():
             shutil.rmtree(_CACHE_BASE)
+
+
+def prune_cache(max_age_days: int = 30, max_entries: int = 200) -> int:
+    """Remove old or excess cache entries to prevent unbounded growth.
+
+    Entries are sorted by last-access time (atime).  Those older than
+    *max_age_days* are removed first; if the count still exceeds
+    *max_entries*, the oldest by atime are removed next.
+
+    Returns the number of directories deleted.
+    """
+    if not _CACHE_BASE.exists():
+        return 0
+
+    import time as _time
+    now = _time.time()
+    cutoff = now - max_age_days * 86400
+
+    entries = []
+    for d in _CACHE_BASE.iterdir():
+        if d.is_dir():
+            try:
+                atime = d.stat().st_atime
+            except OSError:
+                atime = 0.0
+            entries.append((atime, d))
+
+    removed = 0
+    # Remove by age first
+    survivors = []
+    for atime, d in entries:
+        if atime < cutoff:
+            try:
+                shutil.rmtree(d)
+                removed += 1
+            except OSError:
+                pass
+        else:
+            survivors.append((atime, d))
+
+    # If still over the cap, remove oldest by atime
+    if len(survivors) > max_entries:
+        survivors.sort(key=lambda x: x[0])
+        for _, d in survivors[: len(survivors) - max_entries]:
+            try:
+                shutil.rmtree(d)
+                removed += 1
+            except OSError:
+                pass
+
+    if removed:
+        logger.debug("ODE accel cache: pruned %d stale entries", removed)
+    return removed
