@@ -572,7 +572,7 @@ class ExperimentAutomationCategory:
             except Exception as e:
                 print(f"[WARNING] Failed to read compressor_epsilon: {e}, using default {compressor_epsilon}")
 
-        compressor_min_gap = 0.0
+        compressor_min_gap = 5.0
         if hasattr(self.sweep_builder, 'sweep_compressor_min_gap_entry'):
             try:
                 text = self.sweep_builder.sweep_compressor_min_gap_entry.get_text().strip()
