@@ -131,7 +131,11 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
         """
         out: Dict[str, np.ndarray] = {}
         for key, series in channel_data.items():
-            out[key] = np.array([_extract_value(item) for item in series], dtype=np.float64)
+            if isinstance(series, np.ndarray):
+                # Fast path: already a numpy array from the buffer-path DataCollector
+                out[key] = series.astype(np.float64, copy=False)
+            else:
+                out[key] = np.array([_extract_value(item) for item in series], dtype=np.float64)
         return out
 
     def _select_indices(
@@ -225,7 +229,9 @@ class DeltaFilterCompressor(BaseTrajectoryCompressor):
             if vals is None or len(vals) == 0:
                 # Empty channel (fast-path run produced no data for it): skip.
                 continue
-            if series and isinstance(series[0], tuple):
+            # numpy arrays are never (time, value) tuples; use `not isinstance`
+            # guard to avoid ValueError from `bool(ndarray)` with len > 1.
+            if not isinstance(series, np.ndarray) and series and isinstance(series[0], tuple):
                 # Reconstruct tuples: (original_time, compressed_value)
                 out[key] = [
                     (series[i][0], float(vals[i]))  # type: ignore[index]

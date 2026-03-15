@@ -271,10 +271,15 @@ class DataCollector:
     # ------------------------------------------------------------------
 
     def finalize_buf(self) -> None:
-        """Convert pre-allocated numpy place buffers to standard tuple-list format.
+        """Flush pre-allocated numpy place buffers into place_data.
 
         Called automatically by :meth:`stop_collection`.  Safe to call
         multiple times (no-op if buffer not enabled or already finalised).
+
+        place_data values are stored as compact float32 numpy arrays (values
+        only; the matching time grid lives in self.time_points).  This is
+        ~16× smaller than the equivalent Python list-of-(time, value) tuples
+        and avoids per-replicate RAM explosions during batch sweeps.
         """
         if not self._buf_enabled or self._buf_ptr == 0:
             return
@@ -285,12 +290,11 @@ class DataCollector:
         # Rebuild time_points list (was empty / partial while buf was active)
         self.time_points = list(t_arr)
 
-        # Reconstruct place_data as list-of-tuples, matching the standard format
+        # Store place_data as compact float32 numpy arrays (values only).
+        # 16× less RAM than list-of-tuples; downstream consumers handle both
+        # formats via isinstance(..., np.ndarray) checks.
         for col, pid in enumerate(self._p_buf_ids):
-            values = p_arr[:, col]
-            self.place_data[pid] = [
-                (float(t_arr[i]), float(values[i])) for i in range(n)
-            ]
+            self.place_data[pid] = p_arr[:, col].copy()
 
         # Disable buffer so further record_state calls use the list path
         self._buf_enabled = False

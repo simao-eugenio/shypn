@@ -383,12 +383,12 @@ class ReplicateRunner:
             trajectories: Any = []
             for r in successful:
                 place_values = r['place_data'][place_id]
-                # Handle both tuple format [(time, tokens), ...] and flat list [tokens, ...]
-                if place_values and isinstance(place_values[0], tuple):
-                    # Tuple format: extract tokens (second element)
+                # Handle numpy arrays (fast-path buffer), (time, tokens) tuples, and flat lists
+                if isinstance(place_values, np.ndarray):
+                    trajectories.append(place_values)
+                elif len(place_values) > 0 and isinstance(place_values[0], tuple):
                     trajectories.append([tokens for time, tokens in place_values])
                 else:
-                    # Already flat list of token values
                     trajectories.append(place_values)
             
             trajectories = np.array(trajectories)
@@ -434,12 +434,12 @@ class ReplicateRunner:
             rate_trajectories: Any = []
             for r in successful:
                 rate_values = r['transition_rates'][transition_id]
-                # Handle both tuple format [(time, rate), ...] and flat list [rate, ...]
-                if rate_values and isinstance(rate_values[0], tuple):
-                    # Tuple format: extract rate (second element)
+                # Handle numpy arrays (fast-path buffer), (time, rate) tuples, and flat lists
+                if isinstance(rate_values, np.ndarray):
+                    rate_trajectories.append(rate_values)
+                elif len(rate_values) > 0 and isinstance(rate_values[0], tuple):
                     rate_trajectories.append([rate for time, rate in rate_values])
                 else:
-                    # Already flat list of rate values
                     rate_trajectories.append(rate_values)
             
             rate_trajectories = np.array(rate_trajectories)
