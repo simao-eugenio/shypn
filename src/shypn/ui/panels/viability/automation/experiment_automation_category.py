@@ -771,7 +771,38 @@ class ExperimentAutomationCategory:
             result: Result dictionary with statistics
         """
         
-        # Add to results browser (existing functionality)
+        # ── RAM-safe heavy-data extraction ────────────────────────────────────
+        # Extract compressed_trajectories and species_statistics from the result
+        # dict HERE, on the GTK main thread, BEFORE adding to the results browser
+        # or spawning the auto-save thread.
+        #
+        # Why this matters: up to 10 experiments can complete almost
+        # simultaneously (one batch of 10 workers finishing together).  Each
+        # result dict holds ~140 MB (compressed_trajectories ~120 MB +
+        # species_statistics ~20 MB).  The Semaphore(2) only lets 2 saves run
+        # at once, so the remaining 8 dicts would sit in memory waiting — up to
+        # 8 × 140 MB = 1.1 GB of RAM held idle.  Extracting here ensures that
+        # as soon as this callback returns both BatchExecutor.results[name] and
+        # ResultsBrowserView.results[name] hold only the ~few-KB trimmed version,
+        # and only the 2 active save threads hold the heavy data at any time.
+        _compressed_traj = result.pop('compressed_trajectories', [])
+        _stats_obj = result.get('statistics') or {}
+        _ss_full   = _stats_obj.pop('species_statistics', {})
+        _tp_full   = _stats_obj.pop('time_points', [])
+        if _ss_full:
+            # Keep a tiny final-value-only summary in the in-memory result so
+            # get_result() calls still return useful data for downstream display.
+            _stats_obj['species_statistics'] = {
+                _sid: {
+                    'mean_final': (d.get('mean') or [None])[-1],
+                    'std_final':  (d.get('std')  or [None])[-1],
+                    'min_final':  (d.get('min')  or [None])[-1],
+                    'max_final':  (d.get('max')  or [None])[-1],
+                }
+                for _sid, d in _ss_full.items()
+            }
+
+        # Add to results browser (existing functionality) — result is already tiny
         if self.results_browser:
             try:
                 self.results_browser.add_result(name, result)
@@ -780,7 +811,7 @@ class ExperimentAutomationCategory:
                 import traceback
                 traceback.print_exc()
         
-        # NEW: Auto-save experiment results (Phase 3 normalization).
+        # Auto-save experiment results (Phase 3 normalization).
         # CRITICAL: run in a background thread so disk I/O never blocks the
         # GTK main thread (blocking caused the app to be killed by the session
         # manager when 600 fsyncs accumulated in the GTK loop).
@@ -815,6 +846,9 @@ class ExperimentAutomationCategory:
                     name, result, _run_folder_snapshot,
                     _project_folder_snapshot, _id_to_name_snapshot,
                     _names_csv_rows_snapshot,
+                    compressed_trajectories=_compressed_traj,
+                    species_statistics_full=_ss_full,
+                    time_points_full=_tp_full,
                 )
             finally:
                 _sem.release()
@@ -835,6 +869,9 @@ class ExperimentAutomationCategory:
         project_folder: str = None,
         id_to_name: dict = None,
         names_csv_rows: list = None,
+        compressed_trajectories=None,
+        species_statistics_full=None,
+        time_points_full=None,
     ):
         """Auto-save experiment results to disk — all CSV format for easy analysis.
 
@@ -916,7 +953,20 @@ class ExperimentAutomationCategory:
 
         # ── results.csv ── mean + std trajectories (mixed-format, section-aware)
         try:
-            self._export_csv(str(batch_path / 'results.csv'), name, result)
+            # _export_csv needs the full species_statistics and time_points.
+            # Both were extracted by the GTK main thread and passed in as params;
+            # build a temporary enriched view of result for this call only.
+            if species_statistics_full or time_points_full:
+                _stats_for_export = dict(result.get('statistics') or {})
+                if species_statistics_full:
+                    _stats_for_export['species_statistics'] = species_statistics_full
+                if time_points_full:
+                    _stats_for_export['time_points'] = time_points_full
+                _result_for_export = dict(result)
+                _result_for_export['statistics'] = _stats_for_export
+            else:
+                _result_for_export = result
+            self._export_csv(str(batch_path / 'results.csv'), name, _result_for_export)
             _fsync(batch_path / 'results.csv')
         except Exception as e:
             save_errors.append(f'results.csv: {e}')
@@ -926,11 +976,13 @@ class ExperimentAutomationCategory:
         try:
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
-            compressed_trajectories = result.get('compressed_trajectories', [])
+            # Use the explicitly-passed compressed_trajectories (extracted on GTK
+            # main thread to keep peak RAM bounded at Semaphore(2) × ~140 MB).
+            _compressed = compressed_trajectories if compressed_trajectories is not None else []
             n = max(len(replicate_data), len(trajectory_summary))
 
             # Build {replicate_id: CompressionResult} for fast lookup
-            compressed_by_id = {cr.replicate_id: cr for cr in compressed_trajectories}
+            compressed_by_id = {cr.replicate_id: cr for cr in _compressed}
 
             # id→name mapping was captured before this thread started (GTK main
             # thread); use it directly — do NOT access self.parent_panel here.
@@ -1085,7 +1137,7 @@ class ExperimentAutomationCategory:
         # One row per species with final-timepoint mean and std.
         try:
             stats = result.get('statistics', {})
-            species_stats = stats.get('species_statistics', {})
+            species_stats = species_statistics_full if species_statistics_full is not None else stats.get('species_statistics', {})
             if species_stats:
                 # Reuse id→name map built during replicates.csv section
                 id_to_name = _id_to_name_early
@@ -1123,8 +1175,8 @@ class ExperimentAutomationCategory:
         # analysis scripts need no external sidecar.  Skipped gracefully when
         # no compressed data is available (e.g. on error runs).
         try:
-            compressed_trajectories = result.get('compressed_trajectories', [])
-            if compressed_trajectories:
+            compressed_trajectories_data = compressed_trajectories if compressed_trajectories is not None else []
+            if compressed_trajectories_data:
                 from shypn.helpers.compressor import CompressedTrajectoryWriter
 
                 # Reuse id→name map built during replicates.csv section
@@ -1139,7 +1191,7 @@ class ExperimentAutomationCategory:
                 traj_dir = batch_path / 'replicates_trajectories'
                 traj_dir.mkdir(exist_ok=True)
 
-                for cr in compressed_trajectories:
+                for cr in compressed_trajectories_data:
                     _status = _status_by_order.get(cr.replicate_id, 'completed')
                     csv_path = traj_dir / f'run_{cr.replicate_id + 1:03d}.csv'
                     CompressedTrajectoryWriter.write(
@@ -1153,7 +1205,7 @@ class ExperimentAutomationCategory:
                     # thread would block for tens of seconds on Hyper-V virtual
                     # disks, causing the app to appear frozen and be killed.
                     # The OS page-cache flushes these files within seconds anyway.
-                print(f'[AUTO-SAVE] Saved {len(compressed_trajectories)} compressed trajectories → {traj_dir.name}/')
+                print(f'[AUTO-SAVE] Saved {len(compressed_trajectories_data)} compressed trajectories → {traj_dir.name}/')
         except Exception as e:
             save_errors.append(f'replicates_trajectories/: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates_trajectories/: {e}')
@@ -1169,33 +1221,9 @@ class ExperimentAutomationCategory:
             (batch_path / '.partial').write_text('\n'.join(save_errors))
             print(f'[AUTO-SAVE] ⚠️  Partial save for "{name}": {save_errors}')
 
-        # ── Memory cleanup ──────────────────────────────────────────────────
-        # Both heavy fields are now on disk; drop them from the in-memory
-        # result dict so Python can reclaim the RAM.
-        #
-        # • compressed_trajectories : 100 reps × ~1 400 kept-points (at 5 s
-        #   min_gap) × 30 channels × ~30 B each ≈ 120 MB as Python lists.
-        # • species_statistics       : 29 places × 8 arrays × 10 001 floats
-        #   ≈ 64 MB as Python boxed floats.
-        #
-        # Replace species_statistics with a tiny final-value summary so
-        # subsequent get_result() calls still return sensible numbers.
-        result.pop('compressed_trajectories', None)
-        _stats = result.get('statistics')
-        if _stats:
-            _ss = _stats.get('species_statistics', {})
-            if _ss:
-                _final = {}
-                for _sid, _sdata in _ss.items():
-                    _final[_sid] = {
-                        'mean_final': (_sdata.get('mean')  or [None])[-1],
-                        'std_final':  (_sdata.get('std')   or [None])[-1],
-                        'min_final':  (_sdata.get('min')   or [None])[-1],
-                        'max_final':  (_sdata.get('max')   or [None])[-1],
-                    }
-                _stats['species_statistics'] = _final
-            _stats.pop('time_points', None)
-        import gc as _save_gc; _save_gc.collect()
+        # Heavy fields (compressed_trajectories, species_statistics, time_points)
+        # were already extracted and stripped by _on_experiment_result on the GTK
+        # main thread before this function was called — no cleanup needed here.
 
     def _get_project_folder(self) -> str:
         """Get current project folder path for auto-save.

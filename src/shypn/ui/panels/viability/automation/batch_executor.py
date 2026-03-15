@@ -101,9 +101,6 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         replicates = args['replicates']
         duration = args['duration']
         import os as _os
-        _dlog = _os.path.expanduser("~/sweep_debug.log")
-        with open(_dlog, 'a') as _f:
-            _f.write(f"[WORKER START] {name}: replicates={replicates}, duration={duration}\n")
         termination_condition = args['termination_condition']
         subnet_data = args['subnet_data']
         baseline_params = args['baseline_params']
@@ -402,12 +399,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
     # Import property path parser
     from .property_path_parser import parse_property_path, apply_property_to_object, resolve_object
     
-    # DEBUG: File-based logging for worker process
-    debug_log = os.path.expanduser("~/sweep_debug.log")
-    
     if not snapshot:
-        with open(debug_log, 'a') as f:
-            f.write("[WORKER] No snapshot provided!\n")
         return
     
     # Handle both ExperimentSnapshot objects and dict format
@@ -420,15 +412,6 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             arc_weights = snapshot['arc_weights']
             property_overrides = snapshot.get('property_overrides', {})  # NEW
             swept_param = snapshot.get('swept_parameter')
-            snap_name = snapshot.get('name', 'unknown')
-            
-            # DEBUG: Log snapshot info
-            with open(debug_log, 'a') as f:
-                f.write(f"\n[WORKER] Processing snapshot (dict): {snap_name}\n")
-                f.write(f"[WORKER] swept_parameter: {swept_param}\n")
-                f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
-                f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
-                f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
         elif 'parameters' in snapshot:
             # Old dict format - convert to place/transition/arc mappings
             place_markings = {}
@@ -451,9 +434,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             
             swept_param = None  # Old format doesn't have swept_parameter
         else:
-            # No valid dict format
-            with open(debug_log, 'a') as f:
-                f.write(f"[WORKER] ERROR: Unknown dict format, keys: {snapshot.keys()}\n")
+            # No valid dict format — skip silently
             return
     elif hasattr(snapshot, 'place_markings'):
         # ExperimentSnapshot object - use its attributes
@@ -462,55 +443,15 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         arc_weights = snapshot.arc_weights
         property_overrides = getattr(snapshot, 'property_overrides', {})  # NEW
         swept_param = getattr(snapshot, 'swept_parameter', None)
-        snap_name = getattr(snapshot, 'name', 'unknown')
-        
-        # DEBUG: Log snapshot info
-        with open(debug_log, 'a') as f:
-            f.write(f"\n[WORKER] Processing snapshot (object): {snap_name}\n")
-            f.write(f"[WORKER] swept_parameter: {swept_param}\n")
-            f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
-            f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
-            f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
     else:
         # No valid snapshot format
         return
     
-    # Apply place markings (LEGACY - for backward compatibility)
-    debug_log = os.path.expanduser("~/sweep_debug.log")
-    
-    # DEBUG: Check for swept parameter (works for both dict and object)
-    # Note: swept_param['id'] may carry the full property path (e.g. 'P2.initial_marking');
-    # strip the dot-suffix to get the bare object ID for comparison with place_markings keys.
-    if isinstance(swept_param, dict):
-        raw_swept_id = swept_param.get('id', '')
-        bare_swept_id = raw_swept_id.split('.')[0] if raw_swept_id else ''
-        swept_place_id = bare_swept_id if swept_param.get('type') == 'places' and bare_swept_id else None
-    else:
-        swept_place_id = None
-    
-    applied_count = 0
-    not_found_count = 0
-    
+    # Apply place markings
     for place_id, marking in place_markings.items():
         place = next((p for p in model.places if p.id == place_id), None)
         if place:
-            old_value = place.tokens
             place.tokens = float(marking)
-            applied_count += 1
-            
-            # DEBUG: Log swept parameter application
-            if place_id == swept_place_id:
-                with open(debug_log, 'a') as f:
-                    f.write(f"[WORKER] ✓ SWEPT PARAM: {place_id} = {old_value} → {marking}\n")
-        else:
-            not_found_count += 1
-            # DEBUG: Log place not found
-            with open(debug_log, 'a') as f:
-                f.write(f"[WORKER] ✗ Place NOT FOUND: {place_id}\n")
-    
-    # DEBUG: Summary
-    with open(debug_log, 'a') as f:
-        f.write(f"[WORKER] Applied: {applied_count}, Not found: {not_found_count}\n")
     
     # Apply transition rates (handle both numeric and formula strings)
     for trans_id, rate in transition_rates.items():
@@ -542,31 +483,17 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         if arc:
             arc.weight = float(weight)
     
-    # NEW: Apply property overrides (takes precedence over legacy dicts)
+    # Apply property overrides (takes precedence over legacy dicts)
     # This enables explicit property paths like "T5.volume_threshold", "A3.threshold"
     if property_overrides:
-        with open(debug_log, 'a') as f:
-            f.write(f"\n[WORKER] Applying {len(property_overrides)} property overrides:\n")
-        
         for prop_path, value in property_overrides.items():
             try:
-                # Parse property path and resolve object via central helper
                 obj_id, prop_name = parse_property_path(prop_path)
                 obj = resolve_object(model, obj_id)
-
-                # Apply property through validated OOP path
                 if obj:
-                    success = apply_property_to_object(obj, prop_name, value)
-                    with open(debug_log, 'a') as f:
-                        status = "✓" if success else "✗"
-                        f.write(f"[WORKER] {status} {prop_path} = {value}\n")
-                else:
-                    with open(debug_log, 'a') as f:
-                        f.write(f"[WORKER] ✗ Object not found: {obj_id}\n")
-                        
-            except Exception as e:
-                with open(debug_log, 'a') as f:
-                    f.write(f"[WORKER] ✗ Error applying {prop_path}: {e}\n")
+                    apply_property_to_object(obj, prop_name, value)
+            except Exception:
+                pass  # Silently skip invalid property paths
 
 
 class BatchExecutor:
