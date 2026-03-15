@@ -1054,6 +1054,11 @@ class BatchExecutor:
                 # as "queued".  They are promoted to "running" on first heartbeat.
                 async_results = []
                 already_started: set = set()
+                # Tracks experiments that have emitted at least one actual heartbeat
+                # from inside a worker.  Zombie silence is only measured from the
+                # first heartbeat; before that the experiment is still pending in the
+                # pool's task queue and must not be timed-out.
+                heartbeat_received: set = set()
                 for i, args in enumerate(experiment_args):
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
                     start_time = time.time()
@@ -1099,6 +1104,7 @@ class BatchExecutor:
                         while not progress_queue.empty():
                             try:
                                 queue_idx, progress_fraction = progress_queue.get_nowait()
+                                heartbeat_received.add(queue_idx)  # worker has actually started
                                 last_heartbeat[queue_idx] = current_time  # worker is alive
                                 if progress_callback:
                                     # First heartbeat from a queued experiment → promote to running
@@ -1120,7 +1126,17 @@ class BatchExecutor:
                     zombie_detected = False
                     for queue_index, name, async_result, start_time in async_results:
                         elapsed = current_time - start_time
-                        silence = current_time - last_heartbeat.get(queue_index, start_time)
+
+                        # Experiments that have not yet been dispatched to a worker
+                        # (still waiting in the pool's task queue) must never be
+                        # counted as zombies.  Their last_heartbeat was stamped at
+                        # submission time; keep it fresh so silence stays at zero
+                        # until the worker actually starts and emits its first 0%
+                        # progress message.
+                        if queue_index not in heartbeat_received:
+                            last_heartbeat[queue_index] = current_time
+
+                        silence = current_time - last_heartbeat.get(queue_index, current_time)
 
                         if silence > ZOMBIE_SILENCE_S:
                             # ZOMBIE DETECTED: worker has been silent too long.
