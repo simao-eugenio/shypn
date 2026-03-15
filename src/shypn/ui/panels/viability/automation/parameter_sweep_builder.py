@@ -409,7 +409,7 @@ class ParameterSweepBuilder(Gtk.Box):
 
         comp_grid.attach(Gtk.Label(label="min gap:", xalign=0), 0, 1, 1, 1)
         self.sweep_compressor_min_gap_entry = Gtk.Entry()
-        self.sweep_compressor_min_gap_entry.set_text("0.0")
+        self.sweep_compressor_min_gap_entry.set_text("5.0")
         self.sweep_compressor_min_gap_entry.set_width_chars(8)
         self.sweep_compressor_min_gap_entry.set_tooltip_text(
             "Minimum interval (s) between kept points (0 = disabled).\n"

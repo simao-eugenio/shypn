@@ -596,7 +596,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Run batch of experiments asynchronously.
@@ -703,7 +703,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
@@ -757,7 +757,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch sequentially in background thread.
@@ -922,7 +922,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch in parallel using multiprocessing.
