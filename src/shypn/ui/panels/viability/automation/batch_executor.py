@@ -16,6 +16,26 @@ from typing import Optional, Callable, Dict, Any, List
 from datetime import datetime, timezone
 
 
+# Module-level queue injected into each worker via Pool initializer.
+# Using the initializer pattern (instead of passing the queue in the args dict)
+# is required when the multiprocessing context is 'forkserver' or 'spawn':
+# in those contexts, args passed to apply_async() are pickled, but a plain
+# multiprocessing.Queue (OS pipe) is not picklable.  The initializer runs
+# inside the freshly forked worker before any task, so the queue is inherited
+# via the OS fork rather than serialised.
+_worker_progress_queue = None
+
+
+def _worker_pool_initializer(q) -> None:
+    """Called once in each worker process right after it is spawned.
+
+    Sets the module-level _worker_progress_queue so that _worker_run_experiment
+    can use it without the queue appearing in the pickled args dict.
+    """
+    global _worker_progress_queue
+    _worker_progress_queue = q
+
+
 def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     """Worker function to run a single experiment in parallel process.
     
@@ -47,8 +67,11 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     
     start_time = time.time()
     
-    # Extract progress queue if provided
-    progress_queue = args.get('progress_queue')
+    # Progress queue is injected at worker spawn via Pool initializer
+    # (cannot be passed via args dict with forkserver/spawn contexts because
+    # multiprocessing.Queue is not picklable).
+    global _worker_progress_queue
+    progress_queue = _worker_progress_queue
     queue_index = args.get('queue_index')
     
     # Define progress callback that sends updates to queue
@@ -999,7 +1022,6 @@ class BatchExecutor:
                     'termination_condition': termination_condition,
                     'subnet_data': subnet_data,
                     'baseline_params': baseline_params,
-                    'progress_queue': progress_queue,  # Pass queue to workers
                     'use_tau_leaping': use_tau_leaping,
                     'tau_epsilon': tau_epsilon,
                     'max_tau': max_tau,
@@ -1018,7 +1040,12 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as _initial_pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
+            with _mp_ctx.Pool(
+                processes=n_workers,
+                maxtasksperchild=1,  # forkserver + maxtasksperchild=1: clean workers, no GTK/Numba state inherited
+                initializer=_worker_pool_initializer,
+                initargs=(progress_queue,),
+            ) as _initial_pool:
                 pool = _initial_pool  # may be replaced after zombie restart
                 # Submit all experiments with start time tracking.
                 # The first n_workers slots are picked up immediately; the rest
@@ -1199,7 +1226,12 @@ class BatchExecutor:
                             pool.join()
                         except Exception:
                             pass
-                        pool = _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1)
+                        pool = _mp_ctx.Pool(
+                            processes=n_workers,
+                            maxtasksperchild=1,
+                            initializer=_worker_pool_initializer,
+                            initargs=(progress_queue,),
+                        )
                         # Re-submit remaining experiments to the fresh pool.
                         resubmitted = []
                         for queue_index, name, _old_result, start_time in async_results:
