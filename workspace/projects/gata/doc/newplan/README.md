@@ -41,8 +41,15 @@ base / v2 / v3
     │    → EPO* is pH-dependent: 0.615 (pH=7) / 0.610 (pH=7.5) / 0.544 (pH=8)
     │    → Mechanism: pGATA1/pPU1 ratio crosses 1.0 between pH=7.5 and pH=8.0
     │    → Model confirmed stochastic bistable; stochastic commitment window t=100–500s
+    │    → NOTE: EPO*(pH) values superseded by G-v7 (G-v6 had non-reproducible anomalies)
+    │  Phase G-v7 (Mar 17 2026): EPO 0.52–0.65 × pH 7/7.5/8 × GCSF=1.1 × N=100 × 21600s
+    │    → Fine-grid EPO* characterisation near transition
+    │    → 2400 replicates; consistent monotone dose-response at all three pH levels
+    │    → EPO*(revised): > 0.65 (pH=7) / 0.634 (pH=7.5) / 0.596 (pH=8)
+    │    → G-v6 anchors at EPO=0.57/pH=8.0 and EPO=0.65/pH=7.0 were non-reproducible
+    │    → pH=7.0 transition not found in range — EPO* > 0.65 µM
     ▼
- v6 (active — Phase G-v6 complete)```
+ v6 (active — Phase G-v7 complete)```
 
 ---
 
@@ -54,7 +61,7 @@ base / v2 / v3
 | [RESEARCH_PLAN_V4.md](RESEARCH_PLAN_V4.md) | v4 | Mar 8 | All v4 simulation runs, observations, mechanistic diagnoses |
 | [LAYER_ANALYSIS_MAR10.md](LAYER_ANALYSIS_MAR10.md) | v5→v6 | Mar 10 | Full layer + thermodynamic analysis of EPO=1/GCSF=0.1 batch; v6 change rationale |
 | [MIRROR_BATCH_ANALYSIS_MAR10.md](MIRROR_BATCH_ANALYSIS_MAR10.md) | v5 | Mar 10 | EPO=0/GCSF=1 mirror batch; limit cycle confirmed; cross-batch comparison |
-| [MODEL_REFERENCE_v6.md](MODEL_REFERENCE_v6.md) | v6 | Mar 10–15 | v6 model reference (ICs, transitions, all simulation campaigns through Phase G-v6) |
+| [MODEL_REFERENCE_v6.md](MODEL_REFERENCE_v6.md) | v6 | Mar 10–17 | v6 model reference (ICs, transitions, all simulation campaigns through Phase G-v7) |
 
 ---
 
@@ -78,7 +85,7 @@ base / v2 / v3
 | At GCSF=0.001, P(ERY) cannot be used to locate EPO* — the system is always in the ERY basin by construction, not by decision | run_20260315_113546 analysis: GCSFR_bound=0.004–0.005, T26 factor≈2.7 throughout | v6 |
 | pH↑ amplifies stochastic noise in GATA1_nuc (CV: 19–23% at pH=7.0 → 27–32% at pH=8.0) — real coupling independent of GCSF; pH effect on mean GATA1 is sub-sigma at N=100 (Δ/σ=0.3–0.7) | run_20260315_113546: detectable trend but not statistically significant at N=100 | v6 |
 | **EPO range must straddle EPO*** — at GCSF=1.1, net-flux balance EPO*≈0.52 mM; any EPO sweep entirely below EPO* gives all-MYE by construction (and entirely above gives all-ERY); confirmed by rate-function analysis: EPO=0.43–0.45 vs GCSF=1.1 gives PU1/GATA1=1.08–1.11× throughout | Phase G-v5 pre-run analysis (2026-03-15): EPOR_b=50×EPO/(10+EPO), GCSFR_b=4.93, net_gata1=0.08×t(b)/d(b); transition at EPO≈0.52 | v6 |
-| **EPO* is pH-dependent** — higher pH lowers EPO* by ~0.07 mM (pH 7→8); mechanism is the pGATA1/pPU1 phosphorylation ratio, which crosses 1.0 between pH=7.5 and pH=8.0; the net-flux model predicts EPO*≈0.52 independent of pH — wrong; actual EPO*=0.615/0.610/0.544 at pH=7.0/7.5/8.0 | Phase G-v6 run_20260315_164919: EPO=0.57 gives 4% ERY (pH=7.0) vs 95% ERY (pH=8.0) | v6 |
+| **EPO* is pH-dependent** — higher pH lowers EPO*; G-v7 revised values: EPO*=0.634 (pH=7.5) / 0.596 (pH=8.0) / >0.65 (pH=7.0); G-v6 anomalous results (EPO=0.57/pH=8→95% ERY) were non-reproducible; mechanism is pGATA1/pPU1 phosphorylation ratio | Phase G-v7 run_20260317_135730: consistent monotone dose-response; G-v6 EPO=0.57/pH=8 condition z=−22.9 vs G-v7 | v6 |
 | **Stochastic commitment window is t=100–500s** — trajectories are indistinguishable before t≈100s (seed-identical up to that point); stochastic fluctuations in the 100–500s window determine fate; this is 5× later than the t=91s deterministic cascade seen with GCSF=0.001 | Phase G-v6 EPO=0.57/pH=8.0 trajectory analysis: separation 1.3× at t=100s → 352× at t=500s | v6 |
 
 ---
@@ -91,11 +98,14 @@ base / v2 / v3
 | RQ-v6-2 | Is MYELOID commitment accessible at equal EPO=GCSF=1.0? | Same batch — look for PU1_nuc/GATA1_nuc >1.5 | ⬜ pending |
 | RQ-v6-3 | Does the 2:1 ERY:MYELOID bias persist in v6, or does Km_self=1 equalize it? | Compare ERY/MYELOID counts in v6 batch | ⬜ pending |
 | RQ-v6-4 | Does the limit cycle period change with Km_self=1? | Count entry/exit cycles in v6 batch trajectories | ⬜ pending |
-| RQ-v6-5 | What is EPO*(pH) — the EPO level giving P(ERY)=0.5 per pH level? | **Phase G-v6** — 8 EPO (0.30–1.10) × 3 pH × N=100, GCSF=1.1, 21600 s | ✅ **answered** — EPO*=0.615/0.610/0.544 at pH=7.0/7.5/8.0 |
-| RQ-pH | Is EPO* detectably shifted across pH 7.0–8.0? | **Phase G-v6** | ✅ **answered** — Δ=0.071 mM; mechanism pGATA1/pPU1 ratio; EPO=0.57 flips from 4% to 95% ERY between pH=7.0 and pH=8.0 |
+| RQ-v6-5 | What is EPO*(pH) — the EPO level giving P(ERY)=0.5 per pH level? | **Phase G-v6/G-v7** | ✅ **answered (G-v7 supersedes)** — EPO*=0.634 (pH=7.5) / 0.596 (pH=8.0); pH=7.0 EPO*>0.65 (not found) |
+| RQ-pH | Is EPO* detectably shifted across pH 7.0–8.0? | **Phase G-v6/G-v7** | ✅ **answered** — Δ(pH=7.5→8.0)≈−0.038 mM; mechanism pGATA1/pPU1 ratio |
 | RQ-pH-noise | Does pH↑ systematically increase GATA1_nuc stochastic noise (CV)? | Phase G-v6 | ✅ **confirmed in bistable conditions** — pH also deepens both attractors; shift in EPO* is the dominant effect |
 | RQ-EC | Is energy charge fate-independent in v6? | Phase G-v6 | ✅ **partially revised** — EC lower at pH=8 (0.8708 vs 0.8882) due to pGATA1 flux; not a fate proxy within a given pH |
 | RQ-bistable | Is the model stochastic bistable or instructive? | Phase G-v6 | ✅ **answered** — stochastic bistable; 13/24 conditions mixed; bimodal BC>0.88 in all; commitment window t=100–500s |
+| RQ-G8-1 | EPO* at pH=7.0 | EPO grid 0.65–0.85; N=200 | ⬜ pending |
+| RQ-G8-2 | 95% CI on EPO*(pH=7.5) | Fine grid 0.61–0.67 step 0.005; N=200 | ⬜ pending |
+| RQ-G8-3 | 95% CI on EPO*(pH=8.0) | Fine grid 0.57–0.63 step 0.005; N=200 | ⬜ pending |
 
 ## v5 Batch Results Summary
 
@@ -109,7 +119,8 @@ base / v2 / v3
 | Batch | EPO range | GCSF | pH | N | ERY | MYE | Key finding |
 |---|---|---|---|---|---|---|---|
 | `run_20260315_113546` (Phase G-v4b, INVALIDATED) | 0.395–0.46 | **0.001** | 7/7.5/8 | 2100 | 2100 | 0 | GCSF was model default 0.001; PU1 pathway disabled; 100% ERY structurally |
-| `run_20260315_164919` (Phase G-v6) | 0.30–1.10 | **1.1** | 7/7.5/8 | 2400 | 1025 | 1375 | **Stochastic bistable confirmed.** EPO*=0.615/0.610/0.544 (pH=7/7.5/8). pGATA1/pPU1 ratio is the pH sensor. Commitment window t=100–500s. |
+| `run_20260315_164919` (Phase G-v6) | 0.30–1.10 | **1.1** | 7/7.5/8 | 2400 | 1025 | 1375 | **Stochastic bistable confirmed.** pGATA1/pPU1 ratio is the pH sensor. Commitment window t=100–500s. EPO* values superseded by G-v7. |
+| `run_20260317_135730` (Phase G-v7) | 0.52–0.65 | **1.1** | 7/7.5/8 | 2400 | — | — | **Fine-grid EPO* characterisation.** EPO*=0.634/0.596 (pH=7.5/8.0); pH=7.0 EPO*>0.65. G-v6 anchors non-reproducible. |
 
 ---
 

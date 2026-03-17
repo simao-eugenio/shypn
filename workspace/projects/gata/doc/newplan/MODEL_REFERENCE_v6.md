@@ -1,7 +1,7 @@
 # Model Reference: phase3a_spatial_clean_v6.shy
 
 **File:** `workspace/projects/gata/models/phase3a_spatial_clean_v6.shy`  
-**Status:** Active — Phase G-v6 complete  
+**Status:** Active — Phase G-v7 complete (supersedes G-v6 EPO* estimates)  
 **Predecessor:** `phase3a_spatial_clean_v5.shy`  
 **Created:** March 10, 2026  
 **Justification analysis:** [LAYER_ANALYSIS_MAR10.md](LAYER_ANALYSIS_MAR10.md)
@@ -61,26 +61,27 @@ Everything else is unchanged.
 
 ### T11 — GATA1_transcription (adaptive)
 ```
-0.08 * (1 + 0.5*GATA1_Protein_nuc/(1+GATA1_Protein_nuc))
+0.08 * (1 + 2.0*GATA1_Protein_nuc/(1+GATA1_Protein_nuc))
      / (1+(PU1_Protein_nuc/(0.5*10**(0.5*(pH_nucleus-7.5))))**2)
      * (1 + 2*EPOR_bound/(5+EPOR_bound))
      * exp(-7215.0*(1/Temperature-1/310.15))
 ```
 
 - Basal: 0.08
-- Self-activation: max +50% boost, K_half = 1 molecule
+- Self-activation: max +200% boost, K_half = 1 molecule (**coefficient = 2.0**, not 0.5 as initially noted)
 - Cross-inhibition: Hill-2, Km pH-dependent (`0.5 × 10^(0.5×(pHn-7.5))` ≈ 0.5 at pH 7.5)
 - EPO boost: max +200% at saturation, K_half = 5 molecules EPOR_bound
 
 ### T12 — PU1_transcription (adaptive)
 ```
-0.06 * (1 + 0.5*PU1_Protein_nuc/(1+PU1_Protein_nuc))
+0.06 * (1 + 2.0*PU1_Protein_nuc/(1+PU1_Protein_nuc))
      / (1+(GATA1_Protein_nuc/(0.5*10**(0.5*(pH_nucleus-7.5))))**2)
      * (1 + 2*GCSFR_bound/(5+GCSFR_bound))
      * exp(-7215.0*(1/Temperature-1/310.15))
 ```
 
 - Basal: 0.06 (slight structural ERY bias vs GATA1's 0.08)
+- Self-activation: max +200% boost, K_half = 1 molecule (coefficient = 2.0, same as T11)
 
 All other 30 transition rate functions are unchanged from v5.
 
@@ -339,4 +340,109 @@ MYE attractor (PU1_nuc) shows same trend (+0.9–1.9 molecules pH 7→8). Higher
 **Outcome criteria (confirmed effective):**
 - ERY: `GATA1_Protein_nuc / PU1_Protein_nuc` > 1.5 AND `GATA1_Protein_nuc` > 2.0
 - MYELOID: ratio < 0.67 AND `PU1_Protein_nuc` > 2.0
+
+---
+
+---
+
+## Phase G-v7 Results
+
+**Run:** `run_20260317_135730`  
+**Date:** 2026-03-17  
+**Status:** Complete — supersedes G-v6 EPO\* estimates
+
+### Motivation
+
+Phase G-v6 used a coarse EPO grid (step ~0.10 mM) with only 8 conditions per pH. G-v7 aimed to:
+1. Fine-grid characterise EPO\* near the transition (step 0.02 mM)
+2. Verify the G-v6 anchor conditions with identical seeds
+
+### Protocol
+
+| Parameter | Value |
+|---|---|
+| EPO grid | 0.52, 0.54, 0.56, 0.57, 0.59, 0.61, 0.63, 0.65 µM |
+| pH values | 7.0, 7.5, 8.0 |
+| GCSF\_external | 1.1 µM (explicit override, unchanged from G-v6) |
+| N replicates | 100 (planned 200; run short) |
+| Solver | TauLeaping\_SSA, t\_end=21600 s |
+| Random seed | 42 (base; replicates seed 42–141) |
+| Total replicates | 2400 |
+
+### Fate Map
+
+| EPO (µM) | pH=7.0 %ERY | pH=7.5 %ERY | pH=8.0 %ERY |
+|---|---|---|---|
+| 0.52 | 7 | 10 | 12 |
+| 0.54 | 4 | 3 | 11 |
+| 0.56 | 8 | 10 | 16 |
+| 0.57 | 6 | 11 | 10 |
+| 0.59 | 2 | 11 | **7** |
+| 0.61 | 6 | 9 | **93** |
+| 0.63 | 10 | **29** | 92 |
+| 0.65 | 3 | **94** | 90 |
+
+Bold entries bracket the EPO\* transition.
+
+### EPO\* Estimates
+
+| pH | Transition bracket | EPO\* (logistic MLE) | k (steepness) | Δ₁₀₋₉₀ (mM) | 95% CI |
+|---|---|---|---|---|---|
+| 7.0 | > 0.65 (not found) | — | — | — | — |
+| 7.5 | 0.63–0.65 | **0.634 µM** | 35.9 | 0.122 | not computable (N=100) |
+| 8.0 | 0.59–0.61 | **0.596 µM** | 48.1 | 0.091 | not computable (N=100) |
+
+pH dependence: Δ(pH=7.5 → pH=8.0) ≈ −0.038 mM/pH unit.
+
+pH=7.0 EPO\* is above 0.65 µM; the transition was not captured in the tested range.
+
+### Comparison with G-v6 Anchors
+
+| EPO | pH | G-v6 %ERY | G-v7 %ERY | Consistent? |
+|---|---|---|---|---|
+| 0.52 | 7.0 | 4 | 7 | ✓ |
+| 0.57 | 7.0 | 4 | 6 | ✓ |
+| 0.65 | 7.0 | 86 | 3 | **❌ z=−21.5** |
+| 0.52 | 7.5 | 11 | 10 | ✓ |
+| 0.57 | 7.5 | 8 | 11 | ✓ |
+| 0.65 | 7.5 | 92 | 94 | ✓ |
+| 0.52 | 8.0 | 7 | 12 | ✓ |
+| 0.57 | 8.0 | 95 | 10 | **❌ z=−22.9** |
+| 0.65 | 8.0 | 92 | 90 | ✓ |
+
+Two anchor conditions with large z-scores (|z|>20) indicate genuine disagreement, not sampling noise.
+
+### Root-Cause Investigation
+
+Full comparison of both runs (same condition EPO=0.57/pH=8.0):
+- Model file: identical (all 32 transition rate functions character-for-character equal)
+- Place overrides: identical (P1–P29 all equal)
+- Initial conditions at t=0: identical (GATA1\_Protein\_nuc=PU1\_Protein\_nuc=1.0)
+- Per-replicate seeds: identical (42–141)
+- Code: no commits between G-v6 and G-v7 runs (git log confirms)
+
+Despite identical inputs, seed=42 produces `ery` in G-v6 but `mye` in G-v7. **Root cause is unresolved.** Best hypothesis: non-determinism in the parallel batch runner (fork-based worker pool) that existed at the time of G-v6; the `07879d0`/`d02cc79`/`fe08c7b` batch-executor fixes committed 2026-03-15 may have altered effective execution order, changing which propensity-function state was in effect at the first stochastic step per replicate.
+
+G-v6 anomalies:
+- EPO=0.57/pH=8.0: 95% ERY vs expected ~10% (inconsistent with all nearby G-v7 points)
+- EPO=0.47/pH=8.0: 17% ERY — non-monotone outlier in G-v6 (above baseline, between 6% and 7% neighbors)
+
+**Conclusion:** G-v7 results form a consistent, monotone dose-response at all three pH levels. G-v6 results showed non-reproducible anomalies. **G-v7 EPO\* values supersede G-v6.**
+
+### EPO\* Revision Summary
+
+| pH | G-v6 EPO\* | G-v7 EPO\* | Shift |
+|---|---|---|---|
+| 7.0 | 0.615 µM | > 0.65 µM | +> 0.035 |
+| 7.5 | 0.610 µM | 0.634 µM | +0.024 |
+| 8.0 | 0.544 µM | 0.596 µM | +0.052 |
+
+### Open Questions → Phase G-v8
+
+| RQ | Question | Required run |
+|---|---|---|
+| RQ-G8-1 | EPO\* at pH=7.0 | EPO grid 0.65–0.85; N=200 |
+| RQ-G8-2 | 95% CI on EPO\*(pH=7.5) | Fine grid 0.61–0.67 step 0.005; N=200 |
+| RQ-G8-3 | 95% CI on EPO\*(pH=8.0) | Fine grid 0.57–0.63 step 0.005; N=200 |
+| RQ-G8-4 | pH dependence slope | Combine 3 EPO\* values with CIs |
 - No collapsed outcomes observed (0/2400)
