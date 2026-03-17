@@ -446,3 +446,91 @@ G-v6 anomalies:
 | RQ-G8-3 | 95% CI on EPO\*(pH=8.0) | Fine grid 0.57–0.63 step 0.005; N=200 |
 | RQ-G8-4 | pH dependence slope | Combine 3 EPO\* values with CIs |
 - No collapsed outcomes observed (0/2400)
+
+---
+
+---
+
+## Phase G-v8 Protocol
+
+**Objective:** Compute 95% profile-likelihood CIs on EPO\*(pH) and locate EPO\*(pH=7.0).  
+**Status:** Planned — not yet run  
+**Depends on:** G-v7 (`run_20260317_135730`)
+
+Three independent sub-runs, each targeting a single pH.
+
+---
+
+### G-v8a — pH=8.0 fine grid
+
+| Parameter | Value |
+|---|---|
+| EPO (µM) | 0.570, 0.575, 0.580, 0.585, 0.590, 0.595, **0.600**, 0.605, 0.610, 0.615, 0.620, 0.625, 0.630 |
+| pH | 8.0 only |
+| N replicates | 200 |
+| Total replicates | 2600 |
+| GCSF\_external | 1.1 µM (explicit override) |
+| t\_end | 21600 s |
+
+Rationale: centers on G-v7 EPO\*=0.596; 13-point grid gives ≥3 points on each flank
+confirmed below 10% ERY and above 90% ERY. Run this first — it has the sharpest
+transition (k=48.1 in G-v7) and is most likely to give workable CIs.
+
+---
+
+### G-v8b — pH=7.5 fine grid
+
+| Parameter | Value |
+|---|---|
+| EPO (µM) | 0.610, 0.615, 0.620, 0.625, 0.630, **0.635**, 0.640, 0.645, 0.650, 0.655, 0.660, 0.665, 0.670 |
+| pH | 7.5 only |
+| N replicates | 200 |
+| Total replicates | 2600 |
+| GCSF\_external | 1.1 µM (explicit override) |
+| t\_end | 21600 s |
+
+Rationale: centers on G-v7 EPO\*=0.634; extends 0.024 mM below the transition where
+G-v7 showed only 9–11% ERY (good lower flank anchor). Transition is shallower
+(k=35.9) so wider bracket is appropriate.
+
+---
+
+### G-v8c — pH=7.0 range extension
+
+| Parameter | Value |
+|---|---|
+| EPO (µM) | 0.65, 0.67, 0.69, 0.71, 0.73, 0.75, 0.78, 0.81, 0.85 |
+| pH | 7.0 only |
+| N replicates | 200 |
+| Total replicates | 1800 |
+| GCSF\_external | 1.1 µM (explicit override) |
+| t\_end | 21600 s |
+
+Rationale: G-v7 showed 2–10% ERY throughout 0.52–0.65 at pH=7.0 — transition
+not reached. If EPO\* follows the pH trend (+0.038 mM per unit downward in pH from
+pH=8.0), EPO\*(pH=7.0) ≈ 0.634 + 0.038 ≈ **0.672 µM**. The grid above brackets
+0.65–0.85, which covers that estimate with 3+ points on each side.
+
+---
+
+### Priority and dependencies
+
+| Sub-run | Priority | Depends on |
+|---|---|---|
+| G-v8a (pH=8.0) | 1 — run first | G-v7 only |
+| G-v8b (pH=7.5) | 2 — run after G-v8a looks clean | G-v7 only |
+| G-v8c (pH=7.0) | 3 — independent | G-v7 only |
+
+All three can be run in parallel if compute is available.
+
+---
+
+### Success criteria
+
+| Metric | Target |
+|---|---|
+| Profile-likelihood 95% CI width at pH=8.0 | < 0.010 mM |
+| Profile-likelihood 95% CI width at pH=7.5 | < 0.015 mM |
+| EPO\*(pH=7.0) located | p\_ery crosses 0.5 within the tested range |
+| Logistic k > 30 at all three pH | Confirms sharp transition (expected) |
+| Monotone dose-response at all conditions | No non-monotone outliers (as occurred in G-v6) |
