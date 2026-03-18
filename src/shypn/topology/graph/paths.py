@@ -1,7 +1,18 @@
 """Path finding analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional
-import networkx as nx
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
+
+if TYPE_CHECKING:
+    import networkx as nx
+
+
+def _nx():
+    """Lazy networkx import — deferred to first Topology panel use."""
+    import networkx
+    return networkx
+
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
@@ -58,6 +69,7 @@ class PathAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
             self._validate_model()
             
             # Build graph
@@ -100,6 +112,7 @@ class PathAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
             self._validate_model()
             graph = self._build_graph()
             source_id = str(source_id)  # type: ignore[assignment]
@@ -178,6 +191,7 @@ class PathAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
             self._validate_model()
             graph = self._build_graph()
             source_id = str(source_id)  # type: ignore[assignment]
@@ -315,6 +329,7 @@ class PathAnalyzer(TopologyAnalyzer):
         start_time: float
     ) -> AnalysisResult:
         """Analyze general path properties of the network."""
+        nx = _nx()
         # Calculate diameter (longest shortest path)
         try:
             if nx.is_strongly_connected(graph):
@@ -400,6 +415,7 @@ class PathAnalyzer(TopologyAnalyzer):
             List of path info dicts that pass through the node
         """
         try:
+            nx = _nx()
             graph = self._build_graph()
             
             if node_id not in graph:
