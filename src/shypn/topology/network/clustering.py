@@ -1,7 +1,18 @@
 """Clustering coefficient analyzer for Petri nets."""
 
-from typing import List, Dict, Optional
-import networkx as nx
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Dict, Optional
+
+if TYPE_CHECKING:
+    import networkx as nx
+
+
+def _nx():
+    """Lazy networkx import — deferred to first Topology panel use."""
+    import networkx
+    return networkx
+
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
@@ -62,6 +73,7 @@ class ClusteringAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
             self._validate_model()
             
             # Build graph
@@ -174,6 +186,7 @@ class ClusteringAnalyzer(TopologyAnalyzer):
             Clustering coefficient (0-1) or None if node not found
         """
         try:
+            nx = _nx()
             graph = self._build_graph()
             if graph.is_directed():
                 graph = graph.to_undirected()
@@ -224,6 +237,7 @@ class ClusteringAnalyzer(TopologyAnalyzer):
             
             high_clustering_ids = [n['id'] for n in high_clustering_nodes]
             subgraph = graph.subgraph(high_clustering_ids)
+            nx = _nx()
             
             # Find connected components as regions
             regions = []
