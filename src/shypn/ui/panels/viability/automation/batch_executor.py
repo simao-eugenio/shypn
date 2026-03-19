@@ -51,11 +51,14 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     # Without this, each worker spawns BLAS threads equal to cpu_count, so
     # (cpu_count-1) workers × cpu_count BLAS threads = N² thread explosion
     # that saturates all cores and makes the app unresponsive at ~60%.
+    # Force-assign (not setdefault) so parent env vars inherited at higher
+    # values are overridden — the parent's UI/VS Code threads must not
+    # propagate their BLAS concurrency into forked sweep workers.
     import os as _os
-    _os.environ.setdefault("OMP_NUM_THREADS", "1")
-    _os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-    _os.environ.setdefault("MKL_NUM_THREADS", "1")
-    _os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+    _os.environ["OMP_NUM_THREADS"] = "1"
+    _os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    _os.environ["MKL_NUM_THREADS"] = "1"
+    _os.environ["NUMEXPR_NUM_THREADS"] = "1"
     try:
         import numpy as _np
         _np.set_num_threads(1)  # NumPy 2.0+; silently ignored on older versions
@@ -269,6 +272,8 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                         'solver': 'TauLeaping_SSA',
                         'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                         'use_tau_leaping': True,
+                        'tau_epsilon': tau_epsilon,
+                        'max_tau': max_tau,
                     },
                     'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
                     'elapsed_time': elapsed_time,
@@ -842,7 +847,12 @@ class BatchExecutor:
             # Reset execution state
             self.is_running = False
             self.current_experiment = None
-            
+
+            # Run a GC pass to reclaim per-experiment objects (model, runner,
+            # numpy temporaries) that Python's reference counter may not have
+            # released yet due to cycles in the statistics/compressor code.
+            import gc as _seq_gc; _seq_gc.collect()
+
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
                 # Use PRIORITY_LOW (300) so all pending experiment_result_callback calls
@@ -898,6 +908,18 @@ class BatchExecutor:
                 # workers.  On a 12-logical-core machine this yields 10 workers
                 # while keeping the app responsive.
                 n_workers = max(1, multiprocessing.cpu_count() - 2)
+
+            # Cap concurrent workers to prevent RAM exhaustion at large N.
+            # Each worker accumulates all N replicate trajectory arrays in RAM
+            # before returning: empirical peak ≈ N × 4 MB (float32 place
+            # buffers + overhead).  Limit workers so total in-flight data
+            # stays under ~4 GB regardless of N.
+            # Examples: N=200 → 5 workers (5×800 MB = 4 GB)
+            #           N=100 → 10 workers (cap not binding at ≤ cpu_count-2)
+            _ram_limit_mb = 4096
+            _mb_per_worker = max(200, replicates * 4)
+            _ram_cap = max(1, _ram_limit_mb // _mb_per_worker)
+            n_workers = min(n_workers, _ram_cap)
 
             # Use 'forkserver' context: workers are forked from a clean server
             # process that was started before GTK/Numba were loaded, so they
@@ -1465,6 +1487,19 @@ class BatchExecutor:
                             'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0,
                             'elapsed_time': rep.get('elapsed_time', 0.0)  # Wall-clock time
                         })
+
+            # Capture scalar summaries before freeing raw trajectory data.
+            # `results` holds ~200 MB (100 replicates × all place trajectories);
+            # releasing it here instead of at function-return drops peak RSS by
+            # ~200 MB per experiment — critical for multi-condition sweeps.
+            _n_replicates_count = len(results) if results else 0
+            _error_count = sum(1 for r in results if 'error' in r) if results else 0
+            del results
+
+            # Release the per-experiment model object (places/transitions/arcs
+            # built from subnet_data dicts) and the ReplicateRunner that holds
+            # a reference to it — neither is needed past this point.
+            del runner, model
             
             # Generate metadata for this experiment
             from shypn.metadata import SweepHeaderGenerator
@@ -1496,12 +1531,11 @@ class BatchExecutor:
             
             # Determine execution status
             execution_status = 'SUCCESS'
-            if results:
+            if _n_replicates_count > 0:
                 # Count errors in replicates
-                error_count = sum(1 for r in results if 'error' in r)
-                if error_count > 0:
-                    errors.append(f"{error_count}/{len(results)} replicates failed")
-                    execution_status = 'WARNING' if error_count < len(results) else 'FAILED'
+                if _error_count > 0:
+                    errors.append(f"{_error_count}/{_n_replicates_count} replicates failed")
+                    execution_status = 'WARNING' if _error_count < _n_replicates_count else 'FAILED'
                 
                 # Check for deadlocks
                 deadlock_count = sum(1 for r in replicate_data if r.get('deadlocked', False))
@@ -1540,6 +1574,8 @@ class BatchExecutor:
                     'solver': 'TauLeaping_SSA',
                     'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                     'use_tau_leaping': True,
+                    'tau_epsilon': tau_epsilon,
+                    'max_tau': max_tau,
                 },
                 'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
                 'elapsed_time': elapsed_time,
@@ -1567,7 +1603,7 @@ class BatchExecutor:
                 'snapshot_index': snapshot_index,
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
                 'compressed_trajectories': compressed_trajectories,  # δ-filtered per-replicate data
-                'n_replicates': len(results) if results else 0,
+                'n_replicates': _n_replicates_count,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
                 'swept_parameter': swept_param,  # Include swept parameter info for smart plotting
