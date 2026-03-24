@@ -8,13 +8,12 @@ The panel can exist in two states:
   - Detached: standalone floating window
   - Attached: content embedded in main window container (extreme right)
 """
-import os
 import sys
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
     print('ERROR: GTK3 not available in right_panel loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -364,9 +363,6 @@ class RightPanelLoader:
         else:
             # Show floating window
             self.window.show_all()
-        
-        # WAYLAND FIX: Use idle callback to defer hide operation
-        GLib.idle_add(_do_hide)
     
     # ========================================================================
     # GtkStack Integration Methods

@@ -1363,7 +1363,7 @@ class BaseTopologyCategory:
                 errors = '\n'.join(result.errors) if result.errors else "Analysis blocked"
                 warnings = '\n'.join(result.warnings) if result.warnings else ""
                 
-                formatted = f"<span foreground='orange'><b>⛔ Analysis Blocked</b></span>\n\n"
+                formatted = "<span foreground='orange'><b>⛔ Analysis Blocked</b></span>\n\n"
                 formatted += f"<span foreground='red'>{errors}</span>\n\n"
                 if warnings:
                     formatted += f"<span foreground='blue'><i>{warnings}</i></span>"
@@ -1582,7 +1582,7 @@ class BaseTopologyCategory:
             print(f"[BASE_TOPOLOGY] Calling notify_report_panel(), analyzed={len(analyzed_set)}/{total_analyzers}")
             self.parent_panel.notify_report_panel()
         else:
-            print(f"[BASE_TOPOLOGY] No parent_panel to notify!")
+            print("[BASE_TOPOLOGY] No parent_panel to notify!")
     
     def auto_run_all_analyzers(self):
         """Auto-run SAFE analyzers in background without requiring user expansion.

@@ -7,7 +7,7 @@ Following OOP principles with clear separation of concerns.
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from shypn.engine.simulation.state.detector import SimulationStateDetector

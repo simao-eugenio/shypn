@@ -268,9 +268,11 @@ class ExperimentQueueView(Gtk.Box):
         
         # Update status label to reflect running/paused state
         if is_running:
-            # Count running/pending experiments
+            # Count all statuses so the label always shows the full picture
             running = 0
             pending = 0
+            completed = 0
+            failed = 0
             iter = self.queue_store.get_iter_first()
             while iter:
                 status = self.queue_store.get_value(iter, 1)
@@ -278,12 +280,24 @@ class ExperimentQueueView(Gtk.Box):
                     running += 1
                 elif status == self.STATUS_PENDING:
                     pending += 1
+                elif status == self.STATUS_COMPLETED:
+                    completed += 1
+                elif status == self.STATUS_FAILED:
+                    failed += 1
                 iter = self.queue_store.iter_next(iter)
-            
+
+            total = running + pending + completed + failed
+            done_str = f", {completed} done" if completed > 0 else ""
+            failed_str = f", <span foreground='red'>{failed} failed</span>" if failed > 0 else ""
+
             if is_paused:
-                self.status_label.set_markup(f"<span foreground='orange'><b>Paused</b> - {running} active, {pending} pending</span>")
+                self.status_label.set_markup(
+                    f"<span foreground='orange'><b>Paused</b> - {running} active, {pending} pending{done_str}{failed_str} / {total} total</span>"
+                )
             elif running > 0 or pending > 0:
-                self.status_label.set_markup(f"<b>Running... ({running} active, {pending} pending)</b>")
+                self.status_label.set_markup(
+                    f"<b>Running... ({running} active, {pending} pending{done_str}{failed_str} / {total} total)</b>"
+                )
         else:
             # Not running - refresh normal status
             self._update_status_label()

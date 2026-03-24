@@ -22,7 +22,7 @@ Usage:
 
 import ast
 import math
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 
 # Module-level cache: expression string → compiled code object.
 # AST validation runs once per unique expression, then the compiled bytecode is reused.

@@ -5,7 +5,6 @@ Extracts species (metabolites/compounds) from SBML model.
 """
 
 from typing import List, Dict, Any
-import logging
 
 try:
     import libsbml

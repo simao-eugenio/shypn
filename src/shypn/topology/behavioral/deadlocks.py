@@ -21,8 +21,7 @@ Implementation approach:
 - Classify deadlock severity and provide recovery suggestions
 """
 
-from typing import Any, Dict, List, Set, Optional
-import numpy as np
+from typing import Any, Dict, List
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult

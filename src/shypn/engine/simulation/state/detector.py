@@ -248,7 +248,7 @@ class SimulationStateDetector:
         time_str = f"{self._provider.time:.2f}s"
         
         if self.is_idle():
-            return f"Ready for editing (time = 0)"
+            return "Ready for editing (time = 0)"
         elif self.is_running():
             return f"Running simulation (time = {time_str})"
         elif self.has_started():

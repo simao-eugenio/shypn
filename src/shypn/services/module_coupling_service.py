@@ -26,7 +26,7 @@ Design Principles:
 - Quantitative metrics (independence score, coupling strength)
 """
 
-from typing import List, Dict, Set, Tuple, Optional, Any
+from typing import List, Dict, Set, Tuple, Any
 from collections import defaultdict
 import logging
 
@@ -527,7 +527,7 @@ class ModuleCouplingService:
         
         # Metrics
         metrics = validation_result['metrics']
-        lines.append(f"\nMetrics:")
+        lines.append("\nMetrics:")
         lines.append(f"  Modules: {metrics['total_modules']}")
         lines.append(
             f"  Places: {metrics['assigned_places']}/{metrics['total_places']} assigned"

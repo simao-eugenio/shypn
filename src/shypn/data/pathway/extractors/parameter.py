@@ -5,7 +5,6 @@ Extracts global parameters from SBML model.
 """
 
 from typing import Dict
-import logging
 
 try:
     import libsbml

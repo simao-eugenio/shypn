@@ -14,7 +14,7 @@ Example:
     for line in description:
 """
 
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 from .locality_detector import Locality, LocalityDetector
 
 

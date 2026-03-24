@@ -11,7 +11,6 @@ Date: October 2025
 import json
 from typing import Dict, Any, Optional
 from pathlib import Path
-import logging
 
 from .base_metadata_manager import BaseMetadataManager
 
@@ -89,7 +88,6 @@ class JSONMetadataManager(BaseMetadataManager):
             return None
         
         except (OSError, IOError, PermissionError) as e:
-            from shypn.exceptions import ImportExportError
             self.logger.error(f"Failed to read metadata file: {e}")
             return None
     
@@ -123,7 +121,6 @@ class JSONMetadataManager(BaseMetadataManager):
             return True
         
         except (OSError, IOError, PermissionError, json.JSONDecodeError) as e:
-            from shypn.exceptions import ImportExportError
             self.logger.error(f"Failed to update metadata file: {e}")
             return False
     
@@ -276,7 +273,7 @@ class JSONMetadataManager(BaseMetadataManager):
             # Write new metadata
             self._write_json(data)
             
-            self.logger.info(f"Imported metadata from dictionary")
+            self.logger.info("Imported metadata from dictionary")
             return True
         
         except Exception as e:

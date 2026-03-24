@@ -14,9 +14,9 @@ Example:
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
-from gi.repository import Gtk, Pango, Pango
+from gi.repository import Gtk, Pango
 
-from .locality_detector import Locality, LocalityDetector
+from .locality_detector import LocalityDetector
 from .locality_analyzer import LocalityAnalyzer
 from .locality_runtime import LocalityRuntimeAnalyzer
 
@@ -238,7 +238,7 @@ class LocalityInfoWidget(Gtk.Box):
                 text_lines.append(f"  Recent Events:    {diag['event_count']}")
                 text_lines.append(f"  Throughput:       {diag['throughput']:.3f} fires/sec")
             else:
-                text_lines.append(f"  Status:           No firing events recorded")
+                text_lines.append("  Status:           No firing events recorded")
         
         # Set text
         buffer = self.textview.get_buffer()

@@ -14,7 +14,6 @@ from pathlib import Path
 
 from .base_category import BaseReportCategory
 from .widgets import SpeciesConcentrationTable, ReactionActivityTable
-from shypn.helpers.batch_results_saver import BatchResultsSaver
 from shypn.data.project_models import get_project_manager
 
 
@@ -1175,7 +1174,7 @@ class DynamicAnalysesCategory(BaseReportCategory):
             self.logger.debug("_populate_reaction_selected_table: report_data has no simulation data")
             self.reaction_selected_store.clear()
             self.reaction_selected_status.set_markup(
-                f"<i>No simulation data for selected reaction(s). Run a simulation first.</i>"
+                "<i>No simulation data for selected reaction(s). Run a simulation first.</i>"
             )
             self.reaction_selected_status.show()
             return
@@ -1442,11 +1441,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
             # Save metadata.txt for human readability
             metadata_path = os.path.join(simulation_folder, 'metadata.txt')
             with open(metadata_path, 'w') as f:
-                f.write(f"Simulation Auto-Save\n")
+                f.write("Simulation Auto-Save\n")
                 f.write(f"{'=' * 50}\n\n")
                 f.write(f"Model: {model_name}\n")
                 f.write(f"Timestamp: {timestamp}\n")
-                f.write(f"Simulation Type: Report Panel\n\n")
+                f.write("Simulation Type: Report Panel\n\n")
                 
                 metadata_dict = sim_data.get('metadata', {})
                 if metadata_dict:
@@ -1454,11 +1453,11 @@ class DynamicAnalysesCategory(BaseReportCategory):
                     for key, value in metadata_dict.items():
                         f.write(f"  {key}: {value}\n")
                 
-                f.write(f"\nFiles Saved:\n")
-                f.write(f"  - trajectories.csv: Time-series data (wide format)\n")
-                f.write(f"  - statistics.csv: Summary statistics\n")
-                f.write(f"  - simulation_data.json: Full simulation data\n")
-                f.write(f"  - config.json: Simulation configuration\n")
+                f.write("\nFiles Saved:\n")
+                f.write("  - trajectories.csv: Time-series data (wide format)\n")
+                f.write("  - statistics.csv: Summary statistics\n")
+                f.write("  - simulation_data.json: Full simulation data\n")
+                f.write("  - config.json: Simulation configuration\n")
             
             print(f"✓ Simulation auto-saved to: {simulation_folder}")
             

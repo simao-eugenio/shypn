@@ -12,7 +12,6 @@ import threading
 from typing import Optional
 
 from shypn.ui.panels.pathway_operations.base_pathway_category import BasePathwayCategory
-from shypn.data.project_models import get_project_manager
 from shypn.importer.bigg.bigg_model_fetcher import BiGGModelFetcher, BiGGModelInfo
 from shypn.importer.bigg.bigg_downloader import BiGGDownloader
 from shypn.importer.bigg.bigg_signal_classifier import BiGGSignalClassifier
@@ -664,7 +663,7 @@ class BiGGCategory(BasePathwayCategory):
                     self.logger.info("  Reusing cached parsed pathway from preview")
                     parsed_pathway = self.parsed_pathway
                 else:
-                    self.logger.info(f"Step 2: Parsing SBML")
+                    self.logger.info("Step 2: Parsing SBML")
                     parsed_pathway = self.sbml_parser.parse_file(sbml_path)
                     self.logger.info(f"  Parsed: {len(parsed_pathway.species)} species, "
                                    f"{len(parsed_pathway.reactions)} reactions")
@@ -686,11 +685,11 @@ class BiGGCategory(BasePathwayCategory):
                 GLib.idle_add(self._update_sbml_metadata_view, parsed_pathway)
                 
                 # Step 3: Post-process → ProcessedPathwayData
-                self.logger.info(f"Step 3: Post-processing pathway")
+                self.logger.info("Step 3: Post-processing pathway")
                 processed_pathway = self.postprocessor.process(parsed_pathway)
                 
                 # Step 4: Convert to Petri net → DocumentModel
-                self.logger.info(f"Step 4: Converting to Petri net")
+                self.logger.info("Step 4: Converting to Petri net")
                 
                 # Check if this is a large model requiring memory optimization
                 species_count = len(processed_pathway.species)
@@ -698,7 +697,7 @@ class BiGGCategory(BasePathwayCategory):
                 
                 if species_count > 500 or reaction_count > 500:
                     # Use memory-optimized conversion for large models
-                    self.logger.info(f"  Using memory-optimized conversion (large model)")
+                    self.logger.info("  Using memory-optimized conversion (large model)")
                     from shypn.data.pathway.memory_optimizer import optimize_large_model_import
                     document_model = optimize_large_model_import(
                         processed_pathway, 
@@ -735,18 +734,18 @@ class BiGGCategory(BasePathwayCategory):
                 
                 # Step 5: Apply BiGG signal classification (if enabled)
                 if classify_energy:
-                    self.logger.info(f"Step 5: Applying BiGG signal classification")
+                    self.logger.info("Step 5: Applying BiGG signal classification")
                     from shypn.netobjs.signal_type import SignalType
                     classified_places = self.classifier.classify_energy_signals(document_model.places)
                     energy_count = sum(1 for p in classified_places 
                                       if hasattr(p, 'signal_type') and p.signal_type == SignalType.ENERGY)
                     self.logger.info(f"  Classified {energy_count} energy signals (Layer 0)")
                 else:
-                    self.logger.info(f"Step 5: Signal classification skipped (user option)")
+                    self.logger.info("Step 5: Signal classification skipped (user option)")
                 
                 # Step 5.5: Convert arcs to/from signal places to SignalFlowArcs
                 if classify_energy:
-                    self.logger.info(f"Step 5.5: Converting arcs to signal places to SignalFlowArcs")
+                    self.logger.info("Step 5.5: Converting arcs to signal places to SignalFlowArcs")
                     from shypn.netobjs.signal_flow_arc import SignalFlowArc
                     from shypn.netobjs.arc import Arc
                     
@@ -789,7 +788,7 @@ class BiGGCategory(BasePathwayCategory):
                 # - Compartment places (non-cytosol): Violet border (0.5, 0.0, 0.5)
                 # - Regular places (cytosol): Black border (0.0, 0.0, 0.0)
                 # - SignalFlowArcs: Light gray (0.7, 0.7, 0.7)
-                self.logger.info(f"Step 5.6: Enforcing color schema on all entities")
+                self.logger.info("Step 5.6: Enforcing color schema on all entities")
                 from shypn.utils.color_schema_manager import ColorSchemaManager
                 
                 # Apply colors to all places (signal, compartment, regulatory)
@@ -812,7 +811,7 @@ class BiGGCategory(BasePathwayCategory):
                 # Step 6: Convert SBML compartments to modules
                 if SBMLCompartmentModuleService:
                     try:
-                        self.logger.info(f"Step 6: Converting compartments to modules")
+                        self.logger.info("Step 6: Converting compartments to modules")
                         # Build species_id → Place mapping
                         species_to_place = {}
                         for place in document_model.places:
@@ -1041,7 +1040,7 @@ class BiGGCategory(BasePathwayCategory):
                 
                 # CRITICAL: Create canvas with temporary filename to avoid loading
                 # stale view state from previous imports of same model
-                self.logger.info(f"[BIGG AUTO-LOAD] Step 1: Calling add_document()...")
+                self.logger.info("[BIGG AUTO-LOAD] Step 1: Calling add_document()...")
                 page_index, drawing_area = canvas_loader.add_document(filename="importing_temp")
                 self.logger.info(f"[BIGG AUTO-LOAD] Step 2: add_document() returned page_index={page_index}, drawing_area={id(drawing_area) if drawing_area else 'None'}")
                 
@@ -1066,7 +1065,7 @@ class BiGGCategory(BasePathwayCategory):
                     arcs=document_model.arcs,
                     modules=document_model.modules
                 )
-                self.logger.info(f"[BIGG AUTO-LOAD] Step 6: load_objects() completed successfully")
+                self.logger.info("[BIGG AUTO-LOAD] Step 6: load_objects() completed successfully")
                 
                 # CRITICAL: Copy metadata to canvas manager's document
                 # This ensures metadata is available for tab-switch and metadata inspector
@@ -1160,7 +1159,7 @@ class BiGGCategory(BasePathwayCategory):
                 self.import_button.set_sensitive(True)
                 
             except Exception as load_error:
-                self.logger.error(f"=== BiGG canvas auto-load FAILED ===")
+                self.logger.error("=== BiGG canvas auto-load FAILED ===")
                 self.logger.error(f"Failed to auto-load: {load_error}")
                 import traceback
                 traceback.print_exc()
@@ -1175,7 +1174,7 @@ class BiGGCategory(BasePathwayCategory):
         # Schedule canvas loading on idle
         self.logger.info(f"[BIGG] Scheduling do_canvas_load() via GLib.idle_add (canvas_loader={canvas_loader is not None}, document_model={document_model is not None}, saved_filepath={saved_filepath})")
         GLib.idle_add(do_canvas_load)
-        self.logger.info(f"[BIGG] GLib.idle_add(do_canvas_load) called successfully")
+        self.logger.info("[BIGG] GLib.idle_add(do_canvas_load) called successfully")
     
     # ========================================================================
     # Category Interface (from BasePathwayCategory)

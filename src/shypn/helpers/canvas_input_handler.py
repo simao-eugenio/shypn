@@ -15,7 +15,6 @@ Module structure:
 
 from __future__ import annotations
 
-import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -885,7 +884,6 @@ class CanvasInputHandler(AbstractCanvasInputHandler):
         pointer_y: Optional[float] = None,
     ) -> None:
         """Paste clipboard objects centred at *pointer_x/y* (world coords)."""
-        from shypn.netobjs import Place, Transition
         if not self._clipboard:
             return
 
@@ -985,7 +983,7 @@ class CanvasInputHandler(AbstractCanvasInputHandler):
 
     def _capture_delete_snapshots_inline(self, manager: Any, targets: Any) -> List[Any]:
         """Inline snapshot capture (fallback when shypn.edit.snapshots unavailable)."""
-        from shypn.netobjs import Place, Transition, Arc
+        from shypn.netobjs import Place, Arc
         snaps: List[Any] = []
         recorded_arc_ids: Set[int] = set()
 

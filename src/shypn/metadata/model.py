@@ -6,7 +6,6 @@ Captures model file information, version, and provenance.
 
 from typing import Dict, Any, Optional
 import hashlib
-import json
 from pathlib import Path
 from datetime import datetime
 

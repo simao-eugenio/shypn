@@ -1,11 +1,21 @@
 """Cycle detection for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Tuple
-import networkx as nx
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
+
+if TYPE_CHECKING:
+    import networkx as nx
+
+
+def _nx():
+    """Lazy networkx import — deferred to first Topology panel use."""
+    import networkx
+    return networkx
+
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
-from ..base.exceptions import TopologyAnalysisError
 
 
 class CycleAnalyzer(TopologyAnalyzer):
@@ -64,6 +74,7 @@ class CycleAnalyzer(TopologyAnalyzer):
             graph = self._build_graph()
             
             # Find elementary cycles using NetworkX (Johnson's algorithm)
+            nx = _nx()
             all_cycles = list(nx.simple_cycles(graph))
             
             # Filter by minimum length
@@ -142,6 +153,7 @@ class CycleAnalyzer(TopologyAnalyzer):
         Returns:
             NetworkX DiGraph representation of the Petri net
         """
+        nx = _nx()
         graph = nx.DiGraph()
         
         # Add place nodes

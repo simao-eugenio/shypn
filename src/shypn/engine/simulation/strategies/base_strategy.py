@@ -8,7 +8,7 @@ know which specific algorithm is being used.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from shypn.engine.simulation.controller import SimulationController

@@ -32,7 +32,7 @@ from .models import (
 )
 
 # Export context (NEW: place-aware thermodynamics)
-from .context import (
+from .context import (  # noqa: F401
     ThermodynamicContext,
     PlaceThermodynamics,
     ThermodynamicSource

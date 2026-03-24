@@ -10,7 +10,7 @@ Date: October 2025
 from typing import List, Dict, Any
 import logging
 
-from ..models import FetchResult, QualityMetrics
+from ..models import FetchResult
 
 
 class QualityScorer:

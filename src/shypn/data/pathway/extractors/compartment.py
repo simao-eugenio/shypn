@@ -5,7 +5,6 @@ Extracts compartments (cellular locations) from SBML model.
 """
 
 from typing import Dict
-import logging
 
 try:
     import libsbml

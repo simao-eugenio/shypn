@@ -99,6 +99,14 @@ class SweepConfiguration(MetadataSection):
         
         timestep = sim_config.get('timestep', 'adaptive')
         self.add_field('Timestep', timestep)
+
+        tau_epsilon = sim_config.get('tau_epsilon')
+        if tau_epsilon is not None:
+            self.add_field('Tau_Epsilon', tau_epsilon)
+
+        max_tau = sim_config.get('max_tau')
+        if max_tau is not None:
+            self.add_field('Max_Tau', max_tau)
         
     def validate(self) -> tuple[bool, Optional[str]]:
         """Validate sweep configuration."""

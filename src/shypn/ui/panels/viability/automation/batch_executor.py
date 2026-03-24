@@ -10,11 +10,40 @@ Date: December 7, 2025
 
 import threading
 import time
-import numpy as np
 import multiprocessing
 import os
 from typing import Optional, Callable, Dict, Any, List
 from datetime import datetime, timezone
+
+
+# Module-level queue injected into each worker via Pool initializer.
+# Using the initializer pattern (instead of passing the queue in the args dict)
+# is required when the multiprocessing context is 'forkserver' or 'spawn':
+# in those contexts, args passed to apply_async() are pickled, but a plain
+# multiprocessing.Queue (OS pipe) is not picklable.  The initializer runs
+# inside the freshly forked worker before any task, so the queue is inherited
+# via the OS fork rather than serialised.
+_worker_progress_queue = None
+
+
+def _worker_pool_initializer(q) -> None:
+    """Called once in each worker process right after it is spawned.
+
+    Sets the module-level _worker_progress_queue so that _worker_run_experiment
+    can use it without the queue appearing in the pickled args dict.
+
+    Also limits BLAS/OpenMP thread count here — this is the earliest possible
+    point in the worker lifecycle, before ANY library is imported.  Setting env
+    vars in _worker_run_experiment (later, after imports) is too late for some
+    BLAS backends that read the thread count at library-load time.
+    """
+    import os as _os
+    _os.environ["OMP_NUM_THREADS"] = "1"
+    _os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    _os.environ["MKL_NUM_THREADS"] = "1"
+    _os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    global _worker_progress_queue
+    _worker_progress_queue = q
 
 
 def _worker_run_experiment(args: dict) -> Dict[str, Any]:
@@ -28,13 +57,34 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     Returns:
         Result dictionary
     """
+    # Limit numpy/BLAS internal thread count to 1 per worker process.
+    # Without this, each worker spawns BLAS threads equal to cpu_count, so
+    # (cpu_count-1) workers × cpu_count BLAS threads = N² thread explosion
+    # that saturates all cores and makes the app unresponsive at ~60%.
+    # Force-assign (not setdefault) so parent env vars inherited at higher
+    # values are overridden — the parent's UI/VS Code threads must not
+    # propagate their BLAS concurrency into forked sweep workers.
+    import os as _os
+    _os.environ["OMP_NUM_THREADS"] = "1"
+    _os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    _os.environ["MKL_NUM_THREADS"] = "1"
+    _os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    try:
+        import numpy as _np
+        _np.set_num_threads(1)  # NumPy 2.0+; silently ignored on older versions
+    except (AttributeError, ImportError):
+        pass
+
     from shypn.data.canvas.document_model import DocumentModel
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
     
     start_time = time.time()
     
-    # Extract progress queue if provided
-    progress_queue = args.get('progress_queue')
+    # Progress queue is injected at worker spawn via Pool initializer
+    # (cannot be passed via args dict with forkserver/spawn contexts because
+    # multiprocessing.Queue is not picklable).
+    global _worker_progress_queue
+    progress_queue = _worker_progress_queue
     queue_index = args.get('queue_index')
     
     # Define progress callback that sends updates to queue
@@ -50,15 +100,20 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                 pass  # Ignore queue errors (non-fatal)
     
     try:
+        # Send an immediate heartbeat so the zombie-silence clock resets to the
+        # moment this worker actually starts executing, not the submission time.
+        # Without this, conditions that spent time queued in the pool's task
+        # queue (waiting for a free worker slot) would accumulate "silent" time
+        # counted from submission, falsely triggering zombie detection before
+        # any replicate has a chance to run.
+        worker_progress_callback(0.0)
+
         # Extract arguments
         name = args['name']
         snapshot = args['snapshot']
         replicates = args['replicates']
         duration = args['duration']
         import os as _os
-        _dlog = _os.path.expanduser("~/sweep_debug.log")
-        with open(_dlog, 'a') as _f:
-            _f.write(f"[WORKER START] {name}: replicates={replicates}, duration={duration}\n")
         termination_condition = args['termination_condition']
         subnet_data = args['subnet_data']
         baseline_params = args['baseline_params']
@@ -227,6 +282,8 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
                         'solver': 'TauLeaping_SSA',
                         'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                         'use_tau_leaping': True,
+                        'tau_epsilon': tau_epsilon,
+                        'max_tau': max_tau,
                     },
                     'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
                     'elapsed_time': elapsed_time,
@@ -281,23 +338,34 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
             }
 
             # Compress raw trajectories with δ-filter before discarding raw data.
+            # min_gap default: 5.0 s — on a 0.72 s SSA step almost every step
+            # triggers the delta-filter (discrete token changes hit the 2% threshold
+            # at molecule-scale); a 5 s minimum gap lifts compression from ~2× to
+            # ~7×, reducing compressed_trajectories size before IPC pickle.
             worker_compressed: list = []
+            _n_replicates_count = len(results)  # save before del
             try:
                 from shypn.helpers.compressor import DeltaFilterCompressor
                 _cmp = DeltaFilterCompressor(
                     epsilon=args.get('compressor_epsilon', 0.02),
                     max_gap=args.get('compressor_max_gap', 300.0),
-                    min_gap=args.get('compressor_min_gap', 0.0),
+                    min_gap=args.get('compressor_min_gap', 5.0),
                 )
                 worker_compressed = _cmp.compress_batch(results)
             except Exception as _ce:
                 print(f'[WORKER] Warning: trajectory compression failed: {_ce}')
 
+            # Free raw trajectory data (~100–250 MB) before building the return
+            # dict, which is pickled for IPC.  Without this explicit delete the
+            # raw results list stays in scope during pickling, doubling peak RAM.
+            del results
+            import gc as _worker_gc; _worker_gc.collect()
+
             return {
                 'name': name,
                 'snapshot_index': args['snapshot_index'],
                 'statistics': statistics,
-                'n_replicates': len(results),
+                'n_replicates': _n_replicates_count,
                 'duration': elapsed_time,
                 'elapsed_time': elapsed_time,
                 'status': 'success',
@@ -346,13 +414,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
     # Import property path parser
     from .property_path_parser import parse_property_path, apply_property_to_object, resolve_object
     
-    # DEBUG: File-based logging for worker process
-    import os
-    debug_log = os.path.expanduser("~/sweep_debug.log")
-    
     if not snapshot:
-        with open(debug_log, 'a') as f:
-            f.write("[WORKER] No snapshot provided!\n")
         return
     
     # Handle both ExperimentSnapshot objects and dict format
@@ -365,15 +427,6 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             arc_weights = snapshot['arc_weights']
             property_overrides = snapshot.get('property_overrides', {})  # NEW
             swept_param = snapshot.get('swept_parameter')
-            snap_name = snapshot.get('name', 'unknown')
-            
-            # DEBUG: Log snapshot info
-            with open(debug_log, 'a') as f:
-                f.write(f"\n[WORKER] Processing snapshot (dict): {snap_name}\n")
-                f.write(f"[WORKER] swept_parameter: {swept_param}\n")
-                f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
-                f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
-                f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
         elif 'parameters' in snapshot:
             # Old dict format - convert to place/transition/arc mappings
             place_markings = {}
@@ -396,9 +449,7 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
             
             swept_param = None  # Old format doesn't have swept_parameter
         else:
-            # No valid dict format
-            with open(debug_log, 'a') as f:
-                f.write(f"[WORKER] ERROR: Unknown dict format, keys: {snapshot.keys()}\n")
+            # No valid dict format — skip silently
             return
     elif hasattr(snapshot, 'place_markings'):
         # ExperimentSnapshot object - use its attributes
@@ -407,56 +458,15 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         arc_weights = snapshot.arc_weights
         property_overrides = getattr(snapshot, 'property_overrides', {})  # NEW
         swept_param = getattr(snapshot, 'swept_parameter', None)
-        snap_name = getattr(snapshot, 'name', 'unknown')
-        
-        # DEBUG: Log snapshot info
-        with open(debug_log, 'a') as f:
-            f.write(f"\n[WORKER] Processing snapshot (object): {snap_name}\n")
-            f.write(f"[WORKER] swept_parameter: {swept_param}\n")
-            f.write(f"[WORKER] property_overrides: {list(property_overrides.keys())}\n")
-            f.write(f"[WORKER] place_markings keys: {list(place_markings.keys())}\n")
-            f.write(f"[WORKER] model places: {[p.id for p in model.places]}\n")
     else:
         # No valid snapshot format
         return
     
-    # Apply place markings (LEGACY - for backward compatibility)
-    import os
-    debug_log = os.path.expanduser("~/sweep_debug.log")
-    
-    # DEBUG: Check for swept parameter (works for both dict and object)
-    # Note: swept_param['id'] may carry the full property path (e.g. 'P2.initial_marking');
-    # strip the dot-suffix to get the bare object ID for comparison with place_markings keys.
-    if isinstance(swept_param, dict):
-        raw_swept_id = swept_param.get('id', '')
-        bare_swept_id = raw_swept_id.split('.')[0] if raw_swept_id else ''
-        swept_place_id = bare_swept_id if swept_param.get('type') == 'places' and bare_swept_id else None
-    else:
-        swept_place_id = None
-    
-    applied_count = 0
-    not_found_count = 0
-    
+    # Apply place markings
     for place_id, marking in place_markings.items():
         place = next((p for p in model.places if p.id == place_id), None)
         if place:
-            old_value = place.tokens
             place.tokens = float(marking)
-            applied_count += 1
-            
-            # DEBUG: Log swept parameter application
-            if place_id == swept_place_id:
-                with open(debug_log, 'a') as f:
-                    f.write(f"[WORKER] ✓ SWEPT PARAM: {place_id} = {old_value} → {marking}\n")
-        else:
-            not_found_count += 1
-            # DEBUG: Log place not found
-            with open(debug_log, 'a') as f:
-                f.write(f"[WORKER] ✗ Place NOT FOUND: {place_id}\n")
-    
-    # DEBUG: Summary
-    with open(debug_log, 'a') as f:
-        f.write(f"[WORKER] Applied: {applied_count}, Not found: {not_found_count}\n")
     
     # Apply transition rates (handle both numeric and formula strings)
     for trans_id, rate in transition_rates.items():
@@ -488,31 +498,17 @@ def _apply_snapshot_to_worker_model(snapshot, model, baseline_params):
         if arc:
             arc.weight = float(weight)
     
-    # NEW: Apply property overrides (takes precedence over legacy dicts)
+    # Apply property overrides (takes precedence over legacy dicts)
     # This enables explicit property paths like "T5.volume_threshold", "A3.threshold"
     if property_overrides:
-        with open(debug_log, 'a') as f:
-            f.write(f"\n[WORKER] Applying {len(property_overrides)} property overrides:\n")
-        
         for prop_path, value in property_overrides.items():
             try:
-                # Parse property path and resolve object via central helper
                 obj_id, prop_name = parse_property_path(prop_path)
                 obj = resolve_object(model, obj_id)
-
-                # Apply property through validated OOP path
                 if obj:
-                    success = apply_property_to_object(obj, prop_name, value)
-                    with open(debug_log, 'a') as f:
-                        status = "✓" if success else "✗"
-                        f.write(f"[WORKER] {status} {prop_path} = {value}\n")
-                else:
-                    with open(debug_log, 'a') as f:
-                        f.write(f"[WORKER] ✗ Object not found: {obj_id}\n")
-                        
-            except Exception as e:
-                with open(debug_log, 'a') as f:
-                    f.write(f"[WORKER] ✗ Error applying {prop_path}: {e}\n")
+                    apply_property_to_object(obj, prop_name, value)
+            except Exception:
+                pass  # Silently skip invalid property paths
 
 
 class BatchExecutor:
@@ -565,7 +561,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Run batch of experiments asynchronously.
@@ -672,7 +668,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch in background thread - SEQUENTIAL or PARALLEL execution.
@@ -726,7 +722,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch sequentially in background thread.
@@ -861,7 +857,12 @@ class BatchExecutor:
             # Reset execution state
             self.is_running = False
             self.current_experiment = None
-            
+
+            # Run a GC pass to reclaim per-experiment objects (model, runner,
+            # numpy temporaries) that Python's reference counter may not have
+            # released yet due to cycles in the statistics/compressor code.
+            import gc as _seq_gc; _seq_gc.collect()
+
             if complete_callback:
                 # CRITICAL: Schedule callback in main thread - don't block background thread
                 # Use PRIORITY_LOW (300) so all pending experiment_result_callback calls
@@ -891,7 +892,7 @@ class BatchExecutor:
         dt_manual: Optional[float] = None,
         seed_base: int = 42,
         compressor_epsilon: float = 0.02,
-        compressor_min_gap: float = 0.0,
+        compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
     ):
         """Execute batch in parallel using multiprocessing.
@@ -912,7 +913,29 @@ class BatchExecutor:
         try:
             # Determine number of workers
             if n_workers is None:
-                n_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave 1 core free
+                # Reserve 2 logical cores for the GTK UI thread, VS Code, OS
+                # scheduler, and auto-save I/O threads; give the rest to sweep
+                # workers.  On a 12-logical-core machine this yields 10 workers
+                # while keeping the app responsive.
+                n_workers = max(1, multiprocessing.cpu_count() - 2)
+
+            # Cap concurrent workers to prevent resource exhaustion.
+            # Each worker accumulates all N replicate trajectory arrays in RAM
+            # before returning: empirical peak ≈ N × 1 MB (measured on GATA
+            # model: ~0.74 MB/replicate uncompressed; using 1 MB adds safety
+            # margin).
+            #
+            # Hard cap at 5 workers on this 12-core machine:
+            # - 8 workers saturated all cores → VS Code extension host lost
+            #   its LSP heartbeat and disconnected (confirmed empirically).
+            # - 5 workers leaves ~7 cores for VS Code, Python LSP, GTK UI
+            #   thread, OS scheduler, and auto-save I/O — keeps the app
+            #   responsive throughout a sweep.
+            # Examples: N=200 → cap=5  N=1000 → cap=5
+            _ram_limit_mb = 16384
+            _mb_per_worker = max(100, replicates * 1)
+            _ram_cap = max(1, _ram_limit_mb // _mb_per_worker)
+            n_workers = min(n_workers, _ram_cap, 5)  # hard cap at 5
 
             # Use 'forkserver' context: workers are forked from a clean server
             # process that was started before GTK/Numba were loaded, so they
@@ -922,9 +945,14 @@ class BatchExecutor:
             # including all loaded GTK shared-memory segments).
             _mp_ctx = multiprocessing.get_context('forkserver')
 
-            # Create shared progress queue for workers to report back
-            manager = _mp_ctx.Manager()
-            progress_queue = manager.Queue()
+            # Create shared progress queue for workers to report back.
+            # Use a plain multiprocessing.Queue (OS pipe) rather than a
+            # manager.Queue() proxy.  manager.Queue() requires a separate
+            # Manager server process; if that process is OOM-killed the
+            # workers silently lose the ability to send heartbeats, causing
+            # false zombie timeouts after ZOMBIE_SILENCE_S.  A plain Queue
+            # survives as long as either end is alive.
+            progress_queue = _mp_ctx.Queue(maxsize=0)  # unbounded
             
             # Prepare experiment arguments for workers
             experiment_args = []
@@ -959,7 +987,6 @@ class BatchExecutor:
                     'termination_condition': termination_condition,
                     'subnet_data': subnet_data,
                     'baseline_params': baseline_params,
-                    'progress_queue': progress_queue,  # Pass queue to workers
                     'use_tau_leaping': use_tau_leaping,
                     'tau_epsilon': tau_epsilon,
                     'max_tau': max_tau,
@@ -978,17 +1005,36 @@ class BatchExecutor:
             # inside the polling loop from `duration`. Legitimate slow runs are never
             # interrupted.
             
-            with _mp_ctx.Pool(processes=n_workers, maxtasksperchild=1) as pool:  # maxtasksperchild=1 + forkserver: clean workers, no GTK/Numba state inherited
-                # Submit all experiments with start time tracking
+            with _mp_ctx.Pool(
+                processes=n_workers,
+                maxtasksperchild=1,  # forkserver + maxtasksperchild=1: clean workers, no GTK/Numba state inherited
+                initializer=_worker_pool_initializer,
+                initargs=(progress_queue,),
+            ) as _initial_pool:
+                pool = _initial_pool  # may be replaced after zombie restart
+                # Submit all experiments with start time tracking.
+                # The first n_workers slots are picked up immediately; the rest
+                # wait in the pool's internal task queue.  Reflect that in the
+                # UI: mark the first n_workers as "running" and the remainder
+                # as "queued".  They are promoted to "running" on first heartbeat.
                 async_results = []
-                for args in experiment_args:
+                already_started: set = set()
+                # Tracks experiments that have emitted at least one actual heartbeat
+                # from inside a worker.  Zombie silence is only measured from the
+                # first heartbeat; before that the experiment is still pending in the
+                # pool's task queue and must not be timed-out.
+                heartbeat_received: set = set()
+                for i, args in enumerate(experiment_args):
                     async_result = pool.apply_async(_worker_run_experiment, (args,))
                     start_time = time.time()
                     async_results.append((args['queue_index'], args['name'], async_result, start_time))
 
-                    # Set initial running status when experiment is submitted
                     if progress_callback:
-                        progress_callback(args['queue_index'], "running", "0%")
+                        if i < n_workers:
+                            progress_callback(args['queue_index'], "running", "0%")
+                            already_started.add(args['queue_index'])
+                        else:
+                            progress_callback(args['queue_index'], "pending", "pending")
 
                 # Zombie detection: kill a worker only when it goes SILENT, not merely slow.
                 # A legitimate computation that takes longer than any estimate must not be
@@ -1023,13 +1069,24 @@ class BatchExecutor:
                         while not progress_queue.empty():
                             try:
                                 queue_idx, progress_fraction = progress_queue.get_nowait()
+                                heartbeat_received.add(queue_idx)  # worker has actually started
                                 last_heartbeat[queue_idx] = current_time  # worker is alive
                                 if progress_callback:
+                                    # First heartbeat from a queued experiment → promote to running
+                                    if queue_idx not in already_started:
+                                        already_started.add(queue_idx)
+                                        progress_callback(queue_idx, "running", "0%")
                                     progress_pct = int(progress_fraction * 100)
                                     progress_callback(queue_idx, "running", f"{progress_pct}%")
-                            except (OSError, EOFError, ValueError) as e:
-                                import logging
-                                logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
+                            except Exception as e:
+                                # Catches queue.Empty (race: empty() returned False but item
+                                # was consumed before get_nowait()), OSError, EOFError, ValueError.
+                                # queue.Empty must be caught here — it is NOT a subclass of
+                                # OSError/ValueError — and was previously escaping this block,
+                                # breaking the polling loop and freezing progress updates.
+                                import logging, queue as _q
+                                if not isinstance(e, _q.Empty):
+                                    logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
                                 break
                     except (OSError, EOFError) as e:
                         import logging
@@ -1037,18 +1094,43 @@ class BatchExecutor:
 
                     # Check completed experiments and detect zombies
                     still_running = []
+                    zombie_detected = False
                     for queue_index, name, async_result, start_time in async_results:
                         elapsed = current_time - start_time
-                        silence = current_time - last_heartbeat.get(queue_index, start_time)
+
+                        # Experiments that have not yet been dispatched to a worker
+                        # (still waiting in the pool's task queue) must never be
+                        # counted as zombies.  Their last_heartbeat was stamped at
+                        # submission time; keep it fresh so silence stays at zero
+                        # until the worker actually starts and emits its first 0%
+                        # progress message.
+                        if queue_index not in heartbeat_received:
+                            last_heartbeat[queue_index] = current_time
+
+                        silence = current_time - last_heartbeat.get(queue_index, current_time)
 
                         if silence > ZOMBIE_SILENCE_S:
-                            # ZOMBIE DETECTED: worker has been silent too long
+                            # ZOMBIE DETECTED: worker has been silent too long.
+                            # Kill both the hung worker process (releasing its RAM
+                            # and CPU) and the pool so remaining pending experiments
+                            # can be dispatched to fresh workers.
+                            zombie_detected = True
                             print(
                                 f"[BATCH] ⚠️ ZOMBIE: {name} silent for {silence:.0f}s "
                                 f"(threshold {ZOMBIE_SILENCE_S:.0f}s, total elapsed {elapsed:.0f}s)"
                             )
+                            # Attempt to SIGKILL individual worker process.
+                            # multiprocessing.pool does not expose per-task PIDs
+                            # directly, but the worker's OS pid is accessible via
+                            # pool._pool list.  As a robust fallback we terminate the
+                            # whole pool; it gets recreated below.
                             try:
-                                pass  # Cannot kill individual async_result; pool.terminate() below
+                                import os as _os, signal as _signal
+                                for _w in pool._pool:
+                                    try:
+                                        _os.kill(_w.pid, _signal.SIGKILL)
+                                    except (ProcessLookupError, PermissionError):
+                                        pass
                             except (AttributeError, OSError):
                                 pass
 
@@ -1115,6 +1197,37 @@ class BatchExecutor:
                             still_running.append((queue_index, name, async_result, start_time))
 
                     async_results = still_running
+
+                    # If zombies were killed above, the pool's worker processes are
+                    # gone.  The pool object itself is now broken and will never
+                    # dispatch the remaining async_results.  Terminate it cleanly,
+                    # restart with fresh workers, and re-submit the still-pending
+                    # experiments so they get a chance to complete.
+                    if zombie_detected and async_results and not self.is_cancelled:
+                        print(
+                            f"[BATCH] Restarting pool after zombie kill "
+                            f"({len(async_results)} experiments remain)"
+                        )
+                        try:
+                            pool.terminate()
+                            pool.join()
+                        except Exception:
+                            pass
+                        pool = _mp_ctx.Pool(
+                            processes=n_workers,
+                            maxtasksperchild=1,
+                            initializer=_worker_pool_initializer,
+                            initargs=(progress_queue,),
+                        )
+                        # Re-submit remaining experiments to the fresh pool.
+                        resubmitted = []
+                        for queue_index, name, _old_result, start_time in async_results:
+                            matching = [a for a in experiment_args if a['queue_index'] == queue_index]
+                            if matching:
+                                new_result = pool.apply_async(_worker_run_experiment, (matching[0],))
+                                last_heartbeat[queue_index] = time.time()  # reset silence clock
+                                resubmitted.append((queue_index, name, new_result, time.time()))
+                        async_results = resubmitted
                 
                 # Handle cancellation
                 if self.is_cancelled:
@@ -1125,6 +1238,15 @@ class BatchExecutor:
                     for queue_index, name, async_result, start_time in async_results:
                         if progress_callback:
                             progress_callback(queue_index, "cancelled", "Cancelled")
+
+            # If pool was replaced after a zombie restart, the new pool was not
+            # managed by the `with` block; terminate it now.
+            if pool is not _initial_pool:
+                try:
+                    pool.terminate()
+                    pool.join()
+                except Exception:
+                    pass
         
         except Exception as e:
             import traceback
@@ -1134,7 +1256,14 @@ class BatchExecutor:
             # Reset execution state
             self.is_running = False
             self.current_experiment = None
-            
+
+            # Prompt Python to release memory accumulated during the batch.
+            # self.results entries have already been forwarded to the UI via
+            # experiment_result_callback and heavy fields stripped by the
+            # auto-save thread; a GC pass here reclaims any residual objects
+            # (numpy temporaries, closed-over lambda refs, etc.).
+            import gc as _batch_gc; _batch_gc.collect()
+
             if complete_callback:
                 from gi.repository import GLib
                 cancelled = self.is_cancelled
@@ -1380,6 +1509,19 @@ class BatchExecutor:
                             'duration': rep.get('time_points', [0])[-1] if rep.get('time_points') else 0.0,
                             'elapsed_time': rep.get('elapsed_time', 0.0)  # Wall-clock time
                         })
+
+            # Capture scalar summaries before freeing raw trajectory data.
+            # `results` holds ~200 MB (100 replicates × all place trajectories);
+            # releasing it here instead of at function-return drops peak RSS by
+            # ~200 MB per experiment — critical for multi-condition sweeps.
+            _n_replicates_count = len(results) if results else 0
+            _error_count = sum(1 for r in results if 'error' in r) if results else 0
+            del results
+
+            # Release the per-experiment model object (places/transitions/arcs
+            # built from subnet_data dicts) and the ReplicateRunner that holds
+            # a reference to it — neither is needed past this point.
+            del runner, model
             
             # Generate metadata for this experiment
             from shypn.metadata import SweepHeaderGenerator
@@ -1411,12 +1553,11 @@ class BatchExecutor:
             
             # Determine execution status
             execution_status = 'SUCCESS'
-            if results:
+            if _n_replicates_count > 0:
                 # Count errors in replicates
-                error_count = sum(1 for r in results if 'error' in r)
-                if error_count > 0:
-                    errors.append(f"{error_count}/{len(results)} replicates failed")
-                    execution_status = 'WARNING' if error_count < len(results) else 'FAILED'
+                if _error_count > 0:
+                    errors.append(f"{_error_count}/{_n_replicates_count} replicates failed")
+                    execution_status = 'WARNING' if _error_count < _n_replicates_count else 'FAILED'
                 
                 # Check for deadlocks
                 deadlock_count = sum(1 for r in replicate_data if r.get('deadlocked', False))
@@ -1455,6 +1596,8 @@ class BatchExecutor:
                     'solver': 'TauLeaping_SSA',
                     'timestep': f'dt={dt_manual:.4g}' if dt_manual else 'adaptive (auto-dt)',
                     'use_tau_leaping': True,
+                    'tau_epsilon': tau_epsilon,
+                    'max_tau': max_tau,
                 },
                 'experiment_start_time': datetime.fromtimestamp(start_time, tz=timezone.utc),
                 'elapsed_time': elapsed_time,
@@ -1482,7 +1625,7 @@ class BatchExecutor:
                 'snapshot_index': snapshot_index,
                 'trajectory_summary': trajectory_summary,  # Lightweight summary
                 'compressed_trajectories': compressed_trajectories,  # δ-filtered per-replicate data
-                'n_replicates': len(results) if results else 0,
+                'n_replicates': _n_replicates_count,
                 'statistics': statistics,  # Contains mean/std/percentiles for plotting
                 'duration': elapsed_time,
                 'swept_parameter': swept_param,  # Include swept parameter info for smart plotting

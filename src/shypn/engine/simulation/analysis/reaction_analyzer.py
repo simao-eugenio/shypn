@@ -3,7 +3,7 @@
 
 Calculates activity metrics for each transition based on firing data.
 """
-from typing import Any, List, Optional
+from typing import Any, List
 from dataclasses import dataclass
 from enum import Enum
 

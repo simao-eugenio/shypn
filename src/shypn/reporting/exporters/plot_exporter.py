@@ -3,8 +3,7 @@
 
 Generates matplotlib plots and exports to SVG/PNG without GUI interaction.
 """
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 import logging
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend

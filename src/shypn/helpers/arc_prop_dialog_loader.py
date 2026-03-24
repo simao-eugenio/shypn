@@ -298,6 +298,20 @@ class ArcPropDialogLoader(GObject.GObject):
             # IMPORTANT: Signal passes self (loader) so callback can access 
             # self.arc_obj which is updated to new arc after transformations
             self.emit('properties-changed')
+            # Notify panels of arc property change
+            try:
+                from shypn.events import EventBus
+                from shypn.core.document_id import doc_id
+                arc = self.arc_obj if hasattr(self, 'arc_obj') else None
+                drawing_area = None
+                if arc and hasattr(arc, 'source') and hasattr(arc.source, '_manager'):
+                    drawing_area = getattr(arc.source._manager, '_drawing_area', None)
+                if drawing_area is not None:
+                    EventBus.emit('model.arc.modified',
+                                  {'object': arc, 'object_id': getattr(arc, 'id', None)},
+                                  document_id=doc_id(drawing_area))
+            except Exception:
+                pass
         # Don't destroy here - let explicit destroy() method handle it
 
     def _apply_changes(self):

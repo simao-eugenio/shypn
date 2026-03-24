@@ -55,7 +55,6 @@ from .codegen import (
     CONSTANT_VALUES,
     THERMO_LOCALS,
     TranspileError,
-    collect_names,
     preprocess_expr,
     transpile_expression,
 )
@@ -132,6 +131,11 @@ class PropensityAccelerator:
         a_net, a_fwd, a_rev = accel.compute(current_time)
     """
 
+    # Class-level flag: prune the on-disk cache at most once per interpreter
+    # session (avoids repeated filesystem scans when many instances are created,
+    # as happens in parallel sweep workers).
+    _cache_pruned: bool = False
+
     def __init__(self, model: Any, get_behavior: Callable[[Any], Any]) -> None:
         self._model = model
         self._get_behavior = get_behavior
@@ -202,6 +206,15 @@ class PropensityAccelerator:
         Returns True on success, False on any failure.
         """
         try:
+            # Prune stale cache entries once per interpreter session so the
+            # ~/.cache/shypn/ode_accel/ directory does not grow unboundedly.
+            if not PropensityAccelerator._cache_pruned:
+                PropensityAccelerator._cache_pruned = True
+                try:
+                    from shypn.engine.acceleration.c_compiler import prune_cache
+                    prune_cache()
+                except Exception:
+                    pass
             self._analyse_model()
             if not self._specs:
                 logger.debug(
@@ -218,7 +231,44 @@ class PropensityAccelerator:
                 lib_name="propensity_fn",
                 model_hash=self._model_hash,
             )
-            self._load_so(so_path)
+            try:
+                self._load_so(so_path)
+            except (OSError, AttributeError) as load_exc:
+                # .so exists but symbol is missing or the file is corrupt
+                # (e.g. a previous process crashed mid-rename).  Delete and
+                # force a fresh compilation, then try once more.
+                logger.warning(
+                    "PropensityAccelerator: cached .so failed to load (%s); "
+                    "deleting and recompiling …", load_exc,
+                )
+                so_path.unlink(missing_ok=True)
+                so_path = compile_c_lib(
+                    self._c_source,
+                    lib_name="propensity_fn",
+                    model_hash=self._model_hash,
+                    force=True,
+                )
+                # dlopen(3) caches library handles keyed by the absolute path
+                # string.  After unlink + recompile to the same canonical path
+                # in the same process, a subsequent ctypes.CDLL() call returns
+                # the stale in-memory handle for the now-deleted library, so
+                # the missing-symbol error would repeat.  Loading via a unique
+                # per-call copy bypasses the cache; the copy is removed once
+                # the handle is open (the kernel keeps the mapping alive until
+                # self._lib goes out of scope).
+                import os as _os
+                import shutil
+                import tempfile
+                _fd, _tmp = tempfile.mkstemp(
+                    suffix=".so", dir=str(so_path.parent)
+                )
+                _tmp_path = Path(_tmp)
+                try:
+                    _os.close(_fd)
+                    shutil.copy2(so_path, _tmp_path)
+                    self._load_so(_tmp_path)  # re-raise if still broken
+                finally:
+                    _tmp_path.unlink(missing_ok=True)
             self._alloc_arrays()
             self.ready = True
             logger.info(
@@ -528,6 +578,15 @@ class PropensityAccelerator:
         lines.append("")
         lines.append("/* params: [T=0, pH=1, ionic_strength=2] */")
         lines.append("")
+        lines.append(
+            "#if defined(__GNUC__)"
+        )
+        lines.append(
+            "__attribute__((visibility(\"default\")))"
+        )
+        lines.append(
+            "#endif"
+        )
         lines.append(
             "void propensity_fn(int n, double t, double *y,"
         )

@@ -5,7 +5,7 @@ with work-stealing load balancing. Workers atomically claim states and
 explore them concurrently.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import multiprocessing
 import queue
 import time
@@ -111,7 +111,6 @@ class ParallelBasicExplorer(StateSpaceExplorer):
             workers.append(worker)
         
         # Wait for all workers to start (with timeout)
-        import time
         start_wait = time.time()
         while stats['workers_active'] < self.num_workers and time.time() - start_wait < 5.0:
             time.sleep(0.01)

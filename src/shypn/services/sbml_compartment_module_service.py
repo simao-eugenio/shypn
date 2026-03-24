@@ -26,13 +26,12 @@ Author: Shypn Development Team
 Date: December 2025
 """
 
-from typing import Dict, List, Set, Optional, Tuple, Any
-from collections import defaultdict
+from typing import Dict, List, Any
 import logging
 
 from shypn.data.canvas.document_model import DocumentModel
 from shypn.data.pathway.pathway_data import ProcessedPathwayData
-from shypn.netobjs import Module, Place, Transition, Arc
+from shypn.netobjs import Module, Place
 from shypn.netobjs.signal_type import SignalType
 
 # Import detection and validation services
@@ -977,7 +976,7 @@ f"Classified {place.name} as {signal_type if isinstance(signal_type, str) else s
         if validation:
             score = validation.get('independence_score', 0)
             violations = validation.get('violations', [])
-            lines.append(f"\nValidation:")
+            lines.append("\nValidation:")
             lines.append(f"  Independence Score: {score:.1%}")
             lines.append(f"  Violations: {len(violations)}")
         

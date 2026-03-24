@@ -20,7 +20,7 @@ Extracted from: legacy/shypnpy/core/petri.py:1691-1900
 """
 
 from typing import Dict, Tuple, List, Any, Callable, Optional
-from shypn.utils.safe_eval import safe_eval_numeric, preprocess_expression
+from shypn.utils.safe_eval import safe_eval_numeric
 import logging
 import math
 import numpy as np
@@ -290,7 +290,7 @@ class ContinuousBehavior(TransitionBehavior):
                     self._rate_function_error = str(exc)
                     
                     # FAIL LOUDLY - print error once
-                    print(f"\n❌ Rate Function Error - Simulation Stopped")
+                    print("\n❌ Rate Function Error - Simulation Stopped")
                     print(f"   Transition: {self.transition.name} ({self.transition.id})")
                     print(f"   Expression: {expr}")
                     print(f"   Error: {exc}")
@@ -322,7 +322,7 @@ class ContinuousBehavior(TransitionBehavior):
                         except (ImportError, AttributeError, KeyError) as e:
                             logger.debug(f"Skipping function suggestion: {e}")
                     
-                    print(f"\n   Fix the rate expression before running simulation.\n")
+                    print("\n   Fix the rate expression before running simulation.\n")
                 
                 # Raise error to stop simulation
                 raise RuntimeError(

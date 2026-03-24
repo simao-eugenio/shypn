@@ -26,8 +26,13 @@ Example:
         pass
 """
 
-from typing import Dict, List, Any, Optional
+from __future__ import annotations
+from typing import TYPE_CHECKING, Dict, List, Any
 from dataclasses import dataclass, field
+
+
+if TYPE_CHECKING:
+    from shypn.netobjs.transition import Transition
 
 
 @dataclass
@@ -267,6 +272,8 @@ class LocalityDetector:
                 print(f"Dual-role: {len(locality.dual_role_places)}")
         """
         from shypn.netobjs.test_arc import TestArc
+
+
         
         locality = Locality(transition=transition)
         

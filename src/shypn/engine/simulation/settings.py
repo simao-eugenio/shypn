@@ -634,9 +634,9 @@ class SimulationSettings:
         lines.append(f"  Critical threshold: {self._critical_threshold}")
         lines.append(f"  Tau range: [{self._min_tau}, {self._max_tau}]")
         if self._use_parallel_stochastic:
-            lines.append(f"  Parallel execution: Enabled (weak independence scheduling)")
+            lines.append("  Parallel execution: Enabled (weak independence scheduling)")
         else:
-            lines.append(f"  Parallel execution: Disabled (sequential τ-leaping)")
+            lines.append("  Parallel execution: Disabled (sequential τ-leaping)")
         
         return "\n".join(lines)
 

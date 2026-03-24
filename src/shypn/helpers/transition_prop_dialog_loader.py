@@ -5,8 +5,6 @@ Loads and manages the Transition properties dialog UI.
 Follows project pattern: thin loader with business logic in data layer.
 """
 import os
-import sys
-import numpy as np
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
@@ -125,6 +123,14 @@ class TransitionPropDialogLoader(GObject.GObject):
     
     def _populate_fields(self):
         """Populate dialog fields with current Transition properties."""
+        self._populate_identity_fields()
+        self._populate_type_and_policy_fields()
+        self._populate_rate_fields()
+        self._populate_visual_fields()
+        self._update_type_description()
+
+    def _populate_identity_fields(self):
+        """Populate ID, name, label, compartment, source/sink fields."""
         # ID (read-only, managed by IDManager)
         id_entry = self.builder.get_object('id_entry')
         if id_entry and hasattr(self.transition_obj, 'id'):
@@ -153,7 +159,9 @@ class TransitionPropDialogLoader(GObject.GObject):
             elif hasattr(self.transition_obj, 'properties') and isinstance(self.transition_obj.properties, dict):
                 compartment_value = self.transition_obj.properties.get('compartment', '')
             compartment_entry.set_text(str(compartment_value))
-        
+
+    def _populate_type_and_policy_fields(self):
+        """Populate transition type, adaptive options, firing policy, and source/sink fields."""
         # Transition type
         type_combo = self.builder.get_object('prop_transition_type_combo')
         if type_combo and hasattr(self.transition_obj, 'transition_type'):
@@ -213,7 +221,9 @@ class TransitionPropDialogLoader(GObject.GObject):
         is_sink_check = self.builder.get_object('is_sink_check')
         if is_sink_check and hasattr(self.transition_obj, 'is_sink'):
             is_sink_check.set_active(self.transition_obj.is_sink)
-        
+
+    def _populate_rate_fields(self):
+        """Populate rate, timing, guard, and directional-rate fields."""
         # Rate (simple entry) - also check for rate_function formulas (SBML)
         rate_entry = self.builder.get_object('rate_entry')
         if rate_entry:
@@ -333,7 +343,9 @@ class TransitionPropDialogLoader(GObject.GObject):
         
         # Update visibility of reverse rate field
         self._update_reversible_fields_visibility()
-        
+
+    def _populate_visual_fields(self):
+        """Populate line width, rectangle dimensions, and wire flip-orientation button."""
         # Line Width
         width_entry = self.builder.get_object('prop_transition_width_entry')
         if width_entry and hasattr(self.transition_obj, 'border_width'):
@@ -353,10 +365,7 @@ class TransitionPropDialogLoader(GObject.GObject):
         flip_button = self.builder.get_object('flip_orientation_button')
         if flip_button:
             flip_button.connect('clicked', self._on_flip_orientation_clicked)
-        
-        # Update type description
-        self._update_type_description()
-    
+
     def _update_field_visibility(self):
         """Update field visibility based on transition type.
         
@@ -560,7 +569,6 @@ class TransitionPropDialogLoader(GObject.GObject):
         # Validate that function names (if any) exist in the catalog
         try:
             import ast
-            import re
             from shypn.engine import function_catalog
             
             # Parse the expression to extract function calls
@@ -636,6 +644,20 @@ class TransitionPropDialogLoader(GObject.GObject):
                 if self.persistency_manager:
                     self.persistency_manager.mark_dirty()
                 self.emit('properties-changed')
+                # Notify panels of transition property change
+                try:
+                    from shypn.events import EventBus
+                    from shypn.core.document_id import doc_id
+                    drawing_area = None
+                    if self.model and hasattr(self.model, '_drawing_area'):
+                        drawing_area = self.model._drawing_area
+                    if drawing_area is not None:
+                        EventBus.emit('model.transition.modified',
+                                      {'object': self.transition_obj,
+                                       'object_id': self.transition_obj.id},
+                                      document_id=doc_id(drawing_area))
+                except Exception:
+                    pass
         else:
             # BUG-1 FIX: _on_type_changed prematurely mutated transition_type for
             # field-visibility purposes.  Restore the original value on Cancel so
@@ -1306,7 +1328,7 @@ class TransitionPropDialogLoader(GObject.GObject):
             if confidence_str:
                 confidence_label.set_text(f"Confidence: {confidence_str}")
             else:
-                confidence_label.set_text(f"Confidence: N/A")
+                confidence_label.set_text("Confidence: N/A")
         
         if rate_type_label:
             if not rate_type and hasattr(self.transition_obj, 'properties'):

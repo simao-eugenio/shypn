@@ -14,7 +14,7 @@ Time Complexity:
 - fire(): O(k) where k = number of arcs connected to transition
 """
 
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from .base import IncidenceMatrix
 
 

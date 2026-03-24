@@ -23,13 +23,12 @@ import os
 import sys
 import logging
 from typing import Optional, Callable, Any
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib, Gdk
+    from gi.repository import Gtk
     from shypn.data.project_models import get_project_manager
 except Exception as e:
     print(f'ERROR: GTK3 not available in netobj_persistency: {e}', file=sys.stderr)
@@ -243,7 +242,6 @@ class NetObjPersistency:
             self._show_success_dialog('File saved successfully', f'Saved to:\n{self.current_filepath}')
             return True
         except (OSError, IOError, PermissionError) as e:
-            from shypn.exceptions import ImportExportError
             import traceback
             traceback.print_exc()
             self.logger.error(f"File save failed: {e}")
@@ -271,7 +269,6 @@ class NetObjPersistency:
             self._show_success_dialog('File loaded successfully', f'Loaded from:\n{filepath}\n\n' + f'Places: {len(document.places)}\n' + f'Transitions: {len(document.transitions)}\n' + f'Arcs: {len(document.arcs)}')
             return (document, filepath)
         except (OSError, IOError, PermissionError) as e:
-            from shypn.exceptions import ImportExportError
             import traceback
             traceback.print_exc()
             self.logger.error(f"File load failed: {e}")
@@ -331,7 +328,6 @@ class NetObjPersistency:
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
         
-        import sys
         if parent:
             pass
         
@@ -514,7 +510,6 @@ class NetObjPersistency:
         # Ensure parent window is set
         parent = self.parent_window if self.parent_window else None
         
-        import sys
         if parent:
             pass
         

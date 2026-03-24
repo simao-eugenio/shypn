@@ -6,8 +6,7 @@ Exports simulation data in CSV format with two layout options:
 - Long format: Tidy data with Entity/Type/Value columns
 """
 import csv
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import logging
 import statistics
 

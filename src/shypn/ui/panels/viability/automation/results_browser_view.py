@@ -12,7 +12,7 @@ Date: January 22, 2026 (Refactored to BaseResultsView)
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 import os
 import matplotlib
 matplotlib.use('GTK3Agg')
@@ -764,7 +764,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"3D+ Factorial Data Detected"
+                text="3D+ Factorial Data Detected"
             )
             dialog.format_secondary_text(
                 f"Found {len(param_names)} parameters: {', '.join(param_names)}\n\n"
@@ -1017,9 +1017,9 @@ class ResultsBrowserView(BaseResultsView):
                 )
                 
                 if result_stats['significant']:
-                    results_text += f"  <span foreground='green'>✓ Significant difference detected (p &lt; 0.05)</span>"
+                    results_text += "  <span foreground='green'>✓ Significant difference detected (p &lt; 0.05)</span>"
                 else:
-                    results_text += f"  <span foreground='orange'>✗ No significant difference (p ≥ 0.05)</span>"
+                    results_text += "  <span foreground='orange'>✗ No significant difference (p ≥ 0.05)</span>"
             
             else:
                 # One-way ANOVA with Tukey HSD
@@ -1061,7 +1061,7 @@ class ResultsBrowserView(BaseResultsView):
                 )
                 
                 if anova['significant']:
-                    results_text += f"<b><span foreground='green'>✓ Significant differences detected (p &lt; 0.05)</span></b>\n\n"
+                    results_text += "<b><span foreground='green'>✓ Significant differences detected (p &lt; 0.05)</span></b>\n\n"
                     
                     # Show Tukey HSD results
                     if 'tukey' in summary:
@@ -1078,7 +1078,7 @@ class ResultsBrowserView(BaseResultsView):
                             )
                         results_text += "".join(comparison_parts)
                 else:
-                    results_text += f"<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
+                    results_text += "<b><span foreground='orange'>✗ No significant differences (p ≥ 0.05)</span></b>"
             
             # Display results in dialog
             results_dialog = Gtk.MessageDialog(
@@ -1138,7 +1138,6 @@ class ResultsBrowserView(BaseResultsView):
         Creates a single plot with multiple trajectories, color-coded by
         experiment name or swept parameter value.
         """
-        import numpy as np
         
         # Get checked experiments
         checked = self.get_checked_results()
@@ -1726,14 +1725,14 @@ class ResultsBrowserView(BaseResultsView):
         
         # Build statistics text
         text = f"<b>{name}</b>\n\n"
-        text += f"<b>Execution:</b>\n"
+        text += "<b>Execution:</b>\n"
         text += f"  Replicates: {n_reps}\n"
         text += f"  Execution Time: {elapsed:.2f}s\n\n"
         
         # Display species statistics if available
         species_stats = stats.get('species_statistics', {})
         if species_stats:
-            text += f"<b>Species Statistics:</b>\n"
+            text += "<b>Species Statistics:</b>\n"
             # Show first few species as examples
             species_list = list(species_stats.keys())[:3]
             for species_id in species_list:
@@ -1960,7 +1959,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"Batch Export Complete"
+                text="Batch Export Complete"
             )
             dialog.format_secondary_text(
                 f"Exported {success_count} CSV files to:\n{directory}"
@@ -2021,7 +2020,7 @@ class ResultsBrowserView(BaseResultsView):
                 flags=0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
-                text=f"Batch Export Complete"
+                text="Batch Export Complete"
             )
             dialog.format_secondary_text(
                 f"Exported {success_count} JSON files to:\n{directory}"
@@ -2128,23 +2127,6 @@ class ResultsBrowserView(BaseResultsView):
             name: Experiment name
             result: Result dictionary with statistics
         """
-        try:
-            import numpy as np
-        except ImportError:
-            dialog = Gtk.MessageDialog(
-                transient_for=self.get_toplevel(),
-                flags=0,
-                message_type=Gtk.MessageType.ERROR,
-                buttons=Gtk.ButtonsType.OK,
-                text="NumPy not available"
-            )
-            dialog.format_secondary_text(
-                "Install numpy to use plotting: pip install numpy"
-            )
-            dialog.run()
-            dialog.destroy()
-            return
-        
         # Check for error
         if "error" in result:
             dialog = Gtk.MessageDialog(
@@ -2712,30 +2694,47 @@ class ResultsBrowserView(BaseResultsView):
         
         Parses experiment names to find varying parameters and populates
         the dose parameter combo box for dose-response analysis.
+
+        Optimised: only rescans and repopulates when the parameter set actually
+        changes (avoids O(N²) work — previously called on every add_result).
         """
-        # Extract all parameters from experiment names
-        # Format: "param1=val1_param2=val2_..."
-        all_params = set()
-        
+        # Only look at the most recently added row (last row in the store).
+        # Parameters are stable once added, so we only need to check whether
+        # the new name introduces a new parameter key.  If not, skip entirely.
+        n_rows = len(self.results_store)
+        if n_rows == 0:
+            return
+
+        last_row = self.results_store[n_rows - 1]
+        last_name = last_row[1]
+        new_params = set()
+        for part in last_name.split('_'):
+            if '=' in part:
+                new_params.add(part.split('=', 1)[0])
+
+        # Maintain a cached set of all known params to detect changes
+        known = getattr(self, '_dr_known_params', set())
+        if not new_params - known:
+            # No new parameter keys — skip the expensive clear/repopulate
+            return
+
+        # New parameters appeared — do a full rescan and repopulate combo
+        known = known | new_params
+        self._dr_known_params = known
+
+        all_params: set = set()
         for row in self.results_store:
-            name = row[1]  # Column 1 = name
+            name = row[1]
             for part in name.split('_'):
                 if '=' in part:
-                    param_name = part.split('=', 1)[0]
-                    all_params.add(param_name)
-        
-        # Update combo if parameters found
+                    all_params.add(part.split('=', 1)[0])
+
         if all_params and hasattr(self, 'dr_param_combo'):
-            # Store current selection
             current_selection = self.dr_param_combo.get_active_text()
-            
-            # Clear and repopulate
             self.dr_param_combo.remove_all()
             for param in sorted(all_params):
                 self.dr_param_combo.append_text(param)
-            
-            # Restore selection if still valid, otherwise select first
             if current_selection and current_selection in all_params:
                 self.dr_param_combo.set_active_id(current_selection)
-            elif len(all_params) > 0:
+            elif all_params:
                 self.dr_param_combo.set_active(0)

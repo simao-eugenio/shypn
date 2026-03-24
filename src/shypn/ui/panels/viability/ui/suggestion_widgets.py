@@ -2,7 +2,7 @@
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 
 from typing import Callable, Optional, List
 from shypn.ui.panels.viability.investigation import Suggestion

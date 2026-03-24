@@ -103,7 +103,7 @@ class FileExplorer:
         # Check if path is within boundary (repository root and subdirectories)
         if not self._is_within_boundary(path):
             if self.on_error:
-                self.on_error(f"Cannot navigate outside repository root")
+                self.on_error("Cannot navigate outside repository root")
             return False
         
         # Update history
@@ -582,7 +582,7 @@ class FileExplorer:
             return True
         except PermissionError:
             if self.on_error:
-                self.on_error(f"Permission denied: cannot rename")
+                self.on_error("Permission denied: cannot rename")
             return False
         except Exception as e:
             if self.on_error:

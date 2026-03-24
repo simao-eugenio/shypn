@@ -27,9 +27,14 @@ IDManager can track object lifecycle and emit events for observers:
 - on_delete: Called when object is deleted (for cleanup, reference removal)
 """
 
-from typing import Tuple, Optional, Callable, Dict, Any
+from __future__ import annotations
+from typing import TYPE_CHECKING, Tuple, Optional, Callable, Dict, Any
 from contextlib import contextmanager
 import logging
+
+
+if TYPE_CHECKING:
+    from shypn.canvas.lifecycle.id_scope_manager import IDScopeManager
 
 logger = logging.getLogger(__name__)
 
@@ -446,6 +451,8 @@ class IDManager:
         # Emit lifecycle event
         try:
             from shypn.events import EventBus
+
+
             EventBus.emit('lifecycle.object.deleted', {
                 'object': obj,
                 'object_id': obj_id,

@@ -1,5 +1,5 @@
 """Level 4: Conservation analyzer - analyze subnet conservation laws."""
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any
 from .base_analyzer import BaseAnalyzer
 from ..investigation import Issue, Suggestion, Subnet, ConservationAnalysis
 

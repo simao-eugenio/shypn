@@ -11,9 +11,12 @@ Author: Simão Eugénio
 Date: November 11, 2025
 """
 
+import logging
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class PatternType(Enum):
@@ -556,7 +559,7 @@ class RepairSuggester:
             RepairSuggestion(
                 action="add_parallel_transition",
                 target=place_id,
-                description=f"Add parallel output transition to increase throughput",
+                description="Add parallel output transition to increase throughput",
                 confidence=0.7,
                 parameters={},
                 rationale=f"Tokens accumulate (avg={ev['avg_tokens']:.1f}) faster than consumed",
@@ -643,7 +646,7 @@ class RepairSuggester:
             suggestions.append(RepairSuggestion(
                 action="increase_vmax",
                 target=trans_id,
-                description=f"Increase vmax parameter (transition never fires despite sufficient substrates)",
+                description="Increase vmax parameter (transition never fires despite sufficient substrates)",
                 confidence=0.75,
                 parameters={
                     'transition_id': trans_id,
@@ -788,7 +791,7 @@ class RepairSuggester:
         suggestions.append(RepairSuggestion(
             action="add_rate_variance",
             target=f"{t1_id},{t2_id}",
-            description=f"Add stochastic variance to timing windows",
+            description="Add stochastic variance to timing windows",
             confidence=0.80,
             parameters={
                 'transitions': [t1_id, t2_id],
@@ -811,7 +814,7 @@ class RepairSuggester:
         suggestions.append(RepairSuggestion(
             action="offset_timing_windows",
             target=f"{t1_id},{t2_id}",
-            description=f"Offset timing windows to prevent simultaneous enablement",
+            description="Offset timing windows to prevent simultaneous enablement",
             confidence=0.75,
             parameters={
                 'transitions': [t1_id, t2_id],
@@ -890,7 +893,7 @@ class RepairSuggester:
             suggestions.append(RepairSuggestion(
                 action="add_initial_tokens",
                 target=target_place,
-                description=f"Add initial tokens to break cyclic timing dependency",
+                description="Add initial tokens to break cyclic timing dependency",
                 confidence=0.50,
                 parameters={
                     'places': target_places,

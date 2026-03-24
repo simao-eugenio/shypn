@@ -14,7 +14,7 @@ This parameter panel integrates with the universal ParameterPanelManager
 import os
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GObject
+from gi.repository import Gtk, Gdk, GLib, GObject
 
 
 class LayoutSettingsLoader(GObject.GObject):

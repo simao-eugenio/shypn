@@ -10,9 +10,8 @@ Decision Tree:
     4. Default → Hierarchical
 """
 
-from typing import Dict, Optional
+from typing import Dict
 import networkx as nx
-from .base import LayoutAlgorithm
 from .hierarchical import HierarchicalLayout
 from .force_directed import ForceDirectedLayout
 from .circular import CircularLayout
@@ -170,7 +169,7 @@ class LayoutSelector:
         if metrics['is_dag']:
             return f"Graph is acyclic with clear directional flow ({metrics['node_count']} nodes, {metrics['edge_count']} edges). Hierarchical layout emphasizes this flow."
         else:
-            return f"Graph has some cycles but hierarchical structure dominates. Using layered layout with feedback arc handling."
+            return "Graph has some cycles but hierarchical structure dominates. Using layered layout with feedback arc handling."
     
     def _explain_force_directed(self, metrics: Dict) -> str:
         """Explain force-directed selection."""
@@ -189,7 +188,7 @@ class LayoutSelector:
     def _explain_orthogonal(self, metrics: Dict) -> str:
         """Explain orthogonal selection."""
         if metrics['is_dag']:
-            return f"Acyclic graph with structured appearance preference. Orthogonal layout provides clean, grid-aligned visualization."
+            return "Acyclic graph with structured appearance preference. Orthogonal layout provides clean, grid-aligned visualization."
         else:
             return "Structured layout requested. Using grid-aligned orthogonal layout for clarity."
     

@@ -20,9 +20,11 @@ USAGE:
 Author: Simão Eugénio
 Date: February 12, 2026 (Phase 2.2 Extraction)
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from dataclasses import dataclass
 import logging
+
+logger = logging.getLogger(__name__)
 
 # Import specialized analyzers
 from ..analysis import LocalityAnalyzer, DependencyAnalyzer, BoundaryAnalyzer, ConservationAnalyzer

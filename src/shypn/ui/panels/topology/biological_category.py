@@ -18,7 +18,6 @@ Date: October 31, 2025
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
 
 from shypn.ui.panels.topology.base_topology_category import BaseTopologyCategory
 from shypn.topology.biological.dependency_coupling import DependencyAndCouplingAnalyzer
@@ -124,54 +123,53 @@ class BiologicalCategory(BaseTopologyCategory):
         """Format mass-balance analyzer result."""
         rows = []
         
-        if analyzer_name == 'mass_balance':
-            # Result format: {'balanced_transitions': [...], 'unbalanced_transitions': [...], 'incomplete_transitions': [...], 'statistics': {...}}
-            statistics = result.get('statistics', {})
-            unbalanced = result.get('unbalanced_transitions', [])
-            incomplete = result.get('incomplete_transitions', [])
-            balanced = result.get('balanced_transitions', [])
-            
-            # Show truly unbalanced (violation)
-            if unbalanced:
-                for trans_info in unbalanced:
-                    trans_name = trans_info.get('transition_name', trans_info.get('transition_id', 'Unknown'))
-                    imbalances = trans_info.get('imbalances', {})
-                    
-                    # imbalances format: {element: {'input': X, 'output': Y, 'difference': Z}}
-                    imbalance_str = ', '.join([f"{elem}: {data.get('difference', 0):+.2f}" 
-                                               for elem, data in imbalances.items() 
-                                               if isinstance(data, dict)])
-                    
-                    rows.append((
-                        'Imbalanced',
-                        trans_name,
-                        imbalance_str,
-                        1.0,  # High severity
-                        '❌ Mass Error',
-                        'Atoms not conserved'
-                    ))
-            
-            # Show balanced (success)
-            if balanced and not unbalanced:
+        # Result format: {'balanced_transitions': [...], 'unbalanced_transitions': [...], 'incomplete_transitions': [...], 'statistics': {...}}
+        statistics = result.get('statistics', {})
+        unbalanced = result.get('unbalanced_transitions', [])
+        incomplete = result.get('incomplete_transitions', [])
+        balanced = result.get('balanced_transitions', [])
+        
+        # Show truly unbalanced (violation)
+        if unbalanced:
+            for trans_info in unbalanced:
+                trans_name = trans_info.get('transition_name', trans_info.get('transition_id', 'Unknown'))
+                imbalances = trans_info.get('imbalances', {})
+                
+                # imbalances format: {element: {'input': X, 'output': Y, 'difference': Z}}
+                imbalance_str = ', '.join([f"{elem}: {data.get('difference', 0):+.2f}" 
+                                           for elem, data in imbalances.items() 
+                                           if isinstance(data, dict)])
+                
                 rows.append((
-                    'Mass Balance',
-                    'Verified',
-                    f'{len(balanced)} reaction(s)',
-                    0.0,
-                    '✓ Balanced',
-                    'All atoms conserved'
+                    'Imbalanced',
+                    trans_name,
+                    imbalance_str,
+                    1.0,  # High severity
+                    '❌ Mass Error',
+                    'Atoms not conserved'
                 ))
-            
-            # Show incomplete (informational)
-            if incomplete:
-                rows.append((
-                    'Mass Balance',
-                    'Incomplete Data',
-                    f'{len(incomplete)} reaction(s)',
-                    0.3,  # Low severity (info only)
-                    'ℹ️ Cannot Verify',
-                    f'{statistics.get("places_without_formulas", 0)} places lack formulas'
-                ))
+        
+        # Show balanced (success)
+        if balanced and not unbalanced:
+            rows.append((
+                'Mass Balance',
+                'Verified',
+                f'{len(balanced)} reaction(s)',
+                0.0,
+                '✓ Balanced',
+                'All atoms conserved'
+            ))
+        
+        # Show incomplete (informational)
+        if incomplete:
+            rows.append((
+                'Mass Balance',
+                'Incomplete Data',
+                f'{len(incomplete)} reaction(s)',
+                0.3,  # Low severity (info only)
+                'ℹ️ Cannot Verify',
+                f'{statistics.get("places_without_formulas", 0)} places lack formulas'
+            ))
         return rows
 
     def _rows_for_stoichiometry(self, result):
@@ -459,7 +457,7 @@ class BiologicalCategory(BaseTopologyCategory):
                 arc_id = issue.get('arc_id', '')
 
                 rows.append((
-                    f'⚠️ Validation Issue',
+                    '⚠️ Validation Issue',
                     issue_type.replace('_', ' ').title(),
                     message[:60],
                     0.5,

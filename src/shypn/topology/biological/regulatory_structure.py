@@ -29,7 +29,7 @@ Author: GitHub Copilot
 Date: October 31, 2025
 """
 
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, List, Optional
 from collections import defaultdict
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
@@ -378,8 +378,8 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
             # Check if source is place and target is transition
             if self._is_transition(source):
                 issues.append(
-                    f"Invalid test arc: connects Transition → Place "
-                    f"(should be Place → Transition)"
+                    "Invalid test arc: connects Transition → Place "
+                    "(should be Place → Transition)"
                 )
         
         # Check 2: Catalysts should have tokens
@@ -515,13 +515,13 @@ class RegulatoryStructureAnalyzer(TopologyAnalyzer):
         # Catalyst sharing
         if stats['shared_catalysts'] > 0:
             lines.append(f"SHARED CATALYSTS: {stats['shared_catalysts']}")
-            lines.append(f"  → Same enzyme catalyzes multiple reactions")
-            lines.append(f"  → Correct biological behavior (enzyme reuse)")
-            lines.append(f"  → Enables WEAK INDEPENDENCE (not strong)\n")
+            lines.append("  → Same enzyme catalyzes multiple reactions")
+            lines.append("  → Correct biological behavior (enzyme reuse)")
+            lines.append("  → Enables WEAK INDEPENDENCE (not strong)\n")
         
         if stats['single_use_catalysts'] > 0:
             lines.append(f"SINGLE-USE CATALYSTS: {stats['single_use_catalysts']}")
-            lines.append(f"  → One enzyme per reaction (specific catalysis)\n")
+            lines.append("  → One enzyme per reaction (specific catalysis)\n")
         
         # Patterns
         if patterns:

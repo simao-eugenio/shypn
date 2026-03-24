@@ -8,7 +8,6 @@ Components:
 - DocumentState: Manages document metadata (filename, modified flag, etc.)
 """
 
-import math
 from datetime import datetime
 from typing import Tuple, Optional
 

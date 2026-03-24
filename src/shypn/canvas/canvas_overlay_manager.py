@@ -14,7 +14,6 @@ import logging
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk
 except Exception as e:
     logging.getLogger(__name__).error('GTK3 not available in canvas_overlay_manager: %s', e)
     sys.exit(1)
@@ -27,8 +26,6 @@ try:
     from shypn.helpers.edit_palette_loader import create_edit_palette
     from shypn.edit.tools_palette_loader import create_tools_palette
     from shypn.edit.operations_palette_loader import create_operations_palette
-    from shypn.helpers.simulate_palette_loader import create_simulate_palette
-    from shypn.helpers.simulate_tools_palette_loader import create_simulate_tools_palette
 except ImportError as e:
     logging.getLogger(__name__).error('Cannot import palette loaders: %s', e)
     sys.exit(1)
@@ -37,7 +34,7 @@ except ImportError as e:
 try:
     from shypn.edit import (
         EditOperations,
-        LassoSelector
+        LassoSelector  # noqa: F401
     )
 except ImportError as e:
     logging.getLogger(__name__).error('Cannot import editing operations: %s', e)

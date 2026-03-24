@@ -28,7 +28,6 @@ import time
 import numpy as np
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any, Union
-from copy import deepcopy
 
 from shypn.engine.simulation.controller import SimulationController
 from shypn.engine.simulation.settings import SimulationSettings
@@ -143,6 +142,33 @@ class ReplicateRunner:
 
         # Snapshot the initial model marking so we can restore it each replicate
         initial_marking = {p.id: p.tokens for p in self.model.places}
+
+        # Force-initialize the tau-leaping engine NOW (before replicate 0) so
+        # the per-replicate re-seed block below can seed it at i=0 too.
+        # Without this, the engine is created lazily on the first controller.step()
+        # call AFTER the i=0 seed block runs, leaving replicate 0 with seed=None
+        # (system entropy) and breaking N-independence.
+        if use_tau_leaping:
+            controller._update_enablement_states()  # needed before step()
+            _dummy_step_needed = not hasattr(controller, '_tau_leaping_engine')
+            if _dummy_step_needed:
+                # Trigger lazy creation by peeking at the attribute path the
+                # engine uses.  Calling _ensure_propensity_accelerator() is
+                # enough to build the accelerator; the tau engine itself is
+                # created on the first step().  Instead, just pre-create it
+                # directly to avoid side-effects.
+                from shypn.engine.simulation.tau_leaping import TauLeapingEngine
+                controller._tau_leaping_engine = TauLeapingEngine(
+                    epsilon=epsilon,
+                    critical_threshold=controller.settings.critical_threshold,
+                    max_tau=max_tau,
+                    seed=seed_base,           # seeded — will be overwritten per replicate below
+                    use_parallel=use_parallel,
+                    use_jit_kernel=getattr(controller.settings, 'use_jit_kernel', False),
+                    verbose=False,
+                    n_critical=getattr(controller.settings, 'n_critical', 10),
+                )
+                controller._tau_leaping_engine.leap_selector.min_tau = controller.settings.min_tau
         # ────────────────────────────────────────────────────────────────
 
         for i in range(n):
@@ -168,7 +194,25 @@ class ReplicateRunner:
             
             # ── Reset state for this replicate (controller is reused) ──────
             # Unique seed for reproducible but independent replicates
-            controller.settings.random_seed = seed_base + i
+            _rep_seed = seed_base + i
+            controller.settings.random_seed = _rep_seed
+
+            # Re-seed the tau-leaping RNG sources so each replicate is fully
+            # deterministic regardless of N.  Mirrors batch_runner.py ~L408.
+            # Without this the PoissonSampler.rng accumulates state across
+            # replicates, making replicate i's sample path depend on how many
+            # draws replicates 0..i-1 consumed — i.e. results change with N.
+            _engine = getattr(controller, '_tau_leaping_engine', None)
+            if _engine is not None:
+                import numpy as _np_rng
+                _engine.poisson_sampler.rng = _np_rng.random.default_rng(_rep_seed)
+                _engine.skellam_sampler.rng = _np_rng.random.default_rng(_rep_seed + 1)
+                if _engine.use_jit_kernel:
+                    from shypn.engine.simulation.tau_leaping.jit_kernel import (
+                        NUMBA_AVAILABLE, seed_kernel,
+                    )
+                    if NUMBA_AVAILABLE and seed_kernel is not None:
+                        seed_kernel(_rep_seed)
 
             # Restore model to initial marking
             for place in self.model.places:
@@ -384,12 +428,12 @@ class ReplicateRunner:
             trajectories: Any = []
             for r in successful:
                 place_values = r['place_data'][place_id]
-                # Handle both tuple format [(time, tokens), ...] and flat list [tokens, ...]
-                if place_values and isinstance(place_values[0], tuple):
-                    # Tuple format: extract tokens (second element)
+                # Handle numpy arrays (fast-path buffer), (time, tokens) tuples, and flat lists
+                if isinstance(place_values, np.ndarray):
+                    trajectories.append(place_values)
+                elif len(place_values) > 0 and isinstance(place_values[0], tuple):
                     trajectories.append([tokens for time, tokens in place_values])
                 else:
-                    # Already flat list of token values
                     trajectories.append(place_values)
             
             trajectories = np.array(trajectories)
@@ -435,12 +479,12 @@ class ReplicateRunner:
             rate_trajectories: Any = []
             for r in successful:
                 rate_values = r['transition_rates'][transition_id]
-                # Handle both tuple format [(time, rate), ...] and flat list [rate, ...]
-                if rate_values and isinstance(rate_values[0], tuple):
-                    # Tuple format: extract rate (second element)
+                # Handle numpy arrays (fast-path buffer), (time, rate) tuples, and flat lists
+                if isinstance(rate_values, np.ndarray):
+                    rate_trajectories.append(rate_values)
+                elif len(rate_values) > 0 and isinstance(rate_values[0], tuple):
                     rate_trajectories.append([rate for time, rate in rate_values])
                 else:
-                    # Already flat list of rate values
                     rate_trajectories.append(rate_values)
             
             rate_trajectories = np.array(rate_trajectories)
@@ -491,7 +535,6 @@ class ReplicateRunner:
             format: 'wide' (one column per species) or 'long' (tidy format)
             include_transitions: Include transition firing counts
         """
-        import csv
         
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)

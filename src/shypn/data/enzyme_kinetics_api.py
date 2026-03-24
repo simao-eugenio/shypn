@@ -31,7 +31,6 @@ Example:
     >>> enzyme = api_offline.lookup("2.7.1.1")  # From fallback
 """
 
-import requests
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta

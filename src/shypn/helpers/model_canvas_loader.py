@@ -18,7 +18,6 @@ Future extensions:
 """
 import os
 import sys
-import math
 import logging
 from typing import Optional
 from shypn.helpers.canvas_interaction_context import CanvasInteractionContext
@@ -31,8 +30,7 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     gi.require_version('Gdk', '3.0')
-    from gi.repository import Gtk, Gdk, Gio, GLib
-    import time
+    from gi.repository import Gtk, Gdk, GLib
 except Exception as e:
     print('ERROR: GTK3 not available in model_canvas loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -47,7 +45,7 @@ except ImportError as e:
     print(f'Warning: ModuleRenderer not available: {e}', file=sys.stderr, flush=True)
     ModuleRenderer = None
 try:
-    from shypn.netobjs import Place, Transition, Arc
+    from shypn.netobjs import Place, Transition, Arc  # noqa: F401
 except ImportError as e:
     print(f'ERROR: Cannot import Petri net objects: {e}', file=sys.stderr)
     sys.exit(1)
@@ -57,20 +55,18 @@ except ImportError as e:
     print(f'ERROR: Cannot import CanvasOverlayManager: {e}', file=sys.stderr)
     sys.exit(1)
 try:
-    from shypn.edit.palette_manager import PaletteManager
-    from shypn.edit.tools_palette_new import ToolsPalette
-    from shypn.edit.operations_palette_new import OperationsPalette
+    from shypn.edit.tools_palette_new import ToolsPalette  # noqa: F401
+    from shypn.edit.operations_palette_new import OperationsPalette  # noqa: F401
     # SwissKnifePalette - unified palette replacing ToolsPalette + OperationsPalette
     # PHASE 3 COMPLETE: Using new modular architecture with constant height + parameter panels
-    from shypn.helpers.swissknife_palette_new import SwissKnifePalette
-    from shypn.helpers.swissknife_tool_registry import ToolRegistry
+    from shypn.helpers.swissknife_palette_new import SwissKnifePalette  # noqa: F401
 except ImportError as e:
     print(f'ERROR: Cannot import new OOP palettes: {e}', file=sys.stderr)
     sys.exit(1)
 
 # Import simulation controller for state-based permissions
 try:
-    from shypn.engine.simulation.controller import SimulationController
+    from shypn.engine.simulation.controller import SimulationController  # noqa: F401
     # Import IDManager lifecycle integration
     from shypn.data.canvas.id_manager import set_lifecycle_scope_manager
 except ImportError as e:
@@ -562,6 +558,7 @@ class ModelCanvasLoader:
                 # doesn't exist in canvas_managers yet when this hook fires.
 
                 # Ensure lifecycle active canvas and ID scope are set
+                drawing_area = self._get_drawing_area_from_page(child)
                 if drawing_area:
                     if self.lifecycle_adapter:
                         try:
@@ -3529,6 +3526,17 @@ class ModelCanvasLoader:
                     if isinstance(obj, Transition):
                         if obj in self.right_panel_loader.transition_panel.selected_objects:
                             self.right_panel_loader.transition_panel.needs_update = True
+
+            # Notify all analysis panels (viability, topology, environment, report)
+            # that a model property was interactively changed.
+            try:
+                from shypn.core.document_id import doc_id
+                EventBus.emit('model.changed',
+                              {'object': obj, 'change_type': 'property'},
+                              document_id=doc_id(drawing_area))
+            except Exception:
+                pass
+
         dialog_loader.connect('properties-changed', on_properties_changed)
         
         # Show dialog
@@ -3636,7 +3644,6 @@ class ModelCanvasLoader:
             manager: ModelCanvasManager instance
             drawing_area: GtkDrawingArea widget
         """
-        from shypn.netobjs import Transition
         old_type = getattr(transition, 'transition_type', 'continuous')
         if old_type == new_type:
             return

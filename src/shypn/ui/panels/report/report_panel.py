@@ -17,6 +17,7 @@ KEY BEHAVIOR:
 - This is intentional: import saves file, user controls when to load
 """
 import gi
+import os
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 

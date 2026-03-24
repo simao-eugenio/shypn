@@ -34,7 +34,7 @@ Author: GitHub Copilot & Eugênio Simão
 Date: December 26, 2025
 """
 
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, List
 from collections import defaultdict, deque
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
@@ -504,9 +504,9 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
             else:
                 lines.append("  - WARNING: Cyclic structure detected")
             
-            lines.append(f"\nPreemption Mechanism:")
+            lines.append("\nPreemption Mechanism:")
             lines.append(f"  - {len(hierarchy['preemption_pairs'])} preemption relationships")
-            lines.append(f"  - Higher layers control lower layer decisions")
+            lines.append("  - Higher layers control lower layer decisions")
         else:
             lines.append("Hierarchical Control: NOT DETECTED")
             lines.append("  - Single-layer or flat control structure")

@@ -14,15 +14,24 @@ Architecture:
 Author: SHYPN Development Team
 Date: 2026-01-06
 """
+from __future__ import annotations
 import sys
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import TYPE_CHECKING, Optional, Any
+
+
+if TYPE_CHECKING:
+    from shypn.helpers.pathway_panel_loader import PathwayPanelLoader
+    from shypn.helpers.analyses_panel_loader import AnalysesPanelLoader
+    from shypn.helpers.topology_panel_loader import TopologyPanelLoader
+    from shypn.helpers.viability_panel_loader import ViabilityPanelLoader
+    from shypn.helpers.report_panel_loader import ReportPanelLoader
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk
 except Exception as e:
     print(f'ERROR: GTK3 not available in base_panel_loader: {e}', file=sys.stderr)
     sys.exit(1)
@@ -629,6 +638,8 @@ class PanelLoaderFactory:
             ReportPanelLoader: Configured panel loader
         """
         from .report_panel_loader import ReportPanelLoader
+
+
         return ReportPanelLoader(
             model=model,
             simulation_controller=simulation_controller

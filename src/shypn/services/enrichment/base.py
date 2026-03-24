@@ -4,11 +4,17 @@ This module defines the abstract base class for all enrichers that modify
 DocumentModel objects by adding missing information from external sources.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Dict, Any, List
-from datetime import datetime
+from typing import TYPE_CHECKING, Optional, Callable, Dict, Any, List
 import logging
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+
+
 
 logger = logging.getLogger(__name__)
 

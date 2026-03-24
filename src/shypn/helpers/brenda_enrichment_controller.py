@@ -16,11 +16,17 @@ The controller integrates with the project system to track:
 - Source citations and confidence
 """
 
+import logging
 import os
 import json
 import re
+import urllib.error
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
+
+import requests
+
+logger = logging.getLogger(__name__)
 
 from ..data.enrichment_document import EnrichmentDocument
 from ..data.project_models import Project
@@ -479,7 +485,7 @@ class BRENDAEnrichmentController:
             parameters: Dict with km, kcat, vmax, ki values
             override: If True, overwrite existing rate functions (use for BRENDA-enriched models)
         """
-        print(f"\n[BRENDA_MM] ========== RATE FUNCTION GENERATOR CALLED ==========")
+        print("\n[BRENDA_MM] ========== RATE FUNCTION GENERATOR CALLED ==========")
         
         if transition is None:
             return

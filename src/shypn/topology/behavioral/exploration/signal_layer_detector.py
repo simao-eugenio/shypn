@@ -7,11 +7,10 @@ Author: Simão Eugénio
 Date: February 3, 2026
 """
 
-from typing import Dict, List, Set, Tuple, Any, Optional
+from typing import Dict, List, Set, Any, Optional
 from collections import defaultdict, deque
 import logging
 import hashlib
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +129,7 @@ class SignalLayerDetector:
             arcs_count = len(self.model.arcs) if hasattr(self.model, 'arcs') else 0
             
             model_signature = f"{places_count}:{trans_count}:{arcs_count}"
-            return hashlib.md5(model_signature.encode()).hexdigest()
+            return hashlib.md5(model_signature.encode(), usedforsecurity=False).hexdigest()
         except Exception as e:
             logger.warning(f"Could not compute model hash: {e}")
             return ""

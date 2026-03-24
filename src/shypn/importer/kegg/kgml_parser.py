@@ -8,6 +8,7 @@ https://www.kegg.jp/kegg/xml/docs/
 """
 
 import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import fromstring as _safe_fromstring
 from typing import Optional
 from .models import (
     KEGGPathway,
@@ -44,7 +45,7 @@ class KGMLParser:
             ET.ParseError: If XML is malformed
             ValueError: If required attributes are missing
         """
-        root = ET.fromstring(kgml_xml)
+        root = _safe_fromstring(kgml_xml)
         
         # Extract pathway attributes
         pathway_attrs = root.attrib

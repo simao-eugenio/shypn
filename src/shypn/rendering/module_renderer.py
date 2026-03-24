@@ -23,7 +23,7 @@ Integration:
 """
 
 import math
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional
 import logging
 
 try:
@@ -31,7 +31,7 @@ try:
 except ImportError:
     cairo = None
 
-from shypn.netobjs import Module, Place, Transition
+from shypn.netobjs import Module
 
 
 class ModuleRenderer:

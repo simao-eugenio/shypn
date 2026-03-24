@@ -27,9 +27,7 @@ Implementation approach:
 - Efficient marking representation and comparison
 """
 
-from typing import Any, Dict, List, Set, Optional, Tuple
-import numpy as np
-from collections import deque
+from typing import Any, Dict, List, Optional
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
@@ -132,7 +130,7 @@ class ReachabilityAnalyzer(TopologyAnalyzer):
             return AnalysisResult(
                 success=False,
                 errors=[
-                    f"⛔ Model likely has huge state space",
+                    "⛔ Model likely has huge state space",
                     f"   Places: {n_places}, Transitions: {n_transitions}",
                     f"   Estimated states: {estimated_states:,} (may be conservative)",
                     "",

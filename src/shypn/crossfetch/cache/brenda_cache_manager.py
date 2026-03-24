@@ -6,7 +6,6 @@ pre-calculated statistics.
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 
 from .base_cache_manager import BaseCacheManager
 

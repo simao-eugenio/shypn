@@ -98,7 +98,7 @@ def transform_arc(arc, make_curved=None, make_inhibitor=None):
     target_class = _ARC_CLASS_MAP.get((is_curved, is_inhibitor, is_signal), Arc)
     
     # If already the correct type, return the same instance
-    if type(arc) == target_class:
+    if type(arc) is target_class:
         return arc
     
     # Create new arc of target type
@@ -186,8 +186,6 @@ def convert_to_normal(arc):
     Returns:
         Arc or CurvedArc: Normal version of the arc
     """
-    from shypn.netobjs.place import Place
-    from shypn.netobjs.transition import Transition
     
     # Check if it's curved
     is_curved = isinstance(arc, (CurvedArc, CurvedInhibitorArc, CurvedSignalFlowArc))
@@ -196,7 +194,7 @@ def convert_to_normal(arc):
     target_class = CurvedArc if is_curved else Arc
     
     # If already the correct type, return it
-    if type(arc) == target_class:
+    if type(arc) is target_class:
         return arc
     
     # Create new normal arc

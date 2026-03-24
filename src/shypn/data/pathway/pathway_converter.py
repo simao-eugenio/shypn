@@ -518,10 +518,10 @@ class ReactionConverter(BaseConverter):
             if not hasattr(transition, 'properties'):
                 transition.properties = {}
             transition.properties['needs_enrichment'] = True
-            transition.properties['enrichment_reason'] = f"No kinetic formula"
+            transition.properties['enrichment_reason'] = "No kinetic formula"
             
             self.logger.debug(
-                f"  No kinetic formula, set as continuous and marked for enrichment"
+                "  No kinetic formula, set as continuous and marked for enrichment"
             )
     
     def _setup_michaelis_menten(self, transition: Transition, reaction: Reaction, 
@@ -674,8 +674,8 @@ class ReactionConverter(BaseConverter):
             )
             
             self.logger.info(
-                f"  Imported model without kinetics: Marked for user enrichment "
-                f"(heuristics disabled for imports)"
+                "  Imported model without kinetics: Marked for user enrichment "
+                "(heuristics disabled for imports)"
             )
             return
         
@@ -698,7 +698,7 @@ class ReactionConverter(BaseConverter):
             transition.transition_type = "continuous"
             transition.rate = 1.0
             self.logger.warning(
-                f"  No kinetic law and no substrates found, using default continuous rate=1.0"
+                "  No kinetic law and no substrates found, using default continuous rate=1.0"
             )
             return
         
@@ -715,7 +715,7 @@ class ReactionConverter(BaseConverter):
             transition.transition_type = "continuous"
             transition.rate = 1.0
             self.logger.error(
-                f"  Failed to create heuristic estimator, using default continuous rate=1.0"
+                "  Failed to create heuristic estimator, using default continuous rate=1.0"
             )
             return
         
@@ -982,7 +982,7 @@ class ModifierConverter(BaseConverter):
                     f"Created test arc (catalyst): {place.name} --[catalyst]--> {transition.name}"
                 )
                 self.logger.debug(
-                    f"  This is a NON-CONSUMING arc (test arc/read arc)"
+                    "  This is a NON-CONSUMING arc (test arc/read arc)"
                 )
         
         if test_arcs:

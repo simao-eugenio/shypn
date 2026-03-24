@@ -1,7 +1,18 @@
 """Centrality analysis for Petri nets."""
 
-from typing import List, Dict, Any, Optional
-import networkx as nx
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Dict, Optional
+
+if TYPE_CHECKING:
+    import networkx as nx
+
+
+def _nx():
+    """Lazy networkx import — deferred to first Topology panel use."""
+    import networkx
+    return networkx
+
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
@@ -68,9 +79,8 @@ class CentralityAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
             self._validate_model()
-            
-            # Default to all measures
             if measures is None:
                 measures = ['betweenness', 'closeness', 'eigenvector', 'pagerank']
             
@@ -211,6 +221,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
         each node. High betweenness indicates a node is on many paths between
         other nodes (a bridge or bottleneck).
         """
+        nx = _nx()
         weight = 'weight' if weighted else None
         
         # Compute for all nodes
@@ -235,6 +246,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
         average distance). High closeness indicates a node can quickly reach
         all others.
         """
+        nx = _nx()
         # Handle both directed and undirected graphs
         # For directed graphs, we use the undirected version for simplicity
         if graph.is_directed():
@@ -278,6 +290,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
         to other high-centrality nodes. High eigenvector indicates a node is
         connected to important nodes.
         """
+        nx = _nx()
         weight = 'weight' if weighted else None
         
         # Convert to undirected for eigenvector centrality
@@ -319,6 +332,7 @@ class CentralityAnalyzer(TopologyAnalyzer):
         and quantity of connections. High PageRank indicates a node receives
         connections from important nodes.
         """
+        nx = _nx()
         weight = 'weight' if weighted else None
         
         # Convert to directed graph for PageRank

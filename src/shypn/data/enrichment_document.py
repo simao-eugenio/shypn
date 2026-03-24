@@ -10,7 +10,7 @@ Classes:
 
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any
 
 
 class EnrichmentDocument:

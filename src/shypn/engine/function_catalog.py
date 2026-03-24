@@ -1224,7 +1224,7 @@ FUNCTION_CATALOG: Dict[str, Callable[..., Any]] = {
     'atan': math.atan,
     'sinh': math.sinh,
     'cosh': math.cosh,
-    'tanh': math.tanh,
+    'tanh_raw': math.tanh,  # built-in math.tanh; 'tanh' is remapped to tanh_activation below
     'floor': math.floor,
     'ceil': math.ceil,
     'abs': abs,

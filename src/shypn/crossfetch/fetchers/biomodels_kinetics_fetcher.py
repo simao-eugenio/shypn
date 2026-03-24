@@ -16,11 +16,11 @@ Date: November 2025
 
 import logging
 import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import parse as _safe_parse
 import re
 import requests
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from pathlib import Path
-from urllib.parse import urljoin
 
 from .base_fetcher import BaseFetcher
 from ..models.fetch_result import FetchResult, FetchStatus
@@ -260,7 +260,7 @@ class BioModelsKineticsFetcher(BaseFetcher):
             List of parameter dicts
         """
         try:
-            tree = ET.parse(sbml_path)
+            tree = _safe_parse(sbml_path)
             root = tree.getroot()
             
             # Detect SBML level

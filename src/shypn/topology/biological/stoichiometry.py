@@ -20,8 +20,7 @@ Date: November 20, 2025
 """
 
 import numpy as np
-from typing import Any, Dict, List, Set, Tuple, Optional
-from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
@@ -300,7 +299,7 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
             str: Formatted summary
         """
         lines = [
-            f"Stoichiometric Consistency Analysis:",
+            "Stoichiometric Consistency Analysis:",
             f"  Places: {statistics['num_places']}",
             f"  Transitions: {statistics['num_transitions']}",
             f"  Matrix rank: {statistics['matrix_rank']}",
@@ -311,9 +310,9 @@ class StoichiometryAnalyzer(TopologyAnalyzer):
         ]
         
         if statistics['is_consistent']:
-            lines.append(f"\n✓ Stoichiometric matrix is consistent")
+            lines.append("\n✓ Stoichiometric matrix is consistent")
         else:
-            lines.append(f"\n⚠️ Matrix rank exceeds dimensions (inconsistent)")
+            lines.append("\n⚠️ Matrix rank exceeds dimensions (inconsistent)")
         
         if statistics['num_blocked_transitions'] > 0:
             lines.append(f"⚠️ {statistics['num_blocked_transitions']} transition(s) have no stoichiometric effect")

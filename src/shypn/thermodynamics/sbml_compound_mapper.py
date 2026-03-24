@@ -17,8 +17,7 @@ Design:
 - Caches all mappings for performance
 """
 
-from typing import Optional, Dict, List
-import logging
+from typing import Optional, Dict
 
 from shypn.thermodynamics.compound_mapper_base import SpeciesMapperBase
 from shypn.thermodynamics.compound_resolver import CompoundResolver

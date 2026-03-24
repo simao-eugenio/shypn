@@ -3,7 +3,6 @@
 
 from abc import ABCMeta, abstractmethod
 from gi.repository import GObject, Gtk, Gdk
-import sys
 
 
 # Custom metaclass that combines GObject and ABC

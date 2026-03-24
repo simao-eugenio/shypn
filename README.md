@@ -11,6 +11,18 @@ SHYpn (Signal Hierarchical Petri Nets) is a comprehensive GTK3-based platform fo
 
 ## Quick Start
 
+### Prerequisites
+
+SHYpn is a GTK3 desktop application. Before running `pip install`, you need the GTK3
+system libraries. On **Ubuntu / Debian**:
+
+```bash
+sudo apt install -y python3 python3-venv python3-gi python3-gi-cairo \
+    gir1.2-gtk-3.0 libgtk-3-dev libcairo2-dev libgirepository1.0-dev pkg-config
+```
+
+For Fedora, macOS, and Windows (WSL2) see **[INSTALL.md](INSTALL.md)**.
+
 ### Installation
 
 1. Clone the repository:
@@ -22,11 +34,12 @@ cd shypn
 2. Create and activate virtual environment:
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate  # On Linux/Mac
+source .venv/bin/activate  # Linux / macOS / WSL2
 ```
 
-3. Install dependencies:
+3. Install Python dependencies:
 ```bash
+pip install --upgrade pip
 pip install -e .
 ```
 
@@ -36,7 +49,8 @@ pip install -e .
 python src/shypn.py
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed getting started guide.
+See [QUICKSTART.md](QUICKSTART.md) for a guided first-simulation walkthrough.
+See [INSTALL.md](INSTALL.md) for full installation details and troubleshooting.
 
 ## Model Examples
 

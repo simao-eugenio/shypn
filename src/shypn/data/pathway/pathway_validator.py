@@ -13,15 +13,13 @@ Architecture:
 - PathwayValidator: Main validator class (coordinates validation)
 """
 
-from typing import List, Set
+from typing import Set
 import logging
 import re
 
 from .pathway_data import (
     PathwayData,
     ValidationResult,
-    Species,
-    Reaction,
 )
 
 

@@ -10,7 +10,7 @@ Implementation uses NumPy's optimized Poisson generator for performance.
 """
 
 import numpy as np
-from typing import Any, Union, List, Optional
+from typing import Any, List, Optional
 
 
 class PoissonSampler:
@@ -108,28 +108,28 @@ class PoissonSampler:
             extreme_count = np.sum(lambda_params > MAX_LAMBDA)
             
             error_msg = [
-                f"Lambda parameter too large for Poisson sampling:",
+                "Lambda parameter too large for Poisson sampling:",
                 f"  max(λ) = {max_lambda:.2e} > {MAX_LAMBDA:.2e}",
                 f"  Transition #{max_idx}: propensity={max_prop:.2e}, tau={tau:.2e}",
                 f"  Number of transitions with λ > MAX: {extreme_count}",
-                f"",
-                f"MOST COMMON CAUSE:",
-                f"  SBML models with ASSIGNMENT RULES are not yet fully supported.",
-                f"  Assignment rules (e.g., ATP = (P - ADP) / 2) create algebraic",
-                f"  constraints that require special handling during conversion.",
-                f"",
-                f"OTHER POSSIBLE CAUSES:",
-                f"  1. Parameter scaling issue (check if parameters are in wrong units)",
-                f"  2. Initial conditions too large (check species initial amounts)",
-                f"  3. Kinetic law formula error (check rate expression)",
-                f"  4. Missing volume/compartment normalization",
-                f"",
-                f"SOLUTIONS:",
-                f"  1. RECOMMENDED: Choose an SBML model without assignment rules",
-                f"  2. Manually set initial concentrations for rule-based species",
-                f"  3. Use hybrid mode (mark problematic transitions as continuous)",
+                "",
+                "MOST COMMON CAUSE:",
+                "  SBML models with ASSIGNMENT RULES are not yet fully supported.",
+                "  Assignment rules (e.g., ATP = (P - ADP) / 2) create algebraic",
+                "  constraints that require special handling during conversion.",
+                "",
+                "OTHER POSSIBLE CAUSES:",
+                "  1. Parameter scaling issue (check if parameters are in wrong units)",
+                "  2. Initial conditions too large (check species initial amounts)",
+                "  3. Kinetic law formula error (check rate expression)",
+                "  4. Missing volume/compartment normalization",
+                "",
+                "SOLUTIONS:",
+                "  1. RECOMMENDED: Choose an SBML model without assignment rules",
+                "  2. Manually set initial concentrations for rule-based species",
+                "  3. Use hybrid mode (mark problematic transitions as continuous)",
                 f"  4. Reduce time step (tau) by factor of {max_lambda/MAX_LAMBDA:.1e}",
-                f"",
+                "",
                 f"Top 5 lambda values: {sorted(lambda_params, reverse=True)[:5]}"
             ]
             raise ValueError("\n".join(error_msg))

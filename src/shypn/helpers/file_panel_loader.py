@@ -13,14 +13,16 @@ Architecture:
       ├── ProjectInfoController: Project details display (Project Info category)
       └── ProjectActionsController: Project actions (Project Actions category)
 """
+import logging
 import os
 import sys
-from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, Gdk, GLib
+    from gi.repository import Gtk, Gdk
 except Exception as e:
     print('ERROR: GTK3 not available in file_panel loader:', e, file=sys.stderr)
     sys.exit(1)
@@ -401,7 +403,7 @@ class FilePanelLoader:
                 flags=0,
                 message_type=Gtk.MessageType.QUESTION,
                 buttons=Gtk.ButtonsType.YES_NO,
-                text=f"Open Project?"
+                text="Open Project?"
             )
             dialog.format_secondary_text(
                 f"Do you want to open the project '{project_name}'?\n\n"
@@ -420,7 +422,7 @@ class FilePanelLoader:
                 flags=0,
                 message_type=Gtk.MessageType.QUESTION,
                 buttons=Gtk.ButtonsType.YES_NO,
-                text=f"Create Project?"
+                text="Create Project?"
             )
             dialog.format_secondary_text(
                 f"The folder '{folder_name}' is not a SHYpn project yet.\n\n"

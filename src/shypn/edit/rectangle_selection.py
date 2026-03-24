@@ -135,7 +135,6 @@ class RectangleSelection:
         Returns:
             int: Number of objects selected
         """
-        from shypn.netobjs import Place, Transition
         
         bounds = self.get_bounds()
         if not bounds:

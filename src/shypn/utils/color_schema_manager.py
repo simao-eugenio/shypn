@@ -20,7 +20,7 @@ Author: Simão Eugénio
 Date: 2026-01-01
 """
 
-from typing import Tuple, Optional
+from typing import Tuple
 
 
 class ColorSchemaManager:

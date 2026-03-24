@@ -10,7 +10,7 @@ Date: October 2025
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import List
 
 from .base_enricher import EnricherBase, EnrichmentResult, EnrichmentChange
 from .sbml_id_mapper import SBMLIDMapper
@@ -71,7 +71,7 @@ class CoordinateEnricher(EnricherBase):
         changes = []
         
         try:
-            import libsbml
+            import libsbml  # noqa: F401
             
             # Extract coordinate data from fetch result
             coord_data = fetch_result.data

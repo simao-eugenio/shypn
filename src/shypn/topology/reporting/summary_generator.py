@@ -13,7 +13,7 @@ Author: Simão Eugénio
 Date: 2025-10-29
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 from datetime import datetime
 
 

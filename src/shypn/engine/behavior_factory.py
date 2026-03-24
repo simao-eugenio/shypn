@@ -6,7 +6,7 @@ class based on a transition's type attribute. This follows the Factory pattern,
 centralizing behavior creation logic.
 """
 
-from typing import Any, Optional
+from typing import Any
 from .transition_behavior import TransitionBehavior
 
 # Import concrete behaviors (all now implemented)

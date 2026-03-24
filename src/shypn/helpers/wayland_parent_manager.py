@@ -22,7 +22,7 @@ import logging
 from typing import Dict, Optional
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk
 
 logger = logging.getLogger(__name__)
 

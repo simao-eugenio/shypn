@@ -12,7 +12,6 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 import logging
-from typing import Optional, Dict, Any
 
 from .base_pathway_category import BasePathwayCategory
 from shypn.crossfetch.controllers import HeuristicParametersController
@@ -524,7 +523,7 @@ class HeuristicParametersCategory(BasePathwayCategory):
             
             # Find simulation controller for this drawing area
             if hasattr(self.model_canvas_loader, 'simulation_controllers'):
-                self.logger.info(f"[RESET] simulation_controllers attribute exists")
+                self.logger.info("[RESET] simulation_controllers attribute exists")
                 self.logger.info(f"[RESET] Available controllers: {list(self.model_canvas_loader.simulation_controllers.keys())}")
                 
                 if drawing_area in self.model_canvas_loader.simulation_controllers:

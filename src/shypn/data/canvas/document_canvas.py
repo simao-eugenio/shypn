@@ -13,7 +13,6 @@ It delegates to DocumentModel for data and ViewportState for view management.
 """
 
 from typing import Optional, Tuple, List, Callable
-from datetime import datetime
 
 from .canvas_state import ViewportState, DocumentState
 from .document_model import DocumentModel

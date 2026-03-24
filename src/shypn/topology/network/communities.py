@@ -1,8 +1,25 @@
 """Community detection analyzer for Petri nets."""
 
-from typing import List, Dict, Any, Optional, Set
-import networkx as nx
-from networkx.algorithms import community
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional, Set
+
+if TYPE_CHECKING:
+    import networkx as nx
+    from networkx.algorithms import community
+
+
+def _nx():
+    """Lazy networkx import — deferred to first Topology panel use."""
+    import networkx
+    return networkx
+
+
+def _community():
+    """Lazy networkx.algorithms.community import."""
+    from networkx.algorithms import community as _c
+    return _c
+
 
 from ..base.topology_analyzer import TopologyAnalyzer
 from ..base.analysis_result import AnalysisResult
@@ -68,9 +85,9 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         start_time = self._start_timer()
         
         try:
+            nx = _nx()
+            community = _community()
             self._validate_model()
-            
-            # Validate method
             valid_methods = ['louvain', 'greedy_modularity', 'label_propagation', 'girvan_newman']
             if method not in valid_methods:
                 raise TopologyAnalysisError(
@@ -236,6 +253,7 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         
         Louvain is a fast greedy optimization method that maximizes modularity.
         """
+        community = _community()
         try:
             # Try to use louvain_communities if available (NetworkX >= 2.5)
             communities_dict = community.louvain_communities(
@@ -268,6 +286,7 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         
         Hierarchical agglomerative method that merges communities to maximize modularity.
         """
+        community = _community()
         communities_generator = community.greedy_modularity_communities(graph)
         return list(communities_generator)
     
@@ -279,6 +298,7 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         
         Fast semi-synchronous method where nodes adopt labels from their neighbors.
         """
+        community = _community()
         communities_generator = community.label_propagation_communities(graph)
         return list(communities_generator)
     
@@ -291,6 +311,7 @@ class CommunitiesAnalyzer(TopologyAnalyzer):
         
         Iteratively removes edges with highest betweenness. Accurate but slow.
         """
+        community = _community()
         communities_generator = community.girvan_newman(graph)
         
         # If num_communities not specified, try to find optimal number

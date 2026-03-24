@@ -21,7 +21,7 @@ Example:
 """
 
 import re
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, List
 from dataclasses import dataclass
 import logging
 

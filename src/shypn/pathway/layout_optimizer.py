@@ -5,11 +5,18 @@ refinement. Preserves the overall structure from the pathway image while
 improving spacing.
 """
 
-from typing import Optional, List, Tuple, Dict
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional, List, Tuple
 import logging
 import math
 
-from shypn.pathway.base import PostProcessorBase, ProcessorError
+from shypn.pathway.base import PostProcessorBase
+
+
+if TYPE_CHECKING:
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.importer.kegg.models import KEGGPathway
+    from shypn.pathway.options import EnhancementOptions
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +42,8 @@ class LayoutOptimizer(PostProcessorBase):
     Example:
         from shypn.pathway.layout_optimizer import LayoutOptimizer
         from shypn.pathway.options import EnhancementOptions
+
+
         
         options = EnhancementOptions(
             layout_min_spacing=80.0,

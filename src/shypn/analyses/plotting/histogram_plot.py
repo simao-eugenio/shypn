@@ -4,7 +4,6 @@
 Author: Simão Eugénio
 Date: 2025-12-30
 """
-import numpy as np
 from .base_plot import BasePlot
 
 
@@ -37,7 +36,7 @@ class HistogramPlot(BasePlot):
         colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12',
                  '#9b59b6', '#1abc9c', '#e67e22', '#34495e']
         
-        from shypn.netobjs import Place, Transition
+        from shypn.netobjs import Place
         
         # Plot each object
         for i, obj in enumerate(self.selected_objects):

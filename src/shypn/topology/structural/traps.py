@@ -30,7 +30,6 @@ Implementation approach:
 
 from typing import Any, Dict, List, Set, Optional
 from itertools import combinations
-import numpy as np
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
@@ -117,7 +116,7 @@ class TrapAnalyzer(TopologyAnalyzer):
             return AnalysisResult(
                 success=False,
                 errors=[
-                    f"⛔ Model too large for trap analysis",
+                    "⛔ Model too large for trap analysis",
                     f"   Places: {n_places} (maximum: {MAX_PLACES_SAFE})",
                     f"   Estimated operations: > 10^{int(n_places * 0.3)} (exponential)",
                     "",

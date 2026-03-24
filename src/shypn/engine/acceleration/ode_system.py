@@ -35,7 +35,6 @@ import ctypes
 import hashlib
 import logging
 import re
-import textwrap
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -47,7 +46,6 @@ from .codegen import (
     TranspileError,
     THERMO_LOCALS,
     collect_names,
-    preprocess_expr,
     transpile_expression,
 )
 from .c_compiler import compile_ode_rhs

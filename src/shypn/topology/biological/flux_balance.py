@@ -20,8 +20,7 @@ Date: November 20, 2025
 """
 
 import numpy as np
-from typing import Any, Dict, List, Set, Tuple, Optional
-from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
 from shypn.topology.base.topology_analyzer import TopologyAnalyzer
 from shypn.topology.base.analysis_result import AnalysisResult
@@ -70,7 +69,7 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
         try:
             # Check if scipy is available
             try:
-                from scipy.optimize import linprog
+                from scipy.optimize import linprog  # noqa: F401
                 has_scipy = True
             except ImportError:
                 has_scipy = False
@@ -343,7 +342,7 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
             str: Formatted summary
         """
         lines = [
-            f"Flux Balance Analysis:",
+            "Flux Balance Analysis:",
             f"  Places: {statistics['num_places']}",
             f"  Transitions: {statistics['num_transitions']}",
             f"  Matrix rank: {statistics['matrix_rank']}",
@@ -358,9 +357,9 @@ class FluxBalanceAnalyzer(TopologyAnalyzer):
             lines.append(f"  Sink transitions: {statistics.get('num_sink_transitions', 0)}")
         
         if statistics['is_feasible']:
-            lines.append(f"\n✓ Steady-state flux distribution is FEASIBLE")
+            lines.append("\n✓ Steady-state flux distribution is FEASIBLE")
         else:
-            lines.append(f"\n✗ No feasible steady-state flux distribution")
+            lines.append("\n✗ No feasible steady-state flux distribution")
         
         return "\n".join(lines)
     

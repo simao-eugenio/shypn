@@ -9,7 +9,7 @@ Date: 2025-11-15
 """
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gio
+from gi.repository import Gtk
 from typing import Optional, Callable
 
 # Import from top-level shypn.reporting module

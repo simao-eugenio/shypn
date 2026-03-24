@@ -18,8 +18,11 @@ Date: November 10, 2025
 """
 
 import gi
+import logging
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+
+logger = logging.getLogger(__name__)
 
 from .base_category import BaseViabilityCategory
 from .viability_dataclasses import Issue, Suggestion
@@ -227,7 +230,7 @@ class KineticCategory(BaseViabilityCategory):
                     category="kinetic",
                     parameters={'rate': 10.0},
                     confidence=0.4,
-                    reasoning=f"Increase rate to enable firing (verify structural connectivity first)",
+                    reasoning="Increase rate to enable firing (verify structural connectivity first)",
                     preview_elements=[first_trans]
                 )
                 issue.suggestions = [suggestion]

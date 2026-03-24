@@ -11,7 +11,6 @@ Architecture:
 - Override Logic: Respect SBML curated data, override KEGG heuristics
 """
 
-import sys
 import logging
 from typing import Optional, Dict, List, Any, Tuple
 
@@ -250,7 +249,7 @@ class SabioRKEnrichmentController:
         
         self.logger.info(f"[SABIO-RK] ✓ Found data for {len(results)}/{total} transitions (skipped {skipped_count})")
         if skipped_count > 0:
-            self.logger.info(f"[SABIO-RK] Skipped transitions: either no data available or >200 results (too many)")
+            self.logger.info("[SABIO-RK] Skipped transitions: either no data available or >200 results (too many)")
         return results
     
     def apply_parameters(self, 
@@ -356,7 +355,7 @@ class SabioRKEnrichmentController:
                 override_sbml=override_sbml
             )
         else:
-            self.logger.info(f"[SABIO-RK] Skipping rate function generation (missing Km or Vmax/Kcat)")
+            self.logger.info("[SABIO-RK] Skipping rate function generation (missing Km or Vmax/Kcat)")
         
         # Track application in KB (if enabled)
         param_id = None
@@ -690,13 +689,13 @@ class SabioRKEnrichmentController:
         # If no input places or substrate not found, try output places
         # (for reverse reactions where Km might be for product)
         if not substrate_place and output_places:
-            self.logger.info(f"[SABIO-RK] No input places found, using first output place for substrate")
+            self.logger.info("[SABIO-RK] No input places found, using first output place for substrate")
             substrate_place = output_places[0].name  # Use name (alias), not id
         
         # Fallback: use generic names
         if not substrate_place:
             substrate_place = 'S'
-            self.logger.warning(f"[SABIO-RK] Could not identify substrate place, using generic 'S'")
+            self.logger.warning("[SABIO-RK] Could not identify substrate place, using generic 'S'")
         
         # Generate rate function
         if ki and inhibitor_place:

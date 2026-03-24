@@ -18,11 +18,17 @@ Architecture:
         └── Properties Palette (right) [future]
 """
 
+from __future__ import annotations
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
-from typing import Dict, Tuple, Optional
-import sys
+from typing import TYPE_CHECKING, Dict, Tuple, Optional
+
+
+if TYPE_CHECKING:
+    from shypn.edit.base_palette import BasePalette
+
+
 
 
 class PaletteManager:

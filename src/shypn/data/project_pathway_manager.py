@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from .pathway_document import PathwayDocument
-from .enrichment_document import EnrichmentDocument
 
 
 class ProjectPathwayManager:

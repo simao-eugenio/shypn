@@ -6,11 +6,11 @@ Displays simplified subnet topology without full Petri net rendering.
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk
 import cairo
 
-from typing import Optional, List, Tuple
-from shypn.ui.panels.viability.investigation import Subnet, Dependency
+from typing import Optional
+from shypn.ui.panels.viability.investigation import Subnet
 
 
 class TopologyViewer(Gtk.DrawingArea):

@@ -22,7 +22,7 @@ Note: This base class is for species-centric mapping (SBML species lists).
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional
 import logging
 import re
 

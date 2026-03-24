@@ -16,14 +16,13 @@ Design Principles:
 - Separation of concerns: Service orchestrates, metadata classes handle logic
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 import logging
 
 from shypn.data.pathway.pathway_data import PathwayData, Reaction, KineticLaw
 from shypn.data.kinetics import (
     SBMLKineticMetadata,
     KineticMetadata,
-    ConfidenceLevel,
     KineticSource
 )
 from shypn.thermodynamics.simulation_integration import ThermodynamicSimulationValidator
@@ -428,7 +427,7 @@ class SBMLKineticsIntegrationService:
                     )
                     
                     self.logger.debug(
-                        f"  Reversible reaction - marked in properties (net rate formula)"
+                        "  Reversible reaction - marked in properties (net rate formula)"
                     )
                     
                     # Validate thermodynamic consistency of reversible reaction

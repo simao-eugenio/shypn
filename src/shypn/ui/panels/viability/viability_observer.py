@@ -19,17 +19,14 @@ Author: Simão Eugénio
 Date: November 10, 2025
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Callable, Any, Optional
+from dataclasses import dataclass
+from typing import Dict, List, Callable, Any
 from datetime import datetime
 
 # Import pattern recognition engine
 try:
     from shypn.viability.pattern_recognition import (
         PatternRecognitionEngine,
-        PatternType,
-        Pattern,
-        RepairSuggestion
     )
     PATTERN_ENGINE_AVAILABLE = True
 except ImportError:
@@ -521,7 +518,7 @@ class ViabilityObserver:
                 suggestion = {
                     'category': 'kinetic',
                     'title': f'Set firing rate for {trans_name}',
-                    'description': f'Transition has rate=0.',
+                    'description': 'Transition has rate=0.',
                     'reasoning': f'Query BRENDA for {getattr(trans_obj, "label", "reaction")}',
                     'confidence': 0.7,
                     'action_type': 'query_brenda',
@@ -536,7 +533,7 @@ class ViabilityObserver:
                 suggestion = {
                     'category': 'biological',
                     'title': f'Map {place_name} to compound',
-                    'description': f'Place lacks compound mapping.',
+                    'description': 'Place lacks compound mapping.',
                     'reasoning': 'Enable pathway analysis and validation',
                     'confidence': 0.6,
                     'action_type': 'map_compound',
@@ -715,8 +712,8 @@ class ViabilityObserver:
                 return {
                     'reason': 'SOURCE_TRANSITION_NO_RATE',
                     'title': f'{trans_name} is source with NO rate',
-                    'description': f'Source transition has no input places and no firing rate or kinetic law.',
-                    'reasoning': f'Either set a firing rate/kinetic law (e.g., michaelis_menten) or add input places (if not truly a source).',
+                    'description': 'Source transition has no input places and no firing rate or kinetic law.',
+                    'reasoning': 'Either set a firing rate/kinetic law (e.g., michaelis_menten) or add input places (if not truly a source).',
                     'confidence': 0.85,
                     'action_type': 'set_rate_or_add_inputs',
                     'suggestions': [
@@ -732,7 +729,7 @@ class ViabilityObserver:
                     'reason': 'SOURCE_TRANSITION_UNUSED',
                     'title': f'{trans_name} source never fired',
                     'description': f'Source transition has {rate_info} but never fired during simulation.',
-                    'reasoning': f'This might be intentional (boundary condition) or parameters incorrect. Check kinetic parameters or extend simulation time.',
+                    'reasoning': 'This might be intentional (boundary condition) or parameters incorrect. Check kinetic parameters or extend simulation time.',
                     'confidence': 0.6,
                     'action_type': 'check_source_usage',
                     'suggestions': [
@@ -854,7 +851,7 @@ class ViabilityObserver:
         return {
             'reason': 'UNKNOWN',
             'title': f'{trans_name} DEAD: Unknown cause',
-            'description': f'All inputs seem adequate but transition still dead.',
+            'description': 'All inputs seem adequate but transition still dead.',
             'reasoning': f'Check guards, rates, and timing. Inputs: {", ".join(place_names)}',
             'confidence': 0.5,
             'action_type': 'investigate',
@@ -966,7 +963,7 @@ class ViabilityObserver:
                     id=f"empty_siphon_{hash(tuple(siphon))}",
                     category="structural",
                     severity="warning",
-                    title=f"Empty Siphon Detected",
+                    title="Empty Siphon Detected",
                     description=f"Siphon containing places {place_ids} may become permanently empty, "
                                 "causing deadlock. Add initial tokens or rework structure.",
                     element_id=siphon[0],  # Use first place as representative
