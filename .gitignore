@@ -10,6 +10,10 @@ __pycache__/
 debug.log
 CLEANUP_SUMMARY.md
 
+# Internal architecture / development analysis documents at root
+SIMULATION_CONTROLLER_ANALYSIS.md
+*_ANALYSIS.md
+
 # Distribution / packaging
 .Python
 build/

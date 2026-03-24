@@ -248,7 +248,27 @@ class PropensityAccelerator:
                     model_hash=self._model_hash,
                     force=True,
                 )
-                self._load_so(so_path)  # re-raise if still broken
+                # dlopen(3) caches library handles keyed by the absolute path
+                # string.  After unlink + recompile to the same canonical path
+                # in the same process, a subsequent ctypes.CDLL() call returns
+                # the stale in-memory handle for the now-deleted library, so
+                # the missing-symbol error would repeat.  Loading via a unique
+                # per-call copy bypasses the cache; the copy is removed once
+                # the handle is open (the kernel keeps the mapping alive until
+                # self._lib goes out of scope).
+                import os as _os
+                import shutil
+                import tempfile
+                _fd, _tmp = tempfile.mkstemp(
+                    suffix=".so", dir=str(so_path.parent)
+                )
+                _tmp_path = Path(_tmp)
+                try:
+                    _os.close(_fd)
+                    shutil.copy2(so_path, _tmp_path)
+                    self._load_so(_tmp_path)  # re-raise if still broken
+                finally:
+                    _tmp_path.unlink(missing_ok=True)
             self._alloc_arrays()
             self.ready = True
             logger.info(
@@ -558,6 +578,15 @@ class PropensityAccelerator:
         lines.append("")
         lines.append("/* params: [T=0, pH=1, ionic_strength=2] */")
         lines.append("")
+        lines.append(
+            "#if defined(__GNUC__)"
+        )
+        lines.append(
+            "__attribute__((visibility(\"default\")))"
+        )
+        lines.append(
+            "#endif"
+        )
         lines.append(
             "void propensity_fn(int n, double t, double *y,"
         )

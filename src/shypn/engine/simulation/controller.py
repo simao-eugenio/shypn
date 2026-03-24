@@ -1240,12 +1240,19 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         if time_step < 0:
             raise ValueError(f"time_step must be non-negative, got {time_step}")
         
-        # Warn about potentially problematic time steps (once per simulation)
-        if time_step > 1.0:
+        # Warn about potentially problematic time steps (once per simulation).
+        # Threshold is relative: warn when the step would produce fewer than
+        # 1 000 samples for the full simulation duration.  For short (<1 000 s)
+        # simulations the absolute floor of 1.0 s still applies.
+        _warn_threshold = max(1.0, float(duration_seconds or 0) / 1000.0)
+        if time_step > _warn_threshold:
             if not hasattr(self, '_large_timestep_warned'):
                 self._large_timestep_warned = True
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Large time step ({time_step:.2f}s) may cause timed transitions to miss firing windows")
+                logger.warning(
+                    f"Large time step ({time_step:.2f}s) may cause timed transitions "
+                    f"to miss firing windows (threshold: {_warn_threshold:.2f}s)"
+                )
 
         # Update enablement states
         self._update_enablement_states()
