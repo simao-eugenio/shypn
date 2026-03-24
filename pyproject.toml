@@ -35,6 +35,10 @@ dependencies = [
     # Utilities
     "platformdirs>=4.0.0",
     "requests>=2.31.0",
+    # XML parsing (KEGG, BRENDA, SABIO-RK fetchers)
+    "defusedxml>=0.7.1",
+    # SBML support
+    "python-libsbml>=5.20.0",
 ]
 
 [project.optional-dependencies]
