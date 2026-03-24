@@ -31,7 +31,17 @@ def _worker_pool_initializer(q) -> None:
 
     Sets the module-level _worker_progress_queue so that _worker_run_experiment
     can use it without the queue appearing in the pickled args dict.
+
+    Also limits BLAS/OpenMP thread count here — this is the earliest possible
+    point in the worker lifecycle, before ANY library is imported.  Setting env
+    vars in _worker_run_experiment (later, after imports) is too late for some
+    BLAS backends that read the thread count at library-load time.
     """
+    import os as _os
+    _os.environ["OMP_NUM_THREADS"] = "1"
+    _os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    _os.environ["MKL_NUM_THREADS"] = "1"
+    _os.environ["NUMEXPR_NUM_THREADS"] = "1"
     global _worker_progress_queue
     _worker_progress_queue = q
 
@@ -909,17 +919,23 @@ class BatchExecutor:
                 # while keeping the app responsive.
                 n_workers = max(1, multiprocessing.cpu_count() - 2)
 
-            # Cap concurrent workers to prevent RAM exhaustion at large N.
+            # Cap concurrent workers to prevent resource exhaustion.
             # Each worker accumulates all N replicate trajectory arrays in RAM
-            # before returning: empirical peak ≈ N × 4 MB (float32 place
-            # buffers + overhead).  Limit workers so total in-flight data
-            # stays under ~4 GB regardless of N.
-            # Examples: N=200 → 5 workers (5×800 MB = 4 GB)
-            #           N=100 → 10 workers (cap not binding at ≤ cpu_count-2)
-            _ram_limit_mb = 4096
-            _mb_per_worker = max(200, replicates * 4)
+            # before returning: empirical peak ≈ N × 1 MB (measured on GATA
+            # model: ~0.74 MB/replicate uncompressed; using 1 MB adds safety
+            # margin).
+            #
+            # Hard cap at 5 workers on this 12-core machine:
+            # - 8 workers saturated all cores → VS Code extension host lost
+            #   its LSP heartbeat and disconnected (confirmed empirically).
+            # - 5 workers leaves ~7 cores for VS Code, Python LSP, GTK UI
+            #   thread, OS scheduler, and auto-save I/O — keeps the app
+            #   responsive throughout a sweep.
+            # Examples: N=200 → cap=5  N=1000 → cap=5
+            _ram_limit_mb = 16384
+            _mb_per_worker = max(100, replicates * 1)
             _ram_cap = max(1, _ram_limit_mb // _mb_per_worker)
-            n_workers = min(n_workers, _ram_cap)
+            n_workers = min(n_workers, _ram_cap, 5)  # hard cap at 5
 
             # Use 'forkserver' context: workers are forked from a clean server
             # process that was started before GTK/Numba were loaded, so they
@@ -1062,9 +1078,15 @@ class BatchExecutor:
                                         progress_callback(queue_idx, "running", "0%")
                                     progress_pct = int(progress_fraction * 100)
                                     progress_callback(queue_idx, "running", f"{progress_pct}%")
-                            except (OSError, EOFError, ValueError) as e:
-                                import logging
-                                logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
+                            except Exception as e:
+                                # Catches queue.Empty (race: empty() returned False but item
+                                # was consumed before get_nowait()), OSError, EOFError, ValueError.
+                                # queue.Empty must be caught here — it is NOT a subclass of
+                                # OSError/ValueError — and was previously escaping this block,
+                                # breaking the polling loop and freezing progress updates.
+                                import logging, queue as _q
+                                if not isinstance(e, _q.Empty):
+                                    logging.getLogger(__name__).debug(f"Progress queue read failed: {e}")
                                 break
                     except (OSError, EOFError) as e:
                         import logging
