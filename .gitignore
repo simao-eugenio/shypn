@@ -6,14 +6,6 @@ __pycache__/
 # C extensions
 *.so
 
-# Debug and cleanup logs at root
-debug.log
-CLEANUP_SUMMARY.md
-
-# Internal architecture / development analysis documents at root
-SIMULATION_CONTROLLER_ANALYSIS.md
-*_ANALYSIS.md
-
 # Distribution / packaging
 .Python
 build/
@@ -88,100 +80,24 @@ $RECYCLE.BIN/
 *~
 .directory
 
-# Spyder project settings
+# Spyder / Rope project settings
 .spyderproject
 .spyproject
-
-# Rope project settings
 .ropeproject
-Token.txt
 
-# BRENDA credentials (never commit passwords!)
+# Credentials (never commit!)
+Token.txt
 brenda_credentials.txt
 
-# Workspace isolation (user-specific content)
-# workspace/examples/ is tracked (demo files)
-# workspace/cache/ is user-specific
+# Workspace cache (user-specific runtime data)
 workspace/cache/
 
-# Legacy backups (pre-UI work safety backups)
+# ===== Local-only directories =====
+# Legacy backups and archived code — not for any remote
 legacy/
-
-# ===== GitHub Visibility Control =====
-# Hide development materials from public GitHub (keep locally)
-
-# Benchmark results (performance testing artifacts)
-benchmark_results/
-
-# Documentation (papers, thesis, internal docs)
-doc/
-
-# Python examples (keep Biochemical-Examples only)
-examples/
-
-# Test suite
-tests/
-test_output/
-
-# Utility scripts (development tools)
-scripts/
-# Allow scripts in organized manuscript directories
-!workspace/projects/Biochemical-Examples/2*_*/scripts/
-
-# CLI tools (experimental/research validation tools)
-cli/
-
-# Development utilities (pre-commit, sync scripts)
-tools/
-
-# Development and archived code
 archive/
-dev/
 
-# Note: ui/ directory is tracked (contains GTK XML definitions needed at runtime)
-
-# User workspace (except Biochemical-Examples)
-workspace/projects/My_Project/
-workspace/projects/thesis/
-workspace/projects/gata/
-workspace/projects/*.json
-!workspace/projects/Biochemical-Examples/
-
-# Signal hierarchy paper (private development)
-workspace/projects/My_Project/signal_hierarchy/
-
-# Biochemical-Examples: exclude generated artifacts
-workspace/projects/Biochemical-Examples/metadata/
-workspace/projects/Biochemical-Examples/results/
-workspace/projects/Biochemical-Examples/*/metadata/
-workspace/projects/Biochemical-Examples/*/results/
-
-# Signal_hierarchy_foundation: Track manuscript but exclude LaTeX artifacts
-!workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/
-workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.aux
-workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.log
-workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.blg
-workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.out
-workspace/projects/Biochemical-Examples/Signal_hierarchy_foundation/**/*.bbl
-
-# Exclude SBML imports and project metadata (development artifacts)
-workspace/projects/Biochemical-Examples/models/
-workspace/projects/Biochemical-Examples/pathways/
-workspace/projects/Biochemical-Examples/.project.shy
-
-# Hidden files and view state (SHYpn internal, not for version control)
-**/.view_state*.json
-**/.*_view_state*.json
-**/.project.shy
-**/*.Zone.Identifier
-
-# arXiv and PLOS manuscript directories hidden files
-workspace/projects/Biochemical-Examples/23_arXiv_*/**/.view_state*.json
-workspace/projects/Biochemical-Examples/24_arXiv_*/**/.view_state*.json
-workspace/projects/Biochemical-Examples/25_arXiv_*/**/.view_state*.json
-workspace/projects/Biochemical-Examples/26_arXiv_*/**/.view_state*.json
-workspace/projects/Biochemical-Examples/27_PLOS_*/**/.view_state*.json
-workspace/projects/Biochemical-Examples/2*_*/**/*.Zone.Identifier
+# ===== Build / generated artifacts =====
 
 # LaTeX auxiliary files
 *.aux
@@ -198,11 +114,31 @@ workspace/projects/Biochemical-Examples/2*_*/**/*.Zone.Identifier
 *.fdb_latexmk
 *.synctex.gz
 
-# PDF outputs (except manuscript PDFs and figures in organized directories)
-doc/**/*.pdf
+# PDF outputs (except manuscript figures)
 *.pdf
-# Allow PDFs in organized manuscript directories (arXiv and PLOS)
 !workspace/projects/Biochemical-Examples/2*_*/manuscript/*.pdf
 !workspace/projects/Biochemical-Examples/2*_*/figures/*.pdf
 !workspace/projects/Biochemical-Examples/2*_*/scripts/*.pdf
+
+# Hidden files and view state (SHYpn internal)
+**/.view_state*.json
+**/.*_view_state*.json
+**/.project.shy
+**/*.Zone.Identifier
+
+# Biochemical-Examples: generated artifacts
+workspace/projects/Biochemical-Examples/metadata/
+workspace/projects/Biochemical-Examples/results/
+workspace/projects/Biochemical-Examples/*/metadata/
+workspace/projects/Biochemical-Examples/*/results/
+workspace/projects/Biochemical-Examples/models/
+workspace/projects/Biochemical-Examples/pathways/
+
+# Debug / cleanup logs
+debug.log
+CLEANUP_SUMMARY.md
+*_ANALYSIS.md
+SIMULATION_CONTROLLER_ANALYSIS.md
 .backup_pre_refactor
+test_output/
+benchmark_results/
