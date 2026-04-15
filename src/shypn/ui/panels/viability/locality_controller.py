@@ -125,6 +125,11 @@ class LocalityController(AbstractLocalityController):
         all_places: Dict[str, Any] = {
             p.id: p for p in canvas_mgr._document_model.places
         }
+        # Also map by place name so rate formulas that use names (not IDs)
+        # resolve correctly (signal/remote sensing formalism).
+        for p in canvas_mgr._document_model.places:
+            if hasattr(p, 'name') and p.name and p.name not in all_places:
+                all_places[p.name] = p
 
         # Resolve formula — priority: properties dict > string rate attribute
         formula: Optional[str] = None
@@ -143,11 +148,12 @@ class LocalityController(AbstractLocalityController):
         if not formula:
             return []
 
-        # Extract identifier tokens
-        referenced_place_ids: Set[str] = set()
+        # Extract identifier tokens — resolve to place objects for dedup
+        referenced_places: Dict[str, Any] = {}  # id → place
         for match in re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\b', formula):
             if match in all_places:
-                referenced_place_ids.add(match)
+                p = all_places[match]
+                referenced_places[p.id] = p
 
         # Determine which place IDs are already in the locality
         model = self._get_current_model()
@@ -169,9 +175,8 @@ class LocalityController(AbstractLocalityController):
             locality_place_ids = set()
 
         return [
-            all_places[pid]
-            for pid in referenced_place_ids
-            if pid not in locality_place_ids and pid in all_places
+            p for pid, p in referenced_places.items()
+            if pid not in locality_place_ids
         ]
 
     def extract_place_ids_from_formula(
@@ -187,6 +192,10 @@ class LocalityController(AbstractLocalityController):
             return []
 
         all_places: Dict[str, Any] = {p.id: p for p in model.places}
+        # Also map by place name (signal/remote sensing formalism).
+        for p in model.places:
+            if hasattr(p, 'name') and p.name and p.name not in all_places:
+                all_places[p.name] = p
 
         # Build exclusion set from existing locality
         locality_place_ids: Set[str] = set()
@@ -198,9 +207,13 @@ class LocalityController(AbstractLocalityController):
                 locality_place_ids.update(p.id for p in locality.catalyst_places)
 
         referenced: List[Any] = []
+        seen_ids: Set[str] = set()
         for match in re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\b', formula):
-            if match in all_places and match not in locality_place_ids:
-                referenced.append(all_places[match])
+            if match in all_places:
+                p = all_places[match]
+                if p.id not in locality_place_ids and p.id not in seen_ids:
+                    referenced.append(p)
+                    seen_ids.add(p.id)
         return referenced
 
     def add_formula_referenced_places(
@@ -215,6 +228,10 @@ class LocalityController(AbstractLocalityController):
         all_places: Dict[str, Any] = {
             p.id: p for p in canvas_mgr._document_model.places
         }
+        # Also map by place name (signal/remote sensing formalism).
+        for p in canvas_mgr._document_model.places:
+            if hasattr(p, 'name') and p.name and p.name not in all_places:
+                all_places[p.name] = p
 
         for transition in transitions:
             formula: Optional[str] = None
@@ -235,13 +252,15 @@ class LocalityController(AbstractLocalityController):
 
             current_ids: Set[str] = {p.id for p in places_set}
             for match in re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\b', formula):
-                if match in all_places and match not in current_ids:
-                    places_set.add(all_places[match])
-                    current_ids.add(match)
-                    print(
-                        f"[SUBNET] Added place '{match}' referenced in formula "
-                        f"for transition '{transition.id}'"
-                    )
+                if match in all_places:
+                    p = all_places[match]
+                    if p.id not in current_ids:
+                        places_set.add(p)
+                        current_ids.add(p.id)
+                        print(
+                            f"[SUBNET] Added place '{p.name or p.id}' referenced in formula "
+                            f"for transition '{transition.id}'"
+                        )
 
     def create_subnet_model(
         self, selected_localities: Dict[str, Any]

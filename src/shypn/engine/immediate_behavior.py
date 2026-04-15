@@ -117,8 +117,13 @@ class ImmediateBehavior(TransitionBehavior):
                     return False, f"inhibited-by-{source_place.name}"
             else:
                 # Normal and test arcs: check token presence (tokens >= weight)
+                # Signal flow arcs additionally require θ_eff tokens as basin
+                # floor (formalism: M(ps) ≥ θ_eff + Ws). θ_eff = 0 by default.
+                # When activation_energy > 0, θ_eff is temperature-dependent.
                 # Test arcs check enablement but don't consume (checked in fire)
-                if check_tokens < arc.weight:
+                theta = self._get_theta_eff(arc)
+                required = arc.weight + theta
+                if check_tokens < required:
                     return False, f"insufficient-tokens-{source_place.name}"
         
         # NEW: Validate spatial boundary constraints

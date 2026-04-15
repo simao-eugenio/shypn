@@ -100,6 +100,18 @@ class ArcBuilder:
         self._label: Optional[str] = None
         self._color: Optional[Tuple[float, float, float]] = None
         
+        # Thermodynamic constraint tuple Γ = (K, n, ε)
+        self._michaelis_K: Optional[float] = None
+        self._hill_n: Optional[float] = None
+        self._suppression_epsilon: Optional[float] = None
+        
+        # Arrhenius temperature dependence
+        self._activation_energy: Optional[float] = None
+        self._reference_temperature: Optional[float] = None
+        
+        # Lifecycle tracking (optional)
+        self._id_manager: Optional[Any] = None
+        
         # Custom properties and metadata
         self._properties: Dict[str, Any] = {}
         self._metadata: Dict[str, Any] = {}
@@ -300,6 +312,79 @@ class ArcBuilder:
         if weight < 0:
             raise ValueError(f"Arc weight must be non-negative, got {weight}")
         self._weight = float(weight)
+        return self
+    
+    def with_gamma(self, K: float, n: float = 1.0, epsilon: float = 0.0) -> 'ArcBuilder':
+        """Set thermodynamic constraint tuple Γ = (K, n, ε).
+        
+        Γ replaces the static commitment threshold θ with enzyme-kinetic
+        parameters from which θ_eff emerges:
+            θ_eff = K · (ε / (1 - ε))^(1/n)
+        
+        Only meaningful on signal flow arcs. When ε = 0, θ_eff = 0
+        (backward compatible default).
+        
+        Args:
+            K: Michaelis constant (mM). Half-saturation concentration.
+            n: Hill coefficient (dimensionless, default 1.0).
+            epsilon: Rate suppression threshold ε ∈ [0, 1). Fraction of
+                    V_max below which the transition is effectively off.
+        
+        Returns:
+            Self for method chaining
+        
+        Raises:
+            ValueError: If K < 0, n <= 0, or ε ∉ [0, 1)
+        
+        Example - B. subtilis sporulation:
+            .from_place("ATP")
+            .to_transition("commit")
+            .as_signal_flow()
+            .with_signal_weight(0.17)
+            .with_gamma(K=2.04, n=1.0, epsilon=0.52)
+            # → θ_eff ≈ 2.21 mM, M_commit ≈ 2.38 mM
+        """
+        if K < 0:
+            raise ValueError(f"Michaelis constant K must be non-negative, got {K}")
+        if n <= 0:
+            raise ValueError(f"Hill coefficient n must be positive, got {n}")
+        if not (0.0 <= epsilon < 1.0):
+            raise ValueError(f"Suppression epsilon must be in [0, 1), got {epsilon}")
+        self._michaelis_K = float(K)
+        self._hill_n = float(n)
+        self._suppression_epsilon = float(epsilon)
+        return self
+    
+    def with_arrhenius(self, activation_energy: float,
+                       reference_temperature: float = 298.15) -> 'ArcBuilder':
+        """Set Arrhenius temperature dependence for K(T).
+        
+        When activation_energy > 0, K becomes temperature-dependent:
+            K(T) = K_ref · exp(−E_a/R · (1/T − 1/T_ref))
+        
+        Requires with_gamma() to be called first or afterwards.
+        Only meaningful on signal flow arcs.
+        
+        Args:
+            activation_energy: Activation energy E_a in kJ/mol.
+                Must be non-negative.
+            reference_temperature: Reference temperature T_ref in Kelvin
+                (default 298.15 K = 25°C). Must be positive.
+        
+        Returns:
+            Self for method chaining
+        
+        Raises:
+            ValueError: If activation_energy < 0 or reference_temperature <= 0
+        """
+        if activation_energy < 0:
+            raise ValueError(
+                f"Activation energy must be non-negative, got {activation_energy}")
+        if reference_temperature <= 0:
+            raise ValueError(
+                f"Reference temperature must be positive, got {reference_temperature}")
+        self._activation_energy = float(activation_energy)
+        self._reference_temperature = float(reference_temperature)
         return self
     
     def with_signal_weight(self, signal_weight: float) -> 'ArcBuilder':
@@ -548,7 +633,11 @@ class ArcBuilder:
         arc_class = self._determine_arc_class()
         
         # Create arc
-        arc = arc_class(source, target, arc_id, arc_name, weight=self._weight)
+        # For signal flow arcs, weight = W_s (signal weight / commitment quota)
+        build_weight = self._weight
+        if self._is_signal_flow and self._signal_weight is not None:
+            build_weight = self._signal_weight
+        arc = arc_class(source, target, arc_id, arc_name, weight=build_weight)
         
         # Set optional properties
         if self._threshold is not None:
@@ -567,6 +656,18 @@ class ArcBuilder:
         if self._control_offset_x != 0.0 or self._control_offset_y != 0.0:
             arc.control_offset_x = self._control_offset_x
             arc.control_offset_y = self._control_offset_y
+        
+        # Apply Γ parameters to signal flow arcs
+        if self._michaelis_K is not None and hasattr(arc, 'michaelis_K'):
+            arc.michaelis_K = self._michaelis_K
+            arc.hill_n = self._hill_n if self._hill_n is not None else 1.0
+            arc.suppression_epsilon = self._suppression_epsilon if self._suppression_epsilon is not None else 0.0
+        
+        # Apply Arrhenius parameters
+        if self._activation_energy is not None and hasattr(arc, 'activation_energy'):
+            arc.activation_energy = self._activation_energy
+        if self._reference_temperature is not None and hasattr(arc, 'reference_temperature'):
+            arc.reference_temperature = self._reference_temperature
         
         if self._label:
             arc.label = self._label
@@ -631,6 +732,20 @@ class ArcBuilder:
         if self._control_points and not self._is_curved:
             raise ValueError(
                 "Control points require .as_curved() to be called"
+            )
+        
+        # Validate Γ requires signal flow arc
+        if self._michaelis_K is not None and not self._is_signal_flow:
+            raise ValueError(
+                "Γ parameters (with_gamma) require .as_signal_flow() — "
+                "thermodynamic constraints only apply to signal flow arcs."
+            )
+        
+        # Validate Arrhenius requires signal flow arc
+        if self._activation_energy is not None and not self._is_signal_flow:
+            raise ValueError(
+                "Arrhenius parameters (with_arrhenius) require .as_signal_flow() — "
+                "temperature dependence only applies to signal flow arcs."
             )
     
     def _looks_like_place(self, obj: Any) -> bool:
@@ -757,6 +872,10 @@ class ArcBuilder:
         weight_info = f", W={self._weight}"
         if self._signal_weight is not None:
             weight_info += f", W_s={self._signal_weight}"
+        if self._michaelis_K is not None:
+            weight_info += f", Γ=(K={self._michaelis_K}, n={self._hill_n}, ε={self._suppression_epsilon})"
+        if self._activation_energy is not None:
+            weight_info += f", E_a={self._activation_energy} kJ/mol, T_ref={self._reference_temperature} K"
         
         return (f"ArcBuilder({source_str} → {target_str}, "
                 f"type={arc_type}{weight_info})")

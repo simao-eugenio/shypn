@@ -200,8 +200,15 @@ class TimedBehavior(TransitionBehavior):
                     required = arc.weight  # Just check presence for test arcs
                     logger.debug("    → Test/Inhibitor arc: only checking presence")
                 else:
-                    required = arc.weight  # Normal and SignalFlowArcs need full weight
-                    logger.debug("    → Normal arc: will consume tokens")
+                    # Normal and SignalFlowArcs need full weight.
+                    # Signal flow arcs additionally require θ_eff tokens as
+                    # basin floor (formalism: M(ps) ≥ θ_eff + Ws).
+                    # θ_eff = 0 by default, so this is backward-compatible.
+                    # When activation_energy > 0, θ_eff is temperature-dependent
+                    # via Arrhenius: K(T) = K_ref·exp(−E_a/R·(1/T − 1/T_ref)).
+                    theta = self._get_theta_eff(arc)
+                    required = arc.weight + theta
+                    logger.debug(f"    → Normal arc: will consume tokens (θ_eff={theta})")
 
                 # Hybrid PN: timed transitions are discrete — floor fractional tokens
                 # so that a place with e.g. 1.5 µM contributes 1 countable token.
