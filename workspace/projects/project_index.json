@@ -1,0 +1,128 @@
+{
+  "af64b650-301e-46e8-b9b2-c2e7f18d01b9": {
+    "id": "af64b650-301e-46e8-b9b2-c2e7f18d01b9",
+    "name": "My Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/My_Project",
+    "created_date": "2025-11-18T11:13:06.298114",
+    "modified_date": "2025-12-10T18:31:53.297708"
+  },
+  "4a6b6672-52cb-46bf-b4b7-a6958363243f": {
+    "id": "4a6b6672-52cb-46bf-b4b7-a6958363243f",
+    "name": "Biochemical-Examples",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Biochemical-Examples",
+    "created_date": "2025-11-18T11:03:29.589087",
+    "modified_date": "2025-11-18T11:03:29.589087"
+  },
+  "60eb55b1-6eca-49fd-ab13-9edc949ce179": {
+    "id": "60eb55b1-6eca-49fd-ab13-9edc949ce179",
+    "name": "thesis",
+    "path": "/home/simao/projetos/shypn/workspace/projects/thesis",
+    "created_date": "2025-11-26T10:06:54.438770",
+    "modified_date": "2026-01-29T15:42:21.132471"
+  },
+  "a324038e-19fe-443e-afb0-861fc034705f": {
+    "id": "a324038e-19fe-443e-afb0-861fc034705f",
+    "name": "gata",
+    "path": "/home/simao/projetos/shypn/workspace/projects/gata",
+    "created_date": "2026-02-15T10:10:49.020830",
+    "modified_date": "2026-02-15T10:10:49.021506"
+  },
+  "36146b5d-c5dc-4205-8566-4e11706d39ea": {
+    "id": "36146b5d-c5dc-4205-8566-4e11706d39ea",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-27T19:09:54.822759",
+    "modified_date": "2026-02-27T19:09:54.822759"
+  },
+  "3958cc1a-9a7f-48f4-9cba-c03cc8ebc150": {
+    "id": "3958cc1a-9a7f-48f4-9cba-c03cc8ebc150",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-27T19:43:38.506026",
+    "modified_date": "2026-02-27T19:43:38.506026"
+  },
+  "72e57a00-b591-4d27-bbdf-542603977e21": {
+    "id": "72e57a00-b591-4d27-bbdf-542603977e21",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-27T19:44:42.783911",
+    "modified_date": "2026-02-27T19:44:42.783911"
+  },
+  "9510423e-f9b8-476a-9215-74c4ab0b2755": {
+    "id": "9510423e-f9b8-476a-9215-74c4ab0b2755",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-27T20:51:43.471660",
+    "modified_date": "2026-02-27T20:51:43.471660"
+  },
+  "e14bbb7a-cc98-4a33-a3fe-58ebb57f350f": {
+    "id": "e14bbb7a-cc98-4a33-a3fe-58ebb57f350f",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-27T20:52:50.735924",
+    "modified_date": "2026-02-27T20:52:50.735924"
+  },
+  "c7787030-8c13-4e82-84b2-753a427890ac": {
+    "id": "c7787030-8c13-4e82-84b2-753a427890ac",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-28T14:08:59.205002",
+    "modified_date": "2026-02-28T14:08:59.205002"
+  },
+  "f8bbe25a-5311-46a7-bbc7-dffe6cce4b30": {
+    "id": "f8bbe25a-5311-46a7-bbc7-dffe6cce4b30",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-02-28T14:19:35.457696",
+    "modified_date": "2026-02-28T14:19:35.457696"
+  },
+  "66049913-9f86-4dd5-89ec-b0e421c1fe10": {
+    "id": "66049913-9f86-4dd5-89ec-b0e421c1fe10",
+    "name": "models",
+    "path": "/home/simao/projetos/shypn/workspace/projects/gata/models",
+    "created_date": "2026-03-10T10:31:05.445927",
+    "modified_date": "2026-03-10T10:31:05.445927"
+  },
+  "67e88ed9-8017-4327-8825-52cf11114a8f": {
+    "id": "67e88ed9-8017-4327-8825-52cf11114a8f",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-03-14T09:09:01.206196",
+    "modified_date": "2026-03-14T09:09:01.206196"
+  },
+  "95cbfd67-88a2-4079-be34-8529112bb56d": {
+    "id": "95cbfd67-88a2-4079-be34-8529112bb56d",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-03-14T09:09:42.359725",
+    "modified_date": "2026-03-14T09:09:42.359725"
+  },
+  "c73d5693-fcea-459a-bbfc-afbbfad1e5f0": {
+    "id": "c73d5693-fcea-459a-bbfc-afbbfad1e5f0",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-03-14T10:41:42.029127",
+    "modified_date": "2026-03-14T10:41:42.029127"
+  },
+  "9aa381e3-81f5-4979-a807-95fb27f350eb": {
+    "id": "9aa381e3-81f5-4979-a807-95fb27f350eb",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-03-14T10:42:14.011820",
+    "modified_date": "2026-03-14T10:42:14.011820"
+  },
+  "82b67925-a90e-441b-8fb2-34772bda374d": {
+    "id": "82b67925-a90e-441b-8fb2-34772bda374d",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-03-31T16:53:20.406748",
+    "modified_date": "2026-03-31T16:53:20.406748"
+  },
+  "9634c549-3652-4b86-b494-4a6e88ef55aa": {
+    "id": "9634c549-3652-4b86-b494-4a6e88ef55aa",
+    "name": "canabidiol",
+    "path": "/home/simao/projetos/shypn/workspace/projects/canabidiol",
+    "created_date": "2026-04-14T10:59:39.887592",
+    "modified_date": "2026-04-14T10:59:39.888120"
+  }
+}

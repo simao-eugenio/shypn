@@ -1,0 +1,5 @@
+import warnings; warnings.filterwarnings('ignore')
+exec(open('/home/simao/projetos/shypn/workspace/projects/gata/scripts/generate_figures.py').read())
+exps = find_experiments(BASE)
+save_fig(fig2_p_erythroid(exps), 'fig2_p_erythroid')
+print('done')

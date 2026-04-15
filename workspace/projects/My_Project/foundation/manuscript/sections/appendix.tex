@@ -1,0 +1,167 @@
+% Appendix
+
+\section*{Appendix A: Formal Proof of Safe Parallel Integration}
+
+\subsection*{A.1 Preliminaries and Notation}
+
+Let $\mathcal{N} = \langle P, T, \text{Pre}, \text{Post}, m_0, k, S, \Phi, \Sigma, \text{Reg}, \Psi, E, A \rangle$ be a Signal Hierarchical Petri Net. For transitions $t_1, t_2 \in T$, we denote:
+\begin{itemize}
+\item ${}^\bullet t_i = \{p \in P \mid \text{Pre}(p, t_i) > 0\}$ (input places)
+\item $t_i^\bullet = \{p \in P \mid \text{Post}(t_i, p) > 0\}$ (output places)
+\item $\Sigma(t_i) = \{p \in P \mid p \text{ connected to } t_i \text{ via test/inhibitor arc}\}$ (regulatory places)
+\item $\Phi(t_i, M)$ (rate function dependent on marking $M$)
+\end{itemize}
+
+\subsection*{A.2 Lemma 1: ODE Superposition for Convergent Coupling}
+
+\begin{lemma}[Convergent Superposition]
+For weakly independent transitions $t_1, t_2$ with shared output place $p \in t_1^\bullet \cap t_2^\bullet$ and ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, parallel integration yields:
+\[
+M(p, t + \Delta t) = M(p, t) + \int_t^{t+\Delta t} \left[\Phi(t_1, M(\tau)) \cdot \text{Post}(t_1, p) + \Phi(t_2, M(\tau)) \cdot \text{Post}(t_2, p)\right] d\tau
+\]
+This equals sequential integration order (either $t_1 \to t_2$ or $t_2 \to t_1$).
+\end{lemma}
+
+\begin{proof}
+By linearity of integration and commutativity of addition:
+\begin{align*}
+\int_t^{t+\Delta t} \left[\Phi(t_1) + \Phi(t_2)\right] d\tau &= \int_t^{t+\Delta t} \Phi(t_1) d\tau + \int_t^{t+\Delta t} \Phi(t_2) d\tau \\
+&= \lim_{n \to \infty} \sum_{i=1}^n \Phi(t_1, \tau_i) \Delta\tau + \lim_{m \to \infty} \sum_{j=1}^m \Phi(t_2, \tau_j) \Delta\tau
+\end{align*}
+
+Since ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, the rate functions $\Phi(t_1, M)$ and $\Phi(t_2, M)$ depend on disjoint substrate sets. The order of evaluation does not affect the result. Sequential execution in either order yields identical marking evolution.
+\end{proof}
+
+\subsection*{A.3 Lemma 2: Read-Only Regulatory Coupling}
+
+\begin{lemma}[Regulatory Reads are Commutative]
+For weakly independent transitions $t_1, t_2$ with shared regulatory place $p \in \Sigma(t_1) \cap \Sigma(t_2)$ and ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, simultaneous evaluation of $\text{Reg}(p, M(t))$ yields identical results to sequential evaluation.
+\end{lemma}
+
+\begin{proof}
+Test arcs and inhibitor arcs read $M(p)$ without modification:
+\[
+\text{Reg}(p, M(t)) = \begin{cases}
+M(p) & \text{(test arc)} \\
+\max(0, \theta_p - M(p)) & \text{(inhibitor arc)}
+\end{cases}
+\]
+
+Both transitions evaluate $\text{Reg}(p, M(t))$ at the same marking $M(t)$. No race condition exists because $M(p)$ is not consumed during regulatory evaluation. Parallel reads commute:
+\[
+\text{Reg}_1(\text{Reg}_2(M)) = \text{Reg}_2(\text{Reg}_1(M)) = M
+\]
+\end{proof}
+
+\subsection*{A.4 Lemma 3: Disjoint Substrate Independence}
+
+\begin{lemma}[Disjoint Substrates Guarantee Independence]
+For transitions $t_1, t_2$ with ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, substrate consumption operations commute:
+\[
+M_{\text{parallel}} = M - \text{Pre}(\cdot, t_1) - \text{Pre}(\cdot, t_2) = M_{\text{seq-12}} = M_{\text{seq-21}}
+\]
+\end{lemma}
+
+\begin{proof}
+Substrate consumption for transition $t_i$ modifies marking:
+\[
+M'(p) = M(p) - \text{Pre}(p, t_i) \cdot \delta_{p \in {}^\bullet t_i}
+\]
+
+Since ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, the sets of modified places are disjoint. Vector subtraction is commutative for disjoint index sets:
+\begin{align*}
+M_{\text{parallel}} &= M - \sum_{p \in {}^\bullet t_1} \text{Pre}(p, t_1) \cdot e_p - \sum_{p \in {}^\bullet t_2} \text{Pre}(p, t_2) \cdot e_p \\
+&= M - \sum_{p \in {}^\bullet t_2} \text{Pre}(p, t_2) \cdot e_p - \sum_{p \in {}^\bullet t_1} \text{Pre}(p, t_1) \cdot e_p \\
+&= M_{\text{seq-21}}
+\end{align*}
+where $e_p$ denotes the unit vector for place $p$.
+\end{proof}
+
+\subsection*{A.5 Theorem: Safe Parallel Integration (Complete)}
+
+\begin{theorem}[Safe Parallel Integration]
+For continuous transitions $t_1, t_2$ that are weakly independent (${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$), parallel ODE integration over time interval $[t, t+\Delta t]$ preserves correctness: the resulting marking $M(t+\Delta t)$ is identical to sequential integration in any order.
+\end{theorem}
+
+\begin{proof}
+Consider the marking evolution operator $\Theta_{\Delta t}(M, T)$ for transition set $T$ over interval $\Delta t$. We must show:
+\[
+\Theta_{\Delta t}(M, \{t_1, t_2\}_{\text{parallel}}) = \Theta_{\Delta t}(M, \{t_1, t_2\}_{\text{seq-12}}) = \Theta_{\Delta t}(M, \{t_1, t_2\}_{\text{seq-21}})
+\]
+
+\textbf{Step 1: Decompose marking evolution}
+
+For each place $p \in P$, the marking evolution decomposes into:
+\begin{align*}
+M(p, t+\Delta t) = M(p, t) &+ \underbrace{\sum_{t_i \in \{t_1, t_2\}} \int_t^{t+\Delta t} \Phi(t_i, M(\tau)) \cdot \text{Post}(t_i, p) d\tau}_{\text{production}} \\
+&- \underbrace{\sum_{t_i \in \{t_1, t_2\}} \int_t^{t+\Delta t} \Phi(t_i, M(\tau)) \cdot \text{Pre}(p, t_i) d\tau}_{\text{consumption}}
+\end{align*}
+
+\textbf{Step 2: Apply weak independence constraint}
+
+Since ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, for any place $p$:
+\begin{itemize}
+\item If $p \in {}^\bullet t_1$, then $p \notin {}^\bullet t_2$, so $\text{Pre}(p, t_2) = 0$
+\item If $p \in {}^\bullet t_2$, then $p \notin {}^\bullet t_1$, so $\text{Pre}(p, t_1) = 0$
+\end{itemize}
+
+Therefore, consumption terms never overlap. The rate function $\Phi(t_i, M)$ depends only on $M({}^\bullet t_i)$, which is disjoint.
+
+\textbf{Step 3: Analyze coupling modes}
+
+\textit{Case 1: Convergent coupling} ($t_1^\bullet \cap t_2^\bullet \neq \emptyset$). For shared output $p \in t_1^\bullet \cap t_2^\bullet$:
+\[
+M(p, t+\Delta t) = M(p, t) + \int_t^{t+\Delta t} \left[\Phi(t_1) \cdot \text{Post}(t_1, p) + \Phi(t_2) \cdot \text{Post}(t_2, p)\right] d\tau
+\]
+By Lemma 1 (ODE superposition), this equals sequential integration.
+
+\textit{Case 2: Regulatory coupling} ($\Sigma(t_1) \cap \Sigma(t_2) \neq \emptyset$). For shared regulatory place $p \in \Sigma(t_1) \cap \Sigma(t_2)$:
+
+Both $\Phi(t_1, M)$ and $\Phi(t_2, M)$ depend on $M(p)$ via $\text{Reg}(p)$, but do not modify $M(p)$. By Lemma 2 (read-only commutation), parallel evaluation yields identical results.
+
+\textit{Case 3: Disjoint} ($t_1^\bullet \cap t_2^\bullet = \emptyset$ and $\Sigma(t_1) \cap \Sigma(t_2) = \emptyset$). No shared places exist. By Lemma 3, operations commute trivially.
+
+\textbf{Step 4: Conclusion}
+
+In all cases (convergent, regulatory, disjoint), the weak independence constraint ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$ ensures that parallel integration yields results identical to sequential integration in any order. Therefore, parallel execution preserves correctness.
+\end{proof}
+
+\subsection*{A.6 Corollary: Stochastic Tau-Leaping Parallelism}
+
+\begin{corollary}[Parallel Tau-Leaping]
+For stochastic transitions $t_1, t_2$ that are weakly independent, concurrent Poisson sampling within time leap $[t, t+\tau]$ yields statistically equivalent results to sequential sampling.
+\end{corollary}
+
+\begin{proof}
+Tau-leaping approximates the number of firings $k_i \sim \text{Poisson}(\Phi(t_i) \cdot \tau)$ for each transition. For weakly independent $t_1, t_2$:
+
+\textbf{Independence of Poisson processes:} Since ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$, the propensity functions depend on disjoint substrate sets. The Poisson processes are independent:
+\[
+P(k_1, k_2) = P(k_1) \cdot P(k_2) = \frac{(\lambda_1 \tau)^{k_1} e^{-\lambda_1 \tau}}{k_1!} \cdot \frac{(\lambda_2 \tau)^{k_2} e^{-\lambda_2 \tau}}{k_2!}
+\]
+
+\textbf{Commutativity of marking updates:} The marking update after firing $k_1$ times for $t_1$ and $k_2$ times for $t_2$ is:
+\[
+M' = M - k_1 \cdot \text{Pre}(\cdot, t_1) - k_2 \cdot \text{Pre}(\cdot, t_2) + k_1 \cdot \text{Post}(t_1, \cdot) + k_2 \cdot \text{Post}(t_2, \cdot)
+\]
+
+Since pre-sets are disjoint, the order of updates does not affect $M'$. Parallel sampling yields statistically equivalent results.
+\end{proof}
+
+\subsection*{A.7 Complexity Analysis}
+
+\begin{proposition}[Classification Complexity]
+Given a Petri net with $|T|$ transitions and $|F|$ arcs, pairwise weak independence classification requires $O(|T|^2 \cdot |F|)$ time.
+\end{proposition}
+
+\begin{proof}
+For each pair $(t_1, t_2)$, we must check ${}^\bullet t_1 \cap {}^\bullet t_2 = \emptyset$:
+\begin{itemize}
+\item Computing ${}^\bullet t_i$ requires scanning incoming arcs: $O(|F|/|T|)$ per transition
+\item Checking intersection of two pre-sets: $O(|P|)$ worst case
+\item Total for one pair: $O(|F|/|T| + |P|) = O(|F|)$ (since $|P| \leq |F|$)
+\item Total for all $\binom{|T|}{2} = O(|T|^2)$ pairs: $O(|T|^2 \cdot |F|)$
+\end{itemize}
+
+This is efficient for typical biological networks where $|T| \ll |F|$.
+\end{proof}

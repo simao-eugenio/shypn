@@ -1,0 +1,235 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-26T10:41:08.624144",
+    "object_counts": {
+      "places": 4,
+      "transitions": 1,
+      "arcs": 4
+    }
+  },
+  "view_state": {
+    "zoom": 2.253944402704733,
+    "pan_x": -27.88278799999989,
+    "pan_y": -3.702604666666673,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "Glucose",
+      "label": "Glucose\n5.0 mM",
+      "object_type": "place",
+      "x": 150.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 5000,
+      "initial_marking": 5000,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00031",
+        "chebi_id": "CHEBI:17234",
+        "compound_name": "D-Glucose"
+      }
+    },
+    {
+      "id": "P2",
+      "name": "ATP",
+      "label": "ATP\n3.0 mM",
+      "object_type": "place",
+      "x": 150.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 3000,
+      "initial_marking": 3000,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00002",
+        "chebi_id": "CHEBI:15422",
+        "compound_name": "Adenosine triphosphate"
+      }
+    },
+    {
+      "id": "P3",
+      "name": "G6P",
+      "label": "G6P\n0.1 mM",
+      "object_type": "place",
+      "x": 550.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 100,
+      "initial_marking": 100,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00092",
+        "chebi_id": "CHEBI:17665",
+        "compound_name": "Glucose 6-phosphate"
+      }
+    },
+    {
+      "id": "P4",
+      "name": "ADP",
+      "label": "ADP\n0.1 mM",
+      "object_type": "place",
+      "x": 550.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 100,
+      "initial_marking": 100,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "metadata": {
+        "kegg_id": "C00008",
+        "chebi_id": "CHEBI:16761",
+        "compound_name": "Adenosine diphosphate"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "Hexokinase",
+      "label": "Hexokinase\\nVmax=1.0\\nKm(Glc)=0.1\\nKm(ATP)=0.4",
+      "object_type": "transition",
+      "x": 350.0,
+      "y": 200.0,
+      "width": 50.0,
+      "height": 25.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "1.0 * (Glucose / (0.1 + Glucose)) * (ATP / (0.4 + ATP))"
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

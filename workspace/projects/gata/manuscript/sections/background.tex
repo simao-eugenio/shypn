@@ -1,0 +1,63 @@
+% sections/background.tex
+
+\subsection{The GATA1/PU.1 Mutual Antagonism Circuit}
+
+The transcriptional logic governing erythroid versus myeloid commitment centres on two proteins whose activities are mutually exclusive. GATA1 is a zinc-finger transcription factor essential for erythroid and megakaryocytic differentiation; its target genes include those encoding haemoglobin chains, erythroid surface receptors, and the EPO receptor itself. PU.1 is an ETS-family transcription factor required for myeloid and lymphoid lineage specification; it activates granulocyte and monocyte differentiation programmes. The two factors antagonise each other through direct protein--protein interaction as well as through transcriptional repression of each other's regulatory elements. GATA1 competes with PU.1 for binding at composite promoter elements and recruits co-repressors to PU.1 target genes; PU.1 reciprocally blocks GATA1 activity by sequestering it away from DNA. This creates a mutual inhibition topology---a network motif well-understood to produce bistability when each factor also activates its own transcription~\cite{huang2007}. The resulting system has two stable attractors: a high-GATA1/low-PU.1 erythroid state and a high-PU.1/low-GATA1 myeloid state, with an unstable intermediate separating them.
+
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance = 3.2cm,
+  factor/.style  = {circle, draw, thick, minimum size=1.5cm, font=\small\bfseries, inner sep=2pt},
+  erythroid/.style = {factor, fill=red!12},
+  myeloid/.style   = {factor, fill=blue!12},
+  inhibedge/.style = {-{Bar[]}, thick, shorten >=2pt, shorten <=2pt},
+  activedge/.style = {-{Stealth[scale=1.2]}, thick, shorten >=2pt, shorten <=2pt},
+  signaledge/.style= {-{Stealth[scale=1.2]}, thick, dashed, shorten >=2pt},
+  fatelabel/.style = {font=\scriptsize\itshape, text=gray}
+]
+  % Main nodes
+  \node[erythroid] (gata) {GATA1};
+  \node[myeloid,   right=of gata] (pu1)  {PU.1};
+
+  % Mutual inhibition (blunt arrows, curved)
+  \draw[inhibedge, bend left=30]  (gata) to node[above, font=\scriptsize] {$\dashv$} (pu1);
+  \draw[inhibedge, bend left=30]  (pu1)  to node[below, font=\scriptsize] {$\dashv$} (gata);
+
+  % Self-activation loops
+  \draw[activedge, out=120, in=60, looseness=5] (gata) to (gata);
+  \draw[activedge, out=120, in=60, looseness=5] (pu1)  to (pu1);
+
+  % EPO input
+  \node[above left=0.8cm and 0.4cm of gata, font=\small] (epo) {EPO};
+  \draw[signaledge] (epo) -- (gata);
+
+  % GCSF input
+  \node[above right=0.8cm and 0.4cm of pu1, font=\small] (gcsf) {GCSF};
+  \draw[signaledge] (gcsf) -- (pu1);
+
+  % Fate labels
+  \node[fatelabel, below=0.55cm of gata] {Erythroid fate};
+  \node[fatelabel, below=0.55cm of pu1]  {Myeloid fate};
+\end{tikzpicture}
+\caption{\textbf{GATA1/PU.1 mutual antagonism circuit.} The two master regulators inhibit each other (blunt arrows, $\dashv$) while self-activating (curved arrows). EPO (via JAK2/STAT5) biases the circuit toward the erythroid attractor; GCSF (via STAT3/C/EBP$\alpha$) biases it toward the myeloid attractor. The two stable fixed points constitute the erythroid and myeloid attractors; the unstable separatrix between them is the commitment threshold.}
+\label{fig:circuit}
+\end{figure}
+Cytokine signalling overlays this circuit with external biases. EPO binds the EPO receptor (EPOR), which activates the JAK2/STAT5 pathway and ultimately promotes GATA1 expression and activity. GCSF binds the GCSFR and activates STAT3 and C/EBP$\alpha$, which supports PU.1 activity and myeloid differentiation. In this sense the cytokine signals set the relative heights of the two basin walls: more EPO deepens the erythroid attractor and raises the myeloid one, shifting the probability that a given progenitor will land in the erythroid state. The question is whether the cytokine effect is strong enough to deterministically push every cell into one attractor or whether cells remain free to choose between attractors with cytokine-dependent probability.
+
+\subsection{Stochastic Gene Expression and Fate Decisions}
+
+Stochastic gene expression is a general property of molecular systems operating at physiological copy numbers. Elowitz \etal~\cite{elowitz2002} demonstrated in bacteria that nominally identical cells under identical conditions show wide cell-to-cell variation in protein levels, a consequence of the discreteness of molecular events---single mRNA molecules being transcribed and translated in bursts. In mammalian cells operating at larger volumes and higher copy numbers this noise is attenuated by averaging, but for regulatory genes expressed at low copy numbers in progenitor cells the noise is substantial. Chang \etal~\cite{chang2008} showed that transcriptome-wide noise in haematopoietic progenitors predicts lineage choice: cells whose transcriptional noise pushes them transiently into a more erythroid-like state preferentially commit to erythroid fate, and vice versa for myeloid. These observations positioned molecular noise not as a nuisance to be overcome by robust signalling, but as a functional component of the commitment mechanism itself.
+
+The biological interpretation of this noise changes qualitatively depending on the copy number regime in which the system operates. At physiological progenitor copy numbers---where a GATA1 gene may be active at a rate of a few mRNA molecules per hour, with perhaps five to fifteen GATA1 protein molecules in the nucleus at any given time---the relative fluctuation in GATA1 concentration can exceed its mean value. A single additional GATA1 mRNA molecule is then a perturbation of tens of percent, not of parts per thousand. This is the fundamental reason that single-cell experiments see stochastic behaviour that bulk experiments obscure: the large-N mean of a highly variable distribution produces an apparently sharp threshold, while individual draws from that distribution are scattered across a wide range of outcomes. Losick and Desplan~\cite{losick2008} established this principle for several developmental systems and argued that stochastic fate specification is a general mechanism for generating cellular diversity within genetically identical populations.
+
+\subsection{Petri Nets as a Modelling Framework for Molecular Networks}
+
+Petri nets provide a natural formalism for modelling concurrent molecular processes. In the biological Petri net framework~\cite{heiner2008}, chemical species are represented as places holding real-valued tokens (concentrations), and chemical reactions are transitions that consume and produce tokens according to stoichiometry. Test arcs allow transitions to read a concentration without consuming it, modelling catalytic effects such as enzyme action. The framework accommodates deterministic (continuous), stochastic (discrete and continuous), and hybrid semantics within the same structural specification, making it well-suited for models that must span multiple scales of organisation and copy number.
+
+Signal Hierarchical Petri Nets~\cite{shypn2026} extends the standard Petri net formalism with signal places---information channels carrying regulatory rather than material content---and signal flow arcs that consume tokens from signal places during transition firing, enabling formal representation of signal consumption during commitment. Adaptive transitions parameterise their firing rates as explicit functions of current place markings, providing the kinetic flexibility required to represent saturable receptor binding, cooperative transcription factor interactions, and energy-coupled phosphorylation. The stochastic semantics follow a continuous-time Markov chain (Gillespie)~\cite{gillespie1977} in which each transition fires at a rate proportional to a mass-action or custom kinetic expression evaluated at the current marking, ensuring that molecular noise emerges naturally from the simulation dynamics without requiring explicit noise injection.
+
+\subsection{The Gap Addressed by This Work}
+
+Prior computational models of GATA1/PU.1 commitment have either used ordinary differential equations, which are intrinsically deterministic and cannot generate cell-to-cell fate variability~\cite{huang2007,chickarmane2009}, or have studied noise in simplified two-component toggle networks abstracted away from the mechanistic details of receptor signalling, mRNA processing, and post-translational modification. No existing model has integrated the full commitment cascade---from extracellular cytokine binding and receptor recycling through mRNA export and translation to nuclear phosphorylation and ubiquitin-mediated cross-repressor degradation---in a single stochastic framework operating at physiological copy numbers. Consequently, the question of where within the cascade stochastic fluctuations arise, how rapidly the commitment becomes irreversible, and why EPO dose produces different appearances of dose-response at different scales of measurement has not been addressed at a mechanistic level. This is the gap we fill.

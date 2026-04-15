@@ -1,0 +1,2670 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "model_bounds": {
+      "min_x": 475.0,
+      "max_x": 1842.5,
+      "min_y": 290.0,
+      "max_y": 1555.0,
+      "width": 1367.5,
+      "height": 1265.0,
+      "center_x": 1158.75,
+      "center_y": 922.5
+    },
+    "source": "kegg_import",
+    "pathway_id": "hsa00020",
+    "requires_fit_to_page": true,
+    "coordinate_scale": 2.5,
+    "created": "2025-12-21T11:11:29.515616",
+    "object_counts": {
+      "places": 23,
+      "transitions": 22,
+      "arcs": 54,
+      "modules": 0
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 1158.75,
+    "pan_y": 922.5
+  },
+  "places": [
+    {
+      "id": "P27",
+      "name": "C00022",
+      "label": "C00022",
+      "object_type": "place",
+      "x": 4937.360119753628,
+      "y": -1418.0200052172802,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00022",
+        "kegg_entry_id": "61",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00022",
+        "kegg_compound_ids": [
+          "cpd:C00022"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P28",
+      "name": "C00122",
+      "label": "C00122",
+      "object_type": "place",
+      "x": 1726.182416736599,
+      "y": 1228.0639037290819,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00122",
+        "kegg_entry_id": "62",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00122",
+        "kegg_compound_ids": [
+          "cpd:C00122"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P29",
+      "name": "C00036",
+      "label": "C00036",
+      "object_type": "place",
+      "x": 800.0,
+      "y": 872.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00036",
+        "kegg_entry_id": "63",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00036",
+        "kegg_compound_ids": [
+          "cpd:C00036"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P30",
+      "name": "C05379",
+      "label": "C05379",
+      "object_type": "place",
+      "x": 1810.4910016539673,
+      "y": 1131.749526795349,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C05379",
+        "kegg_entry_id": "64",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C05379",
+        "kegg_compound_ids": [
+          "cpd:C05379"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P31",
+      "name": "Acetyl-CoA",
+      "label": "C00024",
+      "object_type": "place",
+      "x": 950.8244576173191,
+      "y": 566.983679734452,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00024",
+        "kegg_entry_id": "65",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00024",
+        "kegg_compound_ids": [
+          "cpd:C00024"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P32",
+      "name": "C00149",
+      "label": "C00149",
+      "object_type": "place",
+      "x": 3962.327032835661,
+      "y": -2166.4591844699494,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00149",
+        "kegg_entry_id": "66",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00149",
+        "kegg_compound_ids": [
+          "cpd:C00149"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P33",
+      "name": "C00311",
+      "label": "C00311",
+      "object_type": "place",
+      "x": 1795.0,
+      "y": 872.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00311",
+        "kegg_entry_id": "67",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00311",
+        "kegg_compound_ids": [
+          "cpd:C00311"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P34",
+      "name": "C00417",
+      "label": "C00417",
+      "object_type": "place",
+      "x": -1112.5328843825503,
+      "y": 3902.816491320283,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00417",
+        "kegg_entry_id": "68",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00417",
+        "kegg_compound_ids": [
+          "cpd:C00417"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P35",
+      "name": "C00042",
+      "label": "C00042",
+      "object_type": "place",
+      "x": 1461.4133777812956,
+      "y": 3902.95449690144,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00042",
+        "kegg_entry_id": "69",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00042",
+        "kegg_compound_ids": [
+          "cpd:C00042"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P36",
+      "name": "C00158",
+      "label": "C00158",
+      "object_type": "place",
+      "x": 1305.0,
+      "y": 872.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00158",
+        "kegg_entry_id": "70",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00158",
+        "kegg_compound_ids": [
+          "cpd:C00158"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P37",
+      "name": "C15972",
+      "label": "C15972",
+      "object_type": "place",
+      "x": 1305.0,
+      "y": 1555.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C15972",
+        "kegg_entry_id": "71",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C15972",
+        "kegg_compound_ids": [
+          "cpd:C15972"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P38",
+      "name": "C00068",
+      "label": "C00068",
+      "object_type": "place",
+      "x": 1472.5,
+      "y": 1337.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00068",
+        "kegg_entry_id": "72",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00068",
+        "kegg_compound_ids": [
+          "cpd:C00068"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P39",
+      "name": "C16254",
+      "label": "C16254",
+      "object_type": "place",
+      "x": 727.6509417033758,
+      "y": 1103.2227428385697,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C16254",
+        "kegg_entry_id": "73",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C16254",
+        "kegg_compound_ids": [
+          "cpd:C16254"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P40",
+      "name": "C15973",
+      "label": "C15973",
+      "object_type": "place",
+      "x": 1020.0,
+      "y": 1555.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C15973",
+        "kegg_entry_id": "74",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C15973",
+        "kegg_compound_ids": [
+          "cpd:C15973"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P41",
+      "name": "C00091",
+      "label": "C00091",
+      "object_type": "place",
+      "x": 700.9054078727756,
+      "y": 1735.0339380631594,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00091",
+        "kegg_entry_id": "75",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00091",
+        "kegg_compound_ids": [
+          "cpd:C00091"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P42",
+      "name": "C00026",
+      "label": "C00026",
+      "object_type": "place",
+      "x": 1915.248545727242,
+      "y": 1156.7662430974735,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00026",
+        "kegg_entry_id": "76",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00026",
+        "kegg_compound_ids": [
+          "cpd:C00026"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P43",
+      "name": "C05381",
+      "label": "C05381",
+      "object_type": "place",
+      "x": 1482.5,
+      "y": 1445.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C05381",
+        "kegg_entry_id": "77",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C05381",
+        "kegg_compound_ids": [
+          "cpd:C05381"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P44",
+      "name": "C05125",
+      "label": "C05125",
+      "object_type": "place",
+      "x": 1565.0,
+      "y": 602.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C05125",
+        "kegg_entry_id": "83",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C05125",
+        "kegg_compound_ids": [
+          "cpd:C05125"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P45",
+      "name": "C00068",
+      "label": "C00068",
+      "object_type": "place",
+      "x": 1565.0,
+      "y": 495.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00068",
+        "kegg_entry_id": "85",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00068",
+        "kegg_compound_ids": [
+          "cpd:C00068"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P46",
+      "name": "C15972",
+      "label": "C15972",
+      "object_type": "place",
+      "x": 1437.5,
+      "y": 710.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C15972",
+        "kegg_entry_id": "87",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C15972",
+        "kegg_compound_ids": [
+          "cpd:C15972"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P47",
+      "name": "C16255",
+      "label": "C16255",
+      "object_type": "place",
+      "x": 1280.0,
+      "y": 602.5,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C16255",
+        "kegg_entry_id": "90",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C16255",
+        "kegg_compound_ids": [
+          "cpd:C16255"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P48",
+      "name": "C15973",
+      "label": "C15973",
+      "object_type": "place",
+      "x": 1182.5,
+      "y": 710.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C15973",
+        "kegg_entry_id": "101",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C15973",
+        "kegg_compound_ids": [
+          "cpd:C15973"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    },
+    {
+      "id": "P49",
+      "name": "C00074",
+      "label": "C00074",
+      "object_type": "place",
+      "x": 1177.5,
+      "y": 290.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "metadata": {
+        "kegg_id": "cpd:C00074",
+        "kegg_entry_id": "102",
+        "source": "KEGG",
+        "data_source": "kegg_import",
+        "kegg_type": "compound",
+        "compound_name": "C00074",
+        "kegg_compound_ids": [
+          "cpd:C00074"
+        ],
+        "compound_type": "metabolite",
+        "kegg_bgcolor": "#FFFFFF",
+        "kegg_fgcolor": "#000000"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T35",
+      "name": "EC_1.8.1.4",
+      "label": "R07618",
+      "object_type": "transition",
+      "x": 1162.5,
+      "y": 1555.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P40) / (0.1 + P40)"
+      }
+    },
+    {
+      "id": "T36",
+      "name": "EC_1.2.4.2",
+      "label": "R00621",
+      "object_type": "transition",
+      "x": 1189.7159064990467,
+      "y": 1055.6550392938193,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P42) / (0.1 + P42)"
+      }
+    },
+    {
+      "id": "T37",
+      "name": "EC_1.2.4.2",
+      "label": "R03316",
+      "object_type": "transition",
+      "x": 1353.75,
+      "y": 1445.625,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P43) / (0.1 + P43)"
+      }
+    },
+    {
+      "id": "T38",
+      "name": "EC_2.3.1.61",
+      "label": "R02570",
+      "object_type": "transition",
+      "x": 1003.3333333333333,
+      "y": 1482.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 50.0,
+        "km": 0.05,
+        "rate_function": "(50.0 * P41) / (0.05 + P41)"
+      }
+    },
+    {
+      "id": "T39",
+      "name": "EC_6.2.1.5",
+      "label": "R00405",
+      "object_type": "transition",
+      "x": 606.4353004580632,
+      "y": -311.96579352779554,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 40.0,
+        "km": 0.3,
+        "rate_function": "(40.0 * P35) / (0.3 + P35)"
+      }
+    },
+    {
+      "id": "T40",
+      "name": "EC_6.2.1.4",
+      "label": "R00727",
+      "object_type": "transition",
+      "x": 551.963853291534,
+      "y": 1447.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 40.0,
+        "km": 0.3,
+        "rate_function": "(40.0 * P35) / (0.3 + P35)"
+      }
+    },
+    {
+      "id": "T41",
+      "name": "EC_1.1.1.42",
+      "label": "R00268",
+      "object_type": "transition",
+      "x": -1299.8601197536268,
+      "y": 3107.9377471180383,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P30) / (0.1 + P30)"
+      }
+    },
+    {
+      "id": "T42",
+      "name": "EC_1.1.1.41",
+      "label": "R00709",
+      "object_type": "transition",
+      "x": 1795.0,
+      "y": 1367.3546068190954,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P33) / (0.1 + P33)"
+      }
+    },
+    {
+      "id": "T43",
+      "name": "EC_1.1.1.42",
+      "label": "R01899",
+      "object_type": "transition",
+      "x": 1795.0,
+      "y": 1008.75,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P33) / (0.1 + P33)"
+      }
+    },
+    {
+      "id": "T44",
+      "name": "EC_2.3.3.8",
+      "label": "R00352",
+      "object_type": "transition",
+      "x": 1140.7051969838587,
+      "y": 782.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 50.0,
+        "km": 0.05,
+        "rate_function": "(50.0 * P31) / (0.05 + P31)"
+      }
+    },
+    {
+      "id": "T45",
+      "name": "EC_1.3.5.1",
+      "label": "R02164",
+      "object_type": "transition",
+      "x": -757.5499130108548,
+      "y": 1354.3178603476613,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P35) / (0.1 + P35)"
+      }
+    },
+    {
+      "id": "T46",
+      "name": "EC_4.2.1.2",
+      "label": "R01082",
+      "object_type": "transition",
+      "x": 475.0,
+      "y": 1105.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 80.0,
+        "km": 0.2,
+        "rate_function": "(80.0 * P32) / (0.2 + P32)"
+      }
+    },
+    {
+      "id": "T47",
+      "name": "EC_4.2.1.3",
+      "label": "R01900",
+      "object_type": "transition",
+      "x": 1673.75,
+      "y": 872.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 80.0,
+        "km": 0.2,
+        "rate_function": "(80.0 * P34) / (0.2 + P34)"
+      }
+    },
+    {
+      "id": "T48",
+      "name": "EC_4.2.1.3",
+      "label": "R01325",
+      "object_type": "transition",
+      "x": 1428.75,
+      "y": 872.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 80.0,
+        "km": 0.2,
+        "rate_function": "(80.0 * P36) / (0.2 + P36)"
+      }
+    },
+    {
+      "id": "T49",
+      "name": "EC_2.3.3.1",
+      "label": "R00351",
+      "object_type": "transition",
+      "x": 909.2948030161415,
+      "y": 782.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 50.0,
+        "km": 0.05,
+        "rate_function": "(50.0 * P31) / (0.05 + P31)"
+      }
+    },
+    {
+      "id": "T50",
+      "name": "EC_1.1.1.37",
+      "label": "R00342",
+      "object_type": "transition",
+      "x": 637.5,
+      "y": 933.75,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P32) / (0.1 + P32)"
+      }
+    },
+    {
+      "id": "T51",
+      "name": "EC_6.4.1.1",
+      "label": "R00344",
+      "object_type": "transition",
+      "x": 1321.25,
+      "y": 737.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 40.0,
+        "km": 0.3,
+        "rate_function": "(40.0 * P27) / (0.3 + P27)"
+      }
+    },
+    {
+      "id": "T52",
+      "name": "EC_1.2.4.1",
+      "label": "R00014",
+      "object_type": "transition",
+      "x": 1657.5,
+      "y": 566.6666666666666,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P45) / (0.1 + P45)"
+      }
+    },
+    {
+      "id": "T53",
+      "name": "EC_1.2.4.1",
+      "label": "R03270",
+      "object_type": "transition",
+      "x": 1461.875,
+      "y": 602.5,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P46) / (0.1 + P46)"
+      }
+    },
+    {
+      "id": "T54",
+      "name": "EC_1.8.1.4",
+      "label": "R07618_2",
+      "object_type": "transition",
+      "x": 1310.0,
+      "y": 710.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 100.0,
+        "km": 0.1,
+        "rate_function": "(100.0 * P48) / (0.1 + P48)"
+      }
+    },
+    {
+      "id": "T55",
+      "name": "EC_2.3.1.12",
+      "label": "R02569",
+      "object_type": "transition",
+      "x": 1144.1666666666667,
+      "y": 638.3333333333334,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 50.0,
+        "km": 0.05,
+        "rate_function": "(50.0 * P48) / (0.05 + P48)"
+      }
+    },
+    {
+      "id": "T56",
+      "name": "EC_4.1.1.32",
+      "label": "R00726",
+      "object_type": "transition",
+      "x": 151.50788854985797,
+      "y": 724.005373823269,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "properties": {
+        "vmax": 80.0,
+        "km": 0.2,
+        "rate_function": "(80.0 * P29) / (0.2 + P29)"
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A74",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P40",
+      "source_type": "place",
+      "target_id": "T35",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A75",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T35",
+      "source_type": "transition",
+      "target_id": "P37",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A76",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P42",
+      "source_type": "place",
+      "target_id": "T36",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A77",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P38",
+      "source_type": "place",
+      "target_id": "T36",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A78",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T36",
+      "source_type": "transition",
+      "target_id": "P43",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A79",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P43",
+      "source_type": "place",
+      "target_id": "T37",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A80",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P37",
+      "source_type": "place",
+      "target_id": "T37",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A81",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T37",
+      "source_type": "transition",
+      "target_id": "P39",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A82",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T37",
+      "source_type": "transition",
+      "target_id": "P38",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A83",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P41",
+      "source_type": "place",
+      "target_id": "T38",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A84",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P40",
+      "source_type": "place",
+      "target_id": "T38",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A85",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T38",
+      "source_type": "transition",
+      "target_id": "P39",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A86",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P35",
+      "source_type": "place",
+      "target_id": "T39",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A87",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T39",
+      "source_type": "transition",
+      "target_id": "P41",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A88",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P35",
+      "source_type": "place",
+      "target_id": "T40",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A89",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T40",
+      "source_type": "transition",
+      "target_id": "P41",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A90",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P30",
+      "source_type": "place",
+      "target_id": "T41",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A91",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T41",
+      "source_type": "transition",
+      "target_id": "P42",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A92",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T42",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A93",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T42",
+      "source_type": "transition",
+      "target_id": "P42",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A94",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T43",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A95",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T43",
+      "source_type": "transition",
+      "target_id": "P30",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A96",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P31",
+      "source_type": "place",
+      "target_id": "T44",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A97",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P29",
+      "source_type": "place",
+      "target_id": "T44",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A98",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T44",
+      "source_type": "transition",
+      "target_id": "P36",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A99",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P35",
+      "source_type": "place",
+      "target_id": "T45",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A100",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T45",
+      "source_type": "transition",
+      "target_id": "P28",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A101",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T46",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A102",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T46",
+      "source_type": "transition",
+      "target_id": "P28",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A103",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T47",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A104",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T47",
+      "source_type": "transition",
+      "target_id": "P33",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A105",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P36",
+      "source_type": "place",
+      "target_id": "T48",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A106",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T48",
+      "source_type": "transition",
+      "target_id": "P34",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A107",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P31",
+      "source_type": "place",
+      "target_id": "T49",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A108",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P29",
+      "source_type": "place",
+      "target_id": "T49",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A109",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T49",
+      "source_type": "transition",
+      "target_id": "P36",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A110",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T50",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A111",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T50",
+      "source_type": "transition",
+      "target_id": "P29",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A112",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P27",
+      "source_type": "place",
+      "target_id": "T51",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A113",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T51",
+      "source_type": "transition",
+      "target_id": "P29",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A114",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P45",
+      "source_type": "place",
+      "target_id": "T52",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A115",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P27",
+      "source_type": "place",
+      "target_id": "T52",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A116",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T52",
+      "source_type": "transition",
+      "target_id": "P44",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A117",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P46",
+      "source_type": "place",
+      "target_id": "T53",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A118",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P44",
+      "source_type": "place",
+      "target_id": "T53",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A119",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T53",
+      "source_type": "transition",
+      "target_id": "P47",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A120",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T53",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A121",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P48",
+      "source_type": "place",
+      "target_id": "T54",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A122",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T54",
+      "source_type": "transition",
+      "target_id": "P46",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A123",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P48",
+      "source_type": "place",
+      "target_id": "T55",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A124",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P31",
+      "source_type": "place",
+      "target_id": "T55",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A125",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T55",
+      "source_type": "transition",
+      "target_id": "P47",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A126",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P29",
+      "source_type": "place",
+      "target_id": "T56",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A127",
+      "name": "",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T56",
+      "source_type": "transition",
+      "target_id": "P49",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ],
+  "modules": []
+}

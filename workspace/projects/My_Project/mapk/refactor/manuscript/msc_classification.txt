@@ -1,0 +1,31 @@
+MATHEMATICS SUBJECT CLASSIFICATION (MSC)
+========================================
+
+RECOMMENDED MSC 2020 CLASSES FOR THIS MANUSCRIPT:
+
+Primary:
+92C42 - Systems biology, networks
+
+Secondary:
+68Q85 - Models and methods for concurrent and distributed computing (Petri nets, process algebras)
+92C40 - Biochemistry, molecular biology
+93A30 - Mathematical modelling of systems and processes
+80A30 - Chemical kinetics in thermodynamics and heat transfer
+
+FORMATTED FOR ARXIV (semicolon-delimited):
+92C42; 68Q85; 92C40; 93A30; 80A30
+
+ALTERNATIVE/ADDITIONAL CLASSES:
+92-08 - Computational methods in biology
+92B05 - General biology and biomathematics
+37N25 - Dynamical systems in biology
+
+JUSTIFICATION:
+- 92C42: Primary focus - signal transduction networks, biological systems
+- 68Q85: Formal computational model (Petri net extension)
+- 92C40: Application domain - molecular biology, biochemical pathways
+- 93A30: Systems modeling methodology development
+- 80A30: Thermodynamic validation of reaction networks
+
+NOTE: MSC 2020 is the current version. ArXiv accepts MSC classifications.
+Use the semicolon-delimited format above for the MSC class field.

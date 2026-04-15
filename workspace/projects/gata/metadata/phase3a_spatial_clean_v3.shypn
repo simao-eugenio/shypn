@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "model": {},
+  "metadata": {
+    "basic": {
+      "model_name": "",
+      "model_id": "",
+      "version": "1.0",
+      "description": "",
+      "keywords": []
+    },
+    "authorship": {
+      "primary_author": "",
+      "contributors": [],
+      "institution": "",
+      "department": "",
+      "contact_email": ""
+    },
+    "biological_context": {
+      "organism": "",
+      "biological_system": "",
+      "pathway_name": "",
+      "cell_type": ""
+    },
+    "provenance": {
+      "import_source": "",
+      "original_model_id": "",
+      "import_date": null,
+      "modification_history": []
+    },
+    "references": {
+      "publications": [],
+      "related_models": [],
+      "external_resources": []
+    },
+    "system": {
+      "created_date": "2026-03-07T09:14:18.924763",
+      "last_modified": "2026-03-07T09:14:18.924766"
+    }
+  }
+}

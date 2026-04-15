@@ -1,0 +1,106 @@
+% Unified 13-Tuple Formalism
+
+Signal hierarchy theory (Section 3) introduces signal places ($\Psi$), signal flow arcs with consumption semantics, hierarchical layers ($L: \Psi \to \mathbb{N}$), and preemption mechanisms. We now integrate these concepts into a unified formalism extending classical Bio-PN with formal semantics for hierarchical regulatory control. The resulting Signal Hierarchical Petri Net (SHYPN) provides complete mathematical specification for modeling integrated metabolic-regulatory systems.
+
+\subsection{Complete Definition}
+
+\begin{definition}[Signal Hierarchical Petri Net]
+A Signal Hierarchical Petri Net is a 13-tuple:
+\begin{equation}
+\label{eq:shypn_tuple}
+\text{PN} = \langle P, T, \text{Pre}, \text{Post}, m_0, k, S, \Phi, \Sigma, \text{Reg}, \Psi, E, A \rangle
+\end{equation}
+\end{definition}
+
+\begin{table}[h]
+\caption{13-tuple formalism components (SHYPN for short)}
+\label{tab:thirteen_tuple}
+\centering
+\small
+\begin{tabular}{@{}clp{6.5cm}@{}}
+\toprule
+\# & \textbf{Symbol/Component} & \textbf{Description} \\
+\midrule
+1 & $P$ & Places representing biochemical species \\
+2 & $T$ & Transitions representing biochemical reactions \\
+3 & Pre & Input arc function: $P \times T \to \mathbb{R}_{\geq 0}$ \\
+4 & Post & Output arc function: $T \times P \to \mathbb{R}_{\geq 0}$ \\
+5 & $m_0$ & Initial marking function: $P \to \mathbb{R}_{\geq 0}$ \\
+6 & $k$ & Rate constant function: $T \to \mathbb{R}_{> 0}$ \\
+7 & $S$ & Transition type classification \\
+8 & $\Phi$ & Rate function: $T \to (\mathbb{R}^{|P|} \to \mathbb{R}_{\geq 0})$ \\
+9 & $\Sigma$ & Regulatory place subset: $\Sigma \subseteq P$ \\
+10 & Reg & Regulatory modulation function: $T \times \Sigma \to \mathbb{R}$ \\
+11 & $\Psi$ & Signal place subset (hierarchical information): $\Psi \subseteq P$ \\
+12 & $E$ & Signal enablement threshold: $T \times \Psi \to \mathbb{R}_{\geq 0}$ \\
+13 & $A$ & Arc type classification (normal, test, inhibitor, signal flow) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{3pt}
+\noindent\textbf{Extensions beyond classical Bio-PN}: Components 11-13 are novel contributions. Signal places $\Psi$ formalize hierarchical information channels distinct from metabolic places. Signal thresholds $E$ enable consumption semantics for commitment modeling. Arc type $A$ includes signal flow arcs consuming regulatory information.
+
+\subsection{Arc Type Taxonomy}
+
+\vspace{3pt}
+\noindent Four arc types with distinct semantics:
+
+\vspace{3pt}
+\noindent\textbf{(1) Normal} ($A(a) = \text{normal}$): Mass transfer---Consumes source tokens: $M(p) \gets M(p) - \text{Pre}(p, t)$---Produces target tokens: $M(p) \gets M(p) + \text{Post}(t, p)$---Stoichiometric weights define conservation
+
+\vspace{3pt}
+\noindent\textbf{(2) Test} ($A(a) = \text{test}$): Catalytic read. Does \textbf{not} consume: $M(p)$ unchanged. Enables transition: $M(p) \geq \text{threshold}$. Models enzymes, catalysts
+
+\vspace{3pt}
+\noindent\textbf{(3) Inhibitor} ($A(a) = \text{inhibitor}$): Allosteric inhibition---Does \textbf{not} consume: $M(p)$ unchanged---Disables transition: $M(p) < \text{threshold}$---Models competitive/non-competitive inhibition
+
+\vspace{3pt}
+\noindent\textbf{(4) Signal\_flow} ($A(a) = \text{signal\_flow}$): Information transfer \textit{(new)}---\textbf{Does} consume: $M(p_{\text{signal}}) \gets M(p_{\text{signal}}) - W(a)$---Hierarchical control: Layer-dependent execution---Models regulatory signals, checkpoints, decision finality
+
+\subsection{Dynamics}
+
+\vspace{3pt}
+\noindent\textbf{Marking evolution}: For continuous semantics:
+\begin{equation}
+\label{eq:marking_evolution}
+\frac{dM(p)}{dt} = \sum_{t \in {}^\bullet p} \Phi(t) \cdot \text{Post}(t, p) - \sum_{t \in p^\bullet} \Phi(t) \cdot \text{Pre}(p, t)
+\end{equation}
+
+\vspace{3pt}
+\noindent\textbf{Rate function}: Integrates dependencies (extending Eq.~\ref{eq:rate_signal} from Section 3):
+\begin{equation}
+\label{eq:rate_function}
+\Phi(t) = k_t \cdot f_{\text{sub}}({}^\bullet t) \cdot f_{\text{reg}}(\Sigma(t)) \cdot f_{\text{sig}}(\Psi(t))
+\end{equation}
+
+\vspace{3pt}
+\noindent\textbf{Enabling condition}: Transition $t$ enabled if: \textbf{(1) Substrates available}---$\forall p \in {}^\bullet t: M(p) \geq \text{Pre}(p, t)$ \textbf{(2) Regulatory conditions met}---Test arc thresholds satisfied, inhibitor arcs below threshold \textbf{(3) Signal conditions met} (Eq.~\ref{eq:signal_enable})---$\forall p \in \Psi(t): M(p) \geq E(t, p)$
+
+\subsection{Integration with Signal Hierarchy}
+
+\vspace{3pt}
+\noindent The unified formalism provides hierarchical execution:
+
+\vspace{3pt}
+\noindent\textbf{Signal hierarchy (Vertical dimension)}---Signal places $\Psi$ organized in layers via assignment $L: \Psi \to \mathbb{N}$---Higher layers execute first (priority-based scheduling)---Signal consumption preempts lower-layer alternatives, collapsing decision spaces
+
+\vspace{3pt}
+\noindent\textbf{Metabolic concurrency (Horizontal dimension)}---Multiple metabolic reactions with disjoint substrates execute concurrently---Rate contributions accumulate for shared metabolic products (e.g., ATP from glycolysis and oxidative phosphorylation)
+
+\vspace{3pt}
+\noindent\textbf{Combined architecture}:
+\begin{center}
+\begin{verbatim}
+L2: [Sig Psi_2] -> hier. ctrl
+       | (signal flow)
+L1: [Sig Psi_1] -> effector
+       |
+L0: [T_1||T_2||T_3] -> reactions
+     |    |    |
+    [P_1][P_2][P_3] -> pools
+\end{verbatim}
+\end{center}
+
+\vspace{3pt}
+\noindent This 2D architecture is unique in Petri net literature. Recent work addresses resource constraints~\cite{genovese2021} but not hierarchical integration.

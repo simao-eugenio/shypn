@@ -97,6 +97,17 @@ workspace/cache/
 legacy/
 archive/
 
+# Documentation (papers, thesis internal docs)
+doc/
+
+# ===== Large generated data (workspace projects) =====
+# Experiments, simulations, and large data — keep only manuscripts/models/scripts
+**/experiments/
+**/simulations/
+workspace/projects/*/data/
+workspace/projects/My_Project/drug_discovery/
+workspace/projects/My_Project/extended_biopn/
+
 # ===== Build / generated artifacts =====
 
 # LaTeX auxiliary files

@@ -1,0 +1,1503 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2026-01-29T19:49:20.830599",
+    "source": "manual",
+    "model_type": "Petri Net",
+    "object_counts": {
+      "places": 13,
+      "transitions": 12,
+      "arcs": 36,
+      "modules": 0
+    }
+  },
+  "view_state": {
+    "zoom": 0.7210496805325011,
+    "pan_x": 729.5803401409756,
+    "pan_y": 278.0707244614438,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "thermodynamic_settings": {
+    "ph": 7.0,
+    "temperature": 298.15,
+    "ionic_strength": 0.1,
+    "tolerance": 0.5,
+    "enable_validation": true,
+    "preset": "biochemical_standard"
+  },
+  "compound_mappings": {},
+  "places": [
+    {
+      "id": "P1",
+      "name": "ATP_cytoplasm",
+      "label": "ATP_cytoplasm\\n3.0 mM\\n[SIGNAL]\\nLayer 0",
+      "metadata": {
+        "compound_name": "ATP_cytoplasm",
+        "is_signal_place": true,
+        "kegg_id": "C00002"
+      },
+      "object_type": "place",
+      "x": 280.0,
+      "y": 190.0,
+      "radius": 35.0,
+      "marking": 4.3454903907297,
+      "initial_marking": 3.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P2",
+      "name": "ATP_mitochondria",
+      "label": "ATP_mitochondria\\n5.0 mM\\n[SIGNAL]\\nLayer 0",
+      "metadata": {
+        "compound_name": "ATP_mitochondria",
+        "is_signal_place": true,
+        "kegg_id": "C00002"
+      },
+      "object_type": "place",
+      "x": -210.0,
+      "y": 130.0,
+      "radius": 35.0,
+      "marking": 4.354463234930368,
+      "initial_marking": 5.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P3",
+      "name": "ADP_cytoplasm",
+      "label": "ADP_cytoplasm\\n0.5 mM\\n[SIGNAL]\\nLayer 0",
+      "metadata": {
+        "compound_name": "ADP_cytoplasm",
+        "is_signal_place": true,
+        "kegg_id": "C00008"
+      },
+      "object_type": "place",
+      "x": 800.0,
+      "y": 90.0,
+      "radius": 35.0,
+      "marking": 0.0,
+      "initial_marking": 0.5,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P4",
+      "name": "ADP_mitochondria",
+      "label": "ADP_mitochondria\\n0.2 mM\\n[SIGNAL]\\nLayer 0",
+      "metadata": {
+        "compound_name": "ADP_mitochondria",
+        "is_signal_place": true,
+        "kegg_id": "C00008"
+      },
+      "object_type": "place",
+      "x": -200.0,
+      "y": 390.0,
+      "radius": 35.0,
+      "marking": 4.637433994779058e-05,
+      "initial_marking": 0.2,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P5",
+      "name": "Ca2+",
+      "label": "Ca2+\\n0.0001 mM\\n[SIGNAL]\\nLayer 0",
+      "metadata": {
+        "compound_name": "Ca2+",
+        "is_signal_place": true,
+        "kegg_id": "C00076"
+      },
+      "object_type": "place",
+      "x": -70.0,
+      "y": 590.0,
+      "radius": 30.0,
+      "marking": 0.0001,
+      "initial_marking": 0.0001,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P6",
+      "name": "Glucose",
+      "label": "Glucose\\n5.0 mM\\nLayer 1",
+      "metadata": {
+        "compound_name": "Glucose",
+        "is_signal_place": false,
+        "kegg_id": "C00031"
+      },
+      "object_type": "place",
+      "x": 500.0,
+      "y": 440.0,
+      "radius": 30.0,
+      "marking": 9.748047730153788,
+      "initial_marking": 5.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P7",
+      "name": "Pyruvate_cyto",
+      "label": "Pyruvate_cyto\\n0.1 mM\\nLayer 1",
+      "metadata": {
+        "compound_name": "Pyruvate_cyto",
+        "is_signal_place": false,
+        "kegg_id": "C00022"
+      },
+      "object_type": "place",
+      "x": 880.0,
+      "y": 440.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 1.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P8",
+      "name": "Pyruvate_mito",
+      "label": "Pyruvate_mito\\n0.05 mM\\nLayer 1",
+      "metadata": {
+        "compound_name": "Pyruvate_mito",
+        "is_signal_place": false,
+        "kegg_id": "C00022"
+      },
+      "object_type": "place",
+      "x": 200.0,
+      "y": 350.0,
+      "radius": 30.0,
+      "marking": 0.109582371764297,
+      "initial_marking": 0.5,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P9",
+      "name": "O2",
+      "label": "O2\\n0.2 mM\\nLayer 1",
+      "metadata": {
+        "compound_name": "O2",
+        "is_signal_place": false,
+        "kegg_id": "C00007"
+      },
+      "object_type": "place",
+      "x": 200.0,
+      "y": 580.0,
+      "radius": 30.0,
+      "marking": 0.501814790850555,
+      "initial_marking": 0.3,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P10",
+      "name": "Protein_cyto",
+      "label": "Protein_cyto\\n0.01 mM\\nLayer 2",
+      "metadata": {
+        "compound_name": "Protein_cyto",
+        "is_signal_place": false
+      },
+      "object_type": "place",
+      "x": 530.0,
+      "y": 0.0,
+      "radius": 30.0,
+      "marking": 0.15536603492998896,
+      "initial_marking": 0.01,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P11",
+      "name": "Protein_mito",
+      "label": "Protein_mito\\n0.005 mM\\nLayer 2",
+      "metadata": {
+        "compound_name": "Protein_mito",
+        "is_signal_place": false
+      },
+      "object_type": "place",
+      "x": 210.0,
+      "y": -100.0,
+      "radius": 30.0,
+      "marking": 7.137461182838355,
+      "initial_marking": 0.005,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P12",
+      "name": "Lipids",
+      "label": "Lipids\\n0.001 mM\\nLayer 2",
+      "metadata": {
+        "compound_name": "Lipids",
+        "is_signal_place": false
+      },
+      "object_type": "place",
+      "x": 830.0,
+      "y": -100.0,
+      "radius": 30.0,
+      "marking": 0.35846497638928476,
+      "initial_marking": 0.001,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P13",
+      "name": "Biomass",
+      "label": "Biomass\\n1.0 AU\\n[SIGNAL]\\nLayer 3",
+      "metadata": {
+        "compound_name": "Biomass",
+        "is_signal_place": true
+      },
+      "object_type": "place",
+      "x": 10.0,
+      "y": -190.0,
+      "radius": 35.0,
+      "marking": 1.037928385622639,
+      "initial_marking": 1.0,
+      "capacity": null,
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "MitochondrialATP",
+      "label": "MitochondrialATP",
+      "object_type": "transition",
+      "x": 40.0,
+      "y": 460.0,
+      "width": 8.0,
+      "height": 45.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 10,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "50.0 * (Pyruvate_mito / (0.1 + Pyruvate_mito)) * (O2 / (0.05 + O2)) * (ADP_mitochondria / (0.1 + ADP_mitochondria))"
+    },
+    {
+      "id": "T2",
+      "name": "ATPase_Translocase",
+      "label": "ATPase_Translocase",
+      "object_type": "transition",
+      "x": 50.0,
+      "y": 300.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 9,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "40.0 * (ATP_mitochondria / (2.0 + ATP_mitochondria)) * ((ATP_mitochondria - ATP_cytoplasm) / (0.5 + abs(ATP_mitochondria - ATP_cytoplasm)))"
+    },
+    {
+      "id": "T12",
+      "name": "O2_Diffusion",
+      "label": "O2_Diffusion",
+      "metadata": {
+        "transition_type": "SOURCE"
+      },
+      "object_type": "transition",
+      "x": 340.0,
+      "y": 550.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 9,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": "1",
+      "rate": "100.0 * (1.0 - O2 / 0.5)",
+      "earliest_time": 1.0,
+      "latest_time": 1.0,
+      "properties": {
+        "guard_function": "1",
+        "earliest_time": 1.0,
+        "latest_time": 1.0
+      }
+    },
+    {
+      "id": "T3",
+      "name": "GlucoseUptake",
+      "label": "GlucoseUptake",
+      "metadata": {
+        "transition_type": "SOURCE"
+      },
+      "object_type": "transition",
+      "x": 420.0,
+      "y": 360.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 8,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": "1",
+      "rate": "10.0 * (1.0 - Glucose / 10.0)",
+      "earliest_time": 1.0,
+      "latest_time": 1.0,
+      "properties": {
+        "guard_function": "1",
+        "earliest_time": 1.0,
+        "latest_time": 1.0
+      }
+    },
+    {
+      "id": "T4",
+      "name": "ATPase_Maintenance",
+      "label": "ATPase_Maintenance",
+      "metadata": {
+        "transition_type": "SINK"
+      },
+      "object_type": "transition",
+      "x": 590.0,
+      "y": 270.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 7,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.5 * ATP_cytoplasm"
+    },
+    {
+      "id": "T5",
+      "name": "PyruvateCarrier",
+      "label": "PyruvateCarrier",
+      "object_type": "transition",
+      "x": 520.0,
+      "y": 560.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 6,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "120.0 * (Pyruvate_cyto / (0.2 + Pyruvate_cyto))"
+    },
+    {
+      "id": "T6",
+      "name": "Glycolysis",
+      "label": "Glycolysis",
+      "object_type": "transition",
+      "x": 610.0,
+      "y": 390.0,
+      "width": 8.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 5,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "30.0 * (Glucose / (1.0 + Glucose)) * (2.0 / (2.0 + ATP_cytoplasm))"
+    },
+    {
+      "id": "T7",
+      "name": "ProteinSynthesis_Cyto",
+      "label": "ProteinSynthesis_Cyto",
+      "object_type": "transition",
+      "x": 550.0,
+      "y": 140.0,
+      "width": 8.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 4,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "2.0 * (ATP_cytoplasm / (0.3 + ATP_cytoplasm)) * (Pyruvate_cyto / (0.1 + Pyruvate_cyto))"
+    },
+    {
+      "id": "T8",
+      "name": "ProteinSynthesis_Mito",
+      "label": "ProteinSynthesis_Mito",
+      "object_type": "transition",
+      "x": 60.0,
+      "y": 70.0,
+      "width": 8.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 3,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "1.5 * (ATP_mitochondria / (0.3 + ATP_mitochondria)) * (Pyruvate_mito / (0.1 + Pyruvate_mito))"
+    },
+    {
+      "id": "T9",
+      "name": "ProteinDegradation",
+      "label": "ProteinDegradation",
+      "metadata": {
+        "transition_type": "SINK"
+      },
+      "object_type": "transition",
+      "x": 420.0,
+      "y": 80.0,
+      "width": 8.0,
+      "height": 35.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 2,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": "1",
+      "rate": "1.0 * Protein_cyto",
+      "earliest_time": 1.0,
+      "latest_time": 1.0,
+      "properties": {
+        "guard_function": "1",
+        "earliest_time": 1.0,
+        "latest_time": 1.0
+      }
+    },
+    {
+      "id": "T10",
+      "name": "LipidSynthesis",
+      "label": "LipidSynthesis",
+      "object_type": "transition",
+      "x": 1030.0,
+      "y": 180.0,
+      "width": 8.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 2,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "1.0 * (ATP_cytoplasm / (0.4 + ATP_cytoplasm)) * (Pyruvate_cyto / (0.15 + Pyruvate_cyto))"
+    },
+    {
+      "id": "T11",
+      "name": "BiomassGrowth",
+      "label": "BiomassGrowth",
+      "object_type": "transition",
+      "x": 490.0,
+      "y": -190.0,
+      "width": 8.0,
+      "height": 45.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 1,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.5 * Protein_cyto * Protein_mito * Lipids * (ATP_cytoplasm / (1.0 + ATP_cytoplasm))"
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P8",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P2",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P6",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "A8",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A9",
+      "name": "A9",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T4",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "A10",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A11",
+      "name": "A11",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P8",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "A12",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A14",
+      "name": "A14",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P7",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A16",
+      "name": "A16",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "A17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A18",
+      "name": "A18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P10",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "A19",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A20",
+      "name": "A20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A21",
+      "name": "A21",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P8",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A22",
+      "name": "A22",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T8",
+      "source_type": "transition",
+      "target_id": "P11",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A23",
+      "name": "A23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T8",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A24",
+      "name": "A24",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "A25",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A26",
+      "name": "A26",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A27",
+      "name": "A27",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P12",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A28",
+      "name": "A28",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A29",
+      "name": "A29",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 0.1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A30",
+      "name": "A30",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 0.1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A31",
+      "name": "A31",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P12",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 0.1,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A32",
+      "name": "A32",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A33",
+      "name": "A33",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T11",
+      "source_type": "transition",
+      "target_id": "P13",
+      "target_type": "place",
+      "weight": 0.1,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A34",
+      "name": "A34",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T11",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "A35",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P9",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A36",
+      "name": "A36",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A37",
+      "name": "A37",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "A38",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 2.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ],
+  "modules": []
+}

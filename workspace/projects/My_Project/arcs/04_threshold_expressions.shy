@@ -1,0 +1,395 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2026-02-13T09:00:53.191807",
+    "source": "test_battery",
+    "model_type": "Petri Net",
+    "name": "Arc Threshold Expressions",
+    "description": "Test inhibitor arcs with different threshold expressions.",
+    "author": "Test Battery"
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 0.0,
+    "pan_y": 0.0,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "thermodynamic_settings": {
+    "ph": 7.0,
+    "temperature": 298.15,
+    "ionic_strength": 0.1,
+    "tolerance": 0.5,
+    "enable_validation": false,
+    "preset": "biochemical_standard"
+  },
+  "compound_mappings": {},
+  "places": [
+    {
+      "id": "P1",
+      "name": "Sub_T5",
+      "label": "",
+      "object_type": "place",
+      "x": 100.0,
+      "y": 100.0,
+      "radius": 40.0,
+      "marking": 50.0,
+      "initial_marking": 50.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P2",
+      "name": "Inh_T5",
+      "label": "",
+      "object_type": "place",
+      "x": 100.0,
+      "y": 180.0,
+      "radius": 40.0,
+      "marking": 7.0,
+      "initial_marking": 7.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P3",
+      "name": "Prod_T5",
+      "label": "",
+      "object_type": "place",
+      "x": 300.0,
+      "y": 100.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P4",
+      "name": "Sub_T10",
+      "label": "",
+      "object_type": "place",
+      "x": 500.0,
+      "y": 100.0,
+      "radius": 40.0,
+      "marking": 50.0,
+      "initial_marking": 50.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P5",
+      "name": "Inh_T10",
+      "label": "",
+      "object_type": "place",
+      "x": 500.0,
+      "y": 180.0,
+      "radius": 40.0,
+      "marking": 15.0,
+      "initial_marking": 15.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P6",
+      "name": "Prod_T10",
+      "label": "",
+      "object_type": "place",
+      "x": 700.0,
+      "y": 100.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "React_T5",
+      "label": "",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": 100.0,
+      "width": 60.0,
+      "height": 12.0,
+      "angle_degrees": 0.0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_source": false,
+      "is_sink": false,
+      "timing": {
+        "type": "immediate",
+        "priority": 1
+      }
+    },
+    {
+      "id": "T2",
+      "name": "React_T10",
+      "label": "",
+      "object_type": "transition",
+      "x": 600.0,
+      "y": 100.0,
+      "width": 60.0,
+      "height": 12.0,
+      "angle_degrees": 0.0,
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_source": false,
+      "is_sink": false,
+      "timing": {
+        "type": "immediate",
+        "priority": 1
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "T=5",
+      "object_type": "arc",
+      "arc_type": "inhibitor",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 5.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "T=10",
+      "object_type": "arc",
+      "arc_type": "inhibitor",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 10.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P6",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "is_curved": false,
+      "curve_control_x": null,
+      "curve_control_y": null
+    }
+  ],
+  "modules": []
+}

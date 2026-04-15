@@ -1,0 +1,64 @@
+{
+  "model": {
+    "name": "Simple P-T-P Test",
+    "description": "Minimal Place-Transition-Place model to verify rate × dt calculation",
+    "version": "1.0.0",
+    "places": [
+      {
+        "id": "place_a",
+        "name": "Place A",
+        "tokens": 100.0,
+        "x": 100,
+        "y": 150,
+        "metadata": {
+          "description": "Source place with 100 tokens",
+          "units": "mM"
+        }
+      },
+      {
+        "id": "place_b",
+        "name": "Place B",
+        "tokens": 0.0,
+        "x": 300,
+        "y": 150,
+        "metadata": {
+          "description": "Target place initially empty",
+          "units": "mM"
+        }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "transition_flow",
+        "name": "Flow",
+        "type": "continuous",
+        "x": 200,
+        "y": 150,
+        "rate": "10.0",
+        "metadata": {
+          "description": "Constant rate of 10.0 mM/s"
+        }
+      }
+    ],
+    "arcs": [
+      {
+        "id": "arc_1",
+        "source_id": "place_a",
+        "source_type": "place",
+        "target_id": "transition_flow",
+        "target_type": "transition",
+        "weight": 1.0,
+        "arc_type": "normal"
+      },
+      {
+        "id": "arc_2",
+        "source_id": "transition_flow",
+        "source_type": "transition",
+        "target_id": "place_b",
+        "target_type": "place",
+        "weight": 1.0,
+        "arc_type": "normal"
+      }
+    ]
+  }
+}
