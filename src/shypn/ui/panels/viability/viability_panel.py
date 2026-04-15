@@ -985,7 +985,11 @@ class ViabilityPanel(Gtk.Box):
         for place in model.places:
             # If localities selected: only show places in those localities
             # If no localities: show all places (entire model)
-            if not show_all_places and place.id not in all_place_ids:
+            # ALWAYS include compartment places (e.g., Temperature, pH) — they are
+            # isolated (no arcs) but implicitly affect all rate functions via the
+            # engine's thermodynamic auto-detection, so they must be sweepable.
+            is_compartment = getattr(place, 'is_compartment_place', False)
+            if not show_all_places and place.id not in all_place_ids and not is_compartment:
                 continue
             place_obj = place
             place_type = "Source" if hasattr(place_obj, 'is_source') and place_obj.is_source else "Normal"

@@ -820,8 +820,12 @@ class StochasticBehavior(TransitionBehavior):
                     # NORMAL ARC: Check sufficient tokens for burst firing.
                     # Hybrid PN: stochastic transitions are discrete — floor fractional tokens
                     # so that a place with e.g. 1.5 µM contributes 1 countable token.
-                    required = arc.weight * burst
-                    logger.debug(f"    → Normal: checking burst requirement={required}")
+                    # Signal flow arcs additionally require θ_eff tokens as basin
+                    # floor (formalism: M(ps) ≥ θ_eff + Ws). θ_eff = 0 by default.
+                    # When activation_energy > 0, θ_eff is temperature-dependent.
+                    theta = self._get_theta_eff(arc)
+                    required = (arc.weight + theta) * burst
+                    logger.debug(f"    → Normal: checking burst requirement={required} (θ_eff={theta})")
                     if math.floor(source_place.tokens) < required:
                         return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         

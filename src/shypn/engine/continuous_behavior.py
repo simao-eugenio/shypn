@@ -530,7 +530,12 @@ class ContinuousBehavior(TransitionBehavior):
             # ALL arcs (normal, test, signal) must check enablement: tokens >= weight
             # Test arcs enable transitions but don't consume (checked during firing)
             # Continuous requires tokens above threshold for ALL arc types
-            if source_place.tokens <= self.min_token_threshold:
+            # Signal flow arcs additionally require θ_eff tokens as basin
+            # floor (formalism: M(ps) ≥ θ_eff + Ws). θ_eff = 0 by default.
+            # When activation_energy > 0, θ_eff is temperature-dependent.
+            theta = self._get_theta_eff(arc)
+            effective_floor = theta + self.min_token_threshold
+            if source_place.tokens <= effective_floor:
                 return False, f"place-below-threshold-{place_id}"
         
         return True, "enabled-continuous"
@@ -813,7 +818,12 @@ class ContinuousBehavior(TransitionBehavior):
                 src = self._get_place(place_id)
                 if src is None:
                     continue
-                max_flow = src.tokens / arc.weight if arc.weight > 0 else float('inf')
+                # Signal flow arcs: only tokens above θ_eff are spendable.
+                # This preserves the basin floor during continuous integration.
+                # When activation_energy > 0, θ_eff is temperature-dependent.
+                theta = self._get_theta_eff(arc)
+                spendable = max(0.0, src.tokens - theta)
+                max_flow = spendable / arc.weight if arc.weight > 0 else float('inf')
                 actual_flow = min(actual_flow, max_flow)
 
         # Phase 2: consume

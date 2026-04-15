@@ -217,6 +217,12 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
                     'direction': direction,
                     'signal_place_id': signal_place_id,
                     'transition_id': transition_id,
+                    # Thermodynamic constraint tuple Γ = (K, n, ε)
+                    'michaelis_K': getattr(arc, 'michaelis_K', 0.0),
+                    'hill_n': getattr(arc, 'hill_n', 1.0),
+                    'suppression_epsilon': getattr(arc, 'suppression_epsilon', 0.0),
+                    'theta_eff': getattr(arc, 'theta_eff', 0.0),
+                    'commitment_marking': getattr(arc, 'commitment_marking', weight),
                     'arc_obj': arc  # For later reference
                 })
         
@@ -274,6 +280,33 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
                     'place_name': sp['name'],
                     'message': f"Signal place {sp['name']} has no outgoing signal flow arcs"
                 })
+
+        # Check 4: Warn when θ_eff > 0 but initial marking < commitment marking
+        # (commitment impossible from initial state without external replenishment)
+        signal_place_map = {sp['id']: sp for sp in signal_places}
+        for arc_info in signal_flow_arcs:
+            theta_eff = arc_info.get('theta_eff', 0)
+            if theta_eff > 0 and arc_info['signal_place_id']:
+                sp = signal_place_map.get(arc_info['signal_place_id'])
+                if sp:
+                    m0 = sp.get('initial_marking', 0)
+                    m_commit = arc_info.get('commitment_marking', 0)
+                    if m0 < m_commit:
+                        warnings.append({
+                            'type': 'commitment_unreachable',
+                            'arc_id': arc_info['id'],
+                            'place_id': sp['id'],
+                            'place_name': sp['name'],
+                            'initial_marking': m0,
+                            'commitment_marking': m_commit,
+                            'theta_eff': theta_eff,
+                            'message': (
+                                f"Signal place {sp['name']} has M₀={m0:.3f} < "
+                                f"M_commit={m_commit:.3f} (θ_eff={theta_eff:.3f} + "
+                                f"Ws={arc_info['weight']:.3f}): commitment impossible "
+                                f"from initial marking without replenishment"
+                            )
+                        })
         
         is_valid = len(issues) == 0
         
@@ -455,7 +488,14 @@ class SignalHierarchyAnalyzer(TopologyAnalyzer):
             'max_layer_size': hierarchy['max_layer_size'],
             'preemption_count': len(hierarchy['preemption_pairs']),
             'is_hierarchical': hierarchy['is_hierarchical'],
-            'is_acyclic': hierarchy['is_acyclic']
+            'is_acyclic': hierarchy['is_acyclic'],
+            # Thermodynamic constraint tuple Γ statistics
+            'arcs_with_gamma': sum(1 for a in signal_flow_arcs if a.get('theta_eff', 0) > 0),
+            'max_theta_eff': max((a.get('theta_eff', 0) for a in signal_flow_arcs), default=0.0),
+            'commitment_markings': {
+                a['id']: a['commitment_marking']
+                for a in signal_flow_arcs if a.get('theta_eff', 0) > 0
+            }
         }
     
     def _generate_interpretation(self, signal_places: List[Dict], signal_flow_arcs: List[Dict], 

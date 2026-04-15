@@ -963,20 +963,22 @@ class Transition(PetriNetObject):
         else:
             transition.properties = {}
         
+        # Legacy support: Load top-level rate_function FIRST (takes precedence over
+        # numeric rate, since it carries the actual formula).
+        if "rate_function" in data and 'rate_function' not in transition.properties:
+            transition.rate_function = data["rate_function"]
+        
         # PHASE 3 REFACTORING: Migrate legacy rate field to properties.rate_function
-        # This automatic migration ensures old models work with new architecture
+        # This automatic migration ensures old models work with new architecture.
+        # Only migrate if rate_function doesn't already exist (neither in properties
+        # nor loaded from the top-level field above).
         if "rate" in data and data["rate"] is not None:
-            # Only migrate if rate_function doesn't already exist
-            if 'rate_function' not  in transition.properties:
+            if 'rate_function' not in transition.properties:
                 # Convert numeric rate to string for rate_function
                 transition.properties['rate_function'] = str(data["rate"])
                 # Note: Engine will parse numeric strings and use as lambda
                 # Clear the deprecated rate field after migration
                 transition.rate = None
-        
-        # Legacy support: Load top-level rate_function (only if not in properties)
-        if "rate_function" in data and 'rate_function' not in transition.properties:
-            transition.rate_function = data["rate_function"]
         if "formula" in data:
             transition.formula = data["formula"]
         

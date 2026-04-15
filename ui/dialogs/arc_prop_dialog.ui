@@ -391,6 +391,260 @@
                             </child>
                           </object>
                         </child>
+                        
+                        <!-- Thermodynamic Constraints Γ = (K, n, ε) — signal flow arcs only -->
+                        <child>
+                          <object class="GtkFrame" id="gamma_frame">
+                            <property name="visible">False</property>
+                            <property name="can-focus">False</property>
+                            <property name="label-xalign">0</property>
+                            <property name="shadow-type">in</property>
+                            
+                            <child>
+                              <object class="GtkBox" id="gamma_box">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">6</property>
+                                <property name="margin-top">6</property>
+                                <property name="margin-bottom">6</property>
+                                <property name="margin-left">8</property>
+                                <property name="margin-right">8</property>
+                                
+                                <!-- Michaelis constant K -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_k_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_k_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">K (mM):</property>
+                                        <property name="width-chars">8</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Michaelis constant — half-saturation concentration (mM)</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="gamma_k_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="width-chars">10</property>
+                                        <property name="placeholder-text" translatable="yes">0.0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                                
+                                <!-- Hill coefficient n -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_n_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_n_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">n:</property>
+                                        <property name="width-chars">8</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Hill coefficient — cooperativity (dimensionless, default 1.0)</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="gamma_n_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="width-chars">10</property>
+                                        <property name="placeholder-text" translatable="yes">1.0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                                
+                                <!-- Rate suppression ε -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_eps_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_eps_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">ε:</property>
+                                        <property name="width-chars">8</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Rate suppression threshold ε ∈ [0, 1) — fraction of Vmax below which transition is off</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="gamma_eps_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="width-chars">10</property>
+                                        <property name="placeholder-text" translatable="yes">0.0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                                
+                                <!-- Activation energy E_a (Arrhenius) -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_ea_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_ea_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">E_a (kJ/mol):</property>
+                                        <property name="width-chars">12</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Activation energy for Arrhenius temperature dependence (kJ/mol, 0 = no temperature effect)</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="gamma_ea_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="width-chars">10</property>
+                                        <property name="placeholder-text" translatable="yes">0.0</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                                
+                                <!-- Reference temperature T_ref (Arrhenius) -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_tref_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_tref_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">T_ref (K):</property>
+                                        <property name="width-chars">12</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Reference temperature for Arrhenius equation (Kelvin, default 298.15 = 25°C)</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkEntry" id="gamma_tref_entry">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="width-chars">10</property>
+                                        <property name="placeholder-text" translatable="yes">298.15</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                                
+                                <!-- Computed θ_eff display -->
+                                <child>
+                                  <object class="GtkBox" id="gamma_theta_box">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="spacing">8</property>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_theta_label">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">θ_eff:</property>
+                                        <property name="width-chars">8</property>
+                                        <property name="xalign">1</property>
+                                        <property name="tooltip-text" translatable="yes">Effective commitment threshold (computed from Γ)</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="gamma_theta_value">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">0.0</property>
+                                        <property name="xalign">0</property>
+                                        <property name="selectable">True</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            
+                            <child type="label">
+                              <object class="GtkLabel" id="gamma_frame_label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Thermodynamic Constraints (Γ)</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     
