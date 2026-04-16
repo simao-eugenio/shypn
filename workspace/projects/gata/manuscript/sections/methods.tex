@@ -1,0 +1,47 @@
+% sections/methods.tex
+
+\subsection{Model Specification and File Format}
+
+The model is provided as \texttt{phase3a\_spatial\_clean\_v6.shy} in the project repository~\cite{shypn2026}. This file is the calibrated production model used for Phase~D, Phase~D-ext, Phase~F, Phase~G, Phase~H, and Phase~X. Earlier sweep phases used precursor files (\texttt{phase3a\_spatial\_scaled.shy} for Phase~B; \texttt{phase3a\_spatial\_clean.shy} for Phase~C) that share identical topology and rate expressions with v6. The model encodes 29 places, 32 transitions, and 114 arcs, together with their associated kinetic rate expressions using the Signal Hierarchical Petri Net extended formalism. Adaptive transition firing rates are expressed as functions of current markings using \texttt{rate = f(markings)} syntax native to Signal Hierarchical Petri Nets. All rate constants, initial conditions, and energy conservation parameters are documented in the model file header and in the companion file \texttt{doc/RATE\_ADJUSTMENT\_IMPLEMENTATION\_LOG.md}.
+
+\subsection{Phase B Sweep Configuration}
+
+Simulations were executed using the Viability Pane batch sweep interface in Signal Hierarchical Petri Nets, configured with the following parameters: eight EPO values (0.430, 0.440, 0.445, 0.449, 0.450, 0.451, 0.455, 0.460~mM); fixed GCSF = 0.100~mM; 50 independent stochastic replicates per EPO condition; simulation duration $T = 3600$~s; trajectory output at 10001 equally spaced timepoints. Each replicate was assigned a distinct random seed via the batch interface's automatic seed allocation. The complete sweep data are archived in the project repository~\cite{shypn2026}. Each EPO condition subdirectory contains: \texttt{results.csv} (mean trajectory), \texttt{mean\_final\_state.csv} (per-species mean and standard deviation of final state), \texttt{replicates.csv} (per-replicate metadata), and \texttt{names.csv} (place/transition ID to name mapping).
+
+\subsection{Single-Cell Initial Condition Scaling}
+
+The Phase B sweep uses initial conditions for GATA1 and PU.1 nuclear protein (P17, P18) set to 0.01~mM, one hundred-fold below the 1~mM reference used in the population-scale validation run (Phase A). This scaling is motivated by the need to reproduce the intracellular copy-number regime of uncommitted haematopoietic progenitor cells and was calibrated empirically against the single-cell variability data of Hoppe et\,al.~\cite{hoppe2016}.
+
+Haematopoietic stem and progenitor cells have nuclear volumes on the order of 1–2~pL. At 1~mM initial concentration in a 1~pL volume, the expected absolute copy number for a species is approximately $N = C \cdot V \cdot N_{\mathrm{A}} \approx 10^{-3} \times 10^{-12} \times 6.022\times10^{23} \approx 6\times10^{8}$ molecules---a regime where Gillespie stochastic fluctuations are negligible (intrinsic noise $\propto 1/\sqrt{N} \approx 3.7\times10^{-5}$) and the simulation is effectively deterministic. At 0.01~mM, the same expression gives $N \approx 6\times10^{6}$ molecules; however, because transcription factors are produced and degraded in discrete bursting events rather than at maximal occupancy, the effective copy number in an uncommitted HSPC is far lower, and the model at 0.01~mM initial conditions captures this amplified noise regime.
+
+The calibration criterion used was that the coefficient of variation (CV) of GATA1$_{\mathrm{nuc}}$ at $t = 3600$~s across stochastic replicates should fall within the range of cell-to-cell variability measured experimentally by Hoppe et\,al.~\cite{hoppe2016} (~0.35–0.45). At 1~mM initial conditions, CV\,$\approx$\,0 (deterministic); at 0.01~mM, CV spans 0.32–0.39 across the eight EPO conditions tested (Table~\ref{tab:commitment_D}), placing the model in quantitative agreement with the reported single-cell variability range. The 0.01~mM initial conditions therefore represent the biologically relevant copy-number regime for an uncommitted progenitor in which the GATA1/PU.1 bistable switch has not yet been resolved.
+
+\subsection{Phase C Sweep Configuration}
+
+The nuclear pH sweep extended the stochastic analysis to test the dependence of erythroid commitment on nuclear pH. Three sweep phases were conducted:
+
+\textbf{Phase~G-v3 (primary pH sweep):} Simulations were executed using \texttt{phase3a\_spatial\_clean\_v6.shy} with the Viability Pane batch sweep interface. Parameters: six EPO values (0.436, 0.438, 0.440, 0.442, 0.444, 0.446~mM); three nuclear pH values (P25: 7.0, 7.5, 8.0); GCSF\,=\,1.1~mM; fixed temperature\,=\,310.15~K; $N=50$ stochastic replicates per condition; simulation duration $T=7200$~s; $1\times$ standard initial conditions. Total: 18 conditions $\times$ 50 = 900 replicates (run identifier \texttt{run\_20260312\_233923}).
+
+\textbf{Phase~H (attractor-depth pH comparison):} Same model. Parameters: EPO\,=\,1.0~mM (well above EPO*, no GCSF competition); three nuclear pH values (7.0, 7.5, 8.0); GCSF\,$\approx$\,0; $N=50$ per condition; $T=7200$~s. Purpose: measure final-state GATA1$_\text{nuc}$ and PU.1$_\text{nuc}$ in fully committed cells across pH to assess attractor depth independently of commitment probability (run identifier \texttt{run\_20260313\_075757}).
+
+\subsection{Phase C Trajectory Analysis}
+
+Phase C final-state analysis used the same header-based parsing and commitment classification (GATA1\textsubscript{nuc} $>$ PU.1\textsubscript{nuc}) as Phase B. Deep trajectory analysis was additionally performed using the companion script \texttt{dev/analyze\_phase\_c\_deep.py}, which reads the full time-series output at 10001 timepoints per trajectory and computes: (i) the GATA1/PU.1 nuclear ratio as a function of time; (ii) total and nuclear/cytoplasmic protein partitioning; (iii) energy nucleotide ratios (ATP/ADP, GTP/GDP); (iv) EPOR and GCSFR binding and internalisation fractions; and (v) nuclear and cytoplasmic mRNA concentrations. All receptor conservation sums (EPOR\textsubscript{free} + EPOR\textsubscript{bound} + EPOR\textsubscript{interiorized}) were verified to equal the nominal total of 50~mM at every timepoint across all 18 conditions, confirming model integrity.
+
+\subsection{Stochastic Algorithm}
+
+The Signal Hierarchical Petri Nets stochastic engine implements an adaptive tau-leaping algorithm (leap-size parameter $\epsilon = 0.03$, base time step $\Delta t = 50$~s). At each step, the engine evaluates all enabled transition propensities by substituting the current marking into the user-defined rate expressions, computes a tentative leap $\Delta t$ such that propensities change by at most $\epsilon$ relative, and fires each transition a Poisson-distributed number of times over that interval. When propensities are locally stiff the step is reduced adaptively. This approach provides efficient approximate stochastic simulation while preserving the qualitative statistics---bimodal fate distributions, coefficient of variation, and mean commitment time---at the copy-number scales used in Phase B and Phase X experiments.
+
+\subsection{Trajectory Analysis}
+
+Trajectory data were analysed using Python 3.x with pandas, NumPy, and SciPy. The mean trajectory file uses a mixed-header format; the data section begins at the line starting \texttt{Time,P...} and all preceding lines are comment records (prefixed with \texttt{\#}). Transition columns record cumulative firing counts as functions of time. Instantaneous firing rates were computed as $\Delta(\text{cumulative count}) / \Delta t$ between adjacent timepoints. Time-to-half-max was defined as the first timepoint at which a cumulative firing count exceeded 50\% of its value at $T = 3600$~s. Time-averaged firing rates over a window $[t_1, t_2]$ were computed as $(\text{count}(t_2) - \text{count}(t_1)) / (t_2 - t_1)$.
+
+The cytokine-priming onset time was defined as the first timepoint $t^*$ at which pGATA1\_nuc$(t^*) >$ PU.1\_Protein\_nuc$(t^*)$ in the mean trajectory. This criterion identifies the earliest point at which the EPOR-driven phosphorylation cascade has established GATA1 dominance; it is a cytokine-dependent priming event, not an irreversible molecular record (see Phase X results). Commitment classification per replicate used the criterion GATA1\_nuc $>$ PU.1\_nuc at the final timepoint $T = 3600$~s. Analysis scripts are available in the project repository~\cite{shypn2026}.
+
+\subsection{Energy Conservation Validation}
+
+Model thermodynamic consistency was verified by confirming conservation of total adenine nucleotide (ATP + ADP) and total guanine nucleotide (GTP + GDP) across all simulations. These sums should remain constant at their initial values (33.000~mM and 17.730~mM respectively) because the model contains no synthesis or degradation of nucleotide bases---only interconversion between phosphorylation states. Deviations from these conserved quantities would indicate numerical integration errors or stoichiometric inconsistencies in the model definition. All 400 Phase B simulations maintained conservation to machine precision.
+
+\subsection{Software Availability}
+
+All materials are publicly available at \url{https://github.com/simao-eugenio/shypn} (DOI:~\href{https://doi.org/10.5281/zenodo.18749556}{10.5281/zenodo.18749556}) under the MIT open source licence; see the Data Availability statement for full details. Statistical analyses were performed in Python 3.11 using pandas 2.x, NumPy 1.26.x, and SciPy 1.12.x. No proprietary software was used.

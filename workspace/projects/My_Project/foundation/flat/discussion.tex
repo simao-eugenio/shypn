@@ -1,0 +1,64 @@
+% Discussion
+
+\subsection{Theoretical Significance}
+
+\vspace{3pt}
+\noindent\textbf{Expressiveness gap}: Classical Bio-PN theory lacks formal semantics for hierarchical regulatory signals consumed during decision-making. Test arcs model catalysis (non-consuming reads) enabling reversible regulation, but cannot express regulatory consumption---consumption events that collapse decision spaces and ensure commitment finality. This limitation prevents formalization of fundamental regulatory phenomena: growth factor depletion during receptor binding, CI repressor consumption in lambda phage commitment, ATP expenditure gating metabolic pathway availability. No existing Bio-PN framework distinguishes consumptive information transfer (signal flow) from non-consumptive catalysis (test arcs).
+
+\vspace{3pt}
+\noindent\textbf{Signal hierarchy approach}: We introduce signal places ($\Psi$) as formal information channels distinct from metabolic mass transfer. Signal flow arcs consume tokens, enabling three previously inexpressible analytical capabilities: \textbf{(1) Hierarchical preemption}---Higher regulatory layers control lower metabolic layers through regulatory consumption (e.g., ATP gates sporulation vs. competence pathways) \textbf{(2) Decision finality analysis}---Signal consumption models irreversible commitment, enabling basin of attraction geometry computation and reliability quantification \textbf{(3) Threshold determination}---Energy status thresholds can be formally computed through hierarchical preemption analysis. These questions are \textit{inexpressible} in classical Bio-PN lacking consumption semantics for regulatory signals.
+
+\vspace{3pt}
+\noindent\textbf{Unified metabolic-regulatory modeling}: Traditional approaches separate metabolism (ODE models) from regulation (Boolean networks), coupling them informally through parameter dependencies. Signal hierarchy makes coupling explicit and formal---energy status (ATP/ADP) functions simultaneously as metabolite (normal arc output in glycolysis) and regulatory signal (signal flow arc source in decision circuits). This unified representation enables bidirectional analysis: How does metabolic state control gene expression? How do regulatory decisions affect metabolic flux? The hierarchical layer structure provides compositional organization for multi-scale models reflecting biological reality: cells do not separate metabolism from regulation, and neither should our formalisms.
+
+\subsection{Analytical Capabilities Enabled}
+
+\vspace{3pt}
+\noindent\textbf{Quantitative regulatory analysis}: Signal hierarchy enables formal questions about regulatory mechanisms previously inexpressible: \textit{Threshold quantification}---What energy concentration triggers pathway commitment? Signal hierarchy formalizes energy-gated decisions through hierarchical preemption analysis. \textit{B. subtilis} sporulation demonstrates this capability: SHYPN analysis computes ATP commitment threshold (2.38 mM) with 7\% accuracy versus experimental measurement (2.21 mM). Classical Bio-PN cannot compute this threshold---test arcs provide no consumption semantics. \textit{Commitment reliability}---How reliable is cell fate convergence? Reachability analysis on hierarchical models enables basin geometry computation and attractor convergence quantification. \textit{Decision finality}---When does reversibility collapse? Signal consumption semantics distinguish irreversible commitment from reversible test arc regulation. These capabilities enable formal mathematical analysis with predictive power validated against experimental data.
+
+\vspace{3pt}
+\noindent\textbf{Model construction and modularity}: Explicit signal places ($\Psi$) replace implicit rate function dependencies, improving transparency. Hierarchical layers can be designed independently---higher-layer decision circuits (UV response, stress sensing) interface with lower-layer metabolic networks (lysis genes, sporulation machinery) through well-defined signal flow arcs. This modularity supports iterative refinement and synthetic biology circuit design where engineered regulatory modules must interface with endogenous pathways.
+
+\vspace{3pt}
+\noindent\textbf{Applications}: \textbf{Synthetic biology}---Engineered decision circuits require signal hierarchy for guaranteed commitment with high reliability design targets. Design principle: irreversible decisions need signal consumption, not merely sensing. \textbf{Drug discovery}---ATP-dependent transporter models reveal how metabolic therapeutics hierarchically modulate drug uptake. Quantitative thresholds (demonstrated for sporulation) guide combination therapy design. \textbf{Precision medicine}---Predictive cell fate models under intervention enable patient-specific optimization. Basin analysis identifies intervention points maximizing desired commitment. The validated \textit{B. subtilis} model exemplifies translational capability: predicting how ATP modulation affects developmental decisions.
+
+\subsection{Comparison with Related Work}
+
+\begin{table}[h]
+\caption{Comparison with related frameworks}
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Framework} & \textbf{SH} & \textbf{UM} & \textbf{Unif.} & \textbf{Tool} \\
+\midrule
+Classical PN~\cite{murata1989} & -- & -- & -- & Yes \\
+Bio-PN~\cite{heiner2008} & -- & -- & -- & Yes \\
+
+Mana~\cite{genovese2021} & $\pm$$^*$ & -- & -- & -- \\
+\textbf{SHYPN} & \cmark & \cmark & \cmark & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{3pt}
+\noindent$^*$Nets with mana model enzyme depletion but lack hierarchical layering and preemption.
+
+\vspace{3pt}
+\noindent\textbf{Legend}: SH=Signal Hierarchy, UM=Unified Modeling (metabolism+regulation), Unif.=Unified Formalism, Tool=Implementation
+
+\vspace{3pt}
+\noindent\textbf{Novelty}: Our theoretical framework is the first providing unified metabolic-regulatory modeling through signal hierarchy with formal consumption semantics and hierarchical preemption.
+
+\subsection{Limitations and Future Work}
+
+\vspace{3pt}
+\noindent\textbf{Current limitations}: \textbf{(1) Signal identification}---Manual annotation of $\Psi$ required. Future work: automated detection from rate function analysis, SBML annotations, and biological pathway databases \textbf{(2) Quantitative threshold determination}---Signal enablement thresholds ($E: T \times \Psi \to \mathbb{R}_{\geq 0}$) currently specified manually. Automated learning from time-series experimental data would enable data-driven model parameterization \textbf{(3) Acyclic hierarchy}---Current formalism assumes acyclic signal flow. Regulatory feedback loops (occasionally present in biological systems) require extension to handle cyclic dependencies with fixpoint semantics \textbf{(4) Semantic types}---Immediate, timed, continuous, and stochastic transitions implemented. Colored Petri net extensions for molecular species tracking remain future work
+
+\vspace{3pt}
+\noindent\textbf{Future directions}: \textbf{(1) Threshold learning}---Machine learning approaches to infer signal thresholds from time-series data. Bayesian parameter estimation integrating prior biological knowledge \textbf{(2) Spatial signal gradients}---Extend signal hierarchy to reaction-diffusion systems where compartments form spatial layers. Morphogen gradients and membrane potential naturally map to spatial signal hierarchies \textbf{(3) Stochastic signal hierarchy}---Formal treatment of rare events where signal noise affects hierarchical preemption. Critical for low-copy-number molecules in single-cell decisions \textbf{(4) SBML standard extension}---Propose formal $\Psi$ annotation standard for SBML Level 4, enabling interoperability with existing databases and tools
+
+\subsection{Broader Impact}
+
+\vspace{3pt}
+\noindent Signal hierarchy theory provides rigorous mathematical foundation for translational systems biology, bridging molecular mechanisms with cellular decision-making through formal semantics. The framework enables quantitative prediction of cell fate under perturbation---ATP threshold modulation (validated at 2.38 mM for \textit{B. subtilis}), basin accessibility control, commitment reliability engineering---supporting rational therapeutic design and synthetic biology circuit construction. Regulatory networks transform from qualitative circuit diagrams into predictive mathematical models with measurable properties: energy thresholds, commitment kinetics, decision finality. These quantitative insights are essential for precision medicine (patient-specific treatment optimization), drug discovery (combination therapy targeting hierarchical control points), and synthetic biology (engineered circuits with high reliability guarantees). By capturing both metabolic mass transfer and regulatory information flow in unified formalism with proven theoretical properties and validated predictive capability, signal hierarchy enables next-generation quantitative systems biology where analytical capabilities match biological complexity.

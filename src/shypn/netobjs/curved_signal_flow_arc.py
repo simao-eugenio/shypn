@@ -62,6 +62,17 @@ class CurvedSignalFlowArc(CurvedArc):
         # Initialize with CurvedArc geometry
         super().__init__(source, target, id, name, weight)
 
+        # Thermodynamic constraint tuple Γ = (K, n, ε)
+        # Mirrors SignalFlowArc: per-arc enzyme kinetics for θ_eff.
+        # Default ε = 0 ⇒ θ_eff = 0 (backward compatible).
+        self.michaelis_K: float = 0.0
+        self.hill_n: float = 1.0
+        self.suppression_epsilon: float = 0.0
+
+        # Arrhenius temperature dependence (Phase 5)
+        self.activation_energy: float = 0.0     # E_a in kJ/mol
+        self.reference_temperature: float = 298.15  # T_ref in Kelvin
+
         # Enforce semantic color via ColorSchemaManager (light gray for signal flow)
         from shypn.utils.color_schema_manager import ColorSchemaManager
         ColorSchemaManager.reset_arc_color(self)
@@ -101,7 +112,67 @@ class CurvedSignalFlowArc(CurvedArc):
             bool: Always True (signal flow behavior)
         """
         return True
-    
+
+    # ── Thermodynamic constraint tuple Γ ──────────────────────────────
+
+    @property
+    def theta_eff(self) -> float:
+        """Effective basin boundary from thermodynamic constraint tuple Γ.
+
+        See SignalFlowArc.theta_eff for full documentation.
+
+        Returns:
+            float: Effective threshold in same units as marking (e.g. mM)
+        """
+        eps = self.suppression_epsilon
+        if eps <= 0.0 or eps >= 1.0:
+            return 0.0
+        ratio = eps / (1.0 - eps)
+        return self.michaelis_K * (ratio ** (1.0 / self.hill_n))
+
+    def theta_eff_at(self, temperature: float) -> float:
+        """Temperature-dependent θ_eff via Arrhenius K(T).
+
+        See SignalFlowArc.theta_eff_at for full documentation.
+
+        Args:
+            temperature: Current temperature in Kelvin
+
+        Returns:
+            float: θ_eff at the given temperature
+        """
+        eps = self.suppression_epsilon
+        if eps <= 0.0 or eps >= 1.0:
+            return 0.0
+        if temperature <= 0:
+            return 0.0
+        K_T = self._arrhenius_K(temperature)
+        ratio = eps / (1.0 - eps)
+        return K_T * (ratio ** (1.0 / self.hill_n))
+
+    def _arrhenius_K(self, temperature: float) -> float:
+        """Compute K(T) via Arrhenius equation.
+
+        See SignalFlowArc._arrhenius_K for full documentation.
+        """
+        import math
+        if self.activation_energy == 0.0 or temperature == self.reference_temperature:
+            return self.michaelis_K
+        R = 0.008314  # kJ/(mol·K)
+        exponent = -(self.activation_energy / R) * (
+            1.0 / temperature - 1.0 / self.reference_temperature
+        )
+        return self.michaelis_K * math.exp(exponent)
+
+    @property
+    def commitment_marking(self) -> float:
+        """Minimum marking for transition enablement: θ_eff + Ws."""
+        try:
+            ws = float(self.weight)
+        except (TypeError, ValueError):
+            ws = 0.0
+        return self.theta_eff + ws
+
     def to_dict(self) -> dict:
         """Serialize to dictionary with arc_type='curved_opposite_signal_flow'.
         
@@ -110,7 +181,36 @@ class CurvedSignalFlowArc(CurvedArc):
         """
         data = super().to_dict()
         data['arc_type'] = 'curved_opposite_signal_flow'
+        # Thermodynamic constraint tuple Γ (only when non-default)
+        if self.michaelis_K != 0.0 or self.hill_n != 1.0 or self.suppression_epsilon != 0.0:
+            data['michaelis_K'] = self.michaelis_K
+            data['hill_n'] = self.hill_n
+            data['suppression_epsilon'] = self.suppression_epsilon
+        if self.activation_energy != 0.0:
+            data['activation_energy'] = self.activation_energy
+        if self.reference_temperature != 298.15:
+            data['reference_temperature'] = self.reference_temperature
         return data
+
+    @classmethod
+    def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'CurvedSignalFlowArc':
+        """Create curved signal flow arc from dictionary, restoring Γ.
+
+        Args:
+            data: Dictionary containing arc properties
+            places: Dictionary mapping place IDs to Place instances
+            transitions: Dictionary mapping transition IDs to Transition instances
+
+        Returns:
+            CurvedSignalFlowArc with restored Γ = (K, n, ε)
+        """
+        arc = super().from_dict(data, places, transitions)
+        arc.michaelis_K = float(data.get('michaelis_K', 0.0))
+        arc.hill_n = float(data.get('hill_n', 1.0))
+        arc.suppression_epsilon = float(data.get('suppression_epsilon', 0.0))
+        arc.activation_energy = float(data.get('activation_energy', 0.0))
+        arc.reference_temperature = float(data.get('reference_temperature', 298.15))
+        return arc
     
     def render(self, cr, zoom):
         """Render curved signal flow arc with dashed line.

@@ -1,0 +1,1031 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-26T10:42:12.188468",
+    "object_counts": {
+      "places": 12,
+      "transitions": 9,
+      "arcs": 25
+    }
+  },
+  "view_state": {
+    "zoom": 0.7047565505701127,
+    "pan_x": 638.4286317821668,
+    "pan_y": 262.14705654561885,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": false
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "Glucose",
+      "label": "Glucose\n5.0 mM",
+      "object_type": "place",
+      "x": 70.0,
+      "y": 0.0,
+      "radius": 30.0,
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P2",
+      "name": "Lactose",
+      "label": "Lactose\n10.0 mM",
+      "object_type": "place",
+      "x": 250.0,
+      "y": -120.0,
+      "radius": 30.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P3",
+      "name": "cAMP",
+      "label": "cAMP\n0.1 \u03bcM",
+      "object_type": "place",
+      "x": -90.0,
+      "y": 370.0,
+      "radius": 30.0,
+      "marking": 0.1,
+      "initial_marking": 0.1,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P4",
+      "name": "CRP",
+      "label": "CRP\n10.0 \u03bcM",
+      "object_type": "place",
+      "x": 200.0,
+      "y": 500.0,
+      "radius": 30.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P5",
+      "name": "CRP_cAMP",
+      "label": "CRP-cAMP\n0.0 \u03bcM",
+      "object_type": "place",
+      "x": 380.0,
+      "y": 370.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P6",
+      "name": "lac_gene",
+      "label": "lac operon\n1 copy",
+      "object_type": "place",
+      "x": 470.0,
+      "y": 760.0,
+      "radius": 30.0,
+      "marking": 1,
+      "initial_marking": 1,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true
+    },
+    {
+      "id": "P7",
+      "name": "mRNA_lac",
+      "label": "lac mRNA\n0 copies",
+      "object_type": "place",
+      "x": 600.0,
+      "y": 420.0,
+      "radius": 30.0,
+      "marking": 0,
+      "initial_marking": 0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true
+    },
+    {
+      "id": "P8",
+      "name": "BetaGal",
+      "label": "\u03b2-Galactosidase\n10 molecules",
+      "object_type": "place",
+      "x": 410.0,
+      "y": 110.0,
+      "radius": 30.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true
+    },
+    {
+      "id": "P9",
+      "name": "ATP",
+      "label": "ATP\n10.0 mM",
+      "object_type": "place",
+      "x": 60.0,
+      "y": 140.0,
+      "radius": 30.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P10",
+      "name": "G6P",
+      "label": "G6P\n0.0 mM",
+      "object_type": "place",
+      "x": 310.0,
+      "y": 280.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P11",
+      "name": "ADP",
+      "label": "ADP\n0.0 mM",
+      "object_type": "place",
+      "x": 70.0,
+      "y": 280.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P12",
+      "name": "Galactose",
+      "label": "Galactose\n0.0 mM",
+      "object_type": "place",
+      "x": 610.0,
+      "y": 0.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "T1",
+      "label": "Glucose consumption",
+      "object_type": "transition",
+      "x": 210.0,
+      "y": 140.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "1.0 * Glucose / (0.5 + Glucose)"
+    },
+    {
+      "id": "T2",
+      "name": "T2",
+      "label": "cAMP synthesis",
+      "object_type": "transition",
+      "x": -90.0,
+      "y": 140.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.5 / (1.0 + Glucose / 0.5)"
+    },
+    {
+      "id": "T3",
+      "name": "T3",
+      "label": "CRP-cAMP formation",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": 370.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "2.0 * CRP * cAMP"
+    },
+    {
+      "id": "T4",
+      "name": "T4",
+      "label": "lac transcription",
+      "object_type": "transition",
+      "x": 470.0,
+      "y": 640.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.01 + 0.5 * CRP_cAMP"
+    },
+    {
+      "id": "T5",
+      "name": "T5",
+      "label": "mRNA translation",
+      "object_type": "transition",
+      "x": 600.0,
+      "y": 290.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.1 * mRNA_lac"
+    },
+    {
+      "id": "T6",
+      "name": "T6",
+      "label": "mRNA degradation",
+      "object_type": "transition",
+      "x": 770.0,
+      "y": 630.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.23 * mRNA_lac"
+    },
+    {
+      "id": "T7",
+      "name": "T7",
+      "label": "Lactose cleavage",
+      "object_type": "transition",
+      "x": 250.0,
+      "y": 0.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "immediate",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.01 * BetaGal * Lactose / (1.0 + Lactose)"
+    },
+    {
+      "id": "T8",
+      "name": "T8",
+      "label": "cAMP degradation",
+      "object_type": "transition",
+      "x": -90.0,
+      "y": 530.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.1 * cAMP"
+    },
+    {
+      "id": "T9",
+      "name": "T9",
+      "label": "CRP-cAMP dissociation",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": 650.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 2.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": "0.5 * CRP_cAMP"
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P10",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P11",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A7",
+      "name": "A7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "inhibitor",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 0.5,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "A8",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A9",
+      "name": "A9",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "A10",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P5",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A11",
+      "name": "A11",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "A12",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A13",
+      "name": "A13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A14",
+      "name": "A14",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A15",
+      "name": "A15",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 0.5,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A16",
+      "name": "A16",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T4",
+      "source_type": "transition",
+      "target_id": "P7",
+      "target_type": "place",
+      "weight": 7.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "A17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A18",
+      "name": "A18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P8",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "A19",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A20",
+      "name": "A20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A21",
+      "name": "A21",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P8",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A22",
+      "name": "A22",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A23",
+      "name": "A23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P12",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A24",
+      "name": "A24",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "A25",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P11",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

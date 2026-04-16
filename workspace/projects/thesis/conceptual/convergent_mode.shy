@@ -1,0 +1,205 @@
+{
+    "version": "2.0",
+    "metadata": {
+        "created": "2025-11-26T09:00:00.000000",
+        "modified": "2025-11-26T09:00:00.000000",
+        "object_counts": {
+            "places": 3,
+            "transitions": 2,
+            "arcs": 4
+        },
+        "description": "Convergent mode: superposition pattern. Used in Chapter 5 (Fig 5.6) to define Mode 2 of weak independence - shared output place.",
+        "purpose": "Pedagogical - demonstrates Mode 2 (convergent coupling, additive effects)"
+    },
+    "view_state": {
+        "zoom": 1.0,
+        "pan_x": 0.0,
+        "pan_y": 0.0,
+        "transformations": {
+            "rotation": {
+                "type": "rotation",
+                "angle_degrees": 0.0,
+                "enabled": false
+            }
+        }
+    },
+    "places": [
+        {
+            "id": "P1",
+            "name": "S1",
+            "label": "S\u2081\n2",
+            "object_type": "place",
+            "x": 50.0,
+            "y": 50.0,
+            "radius": 30.0,
+            "marking": 2.0,
+            "initial_marking": 2.0,
+            "capacity": "Infinity",
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
+            "border_width": 3.0,
+            "is_catalyst": false
+        },
+        {
+            "id": "P2",
+            "name": "S2",
+            "label": "S\u2082\n3",
+            "object_type": "place",
+            "x": 50.0,
+            "y": 250.0,
+            "radius": 30.0,
+            "marking": 3.0,
+            "initial_marking": 3.0,
+            "capacity": "Infinity",
+            "border_color": [
+                0.0,
+                0.4,
+                0.8
+            ],
+            "border_width": 3.0,
+            "is_catalyst": false
+        },
+        {
+            "id": "P3",
+            "name": "P",
+            "label": "P\n0",
+            "object_type": "place",
+            "x": 350.0,
+            "y": 150.0,
+            "radius": 35.0,
+            "marking": 0.0,
+            "initial_marking": 0.0,
+            "capacity": "Infinity",
+            "border_color": [
+                0.0,
+                0.6,
+                0.0
+            ],
+            "border_width": 3.0,
+            "is_catalyst": false
+        }
+    ],
+    "transitions": [
+        {
+            "id": "T1",
+            "name": "t1",
+            "label": "t\u2081",
+            "object_type": "transition",
+            "x": 200.0,
+            "y": 75.0,
+            "width": 15.0,
+            "height": 40.0,
+            "kinetic_type": "mass_action",
+            "rate_constant": 0.5,
+            "rate_function": null,
+            "metadata": {}
+        },
+        {
+            "id": "T2",
+            "name": "t2",
+            "label": "t\u2082",
+            "object_type": "transition",
+            "x": 200.0,
+            "y": 225.0,
+            "width": 15.0,
+            "height": 40.0,
+            "kinetic_type": "mass_action",
+            "rate_constant": 0.5,
+            "rate_function": null,
+            "metadata": {}
+        }
+    ],
+    "arcs": [
+        {
+            "id": "A1",
+            "source_id": "P1",
+            "target_id": "T1",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A1",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
+        },
+        {
+            "id": "A2",
+            "source_id": "T1",
+            "target_id": "P3",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A2",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
+        },
+        {
+            "id": "A3",
+            "source_id": "P2",
+            "target_id": "T2",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {},
+            "source_type": "place",
+            "target_type": "transition",
+            "name": "A3",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
+        },
+        {
+            "id": "A4",
+            "source_id": "T2",
+            "target_id": "P3",
+            "arc_type": "normal",
+            "weight": 1.0,
+            "bidirectional": false,
+            "metadata": {},
+            "source_type": "transition",
+            "target_type": "place",
+            "name": "A4",
+            "label": "",
+            "object_type": "arc",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "width": 3.0,
+            "control_points": [],
+            "threshold": null
+        }
+    ]
+}

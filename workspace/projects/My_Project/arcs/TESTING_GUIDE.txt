@@ -1,0 +1,166 @@
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              ARC TRANSFORMATION TEST - QUICK REFERENCE              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+📍 TEST MODELS LOCATION
+workspace/projects/My_Project/arcs/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 EXPECTED ARC COLORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Arc Type         | Color       | RGB Values      | Visual Note
+─────────────────┼─────────────┼─────────────────┼──────────────────────
+Normal Arc       | Black       | (0.0, 0.0, 0.0) | Solid line
+Test Arc         | Blue        | (0.0, 0.0, 1.0) | Solid line + circle
+Inhibitor Arc    | Black       | (0.0, 0.0, 0.0) | Solid line + circle
+Signal Flow Arc  | Light Gray  | (0.7, 0.7, 0.7) | Solid line
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚙️  EXPECTED BEHAVIORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Arc Type         | Consumes Tokens? | Special Behavior
+─────────────────┼──────────────────┼────────────────────────────────
+Normal Arc       | ✅ YES           | Standard PN token transfer
+Test Arc         | ❌ NO            | Read-only catalyst (classical)
+Inhibitor Arc    | ✅ YES           | Consumes + threshold check *
+Signal Flow Arc  | ✅ YES           | Info transfer with consumption
+
+* Inhibitor in SHPN Living Systems semantics DOES consume tokens
+  (differs from classical PN where inhibitor doesn't consume)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 TRANSFORMATION TEST CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ = PASS  ❌ = FAIL  ⚠️  = WARNING
+
+VISUAL CHECKS:
+□ Color changes IMMEDIATELY after transformation
+□ No color flicker or persistence of old color
+□ Arc line style updates correctly (circle for test/inhibitor)
+□ No duplicate arcs rendered
+□ Weight label stays visible and correct
+
+BEHAVIOR CHECKS:
+□ Normal arc: Consumes tokens ✅
+□ Test arc: Does NOT consume tokens ❌ (catalyst behavior)
+□ Inhibitor arc: Consumes tokens ✅
+□ Signal flow arc: Consumes tokens ✅
+
+TRANSFORMATION SEQUENCE:
+□ Normal → Test: Color black→blue, consumption YES→NO
+□ Test → Inhibitor: Color blue→black, consumption NO→YES
+□ Inhibitor → Test: Color stays black→blue, consumption YES→NO
+□ Test → Normal: Color blue→black, consumption NO→YES
+
+PROPERTY PRESERVATION:
+□ Arc weight preserved across transformations
+□ Threshold expression preserved (inhibitor arcs)
+□ Arc label/description preserved
+□ Arc curve/bend preserved (if curved)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔬 5-MINUTE SMOKE TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open: 03_transformation_test.shy
+2. Note: Catalyst = 10.0, Product = 0.0
+3. Run 1 step: Catalyst→9.0, Product→1.0 (normal consumes) ✅
+4. Right-click catalyst arc → Convert To → Test Arc
+5. Check: Arc color changes to BLUE immediately ✅
+6. Run 1 step: Catalyst stays 9.0, Product→2.0 (test doesn't consume) ✅
+7. Right-click catalyst arc → Convert To → Inhibitor Arc
+8. Check: Arc color changes to BLACK immediately ✅
+9. Run 1 step: Catalyst→8.0, Product→3.0 (inhibitor consumes) ✅
+10. Right-click catalyst arc → Convert To → Test Arc
+11. Check: Arc color changes to BLUE immediately ✅
+12. Run 1 step: Catalyst stays 8.0, Product→4.0 (test doesn't consume) ✅
+
+RESULT: Catalyst tokens = 8.0, Product = 4.0
+Consumption pattern: YES, NO, YES, NO = CORRECT ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🐛 KNOWN ISSUES TO WATCH FOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ BUG 1: Color Doesn't Change
+   Symptom: Arc stays black after transforming to test arc
+   Impact: User can't visually distinguish arc types
+   
+❌ BUG 2: Behavior Mixing
+   Symptom: Test arc consumes tokens OR normal arc doesn't consume
+   Impact: Simulation produces wrong results
+   
+❌ BUG 3: Stale Behavior Cache
+   Symptom: After transformation, behavior matches OLD type not NEW type
+   Impact: Mixed behaviors during successive transformations
+   
+❌ BUG 4: Weight Loss
+   Symptom: Arc weight resets to 1 after transformation
+   Impact: High-weight arcs become low-weight
+   
+❌ BUG 5: Threshold Loss
+   Symptom: Inhibitor threshold expression cleared after transformation
+   Impact: Inhibitor behavior becomes incorrect
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 TWO TRANSFORMATION PATHS TO TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PATH 1: CONTEXT MENU (Right-click)
+  1. Right-click arc
+  2. Convert To → [Test Arc / Inhibitor Arc / Normal Arc]
+  3. Transformation happens immediately
+  ✅ File: model_canvas_loader.py (_on_arc_convert_to_*)
+
+PATH 2: PROPERTY DIALOG (Double-click)
+  1. Double-click arc
+  2. Change "Arc Type" dropdown
+  3. Click "Apply" or "OK"
+  4. Transformation happens when dialog closes
+  ✅ File: arc_prop_dialog_loader.py (_apply_changes)
+
+⚠️  CRITICAL: Both paths must produce IDENTICAL results!
+   - Same color change
+   - Same behavior change
+   - Same property preservation
+   - Same cache invalidation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 TESTING MATRIX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+From ↓ To →   | Normal | Test | Inhibitor | Signal Flow
+──────────────┼────────┼──────┼───────────┼─────────────
+Normal        |   -    |  ✓   |     ✓     |      ✓
+Test          |   ✓    |  -   |     ✓     |      ✓
+Inhibitor     |   ✓    |  ✓   |     -     |      ✓
+Signal Flow   |   ✓    |  ✓   |     ✓     |      -
+
+Test ALL 12 transformations marked with ✓
+Expected: All transformations work correctly in BOTH directions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📞 WHEN TO REPORT BUGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Report if ANY of these occur:
+1. Color doesn't match expected color table
+2. Token consumption doesn't match expected behavior table
+3. Arc properties (weight, threshold, label) lost after transformation
+4. Successive transformations cause behavior mixing
+5. Visual artifacts (duplicate arcs, flickering, rendering glitches)
+6. Transformation works via context menu but NOT property dialog
+7. Transformation works via property dialog but NOT context menu
+
+REPORT TO: Development team with:
+  - Model file used
+  - Transformation sequence attempted
+  - Expected vs actual result
+  - Screenshot if visual issue
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Version: 1.0 | Date: 2026-02-13 | Battery: My_Project/arcs/

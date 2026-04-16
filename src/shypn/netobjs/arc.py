@@ -983,6 +983,12 @@ class Arc(PetriNetObject):
         else:
             arc_class = cls  # Use the class this method was called on (Arc)
         
+        # Delegate to subclass from_dict when the resolved class overrides it.
+        # This ensures subclass-specific fields (e.g., SignalFlowArc Γ tuple)
+        # are restored during deserialization.
+        if arc_class is not cls and hasattr(arc_class, 'from_dict'):
+            return arc_class.from_dict(data, places, transitions)
+        
         # Resolve source and target references (handle both int IDs and string names)
         raw_source_id = data["source_id"]
         raw_target_id = data["target_id"]

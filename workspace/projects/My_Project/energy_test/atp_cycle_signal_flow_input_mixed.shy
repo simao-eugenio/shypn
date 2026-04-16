@@ -1,0 +1,199 @@
+{
+  "model_type": "bio_petri_net",
+  "name": "ATP_Cycle_Test_signal_flow_input_mixed",
+  "description": "Minimal energy conservation test - signal_flow_input - mixed",
+  "version": "1.0",
+  "places": [
+    {
+      "id": "P1",
+      "name": "ATP_pool",
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "x": 100,
+      "y": 100,
+      "compartment_volume": 0.5,
+      "compound_id": null,
+      "is_signal_place": true,
+      "color": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "properties": {
+        "volume_unit": "fL"
+      }
+    },
+    {
+      "id": "P2",
+      "name": "ADP_pool",
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "x": 300,
+      "y": 100,
+      "compartment_volume": 100.0,
+      "compound_id": null,
+      "is_signal_place": false,
+      "color": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "properties": {
+        "volume_unit": "fL"
+      }
+    },
+    {
+      "id": "P3",
+      "name": "Pi_pool",
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "x": 300,
+      "y": 200,
+      "compartment_volume": 100.0,
+      "compound_id": null,
+      "is_signal_place": false,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "properties": {
+        "volume_unit": "fL"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "ATP_synthesis",
+      "transition_type": "adaptive",
+      "x": 200,
+      "y": 150,
+      "properties": {
+        "rate": 10.0,
+        "stochastic_burst_min": 1,
+        "stochastic_burst_max": 1,
+        "volume_threshold": 1.0,
+        "prefer_continuous": true,
+        "adaptive_filter": "inputs_only"
+      },
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "T2",
+      "name": "ATPase",
+      "transition_type": "adaptive",
+      "x": 200,
+      "y": 50,
+      "properties": {
+        "rate": 10.0,
+        "stochastic_burst_min": 1,
+        "stochastic_burst_max": 1,
+        "volume_threshold": 1.0,
+        "prefer_continuous": true,
+        "adaptive_filter": "inputs_only"
+      },
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "adp_to_synth",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "arc_type": "normal",
+      "weight": 1.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "A2",
+      "name": "pi_to_synth",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "arc_type": "normal",
+      "weight": 1.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "A3",
+      "name": "synth_to_atp",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "arc_type": "normal",
+      "weight": 1.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "A4",
+      "name": "atp_to_atpase",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "arc_type": "signal_flow",
+      "weight": 1.0,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ]
+    },
+    {
+      "id": "A5",
+      "name": "atpase_to_adp",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P2",
+      "target_type": "place",
+      "arc_type": "normal",
+      "weight": 1.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "A6",
+      "name": "atpase_to_pi",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "arc_type": "normal",
+      "weight": 1.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

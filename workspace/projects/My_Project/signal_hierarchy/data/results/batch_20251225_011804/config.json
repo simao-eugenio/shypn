@@ -1,0 +1,19 @@
+{
+  "timestamp": "20251225_011804",
+  "n_replicates": 100,
+  "recorded_objects": [
+    "P14",
+    "P21",
+    "P8",
+    "P7",
+    "P6",
+    "P3"
+  ],
+  "settings": {
+    "duration": 3000.0,
+    "time_units": "TimeUnits.SECONDS",
+    "dt_auto": true,
+    "use_tau_leaping": true,
+    "tau_epsilon": 0.03
+  }
+}

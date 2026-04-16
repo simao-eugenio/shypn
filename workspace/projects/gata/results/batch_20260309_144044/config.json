@@ -1,0 +1,12 @@
+{
+  "timestamp": "20260309_144044",
+  "n_replicates": 10,
+  "recorded_objects": [],
+  "settings": {
+    "duration": 1.0,
+    "time_units": "TimeUnits.SECONDS",
+    "dt_auto": false,
+    "use_tau_leaping": true,
+    "tau_epsilon": 0.03
+  }
+}

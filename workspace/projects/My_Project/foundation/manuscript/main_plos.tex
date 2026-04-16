@@ -1,0 +1,201 @@
+% Signal Hierarchical Petri Nets - Foundation Manuscript
+% PLOS Computational Biology Format
+% Version: January 18, 2026
+
+\documentclass[10pt,letterpaper]{article}
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+
+% amsmath and amssymb packages, useful for mathematical formulas and symbols
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+
+% Use adjustwidth environment to exceed column width (see example table in text)
+\usepackage{changepage}
+
+% textcomp package and marvosym package for additional characters
+\usepackage{textcomp,marvosym}
+
+% cite package, to clean up citations in the main text. Do not remove.
+\usepackage{cite}
+
+% Use nameref to cite supporting information files
+\usepackage{nameref,hyperref}
+
+% line numbers
+\usepackage[right]{lineno}
+
+% ligatures disabled
+\usepackage[nopatch=eqnum]{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
+
+% color can be used to apply background shading to table cells only
+\usepackage[table]{xcolor}
+
+% array package for better arrays (eg matrices) in maths
+\usepackage{array}
+
+% verbatim environment for code and preformatted text
+\usepackage{verbatim}
+
+% algorithm and pseudocode packages
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% booktabs for professional tables
+\usepackage{booktabs}
+
+% graphicx for including figures
+\usepackage{graphicx}
+
+% subcaption for subfigures
+\usepackage{subcaption}
+
+% tikz for Petri net diagrams
+\usepackage{tikz}
+\usetikzlibrary{petri,arrows,positioning,shapes.geometric}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{example}{Example}
+
+% Custom commands
+\newcommand{\etal}{\textit{et al.}}
+
+% Remove paragraph indentation
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% Colored comments for revision tracking (remove for final submission)
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\note}[1]{\textcolor{blue}{[NOTE: #1]}}
+
+\begin{document}
+\vspace*{0.2in}
+
+% Title must be 250 characters or less
+\begin{flushleft}
+{\Large
+\textbf{Signal Hierarchy Theory for Biological Petri Nets: Formal Semantics of Hierarchical Regulatory Control}
+}
+\newline
+% Insert author names, affiliations and corresponding author email
+\\
+Eug\^enio Sim\~ao$^{1,*}$
+\\
+\bigskip
+\textbf{1} Department of Computer Science, Universidade Federal de Santa Catarina (UFSC), Ararangu\'a, Santa Catarina, 88906-072, Brazil
+\\
+\bigskip
+
+% Use the asterisk to denote corresponding authorship and provide email address
+* eugenio.simao@ufsc.br
+
+\end{flushleft}
+
+% Please keep the abstract below 300 words
+\section*{Abstract}
+Predicting cellular commitment thresholds---such as ATP concentrations triggering irreversible developmental transitions---requires modeling regulatory signal consumption during decision-making. Biological Petri net theory lacks formal semantics for such hierarchical regulatory signals. Classical test arcs model catalysis (non-consuming reads) but cannot express signal consumption essential for commitment finality and pathway preemption (Table~\ref{tab:test_vs_signal}). We introduce \textit{signal hierarchy theory}, a formal extension to Bio-PN providing signal places as information channels distinct from metabolic mass transfer, with signal flow arcs enabling consumption semantics. Hierarchical layer assignment formalizes multi-scale organization where higher regulatory layers control lower metabolic layers through regulatory consumption. The formalism bridges the expressiveness gap between metabolic mass transfer (normal arcs) and regulatory information flow (signal flow arcs), enabling unified modeling where energy status functions simultaneously as metabolite and regulatory signal. We provide complete formal definitions of the 13-tuple extension (Eq.~\ref{eq:shypn_tuple}, Table~\ref{tab:thirteen_tuple}) including signal places ($\Psi$), signal flow arc semantics, hierarchical layer functions, and enablement thresholds. We demonstrate the formalism's applicability through \textit{Bacillus subtilis} sporulation, an illustrative example: signal hierarchy analysis computes ATP commitment threshold at 2.38 mM, matching experimental measurements (2.21 mM, 7\% error)---a prediction inexpressible in classical Bio-PN lacking consumption semantics. This proof-of-concept demonstrates how the formalism enables quantitative threshold determination, basin geometry quantification, and commitment reliability analysis, providing theoretical foundation for modeling irreversible cellular decisions under energy constraints.
+
+\vspace{6pt}
+\noindent\textbf{Keywords:} Systems Biology, Cellular Decision-Making, Metabolic Networks, Quantitative Modeling, Cell Fate, Biological Petri Nets
+
+% Author Summary (150-200 words, non-technical, first-person voice - UNIQUE TO PLOS)
+\section*{Author Summary}
+Cells make irreversible decisions---like committing to division, differentiation, or death---based on energy availability. Current mathematical models treat energy molecules like ATP simply as passive participants in reactions, missing their role as active regulatory signals that determine which pathways activate. We developed a new theoretical framework that formally distinguishes between ATP as a metabolite (consumed in reactions) and ATP as a regulatory signal (controlling pathway choice). Our theory introduces ``signal flow arcs'' that consume regulatory information during commitment, making decisions irreversible and enabling higher-level pathways to preempt lower-level ones. We demonstrate this framework by analyzing bacterial sporulation, a life-or-death decision where ATP availability determines cell fate. Our mathematical model correctly predicted the ATP threshold for commitment within 7\% of experimental values---a calculation impossible with existing models that cannot represent signal consumption. This work provides new mathematical machinery for understanding how cells make reliable decisions under changing energy conditions. The formalism has potential applications in synthetic biology (designing robust decision circuits), drug discovery (understanding ATP-dependent pathways), and precision medicine (predicting cellular responses to metabolic interventions).
+
+% Introduction
+\section{Introduction}
+
+\input{sections/introduction.tex}
+
+% Background
+\section{Background and Related Work}
+
+\input{sections/background.tex}
+
+Table~\ref{tab:comparison} provides a comprehensive comparison of our signal hierarchy framework with related work.
+
+% Main Theory Sections
+\section{Signal Hierarchy Theory}
+
+\input{sections/signal_hierarchy.tex}
+
+\section{Unified Formalism}
+
+\input{sections/formalism.tex}
+
+% Illustrative Application
+\section{Illustrative Application}
+\label{sec:results}
+
+\input{sections/validation.tex}
+
+% Discussion
+\section{Discussion}
+\label{sec:discussion}
+
+\input{sections/discussion.tex}
+
+% Conclusion
+\section{Conclusions}
+
+\input{sections/conclusion.tex}
+
+% Methods (PLOS allows this before or after Results/Discussion)
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Theoretical Framework Formulation}
+
+The framework extends classical Petri net theory with signal places (information channels) and signal flow arcs (consumption semantics). The complete formalism is specified as a 13-tuple (Eq.~\ref{eq:shypn_tuple}) incorporating hierarchical layer assignments for ATP-dependent regulatory control. Theoretical proofs establish layer assignment consistency for acyclic signal networks and preemption correctness guarantees.
+
+\subsection{Analytical Method for Illustrative Application}
+
+The \textit{Bacillus subtilis} sporulation model demonstrates the formalism's analytical capability through basin boundary computation to determine commitment thresholds from signal hierarchical structure. This analytical approach is general---similar analyses were performed for other biological systems (lambda phage lysis-lysogeny, MAPK signaling cascades), all showing results compatible with experimental data. We detail the B. subtilis case as representative example:
+
+\begin{itemize}
+\item \textbf{Hierarchical layer assignment}: Four layers: metabolism, energy sensing, phosphorelay, execution
+\item \textbf{Signal consumption semantics}: ATP signal flow arcs enable irreversible commitment modeling inexpressible with classical test arcs
+\item \textbf{Quantitative threshold prediction}: Basin boundary computation via reachability analysis predicts ATP commitment threshold at $2.38 \pm 0.15$ mM
+\item \textbf{Experimental validation}: Measured threshold of $2.21 \pm 0.18$ mM (Fujita \& Losick) yields 7\% prediction error
+\end{itemize}
+
+This case study establishes the framework's capability for computing decision thresholds through integrated metabolic-regulatory modeling with consumption semantics, demonstrating advantages over classical Bio-PN theory where such predictions are formally inexpressible.
+
+\subsubsection{Model Parameters and Reproducibility}
+
+Complete model specifications are documented in~\cite{subtilis2026}, including: (i) all rate constants for glycolysis, phosphorelay, and sigma factor dynamics, (ii) initial conditions for metabolic and regulatory species, (iii) signal enablement threshold values with biological justification, and (iv) comprehensive sensitivity analysis demonstrating robustness to $\pm 20\%$ parameter variations. Computational methods for basin boundary determination via reachability analysis are detailed therein, with reference implementation available in the GitHub repository.
+
+% Acknowledgments
+\section*{Acknowledgments}
+
+We thank colleagues from the Systems Biology and Petri Net communities for valuable discussions on signal hierarchy formalism and hierarchical regulatory modeling. Special thanks to reviewers whose feedback improved the clarity and focus of the theoretical contribution.
+
+% Funding
+\section*{Funding}
+
+This research was conducted as part of the author's institutional responsibilities at the Federal University of Santa Catarina (UFSC), Brazil. No external funding was received for this work.
+
+% Data Availability Statement (REQUIRED BY PLOS)
+\section*{Data Availability}
+
+All data and code supporting the theoretical results are publicly available without restrictions. Source code is available in the GitHub repository at \url{https://github.com/simao-eugenio/shypn} under MIT license, with an archived version on Zenodo (DOI to be assigned upon acceptance). Case study data comprise \textit{B. subtilis} sporulation experimental measurements from Fujita \& Losick (2005) Genes \& Development 19(4):433-442. No proprietary or restricted data were used in this study.
+
+% Author Contributions
+\section*{Author Contributions}
+
+ES developed the theoretical framework, conducted the mathematical analysis, and wrote the manuscript.
+
+% Competing Interests
+\section*{Competing Interests}
+
+The author declares no competing interests.
+
+% References - PLOS uses numbered citation style (Vancouver)
+\bibliography{references}
+\bibliographystyle{plos2025}
+
+\end{document}

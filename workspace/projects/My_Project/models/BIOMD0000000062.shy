@@ -1,0 +1,963 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "source": "sbml_import",
+    "pathway_name": "Bhartiya2003_Tryptophan_operon",
+    "species_count": 4,
+    "reactions_count": 5,
+    "compartments": [
+      "compartment"
+    ],
+    "layout_type": "compartment_separated",
+    "has_boundary_species": true,
+    "boundary_species_count": 1,
+    "has_test_arcs": true,
+    "test_arcs_count": 3,
+    "model_type": "Biological Petri Net",
+    "original_file": "BIOMD0000000062.xml",
+    "requires_fit_to_page": true,
+    "sbml_pathway_data": {
+      "name": "BIOMD0000000062",
+      "organism": "Unknown",
+      "species_count": 4,
+      "reactions_count": 5,
+      "parameters": {
+        "Tomax": 100.0,
+        "Tex": 0.14,
+        "e_val": 0.9,
+        "f_val": 380.0,
+        "Ts_norm": 0.0,
+        "To_norm": 0.16416510318949346,
+        "Tt_norm": 0.16416510318949346,
+        "Enz_norm": 0.0,
+        "compartment": 1.0
+      },
+      "constants": [],
+      "compartments_enhanced": {
+        "compartment": {
+          "id": "compartment",
+          "name": "cell",
+          "size": 1.0
+        }
+      },
+      "events_count": 0,
+      "metadata": {
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "model_id": "Bhartiya2003_Tryptophan_operon",
+        "name": "Bhartiya2003_Tryptophan_operon",
+        "model_name": "Bhartiya2003_Tryptophan_operon",
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "notes": "<notes>\n  <body xmlns=\"http://www.w3.org/1999/xhtml\">\n    <p>\n      <a href=\"http://www.sbml.org/\">SBML</a>\n          level 2 code originaly generated for the JWS Online project by Jacky Snoep using      <a href=\"http://pysces.sourceforge.net/\">PySCeS</a>\n      <br/>\n          Run this model online at      <a href=\"http://jjj.biochem.sun.ac.za/\">http://jjj.biochem.sun.ac.za</a>\n      <br/>\n          To cite JWS Online please refer to: Olivier, B.G. and Snoep, J.L. (2004)      <a href=\"http://bio",
+        "assignment_rules": {
+          "count": 6,
+          "species_rules": [
+            {
+              "variable": "To",
+              "formula": "Tomax * Tex / (Tex * (1 + Ts / f_val) + e_val)"
+            },
+            {
+              "variable": "Tt",
+              "formula": "To + Ts"
+            }
+          ],
+          "parameter_rules": [
+            {
+              "variable": "Enz_norm",
+              "formula": "Enz / 1"
+            },
+            {
+              "variable": "Ts_norm",
+              "formula": "Ts / 82"
+            },
+            {
+              "variable": "Tt_norm",
+              "formula": "Tt / 82"
+            },
+            {
+              "variable": "To_norm",
+              "formula": "To / 82"
+            }
+          ],
+          "evaluated": [
+            "To",
+            "Ts_norm",
+            "Tt",
+            "To_norm",
+            "Tt_norm",
+            "Enz_norm"
+          ],
+          "unevaluated": []
+        },
+        "validation_issues": [
+          {
+            "severity": "warning",
+            "category": "assignment_rules",
+            "message": "Assignment rules on species detected (1 rules): Tt",
+            "suggestion": "\u26a0\ufe0f  STOCHASTIC SIMULATION RISK:\nAssignment rules on internal species are evaluated ONCE at t=0 but NOT\nre-evaluated during stochastic simulation. This causes species values to\nbecome stale, leading to:\n  \u2022 Incorrect reaction rates (uses outdated species values)\n  \u2022 Extreme propensities (>1e17) \u2192 simulation failure\n\nRECOMMENDATIONS:\n  \u2713 Use CONTINUOUS mode (re-evaluates formulas at each timestep)\n  \u2713 Use HYBRID mode (continuous for reactions using rule-defined species)\n  \u2717 Avoid STOCHASTIC mode (will likely fail)\n\nAffected species:\n  \u2022 Tt (internal species): To + Ts\n\nNOTE: Assignment rules on parameters or boundary species are acceptable."
+          },
+          {
+            "severity": "warning",
+            "category": "rule_dependencies",
+            "message": "Reactions reference rule-defined variables: Enzyme_synthesis\u2192Tt, tryptophan_synthesis\u2192Tt",
+            "suggestion": "Kinetic laws reference species defined by assignment rules. Rules are evaluated at t=0 but not updated during simulation, which may cause incorrect propensity calculations. Monitor for extreme propensity values during simulation."
+          }
+        ],
+        "user_choice_transition_type": "stochastic_with_reevaluation",
+        "layout_type": "compartment_separated",
+        "layout_note": "Compartments spatially separated: non-default on periphery, default in center. Use Swiss Palette \u2192 Force-Directed to refine layout."
+      }
+    },
+    "created": "2026-03-03T09:19:30.566428",
+    "object_counts": {
+      "places": 4,
+      "transitions": 5,
+      "arcs": 8,
+      "modules": 1
+    }
+  },
+  "view_state": {
+    "zoom": 1.0,
+    "pan_x": 0.0,
+    "pan_y": 0.0
+  },
+  "thermodynamic_settings": {
+    "ph": 7.0,
+    "temperature": 298.15,
+    "ionic_strength": 0.1,
+    "tolerance": 0.5,
+    "enable_validation": true,
+    "preset": "biochemical_standard"
+  },
+  "compound_mappings": {},
+  "places": [
+    {
+      "id": "P66",
+      "name": "Enz",
+      "label": "Anthranilate synthase",
+      "metadata": {
+        "species_id": "Enz",
+        "original_species_id": "Enz",
+        "concentration": 0.0,
+        "compartment": "compartment",
+        "data_source": "sbml_import",
+        "is_enzyme": true
+      },
+      "object_type": "place",
+      "x": 100.0,
+      "y": 300.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P67",
+      "name": "Ts",
+      "label": "Synthesized tryptophan",
+      "metadata": {
+        "species_id": "Ts",
+        "original_species_id": "Ts",
+        "concentration": 0.0,
+        "compartment": "compartment",
+        "data_source": "sbml_import",
+        "kegg_id": "C00806",
+        "db_id_source": "sbml_import",
+        "chebi_id": "CHEBI:27897"
+      },
+      "object_type": "place",
+      "x": 110.0,
+      "y": 310.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P68",
+      "name": "Total",
+      "label": "Total tryptophan",
+      "metadata": {
+        "species_id": "Tt",
+        "original_species_id": "Tt",
+        "concentration": 13.461538461538463,
+        "compartment": "compartment",
+        "data_source": "sbml_import",
+        "kegg_id": "C00806",
+        "db_id_source": "sbml_import",
+        "chebi_id": "CHEBI:27897",
+        "is_enzyme": true
+      },
+      "object_type": "place",
+      "x": 120.0,
+      "y": 320.0,
+      "radius": 40.0,
+      "marking": 13.0,
+      "tokens": 13.0,
+      "initial_marking": 13.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P69",
+      "name": "Exog_",
+      "label": "exog. Trp",
+      "metadata": {
+        "species_id": "To",
+        "original_species_id": "To",
+        "concentration": 13.461538461538463,
+        "compartment": "compartment",
+        "data_source": "sbml_import"
+      },
+      "object_type": "place",
+      "x": 130.0,
+      "y": 330.0,
+      "radius": 40.0,
+      "marking": 13.0,
+      "tokens": 13.0,
+      "initial_marking": 13.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "quorum",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T35",
+      "name": "ASS",
+      "label": "\u21cc Anthranilate synthase synthesis",
+      "metadata": {
+        "reaction_id": "Enzyme_synthesis",
+        "reversible": true,
+        "data_source": "sbml_import",
+        "kinetic_formula": "compartment * k1 * ki1^nH * Ot / (ki1^nH + Tt^nH)",
+        "kinetic_parameters": {
+          "k1": 65.0,
+          "ki1": 3.53,
+          "nH": 1.92,
+          "Ot": 0.0033
+        },
+        "kinetic_type": "custom"
+      },
+      "object_type": "transition",
+      "x": 100.0,
+      "y": 200.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "compartment * k1 * ki1**nH * Ot / (ki1**nH + Total**nH)",
+        "sbml_formula": "compartment * k1 * ki1^nH * Ot / (ki1^nH + Tt^nH)",
+        "needs_enrichment": true,
+        "enrichment_reason": "SBML formula (type: custom)",
+        "rate_function_display": "compartment * k1 * ki1^nH * Ot / (ki1^nH + Tt^nH)",
+        "species_map": {
+          "Enz": "Enz",
+          "Ts": "Ts",
+          "Tt": "Total",
+          "To": "Exog_"
+        },
+        "is_reversible": true,
+        "reversible_note": "SBML reversible reaction - formula represents net rate (forward - reverse). Negative rates indicate reverse flow. Use properties dialog to split into separate rate_forward/rate_reverse if needed.",
+        "thermodynamic_validation": {
+          "status": "insufficient_data",
+          "message": "Could not map species to KEGG compounds",
+          "reactants_mapped": 0,
+          "products_mapped": 1
+        }
+      },
+      "is_environment_aware": false,
+      "module_id": "M1",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "sbml",
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "timestamp": "2026-03-03T09:19:30.418964",
+        "confidence": "definitive",
+        "confidence_score": 1.0,
+        "rate_type": "custom",
+        "formula": "compartment * k1 * ki1^nH * Ot / (ki1^nH + Tt^nH)",
+        "parameters": {
+          "Tomax": 100.0,
+          "Tex": 0.14,
+          "e_val": 0.9,
+          "f_val": 380.0,
+          "Ts_norm": 0.0,
+          "To_norm": 0.16416510318949346,
+          "Tt_norm": 0.16416510318949346,
+          "Enz_norm": 0.0,
+          "compartment": 1.0,
+          "k1": 65.0,
+          "ki1": 3.53,
+          "nH": 1.92,
+          "Ot": 0.0033
+        },
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": true,
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "sbml_reaction_id": "Enzyme_synthesis",
+        "sbml_model_id": "Bhartiya2003_Tryptophan_operon"
+      }
+    },
+    {
+      "id": "T36",
+      "name": "Enzyme",
+      "label": "\u21cc Enzyme dilution due to cell growth",
+      "metadata": {
+        "reaction_id": "Enzyme_dilution",
+        "reversible": true,
+        "data_source": "sbml_import",
+        "kinetic_formula": "compartment * mu * Enz",
+        "kinetic_parameters": {
+          "mu": 0.01
+        },
+        "kinetic_type": "mass_action"
+      },
+      "object_type": "transition",
+      "x": 110.0,
+      "y": 210.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "compartment * mu * Enz",
+        "rate_function_display": "compartment * mu * Enz",
+        "species_map": {
+          "Enz": "Enz",
+          "Ts": "Ts",
+          "Tt": "Total",
+          "To": "Exog_"
+        },
+        "is_reversible": true,
+        "reversible_note": "SBML reversible reaction - formula represents net rate (forward - reverse). Negative rates indicate reverse flow. Use properties dialog to split into separate rate_forward/rate_reverse if needed.",
+        "thermodynamic_validation": {
+          "status": "insufficient_data",
+          "message": "Could not map species to KEGG compounds",
+          "reactants_mapped": 1,
+          "products_mapped": 0
+        }
+      },
+      "is_environment_aware": false,
+      "module_id": "M1",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "sbml",
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "timestamp": "2026-03-03T09:19:30.548316",
+        "confidence": "definitive",
+        "confidence_score": 1.0,
+        "rate_type": "mass_action",
+        "formula": "compartment * mu * Enz",
+        "parameters": {
+          "Tomax": 100.0,
+          "Tex": 0.14,
+          "e_val": 0.9,
+          "f_val": 380.0,
+          "Ts_norm": 0.0,
+          "To_norm": 0.16416510318949346,
+          "Tt_norm": 0.16416510318949346,
+          "Enz_norm": 0.0,
+          "compartment": 1.0,
+          "mu": 0.01
+        },
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": true,
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "sbml_reaction_id": "Enzyme_dilution",
+        "sbml_model_id": "Bhartiya2003_Tryptophan_operon"
+      }
+    },
+    {
+      "id": "T37",
+      "name": "TS",
+      "label": "\u21cc Tryptophan synthesis",
+      "metadata": {
+        "reaction_id": "tryptophan_synthesis",
+        "reversible": true,
+        "data_source": "sbml_import",
+        "kinetic_formula": "compartment * k2 * Enz * Ki2 / (Ki2 + Tt)",
+        "kinetic_parameters": {
+          "k2": 25.0,
+          "Ki2": 810.0
+        },
+        "kinetic_type": "custom"
+      },
+      "object_type": "transition",
+      "x": 120.0,
+      "y": 220.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "compartment * k2 * Enz * Ki2 / (Ki2 + Total)",
+        "sbml_formula": "compartment * k2 * Enz * Ki2 / (Ki2 + Tt)",
+        "needs_enrichment": true,
+        "enrichment_reason": "SBML formula (type: custom)",
+        "rate_function_display": "compartment * k2 * Enz * Ki2 / (Ki2 + Tt)",
+        "species_map": {
+          "Enz": "Enz",
+          "Ts": "Ts",
+          "Tt": "Total",
+          "To": "Exog_"
+        },
+        "is_reversible": true,
+        "reversible_note": "SBML reversible reaction - formula represents net rate (forward - reverse). Negative rates indicate reverse flow. Use properties dialog to split into separate rate_forward/rate_reverse if needed.",
+        "thermodynamic_validation": {
+          "status": "insufficient_data",
+          "message": "Could not map species to KEGG compounds",
+          "reactants_mapped": 0,
+          "products_mapped": 1
+        }
+      },
+      "is_environment_aware": false,
+      "module_id": "M1",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "sbml",
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "timestamp": "2026-03-03T09:19:30.548417",
+        "confidence": "definitive",
+        "confidence_score": 1.0,
+        "rate_type": "custom",
+        "formula": "compartment * k2 * Enz * Ki2 / (Ki2 + Tt)",
+        "parameters": {
+          "Tomax": 100.0,
+          "Tex": 0.14,
+          "e_val": 0.9,
+          "f_val": 380.0,
+          "Ts_norm": 0.0,
+          "To_norm": 0.16416510318949346,
+          "Tt_norm": 0.16416510318949346,
+          "Enz_norm": 0.0,
+          "compartment": 1.0,
+          "k2": 25.0,
+          "Ki2": 810.0
+        },
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": true,
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "sbml_reaction_id": "tryptophan_synthesis",
+        "sbml_model_id": "Bhartiya2003_Tryptophan_operon"
+      }
+    },
+    {
+      "id": "T38",
+      "name": "Tryptophan",
+      "label": "\u21cc Tryptophan consumption for protein synthesis",
+      "metadata": {
+        "reaction_id": "tryptophan_consumption",
+        "reversible": true,
+        "data_source": "sbml_import",
+        "kinetic_formula": "compartment * g * Ts / (Kg + Ts)",
+        "kinetic_parameters": {
+          "g": 25.0,
+          "Kg": 0.2
+        },
+        "kinetic_type": "custom"
+      },
+      "object_type": "transition",
+      "x": 130.0,
+      "y": 230.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "compartment * g * Ts / (Kg + Ts)",
+        "sbml_formula": "compartment * g * Ts / (Kg + Ts)",
+        "needs_enrichment": true,
+        "enrichment_reason": "SBML formula (type: custom)",
+        "rate_function_display": "compartment * g * Ts / (Kg + Ts)",
+        "species_map": {
+          "Enz": "Enz",
+          "Ts": "Ts",
+          "Tt": "Total",
+          "To": "Exog_"
+        },
+        "is_reversible": true,
+        "reversible_note": "SBML reversible reaction - formula represents net rate (forward - reverse). Negative rates indicate reverse flow. Use properties dialog to split into separate rate_forward/rate_reverse if needed.",
+        "thermodynamic_validation": {
+          "status": "insufficient_data",
+          "message": "Could not map species to KEGG compounds",
+          "reactants_mapped": 1,
+          "products_mapped": 0
+        }
+      },
+      "is_environment_aware": false,
+      "module_id": "M1",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "sbml",
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "timestamp": "2026-03-03T09:19:30.548486",
+        "confidence": "definitive",
+        "confidence_score": 1.0,
+        "rate_type": "custom",
+        "formula": "compartment * g * Ts / (Kg + Ts)",
+        "parameters": {
+          "Tomax": 100.0,
+          "Tex": 0.14,
+          "e_val": 0.9,
+          "f_val": 380.0,
+          "Ts_norm": 0.0,
+          "To_norm": 0.16416510318949346,
+          "Tt_norm": 0.16416510318949346,
+          "Enz_norm": 0.0,
+          "compartment": 1.0,
+          "g": 25.0,
+          "Kg": 0.2
+        },
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": true,
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "sbml_reaction_id": "tryptophan_consumption",
+        "sbml_model_id": "Bhartiya2003_Tryptophan_operon"
+      }
+    },
+    {
+      "id": "T39",
+      "name": "Tryptophan",
+      "label": "\u21cc Tryptophan dilution due to cell growth",
+      "metadata": {
+        "reaction_id": "tryptophan_dilution",
+        "reversible": true,
+        "data_source": "sbml_import",
+        "kinetic_formula": "compartment * mu * Ts",
+        "kinetic_parameters": {
+          "mu": 0.01
+        },
+        "kinetic_type": "mass_action"
+      },
+      "object_type": "transition",
+      "x": 140.0,
+      "y": 240.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "compartment * mu * Ts",
+        "rate_function_display": "compartment * mu * Ts",
+        "species_map": {
+          "Enz": "Enz",
+          "Ts": "Ts",
+          "Tt": "Total",
+          "To": "Exog_"
+        },
+        "is_reversible": true,
+        "reversible_note": "SBML reversible reaction - formula represents net rate (forward - reverse). Negative rates indicate reverse flow. Use properties dialog to split into separate rate_forward/rate_reverse if needed.",
+        "thermodynamic_validation": {
+          "status": "insufficient_data",
+          "message": "Could not map species to KEGG compounds",
+          "reactants_mapped": 1,
+          "products_mapped": 0
+        }
+      },
+      "is_environment_aware": false,
+      "module_id": "M1",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "sbml",
+        "source_file": "/tmp/BIOMD0000000062.xml",
+        "timestamp": "2026-03-03T09:19:30.548542",
+        "confidence": "definitive",
+        "confidence_score": 1.0,
+        "rate_type": "mass_action",
+        "formula": "compartment * mu * Ts",
+        "parameters": {
+          "Tomax": 100.0,
+          "Tex": 0.14,
+          "e_val": 0.9,
+          "f_val": 380.0,
+          "Ts_norm": 0.0,
+          "To_norm": 0.16416510318949346,
+          "Tt_norm": 0.16416510318949346,
+          "Enz_norm": 0.0,
+          "compartment": 1.0,
+          "mu": 0.01
+        },
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": true,
+        "sbml_level": 2,
+        "sbml_version": 4,
+        "sbml_reaction_id": "tryptophan_dilution",
+        "sbml_model_id": "Bhartiya2003_Tryptophan_operon"
+      }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A113",
+      "name": "A113",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T35",
+      "source_type": "transition",
+      "target_id": "P66",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A114",
+      "name": "A114",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P66",
+      "source_type": "place",
+      "target_id": "T36",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A115",
+      "name": "A115",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T37",
+      "source_type": "transition",
+      "target_id": "P67",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A116",
+      "name": "A116",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P67",
+      "source_type": "place",
+      "target_id": "T38",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A117",
+      "name": "A117",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P67",
+      "source_type": "place",
+      "target_id": "T39",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A118",
+      "name": "TA118",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P68",
+      "source_type": "place",
+      "target_id": "T35",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A119",
+      "name": "TA119",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P66",
+      "source_type": "place",
+      "target_id": "T37",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A120",
+      "name": "TA120",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P68",
+      "source_type": "place",
+      "target_id": "T37",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "M1",
+      "name": "cell",
+      "compartment_id": "compartment",
+      "place_ids": [
+        "P67",
+        "P69",
+        "P68",
+        "P66"
+      ],
+      "transition_ids": [
+        "T35",
+        "T39",
+        "T38",
+        "T36",
+        "T37"
+      ],
+      "boundary_signal_ids": [],
+      "parent_module_id": null,
+      "child_module_ids": [],
+      "color": [
+        0.9,
+        0.9,
+        0.9
+      ],
+      "collapsed": false,
+      "description": "",
+      "properties": {}
+    }
+  ],
+  "events": []
+}

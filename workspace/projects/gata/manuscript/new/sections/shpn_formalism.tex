@@ -1,0 +1,166 @@
+% sections/shpn_formalism.tex
+% Final section: introduces Signal Hierarchical Petri Nets as a named formalism.
+% Absorbs background + model construction from the old draft.
+% No internal phase labels, model filenames, or run IDs.
+
+\subsection{Petri Nets as a Modelling Framework for Molecular Networks}
+
+Petri nets provide a natural formalism for modelling concurrent molecular
+processes. In the biological Petri net framework~\cite{heiner2008}, chemical
+species are represented as places holding real-valued tokens (concentrations),
+and chemical reactions are transitions that consume and produce tokens according
+to stoichiometry. Test arcs allow transitions to read a concentration without
+consuming it, modelling catalytic effects such as enzyme action. Standard Petri
+net semantics accommodate deterministic (continuous), stochastic (discrete), and
+hybrid interpretations within the same structural specification, making the
+formalism well-suited for models that must span multiple scales of organisation
+and copy number.
+
+\subsection{Signal Hierarchical Petri Nets}
+\label{sec:shpn_def}
+
+Signal Hierarchical Petri Nets (SHPN)~\cite{shypn2026} extend the standard
+biological Petri net with three additional constructs.
+
+\emph{Signal places} are information channels carrying regulatory content rather
+than material substance. Unlike ordinary places, signal places are not depleted
+by arc consumption: a signal can be read by multiple downstream transitions
+simultaneously, representing broadcast regulatory effects such as a transcription
+factor activating many target genes at once.
+
+\emph{Signal flow arcs} consume tokens from signal places during transition
+firing, providing a formal representation of signal consumption in commitment
+circuits. A signal flow arc from a signal place $s$ to transition $t$ means that
+$t$ can fire only while $s$ carries a marking above a threshold, and that firing
+reduces $s$ by the arc weight. This mechanism models the coupling between
+upstream signal state and downstream reaction availability that underlies
+commitment cascade preemption.
+
+\emph{Adaptive transitions} parameterise their firing rates as explicit functions
+of current place markings through user-defined kinetic expressions. Standard
+mass-action, Michaelis--Menten saturation, Hill-type cooperative terms, and
+pH-dependent inhibition constants are all expressible within the adaptive
+transition rate language. This kinetic flexibility is essential for representing
+saturable receptor binding, cooperative transcription factor interactions,
+energy-coupled phosphorylation, and the pH-Hill cross-inhibition mechanism
+(equation~\ref{eq:pHhill}) used in this work.
+
+The stochastic semantics of Signal Hierarchical Petri Nets follow a
+continuous-time Markov chain identical in structure to the Gillespie stochastic
+simulation algorithm~\cite{gillespie1977}: each transition fires at a rate
+proportional to its kinetic expression evaluated at the current marking, with
+the next firing event drawn from an exponential distribution and the firing
+transition selected proportionally to its rate weight. Molecular noise therefore
+emerges naturally from the simulation dynamics without requiring explicit noise
+injection. The framework is intrinsically hybrid: when copy numbers are large, the
+Markov chain approximates deterministic kinetics; when copy numbers are small, it
+enters the high-noise regime in which individual stochastic transitions produce
+proportionally large perturbations.
+
+\subsection{Model Architecture}
+\label{sec:model_arch}
+
+The GATA1/PU.1 commitment model consists of 28 places and 29 transitions,
+partitioned into six biological compartments: extracellular cytokines (EPO,
+GCSF); membrane receptors (EPO receptor and GCSF receptor, together with their
+bound, internalised, and recycling-pool forms); cytoplasmic and nuclear mRNA for
+both GATA1 and PU.1; cytoplasmic and nuclear protein for both factors;
+phosphorylated nuclear GATA1; and the energy currency species (ATP, ADP, GTP,
+GDP, inorganic phosphate). The model topology is illustrated in
+Fig.~\ref{fig:model}.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\linewidth]{fig_model_topology_v6}
+  \caption{\textbf{Signal Hierarchical Petri Net topology of the GATA1/PU.1
+  commitment model.} 28 places and 29 transitions spanning six biological
+  compartments. Filled circles are ordinary places; double circles are signal
+  places; boxes are adaptive transitions. Arc annotations show stoichiometric
+  weights; signal flow arcs are shown as dashed lines.}
+  \label{fig:model}
+\end{figure}
+
+Transitions represent cytokine receptor binding and unbinding, receptor
+internalisation and recycling, mRNA transcription, nuclear export, mRNA
+degradation, protein translation, nuclear import, protein degradation, GATA1
+phosphorylation, and ubiquitin-mediated PU.1 degradation. Energy metabolism is
+represented through ATP synthesis from ADP and inorganic phosphate, and GTP
+regeneration from GDP and inorganic phosphate, so that the energy species are
+dynamically coupled to the signalling network rather than held at fixed
+concentrations.
+
+The model implements two opposing regulatory arms. In the erythroid arm, bound
+EPO receptor promotes GATA1 transcription; the resulting GATA1 protein is
+exported, translated, imported into the nucleus, and phosphorylated by a kinase
+whose activity scales with EPO receptor occupancy. Phosphorylated nuclear GATA1
+then drives PU.1 ubiquitin-mediated degradation through a transition whose rate
+is proportional to the product of phosphorylated GATA1 abundance and nuclear PU.1
+abundance, representing GATA1-dependent recruitment of an E3 ubiquitin ligase to
+PU.1. In the myeloid arm, bound GCSF receptor promotes PU.1 transcription;
+nuclear PU.1 suppresses GATA1 transcription through a competitive inhibition term.
+These kinetic forms produce the double-negative feedback topology necessary and
+sufficient for bistability~\cite{huang2007}.
+
+Consistent with the established biology that uncommitted progenitors carry a
+slight GATA1 bias~\cite{cantor2002}, the GATA1 basal transcription rate is set
+33\% above the PU.1 rate (0.08 versus 0.06~mM/s). This asymmetry is a structural
+modelling assumption reflecting the observed GATA1-primed state of common myeloid
+progenitors; it is not a calibration artefact.
+
+\subsection{Kinetic Parameters and Calibration}
+\label{sec:calibration}
+
+Rate constants were derived from published measurements for EPO receptor binding
+kinetics~\cite{huang2007}, GATA1 and PU.1 transcription and degradation
+rates~\cite{chickarmane2009}, and receptor internalisation and recycling dynamics.
+Energy metabolism parameters were calibrated to maintain physiologically
+reasonable ATP and GTP steady states
+($\text{ATP}+\text{ADP} \approx 33\,\text{mM}$;
+$\text{GTP}+\text{GDP} \approx 17.73\,\text{mM}$), consistent with published measurements for
+erythroid progenitor cells. Cross-repression strengths and basal transcription
+rates were calibrated to produce, at population-scale conditions, a sharp
+commitment threshold near the EPO* values observed in bulk colony assays.
+
+\subsection{Single-Cell Copy Number Scaling}
+\label{sec:scaling}
+
+To access the stochastic regime corresponding to physiological single-cell copy
+numbers, the initial markings of all intracellular molecular species (mRNA,
+cytoplasmic and nuclear proteins, energy metabolites) were set to one-hundredth
+of their population-scale reference values. Extracellular cytokines and membrane
+receptor species were not scaled, preserving concentrations set by the bone
+marrow niche and actual receptor numbers per cell. At one-hundredth of standard
+conditions, the nuclear GATA1 place has an initial marking of approximately eight
+molecules, consistent with published estimates of master transcription factor
+copy numbers in haematopoietic progenitor cells~\cite{chang2008}.
+
+At these copy numbers, the Gillespie stochastic semantics of the framework
+simulate molecular events as discrete random occurrences. A single transcription
+event adds one molecule to a place containing eight, producing a relative
+fluctuation of twelve percent. This is the mechanistic origin of the high
+cell-to-cell fate variability described in the Results: the noise is not injected
+artificially but emerges from the discreteness of molecular events in the
+decision layer.
+
+Bimolecular transitions involving one intracellular species and one receptor
+species were treated with care: transition rates were expressed in terms of the
+scaled intracellular species abundance while receptor occupancy was computed from
+the unscaled receptor concentration, ensuring that receptor-coupled signalling
+was physiologically consistent rather than artificially attenuated.
+
+\subsection{Comparison with Deterministic Bistable Models}
+
+The GATA1/PU.1 mutual antagonism circuit belongs to the class of toggle-switch
+networks whose deterministic dynamics produce bistability through mutual repression
+and self-activation~\cite{huang2007}. In the deterministic limit---large copy
+numbers, negligible fluctuations---the present model recovers the same two-attractor
+structure described by Huang \etal~\cite{huang2007} and Chickarmane
+\etal~\cite{chickarmane2009}. The advance provided by the Signal Hierarchical
+Petri Net implementation is the ability to evaluate the same circuit across the
+full copy-number spectrum, from the molecular-count noise of a single progenitor
+to the near-deterministic dynamics of a bulk colony, within a single model
+specification. The layer decomposition revealed in the Results---and in particular
+the identification of the decision layer as the exclusive locus of stochastic
+fate specification---is an emergent finding of the stochastic analysis that is
+invisible to deterministic models. Signal Hierarchical Petri Nets provide the
+formalism that makes this analysis possible.

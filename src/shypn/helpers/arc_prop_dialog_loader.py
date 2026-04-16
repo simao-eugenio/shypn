@@ -230,6 +230,34 @@ class ArcPropDialogLoader(GObject.GObject):
         if target_info and hasattr(self.arc_obj, 'target'):
             target_name = getattr(self.arc_obj.target, 'name', 'Unknown')
             target_info.set_text(f'Target: {target_name}')
+        
+        # Populate Γ fields for signal flow arcs
+        gamma_frame = self.builder.get_object('gamma_frame')
+        if gamma_frame:
+            if is_signal_flow(self.arc_obj):
+                gamma_frame.set_visible(True)
+                k_entry = self.builder.get_object('gamma_k_entry')
+                n_entry = self.builder.get_object('gamma_n_entry')
+                eps_entry = self.builder.get_object('gamma_eps_entry')
+                theta_label = self.builder.get_object('gamma_theta_value')
+                if k_entry:
+                    k_entry.set_text(str(getattr(self.arc_obj, 'michaelis_K', 0.0)))
+                if n_entry:
+                    n_entry.set_text(str(getattr(self.arc_obj, 'hill_n', 1.0)))
+                if eps_entry:
+                    eps_entry.set_text(str(getattr(self.arc_obj, 'suppression_epsilon', 0.0)))
+                # Arrhenius fields
+                ea_entry = self.builder.get_object('gamma_ea_entry')
+                tref_entry = self.builder.get_object('gamma_tref_entry')
+                if ea_entry:
+                    ea_entry.set_text(str(getattr(self.arc_obj, 'activation_energy', 0.0)))
+                if tref_entry:
+                    tref_entry.set_text(str(getattr(self.arc_obj, 'reference_temperature', 298.15)))
+                if theta_label:
+                    theta_eff = getattr(self.arc_obj, 'theta_eff', 0.0)
+                    theta_label.set_text(f'{theta_eff:.4f}')
+            else:
+                gamma_frame.set_visible(False)
 
     def _format_threshold_for_display(self, threshold):
         """Format threshold value for display in UI TextView.
@@ -440,6 +468,43 @@ class ArcPropDialogLoader(GObject.GObject):
             start, end = buffer.get_bounds()
             threshold_text = buffer.get_text(start, end, True).strip()
             self.arc_obj.threshold = self._parse_threshold(threshold_text)
+    
+        # Γ parameters (signal flow arcs only)
+        if is_signal_flow(self.arc_obj) and hasattr(self.arc_obj, 'michaelis_K'):
+            k_entry = self.builder.get_object('gamma_k_entry')
+            n_entry = self.builder.get_object('gamma_n_entry')
+            eps_entry = self.builder.get_object('gamma_eps_entry')
+            if k_entry:
+                try:
+                    self.arc_obj.michaelis_K = max(0.0, float(k_entry.get_text().strip() or '0.0'))
+                except ValueError:
+                    pass
+            if n_entry:
+                try:
+                    val = float(n_entry.get_text().strip() or '1.0')
+                    self.arc_obj.hill_n = max(0.001, val)  # n must be positive
+                except ValueError:
+                    pass
+            if eps_entry:
+                try:
+                    val = float(eps_entry.get_text().strip() or '0.0')
+                    self.arc_obj.suppression_epsilon = max(0.0, min(val, 0.9999))  # ε ∈ [0, 1)
+                except ValueError:
+                    pass
+            # Arrhenius parameters
+            ea_entry = self.builder.get_object('gamma_ea_entry')
+            tref_entry = self.builder.get_object('gamma_tref_entry')
+            if ea_entry:
+                try:
+                    self.arc_obj.activation_energy = max(0.0, float(ea_entry.get_text().strip() or '0.0'))
+                except ValueError:
+                    pass
+            if tref_entry:
+                try:
+                    val = float(tref_entry.get_text().strip() or '298.15')
+                    self.arc_obj.reference_temperature = max(0.01, val)  # T must be positive
+                except ValueError:
+                    pass
     
     def _show_conversion_error(self, title, message):
         """Show error dialog for arc conversion failure.

@@ -1,0 +1,123 @@
+================================================================================
+arXiv SUBMISSION METADATA
+================================================================================
+
+TITLE:
+Hierarchical Preemption: A Novel Information-Theoretic Control Mechanism in Lambda Phage Decision-Making
+
+AUTHORS:
+Eugenio Simao
+Department of Computer Science
+Universidade Federal de Santa Catarina (UFSC)
+Ararangua, Santa Catarina, 88906-072, Brazil
+Email: eugenio.simao@ufsc.br
+
+ABSTRACT:
+Biological systems organize into hierarchies to manage complexity, yet the mechanisms governing hierarchical control remain incompletely understood. Using information theory and the Lambda phage lysis-lysogeny decision as a model system, we discover that hierarchical control operates through hierarchical preemption - higher layers collapse decision space rather than blocking lower-layer signals. Through mutual information (MI) analysis of 200 stochastic simulations, we demonstrate that the UV damage sensor (RecA) achieves 2.01x information advantage over environmental signals by preempting bistable outcomes into monostable attractors (98% lysogenic or 85% lytic). Conditional MI analysis reveals that the integrator signal (CII) carries lower information when RecA is absent (saturated, 0.06 bits) than when RecA is active (subsaturated, 0.38 bits). This saturation effect demonstrates that signals orchestrate compartment behaviors by removing decision space - achieving 85-98% outcome certainty while preserving 2-15% escape routes. These findings establish a quantitative framework for hierarchical information processing in cellular decision-making.
+
+PRIMARY CATEGORY:
+q-bio.MN (Molecular Networks)
+
+SECONDARY CATEGORIES:
+cs.IT (Information Theory)
+q-bio.QM (Quantitative Methods)
+
+COMMENTS:
+6 pages, 2 figures. Related to arXiv:2512.17106
+
+KEYWORDS:
+hierarchical control; information theory; mutual information; Lambda phage; lysis-lysogeny decision; signal integration; Stochastic Hybrid Petri nets; biological decision-making; systems biology
+
+MSC/ACM CLASSES (optional):
+92C42 (Systems biology, networks)
+94A17 (Measures of information, entropy)
+
+DOI (leave blank for initial submission):
+[Will be assigned by arXiv]
+
+RELATED WORK:
+Previous paper: "Weak Independence Theory" (arXiv:2512.17106)
+
+JOURNAL REFERENCE (leave blank for preprint):
+[None - initial submission]
+
+================================================================================
+FILES TO UPLOAD
+================================================================================
+
+REQUIRED FILES:
+1. hierarchical_preemption.tex (main LaTeX file)
+2. figure1_model_architecture.pdf
+3. figure2_attractor_landscapes.pdf
+
+OPTIONAL FILES (if requested by arXiv):
+- hierarchical_preemption.bbl (if bibliography issues arise)
+- Any additional style files if using custom packages
+
+================================================================================
+SUBMISSION CHECKLIST
+================================================================================
+
+Before submitting to arXiv:
+
+[ ] Verify all figures are embedded correctly in PDF
+[ ] Check that all references are properly formatted
+[ ] Ensure abstract is under 1920 characters (current: ~920 characters ✓)
+[ ] Confirm author email is correct
+[ ] Review compiled PDF one final time
+[ ] Prepare a brief cover letter explaining the work
+[ ] Link to previous preprint (arXiv:2512.17106) if relevant
+
+================================================================================
+SUGGESTED COVER LETTER FOR arXiv SUBMISSION
+================================================================================
+
+Dear arXiv Moderators,
+
+I am submitting a new preprint titled "Hierarchical Preemption: A Novel Information-Theoretic Control Mechanism in Lambda Phage Decision-Making" for consideration in the q-bio.MN category (with cross-listing to cs.IT and q-bio.QM).
+
+This work introduces a novel mechanism for hierarchical control in biological systems, discovered through information-theoretic analysis of the Lambda bacteriophage lysis-lysogeny decision. Using mutual information analysis of stochastic simulations, we demonstrate that hierarchical control operates through "decision space collapse" rather than signal blocking—a finding that challenges classical hierarchical control theory.
+
+This paper builds on our previous work on Weak Independence Theory (arXiv:2512.17106) and extends the framework to hierarchical signal integration using Stochastic Hybrid Petri nets implemented in our open-source software SHYpn (v2.5.2).
+
+The manuscript is 6 pages with 2 figures and has been prepared following standard academic formatting. All figures are original work.
+
+Best regards,
+Eugenio Simao
+Universidade Federal de Santa Catarina
+
+================================================================================
+SUBMISSION INSTRUCTIONS
+================================================================================
+
+1. Go to: https://arxiv.org/submit
+2. Log in with your arXiv account (or create one)
+3. Click "Start New Submission"
+4. Upload files:
+   - Main file: hierarchical_preemption.tex
+   - Ancillary files: figure1_model_architecture.pdf, figure2_attractor_landscapes.pdf
+5. Fill in metadata using information above
+6. Select primary category: q-bio.MN
+7. Add secondary categories: cs.IT, q-bio.QM
+8. Preview the compiled PDF
+9. Submit for moderation
+
+EXPECTED TIMELINE:
+- Submission processing: 1-2 business days
+- Announcement: Next scheduled arXiv announcement (daily at 8pm ET)
+- arXiv ID format: arXiv:YYMM.NNNNN
+
+================================================================================
+POST-SUBMISSION ACTIONS
+================================================================================
+
+After arXiv acceptance:
+1. Update your CV with the arXiv reference
+2. Share on social media/ResearchGate/academic networks
+3. Send to colleagues for feedback
+4. Wait 1-2 weeks for community response
+5. Incorporate any critical feedback
+6. Prepare journal submission (suggested targets: Nature Communications,
+   PLOS Computational Biology, Cell Systems, Bioinformatics)
+
+================================================================================

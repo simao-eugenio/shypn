@@ -1,0 +1,193 @@
+% Signal Hierarchy Theory
+
+\subsection{Motivation and Intuition}
+
+Cellular regulation exhibits hierarchical organization where higher-layer signals control lower-layer processes through information channels with consumption semantics. Existing Bio-PN formalisms separate metabolic mass transfer (normal arcs) from regulatory catalysis (test arcs), but cannot model regulatory consumption---the depletion of regulatory molecules during decision-making that ensures commitment finality. This limitation prevents unified modeling where metabolic state (e.g., ATP concentration) functions simultaneously as metabolite and hierarchical control signal. Consider lambda phage lysis-lysogeny decision:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\textbf{L2:} & UV $\to$ CI/Cro decision \\
+\textbf{L1:} & CI/Cro $\to$ commitment \\
+\textbf{L0:} & Gene expression
+\end{tabular}
+\end{center}
+
+\vspace{3pt}
+\noindent Critical distinction: UV signal is \textit{consumed} during decision-making. This differs from catalytic test arcs (non-consuming enzyme reads). Signal consumption enables hierarchical preemption---higher layers collapse decision spaces at lower layers.
+
+\subsection{Signal Places: Formal Definition}
+
+\begin{definition}[Signal Place]
+A place $p \in P$ is a \textit{signal place} ($p \in \Psi \subseteq P$) if:
+\textbf{(1) $p$ appears in rate function $\Phi(t)$ of some transition $t \in T$}--- \textbf{(2) $p$ is \textbf{not} connected to $t$ by normal arc}--- \textbf{(3) $p$ represents information channel, not mass transfer}---
+\end{definition}
+
+\vspace{3pt}
+\noindent We identify four signal types in biological systems:
+
+\vspace{3pt}
+\noindent\textbf{(1) \textbf{Energy signals}}---ATP, NADH, energy charge. Hierarchically regulate anabolic/catabolic flux. \textbf{(2) \textbf{Spatial signals}}---Compartment markers, membrane integrity, diffusion gradients. Control localization-dependent processes. \textbf{(3) \textbf{Quorum signals}}---Autoinducers, population density markers. Enable coordinated multicellular behavior. \textbf{(4) \textbf{Regulatory signals}}---Transcription factors, checkpoint proteins. Implement decision logic and pathway switching.
+
+\vspace{3pt}
+\noindent\textbf{Mathematical integration}: Rate functions extend to include signal dependencies:
+\[
+\Phi(t) = k_t \cdot f({}^\bullet t) \cdot g(\Sigma(t)) \cdot h(\Psi(t))
+\]
+where $f$ models substrate kinetics, $g$ models regulatory modulation, and $h$ models signal influence.
+
+\subsection{Signal Flow Arcs: Semantics}
+
+\begin{definition}[Signal Flow Arc]
+An arc $a \in F$ has type \textit{signal\_flow} if:
+\textbf{Source or target is signal place ($p \in \Psi$)}--- \textbf{Consumes tokens during transition firing (unlike test arcs)}--- \textbf{Represents information transfer with depletion}---
+\end{definition}
+
+\vspace{3pt}
+\noindent\textbf{Execution semantics} (two-phase):
+
+\noindent\textbf{Phase 1 (Enabling)}---Check signal availability
+\[
+M(p_{\text{signal}}) \geq E(t, p_{\text{signal}})
+\]
+where $E: T \times \Psi \to \mathbb{R}_{\geq 0}$ defines enablement thresholds.
+
+\noindent\textbf{Phase 2 (Firing)}---Consume signal tokens
+\[
+M'(p_{\text{signal}}) = M(p_{\text{signal}}) - W(p_{\text{signal}}, t)
+\]
+where $W$ defines arc weight (consumption amount).
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=0.7, transform shape,
+  node distance=1.5cm,
+  place/.style={circle, draw=black, thick, minimum size=8mm},
+  signal/.style={regular polygon, regular polygon sides=6, draw=blue!70, thick, minimum size=8mm, fill=blue!10},
+  transition/.style={rectangle, draw=black, thick, minimum width=5mm, minimum height=10mm, fill=black},
+  arc/.style={->, thick},
+  signal_arc/.style={->, thick, blue!70, dashed}
+]
+
+% Layer 2 (Energy Sensing)
+\node[signal] (atp_signal) at (0.5, 4) {$ATP_s$};
+\node at (4, 4) {\small\textbf{Layer 2}};
+
+% Layer 1 (Decision)
+\node[transition] (anabolic) at (-1.5, 2.5) {};
+\node[left=1mm of anabolic] {\tiny Anabolic};
+\node[transition] (catabolic) at (1.5, 2.5) {};
+\node[right=1mm of catabolic] {\tiny Catabolic};
+\node at (4, 2.5) {\small\textbf{Layer 1}};
+
+% Layer 0 (Execution)
+\node[place] (biosyn) at (-1.5, 0.5) {$B$};
+\node[below=1mm of biosyn] {\tiny Biosynthesis};
+\node[place] (degr) at (1.5, 0.5) {$D$};
+\node[below=1mm of degr] {\tiny Degradation};
+\node at (4, 0.5) {\small\textbf{Layer 0}};
+
+% Metabolic layer (showing ATP as metabolite)
+\node[place] (glc) at (-3, 4) {$Glc$};
+\node[transition] (glyc) at (-1.5, 4) {};
+
+% Signal flow arcs (blue dashed)
+\draw[signal_arc] (atp_signal) -- node[midway, right, font=\tiny, yshift=-6pt] {$E=2.5$} (anabolic);
+
+% Normal arcs (black solid)
+\draw[arc] (anabolic) -- (biosyn);
+\draw[arc] (biosyn) -- (catabolic);
+\draw[arc] (catabolic) -- (degr);
+\draw[arc] (glc) -- (glyc);
+\draw[arc] (glyc) -- (atp_signal);
+\draw[arc] (biosyn) to[out=180, in=180] (glc);
+\draw[arc] (degr) -- (atp_signal);
+
+\end{tikzpicture}
+\caption{\textbf{Energy-gated metabolic switch (illustrative model).} ATP signal place ($ATP_s$, hexagon) serves dual role: receives tokens from glycolysis (glucose metabolism) and catabolic degradation (biomass breakdown), while controlling pathway selection via signal flow arc (blue dashed). High ATP ($\geq 2.5$ mM) enables anabolic biosynthesis through signal consumption; ATP depletion below threshold blocks anabolic transition, allowing constitutive catabolism to degrade biosynthesis products and regenerate ATP. Signal consumption enables hierarchical preemption---test arcs (non-consuming) cannot model exclusive pathway commitment. Layer assignment: Energy Sensing (Layer 2) $>$ Decision (Layer 1) $>$ Execution (Layer 0).}
+\label{fig:shypn_example}
+\end{figure}
+
+\vspace{3pt}
+\noindent\textbf{Contrast with test arcs}:
+
+\begin{table}[h]
+\caption{Test vs signal flow arcs}
+\centering
+\small
+\begin{tabular}{@{}p{0.35\columnwidth}p{0.28\columnwidth}p{0.28\columnwidth}@{}}
+\toprule
+\textbf{Property} & \textbf{Test Arc} & \textbf{Signal Flow Arc} \\
+\midrule
+Token consumption & Non-consuming & Consuming \\
+Biological semantics & Catalytic effect & Information transfer \\
+Primary use case & Enzyme catalysis & Signal consumption \\
+Hierarchical control & Cannot preempt & Enables preemption \\
+Decision modeling & Observation only & Exclusive pathways \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{3pt}
+\subsection{Hierarchical Layers}
+
+\begin{definition}[Hierarchical Layer Assignment]
+Function $L: \Psi \to \mathbb{N}$ assigns layer indices to signal places where:
+\[
+L(p_1) < L(p_2) \iff p_1 \text{ controls } p_2
+\]
+via signal flow paths $p_1 \to \cdots \to p_2$.
+\end{definition}
+
+\vspace{3pt}
+\noindent\textbf{Layer computation algorithm}: Given annotated signal places $\Psi$ and transitions $T$:
+
+\vspace{2pt}
+\noindent\textbf{(1)} Construct signal dependency graph $G = (\Psi, E)$ where edge $(p_i, p_j) \in E$ exists if signal $p_i$ controls (via enablement threshold or rate modulation) transitions producing/consuming signal $p_j$
+
+\vspace{2pt}
+\noindent\textbf{(2)} Verify acyclicity: If $G$ contains cycle, hierarchy undefined (feedback loops require fixpoint semantics---2\% of analyzed models)
+
+\vspace{2pt}
+\noindent\textbf{(3)} Topological sort: Order signal places by dependencies (Kahn's algorithm)
+
+\vspace{2pt}
+\noindent\textbf{(4)} Assign layers: $L(p) = $ longest path from $p$ to terminal signals. Terminal signals (sinks) receive layer 0
+
+\vspace{3pt}
+\noindent Complexity: $O(|\Psi| + |E|)$ linear in signal network size.
+
+\begin{theorem}[Layer Assignment Consistency]
+For acyclic signal dependency graph $G = (\Psi, E)$, the layer assignment $L: \Psi \to \mathbb{N}$ exists, is unique, and satisfies the hierarchical constraint: $\forall (p_i, p_j) \in E: L(p_i) > L(p_j)$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Acyclicity guarantees topological ordering exists. Longest-path construction ensures uniqueness: any signal $p$ receives layer equal to maximum layer of signals it controls plus one. Hierarchical constraint satisfied by construction since controlling signals receive strictly higher layers than controlled signals.
+\end{proof}
+
+\subsection{Hierarchical Preemption Mechanism}
+
+Execution order respects layer hierarchy:
+
+\noindent\textbf{(1) Priority ordering}---Higher layers (larger $L$) fire first
+
+\vspace{4pt}
+\noindent\textbf{(2) Signal consumption}---Consumption at layer $k$ blocks dependent transitions at layer $k-1$
+
+\vspace{4pt}
+\noindent\textbf{(3) Decision collapse}---Signal availability at higher layer preempts lower-layer alternatives
+
+\vspace{4pt}
+\begin{theorem}[Preemption Correctness]
+If transition $t$ at layer $k$ consumes signal $p_s$ enabling transition $t'$ at layer $k' < k$, then $t'$ cannot fire after $t$ fires and depletes $p_s$ below threshold $E(t', p_s)$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Transition $t'$ enabled requires $M(p_s) \geq E(t', p_s)$. If $t$ fires consuming $W(p_s, t)$ tokens, resulting marking $M'(p_s) = M(p_s) - W(p_s, t)$. If $M'(p_s) < E(t', p_s)$, then $t'$ disabled. This models hierarchical preemption: higher-layer signal consumption blocks lower-layer alternatives.
+\end{proof}
+
+\vspace{3pt}
+\noindent\textbf{Example}: In \textit{B. subtilis} sporulation (detailed in Section 5), ATP signal at layer 2 gates phosphorelay activation at layer 1. ATP depletion below threshold preempts sporulation pathway, activating competence alternative. Signal consumption formalizes energy-controlled developmental commitment.
+
+\vspace{3pt}
+\noindent This hierarchical preemption cannot be modeled with test arcs (non-consuming). Signal consumption is essential for decision finality. Figure~\ref{fig:shypn_example} illustrates this formalism through an energy-gated metabolic switch showing the interplay between signal places, signal flow arcs, and hierarchical layers.

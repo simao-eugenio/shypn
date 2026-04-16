@@ -1,0 +1,285 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-26T10:28:35.790571",
+    "object_counts": {
+      "places": 4,
+      "transitions": 2,
+      "arcs": 6
+    }
+  },
+  "view_state": {
+    "zoom": 1.819941808966489,
+    "pan_x": 92.30367858823536,
+    "pan_y": 107.36634879764708,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": false
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "Glucose",
+      "label": "Glc\n10",
+      "object_type": "place",
+      "x": 50.0,
+      "y": 100.0,
+      "radius": 30.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P2",
+      "name": "ATP",
+      "label": "ATP\n5",
+      "object_type": "place",
+      "x": 300.0,
+      "y": 200.0,
+      "radius": 30.0,
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P3",
+      "name": "G6P",
+      "label": "G6P\n0",
+      "object_type": "place",
+      "x": 300.0,
+      "y": 100.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P4",
+      "name": "F16BP",
+      "label": "F-1,6-BP\n0",
+      "object_type": "place",
+      "x": 550.0,
+      "y": 100.0,
+      "radius": 30.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "HK",
+      "label": "HK",
+      "object_type": "transition",
+      "x": 175.0,
+      "y": 100.0,
+      "width": 15.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "T2",
+      "name": "PFK",
+      "label": "PFK",
+      "object_type": "transition",
+      "x": 425.0,
+      "y": 100.0,
+      "width": 15.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "A6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "inhibitor",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

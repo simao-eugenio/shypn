@@ -1,0 +1,310 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2026-01-29T14:51:13.656178",
+    "source": "manual",
+    "model_type": "Petri Net",
+    "object_counts": {
+      "places": 5,
+      "transitions": 1,
+      "arcs": 5,
+      "modules": 0
+    }
+  },
+  "view_state": {
+    "zoom": 1.9800000000000022,
+    "pan_x": 104.80817613278288,
+    "pan_y": -4.899233860130238,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": true
+      }
+    }
+  },
+  "thermodynamic_settings": {
+    "ph": 7.0,
+    "temperature": 298.15,
+    "ionic_strength": 0.1,
+    "tolerance": 0.5,
+    "enable_validation": true,
+    "preset": "biochemical_standard"
+  },
+  "compound_mappings": {},
+  "places": [
+    {
+      "id": "P1",
+      "name": "F6P",
+      "label": "F6P\\n2.0 mM",
+      "metadata": {
+        "kegg_id": "C00085",
+        "chebi_id": "CHEBI:15946",
+        "compound_name": "Fructose-6-phosphate"
+      },
+      "object_type": "place",
+      "x": 150.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 2.0,
+      "initial_marking": 2.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P2",
+      "name": "ATP",
+      "label": "ATP\\n4.0 mM\\n[SIGNAL]",
+      "metadata": {
+        "kegg_id": "C00002",
+        "chebi_id": "CHEBI:15422",
+        "compound_name": "ATP",
+        "is_signal_place": true
+      },
+      "object_type": "place",
+      "x": 150.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 4.0,
+      "initial_marking": 4.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P3",
+      "name": "F16BP",
+      "label": "F16BP\\n0.1 mM",
+      "metadata": {
+        "kegg_id": "C00354",
+        "chebi_id": "CHEBI:16905",
+        "compound_name": "Fructose-1,6-bisphosphate"
+      },
+      "object_type": "place",
+      "x": 450.0,
+      "y": 150.0,
+      "radius": 30.0,
+      "marking": 0.1,
+      "initial_marking": 0.1,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P4",
+      "name": "ADP",
+      "label": "ADP\\n1.0 mM\\n[SIGNAL]",
+      "metadata": {
+        "kegg_id": "C00008",
+        "chebi_id": "CHEBI:16761",
+        "compound_name": "ADP",
+        "is_signal_place": true
+      },
+      "object_type": "place",
+      "x": 450.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 1.0,
+      "initial_marking": 1.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    },
+    {
+      "id": "P5",
+      "name": "PFK_enzyme",
+      "label": "PFK\\n0.05 mM",
+      "metadata": {
+        "compound_name": "Phosphofructokinase",
+        "is_catalyst": true
+      },
+      "object_type": "place",
+      "x": 300.0,
+      "y": 100.0,
+      "radius": 25.0,
+      "marking": 0.05,
+      "initial_marking": 0.05,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true,
+      "is_signal_place": false,
+      "is_compartment_place": false,
+      "is_regulatory_place": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "PFK_reaction",
+      "label": "PFK",
+      "object_type": "transition",
+      "x": 300.0,
+      "y": 200.0,
+      "width": 50.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0,
+      "rate_function": "50.0 * PFK_enzyme * (F6P / (0.1 + F6P)) * (ATP / (0.05 + ATP)) / (1.0 + pow(ATP / 2.5, 4))"
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "A5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    }
+  ],
+  "modules": []
+}

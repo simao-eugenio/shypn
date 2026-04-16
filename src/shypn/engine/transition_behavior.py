@@ -402,6 +402,38 @@ class TransitionBehavior(ABC):
                 f"Model.places must be dict or list, got {type(places_collection)}"
             )
     
+    def _get_model_temperature(self) -> float:
+        """Get current temperature from model's thermodynamic settings.
+        
+        Priority:
+            1. model.thermodynamic_settings['temperature'] (Kelvin)
+            2. Default: 298.15 K (25°C)
+        
+        Returns:
+            float: Temperature in Kelvin
+        """
+        settings = getattr(self.model, 'thermodynamic_settings', None)
+        if settings and isinstance(settings, dict):
+            return float(settings.get('temperature', 298.15))
+        return 298.15
+    
+    def _get_theta_eff(self, arc) -> float:
+        """Get effective basin boundary θ_eff for an arc.
+        
+        Uses temperature-dependent θ_eff(T) via Arrhenius when the arc
+        has activation_energy > 0. Falls back to static θ_eff otherwise.
+        
+        Args:
+            arc: Arc object (may or may not be a SignalFlowArc)
+        
+        Returns:
+            float: θ_eff value (0.0 for non-signal-flow arcs)
+        """
+        theta_eff_at = getattr(arc, 'theta_eff_at', None)
+        if theta_eff_at is not None and getattr(arc, 'activation_energy', 0.0) != 0.0:
+            return theta_eff_at(self._get_model_temperature())
+        return getattr(arc, 'theta_eff', 0)
+    
     def _get_arc(self, arc_id: Any) -> Any:
         """Get arc object by ID.
         

@@ -1,0 +1,84 @@
+{
+  "version": "1.0",
+  "model": {},
+  "metadata": {
+    "basic": {
+      "model_name": "GATA1/PU.1 Phase 3A: Spatial & Volume-Adaptive Model",
+      "model_id": "gata_pu1_phase3a_spatial",
+      "version": "3.0",
+      "description": "Enhanced GATA1/PU.1 model with spatial gradients, compartment volumes, and adaptive transitions for Phase 3A experiments. Demonstrates position-dependent commitment and volume-based stochastic switching.",
+      "keywords": [
+        "hematopoiesis",
+        "lineage commitment",
+        "bistability",
+        "spatial gradient",
+        "volume-adaptive",
+        "GATA1",
+        "PU.1",
+        "EPO",
+        "GCSF",
+        "bone marrow niche"
+      ]
+    },
+    "authorship": {
+      "primary_author": "Simão Eugénio",
+      "contributors": [],
+      "institution": "",
+      "department": "",
+      "contact_email": ""
+    },
+    "biological_context": {
+      "organism": "Mus musculus",
+      "biological_system": "Hematopoietic stem cell differentiation",
+      "pathway_name": "GATA1/PU.1 mutual antagonism network",
+      "cell_type": "Multipotent progenitor (MPP)"
+    },
+    "provenance": {
+      "import_source": "Extended from phase2a_core_enhanced.shy",
+      "original_model_id": "gata_pu1_phase2a",
+      "import_date": "2026-02-17T00:00:00",
+      "modification_history": [
+        {
+          "date": "2026-02-17",
+          "description": "Added Phase 3A spatial features: EPO/GCSF gradients, compartment volumes, adaptive transcription transitions",
+          "changes": [
+            "EPO_external: Added diffusion (100 μm²/s), gradient (1 µM/µm x-axis), volume (10 fL)",
+            "GCSF_external: Added diffusion (100 μm²/s), gradient (1 µM/µm y-axis), volume (10 fL)",
+            "Nuclear places: Set volume to 0.5 fL (stochastic regime)",
+            "Cytoplasmic places: Set volume to 4.5 fL (continuous regime)",
+            "GATA1_transcription: Changed to adaptive (threshold 1.0 fL, filter inputs_only)",
+            "PU1_transcription: Changed to adaptive (threshold 1.0 fL, filter inputs_only)"
+          ]
+        }
+      ]
+    },
+    "references": {
+      "publications": [
+        {
+          "title": "Transcriptional regulation of erythropoiesis",
+          "authors": "Cantor AB, Orkin SH",
+          "journal": "Cell",
+          "year": 2002
+        },
+        {
+          "title": "Bifurcation dynamics in lineage commitment",
+          "authors": "Huang S, et al.",
+          "journal": "Dev Cell",
+          "year": 2007
+        }
+      ],
+      "related_models": [
+        "phase1_minimal_bistable.shy",
+        "phase2a_core_enhanced.shy"
+      ],
+      "external_resources": [
+        "PHASE3_SPATIAL_THERMODYNAMIC_PLAN.md",
+        "PHASE3_QUICK_REFERENCE.md"
+      ]
+    },
+    "system": {
+      "created_date": "2026-02-17T10:06:00",
+      "last_modified": "2026-02-17T10:30:00"
+    }
+  }
+}

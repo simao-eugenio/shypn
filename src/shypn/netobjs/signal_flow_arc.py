@@ -105,6 +105,23 @@ class SignalFlowArc(Arc):
         """
         super().__init__(source, target, id, name, weight)
 
+        # Thermodynamic constraint tuple Γ = (K, n, ε)
+        # Per-arc enzyme kinetics parameters from which θ_eff emerges:
+        #   K  = Michaelis constant (mM)            — measurable from enzyme assay
+        #   n  = Hill coefficient (dimensionless)    — measurable from dose-response
+        #   ε  = rate suppression threshold [0, 1)   — operational definition
+        # Default ε = 0 ⇒ θ_eff = 0, reproducing pre-Γ behavior exactly.
+        self.michaelis_K: float = 0.0
+        self.hill_n: float = 1.0
+        self.suppression_epsilon: float = 0.0
+
+        # Arrhenius temperature dependence (Phase 5)
+        #   K(T) = K_ref · exp(−E_a/R · (1/T − 1/T_ref))
+        #   E_a = activation energy (kJ/mol), 0 ⇒ K is temperature-independent
+        #   T_ref = reference temperature (K) at which michaelis_K was measured
+        self.activation_energy: float = 0.0     # E_a in kJ/mol
+        self.reference_temperature: float = 298.15  # T_ref in Kelvin (25°C)
+
         # Enforce semantic color via ColorSchemaManager (light gray for signal flow)
         # The base Arc.__init__ already calls CSM, but we call it again after
         # the subclass is fully initialized so the isinstance check is reliable.
@@ -169,6 +186,90 @@ class SignalFlowArc(Arc):
                 raise  # Re-raise weight validation errors
             pass
     
+    # ── Thermodynamic constraint tuple Γ ──────────────────────────────
+
+    @property
+    def theta_eff(self) -> float:
+        """Effective basin boundary from thermodynamic constraint tuple Γ.
+
+        Computed from enzyme kinetics parameters (K, n, ε):
+            θ_eff = K · (ε / (1 − ε))^(1/n)
+
+        When ε = 0 (default), θ_eff = 0 — reproducing legacy behavior
+        where the enablement check is simply M(ps) ≥ Ws.
+
+        When ε ∈ (0, 1), θ_eff > 0 — the transition requires
+        M(ps) ≥ θ_eff + Ws, keeping θ_eff tokens as a basin floor.
+
+        This is the static version using K at reference temperature.
+        For temperature-dependent θ_eff, use theta_eff_at(T).
+
+        Returns:
+            float: Effective threshold in same units as marking (e.g. mM)
+        """
+        eps = self.suppression_epsilon
+        if eps <= 0.0 or eps >= 1.0:
+            return 0.0
+        ratio = eps / (1.0 - eps)
+        return self.michaelis_K * (ratio ** (1.0 / self.hill_n))
+
+    def theta_eff_at(self, temperature: float) -> float:
+        """Temperature-dependent θ_eff via Arrhenius K(T).
+
+        K(T) = K_ref · exp(−E_a/R · (1/T − 1/T_ref))
+        θ_eff(T) = K(T) · (ε/(1−ε))^(1/n)
+
+        When activation_energy = 0 (default), K(T) = K_ref and this
+        returns the same value as the static theta_eff property.
+
+        Args:
+            temperature: Current temperature in Kelvin
+
+        Returns:
+            float: θ_eff at the given temperature
+        """
+        eps = self.suppression_epsilon
+        if eps <= 0.0 or eps >= 1.0:
+            return 0.0
+        if temperature <= 0:
+            return 0.0
+        K_T = self._arrhenius_K(temperature)
+        ratio = eps / (1.0 - eps)
+        return K_T * (ratio ** (1.0 / self.hill_n))
+
+    def _arrhenius_K(self, temperature: float) -> float:
+        """Compute K(T) via Arrhenius equation.
+
+        K(T) = K_ref · exp(−E_a/R · (1/T − 1/T_ref))
+
+        Args:
+            temperature: Current temperature in Kelvin
+
+        Returns:
+            float: Michaelis constant adjusted for temperature
+        """
+        import math
+        if self.activation_energy == 0.0 or temperature == self.reference_temperature:
+            return self.michaelis_K
+        R = 0.008314  # kJ/(mol·K)
+        exponent = -(self.activation_energy / R) * (
+            1.0 / temperature - 1.0 / self.reference_temperature
+        )
+        return self.michaelis_K * math.exp(exponent)
+
+    @property
+    def commitment_marking(self) -> float:
+        """Minimum marking for transition enablement: θ_eff + Ws.
+
+        Returns:
+            float: M_commit = θ_eff + Ws
+        """
+        try:
+            ws = float(self.weight)
+        except (TypeError, ValueError):
+            ws = 0.0
+        return self.theta_eff + ws
+
     def consumes_tokens(self) -> bool:
         """Check if arc consumes tokens from source place.
         
@@ -231,9 +332,46 @@ class SignalFlowArc(Arc):
         # Symmetric with test arcs which write consumes=False
         data['consumes'] = True
         data['produces'] = True
+        # Thermodynamic constraint tuple Γ = (K, n, ε)
+        # Only serialize when non-default to keep files clean for legacy models
+        if self.michaelis_K != 0.0 or self.hill_n != 1.0 or self.suppression_epsilon != 0.0:
+            data['michaelis_K'] = self.michaelis_K
+            data['hill_n'] = self.hill_n
+            data['suppression_epsilon'] = self.suppression_epsilon
+        # Arrhenius parameters (only when non-default)
+        if self.activation_energy != 0.0:
+            data['activation_energy'] = self.activation_energy
+        if self.reference_temperature != 298.15:
+            data['reference_temperature'] = self.reference_temperature
         return data
     
+    @classmethod
+    def from_dict(cls, data: dict, places: dict, transitions: dict) -> 'SignalFlowArc':
+        """Create signal flow arc from dictionary, restoring Γ parameters.
+
+        Delegates to Arc.from_dict() for base construction, then restores
+        the thermodynamic constraint tuple if present in the saved data.
+
+        Args:
+            data: Dictionary containing arc properties
+            places: Dictionary mapping place IDs to Place instances
+            transitions: Dictionary mapping transition IDs to Transition instances
+
+        Returns:
+            SignalFlowArc with restored Γ = (K, n, ε)
+        """
+        arc = super().from_dict(data, places, transitions)
+        # Restore Γ parameters (backward compatible — missing keys use defaults)
+        arc.michaelis_K = float(data.get('michaelis_K', 0.0))
+        arc.hill_n = float(data.get('hill_n', 1.0))
+        arc.suppression_epsilon = float(data.get('suppression_epsilon', 0.0))
+        arc.activation_energy = float(data.get('activation_energy', 0.0))
+        arc.reference_temperature = float(data.get('reference_temperature', 298.15))
+        return arc
+
     def __repr__(self) -> str:
         """String representation for debugging."""
+        theta = self.theta_eff
+        gamma_str = f", Γ=(K={self.michaelis_K}, n={self.hill_n}, ε={self.suppression_epsilon})" if theta > 0 else ""
         return (f"SignalFlowArc(id={self.id}, {self.source.name} → {self.target.name}, "
-                f"weight={self.weight}, information_transfer)")
+                f"weight={self.weight}{gamma_str}, information_transfer)")

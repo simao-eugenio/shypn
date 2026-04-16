@@ -1,0 +1,226 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2025-11-26T10:27:14.422293",
+    "object_counts": {
+      "places": 3,
+      "transitions": 2,
+      "arcs": 4
+    }
+  },
+  "view_state": {
+    "zoom": 2.0490403660952117,
+    "pan_x": 173.09336666666672,
+    "pan_y": 55.904633333333386,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": false
+      }
+    }
+  },
+  "places": [
+    {
+      "id": "P1",
+      "name": "S1",
+      "label": "S\u2081\n2",
+      "object_type": "place",
+      "x": 50.0,
+      "y": 50.0,
+      "radius": 30.0,
+      "marking": 2.0,
+      "initial_marking": 2.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P2",
+      "name": "S2",
+      "label": "S\u2082\n3",
+      "object_type": "place",
+      "x": 50.0,
+      "y": 250.0,
+      "radius": 30.0,
+      "marking": 3.0,
+      "initial_marking": 3.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    },
+    {
+      "id": "P3",
+      "name": "P",
+      "label": "P\n0",
+      "object_type": "place",
+      "x": 350.0,
+      "y": 150.0,
+      "radius": 35.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "t1",
+      "label": "t\u2081",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": 75.0,
+      "width": 15.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    },
+    {
+      "id": "T2",
+      "name": "t2",
+      "label": "t\u2082",
+      "object_type": "transition",
+      "x": 200.0,
+      "y": 225.0,
+      "width": 15.0,
+      "height": 40.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "rate": 1.0
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "A1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A2",
+      "name": "A2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "A3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A4",
+      "name": "A4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    }
+  ]
+}

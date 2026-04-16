@@ -1,0 +1,27 @@
+% Background and Related Work
+
+\subsection{Classical Petri Net Theory}
+
+Petri nets~\cite{petri1962} provide a mathematical formalism for modeling concurrent systems. A Petri net is a 5-tuple $\langle P, T, F, W, M_0 \rangle$ where $P$ is a set of places, $T$ is a set of transitions, $F \subseteq (P \times T) \cup (T \times P)$ defines arcs, $W: F \to \mathbb{N}^+$ assigns arc weights, and $M_0: P \to \mathbb{N}_0$ specifies initial marking.
+
+Murata's canonical survey~\cite{murata1989} establishes fundamental properties: \textbf{Reachability}---Set of markings reachable from $M_0$ via transition firings. \textbf{Boundedness}---Maximum token accumulation in any place. \textbf{Liveness}---Guarantees against deadlock. \textbf{Invariants}---Conservation laws (P-invariants) and structural properties (T-invariants).
+
+\subsection{Biological Petri Nets}
+
+Reddy \etal~\cite{reddy1993} pioneered Biological Petri nets (Bio-PNs) for metabolic pathway modeling, introducing continuous places representing molecular concentrations. Heiner \etal~\cite{heiner2008} provided comprehensive formalization with hybrid discrete/continuous semantics, stochastic extensions via Gillespie's algorithm~\cite{gillespie1977}, and validation frameworks. Koch \etal~\cite{koch2011} presented a systematic treatment of Petri net modeling for systems biology applications. Chaouiya~\cite{chaouiya2007} surveyed applications across metabolism, signal transduction, and gene regulation. Chaouiya \etal~\cite{chaouiya2006} developed qualitative Petri net modeling of genetic networks. Sim\~ao \etal~\cite{simao2005} demonstrated qualitative modeling of regulated metabolic pathways, applying Bio-PNs to tryptophan biosynthesis in \textit{E. coli}.
+
+Standard Bio-PN extensions include: \textbf{Continuous semantics}---Places represent concentrations ($\mathbb{R}_{\geq 0}$), transitions represent reactions with rate functions $\Phi(t)$. Dynamics follow ODEs: $\frac{dM(p)}{dt} = \sum_{t \in {}^\bullet p} \Phi(t) - \sum_{t \in p^\bullet} \Phi(t)$. \textbf{Stochastic semantics}---Discrete token counts with probabilistic firing via Gillespie's SSA~\cite{gillespie1977}. \textbf{Test arcs}---Enable transitions based on place marking without consuming tokens. Model catalysis and allosteric regulation. \textbf{Inhibitor arcs}---Disable transitions when place marking exceeds threshold. Model competitive inhibition. \textbf{Kinetic laws}---Rate functions encode mass-action, Michaelis-Menten, Hill cooperativity, and other enzymatic mechanisms.
+
+Despite these extensions, Bio-PNs lack formal semantics for hierarchical regulatory signals consumed during decision-making. Test arcs model catalysis (non-consuming reads) but cannot express regulatory consumption---regulatory molecules depleted to collapse decision spaces and ensure commitment finality. No existing framework provides hierarchical information channels with consumption semantics.
+
+\subsection{Recent Advances}
+
+Recent research addresses specific limitations but lacks unified treatment of concurrency and hierarchy:
+
+\noindent\textbf{Resource-constrained nets}---Genovese \etal~\cite{genovese2021} introduce ``nets with mana'' modeling enzyme depletion during catalysis. Addresses resource constraints but lacks hierarchical layering or preemption mechanisms.
+
+\noindent\textbf{Stability analysis}---Blanchini \etal~\cite{blanchini2021} provide structural polyhedral stability conditions. Johnston \& Avram~\cite{johnston2025} develop boundary analysis with siphons. Both focus on qualitative properties rather than execution semantics.
+
+\noindent\textbf{Probabilistic methods}---Jia \etal~\cite{jia2025} formalize gene regulatory networks using categorical probability. Emphasizes stochastic structure without hierarchical organization.
+
+\noindent\textbf{Gap identification}: No existing framework addresses hierarchical information channels with consumption semantics distinct from catalytic test arcs. Regulatory consumption---regulatory molecules consumed during decision-making---is fundamental to cellular commitment mechanisms but lacks formal Bio-PN representation. Our work fills this theoretical gap with signal hierarchy theory.
