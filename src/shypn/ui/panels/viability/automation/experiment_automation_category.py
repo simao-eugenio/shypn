@@ -691,7 +691,7 @@ class ExperimentAutomationCategory:
             self._show_error(
                 "No project open.\n"
                 "Remote sweep requires a project folder so results land\n"
-                "in <project>/experiments/results/."
+                "in &lt;project&gt;/experiments/results/."
             )
             return
 

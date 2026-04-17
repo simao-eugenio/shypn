@@ -101,12 +101,22 @@ class RemoteSweepDispatcher:
 
     All heavy I/O runs on a background thread.  GTK callbacks are
     delivered via ``GLib.idle_add`` by the caller (automation category).
+
+    Performance notes (WAN):
+        - A persistent SSH ControlMaster socket is opened once per
+          dispatch and reused for every subsequent SSH/SCP call,
+          avoiding repeated TCP + crypto handshakes.
+        - All SSH/SCP traffic is compressed (``-C``).
+        - Results are fetched via ``tar czf | tar xzf`` through the
+          multiplexed SSH tunnel instead of ``scp -r`` (single stream,
+          compressed, no per-file round-trips).
     """
 
     def __init__(self, settings: RemoteSweepSettings):
         self.settings = settings
         self._cancel = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._ctl_path: Optional[str] = None  # SSH ControlMaster socket
 
     @property
     def is_running(self) -> bool:
@@ -176,6 +186,9 @@ class RemoteSweepDispatcher:
             remote_repo = self.settings.remote_repo
             remote_venv = self.settings.remote_venv
             workers = self.settings.workers
+
+            # ── open persistent SSH connection ───────────────────────
+            self._open_control_master(host, password=ssh_password)
 
             # ── resolve project-relative path ────────────────────────
             # project_folder is absolute: .../workspace/projects/thesis
@@ -273,8 +286,8 @@ class RemoteSweepDispatcher:
             local_results_base.mkdir(parents=True, exist_ok=True)
             local_run_dir = local_results_base / run_name
 
-            self._scp_from(host, run_dir, str(local_run_dir),
-                           password=ssh_password)
+            self._fetch_results_tar(host, run_dir, str(local_run_dir),
+                                    password=ssh_password)
 
             # ── 5. Done ──────────────────────────────────────────────
             self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
@@ -290,6 +303,8 @@ class RemoteSweepDispatcher:
             if complete_cb:
                 complete_cb(False, '', str(e))
         finally:
+            # Close persistent SSH connection
+            self._close_control_master(host)
             # Clean up staging
             if staging and staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
@@ -308,11 +323,73 @@ class RemoteSweepDispatcher:
                 return parent
         return None
 
-    @staticmethod
-    def _ssh(host: str, cmd: str, *, password: Optional[str] = None) -> str:
-        """Run a command on the remote via SSH and return stdout (blocking)."""
-        argv = ['ssh', host, cmd]
+    # ── SSH ControlMaster multiplexing ───────────────────────────────
+    def _ctl_socket_args(self) -> list[str]:
+        """Return SSH args that attach to the persistent control socket."""
+        if self._ctl_path:
+            return ['-o', f'ControlPath={self._ctl_path}']
+        return []
+
+    def _open_control_master(self, host: str, *,
+                             password: Optional[str] = None):
+        """Open a persistent SSH connection (ControlMaster).
+
+        All subsequent _ssh / _scp_to / _ssh_stream calls will
+        multiplex over this single TCP connection, avoiding repeated
+        handshakes (huge win on high-latency WAN links).
+        """
+        ctl = tempfile.mktemp(prefix='shypn_ssh_', suffix='.sock',
+                              dir=tempfile.gettempdir())
+        argv = [
+            'ssh', '-C',
+            '-o', 'ControlMaster=yes',
+            '-o', f'ControlPath={ctl}',
+            '-o', 'ControlPersist=yes',
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
+            '-N',  # no remote command — just open the tunnel
+            host,
+        ]
         if password:
+            argv = ['sshpass', '-p', password] + argv
+        result = subprocess.run(
+            argv,
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            logger.warning("ControlMaster failed (%s), falling back to "
+                           "per-command connections", result.stderr.strip())
+            self._ctl_path = None
+            return
+        self._ctl_path = ctl
+        logger.info("SSH ControlMaster opened: %s", ctl)
+
+    def _close_control_master(self, host: str):
+        """Tear down the persistent SSH connection."""
+        if not self._ctl_path:
+            return
+        try:
+            subprocess.run(
+                ['ssh', '-O', 'exit',
+                 '-o', f'ControlPath={self._ctl_path}', host],
+                capture_output=True, text=True, timeout=10,
+            )
+        except Exception:
+            pass
+        # Remove stale socket file
+        try:
+            os.unlink(self._ctl_path)
+        except OSError:
+            pass
+        logger.info("SSH ControlMaster closed: %s", self._ctl_path)
+        self._ctl_path = None
+
+    # ── SSH / SCP wrappers (with multiplexing + compression) ─────────
+    def _ssh(self, host: str, cmd: str, *,
+             password: Optional[str] = None) -> str:
+        """Run a command on the remote via SSH and return stdout (blocking)."""
+        argv = ['ssh', '-C'] + self._ctl_socket_args() + [host, cmd]
+        if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
         result = subprocess.run(
             argv,
@@ -325,8 +402,8 @@ class RemoteSweepDispatcher:
                 f"  stderr: {result.stderr.strip()}")
         return result.stdout
 
-    @staticmethod
     def _ssh_stream(
+        self,
         host: str,
         cmd: str,
         *,
@@ -339,9 +416,10 @@ class RemoteSweepDispatcher:
         Each non-empty line from stdout is forwarded to *progress_cb*
         in real time.  Returns the full stdout when the process exits.
         """
-        argv = ['ssh', '-tt', host, cmd]
-        if password:
-            argv = ['sshpass', '-p', password, 'ssh', '-tt', host, cmd]
+        argv = ['ssh', '-C', '-tt'] + self._ctl_socket_args() + [host, cmd]
+        if password and not self._ctl_path:
+            argv = ['sshpass', '-p', password, 'ssh', '-C', '-tt'] + \
+                   self._ctl_socket_args() + [host, cmd]
         proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,
@@ -374,33 +452,84 @@ class RemoteSweepDispatcher:
             proc.stderr.close()
         return ''.join(lines)
 
-    @staticmethod
-    def _scp_to(host: str, local_path: str, remote_path: str,
+    def _scp_to(self, host: str, local_path: str, remote_path: str,
                 *, password: Optional[str] = None):
         """SCP a local file/dir to the remote."""
-        argv = ['scp', '-r', local_path, f'{host}:{remote_path}']
-        if password:
+        argv = ['scp', '-C', '-r'] + self._ctl_socket_args() + \
+               [local_path, f'{host}:{remote_path}']
+        if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
         result = subprocess.run(
             argv,
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=300,
         )
         if result.returncode != 0:
             raise RuntimeError(f"SCP upload failed: {result.stderr.strip()}")
 
-    @staticmethod
-    def _scp_from(host: str, remote_path: str, local_path: str,
+    def _scp_from(self, host: str, remote_path: str, local_path: str,
                   *, password: Optional[str] = None):
         """SCP a remote file/dir to local."""
-        argv = ['scp', '-r', f'{host}:{remote_path}', local_path]
-        if password:
+        argv = ['scp', '-C', '-r'] + self._ctl_socket_args() + \
+               [f'{host}:{remote_path}', local_path]
+        if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
         result = subprocess.run(
             argv,
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:
             raise RuntimeError(f"SCP download failed: {result.stderr.strip()}")
+
+    def _fetch_results_tar(self, host: str, remote_dir: str,
+                           local_dir: str, *,
+                           password: Optional[str] = None):
+        """Fetch a remote directory via ``tar cz | tar xz`` over SSH.
+
+        This is dramatically faster than ``scp -r`` over WAN because:
+        - Single data stream (no per-file round-trips)
+        - gzip compression on the wire
+        - Reuses the ControlMaster connection
+        Falls back to ``scp -r`` if tar piping fails.
+        """
+        os.makedirs(local_dir, exist_ok=True)
+        parent = str(Path(remote_dir).parent)
+        name = Path(remote_dir).name
+        tar_cmd = f"tar czf - -C {parent} {name}"
+
+        argv = ['ssh', '-C'] + self._ctl_socket_args() + [host, tar_cmd]
+        if password and not self._ctl_path:
+            argv = ['sshpass', '-p', password] + argv
+
+        try:
+            remote_proc = subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            local_proc = subprocess.Popen(
+                ['tar', 'xzf', '-', '-C', str(Path(local_dir).parent)],
+                stdin=remote_proc.stdout,
+                stderr=subprocess.PIPE,
+            )
+            remote_proc.stdout.close()  # type: ignore[union-attr]
+            _, local_err = local_proc.communicate(timeout=600)
+            remote_proc.wait(timeout=30)
+
+            if remote_proc.returncode != 0 or local_proc.returncode != 0:
+                remote_err = remote_proc.stderr.read() if remote_proc.stderr else b''
+                remote_proc.stderr.close() if remote_proc.stderr else None
+                raise RuntimeError(
+                    f"tar fetch failed: remote={remote_err.decode().strip()}, "
+                    f"local={local_err.decode().strip()}")
+            if remote_proc.stderr:
+                remote_proc.stderr.close()
+            logger.info("Results fetched via tar pipe: %s", local_dir)
+        except Exception as e:
+            logger.warning("tar pipe failed (%s), falling back to scp -r", e)
+            # Clean up partial extraction
+            if os.path.isdir(local_dir):
+                shutil.rmtree(local_dir, ignore_errors=True)
+            self._scp_from(host, remote_dir, local_dir, password=password)
 
     @staticmethod
     def _parse_results_dir(output: str) -> Optional[str]:
