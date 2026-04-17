@@ -140,7 +140,11 @@ class SweepConfig(ABC):
                 f"Unknown sweep mode '{mode}'. "
                 f"Supported: {', '.join(dispatch)}"
             )
-        return cls.from_dict(data)  # type: ignore[attr-defined]
+        result = cls.from_dict(data)  # type: ignore[attr-defined]
+        # Preserve model_path from JSON so CLI can pick it up
+        if 'model_path' in data:
+            result._raw_model_path = data['model_path']
+        return result
 
     @staticmethod
     def load(path: Path) -> 'SweepConfig':

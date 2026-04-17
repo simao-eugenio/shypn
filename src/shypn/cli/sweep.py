@@ -26,10 +26,16 @@ def build_parser() -> argparse.ArgumentParser:
         description='Run parametric sweeps on SHYpn models (headless).',
     )
     p.add_argument(
-        '--model', '-m',
-        required=True,
+        '--project', '-p',
         type=Path,
-        help='Path to .shy model file.',
+        default=None,
+        help='Project folder (all relative paths resolve from here).',
+    )
+    p.add_argument(
+        '--model', '-m',
+        type=Path,
+        default=None,
+        help='Path to .shy model file (overrides sweep config model_path).',
     )
     p.add_argument(
         '--sweep', '-s',
@@ -40,8 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         '--output', '-o',
         type=Path,
-        default=Path('results'),
-        help='Output directory for results (default: results/).',
+        default=None,
+        help='Output directory for results (default: <project>/experiments/results/).',
     )
     p.add_argument(
         '--workers', '-w',
@@ -62,29 +68,59 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _resolve_path(path: Path, project: Path | None) -> Path:
+    """Resolve a path: if relative, anchor to project folder."""
+    if path.is_absolute():
+        return path
+    if project is not None:
+        return project / path
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # Validate inputs
-    if not args.model.exists():
-        print(f"Error: model file not found: {args.model}", file=sys.stderr)
-        return 1
-    if not args.sweep.exists():
-        print(f"Error: sweep config not found: {args.sweep}", file=sys.stderr)
+    project: Path | None = args.project
+
+    # Load sweep config (resolve relative to project if given)
+    sweep_path = _resolve_path(args.sweep, project)
+    if not sweep_path.exists():
+        print(f"Error: sweep config not found: {sweep_path}", file=sys.stderr)
         return 1
 
-    # Load sweep config
     try:
-        config = SweepConfig.load(args.sweep)
+        config = SweepConfig.load(sweep_path)
     except (json.JSONDecodeError, ValueError, KeyError) as exc:
         print(f"Error: invalid sweep config: {exc}", file=sys.stderr)
         return 1
 
+    # Model: CLI flag > sweep config "model_path" > error
+    model_path: Path | None = args.model
+    if model_path is None and hasattr(config, '_raw_model_path'):
+        model_path = Path(config._raw_model_path)
+    if model_path is None:
+        print("Error: no model specified (use --model or include model_path in sweep config)", file=sys.stderr)
+        return 1
+    model_path = _resolve_path(model_path, project)
+    if not model_path.exists():
+        print(f"Error: model file not found: {model_path}", file=sys.stderr)
+        return 1
+
+    # Output: CLI flag > project/experiments/results > ./results
+    output_dir = args.output
+    if output_dir is None:
+        if project is not None:
+            output_dir = project / 'experiments' / 'results'
+        else:
+            output_dir = Path('results')
+    else:
+        output_dir = _resolve_path(output_dir, project)
+
     runner = SweepRunner(
-        model_path=args.model,
+        model_path=model_path,
         config=config,
-        output_dir=args.output,
+        output_dir=output_dir,
         workers=args.workers,
         verbose=args.verbose or args.dry_run,
     )

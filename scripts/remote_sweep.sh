@@ -5,28 +5,30 @@
 # Workflow:
 #   1. Local:  push latest code to shypn-dev
 #   2. Remote: git pull + run sweep
-#   3. Local:  pull results back via scp
+#   3. Local:  pull results back into the project folder
 #
-# Usage:
-#   ./scripts/remote_sweep.sh --model workspace/path/model.shy \
-#                              --sweep workspace/path/config.json \
+# Project-aware usage (recommended):
+#   ./scripts/remote_sweep.sh --project workspace/projects/thesis \
+#                              --sweep biological/sweep_config.json \
+#                              [--model biological/hexokinase.shy] \
 #                              [--workers 24] [--dry-run]
 #
-# The --model and --sweep paths are relative to the shypn repo root
-# (same on both local and remote).
+# Legacy usage (paths relative to repo root):
+#   ./scripts/remote_sweep.sh --model workspace/path/model.shy \
+#                              --sweep workspace/path/config.json
+#
+# Both local and remote share the same project-relative paths.
 # ─────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 # ── Configuration ────────────────────────────────────────────────────
 REMOTE_HOST="remote-gpu"          # SSH config alias (ControlMaster)
-REMOTE_USER="simao"
 REMOTE_REPO="/home/simao/shypn"
-REMOTE_RESULTS_DIR="/home/simao/shypn/results"
-LOCAL_RESULTS_DIR="./results"
 
 SSH_CMD="ssh ${REMOTE_HOST}"
 
 # ── Parse arguments ──────────────────────────────────────────────────
+PROJECT=""
 MODEL=""
 SWEEP=""
 WORKERS=""
@@ -35,24 +37,37 @@ VERBOSE="-v"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --project|-p) PROJECT="$2"; shift 2 ;;
         --model|-m)   MODEL="$2"; shift 2 ;;
         --sweep|-s)   SWEEP="$2"; shift 2 ;;
         --workers|-w) WORKERS="--workers $2"; shift 2 ;;
         --dry-run)    DRY_RUN="--dry-run"; shift ;;
         --quiet|-q)   VERBOSE=""; shift ;;
         -h|--help)
-            echo "Usage: $0 --model <path> --sweep <config.json> [--workers N] [--dry-run]"
-            echo ""
-            echo "Paths are relative to the shypn repo root."
-            echo "Results are fetched to ./results/ after completion."
+            cat << 'USAGE'
+Usage: remote_sweep.sh [OPTIONS]
+
+  --project, -p <path>   Project folder (relative to repo root)
+  --sweep,   -s <path>   Sweep config JSON (relative to project or repo)
+  --model,   -m <path>   Model .shy file (overrides config; relative to project or repo)
+  --workers, -w <N>      Parallel workers (default: auto)
+  --dry-run              Preview without running
+  --quiet,   -q          Suppress progress output
+
+Project-aware (model_path in sweep config):
+  ./scripts/remote_sweep.sh -p workspace/projects/thesis -s biological/sweep.json
+
+Legacy (explicit model):
+  ./scripts/remote_sweep.sh -m workspace/path/model.shy -s workspace/path/sweep.json
+USAGE
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-if [[ -z "$MODEL" || -z "$SWEEP" ]]; then
-    echo "Error: --model and --sweep are required."
+if [[ -z "$SWEEP" ]]; then
+    echo "Error: --sweep is required."
     echo "Run $0 --help for usage."
     exit 1
 fi
@@ -76,7 +91,19 @@ echo ""
 
 # ── Step 3: Run sweep on remote ─────────────────────────────────────
 echo "═══ Step 3: Running sweep on remote ($(echo ${REMOTE_HOST})) ═══"
-echo "  Model:   ${MODEL}"
+
+# Build the CLI command based on project vs legacy mode
+CLI_ARGS="--sweep ${SWEEP}"
+if [[ -n "$PROJECT" ]]; then
+    CLI_ARGS="--project ${PROJECT} ${CLI_ARGS}"
+    echo "  Project: ${PROJECT}"
+fi
+if [[ -n "$MODEL" ]]; then
+    CLI_ARGS="${CLI_ARGS} --model ${MODEL}"
+    echo "  Model:   ${MODEL}"
+else
+    echo "  Model:   (from sweep config)"
+fi
 echo "  Sweep:   ${SWEEP}"
 echo "  Workers: ${WORKERS:-auto}"
 echo "  Dry-run: ${DRY_RUN:-no}"
@@ -85,9 +112,7 @@ echo ""
 REMOTE_CMD="cd ${REMOTE_REPO} && \
     export PYTHONPATH=\${PWD}/src && \
     .venv/bin/python -m shypn.cli.sweep \
-        --model ${MODEL} \
-        --sweep ${SWEEP} \
-        --output results \
+        ${CLI_ARGS} \
         ${WORKERS} \
         ${VERBOSE} \
         ${DRY_RUN}"
@@ -115,10 +140,19 @@ fi
 
 echo "═══ Step 4: Fetching results from remote ═══"
 echo "  Remote: ${RUN_DIR}"
-mkdir -p "${LOCAL_RESULTS_DIR}"
 
-# Use the basename of the run dir (e.g. run_20260417_154624)
+# Determine local results directory:
+# Project mode: <project>/experiments/results/<run_name>
+# Legacy mode:  ./results/<run_name>
 RUN_NAME=$(basename "$RUN_DIR")
+
+if [[ -n "$PROJECT" ]]; then
+    LOCAL_RESULTS_DIR="${PROJECT}/experiments/results"
+else
+    LOCAL_RESULTS_DIR="./results"
+fi
+
+mkdir -p "${LOCAL_RESULTS_DIR}"
 LOCAL_RUN_DIR="${LOCAL_RESULTS_DIR}/${RUN_NAME}"
 
 scp -r "${REMOTE_HOST}:${RUN_DIR}" "${LOCAL_RUN_DIR}" 2>&1 | sed 's/^/  /'
