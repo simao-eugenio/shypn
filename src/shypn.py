@@ -30,6 +30,10 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 # Suppress urllib3 debug messages
 logging.getLogger('urllib3').setLevel(logging.WARNING)
+# Suppress verbose ODE/propensity acceleration messages (compilation, transition lists)
+logging.getLogger('shypn.engine.acceleration').setLevel(logging.ERROR)
+# Suppress acceleration fallback warnings from the simulation controller
+logging.getLogger('shypn.engine.simulation.controller').setLevel(logging.ERROR)
 
 # Suppress matplotlib Axes3D import warning (harmless - system matplotlib visible in path)
 warnings.filterwarnings('ignore', message='Unable to import Axes3D')

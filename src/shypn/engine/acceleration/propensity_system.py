@@ -625,7 +625,6 @@ class PropensityAccelerator:
             lines.extend(kp_lines)
             lines.append('')
 
-        transpile_fails = 0
         for i, spec in enumerate(self._specs):
             sanitized = re.sub(r"[^A-Za-z0-9_]", "_", spec.name)
             lines.append(f"    /* [{i}] {sanitized} */")
@@ -641,13 +640,12 @@ class PropensityAccelerator:
                     thermo_locals=c_thermo,
                 )
             except TranspileError as exc:
-                transpile_fails += 1
-                logger.warning(
-                    "PropensityAccelerator: cannot transpile fwd for '%s': %s"
-                    " — using 0.0 (Python eval path will be used for this transition)",
-                    spec.name, exc,
-                )
-                c_fwd = "0.0"
+                raise TranspileError(
+                    f"Cannot accelerate stochastic transition '{spec.name}' "
+                    f"(forward rate): {exc}.  The propensity accelerator "
+                    f"will fall back to the Python eval path to preserve "
+                    f"transition semantics."
+                ) from exc
 
             lines.append(f"        double _fwd = {c_fwd};")
             lines.append(
@@ -664,13 +662,12 @@ class PropensityAccelerator:
                         thermo_locals=c_thermo,
                     )
                 except TranspileError as exc:
-                    transpile_fails += 1
-                    logger.warning(
-                        "PropensityAccelerator: cannot transpile rev for '%s': %s"
-                        " — treating as irreversible",
-                        spec.name, exc,
-                    )
-                    c_rev = "0.0"
+                    raise TranspileError(
+                        f"Cannot accelerate stochastic transition '{spec.name}' "
+                        f"(reverse rate): {exc}.  The propensity accelerator "
+                        f"will fall back to the Python eval path to preserve "
+                        f"transition semantics."
+                    ) from exc
             else:
                 c_rev = "0.0"
 
@@ -685,14 +682,6 @@ class PropensityAccelerator:
             lines.append("")
 
         lines.append("}")
-
-        if transpile_fails:
-            logger.warning(
-                "PropensityAccelerator: %d transition(s) could not be transpiled; "
-                "those will emit 0 propensity — Python eval path will be used "
-                "as fallback for those transitions.",
-                transpile_fails,
-            )
 
         return "\n".join(lines)
 

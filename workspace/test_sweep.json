@@ -1,0 +1,11 @@
+{
+  "mode": "single",
+  "replicates": 10,
+  "duration": 100.0,
+  "termination": "deadlock",
+  "parameter": {
+    "type": "places",
+    "path": "Glucose.initial_marking",
+    "values": [50, 100, 200, 500]
+  }
+}

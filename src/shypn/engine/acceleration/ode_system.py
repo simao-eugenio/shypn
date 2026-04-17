@@ -167,6 +167,29 @@ class OdeSystemAccelerator:
             if not self._ode_place_ids:
                 logger.debug("OdeSystemAccelerator: no continuous places — skipping")
                 return False
+
+            # Warn about non-continuous transitions that the ODE accelerator
+            # will NOT service.  These transitions retain their declared
+            # semantics only if the caller (e.g. the simulation controller)
+            # also runs the appropriate discrete/stochastic engine.  A
+            # standalone integrate() call will silently miss them.
+            non_continuous = []
+            for t in getattr(self._model, "transitions", []):
+                t_type = getattr(t, "transition_type", "")
+                if t_type and t_type != "continuous":
+                    non_continuous.append(
+                        f"  {getattr(t, 'name', t.id)} (type={t_type})"
+                    )
+            if non_continuous:
+                logger.warning(
+                    "ODE accelerator covers only continuous transitions.  "
+                    "The following %d transition(s) require their own "
+                    "execution engine (stochastic/timed/immediate/adaptive) "
+                    "and will NOT fire during ODE integration:\n%s",
+                    len(non_continuous),
+                    "\n".join(non_continuous),
+                )
+
             self._c_source = self._generate_c()
             self._model_hash = _short_hash(self._c_source)
             so_path = compile_ode_rhs(self._c_source, model_hash=self._model_hash)
@@ -277,6 +300,7 @@ class OdeSystemAccelerator:
             rtol=rtol,
             atol=atol,
             dense_output=False,
+            max_step=(t_end - t_start),  # limit step size to reduce overshoot
         )
 
         if sol.success:
@@ -486,9 +510,17 @@ class OdeSystemAccelerator:
         lines.append('    memset(dydt, 0, (size_t)n * sizeof(double));')
         lines.append('')
 
+        # Clamp y[] to non-negative before computing rates.
+        # LSODA may probe y < 0 during internal adaptive steps; clamping here
+        # makes rates go to zero naturally as species deplete, so conservation
+        # emerges from the topology without external bookkeeping.
+        lines.append('    /* Clamp state to non-negative (Petri net invariant) */')
+        lines.append('    for (int _i = 0; _i < n; _i++)')
+        lines.append('        if (y[_i] < 0.0) y[_i] = 0.0;')
+        lines.append('')
+
         # Emit rate computation for each transition
         c_thermo = THERMO_LOCALS
-        transpile_fails: List[str] = []
 
         for i, spec in enumerate(specs):
             var = f"rate_{i}"
@@ -518,13 +550,15 @@ class OdeSystemAccelerator:
                     thermo_locals=c_thermo,
                 )
             except TranspileError as exc:
-                transpile_fails.append(
-                    f"    /* WARNING: {spec.name} transpile failed: {exc} */"
-                )
-                # Emit a zero rate comment — transition will not be accelerated
-                lines.append(c_comment)
-                lines.append(f"    double {var} = 0.0;  /* transpile failed */{transpile_fails[-1]}")
-                lines.append('')
+                # A transition whose rate cannot be transpiled would silently
+                # contribute zero to the ODE — corrupting the dynamics of the
+                # declared transition type.  Abort the build so the engine
+                # falls back to the Python eval path which handles all syntax.
+                raise TranspileError(
+                    f"Cannot accelerate transition '{spec.name}': {exc}.  "
+                    f"The ODE accelerator will fall back to the Python path "
+                    f"to preserve transition semantics."
+                ) from exc
             else:
                 lines.append(c_comment)
                 lines.append(f"    double {var} = {c_expr};")
@@ -567,13 +601,6 @@ class OdeSystemAccelerator:
             lines.append('')
 
         lines.append('}')  # end ode_rhs
-
-        if transpile_fails:
-            logger.warning(
-                "ODE acceleration: %d transition(s) could not be transpiled "
-                "(will contribute zero to ODE — check generated C comments).",
-                len(transpile_fails),
-            )
 
         return '\n'.join(lines)
 
