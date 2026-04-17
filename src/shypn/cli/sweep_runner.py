@@ -239,6 +239,15 @@ class SweepRunner:
             except Exception as exc:
                 logger.warning("Failed to apply %s=%s: %s", prop_path, value, exc)
 
+        # Sync cached initial-state attributes so that _reset_model() and
+        # SimulationController.reset() use the overridden values instead of
+        # stale ones from a previous condition.
+        for p in model.places:
+            if hasattr(p, 'initial_tokens'):
+                p.initial_tokens = p.tokens
+            if hasattr(p, 'initial_marking'):
+                p.initial_marking = p.tokens
+
     @staticmethod
     def _restore_baseline(model: Any, baseline: ExperimentSnapshot) -> None:
         """Reset model to baseline state."""
