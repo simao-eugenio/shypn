@@ -1,17 +1,30 @@
 #!/usr/bin/env python3
 """Remote Sweep Dispatcher — run CLI sweeps on a remote server via SSH.
 
-Pipeline:
-  1. Export sweep config JSON + model .shy to a temp staging area
-  2. SCP both files to the remote project folder
-  3. SSH run ``python -m shypn.cli.sweep`` on the remote
-  4. SCP results back to the local project folder
-  5. Signal completion so the ResultsBrowserView can load them
+Architecture (minimal data transfer):
+  1. **Git sync**: commit + push locally, ``git pull`` on remote
+     — ensures both model files and engine code are in sync
+  2. **Export sweep config** to a local temp file (small JSON, ~1–5 KB)
+  3. **SCP config only** to the remote project folder
+  4. **SSH run** ``python -m shypn.cli.sweep`` on the remote
+  5. **Fetch results** back via ``tar cz | tar xz`` over the
+     multiplexed SSH tunnel
+
+Only the experiment plan (sweep_config.json) crosses the network.
+The model (``.shy``), engine code, and workspace structure are all
+kept in sync via the git repository on both sides.
+
+Performance (WAN):
+  - A persistent SSH ControlMaster socket is opened once per dispatch
+    and reused for every subsequent SSH/SCP call.
+  - All SSH traffic is compressed (``-C``).
+  - Results are fetched as a single compressed tar stream (no per-file
+    round-trips).
 
 Requires:
-  - SSH config alias (e.g. ``remote-gpu``) with ControlMaster
-  - Remote repo at a known path with ``.venv`` and ``src/`` on PYTHONPATH
-  - The remote branch must already have the CLI module installed
+  - Git remote reachable from both client and server
+  - SSH access to server (password or key)
+  - Remote repo clone at a known path with ``.venv``
 
 Author: Simão Eugénio
 Date: April 2026
@@ -44,6 +57,8 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
+        'git_remote': 'private',   # local git remote name to push to
+        'git_branch': '',          # '' = current branch (auto-detect)
     }
 
     def __init__(self, workspace_settings=None):
@@ -86,6 +101,22 @@ class RemoteSweepSettings:
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
 
+    @property
+    def git_remote(self) -> str:
+        return self._section['git_remote']
+
+    @git_remote.setter
+    def git_remote(self, v: str):
+        self._section['git_remote'] = v
+
+    @property
+    def git_branch(self) -> str:
+        return self._section['git_branch']
+
+    @git_branch.setter
+    def git_branch(self, v: str):
+        self._section['git_branch'] = v
+
     def save(self):
         """Persist to workspace.json."""
         if self._ws:
@@ -97,19 +128,16 @@ class RemoteSweepSettings:
 
 
 class RemoteSweepDispatcher:
-    """Orchestrates a full remote sweep cycle (export → SCP → SSH → fetch).
+    """Orchestrates a full remote sweep cycle (git-sync → config → SSH → fetch).
 
     All heavy I/O runs on a background thread.  GTK callbacks are
     delivered via ``GLib.idle_add`` by the caller (automation category).
 
-    Performance notes (WAN):
-        - A persistent SSH ControlMaster socket is opened once per
-          dispatch and reused for every subsequent SSH/SCP call,
-          avoiding repeated TCP + crypto handshakes.
-        - All SSH/SCP traffic is compressed (``-C``).
-        - Results are fetched via ``tar czf | tar xzf`` through the
-          multiplexed SSH tunnel instead of ``scp -r`` (single stream,
-          compressed, no per-file round-trips).
+    Data-transfer policy:
+        The **model** and **engine code** are synchronised via git
+        (push locally → pull on remote).  Only the **sweep config**
+        (~1–5 KB JSON) is transferred over SCP.  Results are fetched
+        back as a single compressed tar stream.
     """
 
     def __init__(self, settings: RemoteSweepSettings):
@@ -141,19 +169,19 @@ class RemoteSweepDispatcher:
 
         Args:
             model_filepath: Absolute local path to the ``.shy`` model file.
+                Used only to derive the repo-relative model path (the file
+                itself is **not** transferred — it reaches the server via git).
             project_folder: Absolute local path to the project root
-                (e.g. ``workspace/projects/thesis``).
+                (e.g. ``workspace/projects/canabidiol``).
             experiment_manager: ``ExperimentManager`` instance (has
                 ``export_sweep_config``).
             sim_params: Dict with keys ``replicates``, ``duration``,
                 ``termination``, ``seed_base``, ``tau_epsilon``, ``max_tau``.
             progress_cb: Called on the **background** thread with a status
-                string for each pipeline phase.  The caller must wrap in
-                ``GLib.idle_add`` if touching GTK.
-            complete_cb: ``(success: bool, local_results_dir: str, message: str)``
+                string for each pipeline phase.
+            complete_cb: ``(success, local_results_dir, message)``
                 — called when the pipeline finishes or fails.
             ssh_password: Optional SSH password (used via ``sshpass``).
-                Never persisted to disk.
         """
         if self.is_running:
             if complete_cb:
@@ -181,31 +209,37 @@ class RemoteSweepDispatcher:
         ssh_password: Optional[str] = None,
     ):
         staging = None
+        host = self.settings.ssh_host
         try:
-            host = self.settings.ssh_host
             remote_repo = self.settings.remote_repo
             remote_venv = self.settings.remote_venv
             workers = self.settings.workers
 
-            # ── open persistent SSH connection ───────────────────────
-            self._open_control_master(host, password=ssh_password)
-
-            # ── resolve project-relative path ────────────────────────
-            # project_folder is absolute: .../workspace/projects/thesis
-            # We need the repo-relative project path for the remote CLI
+            # ── resolve paths ────────────────────────────────────────
             project_abs = Path(project_folder).resolve()
-            # Walk up to find 'workspace' anchor
             repo_root = self._find_repo_root(project_abs)
             if repo_root is None:
                 raise RuntimeError(
-                    f"Cannot determine repo root from project folder: {project_folder}")
+                    f"Cannot determine repo root from: {project_folder}")
             project_rel = str(project_abs.relative_to(repo_root))
 
-            # Model path relative to project folder
             model_abs = Path(model_filepath).resolve()
             model_rel_to_project = str(model_abs.relative_to(project_abs))
 
-            # ── 1. Export sweep config to staging ────────────────────
+            # ── 1. Git sync: push local → pull remote ────────────────
+            self._emit(progress_cb, 'Syncing repository (git push + pull)...')
+            branch = self._git_sync(
+                repo_root, host, remote_repo,
+                password=ssh_password,
+            )
+
+            if self._cancel.is_set():
+                raise InterruptedError('Cancelled')
+
+            # ── open persistent SSH connection ───────────────────────
+            self._open_control_master(host, password=ssh_password)
+
+            # ── 2. Export sweep config (local temp) ──────────────────
             self._emit(progress_cb, 'Exporting sweep config...')
             staging = Path(tempfile.mkdtemp(prefix='shypn_remote_'))
             config_path = staging / 'sweep_config.json'
@@ -218,32 +252,19 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 2. SCP model + config to remote ─────────────────────
-            self._emit(progress_cb, 'Uploading model and config to remote...')
-
-            # Figure out remote project path
+            # ── 3. SCP config only to remote ─────────────────────────
+            self._emit(progress_cb, 'Uploading sweep config (~1 KB)...')
             remote_project = f"{remote_repo}/{project_rel}"
-            # Determine where the model lives relative to the project
-            remote_model_dir = f"{remote_project}/{Path(model_rel_to_project).parent}"
-            remote_sweep_dir = f"{remote_project}"
-
-            # Ensure remote directories exist
-            self._ssh(host, f"mkdir -p {remote_model_dir} {remote_sweep_dir}",
+            self._ssh(host, f"mkdir -p {remote_project}",
                       password=ssh_password)
-
-            # SCP model file
-            self._scp_to(host, str(model_abs), f"{remote_model_dir}/",
-                         password=ssh_password)
-
-            # SCP sweep config
             self._scp_to(host, str(config_path),
-                         f"{remote_sweep_dir}/sweep_config.json",
+                         f"{remote_project}/sweep_config.json",
                          password=ssh_password)
 
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 3. SSH run CLI on remote ─────────────────────────────
+            # ── 4. SSH run CLI on remote ─────────────────────────────
             self._emit(progress_cb, 'Running sweep on remote server...')
 
             workers_flag = f"--workers {workers}" if workers > 0 else ""
@@ -268,17 +289,16 @@ class RemoteSweepDispatcher:
             run_dir = self._parse_results_dir(stdout)
             if not run_dir:
                 raise RuntimeError(
-                    f"Could not parse results directory from remote output:\n{stdout}")
+                    f"Could not parse results directory from remote output:\n"
+                    f"{stdout[-500:]}")
 
-            # The CLI may emit a relative path (relative to remote repo).
-            # SCP needs the absolute path on the remote.
             if not run_dir.startswith('/'):
                 run_dir = f"{remote_repo}/{run_dir}"
 
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 4. Fetch results back ────────────────────────────────
+            # ── 5. Fetch results back ────────────────────────────────
             self._emit(progress_cb, 'Fetching results from remote...')
 
             run_name = Path(run_dir).name
@@ -289,7 +309,7 @@ class RemoteSweepDispatcher:
             self._fetch_results_tar(host, run_dir, str(local_run_dir),
                                     password=ssh_password)
 
-            # ── 5. Done ──────────────────────────────────────────────
+            # ── 6. Done ──────────────────────────────────────────────
             self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
 
             if complete_cb:
@@ -303,9 +323,7 @@ class RemoteSweepDispatcher:
             if complete_cb:
                 complete_cb(False, '', str(e))
         finally:
-            # Close persistent SSH connection
             self._close_control_master(host)
-            # Clean up staging
             if staging and staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
 
@@ -322,6 +340,83 @@ class RemoteSweepDispatcher:
             if (parent / '.git').is_dir():
                 return parent
         return None
+
+    # ── Git sync ─────────────────────────────────────────────────────
+    def _git_sync(
+        self,
+        local_repo: Path,
+        ssh_host: str,
+        remote_repo: str,
+        *,
+        password: Optional[str] = None,
+    ) -> str:
+        """Push local commits and pull on remote — model + code in sync.
+
+        Steps:
+          1. ``git add -A`` + ``git commit`` locally (auto-commit of any
+             unsaved model / workspace changes).
+          2. ``git push <remote> <branch>``.
+          3. SSH ``git -C <remote_repo> pull origin <branch>``.
+
+        Returns the branch name used.
+        """
+        git_remote = self.settings.git_remote
+        branch = self.settings.git_branch
+
+        # Auto-detect branch if not configured
+        if not branch:
+            result = subprocess.run(
+                ['git', '-C', str(local_repo), 'rev-parse',
+                 '--abbrev-ref', 'HEAD'],
+                capture_output=True, text=True, timeout=10,
+            )
+            branch = result.stdout.strip() or 'main'
+
+        # Local: stage + commit (no-op if tree is clean)
+        subprocess.run(
+            ['git', '-C', str(local_repo), 'add', '-A'],
+            capture_output=True, text=True, timeout=30,
+        )
+        subprocess.run(
+            ['git', '-C', str(local_repo), 'commit',
+             '-m', 'auto: pre-remote-sweep sync',
+             '--allow-empty-message', '--no-verify'],
+            capture_output=True, text=True, timeout=30,
+        )
+
+        # Local: push to the configured remote
+        push = subprocess.run(
+            ['git', '-C', str(local_repo), 'push', git_remote, branch],
+            capture_output=True, text=True, timeout=120,
+        )
+        if push.returncode != 0:
+            raise RuntimeError(
+                f"git push {git_remote} {branch} failed:\n"
+                f"{push.stderr.strip()}")
+
+        # Remote: pull the same branch
+        pull_cmd = (
+            f"cd {remote_repo} && "
+            f"git fetch origin {branch} && "
+            f"git checkout {branch} && "
+            f"git reset --hard origin/{branch}"
+        )
+
+        # Use sshpass for this pre-ControlMaster call
+        argv = ['ssh', '-C', ssh_host, pull_cmd]
+        if password:
+            argv = ['sshpass', '-p', password] + argv
+        pull = subprocess.run(
+            argv,
+            capture_output=True, text=True, timeout=120,
+        )
+        if pull.returncode != 0:
+            raise RuntimeError(
+                f"Remote git pull failed:\n{pull.stderr.strip()}")
+
+        logger.info("Git sync complete: %s/%s → %s:%s",
+                     git_remote, branch, ssh_host, remote_repo)
+        return branch
 
     # ── SSH ControlMaster multiplexing ───────────────────────────────
     def _ctl_socket_args(self) -> list[str]:
