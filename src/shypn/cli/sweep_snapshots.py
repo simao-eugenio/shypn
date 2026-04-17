@@ -78,9 +78,10 @@ class SnapshotsSweep(SweepConfig):
         return self._load_snapshots()
 
     def describe(self) -> str:
+        source = self.snapshots_path.name if self.snapshots_path else 'inline config'
         return (
             f"Snapshots sweep: {self.condition_count()} conditions "
-            f"from {self.snapshots_path.name}"
+            f"from {source}"
         )
 
     def condition_count(self) -> int:
