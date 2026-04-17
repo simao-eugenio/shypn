@@ -1,0 +1,10 @@
+{
+  "mode": "factorial",
+  "replicates": 5,
+  "duration": 50.0,
+  "termination": "deadlock",
+  "parameters": [
+    {"type": "places", "path": "Glucose.initial_marking", "values": [50, 100, 500]},
+    {"type": "places", "path": "ATP.initial_marking", "values": [10, 100]}
+  ]
+}
