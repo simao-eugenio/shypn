@@ -73,6 +73,9 @@ class ExperimentAutomationCategory:
         # Per-run isolation: one folder created at batch start, shared by all experiments in the run
         self._current_run_folder = None  # Path | None
 
+        # Remote sweep dispatcher (lazy init)
+        self._remote_dispatcher = None
+
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
         self._processing_updates = set()  # Set of queue_index currently being processed
@@ -156,6 +159,7 @@ class ExperimentAutomationCategory:
         self.queue_view.set_cancel_callback(self._on_queue_cancel)
         self.queue_view.set_clear_callback(self._on_queue_cleared)
         self.queue_view.set_pause_callback(self._on_queue_pause)  # Stage 3
+        self.queue_view.set_run_remote_callback(self._on_queue_run_remote)
         self.content_box.pack_start(self.queue_view, True, True, 0)
         
         # Create batch executor
@@ -665,8 +669,378 @@ class ExperimentAutomationCategory:
             
             self._show_error(f"Cannot start simulation:\n\n{error_msg}")
     
+    def _on_queue_run_remote(self, pending_experiments):
+        """Handle Run Remote button — dispatch sweep to remote server via SSH.
+
+        Shows a confirmation dialog with SSH settings, then:
+          1. Exports sweep config JSON (from ExperimentManager snapshots)
+          2. SCPs model + config to remote
+          3. SSH runs CLI sweep
+          4. SCPs results back to local project folder
+          5. Loads results into ResultsBrowserView
+        """
+        from .remote_sweep_dispatcher import RemoteSweepSettings, RemoteSweepDispatcher
+
+        if self._remote_dispatcher and self._remote_dispatcher.is_running:
+            self._show_error("A remote sweep is already running.")
+            return
+
+        # ── Validate prerequisites ───────────────────────────────────
+        project_folder = self._get_project_folder()
+        if not project_folder:
+            self._show_error(
+                "No project open.\n"
+                "Remote sweep requires a project folder so results land\n"
+                "in <project>/experiments/results/."
+            )
+            return
+
+        model_filepath = None
+        if self.parent_panel:
+            # _get_current_model() returns the ModelCanvasManager for this
+            # document — it owns the .filepath property.
+            canvas_mgr = self.parent_panel._get_current_model()
+            if canvas_mgr and hasattr(canvas_mgr, 'filepath'):
+                model_filepath = canvas_mgr.filepath
+        if not model_filepath:
+            self._show_error("Cannot determine model file path.\n"
+                             "Please save the model first.")
+            return
+
+        if not self.experiment_manager or not self.experiment_manager.snapshots:
+            self._show_error("No experiment snapshots — generate experiments first.")
+            return
+
+        # ── Load / show settings dialog ──────────────────────────────
+        from shypn.workspace_settings import WorkspaceSettings
+        ws = WorkspaceSettings()
+        settings = RemoteSweepSettings(ws)
+
+        # Read simulation params from sweep builder (same logic as _on_queue_run)
+        sim_params = self._collect_sim_params()
+
+        # Build confirmation dialog
+        confirmed, settings, ssh_password = self._show_remote_sweep_dialog(
+            settings, sim_params, len(pending_experiments))
+        if not confirmed:
+            return
+
+        settings.save()
+
+        # ── Dispatch ─────────────────────────────────────────────────
+        self._remote_dispatcher = RemoteSweepDispatcher(settings)
+
+        # UI feedback
+        if self.queue_view:
+            self.queue_view.run_button.set_sensitive(False)
+            self.queue_view.run_remote_button.set_sensitive(False)
+            self.queue_view.status_label.set_markup(
+                "<span foreground='blue'><b>Remote sweep dispatching...</b></span>"
+            )
+
+        # Mark all queue rows as "running" before dispatch
+        n_total = len(pending_experiments)
+        if self.queue_view:
+            for i in range(n_total):
+                self.queue_view.update_experiment_status(i, 'pending', '—')
+
+        import re as _re
+
+        def on_progress(msg):
+            """Parse CLI progress lines and update individual queue rows.
+
+            Expected patterns from --verbose:
+              [1/4] Condition.name=50 (10 replicates)...
+                done in 7.2s (10 ok, 0 errors)
+              Sweep complete in 28.3s
+            """
+            # Match "[idx/total] condition_name ..."  → mark row as running
+            m_start = _re.match(r'^\[(\d+)/(\d+)\]\s+(.+?)\s+\(', msg)
+            if m_start:
+                cond_idx = int(m_start.group(1)) - 1  # 0-based
+                def _ui_start(idx=cond_idx):
+                    if self.queue_view and 0 <= idx < n_total:
+                        self.queue_view.update_experiment_status(
+                            idx, 'running', 'running…')
+                    return False
+                GLib.idle_add(_ui_start)
+
+            # Match "  done in Xs (N ok, M errors)" → mark previous row done
+            m_done = _re.match(
+                r'^\s*done in ([\d.]+)s\s+\((\d+)\s+ok,\s+(\d+)\s+error', msg)
+            if m_done:
+                wall = m_done.group(1)
+                ok = int(m_done.group(2))
+                errors = int(m_done.group(3))
+                # The "done" line follows the "[idx/total]" line, so find
+                # the last row that is 'running'
+                def _ui_done():
+                    if not self.queue_view:
+                        return False
+                    for i in range(n_total):
+                        try:
+                            it = self.queue_view.queue_store.get_iter(i)
+                            st = self.queue_view.queue_store.get_value(it, 1)
+                            if st == 'running':
+                                status = 'completed' if errors == 0 else 'failed'
+                                prog = f"{ok} ok, {errors} err — {wall}s"
+                                self.queue_view.update_experiment_status(
+                                    i, status, prog)
+                                break
+                        except Exception:
+                            break
+                    return False
+                GLib.idle_add(_ui_done)
+
+            # Always update the status label with the raw line
+            GLib.idle_add(
+                lambda m=msg: (
+                    self.queue_view.status_label.set_markup(
+                        f"<span foreground='blue'><b>Remote:</b> {GLib.markup_escape_text(str(m))}</span>"
+                    ) if self.queue_view else None
+                ) or False
+            )
+
+        def on_complete(success, local_results_dir, message):
+            def _ui():
+                if self.queue_view:
+                    self.queue_view.run_button.set_sensitive(True)
+                    self.queue_view.run_remote_button.set_sensitive(True)
+                if success:
+                    if self.queue_view:
+                        self.queue_view.status_label.set_markup(
+                            f"<span foreground='green'><b>✓</b> {GLib.markup_escape_text(str(message))}</span>"
+                        )
+                    # Load results into browser
+                    self._load_remote_results(local_results_dir)
+                else:
+                    if self.queue_view:
+                        self.queue_view.status_label.set_markup(
+                            f"<span foreground='red'><b>✗</b> {GLib.markup_escape_text(str(message))}</span>"
+                        )
+                return False
+            GLib.idle_add(_ui)
+
+        self._remote_dispatcher.dispatch(
+            model_filepath=model_filepath,
+            project_folder=project_folder,
+            experiment_manager=self.experiment_manager,
+            sim_params=sim_params,
+            progress_cb=on_progress,
+            complete_cb=on_complete,
+            ssh_password=ssh_password or None,
+        )
+
+    def _collect_sim_params(self) -> dict:
+        """Read simulation parameters from sweep builder widgets."""
+        params = {
+            'replicates': 200,
+            'duration': 2000.0,
+            'termination': 'deadlock',
+            'seed_base': 42,
+            'tau_epsilon': 0.03,
+            'max_tau': 0.1,
+        }
+        if hasattr(self.sweep_builder, 'replicates_entry'):
+            try:
+                v = int(self.sweep_builder.replicates_entry.get_text().strip())
+                if v > 0:
+                    params['replicates'] = v
+            except (ValueError, AttributeError):
+                pass
+        if hasattr(self.sweep_builder, 'duration_entry'):
+            try:
+                v = float(self.sweep_builder.duration_entry.get_text().strip())
+                if v > 0:
+                    params['duration'] = v
+            except (ValueError, AttributeError):
+                pass
+        if hasattr(self.sweep_builder, 'termination_combo'):
+            try:
+                params['termination'] = self.sweep_builder.termination_combo.get_active_id() or 'deadlock'
+            except (AttributeError,):
+                pass
+        if hasattr(self.sweep_builder, 'sweep_seed_entry'):
+            try:
+                params['seed_base'] = int(self.sweep_builder.sweep_seed_entry.get_text().strip())
+            except (ValueError, AttributeError):
+                pass
+        if hasattr(self.sweep_builder, 'sweep_tau_epsilon_entry'):
+            try:
+                v = float(self.sweep_builder.sweep_tau_epsilon_entry.get_text().strip())
+                if 0 < v <= 1:
+                    params['tau_epsilon'] = v
+            except (ValueError, AttributeError):
+                pass
+        if hasattr(self.sweep_builder, 'sweep_max_tau_entry'):
+            try:
+                v = float(self.sweep_builder.sweep_max_tau_entry.get_text().strip())
+                if 0 < v <= 100:
+                    params['max_tau'] = v
+            except (ValueError, AttributeError):
+                pass
+        return params
+
+    def _show_remote_sweep_dialog(self, settings, sim_params, n_experiments):
+        """Show a GTK dialog to confirm/edit remote sweep settings.
+
+        Returns:
+            (confirmed: bool, settings: RemoteSweepSettings)
+        """
+        parent_window = None
+        if self.parent_panel:
+            parent_window = self.parent_panel.get_toplevel()
+            if not isinstance(parent_window, Gtk.Window):
+                parent_window = None
+
+        dialog = Gtk.Dialog(
+            title="Run Sweep on Remote Server",
+            transient_for=parent_window,
+            modal=True,
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Dispatch", Gtk.ResponseType.OK,
+        )
+        dialog.set_default_size(420, -1)
+
+        content = dialog.get_content_area()
+        content.set_spacing(10)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+
+        # Summary
+        summary = Gtk.Label()
+        summary.set_markup(
+            f"<b>Dispatch {n_experiments} experiment(s) to remote server</b>\n"
+            f"Replicates: {sim_params['replicates']}  |  "
+            f"Duration: {sim_params['duration']}s  |  "
+            f"Termination: {sim_params['termination']}"
+        )
+        summary.set_xalign(0)
+        summary.set_line_wrap(True)
+        content.pack_start(summary, False, False, 0)
+
+        # SSH Settings grid
+        grid = Gtk.Grid()
+        grid.set_column_spacing(8)
+        grid.set_row_spacing(6)
+
+        row = 0
+        grid.attach(Gtk.Label(label="SSH Host:", xalign=0), 0, row, 1, 1)
+        host_entry = Gtk.Entry()
+        host_entry.set_text(settings.ssh_host)
+        host_entry.set_tooltip_text("SSH config alias or user@host")
+        grid.attach(host_entry, 1, row, 1, 1)
+
+        row += 1
+        grid.attach(Gtk.Label(label="Remote Repo:", xalign=0), 0, row, 1, 1)
+        repo_entry = Gtk.Entry()
+        repo_entry.set_text(settings.remote_repo)
+        repo_entry.set_tooltip_text("Absolute path to shypn repo on remote")
+        repo_entry.set_hexpand(True)
+        grid.attach(repo_entry, 1, row, 1, 1)
+
+        row += 1
+        grid.attach(Gtk.Label(label="Python:", xalign=0), 0, row, 1, 1)
+        venv_entry = Gtk.Entry()
+        venv_entry.set_text(settings.remote_venv)
+        venv_entry.set_tooltip_text("Path to Python interpreter (relative to remote repo)")
+        grid.attach(venv_entry, 1, row, 1, 1)
+
+        row += 1
+        grid.attach(Gtk.Label(label="Workers:", xalign=0), 0, row, 1, 1)
+        workers_spin = Gtk.SpinButton(
+            adjustment=Gtk.Adjustment(value=settings.workers, lower=0, upper=128,
+                                      step_increment=1, page_increment=4, page_size=0)
+        )
+        workers_spin.set_tooltip_text("0 = auto-detect on remote")
+        grid.attach(workers_spin, 1, row, 1, 1)
+
+        row += 1
+        grid.attach(Gtk.Label(label="Password:", xalign=0), 0, row, 1, 1)
+        password_entry = Gtk.Entry()
+        password_entry.set_visibility(False)  # mask input
+        password_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        password_entry.set_tooltip_text(
+            "SSH password (optional — leave blank for key-based auth)."
+            " Not saved to disk."
+        )
+        password_entry.set_placeholder_text("leave blank for key auth")
+        grid.attach(password_entry, 1, row, 1, 1)
+
+        content.pack_start(grid, False, False, 0)
+
+        # Pipeline description
+        desc = Gtk.Label()
+        desc.set_markup(
+            "<small>"
+            "Pipeline: upload model + config → SSH run CLI → fetch results\n"
+            "Results land in &lt;project&gt;/experiments/results/"
+            "</small>"
+        )
+        desc.set_xalign(0)
+        desc.set_line_wrap(True)
+        content.pack_start(desc, False, False, 0)
+
+        dialog.show_all()
+        response = dialog.run()
+
+        ssh_password = ''
+        if response == Gtk.ResponseType.OK:
+            settings.ssh_host = host_entry.get_text().strip()
+            settings.remote_repo = repo_entry.get_text().strip()
+            settings.remote_venv = venv_entry.get_text().strip()
+            settings.workers = int(workers_spin.get_value())
+            ssh_password = password_entry.get_text()  # never persisted
+
+        dialog.destroy()
+        return (response == Gtk.ResponseType.OK, settings, ssh_password)
+
+    def _load_remote_results(self, local_results_dir):
+        """Load results from a remote sweep run into the ResultsBrowserView."""
+        if not self.results_browser or not local_results_dir:
+            return
+
+        results_path = Path(local_results_dir)
+        if not results_path.is_dir():
+            return
+
+        summary_csv = results_path / 'summary.csv'
+        if not summary_csv.exists():
+            return
+
+        # Parse summary.csv and load each condition as a result entry
+        import csv
+        try:
+            with open(summary_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    condition = row.get('condition', 'unknown')
+                    ok = int(row.get('replicates_ok', 0))
+                    errors = int(row.get('replicates_error', 0))
+                    wall = float(row.get('wall_seconds', 0))
+
+                    # Create a minimal result dict for the browser
+                    result = {
+                        'name': condition,
+                        'replicates': ok,
+                        'errors': errors,
+                        'wall_seconds': wall,
+                        'source': 'remote',
+                        'results_dir': str(results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                    }
+                    self.results_browser.add_result(condition, result)
+        except Exception as e:
+            print(f"[WARNING] Failed to load remote results: {e}")
+
     def _on_queue_cancel(self):
         """Handle queue cancel request."""
+        if self._remote_dispatcher and self._remote_dispatcher.is_running:
+            self._remote_dispatcher.cancel()
+
         if not self.batch_executor:
             return
         
