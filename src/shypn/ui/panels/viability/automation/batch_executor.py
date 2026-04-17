@@ -45,6 +45,15 @@ def _worker_pool_initializer(q) -> None:
     global _worker_progress_queue
     _worker_progress_queue = q
 
+    # Mirror the logging suppression from shypn.py so that worker processes
+    # (forkserver context — no inherited logging config) don't flood stderr
+    # with ODE/propensity acceleration warnings about non-transpilable
+    # transitions.
+    import logging as _logging
+    _logging.basicConfig(level=_logging.WARNING, format='%(levelname)s [%(name)s] %(message)s')
+    _logging.getLogger('shypn.engine.acceleration').setLevel(_logging.ERROR)
+    _logging.getLogger('shypn.engine.simulation.controller').setLevel(_logging.ERROR)
+
 
 def _worker_run_experiment(args: dict) -> Dict[str, Any]:
     """Worker function to run a single experiment in parallel process.

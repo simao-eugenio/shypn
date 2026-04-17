@@ -309,11 +309,41 @@ class _CExprEmitter(ast.NodeVisitor):
         return f"({left} {sym} {right})"
 
     def visit_BoolOp(self, node: ast.BoolOp) -> str:  # type: ignore[override]
-        # Convert Python bool ops to C ternary where reasonable
-        raise TranspileError("Boolean operators are not supported in C transpilation")
+        # Python `and` / `or` → C `&&` / `||`
+        # In C, these yield 0 or 1 (int), which is fine for arithmetic use
+        # in rate expressions like: rate * (A > 0 and B > 0)
+        parts = [self._require(v) for v in node.values]
+        if isinstance(node.op, ast.And):
+            return "(" + " && ".join(parts) + ")"
+        if isinstance(node.op, ast.Or):
+            return "(" + " || ".join(parts) + ")"
+        raise TranspileError(f"Unsupported boolean op: {type(node.op).__name__}")
 
     def visit_Compare(self, node: ast.Compare) -> str:  # type: ignore[override]
-        raise TranspileError("Comparison operators are not supported in C transpilation")
+        # Python comparisons → C comparisons.
+        # Supports chained comparisons: a < b < c → ((a < b) && (b < c))
+        # In C, comparison operators yield 0 or 1, which is valid for
+        # arithmetic use in rate expressions like: rate * (X > threshold)
+        _OP_MAP = {
+            ast.Lt: "<", ast.LtE: "<=",
+            ast.Gt: ">", ast.GtE: ">=",
+            ast.Eq: "==", ast.NotEq: "!=",
+        }
+        left = self._require(node.left)
+        parts = []
+        prev = left
+        for op, comparator in zip(node.ops, node.comparators):
+            sym = _OP_MAP.get(type(op))
+            if sym is None:
+                raise TranspileError(
+                    f"Unsupported comparison op: {type(op).__name__}"
+                )
+            right = self._require(comparator)
+            parts.append(f"({prev} {sym} {right})")
+            prev = right
+        if len(parts) == 1:
+            return parts[0]
+        return "(" + " && ".join(parts) + ")"
 
     def visit_IfExp(self, node: ast.IfExp) -> str:  # type: ignore[override]
         # Python ternary: a if cond else b  →  C: (cond ? a : b)

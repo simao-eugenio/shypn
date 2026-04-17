@@ -42,6 +42,7 @@ class ExperimentQueueView(Gtk.Box):
         self.on_cancel_callback = None
         self.on_clear_callback = None
         self.on_pause_callback = None  # Stage 3
+        self.on_run_remote_callback = None  # Remote dispatch
         
         # Build UI
         self._build_ui()
@@ -99,6 +100,15 @@ class ExperimentQueueView(Gtk.Box):
         self.run_button.set_tooltip_text("Execute all pending experiments")
         self.run_button.connect("clicked", self._on_run_clicked)
         button_box.pack_start(self.run_button, False, False, 0)
+        
+        # Run Remote button
+        self.run_remote_button = Gtk.Button(label="☁ Run Remote")
+        self.run_remote_button.set_tooltip_text(
+            "Dispatch sweep to remote server via SSH.\n"
+            "Uploads model + config, runs CLI remotely, fetches results."
+        )
+        self.run_remote_button.connect("clicked", self._on_run_remote_clicked)
+        button_box.pack_start(self.run_remote_button, False, False, 0)
         
         # Pause/Resume button (Stage 3)
         self.pause_button = Gtk.Button(label="⏸ Pause")
@@ -463,3 +473,24 @@ class ExperimentQueueView(Gtk.Box):
             callback: Function to call with boolean (True=pause, False=resume)
         """
         self.on_pause_callback = callback
+    
+    def set_run_remote_callback(self, callback):
+        """Set callback for Run Remote button.
+        
+        Args:
+            callback: Function to call when dispatching to remote server
+        """
+        self.on_run_remote_callback = callback
+    
+    def _on_run_remote_clicked(self, button):
+        """Handle Run Remote button click."""
+        if self.on_run_remote_callback:
+            pending = self.get_pending_experiments()
+            if pending:
+                self.on_run_remote_callback(pending)
+            else:
+                total = len(self.queue_store)
+                if total == 0:
+                    self.status_label.set_markup("<i>Queue empty - generate experiments first</i>")
+                else:
+                    self.status_label.set_markup("<i>No pending experiments - use 'Reset All' to re-run</i>")
