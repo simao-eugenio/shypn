@@ -125,14 +125,23 @@ class RemoteSweepDispatcher:
         self._cancel = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._ctl_path: Optional[str] = None  # SSH ControlMaster socket
+        self._stream_proc: Optional[subprocess.Popen] = None
+        self._ssh_password: Optional[str] = None
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
     def cancel(self):
-        """Request cancellation of a running dispatch."""
+        """Request cancellation of a running dispatch.
+
+        Sends a remote ``pkill`` to terminate the sweep process tree
+        on the server, then terminates the local SSH stream process.
+        Without the remote kill, the server-side sweep keeps running
+        because ``-T`` (no PTY) prevents SIGHUP propagation.
+        """
         self._cancel.set()
+        self._kill_remote_sweep()
 
     # ── public entry point ───────────────────────────────────────────
     def dispatch(
@@ -170,6 +179,7 @@ class RemoteSweepDispatcher:
             return
 
         self._cancel.clear()
+        self._ssh_password = ssh_password
         self._thread = threading.Thread(
             target=self._run_pipeline,
             args=(model_filepath, project_folder, experiment_manager,
@@ -301,8 +311,33 @@ class RemoteSweepDispatcher:
                 complete_cb(False, '', str(e))
         finally:
             self._close_control_master(host)
+            self._ssh_password = None
             if staging and staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
+
+    def _kill_remote_sweep(self):
+        """Send a kill command to the remote server to stop the sweep."""
+        host = self.settings.ssh_host
+        try:
+            # Kill the sweep process and all children (worker pool)
+            kill_cmd = (
+                "pkill -f 'python.*shypn.cli.sweep' ; "
+                "pkill -f '_run_replicate_chunk'"
+            )
+            argv = ['ssh', '-o', 'ConnectTimeout=5', '-C']
+            argv += self._ctl_socket_args()
+            argv += [host, kill_cmd]
+            if self._ssh_password and not self._ctl_path:
+                argv = ['sshpass', '-p', self._ssh_password] + argv
+            subprocess.run(argv, capture_output=True, timeout=10)
+            logger.info("Sent remote kill for sweep processes on %s", host)
+        except Exception as exc:
+            logger.warning("Failed to kill remote sweep: %s", exc)
+
+        # Also terminate the local SSH stream if still running
+        proc = self._stream_proc
+        if proc and proc.poll() is None:
+            proc.terminate()
 
     # ── helpers ──────────────────────────────────────────────────────
     @staticmethod
@@ -554,6 +589,7 @@ class RemoteSweepDispatcher:
             text=True,
             bufsize=1,  # line-buffered
         )
+        self._stream_proc = proc
         lines: list[str] = []
         try:
             for line in proc.stdout:              # type: ignore[union-attr]
@@ -562,9 +598,11 @@ class RemoteSweepDispatcher:
                 if stripped and progress_cb:
                     progress_cb(stripped)
                 if cancel and cancel.is_set():
+                    # Remote kill already sent by cancel(); just clean up local
                     proc.terminate()
                     raise InterruptedError('Cancelled')
         finally:
+            self._stream_proc = None
             proc.stdout.close()                   # type: ignore[union-attr]
             proc.wait(timeout=30)
 
