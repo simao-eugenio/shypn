@@ -184,11 +184,12 @@ class DataCollector:
                 p_row[col] = place.tokens
             self._buf_ptr += 1
 
-            # Still record transition firing counts (cheap — just int getAttribute)
-            if not self._skip_rate_eval:
-                for transition in self._rec_transitions:
-                    count = getattr(transition, 'firing_count', 0)
-                    self.transition_data[transition.id].append((current_time, count))
+            # Always record transition firing counts (cheap — just int getAttribute).
+            # This must NOT be gated by _skip_rate_eval: that flag controls
+            # expensive rate/propensity evaluation, not cumulative firing counts.
+            for transition in self._rec_transitions:
+                count = getattr(transition, 'firing_count', 0)
+                self.transition_data[transition.id].append((current_time, count))
             return  # skip rate-eval entirely in fast path
 
         # ── Standard path — Python list-of-tuples ────────────────────────────
