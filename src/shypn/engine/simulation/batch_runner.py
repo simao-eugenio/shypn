@@ -205,6 +205,10 @@ def _replicate_range_worker(
                 'time_points': time_points,
                 'place_data': place_data,
                 'transition_data': transition_data,
+                'total_firings': {
+                    t.id: getattr(t, 'firing_count', 0)
+                    for t in controller.model.transitions
+                },
                 'stopped_reason': stopped_reason,
                 'final_time': controller.time,
                 'validation_results': controller.data_collector.validation_results,
@@ -503,6 +507,10 @@ class BatchSimulationRunner:
                     'time_points': time_points,
                     'place_data': place_data,
                     'transition_data': transition_data,
+                    'total_firings': {
+                        t.id: getattr(t, 'firing_count', 0)
+                        for t in replicate_controller.model.transitions
+                    },
                     'stopped_reason': stopped_reason,
                     'final_time': replicate_controller.time,
                     'validation_results': replicate_controller.data_collector.validation_results

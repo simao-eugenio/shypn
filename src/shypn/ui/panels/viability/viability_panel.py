@@ -1161,7 +1161,7 @@ class ViabilityPanel(Gtk.Box):
     def _on_place_marking_edited(self, widget, path, new_text, store):
         """Handle place marking edit."""
         try:
-            new_marking = int(new_text)
+            new_marking = float(new_text)
             place_id = store[path][0]
             
             # Update store
@@ -1227,7 +1227,7 @@ class ViabilityPanel(Gtk.Box):
     def _on_arc_weight_edited(self, widget, path, new_text, store):
         """Handle arc weight edit."""
         try:
-            new_weight = int(new_text)
+            new_weight = float(new_text)
             arc_id = store[path][0]
             
             # Update store
