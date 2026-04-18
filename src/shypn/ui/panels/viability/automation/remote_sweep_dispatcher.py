@@ -553,6 +553,8 @@ class RemoteSweepDispatcher:
             return result
 
         # SSH-level failure (exit 255) — invalidate dead socket, retry direct
+        if cancel and cancel.is_set():
+            raise InterruptedError('Cancelled')
         if self._ctl_path:
             logger.warning("SSH stream via ControlMaster failed (exit 255), "
                            "invalidating socket and retrying direct")
@@ -619,6 +621,10 @@ class RemoteSweepDispatcher:
             self._stream_proc = None
             proc.stdout.close()                   # type: ignore[union-attr]
             proc.wait(timeout=30)
+
+        # If cancelled, the remote kill caused exit 255 — don't retry
+        if cancel and cancel.is_set():
+            raise InterruptedError('Cancelled')
 
         if proc.returncode == 255:
             # SSH-level failure — signal retry
