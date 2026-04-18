@@ -319,10 +319,11 @@ class RemoteSweepDispatcher:
         """Send a kill command to the remote server to stop the sweep."""
         host = self.settings.ssh_host
         try:
-            # Kill the sweep process and all children (worker pool)
+            # Kill the sweep process and all children (worker pool).
+            # Match 'shypn.cli.sweep' anywhere in the command line — the
+            # binary may be .venv/bin/python, python3, etc.
             kill_cmd = (
-                "pkill -f 'python.*shypn.cli.sweep' ; "
-                "pkill -f '_run_replicate_chunk'"
+                "pkill -9 -f 'shypn.cli.sweep'"
             )
             argv = ['ssh', '-o', 'ConnectTimeout=5', '-C']
             argv += self._ctl_socket_args()
