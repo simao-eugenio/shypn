@@ -355,7 +355,9 @@ class ReplicateRunner:
         _in_pool = os.environ.get('_SHYPN_IN_POOL_WORKER')
         _cpu_count = os.cpu_count() or 1
         if n > 1 and not _in_pool and _cpu_count > 1:
-            n_workers = min(_cpu_count - 1, n)
+            # Reserve at least 2 cores for SSH / system (cap at 75%)
+            _max_workers = max(1, min(_cpu_count - 2, int(_cpu_count * 0.75)))
+            n_workers = min(_max_workers, n)
             if verbose:
                 print(f"  CPU parallel: {n_workers} workers for {n} replicates")
 

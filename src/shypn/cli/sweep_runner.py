@@ -64,7 +64,9 @@ class SweepRunner:
         self.model_path = model_path
         self.config = config
         self.output_dir = output_dir
-        self.workers = workers or max(1, (os.cpu_count() or 4) - 1)
+        # Reserve at least 2 cores for SSH / system (cap at 75%)
+        _cpus = os.cpu_count() or 4
+        self.workers = workers or max(1, min(_cpus - 2, int(_cpus * 0.75)))
         self.verbose = verbose
 
     # ── public API ───────────────────────────────────────────────────
