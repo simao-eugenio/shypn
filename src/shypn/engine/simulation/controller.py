@@ -1614,22 +1614,38 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                 t_end   = self.time + time_step
                 ok = accel.integrate(t_start, t_end)
                 if ok:
-                    # Count pure-continuous firings and update firing_count
+                    # Count firings and update firing_count for all
+                    # ODE-covered transitions (continuous + adaptive).
                     fired_count = 0
+                    covered_tids = {spec.tid for spec in accel._specs}
                     for t in self.model.transitions:
-                        if getattr(t, 'transition_type', '') == 'continuous':
+                        if t.id in covered_tids:
                             behavior = self._get_behavior(t)
-                            if behavior and behavior.can_fire()[0]:
+                            # For adaptive transitions in ODE, can_fire()
+                            # may return False (stochastic delegate check).
+                            # Use rate evaluation directly instead.
+                            if t.transition_type == 'adaptive':
+                                try:
+                                    places_dict = {p.name: p for p in self.model.places}
+                                    rate = behavior.evaluate_rate(places_dict, self.time)
+                                    if abs(rate) > 0:
+                                        fired_count += 1
+                                        t.firing_count += abs(rate) * time_step
+                                except Exception:
+                                    pass
+                            elif behavior and behavior.can_fire()[0]:
                                 fired_count += 1
                                 t.firing_count += time_step
-                    # ── Still run the Python path for adaptive transitions
-                    # that are currently in continuous mode.  The ODE system
-                    # only includes transition_type=='continuous' nodes; any
-                    # adaptive transition in continuous mode must still be
-                    # executed so tau-leaping (Phase 4) sees correct tokens.
+                    # ── F2: Adaptive transitions in continuous mode are now
+                    # included in the ODE system directly, so we do NOT
+                    # need a separate Python loop for them.  Only run the
+                    # Python path for adaptive-continuous transitions that
+                    # were NOT covered by the ODE (e.g. if ODE build skipped
+                    # them due to missing rate expression).
+                    covered_tids = {spec.tid for spec in accel._specs}
                     adaptive_continuous = []
                     for t in self.model.transitions:
-                        if t.transition_type == 'adaptive':
+                        if t.transition_type == 'adaptive' and t.id not in covered_tids:
                             behavior = self._get_behavior(t)
                             if behavior and hasattr(behavior, 'get_current_mode'):
                                 current_mode = behavior.get_current_mode()
@@ -1809,22 +1825,42 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                         if _mode == 'stochastic':
                             stochastic_transitions.append(_t)
             
-            # Check structural enabling (sufficient tokens)
+            # Check enabling — use the appropriate semantics per type.
+            # Pure stochastic: discrete structural check (tokens >= weight).
+            # Adaptive-in-stochastic-mode: rate-function propensity > 0,
+            # because the arc weight is a stoichiometric coefficient for
+            # continuous-valued places, NOT a discrete token threshold.
+            # (HPN formalism: adaptive transitions bridge continuous and
+            # discrete domains — the rate function encodes enabling.)
             enabled_stochastic = []
             for t in stochastic_transitions:
                 behavior = self._get_behavior(t)
-                input_arcs = behavior.get_input_arcs()
-                structurally_enabled = True
-                for arc in input_arcs:
-                    arc_type = getattr(arc, 'arc_type', 'normal')
-                    if arc_type == 'test':
-                        continue
-                    source_place = arc.source
-                    if source_place and source_place.tokens < arc.weight:
-                        structurally_enabled = False
-                        break
-                if structurally_enabled:
-                    enabled_stochastic.append(t)
+                if t.transition_type == 'adaptive':
+                    # ── F1 fix: rate-based enabling for adaptive transitions ──
+                    # Evaluate the rate function; if rate > 0 the transition
+                    # is enabled.  This avoids the discrete tokens>=weight
+                    # check that permanently blocks adaptive transitions
+                    # connected to continuous-valued places.
+                    try:
+                        places_dict = {p.name: p for p in self.model.places}
+                        rate = behavior.evaluate_rate(places_dict, self.time)
+                        if rate > 0:
+                            enabled_stochastic.append(t)
+                    except Exception:
+                        pass  # skip on eval error
+                else:
+                    input_arcs = behavior.get_input_arcs()
+                    structurally_enabled = True
+                    for arc in input_arcs:
+                        arc_type = getattr(arc, 'arc_type', 'normal')
+                        if arc_type == 'test':
+                            continue
+                        source_place = arc.source
+                        if source_place and source_place.tokens < arc.weight:
+                            structurally_enabled = False
+                            break
+                    if structurally_enabled:
+                        enabled_stochastic.append(t)
             
             if enabled_stochastic:
                 # Use τ-leaping for stochastic simulation
@@ -1862,19 +1898,29 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                     self._tau_leaping_engine.execute_step(self)
                     tau_leaping_advanced_time = True
                 else:
-                    # Hybrid model: clamp tau to dt
+                    # ── F3 fix: operator splitting for hybrid models ──
+                    # Instead of clamping tau = dt (which suppresses
+                    # stochastic dynamics), let tau-leaping choose its
+                    # own adaptive tau up to the remaining dt window.
+                    # The ODE phase already advanced the continuous
+                    # state; now we let the stochastic engine advance
+                    # within the same [t, t+dt] window.
                     original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                    original_min_tau = self._tau_leaping_engine.leap_selector.min_tau
+                    # Cap max_tau at the ODE step size (don't overshoot)
+                    # but let min_tau stay at its configured value so
+                    # the algorithm can take sub-steps if needed.
                     self._tau_leaping_engine.leap_selector.max_tau = time_step
-                    self._tau_leaping_engine.leap_selector.min_tau = time_step
                     
-                    # Prevent tau-leaping from advancing time
+                    # Prevent tau-leaping from advancing the controller
+                    # clock — the finalize phase handles that.
                     self._tau_leaping_engine._advance_time = False
                     self._tau_leaping_engine.execute_step(self)
                     self._tau_leaping_engine._advance_time = True
                     
                     # Restore original tau bounds
                     self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
-                    self._tau_leaping_engine.leap_selector.min_tau = self.settings.min_tau
+                    self._tau_leaping_engine.leap_selector.min_tau = original_min_tau
                     tau_leaping_advanced_time = False
                 
                 discrete_fired = True
