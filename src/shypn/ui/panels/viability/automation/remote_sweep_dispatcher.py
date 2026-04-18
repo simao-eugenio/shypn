@@ -2,17 +2,15 @@
 """Remote Sweep Dispatcher — run CLI sweeps on a remote server via SSH.
 
 Architecture (minimal data transfer):
-  1. **Git sync**: commit + push locally, ``git pull`` on remote
-     — ensures both model files and engine code are in sync
-  2. **Export sweep config** to a local temp file (small JSON, ~1–5 KB)
-  3. **SCP config only** to the remote project folder
-  4. **SSH run** ``python -m shypn.cli.sweep`` on the remote
-  5. **Fetch results** back via ``tar cz | tar xz`` over the
+  1. **Export sweep config** to a local temp file (small JSON, ~1–5 KB)
+  2. **SCP config only** to the remote project folder
+  3. **SSH run** ``python -m shypn.cli.sweep`` on the remote
+  4. **Fetch results** back via ``tar cz | tar xz`` over the
      multiplexed SSH tunnel
 
 Only the experiment plan (sweep_config.json) crosses the network.
-The model (``.shy``), engine code, and workspace structure are all
-kept in sync via the git repository on both sides.
+The user is responsible for keeping client and server code/model
+in sync (e.g. via ``git push`` / ``git pull``) **before** dispatch.
 
 Performance (WAN):
   - A persistent SSH ControlMaster socket is opened once per dispatch
@@ -22,9 +20,9 @@ Performance (WAN):
     round-trips).
 
 Requires:
-  - Git remote reachable from both client and server
   - SSH access to server (password or key)
   - Remote repo clone at a known path with ``.venv``
+  - Client and server repos synced before dispatch
 
 Author: Simão Eugénio
 Date: April 2026
@@ -57,8 +55,6 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
-        'git_remote': 'private',   # local git remote name to push to
-        'git_branch': '',          # '' = current branch (auto-detect)
     }
 
     def __init__(self, workspace_settings=None):
@@ -101,22 +97,6 @@ class RemoteSweepSettings:
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
 
-    @property
-    def git_remote(self) -> str:
-        return self._section['git_remote']
-
-    @git_remote.setter
-    def git_remote(self, v: str):
-        self._section['git_remote'] = v
-
-    @property
-    def git_branch(self) -> str:
-        return self._section['git_branch']
-
-    @git_branch.setter
-    def git_branch(self, v: str):
-        self._section['git_branch'] = v
-
     def save(self):
         """Persist to workspace.json."""
         if self._ws:
@@ -128,16 +108,16 @@ class RemoteSweepSettings:
 
 
 class RemoteSweepDispatcher:
-    """Orchestrates a full remote sweep cycle (git-sync → config → SSH → fetch).
+    """Orchestrates a full remote sweep cycle (config → SSH → fetch).
 
     All heavy I/O runs on a background thread.  GTK callbacks are
     delivered via ``GLib.idle_add`` by the caller (automation category).
 
     Data-transfer policy:
-        The **model** and **engine code** are synchronised via git
-        (push locally → pull on remote).  Only the **sweep config**
-        (~1–5 KB JSON) is transferred over SCP.  Results are fetched
-        back as a single compressed tar stream.
+        Only the **sweep config** (~1–5 KB JSON) is transferred over
+        SCP.  Results are fetched back as a single compressed tar
+        stream.  The user is responsible for keeping the model and
+        engine code synced between client and server before dispatch.
     """
 
     def __init__(self, settings: RemoteSweepSettings):
@@ -170,7 +150,8 @@ class RemoteSweepDispatcher:
         Args:
             model_filepath: Absolute local path to the ``.shy`` model file.
                 Used only to derive the repo-relative model path (the file
-                itself is **not** transferred — it reaches the server via git).
+                itself is **not** transferred — it must already exist on
+                the server).
             project_folder: Absolute local path to the project root
                 (e.g. ``workspace/projects/canabidiol``).
             experiment_manager: ``ExperimentManager`` instance (has
@@ -226,17 +207,8 @@ class RemoteSweepDispatcher:
             model_abs = Path(model_filepath).resolve()
             model_rel_to_project = str(model_abs.relative_to(project_abs))
 
-            # ── 1. Git sync: push local → pull remote ────────────────
-            self._emit(progress_cb, 'Syncing repository (git push + pull)...')
-            branch = self._git_sync(
-                repo_root, host, remote_repo,
-                password=ssh_password,
-            )
-
-            if self._cancel.is_set():
-                raise InterruptedError('Cancelled')
-
-            # ── open persistent SSH connection ───────────────────────
+            # ── 1. Open persistent SSH connection ────────────────────
+            self._emit(progress_cb, 'Opening SSH connection...')
             self._open_control_master(host, password=ssh_password)
 
             # ── 2. Export sweep config (local temp) ──────────────────
@@ -252,11 +224,12 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 3. SCP config only to remote ─────────────────────────
-            self._emit(progress_cb, 'Uploading sweep config (~1 KB)...')
+            # ── 3. SCP config to remote ─────────────────────────────
+            self._emit(progress_cb, 'Creating remote directory...')
             remote_project = f"{remote_repo}/{project_rel}"
             self._ssh(host, f"mkdir -p {remote_project}",
                       password=ssh_password)
+            self._emit(progress_cb, 'Uploading sweep config...')
             self._scp_to(host, str(config_path),
                          f"{remote_project}/sweep_config.json",
                          password=ssh_password)
@@ -264,7 +237,7 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 4. SSH run CLI on remote ─────────────────────────────
+            # ── 3. SSH run CLI on remote ─────────────────────────────
             self._emit(progress_cb, 'Running sweep on remote server...')
 
             workers_flag = f"--workers {workers}" if workers > 0 else ""
@@ -298,7 +271,7 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 5. Fetch results back ────────────────────────────────
+            # ── 4. Fetch results back ────────────────────────────────
             self._emit(progress_cb, 'Fetching results from remote...')
 
             run_name = Path(run_dir).name
@@ -309,7 +282,7 @@ class RemoteSweepDispatcher:
             self._fetch_results_tar(host, run_dir, str(local_run_dir),
                                     password=ssh_password)
 
-            # ── 6. Done ──────────────────────────────────────────────
+            # ── 5. Done ──────────────────────────────────────────────
             self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
 
             if complete_cb:
@@ -341,83 +314,6 @@ class RemoteSweepDispatcher:
                 return parent
         return None
 
-    # ── Git sync ─────────────────────────────────────────────────────
-    def _git_sync(
-        self,
-        local_repo: Path,
-        ssh_host: str,
-        remote_repo: str,
-        *,
-        password: Optional[str] = None,
-    ) -> str:
-        """Push local commits and pull on remote — model + code in sync.
-
-        Steps:
-          1. ``git add -A`` + ``git commit`` locally (auto-commit of any
-             unsaved model / workspace changes).
-          2. ``git push <remote> <branch>``.
-          3. SSH ``git -C <remote_repo> pull origin <branch>``.
-
-        Returns the branch name used.
-        """
-        git_remote = self.settings.git_remote
-        branch = self.settings.git_branch
-
-        # Auto-detect branch if not configured
-        if not branch:
-            result = subprocess.run(
-                ['git', '-C', str(local_repo), 'rev-parse',
-                 '--abbrev-ref', 'HEAD'],
-                capture_output=True, text=True, timeout=10,
-            )
-            branch = result.stdout.strip() or 'main'
-
-        # Local: stage + commit (no-op if tree is clean)
-        subprocess.run(
-            ['git', '-C', str(local_repo), 'add', '-A'],
-            capture_output=True, text=True, timeout=30,
-        )
-        subprocess.run(
-            ['git', '-C', str(local_repo), 'commit',
-             '-m', 'auto: pre-remote-sweep sync',
-             '--allow-empty-message', '--no-verify'],
-            capture_output=True, text=True, timeout=30,
-        )
-
-        # Local: push to the configured remote
-        push = subprocess.run(
-            ['git', '-C', str(local_repo), 'push', git_remote, branch],
-            capture_output=True, text=True, timeout=120,
-        )
-        if push.returncode != 0:
-            raise RuntimeError(
-                f"git push {git_remote} {branch} failed:\n"
-                f"{push.stderr.strip()}")
-
-        # Remote: pull the same branch
-        pull_cmd = (
-            f"cd {remote_repo} && "
-            f"git fetch origin {branch} && "
-            f"git checkout {branch} && "
-            f"git reset --hard origin/{branch}"
-        )
-
-        # Use sshpass for this pre-ControlMaster call
-        argv = ['ssh', '-C', ssh_host, pull_cmd]
-        if password:
-            argv = ['sshpass', '-p', password] + argv
-        pull = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=120,
-        )
-        if pull.returncode != 0:
-            raise RuntimeError(
-                f"Remote git pull failed:\n{pull.stderr.strip()}")
-
-        logger.info("Git sync complete: %s/%s → %s:%s",
-                     git_remote, branch, ssh_host, remote_repo)
-        return branch
-
     # ── SSH ControlMaster multiplexing ───────────────────────────────
     def _ctl_socket_args(self) -> list[str]:
         """Return SSH args that attach to the persistent control socket."""
@@ -429,6 +325,10 @@ class RemoteSweepDispatcher:
                              password: Optional[str] = None):
         """Open a persistent SSH connection (ControlMaster).
 
+        Uses ``-f`` to fork into the background after authentication,
+        so this call returns as soon as the connection is established
+        (typically < 2 s) instead of blocking for the full timeout.
+
         All subsequent _ssh / _scp_to / _ssh_stream calls will
         multiplex over this single TCP connection, avoiding repeated
         handshakes (huge win on high-latency WAN links).
@@ -439,10 +339,12 @@ class RemoteSweepDispatcher:
             'ssh', '-C',
             '-o', 'ControlMaster=yes',
             '-o', f'ControlPath={ctl}',
-            '-o', 'ControlPersist=yes',
+            '-o', 'ControlPersist=300',
             '-o', 'ServerAliveInterval=30',
             '-o', 'ServerAliveCountMax=3',
-            '-N',  # no remote command — just open the tunnel
+            '-o', 'ConnectTimeout=15',
+            '-f',  # fork to background after auth
+            '-N',  # no remote command
             host,
         ]
         if password:
@@ -456,8 +358,25 @@ class RemoteSweepDispatcher:
                            "per-command connections", result.stderr.strip())
             self._ctl_path = None
             return
+
+        # Verify the socket is actually alive
+        check = subprocess.run(
+            ['ssh', '-O', 'check', '-o', f'ControlPath={ctl}', host],
+            capture_output=True, text=True, timeout=10,
+        )
+        if check.returncode != 0:
+            logger.warning("ControlMaster check failed (%s), falling back",
+                           check.stderr.strip())
+            # Clean up the dead socket
+            try:
+                os.unlink(ctl)
+            except OSError:
+                pass
+            self._ctl_path = None
+            return
+
         self._ctl_path = ctl
-        logger.info("SSH ControlMaster opened: %s", ctl)
+        logger.info("SSH ControlMaster opened and verified: %s", ctl)
 
     def _close_control_master(self, host: str):
         """Tear down the persistent SSH connection."""
@@ -481,21 +400,62 @@ class RemoteSweepDispatcher:
 
     # ── SSH / SCP wrappers (with multiplexing + compression) ─────────
     def _ssh(self, host: str, cmd: str, *,
-             password: Optional[str] = None) -> str:
-        """Run a command on the remote via SSH and return stdout (blocking)."""
+             password: Optional[str] = None,
+             timeout: int = 60) -> str:
+        """Run a command on the remote via SSH and return stdout (blocking).
+
+        If a ControlMaster socket is active, tries that first.  On
+        timeout, invalidates the dead socket and retries with a direct
+        connection so the pipeline is not stuck forever.
+        """
         argv = ['ssh', '-C'] + self._ctl_socket_args() + [host, cmd]
         if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
-        result = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=600,
-        )
+        try:
+            result = subprocess.run(
+                argv,
+                capture_output=True, text=True, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            if self._ctl_path:
+                logger.warning("SSH via ControlMaster timed out, "
+                               "invalidating socket and retrying direct")
+                self._invalidate_control_master(host)
+                # Retry without the dead socket
+                argv = ['ssh', '-C', host, cmd]
+                if password:
+                    argv = ['sshpass', '-p', password] + argv
+                result = subprocess.run(
+                    argv,
+                    capture_output=True, text=True, timeout=timeout,
+                )
+            else:
+                raise
         if result.returncode != 0:
             raise RuntimeError(
                 f"SSH command failed (exit {result.returncode}):\n"
                 f"  cmd: {cmd}\n"
                 f"  stderr: {result.stderr.strip()}")
         return result.stdout
+
+    def _invalidate_control_master(self, host: str):
+        """Kill a dead/stuck ControlMaster and clear the socket path."""
+        if not self._ctl_path:
+            return
+        try:
+            subprocess.run(
+                ['ssh', '-O', 'exit',
+                 '-o', f'ControlPath={self._ctl_path}', host],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception:
+            pass
+        try:
+            os.unlink(self._ctl_path)
+        except OSError:
+            pass
+        logger.info("Invalidated dead ControlMaster: %s", self._ctl_path)
+        self._ctl_path = None
 
     def _ssh_stream(
         self,
@@ -554,10 +514,24 @@ class RemoteSweepDispatcher:
                [local_path, f'{host}:{remote_path}']
         if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
-        result = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=300,
-        )
+        try:
+            result = subprocess.run(
+                argv,
+                capture_output=True, text=True, timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            if self._ctl_path:
+                logger.warning("SCP via ControlMaster timed out, retrying direct")
+                self._invalidate_control_master(host)
+                argv = ['scp', '-C', '-r', local_path, f'{host}:{remote_path}']
+                if password:
+                    argv = ['sshpass', '-p', password] + argv
+                result = subprocess.run(
+                    argv,
+                    capture_output=True, text=True, timeout=120,
+                )
+            else:
+                raise
         if result.returncode != 0:
             raise RuntimeError(f"SCP upload failed: {result.stderr.strip()}")
 
