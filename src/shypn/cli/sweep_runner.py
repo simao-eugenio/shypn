@@ -28,6 +28,18 @@ from shypn.ui.panels.viability.automation.property_path_parser import (
     resolve_object,
 )
 
+
+def _worker_init() -> None:
+    """Initializer for ProcessPoolExecutor workers.
+
+    Installs the process guard so worker processes also die cleanly
+    when their parent is killed (e.g. SSH connection drop).
+    Also marks the process so replicate_runner won't spawn a nested pool.
+    """
+    os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
+    from shypn.engine.process_guard import install_process_guard
+    install_process_guard()
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,6 +132,7 @@ class SweepRunner:
 
         with ProcessPoolExecutor(
             max_workers=min(self.workers, n_conditions),
+            initializer=_worker_init,
         ) as pool:
             for idx, snapshot in enumerate(snapshots):
                 fut = pool.submit(

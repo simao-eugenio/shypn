@@ -10,7 +10,7 @@ Date: December 7, 2025
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk, Gdk, GLib, Pango
 
 
 class ExperimentQueueView(Gtk.Box):
@@ -161,6 +161,8 @@ class ExperimentQueueView(Gtk.Box):
         self._status_view = Gtk.TextView()
         self._status_view.set_editable(False)
         self._status_view.set_cursor_visible(False)
+        self._status_view.set_can_focus(True)
+        self._status_view.connect('key-press-event', self._on_status_key_press)
         self._status_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
         self._status_view.set_left_margin(4)
         self._status_view.set_right_margin(4)
@@ -542,6 +544,28 @@ class ExperimentQueueView(Gtk.Box):
         # Auto-scroll to end
         self._status_view.scroll_to_iter(buf.get_end_iter(), 0.0,
                                          False, 0.0, 0.0)
+
+    def _on_status_key_press(self, widget, event):
+        """Handle Ctrl+C / Ctrl+A on the status TextView."""
+        ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+        if ctrl and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
+            buf = self._status_buffer
+            if buf.get_has_selection():
+                bounds = buf.get_selection_bounds()
+                text = buf.get_text(bounds[0], bounds[1], False)
+            else:
+                # Nothing selected → copy all text
+                text = buf.get_text(buf.get_start_iter(),
+                                    buf.get_end_iter(), False)
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            clipboard.set_text(text, -1)
+            clipboard.store()
+            return True  # handled
+        if ctrl and event.keyval in (Gdk.KEY_a, Gdk.KEY_A):
+            buf = self._status_buffer
+            buf.select_range(buf.get_start_iter(), buf.get_end_iter())
+            return True
+        return False
 
 
 class _StatusLabelCompat:

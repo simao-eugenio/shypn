@@ -734,6 +734,7 @@ class ExperimentAutomationCategory:
         if self.queue_view:
             self.queue_view.run_button.set_sensitive(False)
             self.queue_view.run_remote_button.set_sensitive(False)
+            self.queue_view.cancel_button.set_sensitive(True)
             self.queue_view.status_label.set_markup(
                 "<span foreground='blue'><b>Remote sweep dispatching...</b></span>"
             )
@@ -806,6 +807,7 @@ class ExperimentAutomationCategory:
                 if self.queue_view:
                     self.queue_view.run_button.set_sensitive(True)
                     self.queue_view.run_remote_button.set_sensitive(True)
+                    self.queue_view.cancel_button.set_sensitive(False)
                 if success:
                     if self.queue_view:
                         self.queue_view.status_label.set_markup(
