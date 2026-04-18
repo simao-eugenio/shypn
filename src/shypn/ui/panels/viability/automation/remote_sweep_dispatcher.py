@@ -319,10 +319,16 @@ class RemoteSweepDispatcher:
         """Send a kill command to the remote server to stop the sweep."""
         host = self.settings.ssh_host
         try:
-            # Kill the sweep process and all children (worker pool).
-            # Match 'shypn.cli.sweep' anywhere in the command line — the
-            # binary may be .venv/bin/python, python3, etc.
-            kill_cmd = "pkill -9 -f 'shypn\\.cli\\.sweep' || true"
+            # Use pgrep + kill instead of pkill to avoid killing our own
+            # SSH session.  pkill -f "shypn.cli.sweep" matches the bash
+            # shell running the pkill command (its cmdline contains the
+            # pattern), causing exit 255.  pgrep excludes its own PID,
+            # and [.] in the regex prevents matching the literal bracket
+            # characters in the bash cmdline.
+            kill_cmd = (
+                "pids=$(pgrep -f 'shypn[.]cli[.]sweep'); "
+                "[ -n \"$pids\" ] && kill -9 $pids; true"
+            )
             # Use a completely independent SSH connection — bypass both
             # the app's ControlMaster socket and the user's ~/.ssh/config
             # ControlMaster, which may be stale or blocked by the
