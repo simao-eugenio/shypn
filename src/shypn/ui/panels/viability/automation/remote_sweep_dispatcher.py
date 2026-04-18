@@ -322,15 +322,22 @@ class RemoteSweepDispatcher:
             # Kill the sweep process and all children (worker pool).
             # Match 'shypn.cli.sweep' anywhere in the command line — the
             # binary may be .venv/bin/python, python3, etc.
-            kill_cmd = (
-                "pkill -9 -f 'shypn.cli.sweep'"
-            )
-            argv = ['ssh', '-o', 'ConnectTimeout=5', '-C']
-            argv += self._ctl_socket_args()
-            argv += [host, kill_cmd]
-            if self._ssh_password and not self._ctl_path:
+            kill_cmd = "pkill -9 -f 'shypn\\.cli\\.sweep' || true"
+            # Use a completely independent SSH connection — bypass both
+            # the app's ControlMaster socket and the user's ~/.ssh/config
+            # ControlMaster, which may be stale or blocked by the
+            # still-running stream connection.
+            argv = [
+                'ssh',
+                '-o', 'ControlMaster=no',
+                '-o', 'ControlPath=none',
+                '-o', 'ConnectTimeout=10',
+                '-C',
+                host, kill_cmd,
+            ]
+            if self._ssh_password:
                 argv = ['sshpass', '-p', self._ssh_password] + argv
-            subprocess.run(argv, capture_output=True, timeout=10)
+            subprocess.run(argv, capture_output=True, timeout=15)
             logger.info("Sent remote kill for sweep processes on %s", host)
         except Exception as exc:
             logger.warning("Failed to kill remote sweep: %s", exc)
