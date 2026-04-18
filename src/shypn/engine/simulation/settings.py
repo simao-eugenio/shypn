@@ -5,7 +5,7 @@ Provides SimulationSettings class to encapsulate all timing and execution
 configuration for simulation. Follows OOP principles with validation,
 defaults, and clear separation of concerns.
 """
-from typing import Any, cast, Dict, Optional, Set
+from typing import Any, cast, Dict, Literal, Optional, Set
 from shypn.utils.time_utils import TimeUnits, TimeConverter, TimeValidator
 
 
@@ -47,6 +47,7 @@ class SimulationSettings:
     DEFAULT_MIN_TAU = 1e-6  # Minimum leap size (seconds)
     DEFAULT_USE_PARALLEL_STOCHASTIC = True  # Parallel sampling for weakly independent transitions (2-4× faster)
     DEFAULT_USE_JIT_KERNEL = True            # Phase 6: Numba JIT τ-step kernel — enabled (numba 0.64 installed, kernel cached)
+    DEFAULT_USE_GPU: Literal['auto', 'force', 'off'] = 'auto'  # GPU replicate parallelism: auto-detect, force, or disable
     # Note: max_workers is auto-determined from os.cpu_count(), not a user setting
     # Note: use_tau_leaping removed - τ-leaping is always the stochastic simulation method
     
@@ -71,6 +72,7 @@ class SimulationSettings:
         self._min_tau = self.DEFAULT_MIN_TAU
         self._use_parallel_stochastic = self.DEFAULT_USE_PARALLEL_STOCHASTIC
         self._use_jit_kernel = self.DEFAULT_USE_JIT_KERNEL
+        self._use_gpu: Literal['auto', 'force', 'off'] = self.DEFAULT_USE_GPU
         
         # Batch mode settings (for experiment replication)
         self._batch_mode_enabled = False
@@ -360,7 +362,24 @@ class SimulationSettings:
         """
         self._use_jit_kernel = bool(value)
 
-    
+    @property
+    def use_gpu(self) -> Literal['auto', 'force', 'off']:
+        """GPU replicate-parallelism mode.
+
+        ``'auto'``  — detect GPU at runtime; use if available, CPU otherwise.
+        ``'force'`` — require GPU; raise if none found.
+        ``'off'``   — always use CPU path (ignore any GPU).
+        """
+        return self._use_gpu
+
+    @use_gpu.setter
+    def use_gpu(self, value: Literal['auto', 'force', 'off']) -> None:
+        if value not in ('auto', 'force', 'off'):
+            raise ValueError(
+                f"use_gpu must be 'auto', 'force', or 'off'; got {value!r}"
+            )
+        self._use_gpu = value
+
     # ========== Duration Management ==========
     
     def set_duration(self, duration: float, units: TimeUnits) -> None:
@@ -530,6 +549,7 @@ class SimulationSettings:
             'min_tau': self._min_tau,
             'use_parallel_stochastic': self._use_parallel_stochastic,
             'use_jit_kernel': self._use_jit_kernel,
+            'use_gpu': self._use_gpu,
         }
     
     @classmethod
@@ -583,6 +603,9 @@ class SimulationSettings:
 
         if 'use_jit_kernel' in data:
             settings.use_jit_kernel = data['use_jit_kernel']
+
+        if 'use_gpu' in data:
+            settings.use_gpu = data['use_gpu']
         
         return settings
     

@@ -111,7 +111,7 @@ echo ""
 
 REMOTE_CMD="cd ${REMOTE_REPO} && \
     export PYTHONPATH=\${PWD}/src && \
-    .venv/bin/python -m shypn.cli.sweep \
+    exec .venv/bin/python -m shypn.cli.sweep \
         ${CLI_ARGS} \
         ${WORKERS} \
         ${VERBOSE} \

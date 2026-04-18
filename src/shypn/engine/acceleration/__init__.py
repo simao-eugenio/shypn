@@ -30,5 +30,12 @@ Usage::
 
 from .ode_system import OdeSystemAccelerator
 from .propensity_system import PropensityAccelerator
+from .gpu import GPUBackend, GPUInfo, detect_gpu
 
-__all__ = ["OdeSystemAccelerator", "PropensityAccelerator"]
+__all__ = [
+    "OdeSystemAccelerator",
+    "PropensityAccelerator",
+    "GPUBackend",
+    "GPUInfo",
+    "detect_gpu",
+]

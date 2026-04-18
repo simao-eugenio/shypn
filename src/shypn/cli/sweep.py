@@ -78,6 +78,12 @@ def _resolve_path(path: Path, project: Path | None) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Install orphan-prevention guard FIRST — before any heavy work.
+    # This ensures remote SSH-launched processes die cleanly when the
+    # connection drops, instead of running forever as zombies.
+    from shypn.engine.process_guard import install_process_guard
+    install_process_guard()
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

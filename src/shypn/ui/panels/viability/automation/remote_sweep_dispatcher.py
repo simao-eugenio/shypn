@@ -241,10 +241,14 @@ class RemoteSweepDispatcher:
             self._emit(progress_cb, 'Running sweep on remote server...')
 
             workers_flag = f"--workers {workers}" if workers > 0 else ""
+            # Use 'exec' so Python replaces the bash process, becoming
+            # sshd's direct child.  Combined with process_guard's
+            # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
+            # cleanly when the SSH connection drops (no orphan zombies).
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"{remote_venv} -m shypn.cli.sweep "
+                f"exec {remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
@@ -333,6 +337,17 @@ class RemoteSweepDispatcher:
         multiplex over this single TCP connection, avoiding repeated
         handshakes (huge win on high-latency WAN links).
         """
+        # Clean stale sockets from previous runs to prevent
+        # "Connection refused" errors on reused socket paths.
+        import glob
+        for stale in glob.glob(os.path.join(tempfile.gettempdir(),
+                                            'shypn_ssh_*.sock')):
+            try:
+                os.unlink(stale)
+                logger.debug("Removed stale SSH socket: %s", stale)
+            except OSError:
+                pass
+
         ctl = tempfile.mktemp(prefix='shypn_ssh_', suffix='.sock',
                               dir=tempfile.gettempdir())
         argv = [
@@ -470,11 +485,68 @@ class RemoteSweepDispatcher:
 
         Each non-empty line from stdout is forwarded to *progress_cb*
         in real time.  Returns the full stdout when the process exits.
+
+        Uses ``-T`` (no PTY) to avoid pseudo-terminal issues on long-
+        running batch commands, and ``ServerAliveInterval`` to prevent
+        NAT/firewall timeouts from killing the connection.
+
+        On SSH-level failure (exit 255), invalidates the ControlMaster
+        socket and retries with a direct connection.
         """
-        argv = ['ssh', '-C', '-tt'] + self._ctl_socket_args() + [host, cmd]
-        if password and not self._ctl_path:
-            argv = ['sshpass', '-p', password, 'ssh', '-C', '-tt'] + \
-                   self._ctl_socket_args() + [host, cmd]
+        result = self._ssh_stream_once(
+            host, cmd,
+            password=password,
+            progress_cb=progress_cb,
+            cancel=cancel,
+            use_control=bool(self._ctl_path),
+        )
+        if result is not None:
+            return result
+
+        # SSH-level failure (exit 255) — invalidate dead socket, retry direct
+        if self._ctl_path:
+            logger.warning("SSH stream via ControlMaster failed (exit 255), "
+                           "invalidating socket and retrying direct")
+            self._invalidate_control_master(host)
+            result = self._ssh_stream_once(
+                host, cmd,
+                password=password,
+                progress_cb=progress_cb,
+                cancel=cancel,
+                use_control=False,
+            )
+            if result is not None:
+                return result
+
+        raise RuntimeError(
+            f"SSH stream command failed after retry:\n"
+            f"  cmd: {cmd}")
+
+    def _ssh_stream_once(
+        self,
+        host: str,
+        cmd: str,
+        *,
+        password: Optional[str] = None,
+        progress_cb: Optional[Callable[[str], None]] = None,
+        cancel: Optional[threading.Event] = None,
+        use_control: bool = True,
+    ) -> Optional[str]:
+        """Single attempt to run a streaming SSH command.
+
+        Returns the collected stdout on success, or ``None`` on SSH-level
+        failure (exit 255) to signal the caller to retry.
+        """
+        ssh_opts = [
+            '-T',  # no PTY — critical for long-running batch commands
+            '-C',  # compression
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
+        ]
+        ctl_args = self._ctl_socket_args() if use_control else []
+        argv = ['ssh'] + ssh_opts + ctl_args + [host, cmd]
+        if password and not (use_control and self._ctl_path):
+            argv = ['sshpass', '-p', password] + argv
         proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,
@@ -496,9 +568,18 @@ class RemoteSweepDispatcher:
             proc.stdout.close()                   # type: ignore[union-attr]
             proc.wait(timeout=30)
 
+        if proc.returncode == 255:
+            # SSH-level failure — signal retry
+            stderr = proc.stderr.read() if proc.stderr else ''
+            if proc.stderr:
+                proc.stderr.close()
+            logger.warning("SSH stream exit 255: %s", stderr.strip())
+            return None
+
         if proc.returncode != 0:
             stderr = proc.stderr.read() if proc.stderr else ''
-            proc.stderr.close() if proc.stderr else None
+            if proc.stderr:
+                proc.stderr.close()
             raise RuntimeError(
                 f"SSH command failed (exit {proc.returncode}):\n"
                 f"  cmd: {cmd}\n"
