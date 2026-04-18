@@ -535,7 +535,11 @@ class ContinuousBehavior(TransitionBehavior):
             # When activation_energy > 0, θ_eff is temperature-dependent.
             theta = self._get_theta_eff(arc)
             effective_floor = theta + self.min_token_threshold
-            if source_place.tokens <= effective_floor:
+            # F6 fix: use strict less-than (<) instead of less-or-equal (<=)
+            # so that tokens at exactly the floor are considered enabled.
+            # This matches ODE rate-expression semantics where rate→0 as
+            # tokens→0 naturally, without a hard cutoff at the boundary.
+            if source_place.tokens < effective_floor:
                 return False, f"place-below-threshold-{place_id}"
         
         return True, "enabled-continuous"
