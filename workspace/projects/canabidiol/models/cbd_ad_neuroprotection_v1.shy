@@ -1,13 +1,13 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-04-14T16:35:57.206679",
     "source": "manual",
     "model_type": "Petri Net",
+    "created": "2026-04-17T17:33:03.320283",
     "object_counts": {
-      "places": 33,
-      "transitions": 38,
-      "arcs": 87,
+      "places": 34,
+      "transitions": 42,
+      "arcs": 93,
       "modules": 0
     }
   },
@@ -56,7 +56,7 @@
       "marking": 100.0,
       "tokens": 100.0,
       "initial_marking": 100.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -94,7 +94,7 @@
       "marking": 50.0,
       "tokens": 50.0,
       "initial_marking": 50.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -132,7 +132,7 @@
       "marking": 30.0,
       "tokens": 30.0,
       "initial_marking": 30.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -170,7 +170,7 @@
       "marking": 100.0,
       "tokens": 100.0,
       "initial_marking": 100.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -186,7 +186,7 @@
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
-      "compartment_volume": 1.0,
+      "compartment_volume": 1000.0,
       "neighbor_compartments": [],
       "spatial_position": null
     },
@@ -207,7 +207,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -245,11 +245,11 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "border_width": 4.0,
       "is_catalyst": false,
@@ -281,7 +281,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -318,7 +318,7 @@
       "marking": 80.0,
       "tokens": 80.0,
       "initial_marking": 80.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -358,7 +358,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -396,7 +396,7 @@
       "marking": 10.0,
       "tokens": 10.0,
       "initial_marking": 10.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -434,7 +434,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -472,7 +472,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -510,7 +510,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -548,7 +548,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -584,7 +584,7 @@
       "marking": 60.0,
       "tokens": 60.0,
       "initial_marking": 60.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -624,7 +624,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -662,7 +662,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -700,7 +700,7 @@
       "marking": 5.0,
       "tokens": 5.0,
       "initial_marking": 5.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -737,7 +737,7 @@
       "marking": 10.0,
       "tokens": 10.0,
       "initial_marking": 10.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -774,7 +774,7 @@
       "marking": 50.0,
       "tokens": 50.0,
       "initial_marking": 50.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -810,7 +810,7 @@
       "marking": 5.0,
       "tokens": 5.0,
       "initial_marking": 5.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -846,7 +846,7 @@
       "marking": 45.0,
       "tokens": 45.0,
       "initial_marking": 45.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -883,7 +883,7 @@
       "marking": 100.0,
       "tokens": 100.0,
       "initial_marking": 100.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -921,7 +921,7 @@
       "marking": 10.0,
       "tokens": 10.0,
       "initial_marking": 10.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -961,11 +961,11 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "border_width": 3.0,
       "is_catalyst": false,
@@ -1001,11 +1001,11 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "border_width": 3.0,
       "is_catalyst": false,
@@ -1041,11 +1041,11 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "border_width": 3.0,
       "is_catalyst": false,
@@ -1072,7 +1072,7 @@
       "marking": 310.15,
       "tokens": 310.15,
       "initial_marking": 310.15,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1115,7 +1115,7 @@
       "marking": 7.0,
       "tokens": 7.0,
       "initial_marking": 7.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1170,7 +1170,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1201,7 +1201,7 @@
       "marking": 65.0,
       "tokens": 65.0,
       "initial_marking": 65.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1237,7 +1237,6 @@
       "id": "P32",
       "name": "GPR3_inactive",
       "label": "GPR3_inactive",
-      "metadata": {},
       "object_type": "place",
       "x": 360.0,
       "y": -180.0,
@@ -1245,7 +1244,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1269,7 +1268,6 @@
       "id": "P33",
       "name": "GSSG",
       "label": "GSSG",
-      "metadata": {},
       "object_type": "place",
       "x": 1570.0,
       "y": 1170.0,
@@ -1277,7 +1275,7 @@
       "marking": 0.0,
       "tokens": 0.0,
       "initial_marking": 0.0,
-      "capacity": Infinity,
+      "capacity": "Infinity",
       "border_color": [
         0.0,
         0.0,
@@ -1296,6 +1294,37 @@
       "compartment_volume": 1000.0,
       "neighbor_compartments": [],
       "spatial_position": null
+    },
+    {
+      "id": "P34",
+      "name": "APP_mRNA",
+      "label": "APP_mRNA",
+      "object_type": "place",
+      "x": 500.0,
+      "y": -390.0,
+      "radius": 40.0,
+      "marking": 10.0,
+      "tokens": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 500.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
     }
   ],
   "transitions": [
@@ -1312,12 +1341,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -1388,19 +1417,19 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
       "transition_type": "continuous",
       "priority": 0,
       "firing_policy": "race",
-      "is_source": true,
+      "is_source": false,
       "is_sink": false,
       "guard": 1,
       "properties": {
@@ -1778,12 +1807,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -2499,12 +2528,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -2536,12 +2565,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -2744,6 +2773,154 @@
       "adaptive_filter": null,
       "volume_threshold": null,
       "prefer_continuous": null
+    },
+    {
+      "id": "T39",
+      "name": "APP_Transcription",
+      "label": "APP gene\ntranscription",
+      "object_type": "transition",
+      "x": 500.0,
+      "y": -470.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.05 + 0.02 * NFkB_p65 / (10 + NFkB_p65)) * 2**((T_celsius - 37)/10)"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T40",
+      "name": "APP_Translation",
+      "label": "APP\ntranslation",
+      "object_type": "transition",
+      "x": 575.0,
+      "y": -350.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.5 * APP_mRNA / (5 + APP_mRNA) * 2**((T_celsius - 37)/10)"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T41",
+      "name": "APP_Degradation",
+      "label": "APP\ndegradation",
+      "object_type": "transition",
+      "x": 770.0,
+      "y": -310.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.003 * APP * 2**((T_celsius - 37)/10)"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T42",
+      "name": "APP_mRNA_Degradation",
+      "label": "APP mRNA\ndegradation",
+      "object_type": "transition",
+      "x": 620.0,
+      "y": -390.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.005 * APP_mRNA"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
     }
   ],
   "arcs": [
@@ -2851,27 +3028,6 @@
       "consumes": false
     },
     {
-      "id": "A6",
-      "name": "APP_to_T3",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "test",
-      "source_id": "P4",
-      "source_type": "place",
-      "target_id": "T3",
-      "target_type": "transition",
-      "weight": 1.0,
-      "threshold": 1,
-      "color": [
-        0.0,
-        0.0,
-        1.0
-      ],
-      "width": 3.0,
-      "control_points": [],
-      "consumes": false
-    },
-    {
       "id": "A7",
       "name": "T3_to_Abeta",
       "label": "",
@@ -2924,21 +3080,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A10",
       "name": "Oligomer_to_T5",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P6",
       "source_type": "place",
       "target_id": "T5",
@@ -2946,14 +3100,12 @@
       "weight": 2.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A11",
@@ -3152,14 +3304,13 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        1.0
       ],
       "width": 2.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true
+      "consumes": false
     },
     {
       "id": "A21",
@@ -3194,14 +3345,13 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        1.0
       ],
       "width": 2.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true
+      "consumes": false
     },
     {
       "id": "A23",
@@ -3279,14 +3429,12 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A27",
@@ -3313,21 +3461,20 @@
       "name": "ROS_to_T11",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P19",
       "source_type": "place",
       "target_id": "T11",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A29",
@@ -3510,11 +3657,10 @@
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A38",
@@ -3590,14 +3736,12 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A42",
@@ -3612,14 +3756,13 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        1.0
       ],
       "width": 2.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true
+      "consumes": false
     },
     {
       "id": "A43",
@@ -3674,28 +3817,6 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
-      ],
-      "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
-    },
-    {
-      "id": "A46",
-      "name": "TNFa_to_T17",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "test",
-      "source_id": "P11",
-      "source_type": "place",
-      "target_id": "T17",
-      "target_type": "transition",
-      "weight": 1.0,
-      "threshold": 1,
-      "color": [
         0.0,
         0.0,
         1.0
@@ -3703,6 +3824,26 @@
       "width": 2.0,
       "control_points": [],
       "consumes": false
+    },
+    {
+      "id": "A46",
+      "name": "TNFa_to_T17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
     },
     {
       "id": "A47",
@@ -3757,14 +3898,13 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        1.0
       ],
       "width": 2.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true
+      "consumes": false
     },
     {
       "id": "A50",
@@ -3779,14 +3919,13 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        1.0
       ],
       "width": 2.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true
+      "consumes": false
     },
     {
       "id": "A51",
@@ -3842,14 +3981,12 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A54",
@@ -3877,42 +4014,40 @@
       "name": "ROS_to_T20",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P19",
       "source_type": "place",
       "target_id": "T20",
       "target_type": "transition",
       "weight": 5.0,
-      "threshold": 5,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A56",
       "name": "TNFa_to_T20",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P11",
       "source_type": "place",
       "target_id": "T20",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A57",
@@ -3939,21 +4074,20 @@
       "name": "BDNF_to_T21",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P24",
       "source_type": "place",
       "target_id": "T21",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A59",
@@ -4110,14 +4244,12 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A67",
@@ -4205,7 +4337,7 @@
       "name": "CBD_extra_to_Absorption",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P1",
       "source_type": "place",
       "target_id": "T28",
@@ -4213,21 +4345,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A72",
       "name": "Absorption_to_CBD_intra",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "T28",
       "source_type": "transition",
       "target_id": "P30",
@@ -4235,21 +4365,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A73",
       "name": "CBD_intra_to_Efflux",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P30",
       "source_type": "place",
       "target_id": "T29",
@@ -4257,21 +4385,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A74",
       "name": "Efflux_to_CBD_extra",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "T29",
       "source_type": "transition",
       "target_id": "P1",
@@ -4279,21 +4405,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A75",
       "name": "CBD_extra_to_SysClearance",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P1",
       "source_type": "place",
       "target_id": "T30",
@@ -4301,21 +4425,19 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A76",
       "name": "CBD_intra_to_BrainMet",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P30",
       "source_type": "place",
       "target_id": "T31",
@@ -4323,14 +4445,12 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A77",
@@ -4345,13 +4465,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A78",
@@ -4366,13 +4485,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A79",
@@ -4387,13 +4505,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A80",
@@ -4408,13 +4525,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A81",
@@ -4429,13 +4545,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A82",
@@ -4450,13 +4565,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A83",
@@ -4471,13 +4585,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A84",
@@ -4492,13 +4605,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A85",
@@ -4513,13 +4625,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A86",
@@ -4534,13 +4645,12 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": true
+      "control_points": []
     },
     {
       "id": "A87",
@@ -4555,13 +4665,154 @@
       "weight": 1.0,
       "threshold": 1,
       "color": [
-        0.5,
-        0.5,
-        0.5
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A88",
+      "name": "NFkB_p65_to_APP_Transcription",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T39",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
       "control_points": [],
-      "consumes": true
+      "consumes": false
+    },
+    {
+      "id": "A89",
+      "name": "APP_Transcription_to_APP_mRNA",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T39",
+      "source_type": "transition",
+      "target_id": "P34",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A90",
+      "name": "APP_mRNA_to_APP_Translation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T40",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A91",
+      "name": "APP_Translation_to_APP",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T40",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A92",
+      "name": "APP_to_APP_Degradation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T41",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A93",
+      "name": "APP_mRNA_to_APP_mRNA_Degradation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T42",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "APP_to_Abeta_Production",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
     }
   ],
   "modules": [],

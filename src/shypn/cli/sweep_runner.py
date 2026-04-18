@@ -4,6 +4,10 @@ Coordinates model loading, snapshot generation, condition dispatch
 (via :class:`ReplicateRunner`), and structured output writing.
 
 This module contains **no** GTK imports and can run on a headless server.
+
+Conditions are parallelised across worker processes when ``workers > 1``.
+Each worker loads its own copy of the model (safe for fork/forkserver),
+applies its snapshot overrides, and runs all replicates for that condition.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +27,18 @@ from shypn.ui.panels.viability.automation.property_path_parser import (
     parse_property_path,
     resolve_object,
 )
+
+
+def _worker_init() -> None:
+    """Initializer for ProcessPoolExecutor workers.
+
+    Installs the process guard so worker processes also die cleanly
+    when their parent is killed (e.g. SSH connection drop).
+    Also marks the process so replicate_runner won't spawn a nested pool.
+    """
+    os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
+    from shypn.engine.process_guard import install_process_guard
+    install_process_guard()
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +95,7 @@ class SweepRunner:
         """Execute the full sweep and return the run directory path."""
         wall_start = time.monotonic()
 
-        # 1. Load model
+        # 1. Load model (for metadata / dry-run info)
         model = self._load_model()
         if self.verbose:
             print(
@@ -99,73 +116,78 @@ class SweepRunner:
                 f"{sim.replicates} replicates = "
                 f"{n_conditions * sim.replicates} total simulations"
             )
+            print(f"Workers: {self.workers}")
 
         # 3. Prepare output
         output = SweepOutputManager(self.output_dir)
         output.save_config(self.config.to_dict(), str(self.model_path))
 
-        # 4. Import engine components (lazy — avoids importing at module level)
-        from shypn.engine.simulation.replicate_runner import ReplicateRunner
+        # 4. Dispatch conditions in parallel across worker processes
+        #    Each worker loads its own model copy — no shared mutable state.
+        from dataclasses import asdict
+        sim_dict = asdict(sim)
 
-        summary_rows: List[Dict[str, Any]] = []
+        futures_map: Dict[Any, int] = {}  # future → condition index
+        summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
 
-        # 5. Iterate conditions
-        for idx, snapshot in enumerate(snapshots):
-            cond_start = time.monotonic()
-            label = snapshot.name
-            if self.verbose:
-                print(
-                    f"\n[{idx + 1}/{n_conditions}] {label} "
-                    f"({sim.replicates} replicates)...",
-                    flush=True,
+        with ProcessPoolExecutor(
+            max_workers=min(self.workers, n_conditions),
+            initializer=_worker_init,
+        ) as pool:
+            for idx, snapshot in enumerate(snapshots):
+                fut = pool.submit(
+                    _run_single_condition,
+                    model_path=str(self.model_path),
+                    baseline_dict=_snapshot_to_dict(baseline),
+                    snapshot_dict=_snapshot_to_dict(snapshot),
+                    sim_params=sim_dict,
+                    condition_index=idx,
+                    n_conditions=n_conditions,
+                    verbose=self.verbose,
                 )
+                futures_map[fut] = idx
 
-            # Apply snapshot overrides to model
-            self._apply_snapshot(model, snapshot, baseline)
+            for fut in as_completed(futures_map):
+                idx = futures_map[fut]
+                label = snapshots[idx].name
+                try:
+                    result_payload = fut.result()
+                    results = result_payload['results']
+                    stats = result_payload['stats']
+                    cond_elapsed = result_payload['wall_seconds']
+                    n_ok = result_payload['replicates_ok']
+                    n_err = result_payload['replicates_error']
 
-            # Run replicates
-            runner = ReplicateRunner(model)
-            results = runner.run_replicates(
-                n=sim.replicates,
-                use_parallel=True,
-                use_tau_leaping=True,
-                duration=sim.duration,
-                termination_condition=sim.termination,
-                epsilon=sim.tau_epsilon,
-                max_tau=sim.max_tau,
-                time_step=sim.time_step,
-                seed_base=sim.seed_base,
-                verbose=False,
-            )
+                    # Save using the main-process model (for name lookup)
+                    self._apply_snapshot(model, snapshots[idx], baseline)
+                    output.save_condition(label, results, stats, model)
+                    self._restore_baseline(model, baseline)
 
-            # Compute statistics
-            stats = runner.compute_statistics(results)
+                    summary_rows[idx] = {
+                        'condition': label,
+                        'replicates_ok': n_ok,
+                        'replicates_error': n_err,
+                        'wall_seconds': round(cond_elapsed, 2),
+                    }
 
-            # Persist
-            output.save_condition(label, results, stats, model)
+                    if self.verbose:
+                        print(
+                            f"  [{idx + 1}/{n_conditions}] {label}: "
+                            f"{cond_elapsed:.1f}s ({n_ok} ok, {n_err} errors)"
+                        )
+                except Exception as exc:
+                    logger.exception("Condition %d (%s) failed", idx, label)
+                    summary_rows[idx] = {
+                        'condition': label,
+                        'replicates_ok': 0,
+                        'replicates_error': sim.replicates,
+                        'wall_seconds': 0.0,
+                    }
+                    if self.verbose:
+                        print(f"  [{idx + 1}/{n_conditions}] {label}: FAILED — {exc}")
 
-            cond_elapsed = time.monotonic() - cond_start
-            n_ok = sum(1 for r in results if 'error' not in r)
-            n_err = len(results) - n_ok
-
-            summary_rows.append({
-                'condition': label,
-                'replicates_ok': n_ok,
-                'replicates_error': n_err,
-                'wall_seconds': round(cond_elapsed, 2),
-            })
-
-            if self.verbose:
-                print(
-                    f"  done in {cond_elapsed:.1f}s "
-                    f"({n_ok} ok, {n_err} errors)"
-                )
-
-            # Restore baseline marking for next condition
-            self._restore_baseline(model, baseline)
-
-        # 6. Summary
-        output.write_summary(summary_rows)
+        # 5. Summary
+        output.write_summary([r for r in summary_rows if r is not None])
         wall_total = time.monotonic() - wall_start
 
         if self.verbose:
@@ -256,3 +278,103 @@ class SweepRunner:
         for t in model.transitions:
             if t.id in baseline.transition_rates:
                 t.rate = baseline.transition_rates[t.id]
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Module-level helpers for parallel condition dispatch
+# (must be picklable — cannot be methods or closures)
+# ═════════════════════════════════════════════════════════════════════
+
+def _snapshot_to_dict(snap: ExperimentSnapshot) -> dict:
+    """Serialise an ExperimentSnapshot to a plain dict for pickling."""
+    return {
+        'name': snap.name,
+        'place_markings': dict(snap.place_markings),
+        'transition_rates': dict(snap.transition_rates),
+        'arc_weights': dict(snap.arc_weights),
+        'property_overrides': dict(getattr(snap, 'property_overrides', {})),
+    }
+
+
+def _dict_to_snapshot(d: dict) -> ExperimentSnapshot:
+    """Reconstruct an ExperimentSnapshot from a plain dict."""
+    snap = ExperimentSnapshot(d['name'])
+    snap.place_markings = d['place_markings']
+    snap.transition_rates = d['transition_rates']
+    snap.arc_weights = d['arc_weights']
+    snap.property_overrides = d.get('property_overrides', {})
+    return snap
+
+
+def _run_single_condition(
+    *,
+    model_path: str,
+    baseline_dict: dict,
+    snapshot_dict: dict,
+    sim_params: dict,
+    condition_index: int,
+    n_conditions: int,
+    verbose: bool,
+) -> dict:
+    """Execute one condition in a worker process.
+
+    Loads its own model copy, applies overrides, runs all replicates,
+    and returns the results + statistics as a plain dict (picklable).
+    """
+    import time as _time
+    cond_start = _time.monotonic()
+
+    # Suppress ODE acceleration noise in worker
+    import logging as _logging
+    _logging.basicConfig(level=_logging.WARNING)
+    for _name in ('shypn.engine.acceleration', 'shypn.engine.simulation.controller'):
+        _logging.getLogger(_name).setLevel(_logging.ERROR)
+
+    # Load a fresh model in this process
+    os.environ.setdefault('DISPLAY', '')
+    from shypn.data.canvas.document_model import DocumentModel
+    model = DocumentModel.load_from_file(model_path)
+
+    baseline = _dict_to_snapshot(baseline_dict)
+    snapshot = _dict_to_snapshot(snapshot_dict)
+
+    # Apply overrides
+    SweepRunner._apply_snapshot(model, snapshot, baseline)
+
+    # Run replicates
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    runner = ReplicateRunner(model)
+    results = runner.run_replicates(
+        n=sim_params['replicates'],
+        use_parallel=True,
+        use_tau_leaping=True,
+        duration=sim_params['duration'],
+        termination_condition=sim_params['termination'],
+        epsilon=sim_params['tau_epsilon'],
+        max_tau=sim_params['max_tau'],
+        time_step=sim_params.get('time_step'),
+        seed_base=sim_params['seed_base'],
+        verbose=False,
+    )
+
+    stats = runner.compute_statistics(results)
+
+    cond_elapsed = _time.monotonic() - cond_start
+    n_ok = sum(1 for r in results if 'error' not in r)
+    n_err = len(results) - n_ok
+
+    if verbose:
+        print(
+            f"  Worker [{condition_index + 1}/{n_conditions}] "
+            f"{snapshot.name}: {cond_elapsed:.1f}s "
+            f"({n_ok} ok, {n_err} errors)",
+            flush=True,
+        )
+
+    return {
+        'results': results,
+        'stats': stats,
+        'wall_seconds': cond_elapsed,
+        'replicates_ok': n_ok,
+        'replicates_error': n_err,
+    }

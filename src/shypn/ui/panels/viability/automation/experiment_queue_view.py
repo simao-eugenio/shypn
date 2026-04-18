@@ -10,7 +10,7 @@ Date: December 7, 2025
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, Gdk, GLib, Pango
 
 
 class ExperimentQueueView(Gtk.Box):
@@ -149,14 +149,44 @@ class ExperimentQueueView(Gtk.Box):
         self.parallel_checkbox.set_active(True)  # Default: enabled for speed
         button_box.pack_start(self.parallel_checkbox, False, False, 0)
         
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_markup("<i>Queue empty</i>")
-        self.status_label.set_xalign(0)
-        self.status_label.set_hexpand(True)
-        button_box.pack_start(self.status_label, True, True, 0)
-        
         self.pack_start(button_box, False, False, 0)
+
+        # Status bar — scrollable, selectable, copyable text view
+        status_scroll = Gtk.ScrolledWindow()
+        status_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,
+                                 Gtk.PolicyType.AUTOMATIC)
+        status_scroll.set_min_content_height(36)
+        status_scroll.set_max_content_height(72)
+
+        self._status_view = Gtk.TextView()
+        self._status_view.set_editable(False)
+        self._status_view.set_cursor_visible(False)
+        self._status_view.set_can_focus(True)
+        self._status_view.connect('key-press-event', self._on_status_key_press)
+        self._status_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self._status_view.set_left_margin(4)
+        self._status_view.set_right_margin(4)
+        self._status_view.set_top_margin(2)
+        self._status_view.set_bottom_margin(2)
+        self._status_view.override_font(
+            Pango.FontDescription.from_string('monospace 9'))
+
+        self._status_buffer = self._status_view.get_buffer()
+        # Create tags for coloured status messages
+        self._status_buffer.create_tag('blue', foreground='#3465a4')
+        self._status_buffer.create_tag('green', foreground='#4e9a06')
+        self._status_buffer.create_tag('red', foreground='#cc0000')
+        self._status_buffer.create_tag('bold',
+                                       weight=Pango.Weight.BOLD)
+        self._status_buffer.create_tag('italic',
+                                       style=Pango.Style.ITALIC)
+
+        status_scroll.add(self._status_view)
+        self.pack_start(status_scroll, False, False, 0)
+
+        # Keep legacy attribute name for callers that do
+        # ``self.queue_view.status_label.set_markup(...)``
+        self.status_label = _StatusLabelCompat(self)
     
     def add_experiment(self, name, snapshot_index):
         """Add experiment to queue.
@@ -494,3 +524,81 @@ class ExperimentQueueView(Gtk.Box):
                     self.status_label.set_markup("<i>Queue empty - generate experiments first</i>")
                 else:
                     self.status_label.set_markup("<i>No pending experiments - use 'Reset All' to re-run</i>")
+
+    # ── Public status API ────────────────────────────────────────────
+
+    def set_status(self, text: str, tag: str = ''):
+        """Set the status bar text (plain text, selectable/copyable).
+
+        Args:
+            text: Status message (plain text — no markup).
+            tag: Optional tag name to style the text
+                 ('blue', 'green', 'red', 'bold', 'italic', or '').
+        """
+        buf = self._status_buffer
+        buf.set_text('')
+        if tag and buf.get_tag_table().lookup(tag):
+            buf.insert_with_tags_by_name(buf.get_start_iter(), text, tag)
+        else:
+            buf.set_text(text)
+        # Auto-scroll to end
+        self._status_view.scroll_to_iter(buf.get_end_iter(), 0.0,
+                                         False, 0.0, 0.0)
+
+    def _on_status_key_press(self, widget, event):
+        """Handle Ctrl+C / Ctrl+A on the status TextView."""
+        ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
+        if ctrl and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
+            buf = self._status_buffer
+            if buf.get_has_selection():
+                bounds = buf.get_selection_bounds()
+                text = buf.get_text(bounds[0], bounds[1], False)
+            else:
+                # Nothing selected → copy all text
+                text = buf.get_text(buf.get_start_iter(),
+                                    buf.get_end_iter(), False)
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            clipboard.set_text(text, -1)
+            clipboard.store()
+            return True  # handled
+        if ctrl and event.keyval in (Gdk.KEY_a, Gdk.KEY_A):
+            buf = self._status_buffer
+            buf.select_range(buf.get_start_iter(), buf.get_end_iter())
+            return True
+        return False
+
+
+class _StatusLabelCompat:
+    """Shim so ``queue_view.status_label.set_markup(...)`` keeps working.
+
+    Translates Pango markup calls into plain-text writes to the new
+    :class:`Gtk.TextView`-based status bar.
+    """
+
+    # Minimal regex to strip Pango/HTML tags for the plain-text view
+    import re as _re
+    _TAG_RE = _re.compile(r'<[^>]+>')
+    _ENT = {'&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"'}
+
+    def __init__(self, view: ExperimentQueueView):
+        self._view = view
+
+    def set_markup(self, markup: str):
+        """Accept Pango markup, strip tags, write plain text to the status bar."""
+        text = self._TAG_RE.sub('', markup)
+        for ent, ch in self._ENT.items():
+            text = text.replace(ent, ch)
+
+        # Infer a colour tag from the markup
+        tag = ''
+        if 'foreground=' in markup:
+            if 'blue' in markup or '#3465a4' in markup:
+                tag = 'blue'
+            elif 'green' in markup or '#4e9a06' in markup:
+                tag = 'green'
+            elif 'red' in markup or '#cc0000' in markup:
+                tag = 'red'
+            elif 'orange' in markup:
+                tag = 'red'  # closest available
+
+        self._view.set_status(text, tag)

@@ -10,5 +10,6 @@
   "max_tau": 0.1,
   "min_tau": 1e-06,
   "use_parallel_stochastic": true,
-  "use_jit_kernel": true
+  "use_jit_kernel": true,
+  "use_gpu": "auto"
 }

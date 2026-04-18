@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 """Remote Sweep Dispatcher — run CLI sweeps on a remote server via SSH.
 
-Pipeline:
-  1. Export sweep config JSON + model .shy to a temp staging area
-  2. SCP both files to the remote project folder
-  3. SSH run ``python -m shypn.cli.sweep`` on the remote
-  4. SCP results back to the local project folder
-  5. Signal completion so the ResultsBrowserView can load them
+Architecture (minimal data transfer):
+  1. **Export sweep config** to a local temp file (small JSON, ~1–5 KB)
+  2. **SCP config only** to the remote project folder
+  3. **SSH run** ``python -m shypn.cli.sweep`` on the remote
+  4. **Fetch results** back via ``tar cz | tar xz`` over the
+     multiplexed SSH tunnel
+
+Only the experiment plan (sweep_config.json) crosses the network.
+The user is responsible for keeping client and server code/model
+in sync (e.g. via ``git push`` / ``git pull``) **before** dispatch.
+
+Performance (WAN):
+  - A persistent SSH ControlMaster socket is opened once per dispatch
+    and reused for every subsequent SSH/SCP call.
+  - All SSH traffic is compressed (``-C``).
+  - Results are fetched as a single compressed tar stream (no per-file
+    round-trips).
 
 Requires:
-  - SSH config alias (e.g. ``remote-gpu``) with ControlMaster
-  - Remote repo at a known path with ``.venv`` and ``src/`` on PYTHONPATH
-  - The remote branch must already have the CLI module installed
+  - SSH access to server (password or key)
+  - Remote repo clone at a known path with ``.venv``
+  - Client and server repos synced before dispatch
 
 Author: Simão Eugénio
 Date: April 2026
@@ -97,16 +108,23 @@ class RemoteSweepSettings:
 
 
 class RemoteSweepDispatcher:
-    """Orchestrates a full remote sweep cycle (export → SCP → SSH → fetch).
+    """Orchestrates a full remote sweep cycle (config → SSH → fetch).
 
     All heavy I/O runs on a background thread.  GTK callbacks are
     delivered via ``GLib.idle_add`` by the caller (automation category).
+
+    Data-transfer policy:
+        Only the **sweep config** (~1–5 KB JSON) is transferred over
+        SCP.  Results are fetched back as a single compressed tar
+        stream.  The user is responsible for keeping the model and
+        engine code synced between client and server before dispatch.
     """
 
     def __init__(self, settings: RemoteSweepSettings):
         self.settings = settings
         self._cancel = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._ctl_path: Optional[str] = None  # SSH ControlMaster socket
 
     @property
     def is_running(self) -> bool:
@@ -131,19 +149,20 @@ class RemoteSweepDispatcher:
 
         Args:
             model_filepath: Absolute local path to the ``.shy`` model file.
+                Used only to derive the repo-relative model path (the file
+                itself is **not** transferred — it must already exist on
+                the server).
             project_folder: Absolute local path to the project root
-                (e.g. ``workspace/projects/thesis``).
+                (e.g. ``workspace/projects/canabidiol``).
             experiment_manager: ``ExperimentManager`` instance (has
                 ``export_sweep_config``).
             sim_params: Dict with keys ``replicates``, ``duration``,
                 ``termination``, ``seed_base``, ``tau_epsilon``, ``max_tau``.
             progress_cb: Called on the **background** thread with a status
-                string for each pipeline phase.  The caller must wrap in
-                ``GLib.idle_add`` if touching GTK.
-            complete_cb: ``(success: bool, local_results_dir: str, message: str)``
+                string for each pipeline phase.
+            complete_cb: ``(success, local_results_dir, message)``
                 — called when the pipeline finishes or fails.
             ssh_password: Optional SSH password (used via ``sshpass``).
-                Never persisted to disk.
         """
         if self.is_running:
             if complete_cb:
@@ -171,28 +190,28 @@ class RemoteSweepDispatcher:
         ssh_password: Optional[str] = None,
     ):
         staging = None
+        host = self.settings.ssh_host
         try:
-            host = self.settings.ssh_host
             remote_repo = self.settings.remote_repo
             remote_venv = self.settings.remote_venv
             workers = self.settings.workers
 
-            # ── resolve project-relative path ────────────────────────
-            # project_folder is absolute: .../workspace/projects/thesis
-            # We need the repo-relative project path for the remote CLI
+            # ── resolve paths ────────────────────────────────────────
             project_abs = Path(project_folder).resolve()
-            # Walk up to find 'workspace' anchor
             repo_root = self._find_repo_root(project_abs)
             if repo_root is None:
                 raise RuntimeError(
-                    f"Cannot determine repo root from project folder: {project_folder}")
+                    f"Cannot determine repo root from: {project_folder}")
             project_rel = str(project_abs.relative_to(repo_root))
 
-            # Model path relative to project folder
             model_abs = Path(model_filepath).resolve()
             model_rel_to_project = str(model_abs.relative_to(project_abs))
 
-            # ── 1. Export sweep config to staging ────────────────────
+            # ── 1. Open persistent SSH connection ────────────────────
+            self._emit(progress_cb, 'Opening SSH connection...')
+            self._open_control_master(host, password=ssh_password)
+
+            # ── 2. Export sweep config (local temp) ──────────────────
             self._emit(progress_cb, 'Exporting sweep config...')
             staging = Path(tempfile.mkdtemp(prefix='shypn_remote_'))
             config_path = staging / 'sweep_config.json'
@@ -205,26 +224,14 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 2. SCP model + config to remote ─────────────────────
-            self._emit(progress_cb, 'Uploading model and config to remote...')
-
-            # Figure out remote project path
+            # ── 3. SCP config to remote ─────────────────────────────
+            self._emit(progress_cb, 'Creating remote directory...')
             remote_project = f"{remote_repo}/{project_rel}"
-            # Determine where the model lives relative to the project
-            remote_model_dir = f"{remote_project}/{Path(model_rel_to_project).parent}"
-            remote_sweep_dir = f"{remote_project}"
-
-            # Ensure remote directories exist
-            self._ssh(host, f"mkdir -p {remote_model_dir} {remote_sweep_dir}",
+            self._ssh(host, f"mkdir -p {remote_project}",
                       password=ssh_password)
-
-            # SCP model file
-            self._scp_to(host, str(model_abs), f"{remote_model_dir}/",
-                         password=ssh_password)
-
-            # SCP sweep config
+            self._emit(progress_cb, 'Uploading sweep config...')
             self._scp_to(host, str(config_path),
-                         f"{remote_sweep_dir}/sweep_config.json",
+                         f"{remote_project}/sweep_config.json",
                          password=ssh_password)
 
             if self._cancel.is_set():
@@ -234,10 +241,14 @@ class RemoteSweepDispatcher:
             self._emit(progress_cb, 'Running sweep on remote server...')
 
             workers_flag = f"--workers {workers}" if workers > 0 else ""
+            # Use 'exec' so Python replaces the bash process, becoming
+            # sshd's direct child.  Combined with process_guard's
+            # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
+            # cleanly when the SSH connection drops (no orphan zombies).
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"{remote_venv} -m shypn.cli.sweep "
+                f"exec {remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
@@ -255,10 +266,9 @@ class RemoteSweepDispatcher:
             run_dir = self._parse_results_dir(stdout)
             if not run_dir:
                 raise RuntimeError(
-                    f"Could not parse results directory from remote output:\n{stdout}")
+                    f"Could not parse results directory from remote output:\n"
+                    f"{stdout[-500:]}")
 
-            # The CLI may emit a relative path (relative to remote repo).
-            # SCP needs the absolute path on the remote.
             if not run_dir.startswith('/'):
                 run_dir = f"{remote_repo}/{run_dir}"
 
@@ -273,8 +283,8 @@ class RemoteSweepDispatcher:
             local_results_base.mkdir(parents=True, exist_ok=True)
             local_run_dir = local_results_base / run_name
 
-            self._scp_from(host, run_dir, str(local_run_dir),
-                           password=ssh_password)
+            self._fetch_results_tar(host, run_dir, str(local_run_dir),
+                                    password=ssh_password)
 
             # ── 5. Done ──────────────────────────────────────────────
             self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
@@ -290,7 +300,7 @@ class RemoteSweepDispatcher:
             if complete_cb:
                 complete_cb(False, '', str(e))
         finally:
-            # Clean up staging
+            self._close_control_master(host)
             if staging and staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
 
@@ -308,16 +318,134 @@ class RemoteSweepDispatcher:
                 return parent
         return None
 
-    @staticmethod
-    def _ssh(host: str, cmd: str, *, password: Optional[str] = None) -> str:
-        """Run a command on the remote via SSH and return stdout (blocking)."""
-        argv = ['ssh', host, cmd]
+    # ── SSH ControlMaster multiplexing ───────────────────────────────
+    def _ctl_socket_args(self) -> list[str]:
+        """Return SSH args that attach to the persistent control socket."""
+        if self._ctl_path:
+            return ['-o', f'ControlPath={self._ctl_path}']
+        return []
+
+    def _open_control_master(self, host: str, *,
+                             password: Optional[str] = None):
+        """Open a persistent SSH connection (ControlMaster).
+
+        Uses ``-f`` to fork into the background after authentication,
+        so this call returns as soon as the connection is established
+        (typically < 2 s) instead of blocking for the full timeout.
+
+        All subsequent _ssh / _scp_to / _ssh_stream calls will
+        multiplex over this single TCP connection, avoiding repeated
+        handshakes (huge win on high-latency WAN links).
+        """
+        # Clean stale sockets from previous runs to prevent
+        # "Connection refused" errors on reused socket paths.
+        import glob
+        for stale in glob.glob(os.path.join(tempfile.gettempdir(),
+                                            'shypn_ssh_*.sock')):
+            try:
+                os.unlink(stale)
+                logger.debug("Removed stale SSH socket: %s", stale)
+            except OSError:
+                pass
+
+        ctl = tempfile.mktemp(prefix='shypn_ssh_', suffix='.sock',
+                              dir=tempfile.gettempdir())
+        argv = [
+            'ssh', '-C',
+            '-o', 'ControlMaster=yes',
+            '-o', f'ControlPath={ctl}',
+            '-o', 'ControlPersist=300',
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
+            '-o', 'ConnectTimeout=15',
+            '-f',  # fork to background after auth
+            '-N',  # no remote command
+            host,
+        ]
         if password:
             argv = ['sshpass', '-p', password] + argv
         result = subprocess.run(
             argv,
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=30,
         )
+        if result.returncode != 0:
+            logger.warning("ControlMaster failed (%s), falling back to "
+                           "per-command connections", result.stderr.strip())
+            self._ctl_path = None
+            return
+
+        # Verify the socket is actually alive
+        check = subprocess.run(
+            ['ssh', '-O', 'check', '-o', f'ControlPath={ctl}', host],
+            capture_output=True, text=True, timeout=10,
+        )
+        if check.returncode != 0:
+            logger.warning("ControlMaster check failed (%s), falling back",
+                           check.stderr.strip())
+            # Clean up the dead socket
+            try:
+                os.unlink(ctl)
+            except OSError:
+                pass
+            self._ctl_path = None
+            return
+
+        self._ctl_path = ctl
+        logger.info("SSH ControlMaster opened and verified: %s", ctl)
+
+    def _close_control_master(self, host: str):
+        """Tear down the persistent SSH connection."""
+        if not self._ctl_path:
+            return
+        try:
+            subprocess.run(
+                ['ssh', '-O', 'exit',
+                 '-o', f'ControlPath={self._ctl_path}', host],
+                capture_output=True, text=True, timeout=10,
+            )
+        except Exception:
+            pass
+        # Remove stale socket file
+        try:
+            os.unlink(self._ctl_path)
+        except OSError:
+            pass
+        logger.info("SSH ControlMaster closed: %s", self._ctl_path)
+        self._ctl_path = None
+
+    # ── SSH / SCP wrappers (with multiplexing + compression) ─────────
+    def _ssh(self, host: str, cmd: str, *,
+             password: Optional[str] = None,
+             timeout: int = 60) -> str:
+        """Run a command on the remote via SSH and return stdout (blocking).
+
+        If a ControlMaster socket is active, tries that first.  On
+        timeout, invalidates the dead socket and retries with a direct
+        connection so the pipeline is not stuck forever.
+        """
+        argv = ['ssh', '-C'] + self._ctl_socket_args() + [host, cmd]
+        if password and not self._ctl_path:
+            argv = ['sshpass', '-p', password] + argv
+        try:
+            result = subprocess.run(
+                argv,
+                capture_output=True, text=True, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            if self._ctl_path:
+                logger.warning("SSH via ControlMaster timed out, "
+                               "invalidating socket and retrying direct")
+                self._invalidate_control_master(host)
+                # Retry without the dead socket
+                argv = ['ssh', '-C', host, cmd]
+                if password:
+                    argv = ['sshpass', '-p', password] + argv
+                result = subprocess.run(
+                    argv,
+                    capture_output=True, text=True, timeout=timeout,
+                )
+            else:
+                raise
         if result.returncode != 0:
             raise RuntimeError(
                 f"SSH command failed (exit {result.returncode}):\n"
@@ -325,8 +453,27 @@ class RemoteSweepDispatcher:
                 f"  stderr: {result.stderr.strip()}")
         return result.stdout
 
-    @staticmethod
+    def _invalidate_control_master(self, host: str):
+        """Kill a dead/stuck ControlMaster and clear the socket path."""
+        if not self._ctl_path:
+            return
+        try:
+            subprocess.run(
+                ['ssh', '-O', 'exit',
+                 '-o', f'ControlPath={self._ctl_path}', host],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception:
+            pass
+        try:
+            os.unlink(self._ctl_path)
+        except OSError:
+            pass
+        logger.info("Invalidated dead ControlMaster: %s", self._ctl_path)
+        self._ctl_path = None
+
     def _ssh_stream(
+        self,
         host: str,
         cmd: str,
         *,
@@ -338,10 +485,68 @@ class RemoteSweepDispatcher:
 
         Each non-empty line from stdout is forwarded to *progress_cb*
         in real time.  Returns the full stdout when the process exits.
+
+        Uses ``-T`` (no PTY) to avoid pseudo-terminal issues on long-
+        running batch commands, and ``ServerAliveInterval`` to prevent
+        NAT/firewall timeouts from killing the connection.
+
+        On SSH-level failure (exit 255), invalidates the ControlMaster
+        socket and retries with a direct connection.
         """
-        argv = ['ssh', '-tt', host, cmd]
-        if password:
-            argv = ['sshpass', '-p', password, 'ssh', '-tt', host, cmd]
+        result = self._ssh_stream_once(
+            host, cmd,
+            password=password,
+            progress_cb=progress_cb,
+            cancel=cancel,
+            use_control=bool(self._ctl_path),
+        )
+        if result is not None:
+            return result
+
+        # SSH-level failure (exit 255) — invalidate dead socket, retry direct
+        if self._ctl_path:
+            logger.warning("SSH stream via ControlMaster failed (exit 255), "
+                           "invalidating socket and retrying direct")
+            self._invalidate_control_master(host)
+            result = self._ssh_stream_once(
+                host, cmd,
+                password=password,
+                progress_cb=progress_cb,
+                cancel=cancel,
+                use_control=False,
+            )
+            if result is not None:
+                return result
+
+        raise RuntimeError(
+            f"SSH stream command failed after retry:\n"
+            f"  cmd: {cmd}")
+
+    def _ssh_stream_once(
+        self,
+        host: str,
+        cmd: str,
+        *,
+        password: Optional[str] = None,
+        progress_cb: Optional[Callable[[str], None]] = None,
+        cancel: Optional[threading.Event] = None,
+        use_control: bool = True,
+    ) -> Optional[str]:
+        """Single attempt to run a streaming SSH command.
+
+        Returns the collected stdout on success, or ``None`` on SSH-level
+        failure (exit 255) to signal the caller to retry.
+        """
+        ssh_opts = [
+            '-T',  # no PTY — critical for long-running batch commands
+            '-C',  # compression
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
+        ]
+        ctl_args = self._ctl_socket_args() if use_control else []
+        argv = ['ssh'] + ssh_opts + ctl_args + [host, cmd]
+        if password and not (use_control and self._ctl_path):
+            argv = ['sshpass', '-p', password] + argv
         proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,
@@ -363,9 +568,18 @@ class RemoteSweepDispatcher:
             proc.stdout.close()                   # type: ignore[union-attr]
             proc.wait(timeout=30)
 
+        if proc.returncode == 255:
+            # SSH-level failure — signal retry
+            stderr = proc.stderr.read() if proc.stderr else ''
+            if proc.stderr:
+                proc.stderr.close()
+            logger.warning("SSH stream exit 255: %s", stderr.strip())
+            return None
+
         if proc.returncode != 0:
             stderr = proc.stderr.read() if proc.stderr else ''
-            proc.stderr.close() if proc.stderr else None
+            if proc.stderr:
+                proc.stderr.close()
             raise RuntimeError(
                 f"SSH command failed (exit {proc.returncode}):\n"
                 f"  cmd: {cmd}\n"
@@ -374,33 +588,98 @@ class RemoteSweepDispatcher:
             proc.stderr.close()
         return ''.join(lines)
 
-    @staticmethod
-    def _scp_to(host: str, local_path: str, remote_path: str,
+    def _scp_to(self, host: str, local_path: str, remote_path: str,
                 *, password: Optional[str] = None):
         """SCP a local file/dir to the remote."""
-        argv = ['scp', '-r', local_path, f'{host}:{remote_path}']
-        if password:
+        argv = ['scp', '-C', '-r'] + self._ctl_socket_args() + \
+               [local_path, f'{host}:{remote_path}']
+        if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
-        result = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=120,
-        )
+        try:
+            result = subprocess.run(
+                argv,
+                capture_output=True, text=True, timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            if self._ctl_path:
+                logger.warning("SCP via ControlMaster timed out, retrying direct")
+                self._invalidate_control_master(host)
+                argv = ['scp', '-C', '-r', local_path, f'{host}:{remote_path}']
+                if password:
+                    argv = ['sshpass', '-p', password] + argv
+                result = subprocess.run(
+                    argv,
+                    capture_output=True, text=True, timeout=120,
+                )
+            else:
+                raise
         if result.returncode != 0:
             raise RuntimeError(f"SCP upload failed: {result.stderr.strip()}")
 
-    @staticmethod
-    def _scp_from(host: str, remote_path: str, local_path: str,
+    def _scp_from(self, host: str, remote_path: str, local_path: str,
                   *, password: Optional[str] = None):
         """SCP a remote file/dir to local."""
-        argv = ['scp', '-r', f'{host}:{remote_path}', local_path]
-        if password:
+        argv = ['scp', '-C', '-r'] + self._ctl_socket_args() + \
+               [f'{host}:{remote_path}', local_path]
+        if password and not self._ctl_path:
             argv = ['sshpass', '-p', password] + argv
         result = subprocess.run(
             argv,
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:
             raise RuntimeError(f"SCP download failed: {result.stderr.strip()}")
+
+    def _fetch_results_tar(self, host: str, remote_dir: str,
+                           local_dir: str, *,
+                           password: Optional[str] = None):
+        """Fetch a remote directory via ``tar cz | tar xz`` over SSH.
+
+        This is dramatically faster than ``scp -r`` over WAN because:
+        - Single data stream (no per-file round-trips)
+        - gzip compression on the wire
+        - Reuses the ControlMaster connection
+        Falls back to ``scp -r`` if tar piping fails.
+        """
+        os.makedirs(local_dir, exist_ok=True)
+        parent = str(Path(remote_dir).parent)
+        name = Path(remote_dir).name
+        tar_cmd = f"tar czf - -C {parent} {name}"
+
+        argv = ['ssh', '-C'] + self._ctl_socket_args() + [host, tar_cmd]
+        if password and not self._ctl_path:
+            argv = ['sshpass', '-p', password] + argv
+
+        try:
+            remote_proc = subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            local_proc = subprocess.Popen(
+                ['tar', 'xzf', '-', '-C', str(Path(local_dir).parent)],
+                stdin=remote_proc.stdout,
+                stderr=subprocess.PIPE,
+            )
+            remote_proc.stdout.close()  # type: ignore[union-attr]
+            _, local_err = local_proc.communicate(timeout=600)
+            remote_proc.wait(timeout=30)
+
+            if remote_proc.returncode != 0 or local_proc.returncode != 0:
+                remote_err = remote_proc.stderr.read() if remote_proc.stderr else b''
+                remote_proc.stderr.close() if remote_proc.stderr else None
+                raise RuntimeError(
+                    f"tar fetch failed: remote={remote_err.decode().strip()}, "
+                    f"local={local_err.decode().strip()}")
+            if remote_proc.stderr:
+                remote_proc.stderr.close()
+            logger.info("Results fetched via tar pipe: %s", local_dir)
+        except Exception as e:
+            logger.warning("tar pipe failed (%s), falling back to scp -r", e)
+            # Clean up partial extraction
+            if os.path.isdir(local_dir):
+                shutil.rmtree(local_dir, ignore_errors=True)
+            self._scp_from(host, remote_dir, local_dir, password=password)
 
     @staticmethod
     def _parse_results_dir(output: str) -> Optional[str]:
