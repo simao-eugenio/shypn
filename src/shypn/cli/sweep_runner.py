@@ -93,7 +93,9 @@ class SweepRunner:
         self.model_path = model_path
         self.config = config
         self.output_dir = output_dir
-        self.workers = workers or self._compute_safe_workers()
+        safe = self._compute_safe_workers()
+        # User value acts as ceiling; never exceed memory-safe auto cap
+        self.workers = min(workers, safe) if workers else safe
         self.verbose = verbose
 
     @staticmethod

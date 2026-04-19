@@ -313,11 +313,9 @@ class RemoteSweepDispatcher:
             # ── 4. SSH run CLI on remote ─────────────────────────────
             self._emit(progress_cb, 'Running sweep on remote server...')
 
-            # Never override workers — let the server's memory-aware
-            # _compute_safe_workers() decide based on available RAM.
-            # Hardcoding workers from the client caused OOM/swap-thrash
-            # on 64 GB machines with 16 workers × 4.5 GB peak RSS.
-            workers_flag = ""
+            # Pass user-specified workers as a ceiling hint; the server's
+            # _compute_safe_workers() will cap it to a memory-safe value.
+            workers_flag = f"--workers {workers}" if workers > 0 else ""
             # Use 'exec' so Python replaces the bash process, becoming
             # sshd's direct child.  Combined with process_guard's
             # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
