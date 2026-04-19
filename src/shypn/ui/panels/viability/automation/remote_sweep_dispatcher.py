@@ -223,6 +223,40 @@ class RemoteSweepDispatcher:
             self._emit(progress_cb, 'Opening SSH connection...')
             self._open_control_master(host, password=ssh_password)
 
+            # ── 1b. Pre-dispatch cleanup ─────────────────────────────
+            # Clean stale state from previous failed/killed sweeps to
+            # prevent swap pollution, orphan processes, and socket errors.
+            self._emit(progress_cb, 'Cleaning up stale state...')
+            cleanup_cmd = (
+                # Kill orphaned sweep workers from prior runs
+                "pkill -9 -f 'shypn[.]cli[.]sweep' 2>/dev/null; "
+                # Give processes time to die
+                "sleep 1; "
+                # Report cleanup results
+                "echo ORPHANS_KILLED=$?; "
+                # Check swap usage — if high but RAM is free, advise
+                "echo SWAP_USED_KB=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print t-f}' /proc/meminfo); "
+                "echo MEM_FREE_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)"
+            )
+            try:
+                cleanup_out = self._ssh(host, cleanup_cmd, password=ssh_password, timeout=15)
+                cl = {}
+                for line in cleanup_out.strip().splitlines():
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        cl[k.strip()] = v.strip()
+                swap_gb = int(cl.get('SWAP_USED_KB', '0')) / (1024 * 1024)
+                mem_free_gb = int(cl.get('MEM_FREE_KB', '0')) / (1024 * 1024)
+                if swap_gb > 1.0 and mem_free_gb > 20.0:
+                    logger.warning(
+                        "Server has %.1f GB in swap with %.0f GB RAM free "
+                        "(leftover from prior OOM). Performance may be "
+                        "degraded until swap drains.", swap_gb, mem_free_gb)
+                logger.info("Pre-dispatch cleanup done: swap=%.1f GB, "
+                            "RAM free=%.0f GB", swap_gb, mem_free_gb)
+            except Exception as e:
+                logger.warning("Pre-dispatch cleanup failed (non-fatal): %s", e)
+
             # ── 2. Export sweep config (local temp) ──────────────────
             self._emit(progress_cb, 'Exporting sweep config...')
             staging = Path(tempfile.mkdtemp(prefix='shypn_remote_'))
