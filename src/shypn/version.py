@@ -9,11 +9,11 @@ Usage:
 """
 
 # Main package version (semantic versioning: MAJOR.MINOR.PATCH)
-__version__ = "2.6.0"
+__version__ = "2.6.1"
 
 # Version metadata
-__version_name__ = "GATA Project & DTO Editing Infrastructure"
-__version_date__ = "2026-02-23"
+__version_name__ = "Simulation Path Consistency & Remote Execution"
+__version_date__ = "2026-04-19"
 
 # API version for compatibility checking (MAJOR.MINOR)
 # Increment MAJOR when breaking API changes occur
@@ -27,6 +27,7 @@ __required_crossfetch_version__ = "1.0.0"
 # Version history
 __version_history__ = """
 Version History:
+2.6.1 (Apr 19, 2026): Simulation Path Consistency & Remote Execution - Arc weight/marking fixes, SSH hardening, CPU parallel replicates, GPU engine, hybrid CPU+GPU mode
 2.6.0 (Feb 23, 2026): GATA Project & DTO Editing Infrastructure - Event-driven cache, model-independent editing
 2.5.9 (Feb 17, 2026): Property Sweep & Batch Automation - Enhanced batch execution
 2.5.8 (Feb 16, 2026): Batch results saver and metadata improvements
