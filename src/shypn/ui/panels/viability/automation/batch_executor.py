@@ -42,6 +42,9 @@ def _worker_pool_initializer(q) -> None:
     _os.environ["OPENBLAS_NUM_THREADS"] = "1"
     _os.environ["MKL_NUM_THREADS"] = "1"
     _os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    # Signal to ReplicateRunner that we are inside a pool worker so it
+    # must NOT spawn child processes (daemon processes cannot have children).
+    _os.environ["_SHYPN_IN_POOL_WORKER"] = "1"
     global _worker_progress_queue
     _worker_progress_queue = q
 
@@ -171,11 +174,12 @@ def _worker_run_experiment(args: dict) -> Dict[str, Any]:
         dt_manual = args.get('dt_manual', None)
         seed_base = args.get('seed_base', 42)
 
-        # Run replicates
+        # Run replicates — use_parallel=False because we are already inside
+        # a pool worker (daemon process) which cannot spawn child processes.
         runner = ReplicateRunner(model)
         results = runner.run_replicates(
             n=replicates,
-            use_parallel=True,   # Safe in forked workers: Phase 4b replaced ThreadPoolExecutor with vectorised numpy (no deadlock risk)
+            use_parallel=False,
             use_tau_leaping=use_tau_leaping,
             duration=duration,
             termination_condition=termination_condition,
@@ -1896,27 +1900,17 @@ class BatchExecutor:
             arcs = model.arcs if hasattr(model, 'arcs') else []
         
         # Apply place markings (only to subnet places)
-        # CRITICAL: Always apply swept parameter values (even zero)
-        # Skip zero values only for non-swept parameters to preserve baseline
+        # Apply place markings to model.
+        # All snapshot values are applied faithfully — the snapshot captures the
+        # exact float values from the ListStore (which now correctly preserves
+        # fractional markings).  Zero markings are legitimate (e.g. TNFa=0,
+        # IL1b=0, or user-set CBD=0 for control).
         applied_markings = 0
-        skipped_zeros = 0
-        swept_place_id = None
-        if hasattr(snapshot, 'swept_parameter') and snapshot.swept_parameter:
-            if snapshot.swept_parameter.get('type') == 'places':
-                swept_place_id = snapshot.swept_parameter.get('id')
-        
         for place_id, marking in snapshot.place_markings.items():
             place = next((p for p in places if p.id == place_id), None)
             if place:
-                marking_float = float(marking)
-                # Always apply if this is the swept parameter (even zero values)
-                # For non-swept parameters, skip zeros to preserve baseline
-                if place_id == swept_place_id or marking_float != 0.0:
-                    place.tokens = marking_float
-                    applied_markings += 1
-                else:
-                    # Keep baseline value from model (don't overwrite with zero)
-                    skipped_zeros += 1
+                place.tokens = float(marking)
+                applied_markings += 1
         
         # Apply transition rates (only to subnet transitions)
         # Handle both numeric rates and kinetic formulas

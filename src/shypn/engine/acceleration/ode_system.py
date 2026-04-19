@@ -168,18 +168,19 @@ class OdeSystemAccelerator:
                 logger.debug("OdeSystemAccelerator: no continuous places — skipping")
                 return False
 
-            # Warn about non-continuous transitions that the ODE accelerator
-            # will NOT service.  These transitions retain their declared
-            # semantics only if the caller (e.g. the simulation controller)
-            # also runs the appropriate discrete/stochastic engine.  A
-            # standalone integrate() call will silently miss them.
+            # Warn about transitions that the ODE accelerator will NOT
+            # service.  Adaptive transitions in continuous mode are now
+            # included in the ODE system (F2 fix); only non-continuous
+            # non-adaptive transitions remain external.
             non_continuous = []
+            covered_tids = {spec.tid for spec in self._specs}
             for t in getattr(self._model, "transitions", []):
-                t_type = getattr(t, "transition_type", "")
-                if t_type and t_type != "continuous":
-                    non_continuous.append(
-                        f"  {getattr(t, 'name', t.id)} (type={t_type})"
-                    )
+                if t.id not in covered_tids:
+                    t_type = getattr(t, "transition_type", "")
+                    if t_type:
+                        non_continuous.append(
+                            f"  {getattr(t, 'name', t.id)} (type={t_type})"
+                        )
             if non_continuous:
                 logger.warning(
                     "ODE accelerator covers only continuous transitions.  "
@@ -238,7 +239,11 @@ class OdeSystemAccelerator:
         y0 = np.empty(self._n_ode, dtype=np.float64)
         for pid, idx in self._ode_place_index.items():
             p = places.get(pid)
-            y0[idx] = max(float(getattr(p, "tokens", 0.0)) if p else 0.0, 1e-10)
+            # F5 fix: use actual token value, not artificial 1e-10 floor.
+            # Zero tokens means zero concentration — the ODE will produce
+            # zero rates naturally without phantom initial conditions.
+            tok = float(getattr(p, "tokens", 0.0)) if p else 0.0
+            y0[idx] = max(tok, 0.0)
         return y0
 
     def write_back(self, y: np.ndarray) -> None:
@@ -342,13 +347,36 @@ class OdeSystemAccelerator:
                 # transition → place (output arc)
                 arc_out.setdefault(src, []).append((tgt, w, at))
 
-        # Collect continuous transitions and their specs
+        # Collect transitions for ODE integration.
+        # Include both pure continuous and adaptive-in-continuous-mode
+        # transitions so that the coupled ODE system captures ALL
+        # continuous dynamics in a single solve_ivp call (F2 fix).
         specs: List[_TransitionSpec] = []
         ode_place_ids_set: Set[str] = set()
 
         for t in model.transitions:
             t_type = getattr(t, "transition_type", "")
-            if t_type != "continuous":
+            include = False
+            if t_type == "continuous":
+                include = True
+            elif t_type == "adaptive":
+                # Include adaptive transitions whose current mode is
+                # continuous.  We check the behavior cache or fall back
+                # to the default preference.  During ODE build the
+                # controller has not yet stepped, so we inspect the
+                # transition's configured preference.
+                props = getattr(t, "properties", {}) or {}
+                prefer = str(props.get("prefer_continuous", "true")).lower()
+                # Also try to detect mode from a cached behavior if available
+                _beh = getattr(t, '_behavior_cache', None)
+                if _beh is not None and hasattr(_beh, '_current_mode'):
+                    include = _beh._current_mode == 'continuous'
+                elif _beh is not None and hasattr(_beh, '_select_mode'):
+                    include = _beh._select_mode() == 'continuous'
+                else:
+                    # No cached behavior yet — use configured preference
+                    include = prefer in ('true', '1', 'yes')
+            if not include:
                 continue
             props = getattr(t, "properties", {}) or {}
             rate_expr     = props.get("rate_function")
@@ -510,13 +538,14 @@ class OdeSystemAccelerator:
         lines.append('    memset(dydt, 0, (size_t)n * sizeof(double));')
         lines.append('')
 
-        # Clamp y[] to non-negative before computing rates.
-        # LSODA may probe y < 0 during internal adaptive steps; clamping here
-        # makes rates go to zero naturally as species deplete, so conservation
-        # emerges from the topology without external bookkeeping.
-        lines.append('    /* Clamp state to non-negative (Petri net invariant) */')
-        lines.append('    for (int _i = 0; _i < n; _i++)')
-        lines.append('        if (y[_i] < 0.0) y[_i] = 0.0;')
+        # F4 fix: removed in-RHS non-negative clamping.
+        # The previous clamp (y[i] < 0 → y[i] = 0) introduced C⁰
+        # discontinuities that could confuse LSODA's adaptive step
+        # controller and prevented bidirectional flow in reversible
+        # reactions.  Non-negativity is now enforced ONLY in write_back()
+        # after integration completes.  LSODA's internal probes may
+        # temporarily visit y < 0 but the final accepted solution is
+        # clamped when written back to model tokens.
         lines.append('')
 
         # Emit rate computation for each transition

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Test script to verify LocalityDetector works with list-based model."""
 
+from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 

@@ -124,5 +124,19 @@
     "path": "/home/simao/projetos/shypn/workspace/projects/canabidiol",
     "created_date": "2026-04-14T10:59:39.887592",
     "modified_date": "2026-04-14T10:59:39.888120"
+  },
+  "4bb2e904-a10e-4aae-afed-a08525d58b78": {
+    "id": "4bb2e904-a10e-4aae-afed-a08525d58b78",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-04-18T15:47:53.028849",
+    "modified_date": "2026-04-18T15:47:53.028849"
+  },
+  "7f9cf150-cead-4ea4-aa14-b7970464caf6": {
+    "id": "7f9cf150-cead-4ea4-aa14-b7970464caf6",
+    "name": "Test Project",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
+    "created_date": "2026-04-18T15:48:28.532281",
+    "modified_date": "2026-04-18T15:48:28.532281"
   }
 }

@@ -115,7 +115,7 @@ class SweepOutputManager:
             id_to_name[t.id] = getattr(t, 'name', t.id) or t.id
 
         place_ids = list(successful[0].get('place_data', {}).keys())
-        trans_ids = list(successful[0].get('transition_data', {}).keys())
+        trans_ids = list(successful[0].get('total_firings', successful[0].get('transition_data', {})).keys())
 
         path = cond_dir / 'replicates.csv'
         with open(path, 'w', newline='', encoding='utf-8') as fh:
@@ -129,11 +129,17 @@ class SweepOutputManager:
             writer.writerow(header)
 
             for r in successful:
+                # Derive final_time from time_points if not stored directly
+                final_time = r.get('final_time', '')
+                if not final_time:
+                    tp = r.get('time_points', [])
+                    if tp:
+                        final_time = f"{float(tp[-1]):.6g}"
                 row: List[Any] = [
                     r.get('replicate_id', ''),
                     r.get('seed', ''),
                     r.get('stopped_reason', ''),
-                    r.get('final_time', ''),
+                    final_time,
                 ]
                 for pid in place_ids:
                     series = r.get('place_data', {}).get(pid)
@@ -143,12 +149,19 @@ class SweepOutputManager:
                     else:
                         row.append('')
                 for tid in trans_ids:
-                    series = r.get('transition_data', {}).get(tid)
-                    if series is not None and len(series) > 0:
-                        val = series[-1] if not isinstance(series[-1], tuple) else series[-1][1]
-                        row.append(f"{float(val):.6g}")
+                    # Prefer total_firings (always populated) over
+                    # transition_data time-series (empty when numpy fast-path
+                    # is active with skip_rate_eval=True).
+                    firings = r.get('total_firings', {}).get(tid)
+                    if firings is not None:
+                        row.append(f"{int(firings)}")
                     else:
-                        row.append('')
+                        series = r.get('transition_data', {}).get(tid)
+                        if series is not None and len(series) > 0:
+                            val = series[-1] if not isinstance(series[-1], tuple) else series[-1][1]
+                            row.append(f"{float(val):.6g}")
+                        else:
+                            row.append('')
                 writer.writerow(row)
 
     @staticmethod

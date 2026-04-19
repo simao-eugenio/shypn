@@ -251,8 +251,8 @@ class SubnetParametersView(Gtk.Box):
         
         Columns: ID, From, To, Weight (editable), Type, Background, BackgroundSet
         """
-        # Create ListStore: id, from_id, to_id, weight (int, editable), arc_type, background, background_set
-        store = Gtk.ListStore(str, str, str, int, str, str, bool)
+        # Create ListStore: id, from_id, to_id, weight (float, editable), arc_type, background, background_set
+        store = Gtk.ListStore(str, str, str, float, str, str, bool)
         
         # Create TreeView
         treeview = Gtk.TreeView(model=store)

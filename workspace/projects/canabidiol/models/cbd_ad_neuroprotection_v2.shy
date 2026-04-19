@@ -1506,7 +1506,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "race",
       "is_source": false,
@@ -1582,7 +1582,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "race",
       "is_source": true,
@@ -1778,7 +1778,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "race",
       "is_source": true,
@@ -1975,7 +1975,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "race",
       "is_source": false,
@@ -2013,7 +2013,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 2,
       "firing_policy": "race",
       "is_source": false,
@@ -2093,7 +2093,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 0,
       "firing_policy": "race",
       "is_source": false,
@@ -2131,7 +2131,7 @@
         0.0
       ],
       "border_width": 3.0,
-      "transition_type": "continuous",
+      "transition_type": "stochastic",
       "priority": 1,
       "firing_policy": "race",
       "is_source": true,
