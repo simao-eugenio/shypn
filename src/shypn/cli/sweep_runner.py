@@ -165,10 +165,11 @@ class SweepRunner:
             if mem_available_gb is None:
                 mem_available_gb = 16.0  # conservative default
 
-            # Reserve 6 GB for OS, sshd, page cache
-            usable_gb = max(1.0, mem_available_gb - 6.0)
-            # Estimate 3 GB per worker (complex models with tau-leaping)
-            per_worker_gb = 3.0
+            # Reserve 8 GB for OS, sshd, page cache, kernel buffers
+            usable_gb = max(1.0, mem_available_gb - 8.0)
+            # Estimate 4.5 GB per worker (observed peak RSS for CBD v2:
+            # 3.4-4.7 GB with 30 tau-leaping replicates + ODE history)
+            per_worker_gb = 4.5
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
