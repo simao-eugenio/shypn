@@ -268,7 +268,7 @@ class RemoteSweepDispatcher:
             self._emit(progress_cb, 'Checking remote server resources...')
             preflight_cmd = (
                 "echo MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo) && "
-                "echo SWEEP_PROCS=$(pgrep -fc 'shypn[.]cli[.]sweep' 2>/dev/null || echo 0) && "
+                "echo SWEEP_PROCS=$(pgrep -fc 'shypn[.]cli[.]sweep' 2>/dev/null; true) && "
                 "echo SWAP_USED_KB=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print t-f}' /proc/meminfo)"
             )
             try:
@@ -280,7 +280,7 @@ class RemoteSweepDispatcher:
                         pf[k.strip()] = v.strip()
 
                 # Fail if another sweep is already running
-                running = int(pf.get('SWEEP_PROCS', '0'))
+                running = int(pf.get('SWEEP_PROCS', '0').split()[0])
                 if running > 0:
                     raise RuntimeError(
                         f"Another sweep is already running on the server "
@@ -288,9 +288,9 @@ class RemoteSweepDispatcher:
                         f"kill it manually before dispatching a new one.")
 
                 # Warn if available memory is low (< 8 GB)
-                avail_kb = int(pf.get('MEM_AVAIL_KB', '0'))
+                avail_kb = int(pf.get('MEM_AVAIL_KB', '0').split()[0])
                 avail_gb = avail_kb / (1024 * 1024)
-                swap_kb = int(pf.get('SWAP_USED_KB', '0'))
+                swap_kb = int(pf.get('SWAP_USED_KB', '0').split()[0])
                 swap_gb = swap_kb / (1024 * 1024)
                 if avail_gb < 8.0:
                     raise RuntimeError(
