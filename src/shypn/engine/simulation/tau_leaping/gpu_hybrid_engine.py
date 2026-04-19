@@ -146,6 +146,60 @@ class GPUHybridEngine:
             backend.device_info.device_name,
         )
 
+    def _estimate_vram_per_replicate(self) -> float:
+        """Estimate GPU VRAM usage per replicate in bytes.
+
+        Accounts for:
+        - State vector d_y: P × 8
+        - Time + active flags: 8 + 1
+        - Intermediate arrays during step computation:
+          d_log_y [P], d_log_a [M], d_a_fwd [M], d_a_rev [M],
+          d_a_net [M], d_lam_fwd [M], d_k [M×8], d_delta [P×8],
+          d_mu [P], d_sigma_sq [P], d_tau_* [P], d_dy_ode [P_ode×8]
+        - Safety factor 1.5× for CuPy workspace/fragmentation
+        """
+        P = self._P
+        M = self._M_stoch
+        P_ode = self._P_ode
+
+        state = P * 8 + 8 + 1  # d_y row + d_t + d_active
+        intermediates = (
+            P * 8 +       # d_log_y
+            M * 8 * 5 +   # d_log_a, d_a_fwd, d_a_rev, d_a_net, d_lam_fwd
+            M * 8 +       # d_k (int64)
+            P * 8 +       # d_delta
+            P * 8 * 3 +   # d_mu, d_sigma_sq, d_eps_y
+            P * 8 * 3 +   # d_tau_mu, d_tau_sigma, d_tau_per_place
+            P_ode * 8     # d_dy_ode_masked
+        )
+        per_rep = state + intermediates
+        return per_rep * 1.5  # safety factor
+
+    def _max_batch_for_vram(self, n_requested: int) -> int:
+        """Compute max replicates that fit in GPU VRAM.
+
+        Reserves 1 GB for CuPy overhead, driver, and other allocations.
+        """
+        try:
+            free, total = cp.cuda.Device().mem_info
+        except Exception:
+            # Can't query — assume 8 GB total, 6 GB usable
+            free = 6 * 1024**3
+
+        reserved = 1 * 1024**3  # 1 GB for driver/overhead
+        usable = max(free - reserved, 512 * 1024**2)
+
+        per_rep = self._estimate_vram_per_replicate()
+        max_reps = max(1, int(usable / per_rep))
+
+        if max_reps < n_requested:
+            logger.info(
+                "VRAM limit: %.1f GB free, %.0f B/rep → batching %d/%d",
+                free / 1024**3, per_rep, max_reps, n_requested,
+            )
+
+        return min(max_reps, n_requested)
+
     def run_batch(
         self,
         n_replicates: int,
@@ -164,8 +218,61 @@ class GPUHybridEngine:
         with RK4 on dt-sized steps; stochastic transitions fire with
         adaptive τ ≤ dt within each step.
 
+        If N exceeds GPU VRAM capacity, replicates are split into
+        sub-batches automatically.
+
         Returns list of result dicts compatible with ReplicateRunner format.
         """
+        batch_size = self._max_batch_for_vram(n_replicates)
+
+        if batch_size >= n_replicates:
+            # All fit in one batch
+            return self._run_sub_batch(
+                n_replicates, duration, dt, seed_base,
+                snapshot_interval=snapshot_interval,
+                verbose=verbose,
+                progress_callback=progress_callback,
+            )
+
+        # Split into sub-batches
+        all_results: List[Dict[str, Any]] = []
+        offset = 0
+        batch_idx = 0
+        while offset < n_replicates:
+            chunk = min(batch_size, n_replicates - offset)
+            if verbose:
+                print(f"  GPU VRAM batch {batch_idx + 1}: "
+                      f"replicates {offset}–{offset + chunk - 1} "
+                      f"(of {n_replicates})")
+
+            sub_results = self._run_sub_batch(
+                chunk, duration, dt, seed_base + offset,
+                snapshot_interval=snapshot_interval,
+                verbose=verbose,
+                progress_callback=progress_callback,
+            )
+            # Fix replicate IDs to be globally sequential
+            for i, r in enumerate(sub_results):
+                r["replicate_id"] = offset + i
+                r["seed"] = seed_base + offset + i
+            all_results.extend(sub_results)
+            offset += chunk
+            batch_idx += 1
+
+        return all_results
+
+    def _run_sub_batch(
+        self,
+        n_replicates: int,
+        duration: float,
+        dt: float,
+        seed_base: int = 42,
+        *,
+        snapshot_interval: int = 1,
+        verbose: bool = False,
+        progress_callback: Optional[Callable[[float], None]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Run a single sub-batch of N replicates (must fit in VRAM)."""
         N = n_replicates
         P = self._P
         P_ode = self._P_ode
