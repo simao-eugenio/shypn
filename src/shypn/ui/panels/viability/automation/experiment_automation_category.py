@@ -367,6 +367,18 @@ class ExperimentAutomationCategory:
                 )
         
         try:
+            # Clear previously generated sweep snapshots (keep only the
+            # first baseline) so that clicking "Generate Experiments"
+            # multiple times doesn't accumulate duplicate conditions.
+            if len(self.experiment_manager.snapshots) > 1:
+                del self.experiment_manager.snapshots[1:]
+                self.experiment_manager.swept_parameters = {
+                    k: v for k, v in self.experiment_manager.swept_parameters.items()
+                    if k == 0
+                }
+            if self.queue_view:
+                self.queue_view.clear_queue()
+
             # Store baseline snapshot count
             baseline_count = len(self.experiment_manager.snapshots)
             
