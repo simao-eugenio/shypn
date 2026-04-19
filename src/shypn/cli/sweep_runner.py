@@ -28,6 +28,26 @@ from shypn.ui.panels.viability.automation.property_path_parser import (
     resolve_object,
 )
 
+# Number of CPU threads to reserve for system/sshd (cores 0..N-1).
+_RESERVED_CPUS = 4
+
+
+def _apply_cpu_affinity() -> None:
+    """Pin current process to CPUs beyond the reserved set.
+
+    Reserves CPUs 0.._RESERVED_CPUS-1 for sshd and system tasks,
+    preventing sweep workers from starving SSH and causing lockout.
+    No-op on non-Linux or if os.sched_setaffinity is unavailable.
+    """
+    try:
+        all_cpus = os.sched_getaffinity(0)
+        allowed = {c for c in all_cpus if c >= _RESERVED_CPUS}
+        if allowed:
+            os.sched_setaffinity(0, allowed)
+    except (AttributeError, OSError):
+        # Not Linux or permission denied — silently skip
+        pass
+
 
 def _worker_init() -> None:
     """Initializer for ProcessPoolExecutor workers.
@@ -36,6 +56,7 @@ def _worker_init() -> None:
     when their parent is killed (e.g. SSH connection drop).
     Also marks the process so replicate_runner won't spawn a nested pool.
     Deprioritizes CPU scheduling so sshd/system stay responsive.
+    Pins CPU affinity to avoid cores 0-3 (reserved for sshd/system).
     """
     os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
     from shypn.engine.process_guard import install_process_guard
@@ -45,6 +66,8 @@ def _worker_init() -> None:
         os.nice(19)
     except OSError:
         pass
+    # Pin to cores 4+ so cores 0-3 remain free for sshd/system
+    _apply_cpu_affinity()
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +243,8 @@ class SweepRunner:
 
         # 4. Dispatch conditions in parallel across worker processes
         #    Each worker loads its own model copy — no shared mutable state.
+        #    Pin parent process to allowed CPUs as well (children inherit).
+        _apply_cpu_affinity()
         from dataclasses import asdict
         sim_dict = asdict(sim)
 
