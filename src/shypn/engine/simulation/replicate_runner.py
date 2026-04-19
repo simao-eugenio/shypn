@@ -1015,25 +1015,28 @@ class ReplicateRunner:
             logger.info("GPU: no stochastic transitions — using CPU path")
             return None
 
-        # ── Decline GPU path for hybrid ODE+stochastic models ────────
-        # The GPU engine only runs tau-leaping (stochastic/adaptive
-        # transitions).  If the model also has continuous transitions
-        # requiring ODE integration, the GPU path would silently ignore
-        # them, producing wrong results (instant deadlock).  Fall through
-        # to the CPU controller loop which handles both ODE + tau-leaping.
+        # ── Hybrid GPU path for ODE+stochastic models ────────────────
+        # If the model has continuous transitions, try the GPU hybrid
+        # engine that combines RK4 ODE integration with GPU τ-leaping.
         n_continuous = sum(
             1 for t in self.model.transitions
             if getattr(t, 'transition_type', '') == 'continuous'
         )
         if n_continuous > 0:
-            logger.info(
-                "GPU: model has %d continuous transitions requiring ODE "
-                "integration — using CPU hybrid path instead",
-                n_continuous,
+            hybrid_results = self._try_gpu_hybrid(
+                gpu_backend,
+                n=n, duration=duration,
+                epsilon=epsilon, max_tau=max_tau,
+                seed_base=seed_base, time_step=time_step,
+                time_units=time_units,
+                verbose=verbose,
+                progress_callback=progress_callback,
             )
+            if hybrid_results is not None:
+                return hybrid_results
+            # Fall through to CPU path if hybrid GPU failed
             if verbose:
-                print(f"  GPU declined: {n_continuous} continuous transitions "
-                      f"require ODE integration (CPU hybrid path)")
+                print("  GPU hybrid declined — using CPU path")
             return None
 
         # ── Build CPU propensity callback for hybrid mode ────────────
@@ -1079,6 +1082,156 @@ class ReplicateRunner:
             logger.warning("GPU batch execution failed (%s); using CPU", exc)
             if verbose:
                 print(f"  GPU error: {exc}")
+            return None
+
+    def _try_gpu_hybrid(
+        self,
+        gpu_backend: Any,
+        *,
+        n: int,
+        duration: float,
+        epsilon: float,
+        max_tau: float,
+        seed_base: int,
+        time_step: Optional[float],
+        time_units: Any,
+        verbose: bool,
+        progress_callback: Optional[Any],
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Attempt to run hybrid ODE+stochastic replicates on GPU.
+
+        Returns the result list on success, or None if the hybrid engine
+        cannot be built (missing ODE accelerator, no stochastic transitions,
+        etc.).
+        """
+        try:
+            from shypn.engine.acceleration import OdeSystemAccelerator
+            from shypn.engine.simulation.tau_leaping.gpu_hybrid_engine import (
+                GPUHybridEngine,
+            )
+        except ImportError as exc:
+            logger.warning("GPU hybrid engine import failed (%s)", exc)
+            return None
+
+        # Build ODE system
+        controller = SimulationController(self.model)
+        ode_accel = OdeSystemAccelerator(self.model, controller._get_behavior)
+        if not ode_accel.build():
+            logger.info("GPU hybrid: ODE accelerator build failed — using CPU")
+            if verbose:
+                print("  GPU hybrid: ODE accelerator build failed")
+            return None
+
+        # Get ODE RHS function
+        ode_rhs = ode_accel.make_rhs()
+        # Store reference to extras array so hybrid engine can update signal places
+        ode_rhs._extras_arr = ode_accel._extras_arr  # type: ignore[attr-defined]
+
+        # Build place-index mappings
+        all_places = list(self.model.places)
+        place_id_list = [p.id for p in all_places]
+        place_id_to_global = {pid: i for i, pid in enumerate(place_id_list)}
+        n_places = len(place_id_list)
+
+        # ODE place indices (global positions of ODE state places)
+        ode_place_indices = [
+            place_id_to_global[pid] for pid in ode_accel._ode_place_ids
+            if pid in place_id_to_global
+        ]
+
+        # Extra place indices (signal places in rate expressions)
+        extra_place_indices = [
+            place_id_to_global[pid] for pid in ode_accel._extra_place_ids
+            if pid in place_id_to_global
+        ]
+
+        # Build stochastic transition matrices
+        stoch_transitions = [
+            t for t in self.model.transitions
+            if getattr(t, 'transition_type', '') == 'stochastic'
+        ]
+        n_stoch = len(stoch_transitions)
+
+        if n_stoch == 0:
+            logger.info("GPU hybrid: no stochastic transitions — pure ODE")
+            if verbose:
+                print("  GPU hybrid: no stochastic transitions (using CPU)")
+            return None
+
+        # Build stoichiometry matrix for stochastic transitions
+        import numpy as _np
+        S_stoch = _np.zeros((n_places, n_stoch), dtype=_np.float64)
+        input_stoich = _np.zeros((n_stoch, n_places), dtype=_np.float64)
+        rate_constants = _np.zeros(n_stoch, dtype=_np.float64)
+        rate_rev = _np.zeros(n_stoch, dtype=_np.float64)
+        is_reversible = _np.zeros(n_stoch, dtype=_np.bool_)
+
+        for j, t in enumerate(stoch_transitions):
+            rate_constants[j] = float(getattr(t, 'rate', 0.0) or 0.0)
+
+            for arc in self.model.arcs:
+                src = getattr(arc, 'source_id', None)
+                tgt = getattr(arc, 'target_id', None)
+                w = float(getattr(arc, 'weight', 1.0))
+                arc_type = getattr(arc, 'arc_type', 'normal')
+
+                if 'inhibitor' in arc_type or arc_type == 'test':
+                    continue
+
+                if tgt == t.id and src in place_id_to_global:
+                    pi = place_id_to_global[src]
+                    S_stoch[pi, j] -= w
+                    input_stoich[j, pi] = w
+                elif src == t.id and tgt in place_id_to_global:
+                    pi = place_id_to_global[tgt]
+                    S_stoch[pi, j] += w
+
+        # Initial marking
+        y0 = _np.array([float(p.tokens) for p in all_places], dtype=_np.float64)
+
+        # Compute dt
+        settings = self.default_settings
+        dt = time_step if time_step else settings.get_effective_dt()
+
+        if verbose:
+            print(f"  GPU hybrid: {len(ode_place_indices)} ODE places, "
+                  f"{n_stoch} stochastic transitions, dt={dt}")
+
+        try:
+            engine = GPUHybridEngine(
+                ode_rhs_fn=ode_rhs,
+                ode_place_indices=ode_place_indices,
+                stoch_S=S_stoch,
+                stoch_rate_constants=rate_constants,
+                stoch_input_stoich=input_stoich,
+                stoch_is_reversible=is_reversible,
+                stoch_rate_rev=rate_rev,
+                n_places=n_places,
+                place_ids=place_id_list,
+                y0=y0,
+                backend=gpu_backend,
+                extra_place_indices=extra_place_indices,
+                epsilon=epsilon,
+                max_tau=max_tau,
+            )
+            results = engine.run_batch(
+                n_replicates=n,
+                duration=duration,
+                dt=dt,
+                seed_base=seed_base,
+                verbose=verbose,
+                progress_callback=progress_callback,
+            )
+            if progress_callback:
+                progress_callback(1.0)
+            if verbose:
+                print(f"✓ GPU hybrid: {n} replicates completed")
+            return results
+
+        except Exception as exc:
+            logger.warning("GPU hybrid execution failed (%s); using CPU", exc)
+            if verbose:
+                print(f"  GPU hybrid error: {exc}")
             return None
 
     @staticmethod
