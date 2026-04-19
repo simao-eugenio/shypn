@@ -128,6 +128,7 @@ class RemoteSweepDispatcher:
         self._ctl_proc: Optional[subprocess.Popen] = None  # Managed CM process
         self._stream_proc: Optional[subprocess.Popen] = None
         self._ssh_password: Optional[str] = None
+        self.verbose_preflight = True
 
     @property
     def is_running(self) -> bool:
@@ -232,6 +233,21 @@ class RemoteSweepDispatcher:
                 **sim_params,
             )
 
+            # ── 2b. Pre-flight validation ────────────────────────────
+            # Detect duplicate snapshots (common when user clicks Generate
+            # multiple times before the dedup fix).
+            with open(config_path, 'r') as f:
+                exported = json.load(f)
+            if exported.get('mode') == 'snapshots':
+                snap_names = [s.get('name', '') for s in exported.get('snapshots', [])]
+                unique_names = set(snap_names)
+                if len(snap_names) > len(unique_names):
+                    dupes = len(snap_names) - len(unique_names)
+                    raise RuntimeError(
+                        f"Sweep config contains {dupes} duplicate snapshot(s) "
+                        f"({len(snap_names)} total, {len(unique_names)} unique). "
+                        f"Please clear and regenerate experiments.")
+
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
@@ -248,7 +264,53 @@ class RemoteSweepDispatcher:
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 3. SSH run CLI on remote ─────────────────────────────
+            # ── 3b. Remote pre-flight: memory & sweep conflict check ─
+            self._emit(progress_cb, 'Checking remote server resources...')
+            preflight_cmd = (
+                "echo MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo) && "
+                "echo SWEEP_PROCS=$(pgrep -fc 'shypn[.]cli[.]sweep' 2>/dev/null || echo 0) && "
+                "echo SWAP_USED_KB=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print t-f}' /proc/meminfo)"
+            )
+            try:
+                preflight_out = self._ssh(host, preflight_cmd, password=ssh_password, timeout=15)
+                pf = {}
+                for line in preflight_out.strip().splitlines():
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        pf[k.strip()] = v.strip()
+
+                # Fail if another sweep is already running
+                running = int(pf.get('SWEEP_PROCS', '0'))
+                if running > 0:
+                    raise RuntimeError(
+                        f"Another sweep is already running on the server "
+                        f"({running} processes). Wait for it to finish or "
+                        f"kill it manually before dispatching a new one.")
+
+                # Warn if available memory is low (< 8 GB)
+                avail_kb = int(pf.get('MEM_AVAIL_KB', '0'))
+                avail_gb = avail_kb / (1024 * 1024)
+                swap_kb = int(pf.get('SWAP_USED_KB', '0'))
+                swap_gb = swap_kb / (1024 * 1024)
+                if avail_gb < 8.0:
+                    raise RuntimeError(
+                        f"Server has only {avail_gb:.1f} GB available RAM "
+                        f"(swap used: {swap_gb:.1f} GB). "
+                        f"Not enough for a sweep. Reboot or free memory first.")
+                if self.verbose_preflight:
+                    self._emit(progress_cb,
+                               f"Remote: {avail_gb:.0f} GB RAM free, "
+                               f"swap {swap_gb:.1f} GB used")
+            except RuntimeError:
+                raise
+            except Exception as e:
+                # Non-fatal: log and proceed (server might be non-Linux)
+                logger.warning("Pre-flight check failed (non-fatal): %s", e)
+
+            if self._cancel.is_set():
+                raise InterruptedError('Cancelled')
+
+            # ── 4. SSH run CLI on remote ─────────────────────────────
             self._emit(progress_cb, 'Running sweep on remote server...')
 
             workers_flag = f"--workers {workers}" if workers > 0 else ""
