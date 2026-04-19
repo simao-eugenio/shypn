@@ -107,9 +107,10 @@ class SweepRunner:
             system/sshd.  On hybrid CPUs (e.g. i9-14900K: 8P+16E = 24
             physical cores, 32 threads) this prevents all-core saturation
             that causes SSH banner-exchange timeouts.
-          - Memory: estimate per-worker RSS (~3 GB for complex models),
-            cap to fit in available RAM minus a 6 GB system reserve
-          - Final worker count = min(cpu_cap, mem_cap, hard_max=20)
+          - Memory: estimate per-worker RSS (~8 GB for complex models),
+            cap to fit in available RAM + swap minus a 10 GB system reserve.
+            NVMe swap is fast enough for simulation workloads.
+          - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
 
         This prevents memory exhaustion that causes swap thrashing,
         OOM kills, and SSH lockout.
@@ -167,17 +168,34 @@ class SweepRunner:
             if mem_available_gb is None:
                 mem_available_gb = 16.0  # conservative default
 
-            # Reserve 10 GB for OS, sshd, page cache, kernel buffers, swap headroom
-            usable_gb = max(1.0, mem_available_gb - 10.0)
-            # Estimate 6 GB per worker (observed: 5-19 GB RSS for CBD v2
+            # Include swap as addressable memory (NVMe swap is fast enough
+            # for simulation workloads with swappiness=10)
+            swap_free_gb = 0.0
+            try:
+                with open('/proc/meminfo', 'r') as f:
+                    for line in f:
+                        if line.startswith('SwapFree:'):
+                            kb = int(line.split()[1])
+                            swap_free_gb = kb / (1024 * 1024)
+                            break
+            except (OSError, ValueError):
+                pass
+
+            # Total addressable = RAM available + swap free
+            total_addressable_gb = mem_available_gb + swap_free_gb
+
+            # Reserve 10 GB for OS, sshd, page cache, kernel buffers
+            usable_gb = max(1.0, total_addressable_gb - 10.0)
+            # Estimate 8 GB per worker (observed: 5-19 GB RSS for CBD v2
             # with 30 tau-leaping replicates + ODE compiled RHS + history
-            # arrays; parent process holds shared model state)
-            per_worker_gb = 6.0
+            # arrays; parent process holds shared model state.
+            # Raised from 6 to 8 GB for swap-inclusive calculation safety)
+            per_worker_gb = 8.0
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
 
-        workers = min(cpu_cap, mem_cap, 20)
+        workers = min(cpu_cap, mem_cap, 24)
         return workers
 
     # ── public API ───────────────────────────────────────────────────
