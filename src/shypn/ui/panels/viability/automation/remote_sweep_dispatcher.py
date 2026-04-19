@@ -37,10 +37,31 @@ import subprocess
 import tempfile
 import threading
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
 from typing import Callable, Optional
 
+from .remote_results_proxy import RemoteResultsProxy
+
 logger = logging.getLogger(__name__)
+
+
+class FetchMode(Enum):
+    """Controls how much data is fetched after a sweep completes.
+
+    FULL:
+        Legacy behavior — fetch entire run directory via tar pipe.
+        Suitable for local-network sweeps or small result sets.
+
+    SUMMARY_ONLY:
+        Fetch only summary.csv + config.json (~KB). Individual
+        condition directories are fetched on-demand via the
+        RemoteResultsProxy when the user requests plots/exports.
+        Ideal for WAN connections with large result sets (GB+).
+    """
+
+    FULL = auto()
+    SUMMARY_ONLY = auto()
 
 
 class RemoteSweepSettings:
@@ -55,6 +76,7 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
+        'fetch_mode': 'summary_only',  # 'full' or 'summary_only'
     }
 
     def __init__(self, workspace_settings=None):
@@ -97,6 +119,18 @@ class RemoteSweepSettings:
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
 
+    @property
+    def fetch_mode(self) -> FetchMode:
+        raw = self._section.get('fetch_mode', 'summary_only')
+        try:
+            return FetchMode[raw.upper()]
+        except KeyError:
+            return FetchMode.SUMMARY_ONLY
+
+    @fetch_mode.setter
+    def fetch_mode(self, v: FetchMode) -> None:
+        self._section['fetch_mode'] = v.name.lower()
+
     def save(self):
         """Persist to workspace.json."""
         if self._ws:
@@ -114,10 +148,10 @@ class RemoteSweepDispatcher:
     delivered via ``GLib.idle_add`` by the caller (automation category).
 
     Data-transfer policy:
-        Only the **sweep config** (~1–5 KB JSON) is transferred over
-        SCP.  Results are fetched back as a single compressed tar
-        stream.  The user is responsible for keeping the model and
-        engine code synced between client and server before dispatch.
+        Controlled by ``FetchMode`` in settings:
+        - **FULL**: Fetch entire run directory via compressed tar pipe.
+        - **SUMMARY_ONLY** (default): Fetch only summary.csv + config.json.
+          Individual conditions are fetched on-demand via ``RemoteResultsProxy``.
     """
 
     def __init__(self, settings: RemoteSweepSettings):
@@ -129,10 +163,16 @@ class RemoteSweepDispatcher:
         self._stream_proc: Optional[subprocess.Popen] = None
         self._ssh_password: Optional[str] = None
         self.verbose_preflight = True
+        self._last_proxy: Optional[RemoteResultsProxy] = None
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def results_proxy(self) -> Optional[RemoteResultsProxy]:
+        """The proxy from the most recent successful SUMMARY_ONLY dispatch."""
+        return self._last_proxy
 
     def cancel(self):
         """Request cancellation of a running dispatch.
@@ -396,21 +436,42 @@ class RemoteSweepDispatcher:
                 raise InterruptedError('Cancelled')
 
             # ── 4. Fetch results back ────────────────────────────────
-            self._emit(progress_cb, 'Fetching results from remote...')
-
             run_name = Path(run_dir).name
             local_results_base = project_abs / 'experiments' / 'results'
             local_results_base.mkdir(parents=True, exist_ok=True)
             local_run_dir = local_results_base / run_name
 
-            self._fetch_results_tar(host, run_dir, str(local_run_dir),
-                                    password=ssh_password)
+            fetch_mode = self.settings.fetch_mode
+
+            if fetch_mode == FetchMode.SUMMARY_ONLY:
+                # Lightweight fetch: only summary.csv + config.json (~KB)
+                self._emit(progress_cb,
+                           'Fetching summary (lazy mode)...')
+                proxy = RemoteResultsProxy(
+                    remote_run_dir=run_dir,
+                    local_run_dir=str(local_run_dir),
+                    ssh_host=host,
+                    ssh_password=ssh_password,
+                    ctl_socket_args=self._ctl_socket_args(),
+                )
+                proxy.fetch_summary()
+                self._last_proxy = proxy
+                self._emit(progress_cb,
+                           f'Done — summary at {local_run_dir.name} '
+                           f'(conditions fetched on demand)')
+            else:
+                # Full fetch: entire run directory via tar pipe
+                self._emit(progress_cb, 'Fetching results from remote...')
+                self._fetch_results_tar(host, run_dir, str(local_run_dir),
+                                        password=ssh_password)
+                self._last_proxy = None
+                self._emit(progress_cb,
+                           f'Done — results at {local_run_dir.name}')
 
             # ── 5. Done ──────────────────────────────────────────────
-            self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
-
             if complete_cb:
-                complete_cb(True, str(local_run_dir), f'Sweep complete: {run_name}')
+                complete_cb(True, str(local_run_dir),
+                            f'Sweep complete: {run_name}')
 
         except InterruptedError:
             if complete_cb:

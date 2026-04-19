@@ -15,6 +15,8 @@ from .parameter_sweep_builder import ParameterSweepBuilder
 from .experiment_queue_view import ExperimentQueueView
 from .batch_executor import BatchExecutor
 from .results_browser_view import ResultsBrowserView
+from .remote_results_proxy import RemoteResultsProxy, FetchState
+from .remote_sweep_dispatcher import FetchMode
 
 __all__ = [
     'ExperimentAutomationCategory',
@@ -22,4 +24,7 @@ __all__ = [
     'ExperimentQueueView',
     'BatchExecutor',
     'ResultsBrowserView',
+    'RemoteResultsProxy',
+    'FetchState',
+    'FetchMode',
 ]
