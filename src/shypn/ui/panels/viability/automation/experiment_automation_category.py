@@ -20,6 +20,7 @@ Date: December 7, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+import logging
 import os
 import json
 from datetime import datetime
@@ -28,6 +29,8 @@ from pathlib import Path
 from shypn.ui.category_frame import CategoryFrame
 from shypn.data.project_models import get_project_manager
 from shypn.helpers.batch_results_saver import BatchResultsSaver
+
+logger = logging.getLogger(__name__)
 
 
 class ExperimentAutomationCategory:
@@ -1013,8 +1016,17 @@ class ExperimentAutomationCategory:
         dialog.destroy()
         return (response == Gtk.ResponseType.OK, settings, ssh_password)
 
-    def _load_remote_results(self, local_results_dir):
-        """Load results from a remote sweep run into the ResultsBrowserView."""
+    def _load_remote_results(self, local_results_dir: str) -> None:
+        """Load results from a remote sweep run into the ResultsBrowserView.
+
+        If a ``RemoteResultsProxy`` is available (SUMMARY_ONLY mode),
+        conditions are registered as remote-only and will be fetched
+        on demand when the user requests plots or exports.
+
+        Args:
+            local_results_dir: Local path to the run directory containing
+                at minimum ``summary.csv``.
+        """
         if not self.results_browser or not local_results_dir:
             return
 
@@ -1026,8 +1038,13 @@ class ExperimentAutomationCategory:
         if not summary_csv.exists():
             return
 
+        # Attach proxy if dispatcher used SUMMARY_ONLY mode
+        proxy = (self._remote_dispatcher.results_proxy
+                 if self._remote_dispatcher else None)
+
         # Parse summary.csv and load each condition as a result entry
         import csv
+        condition_names: list[str] = []
         try:
             with open(summary_csv, 'r') as f:
                 reader = csv.DictReader(f)
@@ -1037,6 +1054,8 @@ class ExperimentAutomationCategory:
                     errors = int(row.get('replicates_error', 0))
                     wall = float(row.get('wall_seconds', 0))
 
+                    condition_names.append(condition)
+
                     # Create a minimal result dict for the browser
                     result = {
                         'name': condition,
@@ -1044,11 +1063,20 @@ class ExperimentAutomationCategory:
                         'errors': errors,
                         'wall_seconds': wall,
                         'source': 'remote',
-                        'results_dir': str(results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'results_dir': str(
+                            results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'remote_only': proxy is not None,
                     }
                     self.results_browser.add_result(condition, result)
+
+            # Register conditions on the proxy for on-demand fetching
+            if proxy and condition_names:
+                proxy.register_conditions(condition_names)
+                # Store proxy on browser for on-demand access
+                self.results_browser.set_results_proxy(proxy)
+
         except Exception as e:
-            print(f"[WARNING] Failed to load remote results: {e}")
+            logger.warning("Failed to load remote results: %s", e)
 
     def _on_queue_cancel(self):
         """Handle queue cancel request."""
