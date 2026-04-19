@@ -35,10 +35,16 @@ def _worker_init() -> None:
     Installs the process guard so worker processes also die cleanly
     when their parent is killed (e.g. SSH connection drop).
     Also marks the process so replicate_runner won't spawn a nested pool.
+    Deprioritizes CPU scheduling so sshd/system stay responsive.
     """
     os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
     from shypn.engine.process_guard import install_process_guard
     install_process_guard()
+    # Deprioritize worker so sshd (nice 0) stays responsive
+    try:
+        os.nice(19)
+    except OSError:
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +70,11 @@ class SweepRunner:
         self.model_path = model_path
         self.config = config
         self.output_dir = output_dir
-        # Reserve at least 2 cores for SSH / system (cap at 75%)
+        # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
+        # to prevent heavy sweeps from starving sshd and locking out
+        # the server.
         _cpus = os.cpu_count() or 4
-        self.workers = workers or max(1, min(_cpus - 2, int(_cpus * 0.75)))
+        self.workers = workers or max(1, min(_cpus - 4, int(_cpus * 0.70)))
         self.verbose = verbose
 
     # ── public API ───────────────────────────────────────────────────

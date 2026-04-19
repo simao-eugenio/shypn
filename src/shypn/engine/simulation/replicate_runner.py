@@ -54,6 +54,11 @@ def _replicate_worker_init() -> None:
         install_process_guard()
     except Exception:
         pass
+    # Deprioritize worker so sshd (nice 0) stays responsive
+    try:
+        os.nice(19)
+    except OSError:
+        pass
 
 
 def _run_replicate_chunk(
@@ -355,8 +360,8 @@ class ReplicateRunner:
         _in_pool = os.environ.get('_SHYPN_IN_POOL_WORKER')
         _cpu_count = os.cpu_count() or 1
         if n > 1 and not _in_pool and _cpu_count > 1:
-            # Reserve at least 2 cores for SSH / system (cap at 75%)
-            _max_workers = max(1, min(_cpu_count - 2, int(_cpu_count * 0.75)))
+            # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
+            _max_workers = max(1, min(_cpu_count - 4, int(_cpu_count * 0.70)))
             n_workers = min(_max_workers, n)
             if verbose:
                 print(f"  CPU parallel: {n_workers} workers for {n} replicates")
