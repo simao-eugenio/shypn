@@ -125,6 +125,7 @@ class RemoteSweepDispatcher:
         self._cancel = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._ctl_path: Optional[str] = None  # SSH ControlMaster socket
+        self._ctl_proc: Optional[subprocess.Popen] = None  # Managed CM process
         self._stream_proc: Optional[subprocess.Popen] = None
         self._ssh_password: Optional[str] = None
 
@@ -413,19 +414,52 @@ class RemoteSweepDispatcher:
             '-o', 'ServerAliveInterval=30',
             '-o', 'ServerAliveCountMax=3',
             '-o', 'ConnectTimeout=15',
-            '-f',  # fork to background after auth
-            '-N',  # no remote command
+            '-o', 'StrictHostKeyChecking=no',
+            '-N',  # no remote command (stays in foreground)
             host,
         ]
         if password:
+            # Force password auth to avoid wasting time on pubkey attempts
+            # that will never succeed with sshpass.
+            argv.insert(-1, '-o')
+            argv.insert(-1, 'PreferredAuthentications=password')
             argv = ['sshpass', '-p', password] + argv
-        result = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode != 0:
-            logger.warning("ControlMaster failed (%s), falling back to "
-                           "per-command connections", result.stderr.strip())
+
+        # Launch as a managed background subprocess instead of ssh -f.
+        # sshpass + ssh -f is unreliable: sshpass exits after auth but
+        # the forked SSH process sometimes fails to bind the socket.
+        # Running without -f keeps sshpass holding the pipe open.
+        try:
+            self._ctl_proc = subprocess.Popen(
+                argv,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            logger.warning("ControlMaster launch failed (%s), falling back "
+                           "to per-command connections", e)
+            self._ctl_path = None
+            return
+
+        # Wait for socket to appear (up to 15 s)
+        import time
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if os.path.exists(ctl):
+                break
+            if self._ctl_proc.poll() is not None:
+                # Process exited before creating socket
+                stderr = self._ctl_proc.stderr.read().decode().strip() if self._ctl_proc.stderr else ''
+                logger.warning("ControlMaster exited early (%s), falling back",
+                               stderr)
+                self._ctl_path = None
+                return
+            time.sleep(0.2)
+        else:
+            # Timeout — socket never appeared
+            self._ctl_proc.terminate()
+            logger.warning("ControlMaster socket never appeared, falling back")
             self._ctl_path = None
             return
 
@@ -437,7 +471,7 @@ class RemoteSweepDispatcher:
         if check.returncode != 0:
             logger.warning("ControlMaster check failed (%s), falling back",
                            check.stderr.strip())
-            # Clean up the dead socket
+            self._ctl_proc.terminate()
             try:
                 os.unlink(ctl)
             except OSError:
@@ -460,6 +494,14 @@ class RemoteSweepDispatcher:
             )
         except Exception:
             pass
+        # Terminate the managed ControlMaster process
+        if self._ctl_proc and self._ctl_proc.poll() is None:
+            self._ctl_proc.terminate()
+            try:
+                self._ctl_proc.wait(timeout=5)
+            except Exception:
+                self._ctl_proc.kill()
+        self._ctl_proc = None
         # Remove stale socket file
         try:
             os.unlink(self._ctl_path)
@@ -520,6 +562,9 @@ class RemoteSweepDispatcher:
             )
         except Exception:
             pass
+        if self._ctl_proc and self._ctl_proc.poll() is None:
+            self._ctl_proc.kill()
+        self._ctl_proc = None
         try:
             os.unlink(self._ctl_path)
         except OSError:
