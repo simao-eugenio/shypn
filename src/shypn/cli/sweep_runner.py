@@ -78,16 +78,39 @@ class SweepRunner:
         """Compute max workers from CPU and memory constraints.
 
         Policy:
-          - CPU: max 70% of cores, reserve at least 4 for system/sshd
+          - CPU: use *physical* cores minus a reserve of 8 threads for
+            system/sshd.  On hybrid CPUs (e.g. i9-14900K: 8P+16E = 24
+            physical cores, 32 threads) this prevents all-core saturation
+            that causes SSH banner-exchange timeouts.
           - Memory: estimate per-worker RSS (~3 GB for complex models),
             cap to fit in available RAM minus a 6 GB system reserve
-          - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
+          - Final worker count = min(cpu_cap, mem_cap, hard_max=20)
 
         This prevents memory exhaustion that causes swap thrashing,
         OOM kills, and SSH lockout.
         """
-        _cpus = os.cpu_count() or 4
-        cpu_cap = max(1, min(_cpus - 4, int(_cpus * 0.70)))
+        # Detect physical cores (not logical threads)
+        _logical = os.cpu_count() or 4
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                content = f.read()
+            # "cpu cores" line gives physical cores per socket
+            import re
+            cores_per_socket = set(
+                int(m.group(1))
+                for m in re.finditer(r'^cpu cores\s*:\s*(\d+)', content, re.M)
+            )
+            sockets = len(set(
+                m.group(1)
+                for m in re.finditer(r'^physical id\s*:\s*(\d+)', content, re.M)
+            )) or 1
+            physical = max(cores_per_socket) * sockets if cores_per_socket else _logical
+        except Exception:
+            physical = _logical
+
+        # Reserve 8 threads for system/sshd to prevent SSH lockout
+        _reserved = 8
+        cpu_cap = max(1, min(physical - _reserved, int(physical * 0.70)))
 
         # Memory-based cap
         try:
@@ -127,7 +150,7 @@ class SweepRunner:
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
 
-        workers = min(cpu_cap, mem_cap, 24)
+        workers = min(cpu_cap, mem_cap, 20)
         return workers
 
     # ── public API ───────────────────────────────────────────────────
