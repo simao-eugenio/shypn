@@ -1167,7 +1167,16 @@ class ReplicateRunner:
         is_reversible = _np.zeros(n_stoch, dtype=_np.bool_)
 
         for j, t in enumerate(stoch_transitions):
-            rate_constants[j] = float(getattr(t, 'rate', 0.0) or 0.0)
+            raw_rate = getattr(t, 'rate', 0.0)
+            try:
+                rate_constants[j] = float(raw_rate) if raw_rate else 0.0
+            except (ValueError, TypeError):
+                # Non-numeric rate (symbolic expression) — can't use GPU
+                logger.info("GPU hybrid: stochastic transition %s has non-numeric "
+                            "rate (%r) — falling back to CPU", t.id, raw_rate)
+                if verbose:
+                    print(f"  GPU hybrid: non-numeric rate on {t.id}, using CPU")
+                return None
 
             for arc in self.model.arcs:
                 src = getattr(arc, 'source_id', None)
