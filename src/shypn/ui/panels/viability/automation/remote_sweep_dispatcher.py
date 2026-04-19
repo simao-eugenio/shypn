@@ -323,10 +323,15 @@ class RemoteSweepDispatcher:
             # priority so sshd (nice 0) always gets scheduled promptly,
             # preventing the "banner exchange timeout" that locks the
             # server out during heavy sweeps.
+            #
+            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving CPUs
+            # 0-3 (first 2 P-cores on i9-14900K) exclusively for
+            # sshd/system tasks.  This guarantees SSH remains responsive
+            # even under full sweep load.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"exec nice -n 19 ionice -c 3 "
+                f"exec nice -n 19 ionice -c 3 taskset -c 4-31 "
                 f"{remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
