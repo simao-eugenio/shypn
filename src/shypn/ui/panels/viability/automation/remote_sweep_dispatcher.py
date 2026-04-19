@@ -255,10 +255,16 @@ class RemoteSweepDispatcher:
             # sshd's direct child.  Combined with process_guard's
             # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
             # cleanly when the SSH connection drops (no orphan zombies).
+            #
+            # nice -n 19 + ionice -c 3: run at lowest CPU and I/O
+            # priority so sshd (nice 0) always gets scheduled promptly,
+            # preventing the "banner exchange timeout" that locks the
+            # server out during heavy sweeps.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"exec {remote_venv} -m shypn.cli.sweep "
+                f"exec nice -n 19 ionice -c 3 "
+                f"{remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
