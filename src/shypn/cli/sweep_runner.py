@@ -70,12 +70,65 @@ class SweepRunner:
         self.model_path = model_path
         self.config = config
         self.output_dir = output_dir
-        # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
-        # to prevent heavy sweeps from starving sshd and locking out
-        # the server.
-        _cpus = os.cpu_count() or 4
-        self.workers = workers or max(1, min(_cpus - 4, int(_cpus * 0.70)))
+        self.workers = workers or self._compute_safe_workers()
         self.verbose = verbose
+
+    @staticmethod
+    def _compute_safe_workers() -> int:
+        """Compute max workers from CPU and memory constraints.
+
+        Policy:
+          - CPU: max 70% of cores, reserve at least 4 for system/sshd
+          - Memory: estimate per-worker RSS (~3 GB for complex models),
+            cap to fit in available RAM minus a 6 GB system reserve
+          - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
+
+        This prevents memory exhaustion that causes swap thrashing,
+        OOM kills, and SSH lockout.
+        """
+        _cpus = os.cpu_count() or 4
+        cpu_cap = max(1, min(_cpus - 4, int(_cpus * 0.70)))
+
+        # Memory-based cap
+        try:
+            # Use /proc/meminfo for available memory (more accurate than
+            # psutil which may not be installed)
+            mem_available_gb = None
+            try:
+                with open('/proc/meminfo', 'r') as f:
+                    for line in f:
+                        if line.startswith('MemAvailable:'):
+                            kb = int(line.split()[1])
+                            mem_available_gb = kb / (1024 * 1024)
+                            break
+            except (OSError, ValueError):
+                pass
+
+            if mem_available_gb is None:
+                # Fallback: total memory * 0.85 (assume 15% used by system)
+                try:
+                    with open('/proc/meminfo', 'r') as f:
+                        for line in f:
+                            if line.startswith('MemTotal:'):
+                                kb = int(line.split()[1])
+                                mem_available_gb = (kb / (1024 * 1024)) * 0.85
+                                break
+                except (OSError, ValueError):
+                    pass
+
+            if mem_available_gb is None:
+                mem_available_gb = 16.0  # conservative default
+
+            # Reserve 6 GB for OS, sshd, page cache
+            usable_gb = max(1.0, mem_available_gb - 6.0)
+            # Estimate 3 GB per worker (complex models with tau-leaping)
+            per_worker_gb = 3.0
+            mem_cap = max(1, int(usable_gb / per_worker_gb))
+        except Exception:
+            mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
+
+        workers = min(cpu_cap, mem_cap, 24)
+        return workers
 
     # ── public API ───────────────────────────────────────────────────
 
@@ -126,7 +179,17 @@ class SweepRunner:
                 f"{sim.replicates} replicates = "
                 f"{n_conditions * sim.replicates} total simulations"
             )
-            print(f"Workers: {self.workers}")
+            print(f"Workers: {self.workers} (cpu_count={os.cpu_count()})")
+            # Show memory info for diagnostics
+            try:
+                with open('/proc/meminfo', 'r') as f:
+                    for line in f:
+                        if line.startswith('MemAvailable:'):
+                            avail_gb = int(line.split()[1]) / (1024 * 1024)
+                            print(f"Memory available: {avail_gb:.1f} GB")
+                            break
+            except Exception:
+                pass
 
         # 3. Prepare output
         output = SweepOutputManager(self.output_dir)
