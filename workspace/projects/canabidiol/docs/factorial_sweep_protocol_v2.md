@@ -197,7 +197,64 @@ All paths consistent. A34=0.1 (Nrf2→Glutathione) correctly preserved in all co
 - [x] 3-way cross-validation passed
 - [x] SSH hardening applied (MaxStartups, ClientAlive)
 - [x] Server git remote switched to SSH (deploy key added)
+- [x] End-to-end test sweep validated (run_20260420_132707, 6 conditions × 30 rep)
+- [x] **Baseline markings revised** — mid-stage AD (see §11 below)
 - [ ] Verify UI supports >3 sweep dimensions in factorial design
 - [ ] Create all 192 snapshots in Viability Panel
 - [ ] Launch sweep on remote server
 - [ ] Monitor progress and collect results
+
+---
+
+## 11. Baseline Marking Revision (2026-04-20)
+
+### 11.1 Motivation
+
+End-to-end test sweep (run_20260420_132707) revealed the original "healthy brain"
+baseline produces a **binary switch** instead of a graded dose-response:
+- Any CBD ≥15 µM gives FULL PROTECTION (prevents pathology from ever starting)
+- No dose differentiation possible in the 15–100 µM range
+
+See: `baseline_marking_review_v2.md` for full analysis.
+
+### 11.2 New Default: Mid-Stage AD Brain
+
+Initial markings now represent ~35–55% progression toward end-stage untreated AD.
+The system has established inflammation and amyloid burden that CBD must reverse/halt.
+
+**Key changes:**
+- Abeta_Oligomer: 0 → **15** (existing toxic burden)
+- NFkB_p65: 0 → **30** (active inflammation, transition zone)
+- NFkB_IkB: 80 → **50** (partially depleted)
+- Microglia M1/M2: 5/45 → **25/25** (50% polarized)
+- Neuron_Health: 100 → **95** (early loss)
+- Glutathione: 50 → **40** (AD-depleted)
+- CBD_extracellular: 100 → **0** (untreated default; sweep sets dose)
+
+All P-invariants preserved (NFkB=80, Microglia=50, Keap1/Nrf2=60, GSH/GSSG=50).
+
+### 11.3 Revised CBD Factor Levels
+
+Given the shift from prevention→treatment, finer sampling in the low-dose
+region is critical. The original 0–15 µM gap was where the binary switch lived.
+
+| Level | P1 Value | Expected Regime |
+|-------|----------|-----------------|
+| 0 | 0.0 | Untreated mid-stage AD (progression continues) |
+| 5 | 5.0 | Sub-threshold: minimal modulation |
+| 10 | 10.0 | Low-dose: partial receptor engagement |
+| 15 | 15.0 | Low-dose: GPR3 effect begins |
+| 25 | 25.0 | Moderate: partial NFkB suppression |
+| 35 | 35.0 | Pre-transition zone |
+| 50 | 50.0 | Mid-transition: expected phase boundary |
+| 65 | 65.0 | Post-transition: full suppression? |
+| 85 | 85.0 | Saturation check |
+| 100 | 100.0 | Maximum dose (reference) |
+
+**New total conditions:** 10 × 4 × 3 × 2 = **240 snapshots**
+
+### 11.4 Open Calibration Issues (post-sweep)
+
+1. **ROS paradox** — ROS decreases in untreated AD (Nrf2 overcompensation). Needs rate tuning.
+2. **Microglial commitment** — M1 polarization completes in <5 min (too fast).
+3. **BDNF collapse** — Half-life unrealistically short (seconds vs hours).
