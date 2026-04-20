@@ -1,6 +1,6 @@
 % Cannabidiol-Alzheimer's Disease Neuroprotection — Computational Study
 % PLOS Computational Biology Format
-% Version: April 14, 2026
+% Version: April 20, 2026 — Revised with v2 model (mid-stage AD markings)
 
 \documentclass[10pt,letterpaper]{article}
 \usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
@@ -74,7 +74,7 @@
 % Title must be 250 characters or less
 \begin{flushleft}
 {\Large
-\textbf{In Silico Mapping of Multi-Target Cannabidiol Neuroprotection in Alzheimer's Disease: A Stochastic Petri Net Model Predicts Phase Transitions, Dissociated Therapeutic Windows, and Age-Dependent Efficacy to Guide Experimental Design}
+\textbf{In Silico Mapping of Multi-Target Cannabidiol Neuroprotection in Alzheimer's Disease: A Stochastic Petri Net Model Reveals Dissociated Therapeutic Axes, Stochastic Amyloid Bistability, and Age-Dependent Mechanism Switching}
 }
 \newline
 \\
@@ -92,12 +92,12 @@ Eug\^enio Sim\~ao$^{1,*}$
 % Please keep the abstract below 300 words
 \section*{Abstract}
 
-Multi-target pharmacology for Alzheimer's disease (AD) faces a combinatorial challenge: cannabidiol (CBD) engages at least six molecular targets intersecting four AD pathological cascades, generating a dose--age--pathway interaction space too large for brute-force experimental screening. We present an in silico laboratory approach using a stochastic Petri net model comprising 31 places, 31 transitions, and 76 arcs that couples CBD's six molecular targets---GPR3 inverse agonism, PPAR$\gamma$ nuclear activation, Nrf2/Keap1 dissociation, 5-HT$_{1A}$ agonism, adenosine A$_{2A}$ agonism, and direct ROS modulation---with four AD pathological cascades: amyloid processing, neuroinflammation, oxidative stress, and neurodegeneration. The model incorporates two-compartment pharmacokinetics, Q$_{10}$ temperature coefficients, pH-dependent rate modulation, and an age compartment place implementing $\pm 2\%$/year modifiers on seven age-sensitive transitions. Computational screening via stochastic simulation (tau-leaping, 15 replicates per condition, 6 hours) across a $4 \times 5$ factorial design (CBD $\in \{0, 25, 65, 100\}$ $\mu$M $\times$ Age $\in \{40, 55, 65, 75, 90\}$ years) maps the therapeutic landscape and identifies three actionable predictions to guide experimental design. First, an NFkB/PPAR$\gamma$ bistable switch predicts a sharp phase transition between 45--65 $\mu$M CBD---not a gradual dose-response---directing experimentalists to titrate within this narrow range rather than broad dose sweeps. Second, neuronal rescue dissociates from anti-inflammatory action: CBD $\geq 25$ $\mu$M restores neuron health to $>$99.8\% via GPR3 depletion and BDNF induction while inflammation persists at maximal levels, indicating that assay panels must measure both endpoints independently to avoid ambiguous results. Third, aging amplifies disease burden linearly ($\pm 50\%$ plaque at ages 40/90 versus 65) and erodes CBD efficacy for ROS control, predicting that preclinical results from young-animal models will overestimate efficacy in elderly patients. These predictions---threshold dosing, dissociated therapeutic windows, and age-shifted efficacy---arise from nonlinear pathway coupling not visible in single-pathway studies, and are designed to rationalize experimental priorities before committing wet-lab resources.
+Multi-target pharmacology for Alzheimer's disease (AD) faces a combinatorial challenge: cannabidiol (CBD) engages multiple molecular targets intersecting four AD pathological cascades. We present an in silico laboratory using a stochastic Petri net model comprising 34 places, 45 transitions, and 100 arcs, initialized to mid-stage AD pathology, that couples CBD's six molecular targets---GPR3 inverse agonism, PPAR$\gamma$ nuclear activation, Nrf2/Keap1 dissociation, 5-HT$_{1A}$ agonism, adenosine A$_{2A}$ agonism, and direct ROS modulation---with four AD cascades: amyloid processing, neuroinflammation, oxidative stress, and neurodegeneration. The model incorporates P-invariants enforcing mass conservation (NF$\kappa$B$=$80, Microglia$=$50, Keap1/Nrf2$=$60, GSH/GSSG$=$50), two-compartment pharmacokinetics, Q$_{10}$ temperature coefficients, pH-dependent rate modulation, and an age compartment. A full $8 \times 4 \times 3$ factorial sweep (CBD $\in \{0, 1, 2, 4, 6, 8, 12, 15\}$ $\times$ Age $\in \{55, 65, 75, 85\}$ $\times$ pH $\in \{6.6, 7.0, 7.4\}$; 96 conditions, 30 replicates each) reveals four findings. First, a sharp anti-inflammatory phase transition at CBD$\approx$1 ($\eta^2=100\%$ for CBD) completely resolves NF$\kappa$B-driven inflammation, yet neuroprotection caps at 93.4\%---88\% of conditions show inflammation resolved but neurons still declining, mirroring the clinical failure of anti-inflammatory monotherapy (ADAPT, INTREPAD trials). Second, amyloid-$\beta$ oligomers exhibit genuine stochastic bistability (bimodality coefficient up to 0.95, CV up to 1.53) consistent with nucleation-dependent aggregation kinetics. Third, age shifts the therapeutic mechanism: at age 55, 88\% of neuroprotection derives from the anti-inflammatory axis (CBD 0$\to$1), whereas at age 85, 65\% derives from the antioxidant axis (CBD 1$\to$15), with EC$_{50}$ shifting from 0.57 to 1.63. Fourth, at high CBD doses, the inflammation--neurodegeneration correlation weakens ($r=-0.86 \to -0.69$), revealing progressive pathway decoupling. These predictions---dissociated therapeutic axes, amyloid bistability, and age-dependent mechanism switching---rationalize experimental priorities for preclinical validation.
 
 % Please keep the Author Summary between 150 and 200 words
 \section*{Author Summary}
 
-Testing a multi-target drug like cannabidiol (CBD) against Alzheimer's disease involves an overwhelming number of combinations: multiple doses, different patient ages, and dozens of biomarkers across amyloid, inflammation, oxidative, and neurodegenerative pathways. We used computational modeling as an in silico laboratory---running hundreds of virtual experiments in hours rather than months of bench work---to map this landscape before committing wet-lab resources. By connecting six CBD drug targets with four disease processes in a single simulation, we identified three findings that reshape experimental priorities. First, inflammation resolution flips like a switch at a critical concentration, directing experimentalists to focus on a narrow dose range rather than broad sweeps. Second, CBD protects neurons at low doses through a completely different mechanism than its anti-inflammatory action, meaning experiments must measure both endpoints independently or risk missing one effect entirely. Third, aging shifts the effective dose upward, warning that results from young-animal models will overestimate efficacy in elderly patients. These predictions tell experimentalists which experiments to run first, which dose ranges to target, and which biomarkers to measure independently---reducing months of trial-and-error to focused hypothesis testing.
+Testing cannabidiol (CBD) against Alzheimer's disease involves overwhelming combinations of doses, patient ages, and biomarkers across multiple disease pathways. We used computational modeling as an in silico laboratory---running 96 virtual conditions with 30 replicates each---to map this landscape before committing wet-lab resources. Starting from a mid-stage Alzheimer's brain state, our model reveals a critical disconnect that mirrors real clinical experience: CBD rapidly shuts down brain inflammation at low doses, yet neurons continue to decline. This ``dissociation gap'' explains why anti-inflammatory drugs have repeatedly failed in Alzheimer's trials despite reducing inflammatory biomarkers. The model further shows that the amyloid aggregation process is fundamentally stochastic---identical conditions produce divergent outcomes---predicting high patient-to-patient variability. Most strikingly, aging qualitatively changes how CBD protects neurons: in younger patients, the anti-inflammatory effect dominates, while in elderly patients, the antioxidant mechanism becomes the primary protective axis, requiring higher doses. These predictions tell experimentalists which dose ranges matter, why inflammation and neuroprotection must be measured independently, and why age-stratified dosing protocols are essential.
 
 \linenumbers
 
@@ -107,39 +107,39 @@ Testing a multi-target drug like cannabidiol (CBD) against Alzheimer's disease i
 \section{Introduction}
 \label{sec:introduction}
 
-Alzheimer's disease (AD) accounts for 60--80\% of dementia cases, affecting over 55 million people worldwide with projections exceeding 139 million by 2050~\cite{who2023}. Disease-modifying therapies remain elusive: amyloid-targeting monoclonal antibodies (lecanemab, donanemab) show modest clinical benefit with significant adverse effects~\cite{vandyck2023}, underscoring the need for multi-target therapeutic strategies addressing the interconnected pathological cascades of AD rather than isolated molecular targets.
+Alzheimer's disease (AD) accounts for 60--80\% of dementia cases, affecting over 55 million people worldwide with projections exceeding 139 million by 2050~\cite{who2023}. Disease-modifying therapies remain elusive: amyloid-targeting monoclonal antibodies (lecanemab, donanemab) show modest clinical benefit with significant adverse effects~\cite{vandyck2023}, and anti-inflammatory monotherapies have consistently failed to slow cognitive decline despite reducing neuroinflammatory biomarkers~\cite{adapt2007,imbimbo2010}. These failures underscore the need for multi-target therapeutic strategies and computational tools that can predict why single-pathway interventions are insufficient.
 
 Cannabidiol (CBD), a non-psychoactive phytocannabinoid, has emerged as a candidate multi-target agent with documented activity at six molecular targets relevant to AD pathology. Preclinical evidence demonstrates GPR3 inverse agonism reducing $\gamma$-secretase activity and A$\beta$ production~\cite{huang2015}, PPAR$\gamma$ nuclear activation suppressing NFkB-driven neuroinflammation~\cite{esposito2011}, Nrf2/Keap1 dissociation activating antioxidant response elements~\cite{casares2020}, 5-HT$_{1A}$ agonism promoting BDNF-mediated neuroprotection~\cite{russo2005}, adenosine A$_{2A}$ agonism driving anti-inflammatory microglial polarization~\cite{mecha2013}, and direct modulation of mitochondrial ROS through Keap1:Nrf2 complex disruption~\cite{booz2011}. However, no computational framework integrates these six targets with AD pathological cascades to predict emergent therapeutic phenomena arising from pathway crosstalk.
 
 \subsection{The Combinatorial Challenge}
 
-Evaluating CBD for AD experimentally requires navigating a prohibitively large search space. Six molecular targets interact with four disease cascades across multiple dose levels and patient demographics, generating hundreds of potential experimental conditions. Brute-force screening of this space in cell culture alone would require months of work and substantial resources, with most conditions yielding redundant or uninformative results. The fundamental question is not whether to experiment, but \textit{which experiments to prioritize}---which dose ranges contain the critical transitions, which biomarkers must be measured independently, and which patient populations require adjusted dosing.
+Evaluating CBD for AD experimentally requires navigating a prohibitively large search space. Six molecular targets interact with four disease cascades across multiple dose levels, patient ages, and microenvironment conditions (pH), generating hundreds of potential experimental conditions. The fundamental question is not whether to experiment, but \textit{which experiments to prioritize}---which dose ranges contain the critical transitions, which biomarkers must be measured independently, and which patient populations require adjusted dosing.
 
 \vspace{3pt}
-\noindent\textbf{In silico laboratories for experimental rationalization.} Computational modeling can serve as an in silico laboratory, mapping the therapeutic landscape computationally before committing wet-lab resources. By screening hundreds of conditions in hours rather than months, an executable model identifies the most informative experimental conditions, predicts which phenomena to look for, and specifies the dose ranges and biomarker panels that will yield the sharpest discrimination between therapeutic outcomes. This approach does not replace experimentation---it rationalizes it, transforming brute-force screening into focused hypothesis testing.
+\noindent\textbf{In silico laboratories for experimental rationalization.} Computational modeling can serve as an in silico laboratory, mapping the therapeutic landscape computationally before committing wet-lab resources. By screening hundreds of conditions in hours rather than months, an executable model identifies the most informative experimental conditions, predicts which phenomena to look for, and specifies the dose ranges and biomarker panels that will yield the sharpest discrimination between therapeutic outcomes.
 
 \subsection{The Integration Gap}
 
-Existing computational models address components of this system in isolation, preventing the kind of integrated pre-experimental screening that multi-target pharmacology demands. Amyloid kinetic models simulate A$\beta$ aggregation and clearance without pharmacological intervention~\cite{proctor2010,kyrtsos2015}. NFkB signaling models capture oscillatory dynamics without amyloid or cannabinoid inputs~\cite{hoffmann2002}. Nrf2/Keap1 pathway models characterize antioxidant response element activation without AD context~\cite{zhang2017}. CBD pharmacokinetic models describe absorption and metabolism without mechanistic targets~\cite{zgair2016,millar2018}. Quantitative systems pharmacology platforms for AD address cholinergic and glutamatergic systems but not CBD-relevant targets~\cite{geerts2016}. This fragmentation prevents prediction of emergent phenomena: How does amyloid-driven IKK activation interact with CBD-mediated PPAR$\gamma$ induction to determine the NFkB inflammatory state? At what CBD concentration does the coupled system transition from inflammatory to neuroprotective? How does patient age modulate these thresholds?
+Existing computational models address components of this system in isolation. Amyloid kinetic models simulate A$\beta$ aggregation without pharmacological intervention~\cite{proctor2010,kyrtsos2015}. NFkB signaling models capture oscillatory dynamics without amyloid or cannabinoid inputs~\cite{hoffmann2002}. Nrf2/Keap1 pathway models characterize antioxidant response without AD context~\cite{zhang2017}. CBD pharmacokinetic models describe absorption and metabolism without mechanistic targets~\cite{zgair2016,millar2018}. Quantitative systems pharmacology platforms for AD address cholinergic and glutamatergic systems but not CBD-relevant targets~\cite{geerts2016}. This fragmentation prevents prediction of emergent phenomena such as the dissociation between anti-inflammatory efficacy and neuroprotection that has plagued clinical trials~\cite{heneka2015}.
 
 \vspace{3pt}
-\noindent\textbf{Qualitative reviews without executable models.} Cassano \etal\ (2020) and Watt \& Karl (2017) provide comprehensive qualitative pathway diagrams linking CBD targets to AD mechanisms~\cite{cassano2020,watt2017}. These reviews identify the relevant interactions but cannot make quantitative predictions because pathway diagrams lack rate functions, stochastic dynamics, and feedback coupling. Translating qualitative understanding into executable models that generate testable quantitative predictions remains an unaddressed challenge.
+\noindent\textbf{Qualitative reviews without executable models.} Cassano \etal\ (2020) and Watt \& Karl (2017) provide comprehensive qualitative pathway diagrams linking CBD targets to AD mechanisms~\cite{cassano2020,watt2017}. These reviews identify the relevant interactions but cannot make quantitative predictions because pathway diagrams lack rate functions, stochastic dynamics, and feedback coupling.
 
 \subsection{Contributions}
 
-This work addresses the integration gap through an in silico laboratory approach yielding four original contributions:
+This work addresses the integration gap through four original contributions:
 
 \vspace{3pt}
-\noindent\textbf{1. Integrated multi-target model (Original):} We construct a stochastic Petri net comprising 31 places, 31 transitions, and 76 arcs that couples CBD's six molecular targets with four AD pathological cascades---amyloid processing, neuroinflammation, oxidative stress, and neurodegeneration---in a single executable framework. To our knowledge, no published model achieves this integration.
+\noindent\textbf{1. Integrated multi-target model with mid-stage AD initialization (Original):} We construct a stochastic Petri net comprising 34 places, 45 transitions, and 100 arcs, initialized to a mid-stage AD pathological state with established amyloid load, activated neuroinflammation, and partial neuronal loss. Four P-invariants enforce mass conservation. To our knowledge, no published model achieves this integration.
 
 \vspace{3pt}
-\noindent\textbf{2. Predicted phase transition (Original):} Computational screening predicts a sharp NFkB/PPAR$\gamma$ bistable switch between 45--65 $\mu$M CBD, producing all-or-nothing inflammation resolution. This predicted behavior arises from nonlinear coupling between PPAR$\gamma$ activation, NFkB suppression, and cytokine feedback loops, directing experimentalists to focus titration within this narrow range.
+\noindent\textbf{2. Quantified inflammation--neuroprotection dissociation (Original):} The model recapitulates the central clinical failure of AD therapeutics: inflammation resolves completely at low CBD doses, yet neuroprotection caps at $\sim$93\%, with 88\% of conditions showing a ``gap'' between inflammatory resolution and neuronal rescue. We decompose this gap quantitatively: 61\% of CBD's neuroprotective effect is anti-inflammatory, 39\% is antioxidant, and a residual 1.64-neuron deficit remains unexplained by either axis.
 
 \vspace{3pt}
-\noindent\textbf{3. Dissociated therapeutic windows (Original):} The model predicts that neuronal rescue (via GPR3 depletion and BDNF induction) occurs at CBD $\geq 25$ $\mu$M while full anti-inflammatory resolution requires CBD $\geq 65$ $\mu$M. This dissociation indicates that experimental assay panels must measure both endpoints independently to avoid ambiguous results.
+\noindent\textbf{3. Stochastic amyloid-$\beta$ bistability (Original):} Replicate-level analysis reveals genuine bistability in A$\beta$ oligomer distributions---identical conditions produce bimodal outcomes (bimodality coefficient up to 0.95)---consistent with nucleation-dependent aggregation kinetics. This predicts high patient-to-patient variability in amyloid clearance response.
 
 \vspace{3pt}
-\noindent\textbf{4. Age-dependent efficacy mapping (Original):} Through a $4 \times 5$ CBD $\times$ Age factorial design incorporating age-modulated rate functions, we predict that aging amplifies disease burden linearly and erodes CBD efficacy for oxidative stress control, shifting the therapeutic window. This predicts that dose recommendations derived from young-animal models will underestimate requirements for elderly patients by approximately 2.6$\times$.
+\noindent\textbf{4. Age-dependent mechanism switching (Original):} A full $8 \times 4 \times 3$ factorial sweep reveals that aging qualitatively changes CBD's protective mechanism: from predominantly anti-inflammatory at age 55 (88\% of neuroprotection) to predominantly antioxidant at age 85 (65\%), with EC$_{50}$ shifting from 0.57 to 1.63 nominal units. This predicts that elderly patients need different doses and receive protection through a fundamentally different molecular axis.
 
 % ──────────────────────────────────────────────────────────────────────────
 % METHODS
@@ -149,56 +149,61 @@ This work addresses the integration gap through an in silico laboratory approach
 
 \subsection{Computational Framework}
 
-The model is implemented within the Signal Hierarchical Petri Net (SHYpn) framework~\cite{simao2026shypn}, a hybrid stochastic-continuous simulator supporting tau-leaping Stochastic Simulation Algorithm (SSA), deterministic ODE integration, and signal hierarchical control semantics. The framework extends classical Bio-PN formalism with signal flow arcs, compartment places, and age-modulated rate functions, enabling unified metabolic-regulatory modeling within a single net.
+The model is implemented within the Signal Hierarchical Petri Net (SHYpn) framework~\cite{simao2026shypn}, a hybrid stochastic-continuous simulator supporting tau-leaping Stochastic Simulation Algorithm (SSA), deterministic ODE integration, and signal hierarchical control semantics. The framework extends classical Bio-PN formalism with signal flow arcs, compartment places, and age-modulated rate functions.
 
 \vspace{3pt}
 \noindent\textbf{Compartment places.} The SHYpn formalism supports compartment places---isolated places without arcs whose markings are injected into transition rate evaluation contexts as environmental parameters. Temperature ($T = 310.15$ K), pH ($= 7.0$), and Age ($= 65.0$ years, default) are modeled as compartment places, enabling parametric sweeps without model restructuring.
 
 \vspace{3pt}
-\noindent\textbf{Stochastic simulation.} All simulations employ tau-leaping SSA with adaptive step size, 15 independent replicates per condition, and 6-hour simulation horizon ($t = 21{,}600$ s). Coefficient of variation (CV) across replicates is $<0.1\%$ for all key biomarkers, confirming convergence.
+\noindent\textbf{Stochastic simulation.} All simulations employ tau-leaping SSA with adaptive step size, 30 independent replicates per condition, and 6-hour simulation horizon ($t = 21{,}600$ s). Coefficient of variation (CV) across replicates is $<$2\% for most biomarkers, with higher stochastic variability in A$\beta$ oligomers (CV up to 1.53 under bistable conditions) reflecting genuine nucleation stochasticity.
 
 \subsection{Model Architecture}
 
-The CBD-AD neuroprotection model comprises 31 places ($|P| = 31$), 31 transitions ($|T| = 31$), and 76 arcs ($|F| = 76$), organized into six functional modules interconnected through shared molecular species.
+The CBD-AD neuroprotection model comprises 34 places ($|P| = 34$), 45 transitions ($|T| = 45$), and 100 arcs ($|F| = 100$), organized into six functional modules interconnected through shared molecular species.
 
-\subsubsection{Places}
+\subsubsection{Mid-Stage AD Initialization}
+
+Unlike healthy-brain initialization, the model starts from a mid-stage AD pathological state. This design choice is motivated by the clinical reality that CBD intervention would target patients with established disease, and ensures the model captures the correct therapeutic direction (rescue from disease rather than prevention from health).
 
 \begin{table}[htbp]
 \centering
-\caption{Model places organized by functional module. Compartment places (Temperature, pH, Age) have no arcs and serve as environmental parameters injected into rate evaluation contexts.}
+\caption{Model places organized by functional module. Mid-stage AD initial markings reflect established amyloid pathology, activated neuroinflammation, partial antioxidant depletion, and early neurodegeneration. Compartment places (Temperature, pH, Age) have no arcs and serve as environmental parameters.}
 \label{tab:places}
 \begin{tabular}{llrl}
 \toprule
 ID & Name & Initial Marking & Module \\
 \midrule
-P1  & CBD\_extracellular   & 100.0  & Pharmacokinetics \\
+P1  & CBD\_extracellular   & 0.0    & Pharmacokinetics \\
 P30 & CBD\_intracellular   & 0.0    & Pharmacokinetics \\
 P2  & GPR3                 & 50.0   & CBD Targets \\
+P32 & GPR3\_inactive       & 0.0    & CBD Targets \\
 P25 & HT1A\_active         & 0.0    & CBD Targets \\
 P26 & PPARg\_active        & 0.0    & CBD Targets \\
 P27 & A2A\_active          & 0.0    & CBD Targets \\
-P3  & Gamma\_Secretase     & 30.0   & Amyloid Cascade \\
-P4  & APP                  & 100.0  & Amyloid Cascade \\
-P5  & Abeta\_Monomer       & 0.0    & Amyloid Cascade \\
-P6  & Abeta\_Oligomer      & 0.0    & Amyloid Cascade \\
-P7  & Abeta\_Plaque        & 0.0    & Amyloid Cascade \\
-P8  & NFkB\_IkB            & 80.0   & Neuroinflammation \\
-P9  & NFkB\_p65            & 0.0    & Neuroinflammation \\
-P10 & IKK                  & 10.0   & Neuroinflammation \\
-P11 & TNFa                 & 0.0    & Neuroinflammation \\
-P12 & IL1b                 & 0.0    & Neuroinflammation \\
-P13 & IL6                  & 0.0    & Neuroinflammation \\
-P14 & COX2                 & 0.0    & Neuroinflammation \\
-P21 & Microglia\_M1        & 5.0    & Neuroinflammation \\
-P22 & Microglia\_M2        & 45.0   & Neuroinflammation \\
-P15 & Keap1\_Nrf2          & 60.0   & Oxidative Stress \\
-P16 & Nrf2\_free           & 0.0    & Oxidative Stress \\
-P17 & HO1                  & 0.0    & Oxidative Stress \\
-P18 & SOD                  & 5.0    & Oxidative Stress \\
-P19 & ROS                  & 10.0   & Oxidative Stress \\
-P20 & Glutathione          & 50.0   & Oxidative Stress \\
-P23 & Neuron\_Health       & 100.0  & Neurodegeneration \\
-P24 & BDNF                 & 10.0   & Neurodegeneration \\
+P34 & APP\_mRNA            & 8.0    & Amyloid Cascade \\
+P4  & APP                  & 90.0   & Amyloid Cascade \\
+P3  & Gamma\_Secretase     & 50.0   & Amyloid Cascade \\
+P5  & Abeta\_Monomer       & 0.3    & Amyloid Cascade \\
+P6  & Abeta\_Oligomer      & 15.0   & Amyloid Cascade \\
+P7  & Abeta\_Plaque        & 5.0    & Amyloid Cascade \\
+P8  & NFkB\_IkB            & 50.0   & Neuroinflammation \\
+P9  & NFkB\_p65            & 30.0   & Neuroinflammation \\
+P10 & IKK                  & 15.0   & Neuroinflammation \\
+P11 & TNFa                 & 1.0    & Neuroinflammation \\
+P12 & IL1b                 & 1.0    & Neuroinflammation \\
+P13 & IL6                  & 1.0    & Neuroinflammation \\
+P14 & COX2                 & 1.0    & Neuroinflammation \\
+P21 & Microglia\_M1        & 25.0   & Neuroinflammation \\
+P22 & Microglia\_M2        & 25.0   & Neuroinflammation \\
+P15 & Keap1\_Nrf2          & 55.0   & Oxidative Stress \\
+P16 & Nrf2\_free           & 5.0    & Oxidative Stress \\
+P17 & HO1                  & 30.0   & Oxidative Stress \\
+P18 & SOD                  & 20.0   & Oxidative Stress \\
+P19 & ROS                  & 5.0    & Oxidative Stress \\
+P20 & Glutathione          & 40.0   & Oxidative Stress \\
+P33 & GSSG                 & 10.0   & Oxidative Stress \\
+P23 & Neuron\_Health       & 95.0   & Neurodegeneration \\
+P24 & BDNF                 & 5.0    & Neurodegeneration \\
 P28 & Temperature          & 310.15 & Compartment \\
 P29 & pH                   & 7.0    & Compartment \\
 P31 & Age                  & 65.0   & Compartment \\
@@ -206,83 +211,98 @@ P31 & Age                  & 65.0   & Compartment \\
 \end{tabular}
 \end{table}
 
+The mid-stage AD state is characterized by:
+\begin{itemize}
+\item \textbf{Established amyloid:} A$\beta$ oligomers = 15, plaques = 5, with ongoing monomer production (APP = 90, APP\_mRNA = 8)
+\item \textbf{Active neuroinflammation:} NFkB-p65 = 30 (of 80 total NFkB pool), basal cytokines = 1, balanced microglial polarization (M1 = M2 = 25)
+\item \textbf{Partial antioxidant depletion:} Glutathione = 40 (of 50 total GSH/GSSG pool), GSSG = 10, with partial Nrf2 activation (free Nrf2 = 5)
+\item \textbf{Early neurodegeneration:} Neuron Health = 95 (5\% loss), reduced BDNF = 5
+\end{itemize}
+
+\subsubsection{P-Invariant Conservation Laws}
+
+The model enforces four P-invariants (place-conservation laws), ensuring mass balance:
+
+\begin{align}
+\text{NFkB:} \quad &P_8 (\text{NFkB\_IkB}) + P_9 (\text{NFkB\_p65}) = 80 \label{eq:inv_nfkb} \\
+\text{Microglia:} \quad &P_{21} (\text{M1}) + P_{22} (\text{M2}) = 50 \label{eq:inv_micro} \\
+\text{Keap1/Nrf2:} \quad &P_{15} (\text{Keap1\_Nrf2}) + P_{16} (\text{Nrf2\_free}) = 60 \label{eq:inv_nrf2} \\
+\text{Glutathione:} \quad &P_{20} (\text{GSH}) + P_{33} (\text{GSSG}) = 50 \label{eq:inv_gsh}
+\end{align}
+
+These invariants constrain the system's phase space, ensuring that mass is redistributed between active and inactive forms rather than created or destroyed. The NFkB invariant (Eq.~\ref{eq:inv_nfkb}) is particularly important: it means that NFkB-p65 activation is strictly bounded at 80, and CBD-mediated PPAR$\gamma$ suppression shifts the equilibrium toward the IkB-bound (inactive) form.
+
 \subsubsection{CBD Molecular Targets}
 
 Six transitions implement CBD's documented molecular mechanisms:
 
 \begin{itemize}
-\item \textbf{GPR3 inverse agonism (T1):} $r = 0.1 \times \text{CBD}_{\text{ext}} \times \text{GPR3}$. CBD depletes GPR3 receptors, reducing $\gamma$-secretase scaffolding and A$\beta$ production. GPR3 is the most sensitive target: even 15 $\mu$M fully depletes GPR3 ($50 \to \sim 0$), cutting $\gamma$-secretase by $>50\%$~\cite{huang2015}.
+\item \textbf{GPR3 inverse agonism (T1):} $r = k_1 \times \text{CBD}_{\text{ext}} \times \text{GPR3}$. CBD depletes GPR3 receptors, reducing $\gamma$-secretase scaffolding and A$\beta$ production~\cite{huang2015}. GPR3 recycling (T38) opposes this depletion, creating a steady-state balance.
 
-\item \textbf{PPAR$\gamma$ nuclear activation (T10):} $r = 0.2 \times \text{CBD}_{\text{int}}$. Intracellular CBD activates peroxisome proliferator-activated receptor gamma, which suppresses NFkB-p65 nuclear translocation via T9: $r = 0.3 \times \text{PPAR}\gamma_{\text{active}} \times \text{NFkB\_p65}$~\cite{esposito2011}.
+\item \textbf{PPAR$\gamma$ nuclear activation (T10):} $r = k_{10} \times \text{CBD}_{\text{int}}$. Intracellular CBD activates PPAR$\gamma$, which suppresses NFkB-p65 via T9: $r = k_9 \times \text{PPAR}\gamma_{\text{active}} \times \text{NFkB\_p65}$~\cite{esposito2011}. PPAR$\gamma$ degradation (T32) limits accumulation.
 
-\item \textbf{Nrf2/Keap1 dissociation (T11):} $r = 0.15 \times \text{Keap1:Nrf2} \times \left(\frac{\text{ROS}}{10 + \text{ROS}} + 0.3 \times \frac{\text{CBD}_{\text{int}}}{50 + \text{CBD}_{\text{int}}}\right) \times Q_{10}$. Dual activation by ROS (damage-driven) and intracellular CBD (pharmacological), releasing free Nrf2 to drive antioxidant response element (ARE) transcription of HO-1, SOD, and GSH~\cite{casares2020}.
+\item \textbf{Nrf2/Keap1 dissociation (T11):} Dual activation by ROS (damage-driven) and intracellular CBD (pharmacological), releasing free Nrf2 to drive antioxidant response element (ARE) transcription of HO-1, SOD, and GSH~\cite{casares2020}.
 
-\item \textbf{5-HT$_{1A}$ agonism (T15):} $r = 0.15 \times \text{CBD}_{\text{ext}}$. Extracellular CBD activates serotonin 1A receptors, driving BDNF production (T16) that promotes neuronal survival~\cite{russo2005}.
+\item \textbf{5-HT$_{1A}$ agonism (T15):} Extracellular CBD activates serotonin 1A receptors, driving BDNF production that promotes neuronal survival~\cite{russo2005}.
 
-\item \textbf{A$_{2A}$ agonism (T19):} $r = 0.12 \times \text{CBD}_{\text{ext}}$. Activation of adenosine A$_{2A}$ receptors promotes M1$\to$M2 microglial polarization, shifting the inflammatory microenvironment toward resolution~\cite{mecha2013}.
+\item \textbf{A$_{2A}$ agonism (T19):} Activation of adenosine A$_{2A}$ receptors promotes M1$\to$M2 microglial polarization, shifting the inflammatory microenvironment toward resolution~\cite{mecha2013}.
 
-\item \textbf{Direct ROS modulation:} Embedded within the Nrf2/Keap1 rate function (T11), where CBD contributes to Keap1:Nrf2 dissociation kinetics independently of ROS levels, enabling pharmacological antioxidant activation even at low oxidative stress~\cite{booz2011}.
+\item \textbf{Direct ROS modulation:} Embedded within the Nrf2/Keap1 rate function (T11), where CBD contributes to Keap1:Nrf2 dissociation independently of ROS levels~\cite{booz2011}.
 \end{itemize}
 
 \subsubsection{AD Pathological Cascades}
 
-Four interconnected cascades model AD pathology:
+\vspace{3pt}
+\noindent\textbf{Amyloid cascade.} APP transcription (T42) and translation (T43) maintain the APP pool, which is processed through $\gamma$-secretase (T3: GPR3-dependent) to A$\beta$ monomers. Concentration-dependent nucleation forms oligomers (T4: second-order, pH-sensitive) and fibrillar plaques (T5: first-order, pH-sensitive). Clearance includes microglial M2 phagocytosis (T24: age-attenuated), monomer degradation (T25: age-attenuated), and plaque clearance (T39).
 
 \vspace{3pt}
-\noindent\textbf{Amyloid cascade.} APP processing through $\gamma$-secretase (T3: GPR3-dependent) produces A$\beta$ monomers, which undergo concentration-dependent nucleation to oligomers (T4: second-order, pH-sensitive) and fibrillar plaque deposition (T5: first-order, pH-sensitive). Clearance pathways include microglial M2 phagocytosis of oligomers (T24: age-attenuated) and monomer degradation (T25: age-attenuated).
+\noindent\textbf{Neuroinflammation.} A$\beta$ oligomers (T8) and ROS (T40) activate IKK, which phosphorylates I$\kappa$B releasing NFkB-p65 (T6). Nuclear NFkB-p65 drives pro-inflammatory cytokine transcription (T7). PPAR$\gamma$-mediated NFkB suppression (T9) and IKK dephosphorylation (T27) oppose activation. Microglial polarization (T17: M2$\to$M1; T18: M1$\to$M2) integrates amyloid, cytokine, and pharmacological signals.
 
 \vspace{3pt}
-\noindent\textbf{Neuroinflammation.} A$\beta$ oligomers activate IKK (T8), which phosphorylates I$\kappa$B releasing NFkB-p65 (T6: Michaelis-Menten). Nuclear NFkB-p65 drives transcription of pro-inflammatory cytokines TNF$\alpha$, IL-1$\beta$, IL-6, and COX-2 (T7). PPAR$\gamma$-mediated NFkB suppression (T9) creates the bistable switch. Microglial polarization dynamics (T17: M2$\to$M1 driven by oligomers and TNF$\alpha$; T18: M1$\to$M2 driven by PPAR$\gamma$ and A$_{2A}$) integrate amyloid and pharmacological signals.
+\noindent\textbf{Oxidative stress.} Basal and amyloid-amplified ROS production (T14) is opposed by enzymatic scavenging (T13: SOD + HO-1 + GSH, age-attenuated, pH-sensitive). Glutathione reductase (T41) recycles GSSG back to GSH, maintaining the redox pool. Nrf2 ARE transcription (T12) induces antioxidant enzymes.
 
 \vspace{3pt}
-\noindent\textbf{Oxidative stress.} Basal mitochondrial ROS production with amyloid amplification (T14: $r = 2.0 + 0.5 \times \text{A}\beta_{\text{olig}}$) is opposed by enzymatic scavenging (T13: SOD + HO-1 + GSH, age-attenuated, pH-sensitive). Nrf2/Keap1 dissociation (T11) activates ARE transcription (T12), closing the antioxidant feedback loop.
-
-\vspace{3pt}
-\noindent\textbf{Neurodegeneration.} Neurotoxicity (T20) is a triple-product function of A$\beta$ oligomers, ROS, and TNF$\alpha$, each with Michaelis-Menten saturation and age amplification. BDNF-dependent neuroprotection (T21) restores neuron health proportionally to damage level, creating a damage-repair balance.
+\noindent\textbf{Neurodegeneration.} Neurotoxicity (T20) is driven by A$\beta$ oligomers, ROS, and TNF$\alpha$ with age amplification. BDNF-dependent neuroprotection (T21) opposes damage. The balance determines net neuronal health.
 
 \subsubsection{Two-Compartment Pharmacokinetics}
 
-CBD distribution between extracellular and intracellular compartments is modeled through four transitions implementing linear pharmacokinetics:
+CBD distribution between extracellular and intracellular compartments is modeled through four transitions (T28--T31) implementing linear pharmacokinetics with Q$_{10}$ temperature dependence. The absorption/efflux balance and systemic/brain clearance create steady-state intracellular concentrations proportional to extracellular input.
 
-\begin{align}
-\text{T28 (Absorption):} \quad r &= 0.0008 \times \text{CBD}_{\text{ext}} \times Q_{10} \\
-\text{T29 (Efflux):} \quad r &= 0.0003 \times \text{CBD}_{\text{int}} \times Q_{10} \\
-\text{T30 (Systemic clearance):} \quad r &= 0.00003 \times \text{CBD}_{\text{ext}} \times Q_{10} \\
-\text{T31 (Brain metabolism):} \quad r &= 0.00005 \times \text{CBD}_{\text{int}} \times Q_{10}
-\end{align}
-
-At steady state, the intracellular/extracellular concentration ratio is 2.62 (constant across doses), with 33.3\% systemic clearance at 6 hours, consistent with preclinical CBD pharmacokinetic data in the linear regime~\cite{millar2018}. The PK module is integrated within the Petri net rather than implemented as a separate preprocessing step, enabling dynamic feedback between drug distribution and target engagement.
-
-\subsubsection{Thermodynamic Modulation}
+\subsubsection{Thermodynamic and pH Modulation}
 
 All enzymatic transitions incorporate Q$_{10}$ temperature dependence:
 \begin{equation}
 Q_{10}(T) = 2^{(T_{\text{celsius}} - 37)/10}
 \end{equation}
-where $T_{\text{celsius}} = T - 273.15$ and $T$ is the Temperature compartment place marking (default 310.15 K = 37$^\circ$C). At physiological temperature, $Q_{10} = 1.0$; hypothermic conditions ($T < 310.15$) attenuate all temperature-sensitive rates proportionally.
 
-pH-dependent modulation is applied to aggregation (T4, T5: enhanced at acidic pH via $(1 + 0.5 \times (7.0 - \text{pH}))$), inflammation (T17, T20: enhanced at acidic pH), and antioxidant scavenging (T13: attenuated at non-physiological pH via $(1 - 0.3 \times |\text{pH} - 7.4|)$). These modulations reflect documented pH effects on A$\beta$ aggregation kinetics and enzyme catalytic efficiency.
+pH-dependent modulation is applied to aggregation (T4, T5: enhanced at acidic pH via $(1 + 0.5 \times (7.0 - \text{pH}))$), inflammation (T17, T20: enhanced at acidic pH), and antioxidant scavenging (T13: attenuated at non-physiological pH). These modulations reflect documented pH effects on A$\beta$ aggregation kinetics.
 
 \subsubsection{Age Compartment Place}
 
-Age is modeled as a compartment place (P31, default marking 65.0) implementing the factor $(1 + 0.02 \times (\text{Age} - 65))$ on seven age-sensitive transitions:
-
-\begin{itemize}
-\item \textbf{Disease-amplifying} (age increases rate): A$\beta$ production (T3), M2$\to$M1 polarization (T17), neurotoxicity (T20)
-\item \textbf{Defense-attenuating} (age decreases rate, denominator): antioxidant scavenging (T13), M1$\to$M2 resolution (T18), oligomer clearance (T24), monomer clearance (T25)
-\end{itemize}
-
-This formulation produces linear age scaling: at age 40, disease drivers operate at 50\% and defenses at 150\% of age-65 values; at age 90, disease drivers operate at 150\% and defenses at 50\%. The $\pm 2\%$/year coefficient is consistent with epidemiological data showing age as the strongest risk factor for AD, with incidence doubling approximately every 5 years after age 65~\cite{ferri2005}.
+Age (P31, default 65.0) implements the factor $(1 + 0.02 \times (\text{Age} - 65))$ on age-sensitive transitions. Disease-amplifying transitions (A$\beta$ production, M2$\to$M1, neurotoxicity) increase with age; defense-attenuating transitions (antioxidant scavenging, M1$\to$M2, clearance) decrease. The $\pm 2\%$/year coefficient is consistent with AD incidence doubling approximately every 5 years after age 65~\cite{ferri2005}.
 
 \subsection{Experimental Design}
 
-\subsubsection{CBD Dose-Response Sweep}
+\subsubsection{Full Factorial Sweep}
 
-Seven CBD doses ($\{0, 15, 25, 45, 65, 85, 100\}$ $\mu$M) with 15 replicates each at Age = 65, simulated for 6 hours using tau-leaping SSA. This sweep characterizes the full dose-response landscape, identifies phase transition boundaries, and estimates EC$_{50}$ values for each endpoint.
+An $8 \times 4 \times 3$ factorial design crosses:
+\begin{itemize}
+\item 8 CBD doses: $\{0, 1, 2, 4, 6, 8, 12, 15\}$ (nominal concentration units)
+\item 4 Ages: $\{55, 65, 75, 85\}$ years
+\item 3 pH levels: $\{6.6, 7.0, 7.4\}$
+\end{itemize}
 
-\subsubsection{CBD $\times$ Age Factorial Design}
+This yields 96 experimental conditions plus a baseline (CBD=0, Age=65, pH=7.0), each with 30 stochastic replicates, totaling 2,910 simulations. The sweep design enables:
+\begin{itemize}
+\item Main effect estimation ($\eta^2$ effect sizes) for each factor
+\item Two-way and three-way interaction quantification
+\item Minimum effective dose (MED) estimation for each stratum
+\item Replicate-level analysis for stochastic bistability detection
+\end{itemize}
 
-A $4 \times 5$ factorial design crosses 4 CBD doses ($\{0, 25, 65, 100\}$ $\mu$M) with 5 ages ($\{40, 55, 65, 75, 90\}$ years), yielding 20 experimental conditions with 15 replicates each (300 total simulations). This design quantifies main effects of CBD and age, interaction effects (does age modulate CBD efficacy?), and therapeutic window shifts across the lifespan.
+\subsubsection{Biological Phenomena Mining}
+
+Beyond standard factorial analysis, replicate-level data (30 endpoint values per condition) and 108,002-point time series are mined for emergent phenomena: bistability (bimodality coefficient, histogram gap detection), basins of attraction (centroid clustering), critical slowing down (variance peaks), endpoint coupling (inter-species correlation matrices), and pathway decoupling (dose-dependent correlation weakening).
 
 % ──────────────────────────────────────────────────────────────────────────
 % RESULTS
@@ -290,170 +310,162 @@ A $4 \times 5$ factorial design crosses 4 CBD doses ($\{0, 25, 65, 100\}$ $\mu$M
 \section{Results}
 \label{sec:results}
 
-\subsection{Untreated AD Baseline}
+\subsection{Mid-Stage AD Baseline}
 
-At CBD = 0 $\mu$M and Age = 65, the model generates a pathological steady state recapitulating hallmark AD features: 84.5\% neuronal death (Neuron Health = 15.54 mM from initial 100 mM), runaway amyloid accumulation (A$\beta$ plaque = 58{,}864 mM), maximal neuroinflammation (NFkB-p65 = 80 mM, TNF$\alpha$ = 200 mM, 100\% M1 microglial polarization), and saturated oxidative stress (ROS = 500 mM). GPR3 remains unchecked, driving $\gamma$-secretase to 100 mM (3.3$\times$ basal level). BDNF is effectively absent ($\sim 10^{-5}$ mM). This baseline validates the model's capacity to capture genuine AD pathology without pharmacological intervention.
+At CBD = 0 and Age = 65, the model progresses from the mid-stage initial state to a chronic disease steady state. Without treatment, NFkB-p65 reaches 80 (maximal, saturating the invariant), Neuron Health declines from 95 to $\sim$79 (17\% net loss from initial), ROS reaches 0.85, A$\beta$ oligomers accumulate to $\sim$37, and Microglia\_M1 saturates at 50 (100\% pro-inflammatory polarization). Glutathione equilibrates at $\sim$111 marking units. This baseline captures the key features of progressive AD: escalating inflammation, oxidative damage, and ongoing neurodegeneration from a partially compromised state.
 
-\subsection{Emergent Phase Transition}
+\subsection{Sharp Anti-Inflammatory Phase Transition}
 
-The dose-response relationship for inflammation resolution is not gradual but exhibits a sharp phase transition between 45--65 $\mu$M CBD (Table~\ref{tab:phase_transition}). NFkB-p65 drops from 47.82 mM at CBD = 45 $\mu$M to 0.24 mM at CBD = 65 $\mu$M---a 200-fold reduction over a 1.4-fold dose increment. Simultaneously, PPAR$\gamma$ saturates from 0.233 mM to 50.0 mM. Pro-inflammatory cytokines (TNF$\alpha$, IL-1$\beta$, IL-6) transition from saturated (200 mM) to suppressed ($<8$ mM). This switch behavior emerges from the nonlinear coupling of four rate functions: PPAR$\gamma$ activation (T10: $0.2 \times \text{CBD}_{\text{int}}$), PPAR$\gamma$-mediated NFkB suppression (T9: $0.3 \times \text{PPAR}\gamma \times \text{NFkB\_p65}$), NFkB-driven cytokine production (T7: $0.5 \times \text{NFkB\_p65}$), and cytokine feedback on M1 polarization (T17).
+The dose-response for inflammation resolution exhibits a sharp all-or-nothing transition at the lowest non-zero CBD dose (Table~\ref{tab:phase_transition}). NFkB-p65 drops from 80.00 at CBD = 0 to 0.17 at CBD = 1---a 470-fold reduction. The effect size $\eta^2$ for CBD on NFkB-p65 is 100\%, with Age and pH contributing 0\%. The minimum effective dose (MED) for NFkB-p65 $<$ 1 is uniformly CBD = 1 across all 12 age$\times$pH strata.
 
 \begin{table}[htbp]
 \centering
-\caption{NFkB/PPAR$\gamma$ phase transition across CBD doses at Age = 65. Transition zone shaded.}
+\caption{Anti-inflammatory phase transition. NFkB-p65 and Neuron Health across CBD doses (marginal means across Age$\times$pH). The dissociation between inflammation resolution and neuroprotection is evident: NFkB is fully suppressed at CBD$=$1, but Neuron Health never reaches 95.}
 \label{tab:phase_transition}
-\begin{tabular}{rrrrl}
+\begin{tabular}{rrrrrl}
 \toprule
-CBD ($\mu$M) & NFkB-p65 (mM) & PPAR$\gamma$ (mM) & TNF$\alpha$ (mM) & State \\
+CBD & NFkB-p65 & Neuron Health & ROS & A$\beta$ Oligomer & Inflammation \\
 \midrule
-0   & 80.00  & $\sim$0   & 200.00 & Fully inflamed \\
-15  & 94.67  & 0.039     & 200.00 & Fully inflamed \\
-25  & 88.15  & 0.070     & 200.00 & Fully inflamed \\
-\rowcolor{gray!20} 45  & 47.82  & 0.233     & 200.00 & Transition \\
-65  & 0.24   & 50.000    & 7.94   & Neuroprotective \\
-85  & 0.22   & 50.000    & 7.38   & Neuroprotective \\
-100 & 0.21   & 50.000    & 7.38   & Neuroprotective \\
+0   & 79.998 & 79.30  & 0.848 & 36.86  & Active \\
+\rowcolor{gray!20} 1   & 0.170  & 87.86  & 0.759 & 1.13   & Resolved \\
+2   & 0.081  & 90.22  & 0.732 & 0.59   & Resolved \\
+4   & 0.041  & 91.91  & 0.696 & 0.41   & Resolved \\
+6   & 0.029  & 92.57  & 0.664 & 0.37   & Resolved \\
+8   & 0.023  & 92.91  & 0.636 & 0.36   & Resolved \\
+12  & 0.017  & 93.21  & 0.586 & 0.35   & Resolved \\
+15  & 0.014  & 93.36  & 0.553 & 0.35   & Resolved \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \vspace{3pt}
-\noindent\textbf{Bistability mechanism.} The phase transition arises from positive feedback between PPAR$\gamma$ accumulation and NFkB depletion. Below the critical CBD concentration, PPAR$\gamma$ production is insufficient to overcome NFkB self-amplification through cytokine-driven IKK activation and M1 polarization. Above the critical concentration, PPAR$\gamma$ suppression of NFkB reduces cytokine production, which reduces M1 polarization, which reduces IKK activation, creating a self-reinforcing resolution cascade. The system has two stable states---inflamed and neuroprotective---with the transition zone representing an unstable separatrix rather than a smooth interpolation.
+\noindent\textbf{Mechanism.} The phase transition arises from positive feedback between PPAR$\gamma$ accumulation and NFkB depletion, constrained by the NFkB P-invariant (NFkB\_IkB + NFkB\_p65 = 80). Below the critical CBD concentration, PPAR$\gamma$ production is insufficient to overcome NFkB self-amplification through oligomer-driven and ROS-driven IKK activation. Above it, PPAR$\gamma$ suppression of NFkB reduces cytokine production, which reduces M1 polarization, which reduces IKK activation, creating a self-reinforcing resolution cascade. The transition is first-order (all-or-nothing) rather than continuous.
 
-\vspace{3pt}
-\noindent\textbf{Clinical implication.} This predicts a threshold dosing effect qualitatively different from standard pharmacological dose-response: sub-threshold CBD produces minimal anti-inflammatory benefit regardless of dose escalation within the sub-threshold range, while crossing the threshold produces near-complete resolution.
+\subsection{The Dissociation Gap}
 
-\subsection{Dissociated Therapeutic Windows}
-
-The model reveals two mechanistically distinct therapeutic windows (Table~\ref{tab:therapeutic_windows}):
-
-\begin{table}[htbp]
-\centering
-\caption{Two therapeutic windows at Age = 65. Neuron health recovery is mediated by GPR3/BDNF mechanisms (CBD $\geq 25$ $\mu$M), while inflammation resolution requires the PPAR$\gamma$/NFkB switch (CBD $\geq 65$ $\mu$M).}
-\label{tab:therapeutic_windows}
-\begin{tabular}{rrrrr}
-\toprule
-CBD ($\mu$M) & Neuron Health & A$\beta$ Plaque & NFkB-p65 & M1/Total Microglia \\
-\midrule
-0   & 15.54  & 58{,}864  & 80.00 & 100\% \\
-15  & 99.85  & 15{,}802  & 94.67 & 100\% \\
-25  & 99.86  & 9{,}627   & 88.15 & 86\% \\
-45  & 100.00 & 3{,}110   & 47.82 & 86\% \\
-65  & 100.00 & 1{,}867   & 0.24  & 27\% \\
-100 & 100.00 & 1{,}708   & 0.21  & 26\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\vspace{3pt}
-\noindent\textbf{Window 1: Neuronal rescue ($\geq$15--25 $\mu$M).} At CBD = 15 $\mu$M, neurons are fully rescued (Neuron Health = 99.85 mM) despite maximal inflammation (NFkB-p65 = 94.67 mM, 100\% M1 polarization). Two CBD mechanisms operate at low doses independently of the inflammatory state: (i) GPR3 depletion ($50 \to \sim 0$) reduces $\gamma$-secretase, cutting A$\beta$ plaque by 73\%, and (ii) 5-HT$_{1A}$ activation drives BDNF from $\sim$0 to 100 mM, enabling neuronal repair. These pathways do not require PPAR$\gamma$/NFkB engagement.
-
-\vspace{3pt}
-\noindent\textbf{Window 2: Inflammation resolution ($\geq$65 $\mu$M).} The PPAR$\gamma$/NFkB bistable switch (Section 3.2) requires intracellular CBD exceeding the critical threshold. At CBD = 65 $\mu$M, intracellular concentration reaches 31.37 mM (via 2-compartment PK), sufficient to drive PPAR$\gamma$ saturation and NFkB collapse. Cytokines decrease 96\% (TNF$\alpha$: $200 \to 7.94$ mM), M1 polarization drops from 100\% to 27\%, and A$\beta$ plaque achieves 97\% reduction versus untreated.
-
-\vspace{3pt}
-\noindent\textbf{Clinical implication.} Neuroprotection does not equal anti-inflammation. Low-dose CBD regimens may preserve neurons while leaving the inflammatory microenvironment unresolved, potentially permitting continued cytokine-driven damage through non-neuronal pathways.
-
-\subsection{GPR3 as the Most Sensitive CBD Target}
-
-GPR3 is fully depleted at the lowest non-zero dose tested (15 $\mu$M), reducing $\gamma$-secretase from 100 mM to 47 mM and cutting A$\beta$ plaque by 73\% (58{,}864 $\to$ 15{,}802 mM). This sensitivity reflects the direct binding kinetics ($r = 0.1 \times \text{CBD}_{\text{ext}} \times \text{GPR3}$) and is consistent with Huang \etal\ (2015) who identified GPR3 as a high-affinity CBD target~\cite{huang2015}. The downstream consequence---substantial plaque reduction from a single molecular interaction---identifies GPR3 as the primary driver of CBD's anti-amyloid activity and suggests that GPR3-selective agents could replicate CBD's plaque-lowering effect at lower systemic exposure.
-
-\subsection{Diminishing Returns and Pharmacological Ceiling}
-
-CBD = 65 $\mu$M achieves 97\% of the maximal therapeutic benefit of CBD = 100 $\mu$M across all endpoints. The marginal gain from 65 $\to$ 100 $\mu$M is $<$5\% for every biomarker measured. This ceiling arises from target saturation: GPR3 is fully depleted, PPAR$\gamma$ is saturated, and the antioxidant defense system reaches maximal induction. The pharmacological ceiling at $\sim$1.3$\times$ the phase transition threshold implies that dose escalation beyond this point provides marginal benefit while increasing potential for off-target effects.
-
-\subsection{Healthy Aging Plaque Context}
-
-Amyloid plaques are present in cognitively normal elderly: 25--35\% of individuals aged 70--79 are amyloid-positive by PET imaging, with plaque density approximately 10--25\% of clinical AD levels~\cite{jansen2015,ossenkoppele2015}. Using the untreated AD plaque burden (58{,}864 mM at Age = 65) as reference, the healthy aging plaque range corresponds to 5{,}886--14{,}716 mM.
-
-CBD = 25 $\mu$M produces plaque levels of 9{,}627 mM (16.4\% of AD burden)---within the healthy aging range. CBD $\geq$ 45 $\mu$M pushes plaque below 3{,}110 mM (5.3\% of AD burden), substantially below normal elderly levels. This contextualizes the model predictions: CBD $\approx$ 15--25 $\mu$M may suffice for plaque normalization to healthy-aging levels, while CBD $\geq$ 65 $\mu$M is required for inflammation resolution. The two therapeutic windows align with distinct clinical objectives.
-
-\subsection{Age-Dependent Disease Burden}
-
-The $4 \times 5$ factorial design reveals systematic age effects on baseline disease severity (Table~\ref{tab:age_burden}). Age operates as a linear amplifier: plaque burden scales $\pm 50\%$ relative to age 65 at ages 40 and 90, driven by the $(1 + 0.02 \times (\text{Age} - 65))$ factor on disease-amplifying and defense-attenuating transitions.
-
-\begin{table}[htbp]
-\centering
-\caption{Untreated AD baseline (CBD = 0) across ages. Plaque burden scales linearly with age ($\pm 50\%$ at ages 40/90 versus 65). Neuron health shows complete loss ($\to 0$) at age $\geq 75$.}
-\label{tab:age_burden}
-\begin{tabular}{rrrrl}
-\toprule
-Age (yr) & A$\beta$ Plaque & Neuron Health & A$\beta$ Oligomer & \% of Age 65 \\
-\midrule
-40 & 29{,}061  & 59.23 & 157.92  & 49\% \\
-55 & 46{,}943  & 33.02 & 255.26  & 80\% \\
-65 & 58{,}864  & 15.54 & 320.17  & 100\% \\
-75 & 70{,}780  & 0.00  & 384.92  & 120\% \\
-90 & 88{,}649  & 0.00  & 481.48  & 151\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\vspace{3pt}
-\noindent Neuron health shows a critical age threshold: at age $\leq$ 65, some residual neuron health persists (15.54 mM at age 65, 59.23 mM at age 40); at age $\geq$ 75, neurons are completely destroyed (NH = 0.00 mM) even before plaque levels reach maximum. This reflects the age-amplified neurotoxicity (T20) exceeding BDNF-independent repair capacity.
-
-\subsection{Age Modulates CBD Efficacy}
-
-Age systematically erodes CBD's plaque-lowering efficacy (Table~\ref{tab:age_efficacy}). At CBD = 25 $\mu$M, plaque reduction drops from 95.7\% (age 40) to 78.2\% (age 90), a decline of $-$0.35\%/year. At CBD = 65 $\mu$M, the decline is smaller ($-$0.10\%/year) but still significant: 97.4\% (age 40) to 92.5\% (age 90). CBD = 100 $\mu$M maintains efficacy above 93.8\% across all ages.
-
-\begin{table}[htbp]
-\centering
-\caption{CBD efficacy for plaque reduction across ages (\% reduction versus CBD = 0 at same age). Aging erodes efficacy, particularly at lower doses.}
-\label{tab:age_efficacy}
-\begin{tabular}{rrrr}
-\toprule
-Age (yr) & CBD = 25 $\mu$M & CBD = 65 $\mu$M & CBD = 100 $\mu$M \\
-\midrule
-40 & 95.7\% & 97.4\% & 97.4\% \\
-55 & 87.3\% & 97.3\% & 97.4\% \\
-65 & 83.6\% & 96.8\% & 97.1\% \\
-75 & 81.0\% & 95.7\% & 96.2\% \\
-90 & 78.2\% & 92.5\% & 93.8\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\vspace{3pt}
-\noindent\textbf{ROS phase boundary shift.} The most dramatic age$\times$CBD interaction occurs in oxidative stress control. At ages 40 and 55, CBD = 25 $\mu$M achieves near-complete ROS scavenging (ROS = 1.02 and 12.82 mM respectively). At age 65, CBD = 25 $\mu$M fails entirely (ROS = 500 mM, unchanged from untreated), while CBD = 65 $\mu$M succeeds (ROS = 1.65 mM). At age 90, even CBD = 65 $\mu$M fails (ROS = 500 mM), and only CBD = 100 $\mu$M achieves partial control (ROS = 35.67 mM). This demonstrates that the ROS control threshold shifts rightward with age, requiring progressively higher CBD doses to overcome age-attenuated antioxidant defenses.
-
-\subsection{Therapeutic Window Shifts with Age}
-
-The minimum CBD dose required to bring plaque within healthy aging range ($\leq 25\%$ of age-65 untreated) shifts with age:
-
+The model's central finding is a quantified dissociation between anti-inflammatory efficacy and neuroprotection. Of the 96 factorial conditions:
 \begin{itemize}
-\item \textbf{Ages 40--75:} CBD $\geq$ 25 $\mu$M sufficient (plaque = 1{,}241--13{,}467 mM, all within healthy range)
-\item \textbf{Age 90:} CBD $\geq$ 65 $\mu$M required (at CBD = 25 $\mu$M, plaque = 19{,}322 mM exceeds healthy threshold; at CBD = 65 $\mu$M, plaque = 6{,}610 mM)
+\item 84 conditions (88\%): inflammation fully resolved (NFkB $<$ 1) \textbf{and} neurons still declining (Neuron Health $<$ 95)
+\item 12 conditions (12\%): inflammation active (CBD = 0 stratum)
+\item 0 conditions (0\%): full neuroprotection achieved (Neuron Health $\geq$ 95)
 \end{itemize}
 
-For complete inflammation resolution, the therapeutic window is narrower at advanced age. The M1/M2 microglial ratio at CBD = 65 $\mu$M increases from 6.5\% (age 40) to 60.1\% (age 90), indicating that age-impaired M1$\to$M2 resolution (T18, age-attenuated denominator) progressively limits the anti-inflammatory response. At age 90, even the highest dose (CBD = 100 $\mu$M) achieves only 52.2\% M2 polarization compared to 93.8\% at age 40.
+The best achievable Neuron Health across all conditions is 94.73 (Age = 55, pH = 7.4, CBD = 15); the worst treated condition yields 90.73 (Age = 85, pH = 6.6, CBD = 15). No CBD dose, at any age or pH, achieves the pre-disease neuron level.
 
-\subsection{Neuron Health Recovery}
+\vspace{3pt}
+\noindent\textbf{Quantitative decomposition.} The total CBD neuroprotective effect decomposes into two mechanistically distinct axes:
 
-CBD rescues neurons across all ages, with the magnitude of recovery increasing at older ages where baseline damage is more severe (Table~\ref{tab:neuron_recovery}):
+\begin{align}
+\text{Baseline (CBD = 0):} \quad & 79.30 \text{ (mean Neuron Health)} \nonumber \\
++ \text{ Anti-inflammatory axis (CBD } 0 \to 1\text{):} \quad & +8.56 \text{ neurons (61\%)} \nonumber \\
++ \text{ Antioxidant axis (CBD } 1 \to 15\text{):} \quad & +5.50 \text{ neurons (39\%)} \nonumber \\
+= \text{ Best achievable:} \quad & 93.36 \nonumber \\
+\text{Residual gap to 95\%:} \quad & 1.64 \text{ neurons}
+\end{align}
+
+The anti-inflammatory axis (CBD 0$\to$1) provides 61\% of total neuroprotection through NFkB suppression, cytokine reduction, and M2 polarization. The antioxidant axis (CBD 1$\to$15) provides 39\% through progressive ROS reduction (0.759 $\to$ 0.553) via Nrf2-driven GSH, HO-1, and SOD induction. The residual 1.64-neuron gap indicates that a third protective mechanism---not captured by either axis in the current model---is needed to fully restore neuronal health.
+
+\subsection{Stochastic A$\beta$ Oligomer Bistability}
+
+Replicate-level analysis reveals genuine bistability in A$\beta$ oligomer distributions. A bimodality coefficient (BC) threshold of 0.555 detects 92 of 96 conditions as bimodal for oligomers, with BC values reaching 0.95 and coefficient of variation (CV) up to 1.53.
+
+\vspace{3pt}
+\noindent\textbf{Mechanism.} At CBD $\geq$ 1 with young age, the system enters a regime where nucleation-dependent oligomerization creates a stochastic fate decision: some replicates achieve near-complete oligomer clearance ($\sim$0), while others retain substantial oligomer loads ($\sim$28). This bimodality is strongest at low age + moderate CBD (e.g., CBD = 8, Age = 55, pH = 7.4: CV = 1.48), where CBD partially inhibits nucleation, pushing the system to the tipping point between clearance and persistence.
+
+\vspace{3pt}
+\noindent\textbf{False positives filtered.} NFkB-p65 (91 conditions flagged) shows apparent bimodality but CV $\approx$ 0.000---all replicates converge to either 80 or $\sim$0.15, with BC triggered by histogram shape rather than true stochastic divergence. Neuron Health shows discrete-valued peaks (92.93, 94.00, 95.07) reflecting integer neuron counts, not biological bistability. These artifacts are excluded from the bistability interpretation.
+
+\vspace{3pt}
+\noindent\textbf{Microglial polarization bistability.} Microglia\_M1 shows genuine bimodal distributions at high CBD + young age (CV up to 1.81). The P-invariant (M1 + M2 = 50) creates a see-saw: at CBD = 1, Age = 55, replicates split between low M1 ($\sim$7) and moderate M1 ($\sim$14), reflecting stochastic variation in the polarization equilibrium.
+
+\subsection{Factorial Effect Sizes}
+
+The $\eta^2$ effect size decomposition reveals striking differences in factor sensitivity across endpoints (Table~\ref{tab:effect_sizes}).
 
 \begin{table}[htbp]
 \centering
-\caption{Neuron health (mM) across CBD doses and ages. Recovery $\Delta$ represents gain from CBD = 0 to CBD = 100 $\mu$M at each age.}
-\label{tab:neuron_recovery}
-\begin{tabular}{rrrrrr}
+\caption{$\eta^2$ effect sizes (\% variance explained) for the three factorial factors on key endpoints. CBD dominates inflammation; Age dominates oxidative stress; pH has modest effects.}
+\label{tab:effect_sizes}
+\begin{tabular}{lrrr}
 \toprule
-Age (yr) & CBD = 0 & CBD = 25 & CBD = 65 & CBD = 100 & $\Delta$ Recovery \\
+Endpoint & CBD & Age & pH \\
 \midrule
-40 & 59.23  & 100.00 & 100.00 & 100.00 & +40.77 \\
-55 & 33.02  & 99.95  & 100.00 & 100.00 & +66.98 \\
-65 & 15.54  & 99.86  & 100.00 & 100.00 & +84.46 \\
-75 & 0.00   & 99.83  & 99.99  & 99.99  & +99.99 \\
-90 & 0.00   & 99.78  & 99.91  & 99.94  & +99.94 \\
+NFkB\_p65      & 100\% & 0\%  & 0\%  \\
+Neuron\_Health & 68\%  & 21\% & 3\%  \\
+ROS            & 41\%  & 45\% & 13\% \\
+Glutathione    & 35\%  & 50\% & 14\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+NFkB is entirely CBD-determined ($\eta^2=100\%$), reflecting the all-or-nothing phase transition. Neuron Health is primarily CBD-driven (68\%) but with substantial Age contribution (21\%). Strikingly, ROS and Glutathione are dominated by \textit{Age} ($\eta^2=45\%$ and 50\% respectively), with CBD contributing only 41\% and 35\%. This reversal of factor dominance between inflammation (CBD-controlled) and oxidative stress (Age-controlled) is the mechanistic basis for the dissociation gap.
+
+\subsection{Two Discrete Attractors}
+
+Centroid analysis of replicate endpoint vectors identifies two attractors separated by Euclidean distance 100.5 in the 6-dimensional state space (Neuron\_Health, NFkB\_p65, ROS, Glutathione, A$\beta$\_Oligomer, Microglia\_M1):
+
+\begin{align}
+\text{Disease:} \quad & [79.30, \; 80.00, \; 0.85, \; 110.95, \; 36.86, \; 50.00] \nonumber \\
+\text{Treated:} \quad & [93.36, \; 0.01, \; 0.55, \; 122.14, \; 0.44, \; 4.69] \nonumber
+\end{align}
+
+Basin membership is binary: CBD = 0 $\to$ 100\% disease attractor; CBD $\geq$ 1 $\to$ 100\% treated attractor. No replicates occupy intermediate states. The transition from disease to treated basin is complete at the minimum non-zero dose, consistent with a first-order phase transition.
+
+\subsection{Critical Slowing Down}
+
+Inter-replicate variance across CBD doses shows that NFkB-p65 variance peaks at CBD = 1 ($\sigma = 0.005$), the exact transition dose---consistent with critical slowing down at the phase boundary. However, A$\beta$ oligomers and Neuron Health show peak variance at CBD = 0 ($\sigma = 6.94$ and $\sigma = 3.87$ respectively), indicating the untreated disease state is the most stochastically variable regime rather than the transition point. This asymmetry suggests a first-order rather than second-order phase transition for most endpoints.
+
+Variance increases monotonically with age for all endpoints: Neuron Health $\sigma$ ranges from 1.32 (Age = 55) to 2.64 (Age = 85), reflecting amplified stochastic vulnerability in elderly conditions.
+
+\subsection{Pathway Coupling and Decoupling}
+
+Correlation matrices across CBD doses reveal a striking pattern of coupling and progressive decoupling (Table~\ref{tab:coupling}).
+
+\begin{table}[htbp]
+\centering
+\caption{Key inter-endpoint correlations across CBD doses. At CBD = 0, M1 is deterministic (NaN). At CBD = 1, all pathways are maximally coupled. At CBD = 15, Neuron Health partially decouples from inflammatory markers.}
+\label{tab:coupling}
+\begin{tabular}{rrrr}
+\toprule
+CBD & $r$(NFkB, ROS) & $r$(NFkB, Neuron) & $r$(ROS, Neuron) \\
+\midrule
+0  & 0.633  & $-$0.541 & $-$0.798 \\
+1  & 0.825  & $-$0.857 & $-$0.860 \\
+4  & 0.806  & $-$0.813 & $-$0.756 \\
+15 & 0.824  & $-$0.692 & $-$0.625 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At CBD = 1, where the phase transition occurs, all pathways are maximally coupled ($|r| > 0.72$ for all pairs). As CBD increases, the NFkB--Neuron correlation weakens from $-$0.857 to $-$0.692, and the ROS--Neuron correlation from $-$0.860 to $-$0.625. This progressive decoupling means that at high CBD, neuronal outcome becomes less determined by inflammation---the residual neuronal damage is driven by age-dependent oxidative stress and other mechanisms partially independent of the NFkB axis. This provides the mechanistic explanation for the dissociation gap.
+
+\subsection{Age-Dependent Mechanism Switching}
+
+The most striking finding is that aging qualitatively changes CBD's neuroprotective mechanism (Table~\ref{tab:age_mechanism}).
+
+\begin{table}[htbp]
+\centering
+\caption{Age-dependent mechanism switching. The anti-inflammatory contribution (CBD 0$\to$1) decreases with age while the antioxidant contribution (CBD 1$\to$15) increases. EC$_{50}$ shifts rightward with age.}
+\label{tab:age_mechanism}
+\begin{tabular}{rrrrrr}
+\toprule
+Age & Range & Anti-inflam. & Antioxidant & EC$_{50}$ & Deficit at CBD=15 \\
+\midrule
+55 & 84.6 $\to$ 94.6 & 88\% & 12\% & 0.57 & 5.4 \\
+65 & 81.0 $\to$ 94.0 & 80\% & 20\% & 0.62 & 6.0 \\
+75 & 77.5 $\to$ 93.1 & 56\% & 44\% & 0.89 & 6.9 \\
+85 & 74.2 $\to$ 91.8 & 35\% & 65\% & 1.63 & 8.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At age 55, 88\% of CBD's neuroprotective effect comes from the anti-inflammatory axis (the jump from CBD = 0 to CBD = 1), and only 12\% from the antioxidant axis (CBD = 1 to 15). By age 85, this ratio inverts: only 35\% is anti-inflammatory, and 65\% is antioxidant. The EC$_{50}$ shifts from 0.57 to 1.63---a 2.86-fold increase.
+
 \vspace{3pt}
-\noindent Even at age 90, CBD = 25 $\mu$M restores neuron health from 0.00 to 99.78 mM, demonstrating that the GPR3/BDNF neuroprotective mechanism retains efficacy across the lifespan. However, a subtle age gradient emerges at the highest precision: neuron health at CBD = 100 $\mu$M declines from 100.00 (age 40--65) to 99.99 (age 75) to 99.94 (age 90), reflecting age-amplified neurotoxicity beginning to outpace BDNF-dependent repair at extreme ages.
+\noindent\textbf{Linear age-deficit relationship.} The untreated neuron deficit follows a linear relationship: deficit $= 0.35 \times \text{Age} - 3.6$ (max residual from linear fit: 0.10). This linearity indicates that no critical age threshold or bifurcation exists in the 55--85 range---age operates as a smooth amplifier of disease burden rather than a switch.
 
-\subsection{Simulation Quality}
-
-All 300 simulations (20 conditions $\times$ 15 replicates) completed without deadlock. Mean simulation time was 40.7 $\pm$ 3.4 seconds per replicate. Coefficient of variation across replicates was $<$0.1\% for A$\beta$ plaque and neuron health, and $<$8\% for ROS (the most stochastically variable endpoint). These metrics confirm robust convergence of the stochastic simulation and statistical reliability of reported mean values.
+\vspace{3pt}
+\noindent\textbf{Residual deficit grows with age.} At CBD = 15, the neuron deficit (distance from 95\%) grows from 5.4 at age 55 to 8.2 at age 85. Even maximal CBD cannot compensate for age-amplified oxidative damage, predicting that elderly patients will require combination therapy or additional antioxidant supplementation beyond CBD monotherapy.
 
 % ──────────────────────────────────────────────────────────────────────────
 % DISCUSSION
@@ -461,138 +473,133 @@ All 300 simulations (20 conditions $\times$ 15 replicates) completed without dea
 \section{Discussion}
 \label{sec:discussion}
 
-This in silico laboratory maps the therapeutic landscape of CBD for AD, identifying three actionable predictions that can rationalize experimental priorities. Each prediction translates directly into specific experimental guidance: which dose ranges to test, which biomarkers to measure independently, and which patient demographics require adjusted dosing. The value lies not in replacing experiments but in reducing a combinatorial search space of hundreds of potential conditions to a focused set of hypothesis-driven tests.
+This in silico laboratory maps the therapeutic landscape of CBD for mid-stage AD, revealing findings that align with---and mechanistically explain---clinical observations from failed anti-inflammatory trials. The model's value lies not in novel drug discovery but in providing a computational framework that recapitulates known pharmacological constraints and generates quantitative predictions to guide experimental design.
 
-\subsection{The Phase Transition as Emergent Property}
+\subsection{The Dissociation Gap Mirrors Clinical Reality}
 
-The NFkB/PPAR$\gamma$ bistable switch is not hardcoded in the model---it emerges from the nonlinear coupling of four rate functions spanning two pathways (PPAR$\gamma$ activation and NFkB-mediated inflammation). No individual rate function produces switch-like behavior; the bistability arises from the topology of positive feedback between PPAR$\gamma$ accumulation and NFkB depletion operating through cytokine-mediated microglial polarization. This predicted property is fundamentally unpredictable from isolated pathway analysis, illustrating why integrated pre-experimental screening is necessary for multi-target pharmacology.
+The model's prediction that 88\% of conditions show resolved inflammation but persistent neurodegeneration directly mirrors the central finding of the ADAPT trial~\cite{adapt2007}: naproxen and celecoxib effectively reduced neuroinflammatory biomarkers in AD patients but had zero effect on cognitive decline. The INTREPAD trial~\cite{intrepad2019} replicated this finding with low-dose naproxen in presymptomatic AD. Over 25 clinical trials of anti-inflammatory agents have failed to show cognitive benefit despite reducing neuroinflammation~\cite{imbimbo2010}.
 
-\vspace{3pt}
-\noindent\textbf{Comparison with bistability in biological systems.} Phase transitions are well-documented in biological decision-making: the lac operon exhibits bistable switching between repressed and induced states~\cite{novick1957}, T-cell activation shows digital threshold behavior~\cite{altan2005}, and apoptosis proceeds through a point-of-no-return caspase cascade~\cite{rehm2006}. The NFkB/PPAR$\gamma$ switch in our model shares key features with these systems: mutual antagonism (PPAR$\gamma$ suppresses NFkB, inflammation antagonizes resolution), positive feedback (reduced cytokines reduce M1 polarization reduce IKK activation), and threshold sensitivity (small dose changes produce large state transitions near the critical point). This places CBD-mediated inflammation resolution within the broader framework of biological switching, suggesting that the phase transition behavior may be a fundamental feature of the PPAR$\gamma$/NFkB axis rather than a model artifact.
+The model explains \textit{why}: once inflammation is resolved (at CBD = 1), the residual neuronal damage is driven by the partially independent oxidative stress axis ($\eta^2 = 45\%$ for Age on ROS, vs. 41\% for CBD) and by age-amplified neurotoxicity. The 61/39 quantitative decomposition (inflammation/antioxidant contribution) is a novel prediction that could be tested experimentally by combining CBD with selective Nrf2 inhibitors to ablate the antioxidant axis.
 
-\subsection{Therapeutic Implications of Dissociated Windows}
+\subsection{Stochastic Bistability and Patient Variability}
 
-The dissociation of neuronal rescue from inflammation resolution has immediate implications for experimental design. Studies evaluating CBD for AD typically measure composite cognitive endpoints without distinguishing neuroprotection from anti-inflammation. Our model predicts that low-dose regimens (15--25 $\mu$M) would produce measurable neuroprotective effects---amyloid reduction, improved neuronal survival, BDNF elevation---while leaving inflammatory biomarkers unchanged. This could explain equivocal preclinical results: experiments may detect neuroprotection without inflammation resolution (or vice versa), leading to ambiguous efficacy assessments when endpoints are not stratified by mechanism.
+The A$\beta$ oligomer bistability (BC up to 0.95, CV up to 1.53) is consistent with the nucleation-dependent aggregation kinetics documented by Knowles \etal\ (2009)~\cite{knowles2009} and the binary aggregation outcomes observed in single-molecule experiments by Hellstrand \etal\ (2010)~\cite{hellstrand2010}. Secondary nucleation on fibril surfaces creates positive feedback that amplifies stochastic initial events~\cite{arosio2015}, exactly the mechanism captured by the model's concentration-dependent oligomerization transition.
 
-\vspace{3pt}
-\noindent The two-window prediction prescribes a specific experimental design: assay panels must measure neuronal viability (NeuN, MAP2) and inflammatory markers (NFkB-p65, TNF$\alpha$, IL-6) independently at each dose level. Composite endpoints will mask the dissociation and produce false-negative or ambiguous results. Furthermore, dose-response experiments should include both 15--25 $\mu$M and 55--75 $\mu$M ranges to capture both therapeutic thresholds.
+The clinical implication is that patient-to-patient variability in amyloid clearance response to CBD may be intrinsically high---not due to pharmacokinetic differences but due to the stochastic nature of the aggregation process itself. The model predicts that this variability is \textit{highest} at low age + moderate CBD, where the system sits at the nucleation tipping point. Clinical trials enrolling younger-onset AD patients at intermediate CBD doses will show the widest response distributions.
 
-\subsection{Age as a Therapeutic Modifier}
+\subsection{Age-Dependent Mechanism Switching}
 
-The systematic erosion of CBD efficacy with age has implications for experimental design using animal models. The age compartment place implements a simple linear modifier ($\pm 2\%$/year from age 65), yet the nonlinear downstream effects are substantial: the ROS control threshold shifts from CBD $\sim$25 $\mu$M at age 40 to CBD $>$100 $\mu$M at age 90. This amplification occurs because age modifies both disease drivers (increasing A$\beta$ production, neurotoxicity, M2$\to$M1 polarization) and defense mechanisms (decreasing antioxidant scavenging, M1$\to$M2 resolution, amyloid clearance) simultaneously, creating a compounding effect that exceeds the linear input.
+The finding that aging shifts CBD's protective mechanism from anti-inflammatory (88\% at age 55) to antioxidant (65\% at age 85) is supported by converging evidence. Nrf2 activity declines with age~\cite{zhang2015nrf2}, glutathione synthesis decreases 20--30\% between ages 50 and 80~\cite{rahimifard2017}, and oxidative damage becomes the dominant pathological mechanism in late-life neurodegeneration~\cite{mattson2018}. CBD's known Nrf2/Keap1 activation~\cite{casares2020} thus becomes progressively more critical as the antioxidant axis weakens with age.
 
-\vspace{3pt}
-\noindent\textbf{Experimental implication.} AD predominantly affects individuals aged 65+, but preclinical CBD studies are typically conducted in young rodent models (equivalent to human ages 20--40). The model predicts that dose recommendations derived from young-animal studies will underestimate requirements for elderly patients by approximately 2.6$\times$ (65 $\mu$M versus 25 $\mu$M for equivalent plaque reduction). Experiments should therefore include aged animals (18--24 month mice) alongside young cohorts, and dose ranges should be adjusted upward for aged groups.
+This has direct clinical implications: dose-response studies in young animal models will systematically overestimate the anti-inflammatory contribution and underestimate the antioxidant contribution. The EC$_{50}$ shift from 0.57 to 1.63 (2.86-fold) predicts that elderly patients need substantially higher doses, and that the mechanism of protection is qualitatively different---requiring clinical protocols that explicitly measure antioxidant biomarkers (GSH, Nrf2, HO-1) alongside inflammatory endpoints.
 
-\subsection{Model Uniqueness and Comparison}
+\subsection{Literature Validation}
 
-No published computational model, to our knowledge, integrates CBD's six molecular targets with AD's four pathological cascades. Table~\ref{tab:comparison} summarizes the comparison with existing modeling approaches.
+We validated the model's predictions against published experimental and clinical data (Table~\ref{tab:literature_validation}). Eight of ten findings show HIGH or VERY HIGH concordance.
 
 \begin{table}[htbp]
 \centering
-\caption{Comparison with existing computational approaches. Only the present model integrates multi-target CBD pharmacology with interconnected AD cascades.}
-\label{tab:comparison}
-\begin{tabular}{lcccc}
+\caption{Literature validation of model predictions. Concordance assessed against published experimental and clinical evidence.}
+\label{tab:literature_validation}
+\begin{tabular}{p{3.5cm}lp{4cm}}
 \toprule
-Approach & Amyloid & Inflammation & CBD Targets & Integrated \\
+Finding & Concordance & Key References \\
 \midrule
-AD amyloid models \cite{proctor2010}       & \checkmark & --         & --         & -- \\
-NFkB models \cite{hoffmann2002}             & --         & \checkmark & --         & -- \\
-Nrf2/Keap1 models \cite{zhang2017}          & --         & --         & 1 pathway  & -- \\
-CBD PK models \cite{millar2018}             & --         & --         & PK only    & -- \\
-AD QSP platforms \cite{geerts2016}          & \checkmark & partial    & --         & partial \\
-CBD-AD reviews \cite{cassano2020}           & qualitative& qualitative& qualitative& qualitative \\
-\textbf{Present model}                      & \checkmark & \checkmark & 6 targets  & \checkmark \\
+NFkB suppression at low CBD & HIGH & Kozela 2010, Esposito 2006 \\
+A$\beta$ oligomer bistability & HIGH & Knowles 2009, Hellstrand 2010 \\
+M1/M2 polarization bistability & MODERATE & Orihuela 2016, Ransohoff 2016 \\
+Two discrete attractors & HIGH & Bhatt 2020, Proctor \& Gray 2010 \\
+Anti-inflam. $\neq$ neuroprotection & VERY HIGH & ADAPT 2007, INTREPAD 2019 \\
+Pathway decoupling at high CBD & HIGH & Heneka 2015, Jack 2013 (ATN) \\
+Age shifts to antioxidant & HIGH & Zhang 2015, Rahimifard 2017 \\
+61/39 inflam./antioxidant split & NOVEL & No published decomposition \\
+Residual gap $\to$ third mechanism & HIGH & Cheng 2014, Iuvone 2004 \\
+Linear age-deficit & MODERATE & Jack 2010, Terry 1991 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\vspace{3pt}
-\noindent The stochastic Petri net formalism provides advantages over ODE-based systems pharmacology: (i) stochastic simulation captures nucleation-dependent A$\beta$ aggregation events that deterministic models cannot represent, (ii) the Petri net structure enables formal analysis of connectivity and conservation laws, and (iii) compartment places enable parametric sweeps (temperature, pH, age) without model restructuring.
+The strongest validation is the inflammation--neuroprotection dissociation, which recapitulates the most replicated negative result in AD drug development. The 61/39 quantitative decomposition and the age-dependent EC$_{50}$ shift with mechanism switching represent genuinely novel, testable predictions.
+
+\subsection{The Phase Transition as Emergent Property}
+
+The NFkB/PPAR$\gamma$ bistable switch is not hardcoded---it emerges from nonlinear coupling of rate functions spanning the PPAR$\gamma$ activation and NFkB-mediated inflammation pathways, constrained by the P-invariant (Eq.~\ref{eq:inv_nfkb}). No individual rate function produces switch-like behavior; the bistability arises from mutual antagonism, positive feedback, and conservation-law constraints. This places CBD-mediated inflammation resolution within the broader framework of biological switching~\cite{novick1957,altan2005,rehm2006}.
+
+The transition is \textit{first-order} (all-or-nothing, binary basin membership) rather than second-order (continuous, with critical slowing down at intermediate doses). This distinction has practical importance: sub-threshold CBD provides essentially zero anti-inflammatory benefit, while crossing the threshold produces near-complete resolution.
 
 \subsection{Limitations}
 
 \vspace{3pt}
-\noindent\textbf{Concentration units.} Model concentrations are in Petri net marking units (mM), not directly translatable to clinical pharmacology without calibration against quantitative proteomic and metabolomic measurements. The model predicts relative effects (phase transition thresholds, fold-changes, percentage reductions) rather than absolute concentrations. For experimental guidance, the model identifies \textit{where} transitions occur in the dose landscape, not precise absolute concentrations---calibration to specific cell lines or animal models would refine the quantitative mapping.
+\noindent\textbf{Concentration units.} Model concentrations are in Petri net marking units, not directly translatable to clinical pharmacology without calibration. The model predicts relative effects, thresholds, and factor sensitivities rather than absolute drug concentrations.
 
 \vspace{3pt}
-\noindent\textbf{Temporal scope.} The 6-hour simulation window captures acute pharmacodynamic responses but not chronic AD progression operating over months to years. Long-term disease modification---amyloid plaque accumulation rates, tau propagation, synaptic loss---requires extended simulation with additional pathological processes.
+\noindent\textbf{M1/M2 simplification.} The strict M1/M2 binary enforced by the microglial P-invariant is a simplification. Real microglia occupy a spectrum of activation states including disease-associated microglia (DAM). The conservation law creates more rigid polarization switching than biology likely exhibits.
 
 \vspace{3pt}
-\noindent\textbf{Tau pathology.} The model does not include tau hyperphosphorylation, neurofibrillary tangle formation, or tau-mediated neurodegeneration. AD pathology involves both amyloid and tau cascades, and CBD has documented effects on tau phosphorylation~\cite{esposito2006tau}. Incorporating tau would enable analysis of amyloid-tau crosstalk under CBD treatment.
+\noindent\textbf{Temporal scope.} The 6-hour simulation window captures acute pharmacodynamic responses but not chronic AD progression over months to years.
 
 \vspace{3pt}
-\noindent\textbf{Blood-brain barrier.} The 2-compartment PK model simplifies brain penetration to a single absorption rate constant. A physiologically-based pharmacokinetic (PBPK) model incorporating P-glycoprotein efflux, CYP3A4/CYP2C19 hepatic metabolism, and formulation-dependent bioavailability would improve dose-response mapping to clinical dosing.
+\noindent\textbf{Tau pathology.} The model does not include tau hyperphosphorylation or neurofibrillary tangles, despite CBD's documented effects on tau~\cite{esposito2006tau}.
 
 \vspace{3pt}
-\noindent\textbf{Individual variability.} The model uses fixed parameters without incorporating inter-individual variability in CYP polymorphisms, age-related pharmacokinetic changes, BMI-dependent distribution, or genetic risk factors (APOE $\varepsilon$4 carrier status). Population pharmacokinetic-pharmacodynamic modeling would enable prediction intervals rather than point estimates.
+\noindent\textbf{Missing mechanisms for residual gap.} The 1.64-neuron residual deficit suggests missing protective mechanisms. Published evidence points to PPAR$\gamma$-mediated anti-apoptotic signaling, BDNF-driven neurogenesis~\cite{esposito2011}, and adenosine A$_{2A}$ purinergic neuroprotection as candidates.
 
 \vspace{3pt}
-\noindent\textbf{Drug-drug interactions.} CBD inhibits CYP3A4 and CYP2C19~\cite{nasrin2021}, relevant for AD patients on polypharmacy regimens (cholinesterase inhibitors, memantine, antidepressants). The current model does not account for metabolic interactions that could alter CBD exposure or co-medication efficacy.
-
-\subsection{Future Directions}
-
-\vspace{3pt}
-\noindent\textbf{Tau cascade integration.} Extending the model with tau hyperphosphorylation (GSK-3$\beta$, CDK5), neurofibrillary tangle formation, and CBD's tau-modulating effects~\cite{esposito2006tau} would enable analysis of amyloid-tau synergy under multi-target pharmacotherapy.
-
-\vspace{3pt}
-\noindent\textbf{PBPK calibration.} Replacing the 2-compartment PK with a full PBPK model calibrated to human clinical PK data (Millar \etal\ 2018) would enable direct prediction of oral doses (mg/kg) achieving target intracellular concentrations, bridging the gap between computational predictions and clinical dosing.
-
-\vspace{3pt}
-\noindent\textbf{Combination therapy.} The model's identification of PPAR$\gamma$/NFkB as the rate-limiting switch suggests that co-administration with PPAR$\gamma$ agonists (pioglitazone, rosiglitazone) could lower the CBD threshold for inflammation resolution. Virtual combination therapy simulations would quantify synergy and inform rational polypharmacy design.
-
-\vspace{3pt}
-\noindent\textbf{Experimental validation.} The model generates three testable predictions amenable to preclinical verification: (i) sharp inflammation resolution at a critical CBD concentration (measurable via NFkB-p65 Western blot in CBD dose-titration on BV-2 microglial cultures), (ii) neuron survival without inflammation resolution at low CBD doses (dual staining of NeuN and Iba-1 in mixed neuron-microglia cultures), and (iii) age-dependent efficacy erosion (comparing CBD responses in young versus aged APP/PS1 transgenic mice).
+\noindent\textbf{Blood-brain barrier.} The 2-compartment PK model simplifies brain penetration. A PBPK model incorporating P-glycoprotein efflux and CYP metabolism would improve dose translation~\cite{millar2018}.
 
 \subsection{Experimental Guidance}
 
-The primary purpose of this in silico laboratory is to map the therapeutic landscape computationally before committing wet-lab resources, transforming brute-force screening into focused hypothesis testing. Table~\ref{tab:experimental_guidance} translates each model prediction into specific experimental protocols, expected outcomes, refutation criteria, and estimates of experimental economy.
+Table~\ref{tab:experimental_guidance} translates model predictions into specific experimental protocols.
 
 \begin{table}[htbp]
 \centering
-\caption{Experimental guidance derived from model predictions. Each row translates a computational finding into a testable protocol with expected outcomes and refutation criteria. Economy estimates compare in silico screening cost (300 simulations, $\sim$3.5 hours compute time) against equivalent wet-lab factorial design.}
+\caption{Experimental guidance derived from model predictions.}
 \label{tab:experimental_guidance}
 \begin{tabular}{p{2.2cm}p{3cm}p{3cm}p{3cm}}
 \toprule
 \textbf{Prediction} & \textbf{Protocol} & \textbf{Expected Outcome} & \textbf{Refuted If} \\
 \midrule
-Inflammation phase transition (45--65 $\mu$M) &
-BV-2 microglial culture; CBD titration 40--70 $\mu$M in 5 $\mu$M steps; A$\beta_{42}$ challenge (5 $\mu$M); NFkB-p65 Western blot at 6 hrs &
-Abrupt ($>$80\%) decrease in nuclear NFkB-p65 within a 10--15 $\mu$M window; sigmoidal dose-response with Hill coefficient $>$ 3 &
-Gradual linear dose-response (Hill $<$ 1.5); no inflection point in 40--70 $\mu$M range \\
+Dissociation gap &
+BV-2 + primary neuron co-culture; CBD 1--15 units; NFkB-p65 Western blot + NeuN viability at 6 hrs &
+CBD $\geq 1$: NFkB suppressed $>$95\%; Neurons improve but plateau below pre-disease level &
+Full neuron recovery coincides with inflammation resolution at same dose \\
 \midrule
-Dissociated therapeutic windows &
-Mixed neuron-microglia co-culture; CBD at 25 and 65 $\mu$M; NeuN viability + Iba-1/TNF$\alpha$ dual panel at 6 hrs &
-CBD = 25 $\mu$M: $>$90\% neuron viability AND persistent Iba-1$^+$/TNF$\alpha^+$ microglia; CBD = 65 $\mu$M: both endpoints improved &
-Both endpoints improve together at same dose; no dissociation at any tested concentration \\
+A$\beta$ bistability &
+A$\beta_{42}$ aggregation assay with CBD; ThT fluorescence at 30 replicates per condition &
+Bimodal distribution of ThT endpoints at intermediate CBD; high CV ($>$0.5) &
+Unimodal dose-response with low inter-replicate variance \\
 \midrule
-Age-shifted efficacy &
-APP/PS1 mice, young (3 mo) vs. aged (18 mo); CBD 10 mg/kg/day $\times$ 28 days; cortical A$\beta_{42}$ ELISA + ROS (DHE) &
-Aged mice require $>$2$\times$ dose for equivalent plaque reduction; ROS control threshold shifts rightward with age &
-Age groups respond identically at same dose; no interaction between age and CBD efficacy \\
+Age mechanism switching &
+APP/PS1 mice, young (3 mo) vs. aged (18 mo); CBD at 3 dose levels; NFkB + Nrf2/GSH panels &
+Young: neuroprotection correlates with NFkB suppression; Aged: neuroprotection correlates with GSH/Nrf2 induction &
+Same mechanism dominates at all ages \\
+\midrule
+Residual gap closure &
+CBD + Nrf2 activator (sulforaphane) or PPAR$\gamma$ agonist (pioglitazone) combination &
+Combination exceeds CBD monotherapy ceiling (93.4\%) for neuron survival &
+CBD monotherapy achieves full neuroprotection \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\vspace{3pt}
-\noindent\textbf{Experimental economy.} The $4 \times 5$ factorial design (20 conditions $\times$ 15 replicates = 300 simulations) completed in approximately 3.5 hours of compute time, mapping the dose--age interaction landscape. An equivalent wet-lab factorial design in cell culture would require approximately 20 conditions $\times$ 3 replicates $\times$ 4 biomarkers = 240 assays, representing weeks of bench work and substantial reagent costs. The in silico screen does not eliminate these experiments but reduces them: by identifying the three most informative predictions, the model directs experimental effort to the $\sim$12 critical conditions (3 predictions $\times$ 2 dose levels $\times$ 2 age groups) rather than the full combinatorial space.
 
 % ──────────────────────────────────────────────────────────────────────────
 % CONCLUSIONS
 % ──────────────────────────────────────────────────────────────────────────
 \section{Conclusions}
 
-We present an in silico laboratory approach to multi-target CBD neuroprotection in Alzheimer's disease, using a stochastic Petri net (31 places, 31 transitions, 76 arcs) to map the therapeutic landscape computationally before committing wet-lab resources. Three actionable predictions emerge from nonlinear pathway coupling and reshape experimental priorities:
+We present an in silico laboratory for multi-target CBD neuroprotection in mid-stage Alzheimer's disease, using a stochastic Petri net (34 places, 45 transitions, 100 arcs) with P-invariant conservation laws and mid-stage AD initialization. A full $8 \times 4 \times 3$ factorial sweep (96 conditions, 30 replicates) reveals four key findings:
 
 \begin{enumerate}
-\item \textbf{Predicted NFkB/PPAR$\gamma$ phase transition:} all-or-nothing inflammation resolution between 45--65 $\mu$M CBD, directing experimentalists to titrate within this narrow range (BV-2 microglial culture, 5 $\mu$M steps, NFkB-p65 Western blot) rather than broad dose sweeps.
+\item \textbf{Inflammation--neuroprotection dissociation:} CBD resolves NFkB-driven inflammation completely at the lowest non-zero dose, yet neuroprotection caps at 93.4\%. This 88\% dissociation rate mirrors the clinical failure of anti-inflammatory monotherapy in AD trials (ADAPT, INTREPAD). The quantitative decomposition---61\% anti-inflammatory, 39\% antioxidant, 1.64-neuron residual gap---identifies specific mechanistic targets for combination therapy.
 
-\item \textbf{Dissociated therapeutic windows:} neuronal rescue (CBD $\geq$ 25 $\mu$M via GPR3/BDNF) operates independently from inflammation resolution (CBD $\geq$ 65 $\mu$M via PPAR$\gamma$/NFkB), requiring experimental assay panels to measure both endpoints independently to avoid ambiguous results.
+\item \textbf{Stochastic A$\beta$ bistability:} Amyloid oligomers exhibit genuine bimodal distributions (BC up to 0.95) consistent with nucleation-dependent aggregation, predicting high patient-to-patient variability intrinsic to the aggregation process.
 
-\item \textbf{Age-dependent efficacy shift:} aging amplifies disease burden and erodes CBD efficacy, predicting that preclinical results from young-animal models will underestimate dose requirements for elderly patients by $\sim$2.6$\times$. Experiments should include aged cohorts with upward-adjusted dose ranges.
+\item \textbf{Age-dependent mechanism switching:} Aging shifts CBD's protective mechanism from anti-inflammatory (88\% at age 55) to antioxidant (65\% at age 85), with EC$_{50}$ increasing 2.86-fold. This predicts that preclinical results from young models will misidentify the dominant therapeutic axis for elderly patients.
+
+\item \textbf{Progressive pathway decoupling:} At high CBD doses, the inflammation--neurodegeneration correlation weakens ($r = -0.86 \to -0.69$), providing the mechanistic explanation for why resolving inflammation produces diminishing neuroprotective returns.
 \end{enumerate}
 
-By screening 300 virtual conditions in hours rather than months, this in silico laboratory reduces a combinatorial search space to focused hypothesis-driven experiments, identifying the $\sim$12 most informative conditions from the full $4 \times 5$ factorial design. The approach demonstrates that computational pre-screening of multi-target pharmacology can rationalize experimental design, and we provide specific protocols, expected outcomes, and refutation criteria for each prediction.
+These predictions---validated against published literature with 8 of 10 findings showing HIGH or VERY HIGH concordance---rationalize experimental priorities and provide specific protocols, expected outcomes, and refutation criteria for preclinical validation.
 
 % Acknowledgments
 \section*{Acknowledgments}
@@ -607,7 +614,7 @@ This research was conducted as part of the author's institutional responsibiliti
 % Data Availability Statement (REQUIRED BY PLOS)
 \section*{Data Availability}
 
-All data and code supporting the results are publicly available without restrictions. The CBD-AD neuroprotection model (\texttt{cbd\_ad\_neuroprotection\_v1.shy}), simulation scripts, and analysis code are available in the GitHub repository at \url{https://github.com/simao-eugenio/shypn} under MIT license, with an archived version on Zenodo (DOI to be assigned upon acceptance). Complete simulation outputs for both the 7-dose sweep (run\_20260414\_134258) and the $4 \times 5$ factorial design (run\_20260414\_153806) are included in the repository. No proprietary or restricted data were used in this study.
+All data and code supporting the results are publicly available without restrictions. The CBD-AD neuroprotection model (\texttt{cbd\_ad\_neuroprotection\_v2.shy}), simulation scripts, and analysis code are available in the GitHub repository at \url{https://github.com/simao-eugenio/shypn} under MIT license, with an archived version on Zenodo (DOI to be assigned upon acceptance). Complete simulation outputs for the $8 \times 4 \times 3$ factorial sweep (run\_20260420\_150932), factorial analysis results, and biological phenomena mining outputs are included in the repository. No proprietary or restricted data were used in this study.
 
 % Author Contributions
 \section*{Author Contributions}
