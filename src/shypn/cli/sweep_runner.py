@@ -263,9 +263,11 @@ class SweepRunner:
         #    summary payload, preventing IPC memory pressure from full
         #    trajectory data being pickled back to the parent.
         #
-        #    Batched dispatch ensures at most `workers` conditions are
-        #    in-flight simultaneously, capping peak memory at
-        #    workers × (per-condition trajectory footprint).
+        #    Sliding-window dispatch: at most `n_workers` conditions are
+        #    in-flight simultaneously.  As each finishes, the next is
+        #    submitted immediately — no straggler idle time.  Workers
+        #    flush results to disk before returning, so parent memory
+        #    stays bounded.
         _apply_cpu_affinity()
         import gc
         from dataclasses import asdict
@@ -278,81 +280,84 @@ class SweepRunner:
             max_workers=n_workers,
             initializer=_worker_init,
         ) as pool:
-            # Process conditions in bounded windows of `n_workers` size.
-            # This prevents unbounded memory growth: at most n_workers
-            # conditions hold trajectory data simultaneously.
-            for batch_start in range(0, n_conditions, n_workers):
-                batch_end = min(batch_start + n_workers, n_conditions)
-                futures_map: Dict[Any, int] = {}
+            # Sliding window: submit up to n_workers, then for each
+            # completion, submit the next pending condition.
+            futures_map: Dict[Any, int] = {}
+            next_idx = 0  # index of the next condition to submit
 
+            def _submit_one(idx: int) -> None:
+                snapshot = snapshots[idx]
                 if self.verbose:
                     print(
-                        f"Batch [{batch_start + 1}–{batch_end}/{n_conditions}] "
-                        f"dispatching {batch_end - batch_start} conditions...",
+                        f"[{idx + 1}/{n_conditions}] {snapshot.name} "
+                        f"({sim.replicates} replicates)...",
                         flush=True,
                     )
-                    for idx in range(batch_start, batch_end):
+                fut = pool.submit(
+                    _run_single_condition,
+                    model_path=str(self.model_path),
+                    baseline_dict=_snapshot_to_dict(baseline),
+                    snapshot_dict=_snapshot_to_dict(snapshot),
+                    sim_params=sim_dict,
+                    condition_index=idx,
+                    n_conditions=n_conditions,
+                    output_dir=str(output.run_dir),
+                    verbose=self.verbose,
+                )
+                futures_map[fut] = idx
+
+            # Fill the initial window
+            while next_idx < min(n_workers, n_conditions):
+                _submit_one(next_idx)
+                next_idx += 1
+
+            # Process completions and refill the window
+            while futures_map:
+                # Wait for the next completion
+                done_iter = as_completed(futures_map)
+                fut = next(done_iter)
+                idx = futures_map.pop(fut)
+                label = snapshots[idx].name
+
+                try:
+                    result_payload = fut.result()
+                    cond_elapsed = result_payload['wall_seconds']
+                    n_ok = result_payload['replicates_ok']
+                    n_err = result_payload['replicates_error']
+
+                    summary_rows[idx] = {
+                        'condition': label,
+                        'replicates_ok': n_ok,
+                        'replicates_error': n_err,
+                        'wall_seconds': round(cond_elapsed, 2),
+                    }
+
+                    if self.verbose:
                         print(
-                            f"[{idx + 1}/{n_conditions}] {snapshots[idx].name} "
-                            f"({sim.replicates} replicates)...",
+                            f"  done in {cond_elapsed:.1f}s "
+                            f"({n_ok} ok, {n_err} errors)",
+                            flush=True,
+                        )
+                except Exception as exc:
+                    logger.exception("Condition %d (%s) failed", idx, label)
+                    summary_rows[idx] = {
+                        'condition': label,
+                        'replicates_ok': 0,
+                        'replicates_error': sim.replicates,
+                        'wall_seconds': 0.0,
+                    }
+                    if self.verbose:
+                        print(
+                            f"  done in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
                             flush=True,
                         )
 
-                for idx in range(batch_start, batch_end):
-                    snapshot = snapshots[idx]
-                    fut = pool.submit(
-                        _run_single_condition,
-                        model_path=str(self.model_path),
-                        baseline_dict=_snapshot_to_dict(baseline),
-                        snapshot_dict=_snapshot_to_dict(snapshot),
-                        sim_params=sim_dict,
-                        condition_index=idx,
-                        n_conditions=n_conditions,
-                        output_dir=str(output.run_dir),
-                        verbose=self.verbose,
-                    )
-                    futures_map[fut] = idx
+                # Submit next condition if any remain
+                if next_idx < n_conditions:
+                    _submit_one(next_idx)
+                    next_idx += 1
 
-                # Collect this batch — results are already on disk,
-                # workers return only lightweight summary dicts.
-                for fut in as_completed(futures_map):
-                    idx = futures_map[fut]
-                    label = snapshots[idx].name
-                    try:
-                        result_payload = fut.result()
-                        cond_elapsed = result_payload['wall_seconds']
-                        n_ok = result_payload['replicates_ok']
-                        n_err = result_payload['replicates_error']
-
-                        summary_rows[idx] = {
-                            'condition': label,
-                            'replicates_ok': n_ok,
-                            'replicates_error': n_err,
-                            'wall_seconds': round(cond_elapsed, 2),
-                        }
-
-                        if self.verbose:
-                            print(
-                                f"  done in {cond_elapsed:.1f}s "
-                                f"({n_ok} ok, {n_err} errors)",
-                                flush=True,
-                            )
-                    except Exception as exc:
-                        logger.exception("Condition %d (%s) failed", idx, label)
-                        summary_rows[idx] = {
-                            'condition': label,
-                            'replicates_ok': 0,
-                            'replicates_error': sim.replicates,
-                            'wall_seconds': 0.0,
-                        }
-                        if self.verbose:
-                            print(
-                                f"  done in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
-                                flush=True,
-                            )
-
-                # Force GC between batches to reclaim any residual heap
-                # fragments from IPC deserialization in the parent process.
+                # Incremental GC: reclaim IPC deserialization overhead
                 gc.collect()
 
         # 5. Summary
