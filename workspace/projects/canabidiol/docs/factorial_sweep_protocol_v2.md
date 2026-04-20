@@ -1,10 +1,12 @@
 # Factorial Sweep Protocol — CBD-AD Neuroprotection Model v2
 
-**Date:** 2026-04-19  
+**Date:** 2026-04-20 (revised from 2026-04-19)  
 **Model:** `cbd_ad_neuroprotection_v2.shy` (34 places, 45 transitions, ~100 arcs)  
 **Engine:** Hybrid tau-leaping (7 stochastic + 37 continuous + 1 adaptive transitions)  
 **Version:** shypn 2.6.1 (commit f4e6b495)  
 **Server:** Antares (32 cores, RTX 5060 Ti) — simao@150.162.232.36  
+**Baseline:** Mid-stage AD (revised 2026-04-20, see §11)  
+**Key finding:** Anti-inflammatory (EC50 < 1 µM) and neuroprotective (caps ~94%) responses dissociate — factorial probes their interaction under Age/pH/T modulation.  
 
 ---
 
@@ -12,7 +14,7 @@
 
 | Factor | Levels | Values | Rationale |
 |--------|--------|--------|-----------|
-| **CBD dose** (P1) | 8 | 0, 15, 25, 35, 50, 65, 85, 100 | Captures phase transition zone (45–65 µM), low-dose neuronal rescue (15–25), saturation (85–100). Finer grid in transition zone vs v1 sweep. |
+| **CBD dose** (P1) | 8 | 0, 1, 2, 4, 6, 8, 12, 15 | Anti-inflammatory saturates at ~1 µM; antioxidant axis (GSH/HO1/SOD EC50 ≈ 4–8 µM) is dose-graded. Focus on the range where neuroprotection outcome diverges from inflammation resolution. Confirmed by run_20260420_143905. |
 | **Age** (P25) | 4 | 55, 65, 75, 85 | Age factor `(1 + 0.02*(Age-65))` ranges 0.8→1.4. Covers pre-senior through very elderly. Audit flags age-dependent efficacy shift. |
 | **pH** (P29) | 3 | 7.4, 7.0, 6.6 | 7.4=physiological, 7.0=current default, 6.6=AD acidosis. Affects aggregation (T4, T5), inflammation (T17, T20), antioxidant kinetics (T13). |
 | **Temperature** (P28) | 2 | 310.15 (37°C), 312.15 (39°C) | Normal vs fever/neuroinflammation. Q10 dormant at 37°C — 39°C activates it across 16 transitions. |
@@ -37,9 +39,9 @@
 ## 3. Estimated Runtime
 
 - 192 conditions × 30 replicates = **5,760 total simulations**
-- Each replicate ≈ 8.9 s (from run_20260419_110229 baseline: `mean_elapsed_time=8.86`)
-- With 32 cores at 75% cap (24 effective): ~5,760 × 8.9 / 24 ≈ **2,136 s ≈ 36 min**
-- With overhead (snapshot setup, result writing): estimate **~45–60 min total**
+- Each replicate ≈ 8.9 s (from run_20260420_143905: `mean_elapsed_time≈8.9`)
+- With 6 workers (memory-safe cap): ~5,760 × 8.9 / 6 ≈ **8,544 s ≈ 2.4 h**
+- Validated: test sweeps (run_20260420_132707: 6×30; run_20260420_143905: 10×30)
 
 ---
 
@@ -47,16 +49,26 @@
 
 ### 4.1 CBD Dose (P1: CBD_extracellular initial marking)
 
-| Level | P1 Value | Expected Regime |
-|-------|----------|-----------------|
-| 0 | 0.0 | Untreated AD baseline |
-| 15 | 15.0 | Low-dose: GPR3 depletion + BDNF rescue, no inflammation control |
-| 25 | 25.0 | Moderate-low: plaque normalization to healthy-aging range |
-| 35 | 35.0 | Pre-transition zone |
-| 50 | 50.0 | Mid-transition: partial NFkB suppression |
-| 65 | 65.0 | Post-transition: full neuroprotection (97% of max benefit) |
-| 85 | 85.0 | Saturation check |
-| 100 | 100.0 | Maximum dose (reference) |
+*Revised 2026-04-20 based on run_20260420_143905 (10-level fine sweep, mid-stage AD markings).*
+
+**Key observation:** Two CBD mechanisms have different dose-response profiles:
+- **Anti-inflammatory** (NFkB, Oligomer clearance, M1→M2): EC50 < 1 µM — essentially binary (on/off)
+- **Antioxidant** (GSH, ROS, HO1, SOD): EC50 ≈ 4–8 µM — graded, dose-proportional
+
+The **interaction** between these two is the scientific focus: inflammation resolution alone
+(CBD ≥ 1 µM) only achieves ~94% neuron retention — the remaining gap depends on
+antioxidant dose-response AND environmental modifiers (Age, pH, Temperature).
+
+| Level | P1 Value | Mechanism Status |
+|-------|----------|------------------|
+| 0 | 0.0 | Both off: untreated mid-stage AD |
+| 1 | 1.0 | Anti-inflammatory ON (EC50), antioxidant minimal |
+| 2 | 2.0 | Anti-inflammatory saturated, antioxidant sub-EC50 |
+| 4 | 4.0 | Antioxidant ~50% EC50: GSH beginning to respond |
+| 6 | 6.0 | Antioxidant approaching EC50: ROS reduction begins |
+| 8 | 8.0 | Antioxidant at EC50: HO1/SOD half-maximal |
+| 12 | 12.0 | Antioxidant above EC50: near-saturation |
+| 15 | 15.0 | Both saturated: maximum achievable protection |
 
 ### 4.2 Age (P25: Age place marking)
 
@@ -96,8 +108,8 @@ Format: `CBD{dose}_Age{age}_pH{ph}_T{temp_C}`
 
 Examples:
 - `CBD0_Age65_pH7.0_T37` — Untreated AD baseline, default conditions
-- `CBD50_Age75_pH6.6_T39` — Mid-dose, elderly, acidotic, febrile (worst case)
-- `CBD100_Age55_pH7.4_T37` — Max dose, young, physiological (best case)
+- `CBD8_Age75_pH6.6_T39` — Antioxidant EC50, elderly, acidotic, febrile (stress test)
+- `CBD15_Age55_pH7.4_T37` — Max dose, young, physiological (best case)
 
 ---
 
@@ -135,44 +147,48 @@ Examples:
 
 ## 7. Scientific Questions This Design Answers
 
-### 7.1 CBD Dose-Response (Primary)
-- Is the NFkB phase transition at 45–65 µM confirmed in v2 with corrected arc weights?
-- What is the precise EC50 for each endpoint?
-- Are the "two therapeutic windows" (neuronal rescue ≥15 µM, inflammation resolution ≥65 µM) preserved?
+### 7.1 Dissociation Between Anti-Inflammatory and Neuroprotective Effects
+- At what CBD dose does anti-inflammatory benefit (NFkB → 0) fully translate to neuronal rescue (Neuron > 95%)?
+- What closes the 6% gap between inflammation resolution (~94% neuron) and full protection?
+- Is the antioxidant axis (GSH/HO1/SOD, EC50 ≈ 4–8 µM) the bridge between inflammation control and neuroprotection?
 
-### 7.2 Age × CBD Interaction
-- Does age shift the therapeutic threshold upward? (Predicted: elderly need higher CBD dose)
-- At Age=85, is CBD=100 still sufficient for full neuroprotection?
-- Is there an age beyond which CBD cannot fully protect neurons?
+### 7.2 Age × CBD Interaction (Modulates the Gap)
+- Does age widen the dissociation? (Predicted: elderly = inflammation resolved but neurons still die)
+- At Age=85, does the antioxidant EC50 shift rightward (needing higher CBD for same GSH)?
+- Is there an age threshold where even CBD=15 cannot close the gap?
 
-### 7.3 pH × CBD Interaction
-- Does AD acidosis (pH 6.6) worsen outcomes independently of CBD dose?
-- Does acidosis shift the phase transition boundary?
-- Is the Aβ aggregation rate (T4) sensitive to pH at physiological vs acidotic conditions?
+### 7.3 pH × CBD Interaction (Modulates Both Arms)
+- Does AD acidosis (pH 6.6) impair antioxidant efficacy (T13 pH-dependent)?
+- Does acidosis accelerate Aβ re-aggregation even when inflammation is suppressed?
+- At pH 6.6 + CBD=1 (inflammation only): is neuron loss accelerated vs pH 7.4?
 
-### 7.4 Temperature Effects
-- Does fever (39°C) accelerate disease progression via Q10?
-- Does fever change the CBD dose needed for neuroprotection?
-- Is the Q10 effect uniform or does it preferentially accelerate certain pathways?
+### 7.4 Temperature Effects (Q10 Preferentially Accelerates Damage)
+- Does fever (39°C) preferentially accelerate neurotoxicity (T20) vs CBD protective pathways?
+- Does Q10 widen the anti-inflammatory/neuroprotective dissociation?
+- Combined: Age=85 + T=39°C + CBD=8 — does antioxidant EC50 shift make protection impossible?
 
-### 7.5 Multi-Factor Interactions
-- Worst case: CBD=0, Age=85, pH=6.6, T=39°C — how severe is untreated AD?
-- Best case: CBD=100, Age=55, pH=7.4, T=37°C — is there a floor effect?
-- Does the combination of Age=85 + pH=6.6 create a synergistic worsening that CBD cannot overcome?
+### 7.5 Interaction Design: When Does Protection Fail?
+- **Translational failure zone**: conditions where NFkB=0 but Neuron < 90% (resolved inflammation ≠ rescue)
+- **Synergistic harm**: Age=85 + pH=6.6 + T=39°C — is untreated progression faster than in default conditions?
+- **Minimum effective combination**: for each Age/pH/T, what is the minimum CBD that achieves Neuron > 95%?
+- **Ceiling effect**: is there ANY condition where CBD=15 is insufficient? (factorial's key question)
 
 ---
 
 ## 8. Analysis Plan (Post-Sweep)
 
-1. **Dose-response curves** — Each endpoint vs CBD dose, faceted by Age/pH/Temperature
-2. **Phase transition mapping** — NFkB_p65 surface plot (CBD × Age), identifying transition boundary
-3. **ANOVA / factorial analysis** — Main effects and interactions for primary endpoints
-4. **Therapeutic window identification** — For each Age/pH/T combination, find minimum CBD for:
-   - Neuron_Health > 95% (neuronal rescue)
-   - NFkB_p65 < 1.0 (inflammation resolution)
-   - ROS < 0.5 (oxidative stress control)
-5. **Worst-case analysis** — Identify conditions where CBD=100 is insufficient
-6. **Sensitivity ranking** — Which factor (Age, pH, T) has the largest effect on each endpoint?
+1. **Dissociation quantification** — For each condition: Δ = (NFkB suppression %) − (Neuron recovery %). Map Δ across factor space.
+2. **Interaction surfaces** — Neuron_Health surface: CBD × Age (faceted by pH, T). Identify where the gap opens.
+3. **ANOVA / factorial analysis** — Main effects AND 2-way/3-way interactions for:
+   - Neuron_Health (primary outcome)
+   - Δ_dissociation = (1 − NFkB/80) − (Neuron/95) as interaction metric
+4. **Antioxidant bridge analysis** — Correlation between GSH/HO1/SOD level and Neuron_Health, controlling for NFkB. Does antioxidant dose close the gap?
+5. **Minimum effective dose (MED) table** — For each Age/pH/T combination:
+   - MED for NFkB < 1 (anti-inflammatory)
+   - MED for Neuron > 95% (full protection)
+   - Gap between the two MEDs = "antioxidant requirement"
+6. **Failure conditions** — Enumerate all Age/pH/T combinations where CBD=15 is insufficient for Neuron > 95%
+7. **Sensitivity ranking** — Partial η² for each factor and interaction on Neuron_Health
 
 ---
 
@@ -200,9 +216,10 @@ All paths consistent. A34=0.1 (Nrf2→Glutathione) correctly preserved in all co
 - [x] End-to-end test sweep validated (run_20260420_132707, 6 conditions × 30 rep)
 - [x] **Baseline markings revised** — mid-stage AD (see §11 below)
 - [ ] Verify UI supports >3 sweep dimensions in factorial design
-- [ ] Create all 192 snapshots in Viability Panel
+- [ ] Create all 192 snapshots (8 CBD × 4 Age × 3 pH × 2 Temp)
 - [ ] Launch sweep on remote server
 - [ ] Monitor progress and collect results
+- [ ] Run interaction-focused analysis (§8)
 
 ---
 
@@ -233,25 +250,28 @@ The system has established inflammation and amyloid burden that CBD must reverse
 
 All P-invariants preserved (NFkB=80, Microglia=50, Keap1/Nrf2=60, GSH/GSSG=50).
 
-### 11.3 Revised CBD Factor Levels
+### 11.3 Revised CBD Factor Levels (Final — based on run_20260420_143905)
 
-Given the shift from prevention→treatment, finer sampling in the low-dose
-region is critical. The original 0–15 µM gap was where the binary switch lived.
+The 10-level fine sweep (0,1,2,4,6,8,10,12,14,15 µM) revealed:
+- Anti-inflammatory EC50 < 1 µM (NFkB: 80→0.15 at CBD=1)
+- Antioxidant EC50 ≈ 4–8 µM (GSH: 109→121 linearly across range)
+- Neuroprotection caps at ~94% (never reaches 95% even at CBD=15)
 
-| Level | P1 Value | Expected Regime |
-|-------|----------|-----------------|
-| 0 | 0.0 | Untreated mid-stage AD (progression continues) |
-| 5 | 5.0 | Sub-threshold: minimal modulation |
-| 10 | 10.0 | Low-dose: partial receptor engagement |
-| 15 | 15.0 | Low-dose: GPR3 effect begins |
-| 25 | 25.0 | Moderate: partial NFkB suppression |
-| 35 | 35.0 | Pre-transition zone |
-| 50 | 50.0 | Mid-transition: expected phase boundary |
-| 65 | 65.0 | Post-transition: full suppression? |
-| 85 | 85.0 | Saturation check |
-| 100 | 100.0 | Maximum dose (reference) |
+The factorial uses 8 levels focused on the **antioxidant dose-response** range,
+where interactions with Age/pH/T are expected to modulate the outcome:
 
-**New total conditions:** 10 × 4 × 3 × 2 = **240 snapshots**
+| Level | P1 Value | Mechanism Status |
+|-------|----------|------------------|
+| 0 | 0.0 | Both off: untreated mid-stage AD |
+| 1 | 1.0 | Anti-inflammatory ON, antioxidant minimal |
+| 2 | 2.0 | Anti-inflammatory saturated, antioxidant sub-EC50 |
+| 4 | 4.0 | Antioxidant ~50% EC50 |
+| 6 | 6.0 | Antioxidant approaching EC50 |
+| 8 | 8.0 | Antioxidant at EC50 |
+| 12 | 12.0 | Antioxidant above EC50 |
+| 15 | 15.0 | Both saturated |
+
+**Final total conditions:** 8 × 4 × 3 × 2 = **192 snapshots**
 
 ### 11.4 Open Calibration Issues (post-sweep)
 

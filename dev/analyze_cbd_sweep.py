@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-CBD-AD Neuroprotection Sweep Analysis — End-to-End Test
-=======================================================
-Analyzes the 6-condition CBD dose sweep (run_20260420_132707).
+CBD-AD Neuroprotection Sweep Analysis
+======================================
+Analyzes a CBD dose sweep run directory.
 Computes dose-response statistics, phase transition detection,
 EC50 estimation, and bistability signatures.
 
-Run on server: python3 dev/analyze_cbd_sweep.py
+Run on server: .venv/bin/python dev/analyze_cbd_sweep.py [run_dir]
 """
 
 import json
@@ -19,7 +19,8 @@ from dataclasses import dataclass
 
 # ─── Configuration ──────────────────────────────────────────────────────────
 
-RUN_DIR = Path("workspace/projects/canabidiol/experiments/results/run_20260420_132707")
+DEFAULT_RUN_DIR = Path("workspace/projects/canabidiol/experiments/results/run_20260420_143905")
+RUN_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_RUN_DIR
 
 # Primary biomarkers (place name → description)
 PRIMARY = {
@@ -47,16 +48,20 @@ SECONDARY = {
     "Nrf2_free": "Antioxidant TF",
 }
 
-# CBD dose mapping from condition names
-# NOTE: Baseline has P1=100 (same as CBD_extracellular_eq_100), so we exclude
-# it from dose-response curves to avoid duplication. Keep it for reference.
-CONDITION_DOSES = {
-    "CBD_extracellular_eq_0": 0.0,
-    "CBD_extracellular_eq_15": 15.0,
-    "CBD_extracellular_eq_35": 35.0,
-    "CBD_extracellular_eq_55": 55.0,
-    "CBD_extracellular_eq_100": 100.0,
-}
+# CBD dose mapping: auto-detect from condition directory names
+# NOTE: Baseline condition is excluded from dose-response curves
+# (it uses model defaults which may duplicate a specific dose level)
+import re as _re
+
+CONDITION_DOSES = {}
+if RUN_DIR.exists():
+    for d in sorted(RUN_DIR.iterdir()):
+        if d.is_dir() and d.name.startswith("condition_CBD_extracellular_eq_"):
+            dose_str = d.name.replace("condition_CBD_extracellular_eq_", "")
+            try:
+                CONDITION_DOSES[d.name.replace("condition_", "")] = float(dose_str)
+            except ValueError:
+                pass
 
 
 @dataclass
