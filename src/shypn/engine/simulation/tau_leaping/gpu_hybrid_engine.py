@@ -105,6 +105,7 @@ class GPUHybridEngine:
         epsilon: float = 0.03,
         max_tau: float = 0.1,
         min_tau: float = 1e-6,
+        stoch_propensity_fn: Optional[Callable] = None,
     ) -> None:
         if not _CUPY_AVAILABLE:
             raise RuntimeError("CuPy is required for GPUHybridEngine")
@@ -130,6 +131,10 @@ class GPUHybridEngine:
         self._d_rate_fwd = cp.asarray(stoch_rate_constants)  # [M_stoch]
         self._d_rate_rev = cp.asarray(stoch_rate_rev)  # [M_stoch]
         self._d_is_rev = cp.asarray(stoch_is_reversible)  # [M_stoch]
+
+        # Optional CPU propensity callback for symbolic (non-mass-action) rates.
+        # Signature: (y: ndarray[N, P], t: ndarray[N]) → (a_fwd[N, M], a_rev[N, M])
+        self._stoch_propensity_fn = stoch_propensity_fn
 
         # g_vec for tau-selection (max stoich order per place)
         g_vec = np.ones(n_places, dtype=np.float64)
@@ -348,22 +353,33 @@ class GPUHybridEngine:
             # PHASE 2: Stochastic τ-leaping (within same dt)
             # ════════════════════════════════════════════════════════════
             if M > 0:
-                # Propensities (GPU mass-action)
-                d_y_safe = cp.maximum(d_y, 1e-30)
-                d_log_y = cp.log(d_y_safe)  # [N, P]
-                d_log_a = d_log_y @ self._d_input_stoich.T  # [N, M]
-                d_log_k = cp.log(cp.maximum(self._d_rate_fwd, 1e-30))
-                d_a_fwd = cp.exp(d_log_a + d_log_k[cp.newaxis, :])  # [N, M]
-
-                d_a_rev = cp.zeros_like(d_a_fwd)
-                if cp.any(self._d_is_rev):
-                    d_log_kr = cp.log(cp.maximum(self._d_rate_rev, 1e-30))
-                    d_S_pos = cp.maximum(self._d_S_stoch, 0.0).T  # [M, P]
-                    d_log_a_rev = d_log_y @ d_S_pos.T
-                    d_a_rev_all = cp.exp(d_log_a_rev + d_log_kr[cp.newaxis, :])
-                    d_a_rev = cp.where(
-                        self._d_is_rev[cp.newaxis, :], d_a_rev_all, 0.0
+                # Propensities — use CPU callback if available (symbolic
+                # rate expressions), otherwise GPU mass-action.
+                if self._stoch_propensity_fn is not None:
+                    h_y_phase2 = d_y.get()  # [N, P]
+                    h_t_phase2 = d_t.get()  # [N]
+                    h_a_fwd, h_a_rev = self._stoch_propensity_fn(
+                        h_y_phase2, h_t_phase2,
                     )
+                    d_a_fwd = cp.asarray(h_a_fwd)  # [N, M]
+                    d_a_rev = cp.asarray(h_a_rev)  # [N, M]
+                else:
+                    # GPU mass-action propensities
+                    d_y_safe = cp.maximum(d_y, 1e-30)
+                    d_log_y = cp.log(d_y_safe)  # [N, P]
+                    d_log_a = d_log_y @ self._d_input_stoich.T  # [N, M]
+                    d_log_k = cp.log(cp.maximum(self._d_rate_fwd, 1e-30))
+                    d_a_fwd = cp.exp(d_log_a + d_log_k[cp.newaxis, :])  # [N, M]
+
+                    d_a_rev = cp.zeros_like(d_a_fwd)
+                    if cp.any(self._d_is_rev):
+                        d_log_kr = cp.log(cp.maximum(self._d_rate_rev, 1e-30))
+                        d_S_pos = cp.maximum(self._d_S_stoch, 0.0).T  # [M, P]
+                        d_log_a_rev = d_log_y @ d_S_pos.T
+                        d_a_rev_all = cp.exp(d_log_a_rev + d_log_kr[cp.newaxis, :])
+                        d_a_rev = cp.where(
+                            self._d_is_rev[cp.newaxis, :], d_a_rev_all, 0.0
+                        )
 
                 d_a_net = d_a_fwd - d_a_rev  # [N, M]
 

@@ -1148,7 +1148,7 @@ class ReplicateRunner:
         # Build stochastic transition matrices
         stoch_transitions = [
             t for t in self.model.transitions
-            if getattr(t, 'transition_type', '') == 'stochastic'
+            if getattr(t, 'transition_type', '') in ('stochastic', 'adaptive')
         ]
         n_stoch = len(stoch_transitions)
 
@@ -1166,17 +1166,14 @@ class ReplicateRunner:
         rate_rev = _np.zeros(n_stoch, dtype=_np.float64)
         is_reversible = _np.zeros(n_stoch, dtype=_np.bool_)
 
+        has_symbolic_rates = False
         for j, t in enumerate(stoch_transitions):
             raw_rate = getattr(t, 'rate', 0.0)
             try:
                 rate_constants[j] = float(raw_rate) if raw_rate else 0.0
             except (ValueError, TypeError):
-                # Non-numeric rate (symbolic expression) — can't use GPU
-                logger.info("GPU hybrid: stochastic transition %s has non-numeric "
-                            "rate (%r) — falling back to CPU", t.id, raw_rate)
-                if verbose:
-                    print(f"  GPU hybrid: non-numeric rate on {t.id}, using CPU")
-                return None
+                # Non-numeric rate (symbolic expression) — need CPU propensity
+                has_symbolic_rates = True
 
             for arc in self.model.arcs:
                 src = getattr(arc, 'source_id', None)
@@ -1195,6 +1192,17 @@ class ReplicateRunner:
                     pi = place_id_to_global[tgt]
                     S_stoch[pi, j] += w
 
+        # Build CPU propensity callback for symbolic-rate stochastic transitions
+        stoch_propensity_fn = None
+        if has_symbolic_rates:
+            stoch_propensity_fn = self._build_hybrid_stoch_propensity_fn(
+                controller, stoch_transitions, place_id_list,
+                verbose=verbose,
+            )
+            if stoch_propensity_fn is None:
+                # PropensityAccelerator build failed — fall through to CPU
+                return None
+
         # Initial marking
         y0 = _np.array([float(p.tokens) for p in all_places], dtype=_np.float64)
 
@@ -1203,8 +1211,10 @@ class ReplicateRunner:
         dt = time_step if time_step else settings.get_effective_dt()
 
         if verbose:
+            _mode = "CPU+GPU (symbolic)" if stoch_propensity_fn else "GPU (mass-action)"
             print(f"  GPU hybrid: {len(ode_place_indices)} ODE places, "
-                  f"{n_stoch} stochastic transitions, dt={dt}")
+                  f"{n_stoch} stochastic transitions, dt={dt}, "
+                  f"propensities={_mode}")
 
         try:
             engine = GPUHybridEngine(
@@ -1222,6 +1232,7 @@ class ReplicateRunner:
                 extra_place_indices=extra_place_indices,
                 epsilon=epsilon,
                 max_tau=max_tau,
+                stoch_propensity_fn=stoch_propensity_fn,
             )
             results = engine.run_batch(
                 n_replicates=n,
@@ -1234,7 +1245,8 @@ class ReplicateRunner:
             if progress_callback:
                 progress_callback(1.0)
             if verbose:
-                print(f"✓ GPU hybrid: {n} replicates completed")
+                _tag = "hybrid CPU+GPU" if stoch_propensity_fn else "GPU hybrid"
+                print(f"✓ {_tag}: {n} replicates completed")
             return results
 
         except Exception as exc:
@@ -1320,6 +1332,80 @@ class ReplicateRunner:
             return a_fwd_out, a_rev_out
 
         return _propensity_fn
+
+    def _build_hybrid_stoch_propensity_fn(
+        self,
+        controller: Any,
+        stoch_transitions: List[Any],
+        place_id_list: List[str],
+        *,
+        verbose: bool = False,
+    ) -> Optional[Callable]:
+        """Build a CPU propensity callback for stochastic transitions in hybrid mode.
+
+        Uses the compiled C :class:`PropensityAccelerator` to evaluate
+        propensities for the stochastic+adaptive transitions.  The returned
+        callable has signature::
+
+            (y: ndarray[N, P], t: ndarray[N])
+                → (a_fwd: ndarray[N, M_stoch], a_rev: ndarray[N, M_stoch])
+
+        Returns ``None`` if the accelerator cannot be built.
+        """
+        from shypn.engine.acceleration import PropensityAccelerator
+
+        accel = PropensityAccelerator(controller.model, controller._get_behavior)
+        if not accel.build():
+            logger.warning(
+                "GPU hybrid stoch: PropensityAccelerator build failed (%s); "
+                "using CPU path",
+                accel.build_error,
+            )
+            if verbose:
+                print(f"  GPU hybrid stoch: C accelerator build failed — "
+                      f"falling back to CPU")
+            return None
+
+        # Build mapping: place_id_list order → accel._all_place_index
+        place_idx_map = np.array(
+            [accel._all_place_index[pid] for pid in place_id_list],
+            dtype=np.intp,
+        )
+
+        # Build mapping: stoch_transitions order → accel.transition_ids_order
+        accel_tid_to_j = {
+            tid: j for j, tid in enumerate(accel.transition_ids_order)
+        }
+        stoch_tid_list = [t.id for t in stoch_transitions]
+        trans_idx_map = np.array(
+            [accel_tid_to_j[tid] for tid in stoch_tid_list],
+            dtype=np.intp,
+        )
+
+        M_stoch = len(stoch_transitions)
+
+        if verbose:
+            print(f"  GPU hybrid stoch: C propensity accelerator ready "
+                  f"({M_stoch} stochastic transitions)")
+
+        def _stoch_propensity_fn(
+            y_host: np.ndarray,   # [N, P]
+            t_host: np.ndarray,   # [N]
+        ) -> tuple:
+            N = y_host.shape[0]
+            a_fwd_out = np.zeros((N, M_stoch), dtype=np.float64)
+            a_rev_out = np.zeros((N, M_stoch), dtype=np.float64)
+
+            for r in range(N):
+                accel._y_arr[place_idx_map] = y_host[r]
+                accel.update_thermo_params()
+                a_net, a_fwd, a_rev = accel.compute(float(t_host[r]))
+                a_fwd_out[r] = a_fwd[trans_idx_map]
+                a_rev_out[r] = a_rev[trans_idx_map]
+
+            return a_fwd_out, a_rev_out
+
+        return _stoch_propensity_fn
 
     def _reset_model(self, model: Any) -> None:
         """Reset model to initial marking.
