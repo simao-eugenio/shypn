@@ -168,29 +168,23 @@ class SweepRunner:
             if mem_available_gb is None:
                 mem_available_gb = 16.0  # conservative default
 
-            # Include swap as addressable memory (NVMe swap is fast enough
-            # for simulation workloads with swappiness=10)
-            swap_free_gb = 0.0
-            try:
-                with open('/proc/meminfo', 'r') as f:
-                    for line in f:
-                        if line.startswith('SwapFree:'):
-                            kb = int(line.split()[1])
-                            swap_free_gb = kb / (1024 * 1024)
-                            break
-            except (OSError, ValueError):
-                pass
+            # Do NOT include swap in the worker cap calculation.
+            # Swap should only be used as a safety buffer for transient
+            # peaks, not as steady-state working memory.  Swap thrashing
+            # kills throughput (observed: 9 GB/min swap growth with 16
+            # workers on 62 GB RAM caused ~5× slowdown vs RAM-only).
 
-            # Total addressable = RAM available + swap free
-            total_addressable_gb = mem_available_gb + swap_free_gb
-
-            # Reserve 10 GB for OS, sshd, page cache, kernel buffers
-            usable_gb = max(1.0, total_addressable_gb - 10.0)
-            # Estimate 8 GB per worker (observed: 5-19 GB RSS for CBD v2
-            # with 30 tau-leaping replicates + ODE compiled RHS + history
-            # arrays; parent process holds shared model state.
-            # Raised from 6 to 8 GB for swap-inclusive calculation safety)
-            per_worker_gb = 8.0
+            # Reserve 12 GB for OS, sshd, page cache, kernel buffers,
+            # and the parent process (which holds model metadata + IPC).
+            usable_gb = max(1.0, mem_available_gb - 12.0)
+            # Estimate per-worker peak RSS.  With worker-side disk flush
+            # (results written to disk in worker, then freed), peak is
+            # 1 condition's trajectory: 30 replicates × ~15 MB each for
+            # a 34-place/45-transition model at 60k steps ≈ 500 MB active
+            # data + ~300 MB model/controller/accelerator overhead ≈ 1 GB.
+            # Use 3 GB as safety margin for Python heap fragmentation and
+            # larger models.
+            per_worker_gb = 3.0
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
@@ -263,71 +257,86 @@ class SweepRunner:
         output = SweepOutputManager(self.output_dir)
         output.save_config(self.config.to_dict(), str(self.model_path))
 
-        # 4. Dispatch conditions in parallel across worker processes
+        # 4. Dispatch conditions in bounded batches across worker processes.
         #    Each worker loads its own model copy — no shared mutable state.
-        #    Pin parent process to allowed CPUs as well (children inherit).
+        #    Workers write results directly to disk and return only a light
+        #    summary payload, preventing IPC memory pressure from full
+        #    trajectory data being pickled back to the parent.
+        #
+        #    Batched dispatch ensures at most `workers` conditions are
+        #    in-flight simultaneously, capping peak memory at
+        #    workers × (per-condition trajectory footprint).
         _apply_cpu_affinity()
+        import gc
         from dataclasses import asdict
         sim_dict = asdict(sim)
 
-        futures_map: Dict[Any, int] = {}  # future → condition index
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
+        n_workers = min(self.workers, n_conditions)
 
         with ProcessPoolExecutor(
-            max_workers=min(self.workers, n_conditions),
+            max_workers=n_workers,
             initializer=_worker_init,
         ) as pool:
-            for idx, snapshot in enumerate(snapshots):
-                fut = pool.submit(
-                    _run_single_condition,
-                    model_path=str(self.model_path),
-                    baseline_dict=_snapshot_to_dict(baseline),
-                    snapshot_dict=_snapshot_to_dict(snapshot),
-                    sim_params=sim_dict,
-                    condition_index=idx,
-                    n_conditions=n_conditions,
-                    verbose=self.verbose,
-                )
-                futures_map[fut] = idx
+            # Process conditions in bounded windows of `n_workers` size.
+            # This prevents unbounded memory growth: at most n_workers
+            # conditions hold trajectory data simultaneously.
+            for batch_start in range(0, n_conditions, n_workers):
+                batch_end = min(batch_start + n_workers, n_conditions)
+                futures_map: Dict[Any, int] = {}
 
-            for fut in as_completed(futures_map):
-                idx = futures_map[fut]
-                label = snapshots[idx].name
-                try:
-                    result_payload = fut.result()
-                    results = result_payload['results']
-                    stats = result_payload['stats']
-                    cond_elapsed = result_payload['wall_seconds']
-                    n_ok = result_payload['replicates_ok']
-                    n_err = result_payload['replicates_error']
+                for idx in range(batch_start, batch_end):
+                    snapshot = snapshots[idx]
+                    fut = pool.submit(
+                        _run_single_condition,
+                        model_path=str(self.model_path),
+                        baseline_dict=_snapshot_to_dict(baseline),
+                        snapshot_dict=_snapshot_to_dict(snapshot),
+                        sim_params=sim_dict,
+                        condition_index=idx,
+                        n_conditions=n_conditions,
+                        output_dir=str(output.run_dir),
+                        verbose=self.verbose,
+                    )
+                    futures_map[fut] = idx
 
-                    # Save using the main-process model (for name lookup)
-                    self._apply_snapshot(model, snapshots[idx], baseline)
-                    output.save_condition(label, results, stats, model)
-                    self._restore_baseline(model, baseline)
+                # Collect this batch — results are already on disk,
+                # workers return only lightweight summary dicts.
+                for fut in as_completed(futures_map):
+                    idx = futures_map[fut]
+                    label = snapshots[idx].name
+                    try:
+                        result_payload = fut.result()
+                        cond_elapsed = result_payload['wall_seconds']
+                        n_ok = result_payload['replicates_ok']
+                        n_err = result_payload['replicates_error']
 
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': n_ok,
-                        'replicates_error': n_err,
-                        'wall_seconds': round(cond_elapsed, 2),
-                    }
+                        summary_rows[idx] = {
+                            'condition': label,
+                            'replicates_ok': n_ok,
+                            'replicates_error': n_err,
+                            'wall_seconds': round(cond_elapsed, 2),
+                        }
 
-                    if self.verbose:
-                        print(
-                            f"  [{idx + 1}/{n_conditions}] {label}: "
-                            f"{cond_elapsed:.1f}s ({n_ok} ok, {n_err} errors)"
-                        )
-                except Exception as exc:
-                    logger.exception("Condition %d (%s) failed", idx, label)
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': 0,
-                        'replicates_error': sim.replicates,
-                        'wall_seconds': 0.0,
-                    }
-                    if self.verbose:
-                        print(f"  [{idx + 1}/{n_conditions}] {label}: FAILED — {exc}")
+                        if self.verbose:
+                            print(
+                                f"  [{idx + 1}/{n_conditions}] {label}: "
+                                f"{cond_elapsed:.1f}s ({n_ok} ok, {n_err} errors)"
+                            )
+                    except Exception as exc:
+                        logger.exception("Condition %d (%s) failed", idx, label)
+                        summary_rows[idx] = {
+                            'condition': label,
+                            'replicates_ok': 0,
+                            'replicates_error': sim.replicates,
+                            'wall_seconds': 0.0,
+                        }
+                        if self.verbose:
+                            print(f"  [{idx + 1}/{n_conditions}] {label}: FAILED — {exc}")
+
+                # Force GC between batches to reclaim any residual heap
+                # fragments from IPC deserialization in the parent process.
+                gc.collect()
 
         # 5. Summary
         output.write_summary([r for r in summary_rows if r is not None])
@@ -449,6 +458,19 @@ def _dict_to_snapshot(d: dict) -> ExperimentSnapshot:
     return snap
 
 
+def _sanitise_condition_name(name: str) -> str:
+    """Filesystem-safe condition name (mirrors sweep_output._sanitise)."""
+    return (
+        name.replace(' ', '_')
+            .replace('/', '_')
+            .replace('\\', '_')
+            .replace(':', '_')
+            .replace(',', '_')
+            .replace(';', '_')
+            .replace('=', '_eq_')
+    )[:120]
+
+
 def _run_single_condition(
     *,
     model_path: str,
@@ -457,13 +479,19 @@ def _run_single_condition(
     sim_params: dict,
     condition_index: int,
     n_conditions: int,
+    output_dir: str,
     verbose: bool,
 ) -> dict:
     """Execute one condition in a worker process.
 
     Loads its own model copy, applies overrides, runs all replicates,
-    and returns the results + statistics as a plain dict (picklable).
+    writes results directly to disk (avoiding IPC transfer of full
+    trajectory data), and returns only a lightweight summary dict.
+
+    Memory management: results are deleted and GC'd immediately after
+    disk flush, so peak RSS = 1 condition's trajectory data only.
     """
+    import gc
     import time as _time
     cond_start = _time.monotonic()
 
@@ -506,6 +534,29 @@ def _run_single_condition(
     n_ok = sum(1 for r in results if 'error' not in r)
     n_err = len(results) - n_ok
 
+    # ── Worker-side disk flush ───────────────────────────────────────
+    # Write results directly to disk in the worker process, then delete
+    # the large trajectory data.  This prevents full result payloads
+    # from being pickled back to the parent process via IPC, which was
+    # the primary cause of memory exhaustion during large sweeps.
+    from shypn.cli.sweep_output import SweepOutputManager
+    from pathlib import Path
+
+    run_dir = Path(output_dir)
+    safe_name = _sanitise_condition_name(snapshot.name)
+    cond_dir = run_dir / f"condition_{safe_name}"
+    cond_dir.mkdir(parents=True, exist_ok=True)
+
+    SweepOutputManager._write_replicates_csv(cond_dir, results, model)
+    SweepOutputManager._write_statistics_json(cond_dir, stats)
+
+    # Free trajectory data immediately — this is the critical memory
+    # reclamation point.  Without this, the worker holds ~0.5–1.5 GB
+    # of trajectory arrays until the function returns.
+    del results, stats, runner, model
+    gc.collect()
+    # ─────────────────────────────────────────────────────────────────
+
     if verbose:
         print(
             f"  Worker [{condition_index + 1}/{n_conditions}] "
@@ -514,9 +565,8 @@ def _run_single_condition(
             flush=True,
         )
 
+    # Return only the lightweight summary — no trajectory data crosses IPC.
     return {
-        'results': results,
-        'stats': stats,
         'wall_seconds': cond_elapsed,
         'replicates_ok': n_ok,
         'replicates_error': n_err,
