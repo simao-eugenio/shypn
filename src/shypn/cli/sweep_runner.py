@@ -285,6 +285,19 @@ class SweepRunner:
                 batch_end = min(batch_start + n_workers, n_conditions)
                 futures_map: Dict[Any, int] = {}
 
+                if self.verbose:
+                    print(
+                        f"Batch [{batch_start + 1}–{batch_end}/{n_conditions}] "
+                        f"dispatching {batch_end - batch_start} conditions...",
+                        flush=True,
+                    )
+                    for idx in range(batch_start, batch_end):
+                        print(
+                            f"[{idx + 1}/{n_conditions}] {snapshots[idx].name} "
+                            f"({sim.replicates} replicates)...",
+                            flush=True,
+                        )
+
                 for idx in range(batch_start, batch_end):
                     snapshot = snapshots[idx]
                     fut = pool.submit(
@@ -320,8 +333,9 @@ class SweepRunner:
 
                         if self.verbose:
                             print(
-                                f"  [{idx + 1}/{n_conditions}] {label}: "
-                                f"{cond_elapsed:.1f}s ({n_ok} ok, {n_err} errors)"
+                                f"  done in {cond_elapsed:.1f}s "
+                                f"({n_ok} ok, {n_err} errors)",
+                                flush=True,
                             )
                     except Exception as exc:
                         logger.exception("Condition %d (%s) failed", idx, label)
@@ -332,7 +346,10 @@ class SweepRunner:
                             'wall_seconds': 0.0,
                         }
                         if self.verbose:
-                            print(f"  [{idx + 1}/{n_conditions}] {label}: FAILED — {exc}")
+                            print(
+                                f"  done in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
+                                flush=True,
+                            )
 
                 # Force GC between batches to reclaim any residual heap
                 # fragments from IPC deserialization in the parent process.
@@ -556,14 +573,6 @@ def _run_single_condition(
     del results, stats, runner, model
     gc.collect()
     # ─────────────────────────────────────────────────────────────────
-
-    if verbose:
-        print(
-            f"  Worker [{condition_index + 1}/{n_conditions}] "
-            f"{snapshot.name}: {cond_elapsed:.1f}s "
-            f"({n_ok} ok, {n_err} errors)",
-            flush=True,
-        )
 
     # Return only the lightweight summary — no trajectory data crosses IPC.
     return {

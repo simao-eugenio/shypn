@@ -160,7 +160,7 @@ class ExperimentQueueView(Gtk.Box):
 
         self._status_view = Gtk.TextView()
         self._status_view.set_editable(False)
-        self._status_view.set_cursor_visible(False)
+        self._status_view.set_cursor_visible(True)
         self._status_view.set_can_focus(True)
         self._status_view.connect('key-press-event', self._on_status_key_press)
         self._status_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
