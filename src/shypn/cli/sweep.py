@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
         '--output', '-o',
         type=Path,
         default=None,
-        help='Output directory for results (default: <project>/results/).',
+        help='Output directory for results (default: <project>/experiments/results/).',
     )
     p.add_argument(
         '--workers', '-w',
@@ -113,15 +113,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: model file not found: {model_path}", file=sys.stderr)
         return 1
 
-    # Output: CLI flag > project/results > ./results
-    # Convention: per-project sweep outputs live in <project>/results/.
-    # On the GPU server, <project>/results is typically a symlink to the
-    # large HDD (e.g. /home/simao/data/results/<project>/) — the path rule
-    # stays the same regardless of the underlying storage.
+    # Output: CLI flag > <project>/experiments/results > ./results
+    # Convention: per-project sweep outputs always live under
+    #   <project>/experiments/results/run_<timestamp>/
+    # The path is derived from the opened project, so client and server
+    # produce identical relative layouts.
+    # On the GPU server, <project>/experiments/results is typically a
+    # symlink to the HDD store (e.g. /home/simao/data/results/<project>/)
+    # to preserve SSD space — the path the agent uses is unchanged.
     output_dir = args.output
     if output_dir is None:
         if project is not None:
-            output_dir = project / 'results'
+            output_dir = project / 'experiments' / 'results'
         else:
             output_dir = Path('results')
     else:
