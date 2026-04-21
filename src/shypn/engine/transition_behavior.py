@@ -631,6 +631,131 @@ class TransitionBehavior(ABC):
         return False
 
     # ============================================================================
+    # PreemptionCheck (13-tuple formalism §3.3)
+    # ============================================================================
+
+    def _check_preemption(self) -> Tuple[bool, str]:
+        """Single-layer PreemptionCheck per 13-tuple Bio-PN formalism.
+
+        For each signal place p_s in •_s t (signal flow arcs into this transition),
+        every transition t' that produces p_s via a signal flow arc must itself
+        satisfy NormalEnabled ∧ TestEnabled ∧ SignalEnabled at the current marking.
+
+        This is a single-layer check: t' is NOT asked to run its own
+        PreemptionCheck, so there is no recursion.  Hierarchical consistency
+        propagates naturally because each layer performs the same check on its
+        own signal predecessors (cascading verification back to Layer 0).
+
+        Vacuously true when this transition has no signal flow input arcs
+        (Layer 0 / metabolic transitions — the common case; zero cost).
+
+        Returns:
+            (True, "preemption-vacuous") — no signal flow inputs
+            (True, "preemption-ok")      — all producers enabled
+            (False, "preemption-blocked-by-<id>: <reason>") — producer not enabled
+        """
+        # Decision 4: early exit for the common case (no signal flow inputs)
+        signal_input_arcs = [
+            arc for arc in self.get_input_arcs()
+            if getattr(arc, 'arc_type', 'normal') == 'signal_flow'
+        ]
+        if not signal_input_arcs:
+            return True, "preemption-vacuous"
+
+        # Collect unique signal input places •_s t
+        seen_sp_ids: set = set()
+        for arc in signal_input_arcs:
+            signal_place = arc.source
+            sp_id = getattr(signal_place, 'id', id(signal_place))
+            if sp_id in seen_sp_ids:
+                continue
+            seen_sp_ids.add(sp_id)
+
+            # Decision 3: linear scan — find all t' s.t. (t', p_s) ∈ F_s
+            for candidate in self._get_all_model_arcs():
+                if getattr(candidate, 'arc_type', 'normal') != 'signal_flow':
+                    continue
+                # target of candidate must be this signal place
+                c_target_id = (
+                    getattr(candidate, 'target_id', None)
+                    or getattr(getattr(candidate, 'target', None), 'id', None)
+                )
+                if c_target_id != sp_id:
+                    continue
+                t_prime = candidate.source
+                # Only transitions (not places) are producers in F_s
+                if not hasattr(t_prime, 'transition_type'):
+                    continue
+
+                # Decision 2: call dedicated method, NOT t_prime.can_fire()
+                ok, reason = self._check_three_predicates_for(t_prime)
+                if not ok:
+                    t_id = getattr(t_prime, 'id', '?')
+                    return False, f"preemption-blocked-by-{t_id}: {reason}"
+
+        return True, "preemption-ok"
+
+    def _get_all_model_arcs(self) -> List:
+        """Return all arcs in the model as a flat list."""
+        coll = self.model.arcs
+        return list(coll.values()) if isinstance(coll, dict) else list(coll)
+
+    def _check_three_predicates_for(self, transition: Any) -> Tuple[bool, str]:
+        """Check NormalEnabled ∧ TestEnabled ∧ SignalEnabled for an arbitrary transition.
+
+        Does NOT evaluate PreemptionCheck for that transition (single-layer rule).
+
+        Arc semantics:
+          - Normal / signal flow arc : M(p) ≥ W + θ_eff
+          - Test arc                 : M(p) ≥ τ_t  (threshold or weight, default 0)
+          - Inhibitor arc            : not part of the three sub-predicates — skipped
+
+        Args:
+            transition: Any Transition instance in the model.
+
+        Returns:
+            (True, "three-predicates-ok") or (False, <reason string>)
+        """
+        t_id = getattr(transition, 'id', str(id(transition)))
+        all_arcs = self._get_all_model_arcs()
+
+        # Collect input arcs for the target transition
+        input_arcs = [
+            arc for arc in all_arcs
+            if (getattr(arc, 'target_id', None) == t_id
+                or getattr(arc, 'target', None) is transition)
+        ]
+
+        for arc in input_arcs:
+            source_place = getattr(arc, 'source', None)
+            if source_place is None:
+                return False, f"missing-source-{getattr(arc, 'id', '?')}"
+
+            arc_type = getattr(arc, 'arc_type', 'normal')
+
+            # Inhibitor arcs are not part of the three sub-predicates
+            if 'inhibitor' in arc_type:
+                continue
+
+            tokens = getattr(source_place, 'tokens', 0.0)
+            theta = self._get_theta_eff(arc)
+
+            if arc_type == 'test':
+                # TestEnabled: M(p) >= τ_t
+                tau_t = arc.threshold if getattr(arc, 'threshold', None) is not None else arc.weight
+                if tokens < tau_t:
+                    sp_id = getattr(source_place, 'id', '?')
+                    return False, f"test-unmet-{sp_id}"
+            else:
+                # NormalEnabled / SignalEnabled: M(p) >= W + θ_eff
+                required = arc.weight + theta
+                if tokens < required:
+                    sp_id = getattr(source_place, 'id', '?')
+                    return False, f"insufficient-{sp_id}"
+
+        return True, "three-predicates-ok"
+
+    # ============================================================================
     # String Representation
     # ============================================================================
     

@@ -64,8 +64,11 @@ class Place(PetriNetObject):
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
         
         # Signal place properties (13-tuple Bio-PN formalism: Ψ)
-        # Signal places enable modular architecture through information flow without mass transfer
-        self.is_signal_place = False  # True if this place has no arc connections (read-only sensing)
+        # Signal places are any places designated by the modeller as belonging to Ψ ⊆ P.
+        # They participate in both normal arcs (F) and signal flow arcs (F_s).
+        # Signal flow arcs ARE consumptive — they consume/produce Ws tokens just like
+        # normal arcs, AND make the place's marking visible to the signal hierarchy.
+        self.is_signal_place = False  # True when this place is in Ψ (modeller-designated signal place)
         self.signal_type: Optional[SignalType] = None  # Classification: quorum, energy, regulatory, spatial
         self.signal_scope: List[str] = []  # Module IDs that can read this signal (empty = global scope)
         

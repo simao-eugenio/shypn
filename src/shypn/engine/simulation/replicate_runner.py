@@ -116,7 +116,6 @@ def _run_replicate_chunk(
                 max_tau=max_tau,
                 seed=seed_base,
                 use_parallel=use_parallel,
-                use_jit_kernel=getattr(controller.settings, 'use_jit_kernel', False),
                 verbose=False,
                 n_critical=getattr(controller.settings, 'n_critical', 10),
             )
@@ -137,12 +136,6 @@ def _run_replicate_chunk(
             import numpy as _np
             _engine.poisson_sampler.rng = _np.random.default_rng(_rep_seed)
             _engine.skellam_sampler.rng = _np.random.default_rng(_rep_seed + 1)
-            if _engine.use_jit_kernel:
-                from shypn.engine.simulation.tau_leaping.jit_kernel import (
-                    NUMBA_AVAILABLE, seed_kernel,
-                )
-                if NUMBA_AVAILABLE and seed_kernel is not None:
-                    seed_kernel(_rep_seed)
 
         # Restore initial marking
         for place in model.places:
@@ -469,7 +462,6 @@ class ReplicateRunner:
                     max_tau=max_tau,
                     seed=seed_base,           # seeded — will be overwritten per replicate below
                     use_parallel=use_parallel,
-                    use_jit_kernel=getattr(controller.settings, 'use_jit_kernel', False),
                     verbose=False,
                     n_critical=getattr(controller.settings, 'n_critical', 10),
                 )
@@ -512,12 +504,6 @@ class ReplicateRunner:
                 import numpy as _np_rng
                 _engine.poisson_sampler.rng = _np_rng.random.default_rng(_rep_seed)
                 _engine.skellam_sampler.rng = _np_rng.random.default_rng(_rep_seed + 1)
-                if _engine.use_jit_kernel:
-                    from shypn.engine.simulation.tau_leaping.jit_kernel import (
-                        NUMBA_AVAILABLE, seed_kernel,
-                    )
-                    if NUMBA_AVAILABLE and seed_kernel is not None:
-                        seed_kernel(_rep_seed)
 
             # Restore model to initial marking
             for place in self.model.places:
