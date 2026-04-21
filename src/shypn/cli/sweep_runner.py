@@ -520,7 +520,7 @@ def _run_single_condition(
     # Suppress ODE acceleration noise in worker
     import logging as _logging
     _logging.basicConfig(level=_logging.WARNING)
-    for _name in ('shypn.engine.acceleration', 'shypn.engine.simulation.controller'):
+    for _name in ('shypn.engine.simulation.controller',):
         _logging.getLogger(_name).setLevel(_logging.ERROR)
 
     # Load a fresh model in this process

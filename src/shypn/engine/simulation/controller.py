@@ -264,18 +264,6 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         # Continuous execution strategy (Phase 2.3.1 extraction)
         self._continuous_executor = ContinuousExecutor(self)
 
-        # ODE acceleration: C-compiled RHS + scipy.solve_ivp (optional).
-        # Lazily initialised on first call to _execute_continuous_transitions.
-        # Falls back to the Python per-transition path when None or not ready.
-        self._ode_accelerator: Optional[Any] = None
-        self._ode_accel_tried: bool = False   # avoid retrying after a failure
-
-        # Propensity acceleration: C-compiled propensity vector for tau-leaping.
-        # Lazily initialised on the first tau-leaping step.
-        # Replaces _evaluate_rate_at_enablement × N × 2 Python eval calls per step.
-        self._propensity_accelerator: Optional[Any] = None
-        self._propensity_accel_tried: bool = False
-
         # Viability checking strategy (Phase 2.3.2 extraction, injectable for testing)
         _vc_factory = viability_checker_factory or ViabilityChecker
         self._viability_checker = _vc_factory(self)
@@ -350,14 +338,6 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         if hasattr(self, '_tau_leaping_engine'):
             delattr(self, '_tau_leaping_engine')
 
-        # Reset ODE accelerator so it is rebuilt for the new model
-        self._ode_accelerator = None
-        self._ode_accel_tried = False
-
-        # Reset propensity accelerator so it is rebuilt for the new model
-        self._propensity_accelerator = None
-        self._propensity_accel_tried = False
-        
         # Reinitialize model adapter with current model
         self.model_adapter = ModelAdapter(self.model, controller=self)
         # Reset dirty-place state and rebuild place-transition index for new model
@@ -1531,73 +1511,8 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         
         return window_crossing_fired
 
-    def _has_continuous_transitions(self) -> bool:
-        """Return True if the model has at least one continuous transition."""
-        return any(
-            getattr(t, 'transition_type', '') == 'continuous'
-            for t in self.model.transitions
-        )
-
-    def _ensure_ode_accelerator(self) -> None:
-        """Lazily build the ODE accelerator for this model (called once)."""
-        if self._ode_accel_tried:
-            return
-        self._ode_accel_tried = True
-        try:
-            from shypn.engine.acceleration import OdeSystemAccelerator
-            accel = OdeSystemAccelerator(self.model, self._get_behavior)
-            if accel.build():
-                self._ode_accelerator = accel
-                _log = logging.getLogger(__name__)
-                _log.info(
-                    "ODE acceleration active (%d ODE places, %d extras)",
-                    accel._n_ode, accel._n_extra,
-                )
-            else:
-                _log = logging.getLogger(__name__)
-                _log.info("ODE acceleration skipped (no continuous ODE places)")
-        except Exception as exc:
-            _log = logging.getLogger(__name__)
-            _log.warning("ODE acceleration unavailable: %s", exc)
-
-    def _ensure_propensity_accelerator(self) -> None:
-        """Lazily build the propensity accelerator for stochastic transitions.
-
-        Called on the first tau-leaping step.  Compiles a C function that
-        evaluates the entire propensity vector in one call so that both
-        ``LeapSelector`` and ``TauLeapingEngine._sample_firings`` avoid the
-        per-transition Python ``eval()`` / dict-build overhead.
-        """
-        if self._propensity_accel_tried:
-            return
-        self._propensity_accel_tried = True
-        try:
-            from shypn.engine.acceleration import PropensityAccelerator
-            accel = PropensityAccelerator(self.model, self._get_behavior)
-            if accel.build():
-                self._propensity_accelerator = accel
-                _log = logging.getLogger(__name__)
-                _log.info(
-                    "Propensity acceleration active (%d stochastic transitions, "
-                    "%d places)",
-                    accel._n_transitions, accel._n_places,
-                )
-            else:
-                _log = logging.getLogger(__name__)
-                _log.info(
-                    "Propensity acceleration skipped (no stochastic transitions)"
-                )
-        except Exception as exc:
-            _log = logging.getLogger(__name__)
-            _log.warning("Propensity acceleration unavailable: %s", exc)
-
     def _execute_continuous_transitions(self, time_step: float) -> int:
         """Execute continuous transitions with conflict resolution.
-
-        When the ODE accelerator is ready, uses a single scipy.solve_ivp
-        call over the full time_step for all continuous ODE places
-        (compiled C RHS — no Python eval/dict overhead per transition).
-        Falls back to the per-transition Python path on any failure.
 
         Args:
             time_step: The time increment for this step
@@ -1605,85 +1520,6 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         Returns:
             int: Number of continuous transitions that successfully integrated
         """  # noqa: D401
-        # ── Attempt accelerated path ──────────────────────────────────────
-        self._ensure_ode_accelerator()
-        accel = self._ode_accelerator
-        if accel is not None and accel.ready and self._has_continuous_transitions():
-            try:
-                t_start = self.time
-                t_end   = self.time + time_step
-                ok = accel.integrate(t_start, t_end)
-                if ok:
-                    # Count firings and update firing_count for all
-                    # ODE-covered transitions (continuous + adaptive).
-                    fired_count = 0
-                    covered_tids = {spec.tid for spec in accel._specs}
-                    for t in self.model.transitions:
-                        if t.id in covered_tids:
-                            behavior = self._get_behavior(t)
-                            # For adaptive transitions in ODE, can_fire()
-                            # may return False (stochastic delegate check).
-                            # Use rate evaluation directly instead.
-                            if t.transition_type == 'adaptive':
-                                try:
-                                    places_dict = {p.name: p for p in self.model.places}
-                                    rate = behavior.evaluate_rate(places_dict, self.time)
-                                    if abs(rate) > 0:
-                                        fired_count += 1
-                                        t.firing_count += abs(rate) * time_step
-                                except Exception:
-                                    pass
-                            elif behavior and behavior.can_fire()[0]:
-                                fired_count += 1
-                                t.firing_count += time_step
-                    # ── F2: Adaptive transitions in continuous mode are now
-                    # included in the ODE system directly, so we do NOT
-                    # need a separate Python loop for them.  Only run the
-                    # Python path for adaptive-continuous transitions that
-                    # were NOT covered by the ODE (e.g. if ODE build skipped
-                    # them due to missing rate expression).
-                    covered_tids = {spec.tid for spec in accel._specs}
-                    adaptive_continuous = []
-                    for t in self.model.transitions:
-                        if t.transition_type == 'adaptive' and t.id not in covered_tids:
-                            behavior = self._get_behavior(t)
-                            if behavior and hasattr(behavior, 'get_current_mode'):
-                                current_mode = behavior.get_current_mode()
-                                if current_mode is None and hasattr(behavior, '_select_mode'):
-                                    current_mode = behavior._select_mode()
-                                if current_mode == 'continuous':
-                                    adaptive_continuous.append(t)
-                            elif behavior:
-                                from shypn.engine.adaptive_hybrid_behavior import AdaptiveHybridBehavior
-                                if isinstance(behavior, AdaptiveHybridBehavior):
-                                    if behavior._select_mode() == 'continuous':
-                                        adaptive_continuous.append(t)
-                    if adaptive_continuous:
-                        for t in adaptive_continuous:
-                            behavior = self._get_behavior(t)
-                            can_flow, _ = behavior.can_fire()
-                            if can_flow:
-                                ia = behavior.get_input_arcs()
-                                oa = behavior.get_output_arcs()
-                                success, details = behavior.integrate_step(
-                                    dt=time_step, input_arcs=ia, output_arcs=oa
-                                )
-                                if success:
-                                    fired_count += 1
-                                    rate = details.get('rate', 0.0) if details else 0.0
-                                    t.firing_count += abs(rate) * time_step
-                                    if self.data_collector is not None and \
-                                            hasattr(self.data_collector, 'on_transition_fired'):
-                                        self.data_collector.on_transition_fired(t, self.time, details)
-                    return fired_count
-            except Exception as exc:
-                _log = logging.getLogger(__name__)
-                _log.warning(
-                    "ODE accelerator step failed (%s) — falling back to Python",
-                    exc,
-                )
-                # Fall through to Python path
-        # ── Python per-transition fallback (original implementation) ─────
         # Group continuous transitions by locality conflicts and apply firing policies
         # NOTE: Include adaptive transitions ONLY if they're in continuous mode
         continuous_transitions = []
@@ -1873,7 +1709,6 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                         max_tau=self.settings.max_tau,
                         seed=None,
                         use_parallel=self.settings.use_parallel_stochastic,
-                        use_jit_kernel=getattr(self.settings, 'use_jit_kernel', False),
                         verbose=self.verbose,
                         n_critical=getattr(self.settings, 'n_critical', 10),
                     )
@@ -2677,13 +2512,6 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         
         # Update model reference
         self.model = new_model
-
-        # Reset accelerators — they are compiled for a specific model structure
-        # and must be rebuilt when the model changes.
-        self._ode_accelerator = None
-        self._ode_accel_tried = False
-        self._propensity_accelerator = None
-        self._propensity_accel_tried = False
 
         # Recreate model adapter with new model
         self.model_adapter = ModelAdapter(new_model, controller=self)

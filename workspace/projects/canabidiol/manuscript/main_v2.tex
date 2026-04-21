@@ -287,7 +287,7 @@ Age (P31, default 65.0) implements the factor $(1 + 0.02 \times (\text{Age} - 65
 
 An $8 \times 4 \times 3$ factorial design crosses:
 \begin{itemize}
-\item 8 CBD doses: $\{0, 1, 2, 4, 6, 8, 12, 15\}$ (working calibration: 1 token = 1 uM)
+\item 8 CBD doses: $\{0, 1, 2, 4, 6, 8, 12, 15\}$ (nominal concentration units)
 \item 4 Ages: $\{55, 65, 75, 85\}$ years
 \item 3 pH levels: $\{6.6, 7.0, 7.4\}$
 \end{itemize}
@@ -530,7 +530,7 @@ The transition is \textit{first-order} (all-or-nothing, binary basin membership)
 \subsection{Limitations}
 
 \vspace{3pt}
-\noindent\textbf{Concentration units.} We adopt a working calibration of 1 token = 1 uM for experimental interpretation in this study. However, this mapping remains a modeling convention; direct translation to clinical pharmacology requires explicit PK/PD calibration against measured brain and plasma concentrations. Thus, the model's strongest claims are on relative effects, thresholds, and factor sensitivities.
+\noindent\textbf{Concentration units.} Model concentrations are in Petri net marking units, not directly translatable to clinical pharmacology without calibration. The model predicts relative effects, thresholds, and factor sensitivities rather than absolute drug concentrations.
 
 \vspace{3pt}
 \noindent\textbf{M1/M2 simplification.} The strict M1/M2 binary enforced by the microglial P-invariant is a simplification. Real microglia occupy a spectrum of activation states including disease-associated microglia (DAM). The conservation law creates more rigid polarization switching than biology likely exhibits.

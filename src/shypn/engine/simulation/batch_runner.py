@@ -312,7 +312,6 @@ class BatchSimulationRunner:
                 max_tau=s.max_tau,
                 seed=None,
                 use_parallel=s.use_parallel_stochastic,
-                use_jit_kernel=getattr(s, 'use_jit_kernel', False),
                 verbose=False,
             )
             replicate_controller._tau_leaping_engine.leap_selector.min_tau = s.min_tau
@@ -423,12 +422,6 @@ class BatchSimulationRunner:
                     import numpy as _np
                     _engine.poisson_sampler.rng = _np.random.default_rng(_rep_seed)
                     _engine.skellam_sampler.rng = _np.random.default_rng(_rep_seed + 1)
-                    if _engine.use_jit_kernel:
-                        from shypn.engine.simulation.tau_leaping.jit_kernel import (
-                            NUMBA_AVAILABLE, seed_kernel,
-                        )
-                        if NUMBA_AVAILABLE and seed_kernel is not None:
-                            seed_kernel(_rep_seed)
 
                 # Reset the PROXY model to initial marking with optional noise.
                 # Must use replicate_controller.model (the isolated proxy) so that
@@ -612,7 +605,6 @@ class BatchSimulationRunner:
         replicate_controller.data_collector.time_based_recording = True
         replicate_controller.data_collector.recording_time_interval = 0.5
         replicate_controller.settings.use_tau_leaping = True
-        replicate_controller.settings.use_jit_kernel = True  # Phase 6: enable JIT in batch
 
         # Warm up the C accelerator BEFORE forking so every child inherits the
         # compiled .so (avoids N separate compilations in parallel workers).

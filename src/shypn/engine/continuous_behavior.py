@@ -211,7 +211,6 @@ class ContinuousBehavior(TransitionBehavior):
                         T = ts.get('temperature', 298.15)
                         static['T'] = T
                         static['Temperature'] = T
-                        static['T_celsius'] = T - 273.15
                         static['pH'] = ts.get('ph', 7.0)
                         static['ionic_strength'] = ts.get('ionic_strength', 0.1)
                         static['I'] = static['ionic_strength']
@@ -269,16 +268,19 @@ class ContinuousBehavior(TransitionBehavior):
                     pname = getattr(places[tid], 'name', '') or ''
                     pname_lo = pname.lower()
                     if 'celsius' in pname_lo or 'celcius' in pname_lo:
-                        context['T_celsius'] = tokens
                         context['T'] = tokens + 273.15
                         context['Temperature'] = context['T']
                     else:
                         context['T'] = tokens
                         context['Temperature'] = tokens
-                        context['T_celsius'] = tokens - 273.15
                 for pid in self._thermo_ph_place_ids:  # type: ignore[union-attr]
                     if pid in places:
                         context['pH'] = context.get(pid, 0)
+
+                # Backward-compatible derived thermodynamic alias used by
+                # existing model equations (e.g. Q10 terms).
+                if 'T' in context:
+                    context['T_celsius'] = context['T'] - 273.15
                 
                 # Evaluate expression safely (replaces eval() for security)
                 result = safe_eval_numeric(expr_processed, context, allow_math=True)
@@ -542,6 +544,11 @@ class ContinuousBehavior(TransitionBehavior):
             if source_place.tokens < effective_floor:
                 return False, f"place-below-threshold-{place_id}"
         
+        # PreemptionCheck: single-layer verification of signal-producing predecessors
+        preempt_ok, preempt_reason = self._check_preemption()
+        if not preempt_ok:
+            return False, preempt_reason
+
         return True, "enabled-continuous"
     
     def fire(self, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:

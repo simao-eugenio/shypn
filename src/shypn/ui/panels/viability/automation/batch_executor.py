@@ -54,7 +54,6 @@ def _worker_pool_initializer(q) -> None:
     # transitions.
     import logging as _logging
     _logging.basicConfig(level=_logging.WARNING, format='%(levelname)s [%(name)s] %(message)s')
-    _logging.getLogger('shypn.engine.acceleration').setLevel(_logging.ERROR)
     _logging.getLogger('shypn.engine.simulation.controller').setLevel(_logging.ERROR)
 
 

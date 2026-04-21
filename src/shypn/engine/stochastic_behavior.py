@@ -317,7 +317,6 @@ class StochasticBehavior(TransitionBehavior):
                 # NOTE: Internal storage is Kelvin, but users can use celsius=True in functions
                 context['T'] = settings.get('temperature', 298.15)  # Kelvin
                 context['Temperature'] = context['T']
-                context['T_celsius'] = context['T'] - 273.15  # Celsius for convenience
                 context['pH'] = settings.get('ph', 7.0)
                 context['ionic_strength'] = settings.get('ionic_strength', 0.1)
                 context['I'] = context['ionic_strength']  # Shorthand
@@ -331,18 +330,16 @@ class StochasticBehavior(TransitionBehavior):
             # This makes temperature, pH, etc. dynamic state variables (more realistic)
             for place_name, tokens in places_dict.items():
                 # Temperature place overrides static setting
-                # Support both Kelvin and Celsius units based on place name
+                # Support both Kelvin and Celsius-named places based on place name
                 if 'temperature' in place_name.lower():
-                    # If place name suggests Celsius (e.g., "Temperature_celsius", "T_celsius")
+                    # If place name suggests Celsius, convert to Kelvin immediately.
                     if 'celsius' in place_name.lower() or 'celcius' in place_name.lower():
-                        context['T_celsius'] = tokens
                         context['T'] = tokens + 273.15  # Convert to Kelvin
                         context['Temperature'] = context['T']
                     # Otherwise assume Kelvin (standard for thermodynamics)
                     else:
                         context['T'] = tokens
                         context['Temperature'] = tokens
-                        context['T_celsius'] = tokens - 273.15
                 # pH places (could be pH_gradient, pH_cytoplasm, etc.)
                 elif 'ph' in place_name.lower() and 'gradient' not in place_name.lower():
                     context['pH'] = tokens
@@ -351,6 +348,11 @@ class StochasticBehavior(TransitionBehavior):
                     # Assume concentration is in appropriate units (nM or µM)
                     # context['pH'] = -log10(tokens * scaling_factor)
                     pass  # User can use concentration_to_ph() function
+
+            # Backward-compatible derived thermodynamic alias used by
+            # existing model equations (e.g. Q10 terms).
+            if 'T' in context:
+                context['T_celsius'] = context['T'] - 273.15
             
             # Debug: Log available places
             if not places_dict:
@@ -821,14 +823,21 @@ class StochasticBehavior(TransitionBehavior):
                     # Hybrid PN: stochastic transitions are discrete — floor fractional tokens
                     # so that a place with e.g. 1.5 µM contributes 1 countable token.
                     # Signal flow arcs additionally require θ_eff tokens as basin
-                    # floor (formalism: M(ps) ≥ θ_eff + Ws). θ_eff = 0 by default.
+                    # floor (formalism: M(ps) ≥ θ_eff + Ws·burst). θ_eff = 0 by default.
                     # When activation_energy > 0, θ_eff is temperature-dependent.
+                    # NOTE: θ_eff is the basin floor (a single minimum, not per-firing).
+                    # For n burst firings: M(ps) ≥ θ_eff + Ws·n, NOT (θ_eff + Ws)·n.
                     theta = self._get_theta_eff(arc)
-                    required = (arc.weight + theta) * burst
+                    required = arc.weight * burst + theta
                     logger.debug(f"    → Normal: checking burst requirement={required} (θ_eff={theta})")
                     if math.floor(source_place.tokens) < required:
                         return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
+        # PreemptionCheck: single-layer verification of signal-producing predecessors
+        preempt_ok, preempt_reason = self._check_preemption()
+        if not preempt_ok:
+            return False, preempt_reason
+
         if is_source:
             return True, f"enabled-source (burst={self._sampled_burst if self._sampled_burst else self.max_burst})"
         return True, f"enabled-stochastic (burst={self._sampled_burst if self._sampled_burst else self.max_burst})"
