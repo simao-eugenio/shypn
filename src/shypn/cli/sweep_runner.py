@@ -324,18 +324,24 @@ class SweepRunner:
                     cond_elapsed = result_payload['wall_seconds']
                     n_ok = result_payload['replicates_ok']
                     n_err = result_payload['replicates_error']
+                    cpu_s = result_payload.get('cpu_seconds', 0.0)
+                    peak_mib = result_payload.get('peak_rss_mib', 0.0)
 
                     summary_rows[idx] = {
                         'condition': label,
                         'replicates_ok': n_ok,
                         'replicates_error': n_err,
                         'wall_seconds': round(cond_elapsed, 2),
+                        'cpu_seconds': round(cpu_s, 2),
+                        'peak_rss_mib': round(peak_mib, 1),
                     }
 
                     if self.verbose:
+                        cpu_pct = (cpu_s / cond_elapsed * 100.0) if cond_elapsed > 0 else 0.0
                         print(
                             f"  done in {cond_elapsed:.1f}s "
-                            f"({n_ok} ok, {n_err} errors)",
+                            f"({n_ok} ok, {n_err} errors) "
+                            f"[cpu={cpu_s:.0f}s {cpu_pct:.0f}%, rss={peak_mib:.0f} MiB]",
                             flush=True,
                         )
                 except Exception as exc:
@@ -345,6 +351,8 @@ class SweepRunner:
                         'replicates_ok': 0,
                         'replicates_error': sim.replicates,
                         'wall_seconds': 0.0,
+                        'cpu_seconds': 0.0,
+                        'peak_rss_mib': 0.0,
                     }
                     if self.verbose:
                         print(
@@ -363,6 +371,46 @@ class SweepRunner:
         # 5. Summary
         output.write_summary([r for r in summary_rows if r is not None])
         wall_total = time.monotonic() - wall_start
+
+        # 5b. Resource usage report (parent + per-condition aggregates)
+        try:
+            import json as _json
+            import resource as _resource
+            _ru_self = _resource.getrusage(_resource.RUSAGE_SELF)
+            _ru_chld = _resource.getrusage(_resource.RUSAGE_CHILDREN)
+            rows = [r for r in summary_rows if r is not None]
+            total_cpu = sum(r.get('cpu_seconds', 0.0) for r in rows)
+            peak_worker_rss = max(
+                (r.get('peak_rss_mib', 0.0) for r in rows), default=0.0
+            )
+            cpu_efficiency = (
+                (total_cpu / (wall_total * n_workers) * 100.0)
+                if wall_total > 0 and n_workers > 0 else 0.0
+            )
+            usage = {
+                'wall_seconds': round(wall_total, 2),
+                'workers': n_workers,
+                'n_conditions': n_conditions,
+                'parent_peak_rss_mib': round(_ru_self.ru_maxrss / 1024.0, 1),
+                'children_peak_rss_mib': round(_ru_chld.ru_maxrss / 1024.0, 1),
+                'children_cpu_user_seconds': round(_ru_chld.ru_utime, 2),
+                'children_cpu_sys_seconds': round(_ru_chld.ru_stime, 2),
+                'sum_condition_cpu_seconds': round(total_cpu, 2),
+                'max_condition_peak_rss_mib': round(peak_worker_rss, 1),
+                'cpu_efficiency_percent': round(cpu_efficiency, 1),
+                'per_condition': rows,
+            }
+            with open(output.run_dir / 'resource_usage.json', 'w') as f:
+                _json.dump(usage, f, indent=2)
+            if self.verbose:
+                print(
+                    f"Resource: cpu_eff={cpu_efficiency:.0f}% "
+                    f"(sum_cpu={total_cpu:.0f}s / {wall_total:.0f}s × {n_workers} workers), "
+                    f"max worker RSS={peak_worker_rss:.0f} MiB, "
+                    f"parent RSS={_ru_self.ru_maxrss / 1024.0:.0f} MiB"
+                )
+        except Exception as _exc:
+            logger.warning("Failed to write resource_usage.json: %s", _exc)
 
         if self.verbose:
             print(f"\nSweep complete in {wall_total:.1f}s")
@@ -515,7 +563,9 @@ def _run_single_condition(
     """
     import gc
     import time as _time
+    import resource as _resource
     cond_start = _time.monotonic()
+    cpu_start = _time.process_time()
 
     # Suppress ODE acceleration noise in worker
     import logging as _logging
@@ -579,9 +629,17 @@ def _run_single_condition(
     gc.collect()
     # ─────────────────────────────────────────────────────────────────
 
+    # Resource usage — peak RSS in MiB, CPU seconds (user + sys for self
+    # and any reaped child threads).  ru_maxrss is in KiB on Linux.
+    _ru_self = _resource.getrusage(_resource.RUSAGE_SELF)
+    cpu_elapsed = _time.process_time() - cpu_start
+    peak_rss_mib = _ru_self.ru_maxrss / 1024.0  # KiB → MiB on Linux
+
     # Return only the lightweight summary — no trajectory data crosses IPC.
     return {
         'wall_seconds': cond_elapsed,
+        'cpu_seconds': cpu_elapsed,
+        'peak_rss_mib': peak_rss_mib,
         'replicates_ok': n_ok,
         'replicates_error': n_err,
     }
