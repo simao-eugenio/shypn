@@ -17,7 +17,6 @@ from .leap_selector import LeapSelector
 from .poisson_sampler import PoissonSampler
 from .skellam_sampler import SkellamSampler
 from .parallel_scheduler import ParallelStochasticScheduler
-from . import jit_kernel as jit_kernel
 
 
 class TauLeapingEngine:
@@ -47,7 +46,6 @@ class TauLeapingEngine:
         max_tau: float = 1.0,
         seed: Optional[int] = None,
         use_parallel: bool = False,
-        use_jit_kernel: bool = False,
         n_critical: int = 10,
         verbose: bool = True
     ):
@@ -71,7 +69,6 @@ class TauLeapingEngine:
         self.poisson_sampler = PoissonSampler(seed=seed)
         self.skellam_sampler = SkellamSampler(seed=seed)  # For reversible reactions
         self.use_parallel = use_parallel
-        self.use_jit_kernel = use_jit_kernel
         self.verbose = verbose
         
         # Parallel scheduler (initialized lazily)
@@ -133,7 +130,6 @@ class TauLeapingEngine:
         # Compute the full propensity vector via the C accelerator (once per
         # step) so that both select_tau and _sample_firings share the result
         # instead of each calling _evaluate_rate_at_enablement × N.
-        _jit_raw = None  # Phase 6: (a_net, a_fwd, a_rev) raw arrays when JIT is active
         self._accel_props = None
         if hasattr(controller, '_ensure_propensity_accelerator'):
             controller._ensure_propensity_accelerator()
@@ -152,28 +148,14 @@ class TauLeapingEngine:
                     _prop_accel.update_y_from_model()
                 _prop_accel.update_thermo_params()
                 _a_net, _a_fwd, _a_rev = _prop_accel.compute(current_time)
-                # Phase 6: in JIT mode skip the per-step dict build (raw numpy
-                # arrays go directly to the compiled kernel, saving ~29 Python
-                # float() calls and a dict comprehension per step).
-                _use_jit = (
-                    self.use_jit_kernel
-                    and jit_kernel.NUMBA_AVAILABLE
-                    and jit_kernel.tau_step_kernel is not None
-                    and _prop_accel._g_vec is not None
-                    and _prop_accel._stoich_matrix is not None
-                )
-                if _use_jit:
-                    _jit_raw = (_a_net, _a_fwd, _a_rev)
-                    # self._accel_props stays None — not needed in the JIT path
-                else:
-                    self._accel_props = {
-                        tid: (
-                            float(_a_net[i]),
-                            float(_a_fwd[i]),
-                            float(_a_rev[i]),
-                        )
-                        for i, tid in enumerate(_prop_accel.transition_ids_order)
-                    }
+                self._accel_props = {
+                    tid: (
+                        float(_a_net[i]),
+                        float(_a_fwd[i]),
+                        float(_a_rev[i]),
+                    )
+                    for i, tid in enumerate(_prop_accel.transition_ids_order)
+                }
             except Exception as _exc:
                 self.logger.debug(
                     "PropensityAccelerator.compute failed (%s); "
@@ -209,64 +191,7 @@ class TauLeapingEngine:
                 _prop_accel.transition_ids_order,
             )
 
-        # ── Phase 6: JIT short-circuit ────────────────────────────────────────
-        # Combines Cao τ selection + Poisson/Skellam sampling in a single
-        # Numba-compiled call, bypassing the Python loops in select_tau() and
-        # _sample_firings().  Falls through to the standard path when the JIT
-        # is not active (e.g. numba not installed, first call, accel not ready).
-        if _jit_raw is not None:
-            _a_net_j, _a_fwd_j, _a_rev_j = _jit_raw
-            tau_jit, k_arr_jit = jit_kernel.tau_step_kernel(
-                np.ascontiguousarray(_a_net_j, dtype=np.float64),
-                np.ascontiguousarray(_a_fwd_j, dtype=np.float64),
-                np.ascontiguousarray(_a_rev_j, dtype=np.float64),
-                _prop_accel._g_vec,
-                _prop_accel._y_arr,          # read-only snapshot for ε_i term
-                _prop_accel._stoich_matrix,
-                _prop_accel._stoich_matrix_sq,
-                float(self.leap_selector.critical_threshold),
-                float(self.leap_selector.epsilon),
-                float(self.leap_selector.max_tau),
-                float(self.leap_selector.min_tau),
-                np.int64(getattr(self.leap_selector, 'n_critical', 10)),
-            )
-            if tau_jit == 0.0:
-                self.stats['exact_ssa_fallbacks'] += 1
-                return self._execute_exact_ssa_step(controller, stochastic_transitions)
-            firings_map = self._k_arr_to_firings_map(
-                k_arr_jit, _prop_accel, stochastic_transitions
-            )
-            firings_map = self._apply_inhibitor_constraints(firings_map, stochastic_transitions)
-            self._changed_place_ids = set()
-            total_firings = self._apply_firings_fast(firings_map, controller, _prop_accel)
-            if self._advance_time:
-                controller.time += tau_jit
-            if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
-                self._update_assignment_rules(controller)
-            self.stats['total_leaps'] += 1
-            self.stats['total_firings'] += total_firings
-            self.stats['mean_tau'] = (
-                (self.stats['mean_tau'] * (self.stats['total_leaps'] - 1) + tau_jit)
-                / self.stats['total_leaps']
-            )
-            if hasattr(controller, 'data_collector') and controller.data_collector:
-                controller.data_collector.record_event(
-                    time=controller.time,
-                    event_type='tau_leap',
-                    data={
-                        'tau': tau_jit,
-                        'total_firings': total_firings,
-                        'num_transitions': int(np.count_nonzero(k_arr_jit)),
-                        'leap_info': {'reason': 'jit_kernel'},
-                    },
-                )
-            duration_s = controller.settings.get_duration_seconds()
-            if duration_s is None:
-                return True
-            return controller.time < duration_s
-        # ─────────────────────────────────────────────────────────────────────
-
-        # Step 1: Select leap size τ  (standard Python path)
+        # Step 1: Select leap size τ
         tau, leap_info = self.leap_selector.select_tau(
             stochastic_transitions,
             model,
