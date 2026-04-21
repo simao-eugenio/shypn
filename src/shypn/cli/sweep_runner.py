@@ -69,6 +69,93 @@ def _worker_init() -> None:
     # Pin to cores 4+ so cores 0-3 remain free for sshd/system
     _apply_cpu_affinity()
 
+
+class _GpuSampler:
+    """Background ``nvidia-smi`` poller that records GPU utilisation.
+
+    Spawns a single ``nvidia-smi --query-gpu=... -lms <period>`` process
+    in the parent (one sampler shared across all workers, since they all
+    share the same physical GPU).  When ``stop()`` is called, the
+    subprocess is terminated, its stdout parsed, and aggregate stats
+    (mean / peak SM utilisation, mean / peak VRAM in MiB, sample count)
+    are returned as a dict.
+
+    Returns ``{'available': False, ...}`` if ``nvidia-smi`` is missing
+    or fails to start, so callers can always include the field
+    unconditionally in their output.
+    """
+
+    @classmethod
+    def start(cls, period_ms: int = 500) -> "_GpuSampler":
+        self = cls()
+        self.period_ms = period_ms
+        self.proc = None
+        self.t0 = time.monotonic()
+        try:
+            import subprocess
+            # noheader,nounits => "<sm>, <mem_used>" per line
+            self.proc = subprocess.Popen(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=utilization.gpu,memory.used",
+                    "--format=csv,noheader,nounits",
+                    f"-lms", str(period_ms),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
+            )
+        except (FileNotFoundError, OSError):
+            self.proc = None
+        return self
+
+    def stop(self) -> dict:
+        out = {
+            "available": False,
+            "period_ms": self.period_ms,
+            "duration_seconds": round(time.monotonic() - self.t0, 2),
+        }
+        if self.proc is None:
+            out["reason"] = "nvidia-smi unavailable"
+            return out
+        try:
+            self.proc.terminate()
+            stdout_text, _ = self.proc.communicate(timeout=2.0)
+        except Exception:
+            try:
+                self.proc.kill()
+                stdout_text, _ = self.proc.communicate(timeout=1.0)
+            except Exception:
+                stdout_text = ""
+        sm_samples = []
+        vram_samples = []
+        for line in (stdout_text or "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 2:
+                continue
+            try:
+                sm_samples.append(float(parts[0]))
+                vram_samples.append(float(parts[1]))
+            except ValueError:
+                continue
+        if not sm_samples:
+            out["reason"] = "no samples collected"
+            return out
+        out.update(
+            available=True,
+            n_samples=len(sm_samples),
+            avg_sm_pct=round(sum(sm_samples) / len(sm_samples), 1),
+            max_sm_pct=round(max(sm_samples), 1),
+            avg_vram_mib=round(sum(vram_samples) / len(vram_samples), 1),
+            max_vram_mib=round(max(vram_samples), 1),
+        )
+        return out
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -276,6 +363,9 @@ class SweepRunner:
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
         n_workers = min(self.workers, n_conditions)
 
+        # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
+        gpu_sampler = _GpuSampler.start(period_ms=500)
+
         with ProcessPoolExecutor(
             max_workers=n_workers,
             initializer=_worker_init,
@@ -372,6 +462,9 @@ class SweepRunner:
         output.write_summary([r for r in summary_rows if r is not None])
         wall_total = time.monotonic() - wall_start
 
+        # 5a. Stop GPU sampler and collect stats (None if unavailable)
+        gpu_stats = gpu_sampler.stop()
+
         # 5b. Resource usage report (parent + per-condition aggregates)
         try:
             import json as _json
@@ -398,6 +491,7 @@ class SweepRunner:
                 'sum_condition_cpu_seconds': round(total_cpu, 2),
                 'max_condition_peak_rss_mib': round(peak_worker_rss, 1),
                 'cpu_efficiency_percent': round(cpu_efficiency, 1),
+                'gpu': gpu_stats,
                 'per_condition': rows,
             }
             with open(output.run_dir / 'resource_usage.json', 'w') as f:
@@ -409,6 +503,15 @@ class SweepRunner:
                     f"max worker RSS={peak_worker_rss:.0f} MiB, "
                     f"parent RSS={_ru_self.ru_maxrss / 1024.0:.0f} MiB"
                 )
+                if gpu_stats and gpu_stats.get('available'):
+                    print(
+                        f"GPU: avg_sm={gpu_stats['avg_sm_pct']:.0f}% "
+                        f"max_sm={gpu_stats['max_sm_pct']:.0f}% "
+                        f"avg_vram={gpu_stats['avg_vram_mib']:.0f} MiB "
+                        f"max_vram={gpu_stats['max_vram_mib']:.0f} MiB "
+                        f"({gpu_stats['n_samples']} samples "
+                        f"every {gpu_stats['period_ms']} ms)"
+                    )
         except Exception as _exc:
             logger.warning("Failed to write resource_usage.json: %s", _exc)
 
