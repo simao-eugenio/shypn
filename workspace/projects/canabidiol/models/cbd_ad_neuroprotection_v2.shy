@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-04-20T19:48:05.757120",
+    "created": "2026-04-22T15:44:40.273915",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -12,9 +12,9 @@
     }
   },
   "view_state": {
-    "zoom": 0.31046066152958307,
-    "pan_x": 3164.8617328122305,
-    "pan_y": 124.30693241893337,
+    "zoom": 0.8857805000000165,
+    "pan_x": 2257.9171596218903,
+    "pan_y": 93.29413071929105,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1069,9 +1069,9 @@
       "x": -1880.0,
       "y": 270.0,
       "radius": 40.0,
-      "marking": 312.15,
-      "tokens": 312.15,
-      "initial_marking": 312.15,
+      "marking": 310.15,
+      "tokens": 310.15,
+      "initial_marking": 310.15,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -1476,6 +1476,7 @@
       },
       "signal_places": [
         "P29",
+        "P28",
         "P5"
       ],
       "is_environment_aware": true,
@@ -1518,6 +1519,7 @@
       },
       "signal_places": [
         "P29",
+        "P28",
         "P6"
       ],
       "is_environment_aware": true,
@@ -1597,6 +1599,7 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
+        "P28",
         "P9"
       ],
       "is_environment_aware": true,
@@ -1796,6 +1799,7 @@
         "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
       },
       "signal_places": [
+        "P28",
         "P16"
       ],
       "is_environment_aware": true,
@@ -1996,11 +2000,12 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P31",
         "P29",
-        "P11",
+        "P28",
         "P6",
-        "P22"
+        "P22",
+        "P31",
+        "P11"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2043,8 +2048,8 @@
       "signal_places": [
         "P31",
         "P26",
-        "P27",
-        "P21"
+        "P21",
+        "P27"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2123,11 +2128,12 @@
         "rate_function_display": "k_tox \u00d7 f([A\u03b2]) \u00d7 f([ROS]) \u00d7 f([TNF\u03b1])"
       },
       "signal_places": [
-        "P31",
         "P29",
-        "P11",
+        "P28",
+        "P19",
         "P6",
-        "P19"
+        "P31",
+        "P11"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2169,6 +2175,7 @@
       },
       "signal_places": [
         "P24",
+        "P28",
         "P23"
       ],
       "is_environment_aware": true,

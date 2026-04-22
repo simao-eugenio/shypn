@@ -31,7 +31,8 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 CONDITION_RE = re.compile(r"condition_(.+)$")
-KV_RE = re.compile(r"(?P<k>[A-Za-z0-9_]+)=(?P<v>-?\d+(?:\.\d+)?)")
+# Accept both "Key=Value" (raw) and "Key_eq_Value" (filesystem-safe) condition dirs.
+KV_RE = re.compile(r"(?P<k>[A-Za-z][A-Za-z0-9_]*?)(?:=|_eq_)(?P<v>-?\d+(?:\.\d+)?)")
 
 
 def parse_condition_name(name: str) -> Optional[Dict[str, float]]:
