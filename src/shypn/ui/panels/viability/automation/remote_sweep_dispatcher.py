@@ -340,6 +340,23 @@ class RemoteSweepDispatcher:
                         f"({len(snap_names)} total, {len(unique_names)} unique). "
                         f"Please clear and regenerate experiments.")
 
+            # Allocation summary — emitted explicitly so the user sees
+            # workers × conditions × replicates regardless of streaming
+            # noise from the parent sweep CLI.
+            try:
+                _n_snap = len(exported.get('snapshots', [])) or 1
+                _n_rep = int(exported.get('replicates', 1) or 1)
+                _n_evt = len(exported.get('events', []) or [])
+                _w = workers if workers > 0 else 'auto'
+                self._emit(
+                    progress_cb,
+                    f"Allocated {_w} worker(s) for {_n_snap} condition(s) "
+                    f"× {_n_rep} replicate(s) = {_n_snap * _n_rep} simulation(s) "
+                    f"({_n_evt} event(s))",
+                )
+            except Exception:
+                pass
+
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 

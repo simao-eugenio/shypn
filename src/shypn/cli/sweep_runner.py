@@ -695,18 +695,21 @@ def _run_single_condition(
     # _evaluate_environment_events picks them up from model.events.
     if events:
         from shypn.data.pathway.pathway_data import Event as _Event
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
         try:
             model.events = [_Event.from_dict(e) for e in events]
-            if verbose and condition_index == 0:
-                # Print once per sweep (first condition) so log is not noisy
-                print(
-                    f"[EVENT_DISPATCH] worker installed {len(model.events)} event(s) on model: "
-                    + str([e.id + '@' + e.trigger for e in model.events]),
-                    flush=True,
+            if condition_index == 0:
+                # Audit log only — NOT printed to stdout, otherwise this
+                # would freeze the GUI status label on the SSH stream
+                # for the duration of the worker's first simulation.
+                _log.info(
+                    "[EVENT_DISPATCH] worker installed %d event(s) on model: %s",
+                    len(model.events),
+                    [e.id + '@' + e.trigger for e in model.events],
                 )
         except Exception as _exc:
-            import logging as _lg
-            _lg.getLogger(__name__).warning(
+            _log.warning(
                 "Failed to install %d dispatched events: %s", len(events), _exc
             )
 
