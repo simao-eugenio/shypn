@@ -238,9 +238,14 @@ def main() -> int:
     lines.append("fit transfer function CBD_intracellular_final = f(CBD_extracellular_final); invert at EC50_intra and EC90_intra.\n\n")
 
     lines.append("## Per (Age, pH) results\n")
+    lines.append("**Therapeutic intracellular window** is defined as [EC50_intra, EC90_intra] of the "
+                 "Hill fit of `Neuron_Health_final` vs `CBD_intracellular_final`.\n")
+    lines.append("**Administered dose** is the set `CBD_extracellular` initial concentration "
+                 "(condition-name parameter). Transfer fit `CBD_intracellular_final = f(set_dose)` "
+                 "is inverted to give the dose required to reach each intracellular target.\n")
     header = ("| Age | pH | n pts | EC50_intra (µM) | 95% CI | Hill n | E0 | Emax | "
               "EC90_intra (µM) | transfer | k or (ec50,n,vmax) | RMSE_t | "
-              "external @ EC50_intra (µM) | external @ EC90_intra (µM) | intra/extra @ EC50_intra |")
+              "**set dose @ EC50_intra (µM)** | **set dose @ EC90_intra (µM)** | intra/set ratio |")
     sep = ("|---:|---:|---:|---:|---|---:|---:|---:|---:|---|---|---:|---:|---:|---:|")
     lines.append(header)
     lines.append(sep)
@@ -254,16 +259,18 @@ def main() -> int:
         by_cbd: Dict[float, List[Dict]] = {}
         for r in rs:
             by_cbd.setdefault(round(r["CBD_extracellular"], 4), []).append(r)
-        ext_arr, intra_arr, neuron_arr = [], [], []
+        ext_arr, intra_arr, neuron_arr, extfin_arr = [], [], [], []
         for cbd, recs in sorted(by_cbd.items()):
             ws = np.array([rec["CBD_extracellular_final_n"] for rec in recs], dtype=float)
             if ws.sum() == 0:
                 continue
-            extra_v = np.average([rec["CBD_extracellular_final_mean"] for rec in recs], weights=ws)
+            extra_set = float(cbd)  # the administered/set dose from the condition name
+            extra_fin = np.average([rec["CBD_extracellular_final_mean"] for rec in recs], weights=ws)
             intra_v = np.average([rec["CBD_intracellular_final_mean"] for rec in recs], weights=ws)
             neuron_v = np.average([rec["Neuron_Health_final_mean"] for rec in recs], weights=ws)
-            ext_arr.append(extra_v); intra_arr.append(intra_v); neuron_arr.append(neuron_v)
-        ext_arr = np.array(ext_arr); intra_arr = np.array(intra_arr); neuron_arr = np.array(neuron_arr)
+            ext_arr.append(extra_set); intra_arr.append(intra_v); neuron_arr.append(neuron_v); extfin_arr.append(extra_fin)
+        ext_arr = np.array(ext_arr); intra_arr = np.array(intra_arr)
+        neuron_arr = np.array(neuron_arr); extfin_arr = np.array(extfin_arr)
 
         hill_intra = fit_hill_with_ci(intra_arr, neuron_arr)
         transfer = fit_intra_vs_extra(ext_arr, intra_arr)
