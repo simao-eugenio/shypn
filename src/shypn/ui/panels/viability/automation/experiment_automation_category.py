@@ -858,16 +858,27 @@ class ExperimentAutomationCategory:
         Returns a list of plain dicts suitable for embedding in the sweep
         config JSON.  Empty list if no events or model unavailable.
         """
-        try:
-            if not self.parent_panel:
-                return []
-            canvas_mgr = self.parent_panel._get_current_model()
-            if canvas_mgr is None:
-                return []
-            events = getattr(canvas_mgr, 'events', None) or []
-            return [e.to_dict() for e in events if hasattr(e, 'to_dict')]
-        except Exception:
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
+        if not self.parent_panel:
+            _log.warning("[EVENT_DISPATCH] no parent_panel; events=[]")
             return []
+        canvas_mgr = self.parent_panel._get_current_model()
+        if canvas_mgr is None:
+            _log.warning("[EVENT_DISPATCH] _get_current_model returned None; events=[]")
+            return []
+        events = getattr(canvas_mgr, 'events', None) or []
+        try:
+            payload = [e.to_dict() for e in events if hasattr(e, 'to_dict')]
+        except Exception as exc:
+            _log.exception("[EVENT_DISPATCH] serialisation failed: %s", exc)
+            return []
+        _log.info(
+            "[EVENT_DISPATCH] captured %d event(s) from model %r: %s",
+            len(payload), getattr(canvas_mgr, 'filepath', '?'),
+            [e.get('id') + '@' + e.get('trigger', '') for e in payload],
+        )
+        return payload
 
     def _collect_sim_params(self) -> dict:
         """Read simulation parameters from sweep builder widgets."""
