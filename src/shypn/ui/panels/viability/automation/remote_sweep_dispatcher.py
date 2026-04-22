@@ -302,7 +302,8 @@ class RemoteSweepDispatcher:
                 logger.warning("Pre-dispatch cleanup failed (non-fatal): %s", e)
 
             # ── 2. Export sweep config (local temp) ──────────────────
-            self._emit(progress_cb, 'Exporting sweep config...')
+            self._emit(progress_cb,
+                       f'Exporting sweep config ({len(events or [])} event(s))...')
             staging = Path(tempfile.mkdtemp(prefix='shypn_remote_'))
             config_path = staging / 'sweep_config.json'
             experiment_manager.export_sweep_config(
@@ -311,6 +312,18 @@ class RemoteSweepDispatcher:
                 events=events or None,
                 **sim_params,
             )
+            # Audit log: dump event count + ids straight from the file
+            try:
+                with open(config_path) as _f:
+                    _exported = json.load(_f)
+                _ev = _exported.get('events') or []
+                logger.info(
+                    "[EVENT_DISPATCH] sweep_config.json contains %d event(s): %s",
+                    len(_ev),
+                    [e.get('id') + '@' + e.get('trigger', '') for e in _ev],
+                )
+            except Exception:
+                pass
 
             # ── 2b. Pre-flight validation ────────────────────────────
             # Detect duplicate snapshots (common when user clicks Generate
