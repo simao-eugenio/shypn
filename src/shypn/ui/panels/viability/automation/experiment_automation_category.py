@@ -847,7 +847,27 @@ class ExperimentAutomationCategory:
             progress_cb=on_progress,
             complete_cb=on_complete,
             ssh_password=ssh_password or None,
+            events=self._collect_model_events(),
         )
+
+    def _collect_model_events(self) -> list:
+        """Serialise the current model's environment events for dispatch.
+
+        Events are defined by the user on the Environment Panel and live
+        on ``model.events`` (list of ``shypn.data.pathway.pathway_data.Event``).
+        Returns a list of plain dicts suitable for embedding in the sweep
+        config JSON.  Empty list if no events or model unavailable.
+        """
+        try:
+            if not self.parent_panel:
+                return []
+            canvas_mgr = self.parent_panel._get_current_model()
+            if canvas_mgr is None:
+                return []
+            events = getattr(canvas_mgr, 'events', None) or []
+            return [e.to_dict() for e in events if hasattr(e, 'to_dict')]
+        except Exception:
+            return []
 
     def _collect_sim_params(self) -> dict:
         """Read simulation parameters from sweep builder widgets."""

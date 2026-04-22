@@ -393,6 +393,7 @@ class SweepRunner:
                     n_conditions=n_conditions,
                     output_dir=str(output.run_dir),
                     verbose=self.verbose,
+                    events=list(getattr(self.config, 'events', []) or []),
                 )
                 futures_map[fut] = idx
 
@@ -654,6 +655,7 @@ def _run_single_condition(
     n_conditions: int,
     output_dir: str,
     verbose: bool,
+    events: list = None,
 ) -> dict:
     """Execute one condition in a worker process.
 
@@ -686,6 +688,20 @@ def _run_single_condition(
 
     # Apply overrides
     SweepRunner._apply_snapshot(model, snapshot, baseline)
+
+    # Install environment events forwarded from the dispatching client.
+    # These are defined on the GUI Environment Panel and travel inside
+    # the sweep config JSON (top-level 'events' field).  The engine's
+    # _evaluate_environment_events picks them up from model.events.
+    if events:
+        from shypn.data.pathway.pathway_data import Event as _Event
+        try:
+            model.events = [_Event.from_dict(e) for e in events]
+        except Exception as _exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                "Failed to install %d dispatched events: %s", len(events), _exc
+            )
 
     # Run replicates
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
