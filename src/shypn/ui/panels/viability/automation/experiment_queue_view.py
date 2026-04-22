@@ -151,12 +151,27 @@ class ExperimentQueueView(Gtk.Box):
         
         self.pack_start(button_box, False, False, 0)
 
-        # Status bar — scrollable, selectable, copyable text view
+        # Status bar — scrollable, selectable, copyable text view.
+        # Acts as a category-aware append-only log so messages from
+        # different sources (setup, allocation, stream, events, results)
+        # never overwrite each other.
+        status_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        status_title = Gtk.Label()
+        status_title.set_markup('<small><b>Activity log</b></small>')
+        status_title.set_xalign(0)
+        status_header.pack_start(status_title, True, True, 0)
+        self._status_clear_btn = Gtk.Button(label='Clear')
+        self._status_clear_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self._status_clear_btn.set_tooltip_text('Clear the activity log')
+        self._status_clear_btn.connect('clicked', lambda *_: self.clear_status())
+        status_header.pack_end(self._status_clear_btn, False, False, 0)
+        self.pack_start(status_header, False, False, 0)
+
         status_scroll = Gtk.ScrolledWindow()
         status_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,
                                  Gtk.PolicyType.AUTOMATIC)
-        status_scroll.set_min_content_height(36)
-        status_scroll.set_max_content_height(72)
+        status_scroll.set_min_content_height(72)
+        status_scroll.set_max_content_height(160)
 
         self._status_view = Gtk.TextView()
         self._status_view.set_editable(False)
@@ -172,14 +187,20 @@ class ExperimentQueueView(Gtk.Box):
             Pango.FontDescription.from_string('monospace 9'))
 
         self._status_buffer = self._status_view.get_buffer()
-        # Create tags for coloured status messages
+        # Coloured tags for category visual coding
         self._status_buffer.create_tag('blue', foreground='#3465a4')
         self._status_buffer.create_tag('green', foreground='#4e9a06')
         self._status_buffer.create_tag('red', foreground='#cc0000')
+        self._status_buffer.create_tag('orange', foreground='#ce5c00')
+        self._status_buffer.create_tag('grey', foreground='#888888')
         self._status_buffer.create_tag('bold',
                                        weight=Pango.Weight.BOLD)
         self._status_buffer.create_tag('italic',
                                        style=Pango.Style.ITALIC)
+
+        # Append-log bookkeeping
+        self._status_max_lines = 200
+        self._status_last_line = None  # (category, text) for dedup
 
         status_scroll.add(self._status_view)
         self.pack_start(status_scroll, False, False, 0)
@@ -527,23 +548,94 @@ class ExperimentQueueView(Gtk.Box):
 
     # ── Public status API ────────────────────────────────────────────
 
+    # Category → (label-prefix, default-tag) mapping for the activity log
+    _CATEGORIES = {
+        'setup':      ('SETUP',  'grey'),
+        'allocation': ('ALLOC',  'blue'),
+        'event':      ('EVENT',  'orange'),
+        'stream':     ('REMOTE', 'blue'),
+        'condition':  ('COND',   'blue'),
+        'done':       ('DONE',   'green'),
+        'error':      ('ERROR',  'red'),
+        'paused':     ('PAUSE',  'orange'),
+        'info':       ('INFO',   'grey'),
+    }
+
+    def append_status(self, text: str, category: str = 'info',
+                      tag: str = '') -> None:
+        """Append a categorised line to the activity log.
+
+        Each call adds a new line so messages never overwrite each other;
+        the user can scroll back through the full history. Consecutive
+        identical lines are coalesced (the prior duplicate is silently
+        dropped) to avoid spam from rapid re-emits.
+
+        Args:
+            text:     Plain text to display (already markup-stripped).
+            category: One of ``_CATEGORIES`` keys (default 'info').
+            tag:      Override tag name; falls back to category default.
+        """
+        cat_label, default_tag = self._CATEGORIES.get(
+            category, self._CATEGORIES['info'])
+        tag = tag or default_tag
+
+        # Drop exact-duplicate consecutive emits
+        line_key = (category, text)
+        if self._status_last_line == line_key:
+            return
+        self._status_last_line = line_key
+
+        import time as _time
+        ts = _time.strftime('%H:%M:%S')
+        prefix = f'[{ts}] [{cat_label}] '
+
+        buf = self._status_buffer
+        # Add separating newline if buffer not empty
+        end = buf.get_end_iter()
+        if buf.get_char_count() > 0:
+            buf.insert(end, '\n')
+            end = buf.get_end_iter()
+
+        # Insert prefix in grey, message in chosen tag
+        buf.insert_with_tags_by_name(end, prefix, 'grey')
+        end = buf.get_end_iter()
+        if tag and buf.get_tag_table().lookup(tag):
+            buf.insert_with_tags_by_name(end, text, tag)
+        else:
+            buf.insert(end, text)
+
+        # Cap buffer to last N lines (drop oldest)
+        line_count = buf.get_line_count()
+        if line_count > self._status_max_lines:
+            cut = buf.get_iter_at_line(line_count - self._status_max_lines)
+            buf.delete(buf.get_start_iter(), cut)
+
+        # Auto-scroll to end
+        self._status_view.scroll_to_iter(
+            buf.get_end_iter(), 0.0, False, 0.0, 0.0)
+
     def set_status(self, text: str, tag: str = ''):
-        """Set the status bar text (plain text, selectable/copyable).
+        """Backward-compatible entry point — forwards to :meth:`append_status`.
 
         Args:
             text: Status message (plain text — no markup).
-            tag: Optional tag name to style the text
-                 ('blue', 'green', 'red', 'bold', 'italic', or '').
+            tag:  Optional tag name. The category is inferred from the tag.
         """
-        buf = self._status_buffer
-        buf.set_text('')
-        if tag and buf.get_tag_table().lookup(tag):
-            buf.insert_with_tags_by_name(buf.get_start_iter(), text, tag)
-        else:
-            buf.set_text(text)
-        # Auto-scroll to end
-        self._status_view.scroll_to_iter(buf.get_end_iter(), 0.0,
-                                         False, 0.0, 0.0)
+        tag_to_cat = {
+            'green':  'done',
+            'red':    'error',
+            'orange': 'paused',
+            'blue':   'stream',
+            'grey':   'info',
+            '':       'info',
+        }
+        category = tag_to_cat.get(tag, 'info')
+        self.append_status(text, category=category, tag=tag)
+
+    def clear_status(self) -> None:
+        """Clear the activity log."""
+        self._status_buffer.set_text('')
+        self._status_last_line = None
 
     def _on_status_key_press(self, widget, event):
         """Handle Ctrl+C / Ctrl+A on the status TextView."""
@@ -571,8 +663,8 @@ class ExperimentQueueView(Gtk.Box):
 class _StatusLabelCompat:
     """Shim so ``queue_view.status_label.set_markup(...)`` keeps working.
 
-    Translates Pango markup calls into plain-text writes to the new
-    :class:`Gtk.TextView`-based status bar.
+    Translates Pango markup calls into category-aware appends to the
+    new :class:`Gtk.TextView`-based activity log.
     """
 
     # Minimal regex to strip Pango/HTML tags for the plain-text view
@@ -583,22 +675,45 @@ class _StatusLabelCompat:
     def __init__(self, view: ExperimentQueueView):
         self._view = view
 
+    def _infer_category(self, markup: str, text: str) -> tuple:
+        """Return ``(category, tag)`` based on markup + text content."""
+        low = text.lower()
+        if '✓' in markup or low.startswith('done'):
+            return 'done', 'green'
+        if '✗' in markup or 'error' in low or 'fail' in low:
+            return 'error', 'red'
+        if 'paused' in low or 'orange' in markup:
+            return 'paused', 'orange'
+        if low.startswith('remote:'):
+            return 'stream', 'blue'
+        if 'allocated' in low:
+            return 'allocation', 'blue'
+        if 'event' in low and ('dispatch' in low or 'redose' in low
+                               or 'washout' in low or '@' in text):
+            return 'event', 'orange'
+        if low.startswith(('exporting', 'uploading', 'opening',
+                           'cleaning', 'checking', 'creating', 'fetching')):
+            return 'setup', 'grey'
+        if low.startswith('running sweep'):
+            return 'condition', 'blue'
+        if 'foreground=' in markup:
+            if 'green' in markup:
+                return 'done', 'green'
+            if 'red' in markup:
+                return 'error', 'red'
+            if 'orange' in markup:
+                return 'paused', 'orange'
+            if 'blue' in markup:
+                return 'stream', 'blue'
+        return 'info', ''
+
     def set_markup(self, markup: str):
-        """Accept Pango markup, strip tags, write plain text to the status bar."""
+        """Accept Pango markup, strip tags, append a categorised log line."""
         text = self._TAG_RE.sub('', markup)
         for ent, ch in self._ENT.items():
             text = text.replace(ent, ch)
-
-        # Infer a colour tag from the markup
-        tag = ''
-        if 'foreground=' in markup:
-            if 'blue' in markup or '#3465a4' in markup:
-                tag = 'blue'
-            elif 'green' in markup or '#4e9a06' in markup:
-                tag = 'green'
-            elif 'red' in markup or '#cc0000' in markup:
-                tag = 'red'
-            elif 'orange' in markup:
-                tag = 'red'  # closest available
-
-        self._view.set_status(text, tag)
+        text = text.strip()
+        if not text:
+            return
+        category, tag = self._infer_category(markup, text)
+        self._view.append_status(text, category=category, tag=tag)
