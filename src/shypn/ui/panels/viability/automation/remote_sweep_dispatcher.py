@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .remote_results_proxy import RemoteResultsProxy
+from .dispatch_registry import DispatchRegistry, PendingDispatch
 
 logger = logging.getLogger(__name__)
 
@@ -443,6 +444,21 @@ class RemoteSweepDispatcher:
 
             fetch_mode = self.settings.fetch_mode
 
+            # Persist a recovery record BEFORE the fetch begins.  If the
+            # GUI is closed, restarted, or the connection drops between
+            # this point and the successful complete_cb call below, the
+            # next project-open will pick up this entry and retry the
+            # summary fetch — recovering an otherwise-invisible run.
+            registry = DispatchRegistry.for_project(project_abs)
+            pending_entry = PendingDispatch(
+                run_dir_remote=run_dir,
+                run_dir_local=str(local_run_dir),
+                ssh_host=host,
+                fetch_mode=fetch_mode.name.lower(),
+            )
+            if registry is not None:
+                registry.register(pending_entry)
+
             if fetch_mode == FetchMode.SUMMARY_ONLY:
                 # Lightweight fetch: only summary.csv + config.json (~KB)
                 self._emit(progress_cb,
@@ -467,6 +483,10 @@ class RemoteSweepDispatcher:
                 self._last_proxy = None
                 self._emit(progress_cb,
                            f'Done — results at {local_run_dir.name}')
+
+            # Fetch succeeded — drop the recovery record.
+            if registry is not None:
+                registry.unregister(str(local_run_dir))
 
             # ── 5. Done ──────────────────────────────────────────────
             if complete_cb:
