@@ -50,10 +50,44 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 try:
-    from scipy.stats import skew, kurtosis  # type: ignore
+    from scipy.stats import skew, kurtosis, pearsonr  # type: ignore
+    from scipy.optimize import curve_fit  # type: ignore
     _HAVE_SCIPY = True
 except ImportError:  # pragma: no cover
     _HAVE_SCIPY = False
+
+
+# ── Model-id → human-name resolution ────────────────────────────────
+
+
+def load_place_name_map(model_path: Path) -> Dict[str, str]:
+    """Return {place_id: name} from a ``.shy`` JSON model file.
+
+    The .shy model is JSON; ``places`` is a list of dicts each with
+    ``id`` and ``name`` (or ``label``).  Returns {} on any failure;
+    callers fall back to raw IDs.
+    """
+    try:
+        with model_path.open() as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"WARN: cannot load model {model_path}: {exc}", file=sys.stderr)
+        return {}
+    out: Dict[str, str] = {}
+    for p in data.get("places", []):
+        pid = p.get("id")
+        nm = p.get("name") or p.get("label")
+        if pid and nm:
+            out[pid] = nm
+    return out
+
+
+def resolve_species(stat_keys: List[str], id2name: Dict[str, str]) -> Dict[str, str]:
+    """Return {key_in_statistics_json: human_name} for every key.
+
+    Identity-mapped when the key already looks like a name.
+    """
+    return {k: id2name.get(k, k) for k in stat_keys}
 
 
 # ── Per-condition replicate analysis ────────────────────────────────
@@ -264,10 +298,176 @@ CASCADE_SPECIES = [
 ]
 
 
-def mine_run(run_dir: Path) -> Dict:
+# ── Hill curve fitting (EC50 + n + bootstrap CI) ────────────────────
+
+
+def hill_up(x: np.ndarray, e0: float, emax: float, ec50: float, n: float) -> np.ndarray:
+    """Up-going Hill: e0 + (emax - e0) * x^n / (ec50^n + x^n)."""
+    x = np.asarray(x, dtype=float)
+    safe_ec = max(ec50, 1e-9)
+    return e0 + (emax - e0) * (x ** n) / (safe_ec ** n + x ** n)
+
+
+def fit_hill_with_ci(cbds: np.ndarray, y: np.ndarray,
+                     n_boot: int = 200, seed: int = 0) -> Optional[Dict[str, float]]:
+    """Fit an up-going Hill and return EC50 + CI by simple bootstrap.
+
+    Returns None if the fit fails or the data is degenerate (no spread).
+    """
+    if not _HAVE_SCIPY or len(cbds) < 4 or np.ptp(y) < 1e-6:
+        return None
+    e0_g = float(min(y)); emax_g = float(max(y))
+    # initial EC50 = x at half-amplitude
+    half = (e0_g + emax_g) / 2
+    ec50_g = float(cbds[int(np.argmin(np.abs(y - half)))]) or 1.0
+    p0 = [e0_g, emax_g, max(ec50_g, 0.1), 1.0]
+    bounds = ([min(y) - 50, max(y) - 50, 1e-3, 0.2],
+              [min(y) + 50, max(y) + 50, max(cbds) * 5, 8.0])
+    try:
+        popt, _ = curve_fit(hill_up, cbds, y, p0=p0, bounds=bounds, maxfev=5000)
+    except Exception:
+        return None
+    ec50_main = float(popt[2]); n_main = float(popt[3])
+    # bootstrap residuals
+    rng = np.random.default_rng(seed)
+    yhat = hill_up(cbds, *popt)
+    resid = y - yhat
+    ec50s, ns = [], []
+    for _ in range(n_boot):
+        yr = yhat + rng.choice(resid, size=len(resid), replace=True)
+        try:
+            pp, _ = curve_fit(hill_up, cbds, yr, p0=popt, bounds=bounds, maxfev=2000)
+            ec50s.append(pp[2]); ns.append(pp[3])
+        except Exception:
+            continue
+    if len(ec50s) < 20:
+        ec50_lo = ec50_hi = float("nan")
+    else:
+        ec50_lo = float(np.percentile(ec50s, 2.5))
+        ec50_hi = float(np.percentile(ec50s, 97.5))
+    return {
+        "e0": float(popt[0]),
+        "emax": float(popt[1]),
+        "ec50": ec50_main,
+        "ec50_ci_lo": ec50_lo,
+        "ec50_ci_hi": ec50_hi,
+        "n_hill": n_main,
+        "rmse": float(np.sqrt(np.mean(resid ** 2))),
+    }
+
+
+def fit_ec50_landscape(per_cond: List[Dict],
+                       species: str = "Neuron_Health_final") -> Dict:
+    """Fit Hill curves to ``species`` over CBD for every (Age, pH)."""
+    grid: Dict[Tuple[float, float], List[Tuple[float, float]]] = defaultdict(list)
+    for c in per_cond:
+        ax = c["axes"]
+        cbd = ax.get("CBD_extracellular")
+        age = ax.get("Age"); ph = ax.get("pH")
+        st = c["replicate_stats"].get(species)
+        if None in (cbd, age, ph) or st is None:
+            continue
+        grid[(age, ph)].append((cbd, st["mean"]))
+    out: Dict[str, Dict] = {}
+    for (age, ph), pts in sorted(grid.items()):
+        pts.sort()
+        if len(pts) < 4:
+            continue
+        x = np.asarray([p[0] for p in pts])
+        y = np.asarray([p[1] for p in pts])
+        fit = fit_hill_with_ci(x, y)
+        if fit is None:
+            continue
+        out[f"Age={int(age)}|pH={ph}"] = fit
+    return out
+
+
+# ── Pathway-decoupling correlation ──────────────────────────────────
+
+
+def pathway_decoupling(per_cond: List[Dict],
+                       inflam_species: str = "NFkB_p65_final",
+                       neuro_species: str = "Neuron_Health_final") -> Dict:
+    """Pearson r between inflammation and neurodegeneration final values
+    across the CBD ladder, partitioned at the EC50 (≈ 1 µM).
+
+    A weakening |r| above EC50 supports the manuscript's pathway-
+    decoupling claim.
+    """
+    if not _HAVE_SCIPY:
+        return {}
+    by_ap: Dict[Tuple[float, float], List[Tuple[float, float, float]]] = defaultdict(list)
+    for c in per_cond:
+        ax = c["axes"]
+        age = ax.get("Age"); ph = ax.get("pH"); cbd = ax.get("CBD_extracellular")
+        if None in (age, ph, cbd):
+            continue
+        i = c["replicate_stats"].get(inflam_species)
+        n = c["replicate_stats"].get(neuro_species)
+        if i is None or n is None:
+            continue
+        by_ap[(age, ph)].append((cbd, i["mean"], n["mean"]))
+    out: Dict[str, Dict] = {}
+    for (age, ph), pts in sorted(by_ap.items()):
+        pts.sort()
+        cbd = np.asarray([p[0] for p in pts])
+        inf = np.asarray([p[1] for p in pts])
+        neu = np.asarray([p[2] for p in pts])
+        block: Dict[str, float] = {}
+        if len(cbd) >= 4:
+            try:
+                r_all, _ = pearsonr(inf, neu)
+                block["r_all"] = float(r_all)
+            except Exception:
+                pass
+        # Split at CBD = 1.0 (EC50 from manuscript)
+        m_lo = cbd <= 1.0; m_hi = cbd > 1.0
+        if m_lo.sum() >= 3:
+            try:
+                r_lo, _ = pearsonr(inf[m_lo], neu[m_lo])
+                block["r_low_dose"] = float(r_lo)
+            except Exception:
+                pass
+        if m_hi.sum() >= 3:
+            try:
+                r_hi, _ = pearsonr(inf[m_hi], neu[m_hi])
+                block["r_high_dose"] = float(r_hi)
+            except Exception:
+                pass
+        if block:
+            out[f"Age={int(age)}|pH={ph}"] = block
+    return out
+
+
+def mine_run(run_dir: Path, model_path: Optional[Path] = None) -> Dict:
     print(f"Mining {run_dir} …", file=sys.stderr)
     conditions = index_conditions(run_dir)
     print(f"  {len(conditions)} conditions", file=sys.stderr)
+
+    # Resolve P1..PN -> human names (best-effort)
+    if model_path is None:
+        # Look in the sweep config first
+        cfg = run_dir / "config.json"
+        try:
+            with cfg.open() as f:
+                cfg_data = json.load(f)
+            cand = cfg_data.get("model_path") or cfg_data.get("model")
+            if cand:
+                cand_path = Path(cand)
+                if not cand_path.is_absolute():
+                    # try relative to ~/shypn (server convention)
+                    home_shypn = Path.home() / "shypn"
+                    if (home_shypn / cand_path).exists():
+                        cand_path = home_shypn / cand_path
+                if cand_path.exists():
+                    model_path = cand_path
+        except (OSError, json.JSONDecodeError):
+            pass
+    id2name: Dict[str, str] = {}
+    if model_path and model_path.exists():
+        id2name = load_place_name_map(model_path)
+        print(f"  resolved {len(id2name)} place names from {model_path}",
+              file=sys.stderr)
 
     per_cond: List[Dict] = []
     for cdir, axes in conditions:
@@ -279,17 +479,20 @@ def mine_run(run_dir: Path) -> Dict:
             "replicate_stats": rep_stats,
         })
 
-    # Cascade timing: pick a representative condition near EC50
-    # (CBD ≈ 1 µM, Age 65, pH 7.4) and a saturating one (CBD ≈ 7 µM)
-    cascade = mine_cascade_timing(run_dir, conditions)
-
-    # Variance / bimodality landscape across axes
+    cascade = mine_cascade_timing(run_dir, conditions, id2name)
     landscape = build_landscape(per_cond)
+    ec50_landscape = fit_ec50_landscape(per_cond, "Neuron_Health_final")
+    decoupling = pathway_decoupling(per_cond,
+                                    "NFkB_p65_final", "Neuron_Health_final")
 
     return {
         "run": str(run_dir),
+        "model_path": str(model_path) if model_path else None,
         "n_conditions": len(conditions),
+        "id2name_resolved": len(id2name),
         "cascade_timing": cascade,
+        "ec50_landscape": ec50_landscape,
+        "pathway_decoupling": decoupling,
         "landscape": landscape,
         "per_condition": per_cond,
     }
@@ -303,8 +506,12 @@ def _pick(conds, **want) -> Optional[Path]:
 
 
 def mine_cascade_timing(run_dir: Path,
-                        conds: List[Tuple[Path, Dict[str, float]]]) -> Dict:
+                        conds: List[Tuple[Path, Dict[str, float]]],
+                        id2name: Optional[Dict[str, str]] = None) -> Dict:
     out: Dict = {}
+    name2id: Dict[str, str] = {}
+    if id2name:
+        name2id = {v: k for k, v in id2name.items()}
     targets = [
         ("at_ec50",        {"CBD_extracellular": 1.0, "Age": 65, "pH": 7.4}),
         ("near_threshold", {"CBD_extracellular": 0.7, "Age": 65, "pH": 7.4}),
@@ -319,26 +526,33 @@ def mine_cascade_timing(run_dir: Path,
         if not sj.exists():
             out[label] = {"selected": cdir.name, "error": "no statistics.json"}
             continue
-        traj = load_trajectory_means(sj, CASCADE_SPECIES)
+        # Resolve human names → place IDs (statistics.json keys)
+        wanted_ids: List[str] = []
+        for nm in CASCADE_SPECIES:
+            wanted_ids.append(name2id.get(nm, nm))
+        traj = load_trajectory_means(sj, wanted_ids)
         if traj is None:
-            out[label] = {"selected": cdir.name, "error": "cannot load trajectories"}
+            out[label] = {"selected": cdir.name,
+                          "error": "cannot load trajectories"}
             continue
         t = traj.pop("__t__")
         if len(t) < 4:
             out[label] = {"selected": cdir.name, "error": "trajectory too short"}
             continue
         dt = float(np.median(np.diff(t)))
-        anchor = "Neuron_Health"
-        if anchor not in traj:
+        anchor_id = name2id.get("Neuron_Health", "Neuron_Health")
+        if anchor_id not in traj:
             out[label] = {"selected": cdir.name,
-                          "error": f"no {anchor} trajectory"}
+                          "error": f"no Neuron_Health trajectory ({anchor_id})"}
             continue
+        anchor_y = traj[anchor_id]
         lags: Dict[str, Dict[str, float]] = {}
-        for s, y in traj.items():
-            if s == anchor:
+        for sid, y in traj.items():
+            if sid == anchor_id:
                 continue
-            lag_t, r = cross_correlation_lag(y, traj[anchor], dt=dt)
-            lags[s] = {"lag_to_NeuronHealth_s": lag_t, "peak_r": r}
+            human = id2name.get(sid, sid) if id2name else sid
+            lag_t, r = cross_correlation_lag(y, anchor_y, dt=dt)
+            lags[human] = {"lag_to_NeuronHealth_s": lag_t, "peak_r": r}
         out[label] = {
             "selected": cdir.name,
             "dt_s": dt,
@@ -469,12 +683,57 @@ def render_report(findings: Dict) -> str:
     if not any_bim:
         lines.append("_No bimodal conditions detected by BC criterion._\n")
 
-    # 4. Hysteresis surrogate note
+    # 4. Hysteresis caveat
     lines.append("## 4. Hysteresis caveat")
     lines.append("True hysteresis requires forward + reverse CBD ramps; "
                  "the current factorial sweep does not provide them.  "
                  "Bimodality + CV peaks at the same CBD value are the "
                  "*necessary* fingerprint and are reported above.")
+
+    # 5. Hill EC50 fits
+    lines.append("\n## 5. Hill EC50 fits — Neuron_Health vs CBD")
+    if not findings.get("ec50_landscape"):
+        lines.append("_No EC50 fits available (scipy missing or fits failed)._\n")
+    else:
+        lines.append("Up-going Hill fit per (Age, pH).  EC50 in µM, "
+                     "95 % bootstrap CI, Hill coefficient n.\n")
+        lines.append("| Age | pH | EC50 | 95% CI | n | E0 | Emax | RMSE |")
+        lines.append("|---:|---:|---:|---|---:|---:|---:|---:|")
+        for key, fit in sorted(findings["ec50_landscape"].items()):
+            ci = (f"[{fit['ec50_ci_lo']:.2f}, {fit['ec50_ci_hi']:.2f}]"
+                  if not math.isnan(fit['ec50_ci_lo']) else "—")
+            age = key.split("|")[0].split("=")[1]
+            ph = key.split("|")[1].split("=")[1]
+            lines.append(
+                f"| {age} | {ph} | {fit['ec50']:.2f} | {ci} "
+                f"| {fit['n_hill']:.2f} | {fit['e0']:.2f} "
+                f"| {fit['emax']:.2f} | {fit['rmse']:.2f} |"
+            )
+        lines.append("")
+
+    # 6. Pathway decoupling
+    lines.append("## 6. Pathway decoupling — NFkB_p65 vs Neuron_Health")
+    if not findings.get("pathway_decoupling"):
+        lines.append("_No correlation block available._\n")
+    else:
+        lines.append("Pearson r across the CBD ladder, partitioned at "
+                     "1 µM.  Manuscript predicts |r| weakens at high "
+                     "CBD (decoupling).\n")
+        lines.append("| Age | pH | r (all) | r (CBD ≤ 1) | r (CBD > 1) | |Δr| |")
+        lines.append("|---:|---:|---:|---:|---:|---:|")
+        for key, blk in sorted(findings["pathway_decoupling"].items()):
+            age = key.split("|")[0].split("=")[1]
+            ph = key.split("|")[1].split("=")[1]
+            r_all = blk.get("r_all", float("nan"))
+            r_lo = blk.get("r_low_dose", float("nan"))
+            r_hi = blk.get("r_high_dose", float("nan"))
+            delta = (abs(abs(r_lo) - abs(r_hi))
+                     if not (math.isnan(r_lo) or math.isnan(r_hi)) else float("nan"))
+            def _f(v): return f"{v:+.3f}" if not math.isnan(v) else "—"
+            def _g(v): return f"{v:.3f}" if not math.isnan(v) else "—"
+            lines.append(f"| {age} | {ph} | {_f(r_all)} | {_f(r_lo)} | {_f(r_hi)} | {_g(delta)} |")
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -486,6 +745,10 @@ def main(argv=None) -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run", required=True, type=Path,
                    help="Path to a sweep run_<timestamp> directory.")
+    p.add_argument("--model", type=Path, default=None,
+                   help="Path to the .shy model used by the sweep "
+                        "(for P-id → human-name resolution).  "
+                        "Auto-discovered from <run>/config.json if omitted.")
     p.add_argument("--report", type=Path, default=None,
                    help="Optional output Markdown report path "
                         "(default: prints to stdout).")
@@ -497,7 +760,7 @@ def main(argv=None) -> int:
     if not args.run.is_dir():
         p.error(f"--run {args.run} is not a directory")
 
-    findings = mine_run(args.run)
+    findings = mine_run(args.run, args.model)
 
     json_path = args.json or (args.run / "mining_phenomena.json")
     try:
