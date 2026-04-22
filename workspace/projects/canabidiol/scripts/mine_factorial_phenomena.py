@@ -513,9 +513,17 @@ def mine_cascade_timing(run_dir: Path,
     if id2name:
         name2id = {v: k for k, v in id2name.items()}
     targets = [
-        ("at_ec50",        {"CBD_extracellular": 1.0, "Age": 65, "pH": 7.4}),
-        ("near_threshold", {"CBD_extracellular": 0.7, "Age": 65, "pH": 7.4}),
-        ("saturating",     {"CBD_extracellular": 7.0, "Age": 65, "pH": 7.4}),
+        # Young/middle-aged anchors (run_20260421_204933 grid)
+        ("at_ec50_age65",        {"CBD_extracellular": 1.0, "Age": 65, "pH": 7.4}),
+        ("near_threshold_age65", {"CBD_extracellular": 0.7, "Age": 65, "pH": 7.4}),
+        ("saturating_age65",     {"CBD_extracellular": 7.0, "Age": 65, "pH": 7.4}),
+        # Older-age extension anchors (run_20260422_173323 grid)
+        ("low_dose_age75",       {"CBD_extracellular": 5.0,  "Age": 75, "pH": 7.4}),
+        ("near_ec50_age75",      {"CBD_extracellular": 20.0, "Age": 75, "pH": 7.4}),
+        ("saturating_age75",     {"CBD_extracellular": 40.0, "Age": 75, "pH": 7.4}),
+        ("low_dose_age85",       {"CBD_extracellular": 5.0,  "Age": 85, "pH": 7.4}),
+        ("near_ec50_age85",      {"CBD_extracellular": 30.0, "Age": 85, "pH": 7.4}),
+        ("saturating_age85",     {"CBD_extracellular": 40.0, "Age": 85, "pH": 7.4}),
     ]
     for label, want in targets:
         cdir = _pick(conds, **want)
@@ -629,6 +637,9 @@ def render_report(findings: Dict) -> str:
                  "leads Neuron_Health (predictor); positive → trails.\n")
     for label, blk in findings["cascade_timing"].items():
         lines.append(f"### {label} — `{blk.get('selected')}`")
+        if blk.get("selected") is None:
+            lines.append("_no matching condition in this sweep_\n")
+            continue
         if "error" in blk:
             lines.append(f"_{blk['error']}_\n")
             continue
