@@ -71,6 +71,10 @@ class SweepConfig(ABC):
 
     def __init__(self, sim_params: SimulationParams) -> None:
         self.sim_params = sim_params
+        # Top-level environment events captured from the model at dispatch
+        # time.  Each entry is a dict produced by Event.to_dict().  Applied
+        # to every condition (per-snapshot override is not yet implemented).
+        self.events: List[Dict[str, Any]] = []
 
     # ── abstract contract ─────────────────────────────────────────────
 
@@ -104,7 +108,7 @@ class SweepConfig(ABC):
 
         Subclasses should call ``super().to_dict()`` and add their keys.
         """
-        return {
+        d: Dict[str, Any] = {
             'replicates': self.sim_params.replicates,
             'duration': self.sim_params.duration,
             'termination': self.sim_params.termination,
@@ -113,6 +117,9 @@ class SweepConfig(ABC):
             'max_tau': self.sim_params.max_tau,
             'time_step': self.sim_params.time_step,
         }
+        if self.events:
+            d['events'] = list(self.events)
+        return d
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> 'SweepConfig':
@@ -144,6 +151,12 @@ class SweepConfig(ABC):
         # Preserve model_path from JSON so CLI can pick it up
         if 'model_path' in data:
             result._raw_model_path = data['model_path']
+        # Pull top-level environment events (defined on the Environment
+        # Panel of the dispatching client).  Stored as raw dicts; the
+        # worker reconstructs Event objects via Event.from_dict().
+        events = data.get('events') or []
+        if events:
+            result.events = list(events)
         return result
 
     @staticmethod

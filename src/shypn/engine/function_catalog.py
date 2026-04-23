@@ -837,7 +837,7 @@ def kelvin_to_celsius(kelvin: float) -> float:
         Temperature in Celsius
     
     Example:
-        T_celsius = kelvin_to_celsius(310.15)  # 37°C
+        temp_c = kelvin_to_celsius(310.15)  # 37°C
     """
     return kelvin - 273.15
 

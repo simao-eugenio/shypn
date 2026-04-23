@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """SignalFlowArc - Dual-role arc in hierarchical Bio-PNs.
 
-Signal flow arcs behave like normal arcs in terms of token flow: they consume
-tokens from the source place and produce tokens at the target place on every
-firing (weight Ws). Their additional role is to act as an information channel
-over the normal arc: because they connect to or from signal places (Ψ), the
-firing event and the current marking of those signal places are visible to the
-vertical decision layers of the signal hierarchy. This allows upper layers to
-read the state of lower-layer processes and issue preemptive regulatory actions
-without interfering with the underlying token dynamics.
+Signal flow arcs connect to signal places (Ψ) and have TWO simultaneous
+roles in the 13-tuple Bio-PN formalism:
+
+  1. Token flow (consumptive, like a normal arc): Ws tokens are consumed from
+     the source place and Ws tokens are produced at the target place on every
+     firing.  Enablement requires M(ps) ≥ θ(t) + Ws where θ(t) is the basin
+     floor computed from the thermodynamic constraint tuple Γ = (K, n, ε).
+
+  2. Vertical information channel: because at least one endpoint is a signal
+     place, the marking of that place is visible to the signal hierarchy's
+     upper layers, enabling preemptive regulatory actions.
+
+Signal flow arcs are therefore NOT read-only: they DO consume and produce
+tokens (unlike test arcs which are non-consuming).
 
 Theoretical Foundation:
 - Signal Hierarchy Theory (Simão 2025)

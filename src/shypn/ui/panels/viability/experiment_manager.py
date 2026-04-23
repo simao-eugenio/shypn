@@ -541,6 +541,7 @@ class ExperimentManager:
         seed_base: int = 42,
         tau_epsilon: float = 0.03,
         max_tau: float = 0.1,
+        events: list = None,
     ):
         """Export a CLI-ready sweep configuration JSON.
 
@@ -577,6 +578,12 @@ class ExperimentManager:
         config = self._infer_sweep_config(sim_block)
         if model_path:
             config['model_path'] = model_path
+        if events:
+            # Top-level environment events captured from the live model's
+            # Environment Panel.  Forwarded verbatim to the server; the
+            # sweep worker installs them on model.events before each run
+            # so the engine's _evaluate_environment_events picks them up.
+            config['events'] = list(events)
 
         config['exported_from'] = 'viability_panel'
         config['exported_date'] = datetime.now().isoformat()

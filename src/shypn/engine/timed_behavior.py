@@ -253,7 +253,12 @@ class TimedBehavior(TransitionBehavior):
         
         # In the window - can fire
         self._was_in_window = True  # Remember we were in window
-        
+
+        # PreemptionCheck: single-layer verification of signal-producing predecessors
+        preempt_ok, preempt_reason = self._check_preemption()
+        if not preempt_ok:
+            return False, preempt_reason
+
         if is_source:
             return (True, f'enabled-source (elapsed={elapsed:.3f})')
         return (True, f'enabled-in-window (elapsed={elapsed:.3f})')

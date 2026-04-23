@@ -20,14 +20,18 @@ Date: December 7, 2025
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
+import logging
 import os
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from shypn.ui.category_frame import CategoryFrame
 from shypn.data.project_models import get_project_manager
 from shypn.helpers.batch_results_saver import BatchResultsSaver
+
+logger = logging.getLogger(__name__)
 
 
 class ExperimentAutomationCategory:
@@ -247,9 +251,27 @@ class ExperimentAutomationCategory:
                     iter = store.iter_next(iter)
         
         elif param_type == 'places':
+            # Build a quick lookup of which place IDs are flagged as
+            # Environment-Panel parameter places so we can surface them
+            # at the top of the dropdown with a [param] tag.
+            param_place_ids: set = set()
+            try:
+                _src_model = (
+                    getattr(self.parent_panel, 'subnet_model', None)
+                    or self.parent_panel._get_current_model()
+                )
+                if _src_model is not None:
+                    for _p in getattr(_src_model, 'places', []) or []:
+                        if getattr(_p, 'is_parameter_place', False):
+                            param_place_ids.add(_p.id)
+            except Exception:
+                param_place_ids = set()
+
             # Get from places_store
             if hasattr(self.parent_panel, 'places_store'):
                 store = self.parent_panel.places_store
+                _params_top: list = []
+                _params_rest: list = []
                 iter = store.get_iter_first()
                 while iter:
                     # Column 0 = ID (internal), Column 1 = Name (display)
@@ -257,8 +279,18 @@ class ExperimentAutomationCategory:
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
                         # Places: Only initial_marking property
-                        params.append((f"{place_name}", f"{place_id}.initial_marking"))
+                        if place_id in param_place_ids:
+                            _params_top.append(
+                                (f"[param] {place_name}", f"{place_id}.initial_marking")
+                            )
+                        else:
+                            _params_rest.append(
+                                (f"{place_name}", f"{place_id}.initial_marking")
+                            )
                     iter = store.iter_next(iter)
+                # Parameter places first, then biological species
+                params.extend(_params_top)
+                params.extend(_params_rest)
         
         elif param_type == 'arcs':
             # Get from arcs_store
@@ -367,6 +399,18 @@ class ExperimentAutomationCategory:
                 )
         
         try:
+            # Clear previously generated sweep snapshots (keep only the
+            # first baseline) so that clicking "Generate Experiments"
+            # multiple times doesn't accumulate duplicate conditions.
+            if len(self.experiment_manager.snapshots) > 1:
+                del self.experiment_manager.snapshots[1:]
+                self.experiment_manager.swept_parameters = {
+                    k: v for k, v in self.experiment_manager.swept_parameters.items()
+                    if k == 0
+                }
+            if self.queue_view:
+                self.queue_view.clear_queue()
+
             # Store baseline snapshot count
             baseline_count = len(self.experiment_manager.snapshots)
             
@@ -831,7 +875,38 @@ class ExperimentAutomationCategory:
             progress_cb=on_progress,
             complete_cb=on_complete,
             ssh_password=ssh_password or None,
+            events=self._collect_model_events(),
         )
+
+    def _collect_model_events(self) -> list:
+        """Serialise the current model's environment events for dispatch.
+
+        Events are defined by the user on the Environment Panel and live
+        on ``model.events`` (list of ``shypn.data.pathway.pathway_data.Event``).
+        Returns a list of plain dicts suitable for embedding in the sweep
+        config JSON.  Empty list if no events or model unavailable.
+        """
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
+        if not self.parent_panel:
+            _log.warning("[EVENT_DISPATCH] no parent_panel; events=[]")
+            return []
+        canvas_mgr = self.parent_panel._get_current_model()
+        if canvas_mgr is None:
+            _log.warning("[EVENT_DISPATCH] _get_current_model returned None; events=[]")
+            return []
+        events = getattr(canvas_mgr, 'events', None) or []
+        try:
+            payload = [e.to_dict() for e in events if hasattr(e, 'to_dict')]
+        except Exception as exc:
+            _log.exception("[EVENT_DISPATCH] serialisation failed: %s", exc)
+            return []
+        _log.info(
+            "[EVENT_DISPATCH] captured %d event(s) from model %r: %s",
+            len(payload), getattr(canvas_mgr, 'filepath', '?'),
+            [e.get('id') + '@' + e.get('trigger', '') for e in payload],
+        )
+        return payload
 
     def _collect_sim_params(self) -> dict:
         """Read simulation parameters from sweep builder widgets."""
@@ -1001,8 +1076,17 @@ class ExperimentAutomationCategory:
         dialog.destroy()
         return (response == Gtk.ResponseType.OK, settings, ssh_password)
 
-    def _load_remote_results(self, local_results_dir):
-        """Load results from a remote sweep run into the ResultsBrowserView."""
+    def _load_remote_results(self, local_results_dir: str) -> None:
+        """Load results from a remote sweep run into the ResultsBrowserView.
+
+        If a ``RemoteResultsProxy`` is available (SUMMARY_ONLY mode),
+        conditions are registered as remote-only and will be fetched
+        on demand when the user requests plots or exports.
+
+        Args:
+            local_results_dir: Local path to the run directory containing
+                at minimum ``summary.csv``.
+        """
         if not self.results_browser or not local_results_dir:
             return
 
@@ -1014,8 +1098,13 @@ class ExperimentAutomationCategory:
         if not summary_csv.exists():
             return
 
+        # Attach proxy if dispatcher used SUMMARY_ONLY mode
+        proxy = (self._remote_dispatcher.results_proxy
+                 if self._remote_dispatcher else None)
+
         # Parse summary.csv and load each condition as a result entry
         import csv
+        condition_names: list[str] = []
         try:
             with open(summary_csv, 'r') as f:
                 reader = csv.DictReader(f)
@@ -1025,6 +1114,8 @@ class ExperimentAutomationCategory:
                     errors = int(row.get('replicates_error', 0))
                     wall = float(row.get('wall_seconds', 0))
 
+                    condition_names.append(condition)
+
                     # Create a minimal result dict for the browser
                     result = {
                         'name': condition,
@@ -1032,11 +1123,127 @@ class ExperimentAutomationCategory:
                         'errors': errors,
                         'wall_seconds': wall,
                         'source': 'remote',
-                        'results_dir': str(results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'results_dir': str(
+                            results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'remote_only': proxy is not None,
                     }
                     self.results_browser.add_result(condition, result)
+
+            # Register conditions on the proxy for on-demand fetching
+            if proxy and condition_names:
+                proxy.register_conditions(condition_names)
+                # Store proxy on browser for on-demand access
+                self.results_browser.set_results_proxy(proxy)
+
         except Exception as e:
-            print(f"[WARNING] Failed to load remote results: {e}")
+            logger.warning("Failed to load remote results: %s", e)
+
+    # ── Pending-dispatch recovery ────────────────────────────────────
+
+    def _schedule_pending_dispatch_recovery(self) -> None:
+        """Resume any unfinished remote sweeps in the background.
+
+        Reads ``<project>/experiments/.pending_dispatches.json`` and,
+        for each entry, ensures ``summary.csv`` + ``config.json`` are
+        present locally and the corresponding rows appear in the
+        Experiment Results browser.  Each entry is processed in its
+        own daemon thread so a slow or dead server cannot stall the
+        UI; results are marshalled back via ``GLib.idle_add``.
+
+        Idempotent: re-invocation is harmless because successful
+        recovery removes the registry entry, and entries already
+        loaded into the browser are simply re-added (same key).
+        """
+        try:
+            from shypn.data.project_models import get_project_manager
+            project = get_project_manager().current_project
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Pending-dispatch recovery skipped (no project): %s", exc)
+            return
+        if project is None or not getattr(project, 'base_path', None):
+            return
+
+        from .dispatch_registry import DispatchRegistry
+        registry = DispatchRegistry(project.base_path)
+        entries = registry.pending()
+        if not entries:
+            return
+
+        logger.info(
+            "Pending-dispatch recovery: %d unresolved sweep(s) for project %s",
+            len(entries), project.base_path,
+        )
+        for entry in entries:
+            t = threading.Thread(
+                target=self._recover_one_dispatch,
+                args=(entry, registry),
+                name=f"DispatchRecovery-{Path(entry.run_dir_local).name}",
+                daemon=True,
+            )
+            t.start()
+
+    def _recover_one_dispatch(self, entry, registry) -> None:
+        """Fetch summary for a single pending dispatch (background thread).
+
+        On success the result is loaded into the browser via the GTK
+        main loop and the registry entry is removed.  On failure the
+        entry is left in place so a future attempt can retry.
+
+        Args:
+            entry: A ``PendingDispatch`` instance.
+            registry: The owning ``DispatchRegistry``.
+        """
+        from .remote_results_proxy import RemoteResultsProxy
+
+        local_run_dir = Path(entry.run_dir_local)
+        summary_path = local_run_dir / 'summary.csv'
+
+        try:
+            if not summary_path.exists():
+                # Need to pull summary.csv + config.json from the server.
+                # Recovery uses key-based SSH only (no password is persisted).
+                proxy = RemoteResultsProxy(
+                    remote_run_dir=entry.run_dir_remote,
+                    local_run_dir=str(local_run_dir),
+                    ssh_host=entry.ssh_host,
+                )
+                proxy.fetch_summary()
+            else:
+                # Summary already on disk (e.g. partial recovery from a
+                # prior session).  Still attach a proxy so on-demand
+                # condition fetches keep working.
+                proxy = RemoteResultsProxy(
+                    remote_run_dir=entry.run_dir_remote,
+                    local_run_dir=str(local_run_dir),
+                    ssh_host=entry.ssh_host,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Recovery failed for %s (%s): %s",
+                local_run_dir.name, entry.ssh_host, exc,
+            )
+            return
+
+        # Marshal the browser update onto the GTK main thread.
+        def _hydrate():
+            # Temporarily swap _last_proxy so _load_remote_results
+            # picks it up (the method already reads from
+            # self._remote_dispatcher.results_proxy).  We use a tiny
+            # adapter to avoid mutating live dispatcher state.
+            class _ProxyHolder:
+                results_proxy = proxy
+            saved = self._remote_dispatcher
+            self._remote_dispatcher = _ProxyHolder()
+            try:
+                self._load_remote_results(str(local_run_dir))
+            finally:
+                self._remote_dispatcher = saved
+            registry.unregister(str(local_run_dir))
+            logger.info(
+                "Recovered remote sweep: %s", local_run_dir.name)
+            return False  # one-shot idle handler
+
+        GLib.idle_add(_hydrate)
 
     def _on_queue_cancel(self):
         """Handle queue cancel request."""
@@ -2002,6 +2209,13 @@ class ExperimentAutomationCategory:
         
         # Refresh parameters now that parent is available
         self.refresh_parameters()
+
+        # Resume any remote sweeps whose summary fetch was interrupted
+        # (GUI close / reset / SSH drop).  The server-side run is
+        # already complete; we just need to pull summary.csv +
+        # config.json so the Experiment Results browser can list it.
+        # Runs in a daemon thread so the UI stays responsive.
+        self._schedule_pending_dispatch_recovery()
     
     def set_model_canvas(self, model_canvas):
         """Update model canvas reference.

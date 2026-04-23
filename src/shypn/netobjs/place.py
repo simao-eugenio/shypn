@@ -64,8 +64,11 @@ class Place(PetriNetObject):
         self.capacity = float('inf')  # Maximum token capacity (infinite by default)
         
         # Signal place properties (13-tuple Bio-PN formalism: Ψ)
-        # Signal places enable modular architecture through information flow without mass transfer
-        self.is_signal_place = False  # True if this place has no arc connections (read-only sensing)
+        # Signal places are any places designated by the modeller as belonging to Ψ ⊆ P.
+        # They participate in both normal arcs (F) and signal flow arcs (F_s).
+        # Signal flow arcs ARE consumptive — they consume/produce Ws tokens just like
+        # normal arcs, AND make the place's marking visible to the signal hierarchy.
+        self.is_signal_place = False  # True when this place is in Ψ (modeller-designated signal place)
         self.signal_type: Optional[SignalType] = None  # Classification: quorum, energy, regulatory, spatial
         self.signal_scope: List[str] = []  # Module IDs that can read this signal (empty = global scope)
         
@@ -76,6 +79,16 @@ class Place(PetriNetObject):
         # Energy/metabolic cofactor places (ATP, ADP, GTP, GDP, Pi, etc.)
         # Participate in kinetics via rate functions (Φ), not signal hierarchy
         self.is_energy_place = False  # True if metabolic cofactor (rendered with amber border)
+
+        # Parameter places (exogenous experimental constants — NOT consumed/produced
+        # by the reaction network). Read by events, rate functions, or triggers as a
+        # constant scalar. Their `initial_marking` is varied across sweep snapshots
+        # (factorial mode). Examples: dose, dosing interval, redose time, applied
+        # stressor magnitude, ambient pH/temperature when used as a knob.
+        # Orthogonal to is_signal_place and is_energy_place.
+        self.is_parameter_place: bool = False
+        self.parameter_kind: Optional[str] = None    # e.g. 'dose', 'interval', 'time', 'stressor', 'environment'
+        self.parameter_units: Optional[str] = None   # e.g. 'µM', 's', 'mg/kg', 'K', 'pH'
         
         # Module assignment (modular Bio-PN architecture)
         # Places belong to modules, enabling network partitioning and compartmentalization
@@ -600,6 +613,9 @@ class Place(PetriNetObject):
             "is_compartment_place": getattr(self, 'is_compartment_place', False),  # Save compartment place flag
             "is_regulatory_place": getattr(self, 'is_regulatory_place', False),  # Save regulatory place flag
             "is_energy_place": getattr(self, 'is_energy_place', False),  # Save energy/metabolic cofactor flag
+            "is_parameter_place": getattr(self, 'is_parameter_place', False),  # Save parameter place flag (exogenous constant)
+            "parameter_kind": getattr(self, 'parameter_kind', None),
+            "parameter_units": getattr(self, 'parameter_units', None),
             
             # Spatial signal properties (Layer 1)
             "diffusion_coefficient": getattr(self, 'diffusion_coefficient', None),
@@ -723,6 +739,10 @@ class Place(PetriNetObject):
         place.is_compartment_place = data.get("is_compartment_place", False)
         # Restore regulatory place flag (genes/resources)
         place.is_regulatory_place = data.get("is_regulatory_place", False)
+        # Restore parameter place flag (exogenous experimental constant)
+        place.is_parameter_place = data.get("is_parameter_place", False)
+        place.parameter_kind = data.get("parameter_kind", None)
+        place.parameter_units = data.get("parameter_units", None)
         if "capacity" in data:
             capacity_value = data["capacity"]
             # Normalize capacity: handle string "Infinity" or "inf"

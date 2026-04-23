@@ -57,6 +57,9 @@ class ResultsBrowserView(BaseResultsView):
         
         # Status label
         self.status_label = None
+
+        # Remote results proxy for on-demand fetching (lazy-fetch mode)
+        self._results_proxy = None
         
         # Call parent constructor (which calls setup_ui)
         super().__init__(model)
@@ -657,6 +660,7 @@ class ResultsBrowserView(BaseResultsView):
         """Generate plot based on selected mode (E4 enhancement).
         
         Handles both trajectory plots and factorial heatmaps.
+        For remote-only conditions, triggers on-demand fetch first.
         """
         plot_mode = self.plot_mode_combo.get_active_id()
         
@@ -664,6 +668,16 @@ class ResultsBrowserView(BaseResultsView):
             # Use existing trajectory plot functionality
             name, result = self.get_selected_result()
             if name and result:
+                # Ensure condition data is local before plotting
+                if result.get('remote_only'):
+                    if not self.ensure_condition_local(name):
+                        self._show_error(
+                            f"Cannot fetch trajectory data for '{name}'.\n\n"
+                            "Check network connection to remote server.")
+                        return
+                    # Re-fetch result after fetch updated it
+                    result = self.results.get(name)
+
                 self.notebook.set_current_page(1)  # Switch to plot page
                 try:
                     self._plot_trajectories(name, result)
@@ -1145,6 +1159,30 @@ class ResultsBrowserView(BaseResultsView):
         if len(checked) < 2:
             self._show_error("Please check at least 2 experiments to compare")
             return
+
+        # Ensure all checked conditions are local before comparing
+        remote_names = [
+            name for name, result in checked if result.get('remote_only')]
+        if remote_names:
+            if self._results_proxy:
+                try:
+                    self._results_proxy.fetch_conditions_batch(remote_names)
+                    for name in remote_names:
+                        r = self.results.get(name)
+                        if r:
+                            r['remote_only'] = False
+                except Exception as e:
+                    self._show_error(
+                        f"Failed to fetch {len(remote_names)} remote "
+                        f"condition(s):\n\n{e}")
+                    return
+            else:
+                self._show_error(
+                    f"{len(remote_names)} condition(s) are remote-only "
+                    f"and no proxy is available for fetching.")
+                return
+            # Re-fetch checked list after fetch
+            checked = self.get_checked_results()
         
         if len(checked) > 10:
             # Warn about too many comparisons
@@ -1623,6 +1661,60 @@ class ResultsBrowserView(BaseResultsView):
                     checked.append((name, result))
             iter = self.results_store.iter_next(iter)
         return checked
+
+    # ── Remote results proxy (lazy-fetch) ────────────────────────────
+
+    def set_results_proxy(self, proxy) -> None:
+        """Attach a RemoteResultsProxy for on-demand condition fetching.
+
+        When set, conditions marked ``remote_only=True`` will trigger
+        a background fetch before plotting/export operations.
+
+        Args:
+            proxy: A ``RemoteResultsProxy`` instance (or None to clear).
+        """
+        self._results_proxy = proxy
+
+    def ensure_condition_local(self, condition_name: str) -> bool:
+        """Ensure a condition's trajectory data is available locally.
+
+        If data is remote-only and a proxy is available, fetches it
+        synchronously (caller should run from a background thread for
+        large datasets).
+
+        Args:
+            condition_name: The condition identifier.
+
+        Returns:
+            True if data is now local (or was already), False on failure.
+        """
+        result = self.results.get(condition_name)
+        if not result:
+            return False
+
+        # Already has full statistics → data is local
+        if result.get('statistics'):
+            return True
+
+        # Not marked as remote-only → already local (or local-run)
+        if not result.get('remote_only'):
+            return True
+
+        # Need to fetch via proxy
+        if not self._results_proxy:
+            return False
+
+        try:
+            local_dir = self._results_proxy.fetch_condition(condition_name)
+            # Update result dict with the local path
+            result['results_dir'] = str(local_dir)
+            result['remote_only'] = False
+            return True
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "On-demand fetch failed for %r: %s", condition_name, e)
+            return False
     
     def _update_status_label(self):
         """Update status label with result count and selection count."""

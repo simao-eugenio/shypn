@@ -677,8 +677,6 @@ class ParameterSweepBuilder(Gtk.Box):
         except Exception as e:
             self.preview_label.set_markup(f"<span foreground='red'>Error: {str(e)}</span>")
             self.generate_button.set_sensitive(False)
-            import traceback
-            traceback.print_exc()
     
     def _on_name_changed(self, combo):
         """Handle parameter name selection - auto-predict range and settings."""

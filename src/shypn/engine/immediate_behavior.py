@@ -136,7 +136,12 @@ class ImmediateBehavior(TransitionBehavior):
         
         if not boundary_valid:
             return False, boundary_reason
-        
+
+        # PreemptionCheck: single-layer verification of signal-producing predecessors
+        preempt_ok, preempt_reason = self._check_preemption()
+        if not preempt_ok:
+            return False, preempt_reason
+
         return True, "enabled"
     
     def fire(self, input_arcs: List, output_arcs: List) -> Tuple[bool, Dict[str, Any]]:

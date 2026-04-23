@@ -113,7 +113,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: model file not found: {model_path}", file=sys.stderr)
         return 1
 
-    # Output: CLI flag > project/experiments/results > ./results
+    # Output: CLI flag > <project>/experiments/results > ./results
+    # Convention: per-project sweep outputs always live under
+    #   <project>/experiments/results/run_<timestamp>/
+    # The path is derived from the opened project, so client and server
+    # produce identical relative layouts.
+    # On the GPU server, <project>/experiments/results is typically a
+    # symlink to the HDD store (e.g. /home/simao/data/results/<project>/)
+    # to preserve SSD space — the path the agent uses is unchanged.
     output_dir = args.output
     if output_dir is None:
         if project is not None:
@@ -129,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=output_dir,
         workers=args.workers,
         verbose=args.verbose or args.dry_run,
+        config_path=sweep_path,
     )
 
     if args.dry_run:

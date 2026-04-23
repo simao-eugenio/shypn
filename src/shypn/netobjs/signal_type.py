@@ -4,9 +4,12 @@
 This module defines the SignalType enumeration for classifying signal places
 in the modular Bio-PN formalism (13-tuple with Ψ signal places).
 
-Signal places enable information flow without mass transfer, allowing modular
-architecture where biological subsystems are coupled through sensing rather
-than direct material exchange.
+Signal places (Ψ) carry biological state that is observable by the signal
+hierarchy.  They participate in consumptive signal flow arcs (F_s) that
+transfer Ws tokens on every firing AND expose the place's marking to upper
+hierarchy layers.  The designation is purely semantic — any place may become
+a signal place; the structural difference is that it also appears as an
+endpoint of at least one arc in F_s.
 """
 
 from enum import Enum

@@ -28,19 +28,44 @@ Author: Simão Eugénio
 Date: April 2026
 """
 
+import hashlib
 import json
 import logging
 import os
+import platform
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
 from typing import Callable, Optional
 
+from .remote_results_proxy import RemoteResultsProxy
+from .dispatch_registry import DispatchRegistry, PendingDispatch
+
 logger = logging.getLogger(__name__)
+
+
+class FetchMode(Enum):
+    """Controls how much data is fetched after a sweep completes.
+
+    FULL:
+        Legacy behavior — fetch entire run directory via tar pipe.
+        Suitable for local-network sweeps or small result sets.
+
+    SUMMARY_ONLY:
+        Fetch only summary.csv + config.json (~KB). Individual
+        condition directories are fetched on-demand via the
+        RemoteResultsProxy when the user requests plots/exports.
+        Ideal for WAN connections with large result sets (GB+).
+    """
+
+    FULL = auto()
+    SUMMARY_ONLY = auto()
 
 
 class RemoteSweepSettings:
@@ -55,6 +80,7 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
+        'fetch_mode': 'summary_only',  # 'full' or 'summary_only'
     }
 
     def __init__(self, workspace_settings=None):
@@ -97,6 +123,18 @@ class RemoteSweepSettings:
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
 
+    @property
+    def fetch_mode(self) -> FetchMode:
+        raw = self._section.get('fetch_mode', 'summary_only')
+        try:
+            return FetchMode[raw.upper()]
+        except KeyError:
+            return FetchMode.SUMMARY_ONLY
+
+    @fetch_mode.setter
+    def fetch_mode(self, v: FetchMode) -> None:
+        self._section['fetch_mode'] = v.name.lower()
+
     def save(self):
         """Persist to workspace.json."""
         if self._ws:
@@ -114,10 +152,10 @@ class RemoteSweepDispatcher:
     delivered via ``GLib.idle_add`` by the caller (automation category).
 
     Data-transfer policy:
-        Only the **sweep config** (~1–5 KB JSON) is transferred over
-        SCP.  Results are fetched back as a single compressed tar
-        stream.  The user is responsible for keeping the model and
-        engine code synced between client and server before dispatch.
+        Controlled by ``FetchMode`` in settings:
+        - **FULL**: Fetch entire run directory via compressed tar pipe.
+        - **SUMMARY_ONLY** (default): Fetch only summary.csv + config.json.
+          Individual conditions are fetched on-demand via ``RemoteResultsProxy``.
     """
 
     def __init__(self, settings: RemoteSweepSettings):
@@ -125,12 +163,20 @@ class RemoteSweepDispatcher:
         self._cancel = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._ctl_path: Optional[str] = None  # SSH ControlMaster socket
+        self._ctl_proc: Optional[subprocess.Popen] = None  # Managed CM process
         self._stream_proc: Optional[subprocess.Popen] = None
         self._ssh_password: Optional[str] = None
+        self.verbose_preflight = True
+        self._last_proxy: Optional[RemoteResultsProxy] = None
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def results_proxy(self) -> Optional[RemoteResultsProxy]:
+        """The proxy from the most recent successful SUMMARY_ONLY dispatch."""
+        return self._last_proxy
 
     def cancel(self):
         """Request cancellation of a running dispatch.
@@ -153,6 +199,7 @@ class RemoteSweepDispatcher:
         progress_cb: Optional[Callable[[str], None]] = None,
         complete_cb: Optional[Callable[[bool, str, str], None]] = None,
         ssh_password: Optional[str] = None,
+        events: Optional[list] = None,
     ):
         """Launch the remote sweep pipeline on a background thread.
 
@@ -183,7 +230,8 @@ class RemoteSweepDispatcher:
         self._thread = threading.Thread(
             target=self._run_pipeline,
             args=(model_filepath, project_folder, experiment_manager,
-                  sim_params, progress_cb, complete_cb, ssh_password),
+                  sim_params, progress_cb, complete_cb, ssh_password,
+                  list(events) if events else []),
             daemon=True,
         )
         self._thread.start()
@@ -198,6 +246,7 @@ class RemoteSweepDispatcher:
         progress_cb,
         complete_cb,
         ssh_password: Optional[str] = None,
+        events: Optional[list] = None,
     ):
         staging = None
         host = self.settings.ssh_host
@@ -221,15 +270,143 @@ class RemoteSweepDispatcher:
             self._emit(progress_cb, 'Opening SSH connection...')
             self._open_control_master(host, password=ssh_password)
 
+            # ── 1b. Pre-dispatch cleanup ─────────────────────────────
+            # Clean stale state from previous failed/killed sweeps to
+            # prevent swap pollution, orphan processes, and socket errors.
+            self._emit(progress_cb, 'Cleaning up stale state...')
+            cleanup_cmd = (
+                # Kill orphaned sweep workers from prior runs
+                "pkill -9 -f 'shypn[.]cli[.]sweep' 2>/dev/null; "
+                # Give processes time to die
+                "sleep 1; "
+                # Report cleanup results
+                "echo ORPHANS_KILLED=$?; "
+                # Check swap usage — if high but RAM is free, advise
+                "echo SWAP_USED_KB=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print t-f}' /proc/meminfo); "
+                "echo MEM_FREE_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)"
+            )
+            try:
+                cleanup_out = self._ssh(host, cleanup_cmd, password=ssh_password, timeout=15)
+                cl = {}
+                for line in cleanup_out.strip().splitlines():
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        cl[k.strip()] = v.strip()
+                swap_gb = int(cl.get('SWAP_USED_KB', '0')) / (1024 * 1024)
+                mem_free_gb = int(cl.get('MEM_FREE_KB', '0')) / (1024 * 1024)
+                if swap_gb > 1.0 and mem_free_gb > 20.0:
+                    logger.warning(
+                        "Server has %.1f GB in swap with %.0f GB RAM free "
+                        "(leftover from prior OOM). Performance may be "
+                        "degraded until swap drains.", swap_gb, mem_free_gb)
+                logger.info("Pre-dispatch cleanup done: swap=%.1f GB, "
+                            "RAM free=%.0f GB", swap_gb, mem_free_gb)
+            except Exception as e:
+                logger.warning("Pre-dispatch cleanup failed (non-fatal): %s", e)
+
             # ── 2. Export sweep config (local temp) ──────────────────
-            self._emit(progress_cb, 'Exporting sweep config...')
+            self._emit(progress_cb,
+                       f'Exporting sweep config ({len(events or [])} event(s))...')
             staging = Path(tempfile.mkdtemp(prefix='shypn_remote_'))
             config_path = staging / 'sweep_config.json'
             experiment_manager.export_sweep_config(
                 filepath=str(config_path),
                 model_path=model_rel_to_project,
+                events=events or None,
                 **sim_params,
             )
+            # Audit log: dump event count + ids straight from the file
+            try:
+                with open(config_path) as _f:
+                    _exported = json.load(_f)
+                _ev = _exported.get('events') or []
+                logger.info(
+                    "[EVENT_DISPATCH] sweep_config.json contains %d event(s): %s",
+                    len(_ev),
+                    [e.get('id') + '@' + e.get('trigger', '') for e in _ev],
+                )
+            except Exception:
+                pass
+
+            # Sanity check (parity with BatchExecutor): warn when an event
+            # references a token (place id or name) not present in the
+            # local model file. Catches typos like ``MANT_DOSE`` for
+            # ``MAINT_DOSE`` that would otherwise silently no-op inside
+            # remote workers (eval() failure is logged at debug level only).
+            try:
+                with open(model_filepath) as _mf:
+                    _model_json = json.load(_mf)
+                _model_place_ids = {p.get('id') for p in _model_json.get('places', [])
+                                    if p.get('id')}
+                _model_place_names = {p.get('name') for p in _model_json.get('places', [])
+                                      if p.get('name')}
+                import re as _re
+                _token_re = _re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+                _BUILTINS = {'t', 'time', 'and', 'or', 'not', 'True', 'False',
+                             'min', 'max', 'abs', 'log', 'exp', 'sqrt', 'if',
+                             'else', 'None'}
+                for _ev in _exported.get('events') or []:
+                    _refs: set = set()
+                    _refs.update(_token_re.findall(_ev.get('trigger', '') or ''))
+                    for _k, _v in (_ev.get('assignments', {}) or {}).items():
+                        _refs.add(_k)
+                        _refs.update(_token_re.findall(str(_v)))
+                    _missing = sorted(
+                        t for t in _refs
+                        if t not in _model_place_ids
+                        and t not in _model_place_names
+                        and not t.isdigit()
+                        and t not in _BUILTINS
+                    )
+                    if _missing:
+                        _msg = (
+                            f"[EVENT_DISPATCH] event {_ev.get('id', '?')!r} "
+                            f"references token(s) not present in model "
+                            f"{Path(model_filepath).name!r}: {_missing}. "
+                            f"These will silently no-op on workers (eval "
+                            f"NameError logged at debug level only). "
+                            f"Likely a typo in trigger/assignment expression "
+                            f"or a missing parameter place."
+                        )
+                        logger.warning(_msg)
+                        self._emit(progress_cb, _msg)
+            except Exception as _exc:
+                logger.warning(
+                    "[EVENT_DISPATCH] event sanity check skipped (%s): %s",
+                    type(_exc).__name__, _exc,
+                )
+
+            # ── 2b. Pre-flight validation ────────────────────────────
+            # Detect duplicate snapshots (common when user clicks Generate
+            # multiple times before the dedup fix).
+            with open(config_path, 'r') as f:
+                exported = json.load(f)
+            if exported.get('mode') == 'snapshots':
+                snap_names = [s.get('name', '') for s in exported.get('snapshots', [])]
+                unique_names = set(snap_names)
+                if len(snap_names) > len(unique_names):
+                    dupes = len(snap_names) - len(unique_names)
+                    raise RuntimeError(
+                        f"Sweep config contains {dupes} duplicate snapshot(s) "
+                        f"({len(snap_names)} total, {len(unique_names)} unique). "
+                        f"Please clear and regenerate experiments.")
+
+            # Allocation summary — emitted explicitly so the user sees
+            # workers × conditions × replicates regardless of streaming
+            # noise from the parent sweep CLI.
+            try:
+                _n_snap = len(exported.get('snapshots', [])) or 1
+                _n_rep = int(exported.get('replicates', 1) or 1)
+                _n_evt = len(exported.get('events', []) or [])
+                _w = workers if workers > 0 else 'auto'
+                self._emit(
+                    progress_cb,
+                    f"Allocated {_w} worker(s) for {_n_snap} condition(s) "
+                    f"× {_n_rep} replicate(s) = {_n_snap * _n_rep} simulation(s) "
+                    f"({_n_evt} event(s))",
+                )
+            except Exception:
+                pass
 
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
@@ -244,21 +421,167 @@ class RemoteSweepDispatcher:
                          f"{remote_project}/sweep_config.json",
                          password=ssh_password)
 
+            # Upload the model file too. Without this, the remote uses
+            # whatever stale revision is checked out in its working tree
+            # (events, edits, parameter overrides applied locally would
+            # silently no-op). Uploads to the relative path encoded in
+            # the sweep config (model_rel_to_project) so the worker's
+            # `model_path` resolves to the freshly uploaded file.
+            remote_model_path = f"{remote_project}/{model_rel_to_project}"
+            remote_model_dir = str(Path(remote_model_path).parent).replace('\\', '/')
+            self._ssh(host, f"mkdir -p {remote_model_dir}",
+                      password=ssh_password)
+            self._emit(progress_cb,
+                       f'Uploading model file ({Path(model_filepath).name})...')
+            self._scp_to(host, str(model_abs), remote_model_path,
+                         password=ssh_password)
+            logger.info("[MODEL_DISPATCH] uploaded %s -> %s",
+                        model_filepath, remote_model_path)
+
+            # ── Provenance: git context (client + server) + digests ──
+            # Hybrid sync model: SCP delivers the model, git remains the
+            # canonical history. Provenance ties each run to a (client
+            # SHA, server SHA, model sha256) triple so any run can be
+            # reconstructed regardless of subsequent edits/commits.
+            self._emit(progress_cb, 'Collecting provenance...')
+            client_git = self._local_git_context(repo_root)
+            server_git = self._remote_git_context(
+                host, remote_repo, password=ssh_password)
+            model_sha = self._sha256_file(model_abs)
+            try:
+                model_size = model_abs.stat().st_size
+            except OSError:
+                model_size = -1
+            config_sha = self._sha256_file(config_path)
+            provenance = self._build_provenance(
+                client_git=client_git,
+                server_git=server_git,
+                model_filepath=str(model_abs),
+                model_sha256=model_sha,
+                model_size_bytes=model_size,
+                remote_model_path=remote_model_path,
+                sweep_config_sha256=config_sha,
+                host=host,
+            )
+
+            # Dirty-tree warnings — non-blocking. Interactive science
+            # often runs from a dirty tree; we only flag it loudly so
+            # results stay traceable.
+            if client_git.get('dirty'):
+                msg = (f"Client repo {repo_root} has uncommitted changes "
+                       f"({len(client_git.get('dirty_paths', []))} path(s)). "
+                       f"Run will be marked dirty in provenance.json.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+            if server_git.get('dirty'):
+                msg = (f"Server repo {remote_repo} has uncommitted changes "
+                       f"({len(server_git.get('dirty_paths', []))} path(s)). "
+                       f"Engine code may differ from client.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+            client_sha = client_git.get('head_sha')
+            server_sha = server_git.get('head_sha')
+            if client_sha and server_sha and client_sha != server_sha:
+                msg = (f"Client/server git HEAD diverge "
+                       f"({client_sha[:8]} vs {server_sha[:8]}). "
+                       f"Engine semantics may differ from local expectations.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+
+            # Stage + upload provenance.json next to sweep_config.json.
+            # The CLI sweep_runner copies it into the run dir on startup.
+            provenance_path = staging / 'provenance.json'
+            try:
+                with open(provenance_path, 'w') as _pf:
+                    json.dump(provenance, _pf, indent=2, sort_keys=True)
+                self._scp_to(host, str(provenance_path),
+                             f"{remote_project}/provenance.json",
+                             password=ssh_password)
+                logger.info(
+                    "[PROVENANCE] client=%s%s server=%s%s model_sha256=%s",
+                    (client_sha or 'n/a')[:8],
+                    '+dirty' if client_git.get('dirty') else '',
+                    (server_sha or 'n/a')[:8],
+                    '+dirty' if server_git.get('dirty') else '',
+                    (model_sha or 'n/a')[:12],
+                )
+            except OSError as exc:
+                logger.warning("Could not write/upload provenance.json: %s", exc)
+
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
 
-            # ── 3. SSH run CLI on remote ─────────────────────────────
+            # ── 3b. Remote pre-flight: memory & sweep conflict check ─
+            self._emit(progress_cb, 'Checking remote server resources...')
+            preflight_cmd = (
+                "echo MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo) && "
+                "echo SWEEP_PROCS=$(pgrep -fc 'shypn[.]cli[.]sweep' 2>/dev/null; true) && "
+                "echo SWAP_USED_KB=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print t-f}' /proc/meminfo)"
+            )
+            try:
+                preflight_out = self._ssh(host, preflight_cmd, password=ssh_password, timeout=15)
+                pf = {}
+                for line in preflight_out.strip().splitlines():
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        pf[k.strip()] = v.strip()
+
+                # Fail if another sweep is already running
+                running = int(pf.get('SWEEP_PROCS', '0').split()[0])
+                if running > 0:
+                    raise RuntimeError(
+                        f"Another sweep is already running on the server "
+                        f"({running} processes). Wait for it to finish or "
+                        f"kill it manually before dispatching a new one.")
+
+                # Warn if available memory is low (< 8 GB)
+                avail_kb = int(pf.get('MEM_AVAIL_KB', '0').split()[0])
+                avail_gb = avail_kb / (1024 * 1024)
+                swap_kb = int(pf.get('SWAP_USED_KB', '0').split()[0])
+                swap_gb = swap_kb / (1024 * 1024)
+                if avail_gb < 8.0:
+                    raise RuntimeError(
+                        f"Server has only {avail_gb:.1f} GB available RAM "
+                        f"(swap used: {swap_gb:.1f} GB). "
+                        f"Not enough for a sweep. Reboot or free memory first.")
+                if self.verbose_preflight:
+                    self._emit(progress_cb,
+                               f"Remote: {avail_gb:.0f} GB RAM free, "
+                               f"swap {swap_gb:.1f} GB used")
+            except RuntimeError:
+                raise
+            except Exception as e:
+                # Non-fatal: log and proceed (server might be non-Linux)
+                logger.warning("Pre-flight check failed (non-fatal): %s", e)
+
+            if self._cancel.is_set():
+                raise InterruptedError('Cancelled')
+
+            # ── 4. SSH run CLI on remote ─────────────────────────────
             self._emit(progress_cb, 'Running sweep on remote server...')
 
+            # Pass user-specified workers as a ceiling hint; the server's
+            # _compute_safe_workers() will cap it to a memory-safe value.
             workers_flag = f"--workers {workers}" if workers > 0 else ""
             # Use 'exec' so Python replaces the bash process, becoming
             # sshd's direct child.  Combined with process_guard's
             # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
             # cleanly when the SSH connection drops (no orphan zombies).
+            #
+            # nice -n 19 + ionice -c 3: run at lowest CPU and I/O
+            # priority so sshd (nice 0) always gets scheduled promptly,
+            # preventing the "banner exchange timeout" that locks the
+            # server out during heavy sweeps.
+            #
+            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving CPUs
+            # 0-3 (first 2 P-cores on i9-14900K) exclusively for
+            # sshd/system tasks.  This guarantees SSH remains responsive
+            # even under full sweep load.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"exec {remote_venv} -m shypn.cli.sweep "
+                f"exec nice -n 19 ionice -c 3 taskset -c 4-31 "
+                f"{remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
@@ -286,21 +609,61 @@ class RemoteSweepDispatcher:
                 raise InterruptedError('Cancelled')
 
             # ── 4. Fetch results back ────────────────────────────────
-            self._emit(progress_cb, 'Fetching results from remote...')
-
             run_name = Path(run_dir).name
             local_results_base = project_abs / 'experiments' / 'results'
             local_results_base.mkdir(parents=True, exist_ok=True)
             local_run_dir = local_results_base / run_name
 
-            self._fetch_results_tar(host, run_dir, str(local_run_dir),
-                                    password=ssh_password)
+            fetch_mode = self.settings.fetch_mode
+
+            # Persist a recovery record BEFORE the fetch begins.  If the
+            # GUI is closed, restarted, or the connection drops between
+            # this point and the successful complete_cb call below, the
+            # next project-open will pick up this entry and retry the
+            # summary fetch — recovering an otherwise-invisible run.
+            registry = DispatchRegistry.for_project(project_abs)
+            pending_entry = PendingDispatch(
+                run_dir_remote=run_dir,
+                run_dir_local=str(local_run_dir),
+                ssh_host=host,
+                fetch_mode=fetch_mode.name.lower(),
+            )
+            if registry is not None:
+                registry.register(pending_entry)
+
+            if fetch_mode == FetchMode.SUMMARY_ONLY:
+                # Lightweight fetch: only summary.csv + config.json (~KB)
+                self._emit(progress_cb,
+                           'Fetching summary (lazy mode)...')
+                proxy = RemoteResultsProxy(
+                    remote_run_dir=run_dir,
+                    local_run_dir=str(local_run_dir),
+                    ssh_host=host,
+                    ssh_password=ssh_password,
+                    ctl_socket_args=self._ctl_socket_args(),
+                )
+                proxy.fetch_summary()
+                self._last_proxy = proxy
+                self._emit(progress_cb,
+                           f'Done — summary at {local_run_dir.name} '
+                           f'(conditions fetched on demand)')
+            else:
+                # Full fetch: entire run directory via tar pipe
+                self._emit(progress_cb, 'Fetching results from remote...')
+                self._fetch_results_tar(host, run_dir, str(local_run_dir),
+                                        password=ssh_password)
+                self._last_proxy = None
+                self._emit(progress_cb,
+                           f'Done — results at {local_run_dir.name}')
+
+            # Fetch succeeded — drop the recovery record.
+            if registry is not None:
+                registry.unregister(str(local_run_dir))
 
             # ── 5. Done ──────────────────────────────────────────────
-            self._emit(progress_cb, f'Done — results at {local_run_dir.name}')
-
             if complete_cb:
-                complete_cb(True, str(local_run_dir), f'Sweep complete: {run_name}')
+                complete_cb(True, str(local_run_dir),
+                            f'Sweep complete: {run_name}')
 
         except InterruptedError:
             if complete_cb:
@@ -367,6 +730,137 @@ class RemoteSweepDispatcher:
                 return parent
         return None
 
+    # ── provenance: git context + file digests ───────────────────────
+    @staticmethod
+    def _sha256_file(path: Path, *, chunk: int = 1 << 20) -> Optional[str]:
+        """Return hex sha256 of *path* or ``None`` on read failure."""
+        try:
+            h = hashlib.sha256()
+            with open(path, 'rb') as f:
+                for buf in iter(lambda: f.read(chunk), b''):
+                    h.update(buf)
+            return h.hexdigest()
+        except OSError as exc:
+            logger.warning("Could not hash %s: %s", path, exc)
+            return None
+
+    @staticmethod
+    def _local_git_context(repo_root: Path) -> dict:
+        """Capture ``HEAD`` SHA, branch, dirty flag for *repo_root*.
+
+        Never raises. Missing git / non-repo / disconnected state are
+        all reported as ``None`` fields with a ``status`` annotation.
+        """
+        ctx: dict = {
+            'repo_root': str(repo_root),
+            'head_sha': None,
+            'branch': None,
+            'dirty': None,
+            'dirty_paths': [],
+            'status': 'ok',
+        }
+        try:
+            head = subprocess.run(
+                ['git', '-C', str(repo_root), 'rev-parse', 'HEAD'],
+                capture_output=True, text=True, timeout=5)
+            if head.returncode == 0:
+                ctx['head_sha'] = head.stdout.strip()
+            branch = subprocess.run(
+                ['git', '-C', str(repo_root), 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True, text=True, timeout=5)
+            if branch.returncode == 0:
+                ctx['branch'] = branch.stdout.strip()
+            status = subprocess.run(
+                ['git', '-C', str(repo_root), 'status', '--porcelain'],
+                capture_output=True, text=True, timeout=5)
+            if status.returncode == 0:
+                lines = [ln for ln in status.stdout.splitlines() if ln.strip()]
+                ctx['dirty'] = len(lines) > 0
+                ctx['dirty_paths'] = lines[:50]  # cap
+        except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+            ctx['status'] = f'git probe failed: {exc}'
+        return ctx
+
+    def _remote_git_context(self, host: str, repo_root_remote: str,
+                            *, password: Optional[str]) -> dict:
+        """SSH-side equivalent of :meth:`_local_git_context`.
+
+        One round-trip: combines ``rev-parse``, ``rev-parse --abbrev-ref``
+        and ``status --porcelain`` into a single shell command.
+        Returns same shape as the local context.
+        """
+        ctx: dict = {
+            'repo_root': repo_root_remote,
+            'head_sha': None,
+            'branch': None,
+            'dirty': None,
+            'dirty_paths': [],
+            'status': 'ok',
+        }
+        cmd = (
+            f"cd {repo_root_remote} && "
+            "echo HEAD=$(git rev-parse HEAD 2>/dev/null) && "
+            "echo BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) && "
+            "echo --STATUS-- && "
+            "git status --porcelain 2>/dev/null | head -50"
+        )
+        try:
+            out = self._ssh(host, cmd, password=password, timeout=15)
+        except Exception as exc:
+            ctx['status'] = f'remote git probe failed: {exc}'
+            return ctx
+        in_status = False
+        dirty: list[str] = []
+        for line in out.splitlines():
+            if line.startswith('HEAD='):
+                v = line.split('=', 1)[1].strip()
+                ctx['head_sha'] = v or None
+            elif line.startswith('BRANCH='):
+                v = line.split('=', 1)[1].strip()
+                ctx['branch'] = v or None
+            elif line.strip() == '--STATUS--':
+                in_status = True
+            elif in_status and line.strip():
+                dirty.append(line)
+        ctx['dirty'] = bool(dirty) if ctx['head_sha'] else None
+        ctx['dirty_paths'] = dirty
+        return ctx
+
+    @staticmethod
+    def _build_provenance(
+        *,
+        client_git: dict,
+        server_git: dict,
+        model_filepath: str,
+        model_sha256: Optional[str],
+        model_size_bytes: int,
+        remote_model_path: str,
+        sweep_config_sha256: Optional[str],
+        host: str,
+    ) -> dict:
+        """Assemble the provenance record for a single dispatch."""
+        return {
+            'schema_version': 1,
+            'dispatched_at': datetime.now().isoformat(timespec='seconds'),
+            'client': {
+                'hostname': socket.gethostname(),
+                'platform': platform.platform(),
+                'python': platform.python_version(),
+                'git': client_git,
+            },
+            'server': {
+                'host': host,
+                'git': server_git,
+            },
+            'model': {
+                'source_path': str(model_filepath),
+                'remote_path': remote_model_path,
+                'sha256': model_sha256,
+                'size_bytes': model_size_bytes,
+            },
+            'sweep_config_sha256': sweep_config_sha256,
+        }
+
     # ── SSH ControlMaster multiplexing ───────────────────────────────
     def _ctl_socket_args(self) -> list[str]:
         """Return SSH args that attach to the persistent control socket."""
@@ -407,19 +901,52 @@ class RemoteSweepDispatcher:
             '-o', 'ServerAliveInterval=30',
             '-o', 'ServerAliveCountMax=3',
             '-o', 'ConnectTimeout=15',
-            '-f',  # fork to background after auth
-            '-N',  # no remote command
+            '-o', 'StrictHostKeyChecking=no',
+            '-N',  # no remote command (stays in foreground)
             host,
         ]
         if password:
+            # Force password auth to avoid wasting time on pubkey attempts
+            # that will never succeed with sshpass.
+            argv.insert(-1, '-o')
+            argv.insert(-1, 'PreferredAuthentications=password')
             argv = ['sshpass', '-p', password] + argv
-        result = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode != 0:
-            logger.warning("ControlMaster failed (%s), falling back to "
-                           "per-command connections", result.stderr.strip())
+
+        # Launch as a managed background subprocess instead of ssh -f.
+        # sshpass + ssh -f is unreliable: sshpass exits after auth but
+        # the forked SSH process sometimes fails to bind the socket.
+        # Running without -f keeps sshpass holding the pipe open.
+        try:
+            self._ctl_proc = subprocess.Popen(
+                argv,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            logger.warning("ControlMaster launch failed (%s), falling back "
+                           "to per-command connections", e)
+            self._ctl_path = None
+            return
+
+        # Wait for socket to appear (up to 15 s)
+        import time
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if os.path.exists(ctl):
+                break
+            if self._ctl_proc.poll() is not None:
+                # Process exited before creating socket
+                stderr = self._ctl_proc.stderr.read().decode().strip() if self._ctl_proc.stderr else ''
+                logger.warning("ControlMaster exited early (%s), falling back",
+                               stderr)
+                self._ctl_path = None
+                return
+            time.sleep(0.2)
+        else:
+            # Timeout — socket never appeared
+            self._ctl_proc.terminate()
+            logger.warning("ControlMaster socket never appeared, falling back")
             self._ctl_path = None
             return
 
@@ -431,7 +958,7 @@ class RemoteSweepDispatcher:
         if check.returncode != 0:
             logger.warning("ControlMaster check failed (%s), falling back",
                            check.stderr.strip())
-            # Clean up the dead socket
+            self._ctl_proc.terminate()
             try:
                 os.unlink(ctl)
             except OSError:
@@ -454,6 +981,14 @@ class RemoteSweepDispatcher:
             )
         except Exception:
             pass
+        # Terminate the managed ControlMaster process
+        if self._ctl_proc and self._ctl_proc.poll() is None:
+            self._ctl_proc.terminate()
+            try:
+                self._ctl_proc.wait(timeout=5)
+            except Exception:
+                self._ctl_proc.kill()
+        self._ctl_proc = None
         # Remove stale socket file
         try:
             os.unlink(self._ctl_path)
@@ -514,6 +1049,9 @@ class RemoteSweepDispatcher:
             )
         except Exception:
             pass
+        if self._ctl_proc and self._ctl_proc.poll() is None:
+            self._ctl_proc.kill()
+        self._ctl_proc = None
         try:
             os.unlink(self._ctl_path)
         except OSError:

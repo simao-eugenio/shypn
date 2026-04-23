@@ -56,6 +56,7 @@ class PlacePropDialogLoader(GObject.GObject):
         self._populate_fields()
         self._populate_spatial_properties()
         self._populate_thermodynamic_properties()
+        self._populate_parameter_properties()
 
     def _load_ui(self):
         """Load the Place properties dialog UI from file."""
@@ -190,6 +191,7 @@ class PlacePropDialogLoader(GObject.GObject):
             self._apply_changes()
             self._save_spatial_properties()  # Save spatial properties
             self._save_thermodynamic_properties()  # Save thermodynamic properties
+            self._save_parameter_properties()  # Save parameter-place properties
             if self.persistency_manager:
                 self.persistency_manager.mark_dirty()
             self.emit('properties-changed')
@@ -508,7 +510,54 @@ class PlacePropDialogLoader(GObject.GObject):
                 self.place_obj.neighbor_compartments = neighbors if neighbors else []
             else:
                 self.place_obj.neighbor_compartments = []
-    
+
+    # ------------------------------------------------------------------
+    # Parameter-place tab (exogenous experimental constants)
+    # ------------------------------------------------------------------
+    def _populate_parameter_properties(self):
+        """Populate the Parameter tab from the place object."""
+        checkbox = self.builder.get_object('parameter_place_checkbox')
+        if checkbox is not None:
+            checkbox.set_active(bool(getattr(self.place_obj, 'is_parameter_place', False)))
+
+        kind_combo = self.builder.get_object('parameter_kind_combo')
+        if kind_combo is not None:
+            kind = getattr(self.place_obj, 'parameter_kind', None) or ''
+            entry = kind_combo.get_child()
+            if entry is not None and hasattr(entry, 'set_text'):
+                entry.set_text(str(kind))
+
+        units_entry = self.builder.get_object('parameter_units_entry')
+        if units_entry is not None:
+            units = getattr(self.place_obj, 'parameter_units', None) or ''
+            units_entry.set_text(str(units))
+
+    def _save_parameter_properties(self):
+        """Save the Parameter tab to the place object."""
+        checkbox = self.builder.get_object('parameter_place_checkbox')
+        if checkbox is not None:
+            self.place_obj.is_parameter_place = bool(checkbox.get_active())
+
+        kind_combo = self.builder.get_object('parameter_kind_combo')
+        if kind_combo is not None:
+            entry = kind_combo.get_child()
+            text = entry.get_text().strip() if entry is not None and hasattr(entry, 'get_text') else ''
+            self.place_obj.parameter_kind = text or None
+
+        units_entry = self.builder.get_object('parameter_units_entry')
+        if units_entry is not None:
+            text = units_entry.get_text().strip()
+            self.place_obj.parameter_units = text or None
+
+        # Refresh border colour to reflect the new flag state.
+        try:
+            from shypn.utils.color_schema_manager import ColorSchemaManager
+            ColorSchemaManager.reset_place_color(self.place_obj)
+            if hasattr(self.place_obj, '_manager') and self.place_obj._manager:
+                self.place_obj._manager.mark_needs_redraw()
+        except Exception as e:
+            logger.debug(f"Could not refresh place colour after parameter edit: {e}")
+
     def _setup_thermodynamic_handlers(self):
         """Setup thermodynamic tab button handlers."""
         # Fetch from Database button
