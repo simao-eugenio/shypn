@@ -1219,6 +1219,11 @@ class ReplicateRunner:
                 epsilon=epsilon,
                 max_tau=max_tau,
                 stoch_propensity_fn=stoch_propensity_fn,
+                events=list(getattr(self.model, 'events', []) or []),
+                place_name_to_index={
+                    getattr(p, 'name', '') or p.id: i
+                    for i, p in enumerate(all_places)
+                },
             )
             results = engine.run_batch(
                 n_replicates=n,

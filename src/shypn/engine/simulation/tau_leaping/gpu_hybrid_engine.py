@@ -106,6 +106,8 @@ class GPUHybridEngine:
         max_tau: float = 0.1,
         min_tau: float = 1e-6,
         stoch_propensity_fn: Optional[Callable] = None,
+        events: Optional[List[Any]] = None,
+        place_name_to_index: Optional[Dict[str, int]] = None,
     ) -> None:
         if not _CUPY_AVAILABLE:
             raise RuntimeError("CuPy is required for GPUHybridEngine")
@@ -150,6 +152,73 @@ class GPUHybridEngine:
             self._P_ode, self._M_stoch, self._P,
             backend.device_info.device_name,
         )
+
+        # ---- Environment events (parity with controller._evaluate_environment_events) ----
+        # `events` is a list of Event-like objects (id, trigger, delay,
+        # assignments dict {place_name_or_id: expr_str}). Triggers are
+        # Python expressions over `t` and place names/ids.
+        self._events_raw: List[Any] = list(events or [])
+        self._place_name_to_index: Dict[str, int] = dict(place_name_to_index or {})
+        # Also map place IDs (the engine's canonical key)
+        self._place_id_to_index: Dict[str, int] = {
+            pid: i for i, pid in enumerate(place_ids)
+        }
+        # Pre-compile each event's trigger + assignments. Compilation
+        # failures are logged and the offending event is dropped.
+        self._events_compiled: List[Dict[str, Any]] = []
+        for ev in self._events_raw:
+            trig = (getattr(ev, 'trigger', '') or '').strip()
+            if not trig:
+                continue
+            try:
+                trig_code = compile(trig, f"<event {getattr(ev, 'id', '?')} trigger>", 'eval')
+            except Exception as exc:
+                logger.warning(
+                    "GPUHybridEngine: skipping event %r — trigger compile failed: %s",
+                    getattr(ev, 'id', '?'), exc,
+                )
+                continue
+            assignments = dict(getattr(ev, 'assignments', {}) or {})
+            assign_compiled: Dict[int, Any] = {}
+            for tgt_name, expr in assignments.items():
+                # Resolve target → global place index
+                gi = self._place_name_to_index.get(tgt_name)
+                if gi is None:
+                    gi = self._place_id_to_index.get(tgt_name)
+                if gi is None:
+                    logger.warning(
+                        "GPUHybridEngine: event %r assignment target %r not found in places",
+                        getattr(ev, 'id', '?'), tgt_name,
+                    )
+                    continue
+                try:
+                    expr_code = compile(str(expr), f"<event {getattr(ev, 'id', '?')} assign {tgt_name}>", 'eval')
+                except Exception as exc:
+                    logger.warning(
+                        "GPUHybridEngine: event %r assignment %r compile failed: %s",
+                        getattr(ev, 'id', '?'), tgt_name, exc,
+                    )
+                    continue
+                assign_compiled[gi] = expr_code
+            if not assign_compiled:
+                logger.warning(
+                    "GPUHybridEngine: event %r has no usable assignments — skipped",
+                    getattr(ev, 'id', '?'),
+                )
+                continue
+            self._events_compiled.append({
+                'id': getattr(ev, 'id', f'evt_{len(self._events_compiled)}'),
+                'trigger': trig_code,
+                'trigger_str': trig,
+                'delay': float(getattr(ev, 'delay', 0.0) or 0.0),
+                'assignments': assign_compiled,
+            })
+        if self._events_compiled:
+            logger.info(
+                "GPUHybridEngine: %d environment event(s) registered: %s",
+                len(self._events_compiled),
+                [f"{e['id']}@({e['trigger_str']})" for e in self._events_compiled],
+            )
 
     def _estimate_vram_per_replicate(self) -> float:
         """Estimate GPU VRAM usage per replicate in bytes.
@@ -287,6 +356,11 @@ class GPUHybridEngine:
         if verbose:
             print(f"  GPU hybrid: {N} replicates × {max_steps} steps "
                   f"({P_ode} ODE places, {M} stochastic transitions)")
+            if self._events_compiled:
+                ev_summary = ", ".join(
+                    f"{e['id']}@({e['trigger_str']})" for e in self._events_compiled
+                )
+                print(f"  GPU hybrid: {len(self._events_compiled)} environment event(s) active: {ev_summary}")
 
         t0_wall = time.time()
 
@@ -309,6 +383,19 @@ class GPUHybridEngine:
 
         # ── RNG ──────────────────────────────────────────────────────
         cp.random.seed(seed_base)
+
+        # ── Environment-event per-batch state ───────────────────────
+        # Edge tracking: True if the trigger was True on the previous step
+        # for replicate r and event e. Shape [N, n_events].
+        n_events = len(self._events_compiled)
+        if n_events > 0:
+            event_last = np.zeros((N, n_events), dtype=np.bool_)
+            # Deferred assignments: list of (fire_at_time, replicate_idx, {gi: value})
+            # Resolved values are floats so the GPU writeback is trivial.
+            event_pending: List[Tuple[float, int, Dict[int, float]]] = []
+        else:
+            event_last = None
+            event_pending = []
 
         # ── ODE index arrays ─────────────────────────────────────────
         ode_idx = self._ode_indices  # numpy array of global indices
@@ -431,6 +518,17 @@ class GPUHybridEngine:
             newly_done = d_active & (d_t >= duration - 1e-12)
             d_active &= ~newly_done
 
+            # ════════════════════════════════════════════════════════════
+            # PHASE 3: Environment events (parity with CPU controller)
+            # Evaluated after time advances so trigger expressions like
+            # `t > 5400` see the new t. Per-replicate edge-triggered;
+            # writes assignments back into d_y.
+            # ════════════════════════════════════════════════════════════
+            if n_events > 0:
+                self._evaluate_events_batch(
+                    d_y, d_t, d_active, event_last, event_pending,
+                )
+
             # Snapshot
             if step % snapshot_interval == 0:
                 h_t = d_t.get()
@@ -543,6 +641,128 @@ class GPUHybridEngine:
             extras = self._ode_rhs_fn._extras_arr
             for i, global_idx in enumerate(self._extra_indices):
                 extras[i] = h_y_r[global_idx]
+
+    # ── Tau selection (same as GPUReplicateEngine) ───────────────────
+
+    def _evaluate_events_batch(
+        self,
+        d_y: Any,                                # cupy [N, P]  state
+        d_t: Any,                                # cupy [N]     time per replicate
+        d_active: Any,                           # cupy [N]     active mask
+        event_last: NDArray[np.bool_],           # [N, n_events]
+        event_pending: List[Tuple[float, int, Dict[int, float]]],
+    ) -> None:
+        """Per-step environment-event evaluation across all replicates.
+
+        Mirrors :meth:`SimulationController._evaluate_environment_events`
+        but vectorises across the N parallel replicates that share this
+        GPU batch. Events are edge-triggered per replicate; assignments
+        write the resolved float values back into ``d_y`` in-place.
+
+        Run after time has been advanced for the current step so that
+        triggers like ``t > 5400`` see the new ``t``.
+        """
+        if not self._events_compiled:
+            return
+
+        # Bring state to host. The hot path is small: N<=128, P<~100.
+        # We have to do this anyway for trigger evaluation in Python.
+        h_y = d_y.get()                          # [N, P] float64
+        h_t = d_t.get()                          # [N]    float64
+        h_active = d_active.get()                # [N]    bool
+        N = h_y.shape[0]
+
+        # Track which replicate rows we modify so we only re-upload those
+        dirty_rows: List[int] = []
+        # Pre-build per-place name list for namespace construction
+        # (fast: use plain attribute lookup at module import time)
+        place_id_to_index = self._place_id_to_index
+        name_to_index = self._place_name_to_index
+
+        # ---- 1. Resolve any pending (delayed) assignments whose time has come
+        if event_pending:
+            still_pending: List[Tuple[float, int, Dict[int, float]]] = []
+            for fire_at, r, assigns in event_pending:
+                if r >= N or not h_active[r]:
+                    # Replicate is no longer active — drop the deferral
+                    continue
+                if h_t[r] >= fire_at:
+                    for gi, val in assigns.items():
+                        h_y[r, gi] = float(val)
+                    if r not in dirty_rows:
+                        dirty_rows.append(r)
+                else:
+                    still_pending.append((fire_at, r, assigns))
+            event_pending[:] = still_pending
+
+        # ---- 2. Evaluate triggers + apply assignments per replicate
+        for r in range(N):
+            if not h_active[r]:
+                continue
+            # Build evaluation namespace for this replicate
+            row = h_y[r]
+            t_r = float(h_t[r])
+            ns: Dict[str, Any] = {'t': t_r}
+            # Bind both place names and place IDs to current values
+            for nm, gi in name_to_index.items():
+                ns[nm] = float(row[gi])
+            for pid, gi in place_id_to_index.items():
+                ns[pid] = float(row[gi])
+
+            for e_idx, ev in enumerate(self._events_compiled):
+                try:
+                    fired = bool(eval(ev['trigger'], {"__builtins__": {}}, ns))  # noqa: S307
+                except Exception as exc:
+                    logger.debug(
+                        "[GPU_EVENT] trigger eval failed for event %r rep %d: %s",
+                        ev['id'], r, exc,
+                    )
+                    continue
+
+                prev = bool(event_last[r, e_idx])
+                event_last[r, e_idx] = fired
+
+                if not (fired and not prev):
+                    continue  # not a rising edge
+
+                # Resolve assignments now (snapshot semantics: values
+                # captured at trigger time, matching the GUI default
+                # `use_values_from_trigger_time=True`).
+                resolved: Dict[int, float] = {}
+                for gi, expr_code in ev['assignments'].items():
+                    try:
+                        v = eval(expr_code, {"__builtins__": {}}, ns)  # noqa: S307
+                        resolved[gi] = float(v)
+                    except Exception as exc:
+                        logger.debug(
+                            "[GPU_EVENT] assignment eval failed event=%r rep=%d gi=%d: %s",
+                            ev['id'], r, gi, exc,
+                        )
+
+                if not resolved:
+                    continue
+
+                if ev['delay'] > 0.0:
+                    event_pending.append((t_r + ev['delay'], r, resolved))
+                else:
+                    for gi, val in resolved.items():
+                        h_y[r, gi] = val
+                        # Update namespace so later assignments in the
+                        # same step see the freshly-written value
+                        for nm, g in name_to_index.items():
+                            if g == gi:
+                                ns[nm] = val
+                        for pid, g in place_id_to_index.items():
+                            if g == gi:
+                                ns[pid] = val
+                    if r not in dirty_rows:
+                        dirty_rows.append(r)
+
+        # ---- 3. Push dirty rows back to GPU
+        if dirty_rows:
+            # Single transfer for the whole [N, P] array is simpler and,
+            # for the small batches we use, faster than per-row scatter.
+            d_y[...] = cp.asarray(h_y)
 
     # ── Tau selection (same as GPUReplicateEngine) ───────────────────
 
