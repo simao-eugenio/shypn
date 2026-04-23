@@ -167,6 +167,20 @@ class ExperimentQueueView(Gtk.Box):
         status_header.pack_end(self._status_clear_btn, False, False, 0)
         self.pack_start(status_header, False, False, 0)
 
+        # Sticky summary line — always visible, never scrolls. Updated
+        # by _update_status_label() whenever queue state changes.
+        self._status_summary = Gtk.Label()
+        self._status_summary.set_xalign(0)
+        self._status_summary.set_margin_start(4)
+        self._status_summary.set_margin_end(4)
+        self._status_summary.set_margin_top(1)
+        self._status_summary.set_margin_bottom(1)
+        self._status_summary.override_font(
+            Pango.FontDescription.from_string('monospace 9'))
+        self._status_summary.set_markup(
+            "<small><span foreground='#888888'><i>Queue empty</i></span></small>")
+        self.pack_start(self._status_summary, False, False, 0)
+
         status_scroll = Gtk.ScrolledWindow()
         status_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,
                                  Gtk.PolicyType.AUTOMATIC)
@@ -352,22 +366,26 @@ class ExperimentQueueView(Gtk.Box):
             failed_str = f", <span foreground='red'>{failed} failed</span>" if failed > 0 else ""
 
             if is_paused:
-                self.status_label.set_markup(
-                    f"<span foreground='orange'><b>Paused</b> - {running} active, {pending} pending{done_str}{failed_str} / {total} total</span>"
+                self._write_summary(
+                    f"<small><span foreground='#ce5c00'><b>Paused</b> — "
+                    f"{running} active, {pending} pending{done_str}{failed_str} "
+                    f"/ {total} total</span></small>"
                 )
             elif running > 0 or pending > 0:
-                self.status_label.set_markup(
-                    f"<b>Running... ({running} active, {pending} pending{done_str}{failed_str} / {total} total)</b>"
+                self._write_summary(
+                    f"<small><b>Running…</b> {running} active, {pending} pending"
+                    f"{done_str}{failed_str} / {total} total</small>"
                 )
         else:
-            # Not running - refresh normal status
+            # Not running - refresh normal summary
             self._update_status_label()
     
     def _update_status_label(self):
-        """Update status label with queue statistics."""
+        """Update the sticky summary label with queue statistics."""
         total = len(self.queue_store)
         if total == 0:
-            self.status_label.set_markup("<i>Queue empty</i>")
+            self._write_summary(
+                "<small><span foreground='#888888'><i>Queue empty</i></span></small>")
             return False  # For GLib.timeout_add
         
         # Count by status
@@ -401,13 +419,22 @@ class ExperimentQueueView(Gtk.Box):
         if completed > 0:
             parts.append(f"{completed} completed")
         if cancelled > 0:
-            parts.append(f"<span foreground='orange'>{cancelled} cancelled</span>")
+            parts.append(f"<span foreground='#ce5c00'>{cancelled} cancelled</span>")
         if failed > 0:
-            parts.append(f"<span foreground='red'>{failed} failed</span>")
+            parts.append(f"<span foreground='#cc0000'>{failed} failed</span>")
         
-        status_text = f"{total} total: {', '.join(parts)}"
-        self.status_label.set_markup(status_text)
+        status_text = f"<small>{total} total: {', '.join(parts)}</small>"
+        self._write_summary(status_text)
         return False  # For GLib.timeout_add
+
+    def _write_summary(self, markup: str) -> None:
+        """Write Pango markup to the sticky summary label (above the log)."""
+        try:
+            self._status_summary.set_markup(markup)
+        except Exception:
+            # Fallback to plain text
+            import re
+            self._status_summary.set_text(re.sub(r'<[^>]+>', '', markup))
     
     def _on_run_clicked(self, button):
         """Handle Run All button click."""
@@ -633,9 +660,19 @@ class ExperimentQueueView(Gtk.Box):
         self.append_status(text, category=category, tag=tag)
 
     def clear_status(self) -> None:
-        """Clear the activity log."""
+        """Clear the activity log.
+
+        Resets dedup state and emits a confirmation marker so the user
+        gets immediate feedback that the log is alive (the next sweep
+        message may not arrive for several seconds while workers are
+        silently simulating).
+        """
         self._status_buffer.set_text('')
         self._status_last_line = None
+        # Force redraw and emit a confirmation line so the user sees
+        # the log is still receiving messages.
+        self._status_view.queue_draw()
+        self.append_status('Activity log cleared', category='info', tag='grey')
 
     def _on_status_key_press(self, widget, event):
         """Handle Ctrl+C / Ctrl+A on the status TextView."""
@@ -678,14 +715,27 @@ class _StatusLabelCompat:
     def _infer_category(self, markup: str, text: str) -> tuple:
         """Return ``(category, tag)`` based on markup + text content."""
         low = text.lower()
+        # Remote-stream lines first: a "done in 7.2s (30 ok, 0 errors)"
+        # is success, not an error, even though it contains "errors".
+        if low.startswith('remote:') or low.startswith('[remote]'):
+            # Promote to DONE if the streamed line is a clear completion
+            if 'done in' in low or '✓' in markup:
+                return 'done', 'green'
+            # Real failures from the remote side
+            if '✗' in markup or ' failed' in low or 'traceback' in low:
+                return 'error', 'red'
+            return 'stream', 'blue'
         if '✓' in markup or low.startswith('done'):
             return 'done', 'green'
-        if '✗' in markup or 'error' in low or 'fail' in low:
+        # Tighten: require word-boundaries, not substring "errors" in "0 errors"
+        if ('✗' in markup
+                or ' failed' in low or low.startswith('failed')
+                or low.endswith('failed')
+                or ' error:' in low or low.startswith('error')
+                or 'traceback' in low or 'exception' in low):
             return 'error', 'red'
         if 'paused' in low or 'orange' in markup:
             return 'paused', 'orange'
-        if low.startswith('remote:'):
-            return 'stream', 'blue'
         if 'allocated' in low:
             return 'allocation', 'blue'
         if 'event' in low and ('dispatch' in low or 'redose' in low
