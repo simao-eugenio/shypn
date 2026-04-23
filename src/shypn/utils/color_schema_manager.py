@@ -38,6 +38,7 @@ class ColorSchemaManager:
     PLACE_COMPARTMENT_BORDER = (0.5, 0.0, 0.5)  # Violet - compartment places
     PLACE_REGULATORY_BORDER = (0.0, 0.0, 0.0)   # Black - regulatory places (genes)
     PLACE_ENERGY_BORDER = (0.8, 0.5, 0.0)        # Amber - energy/metabolic cofactor places (ATP/ADP/GTP/GDP/Pi)
+    PLACE_PARAMETER_BORDER = (0.45, 0.45, 0.45)  # Gray - parameter places (exogenous experimental constants)
     
     # ========================================================================
     # ARC COLORS
@@ -73,7 +74,13 @@ class ColorSchemaManager:
         # Checked before signal: energy is a specific sub-type of signal place
         if getattr(place, 'is_energy_place', False):
             return ColorSchemaManager.PLACE_ENERGY_BORDER
-        
+
+        # Parameter places (exogenous experimental constants) get gray border.
+        # Checked before signal because a place may be designated as a knob even
+        # if it is also part of the signal hierarchy in some refactored model.
+        if getattr(place, 'is_parameter_place', False):
+            return ColorSchemaManager.PLACE_PARAMETER_BORDER
+
         # Signal places get blue border (hexagonal shape distinguishes them)
         if getattr(place, 'is_signal_place', False):
             return ColorSchemaManager.PLACE_SIGNAL_BORDER
@@ -185,7 +192,8 @@ class ColorSchemaManager:
         return (getattr(place, 'is_signal_place', False) or
                 getattr(place, 'is_energy_place', False) or
                 getattr(place, 'is_compartment_place', False) or
-                getattr(place, 'is_regulatory_place', False))
+                getattr(place, 'is_regulatory_place', False) or
+                getattr(place, 'is_parameter_place', False))
     
     @staticmethod
     def is_semantic_arc_color(arc) -> bool:

@@ -176,9 +176,11 @@ class SweepRunner:
         output_dir: Path,
         workers: Optional[int] = None,
         verbose: bool = False,
+        config_path: Optional[Path] = None,
     ) -> None:
         self.model_path = model_path
         self.config = config
+        self.config_path = config_path
         self.output_dir = output_dir
         safe = self._compute_safe_workers()
         # User value acts as ceiling; never exceed memory-safe auto cap
@@ -343,6 +345,42 @@ class SweepRunner:
         # 3. Prepare output
         output = SweepOutputManager(self.output_dir)
         output.save_config(self.config.to_dict(), str(self.model_path))
+
+        # 3b. Snapshot the model + provenance into the run dir.
+        # Hybrid sync (git + SCP): the canonical .shy may be edited or
+        # overwritten between dispatches, so each run keeps its own
+        # immutable copy. Combined with provenance.json (client/server
+        # git SHAs + dirty flags + sha256), every run is independently
+        # reconstructible.
+        try:
+            import shutil as _shutil
+            model_src = Path(self.model_path)
+            if model_src.is_file():
+                _shutil.copy2(model_src,
+                              output.run_dir / 'model_snapshot.shy')
+                if self.verbose:
+                    print(f"Snapshot: model_snapshot.shy "
+                          f"({model_src.stat().st_size} bytes)")
+        except OSError as _exc:
+            print(f"WARNING: could not snapshot model: {_exc}")
+
+        # Look for provenance.json next to the sweep config and copy
+        # it into the run dir. Dispatcher writes it as a sibling of
+        # sweep_config.json in the project folder.
+        try:
+            prov_candidates = []
+            if self.config_path is not None:
+                prov_candidates.append(Path(self.config_path).parent
+                                       / 'provenance.json')
+            for prov in prov_candidates:
+                if prov.is_file():
+                    import shutil as _shutil2
+                    _shutil2.copy2(prov, output.run_dir / 'provenance.json')
+                    if self.verbose:
+                        print(f"Snapshot: provenance.json from {prov}")
+                    break
+        except OSError as _exc:
+            print(f"WARNING: could not snapshot provenance: {_exc}")
 
         # 4. Dispatch conditions in bounded batches across worker processes.
         #    Each worker loads its own model copy — no shared mutable state.

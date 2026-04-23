@@ -28,11 +28,14 @@ Author: Simão Eugénio
 Date: April 2026
 """
 
+import hashlib
 import json
 import logging
 import os
+import platform
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
@@ -325,6 +328,54 @@ class RemoteSweepDispatcher:
             except Exception:
                 pass
 
+            # Sanity check (parity with BatchExecutor): warn when an event
+            # references a token (place id or name) not present in the
+            # local model file. Catches typos like ``MANT_DOSE`` for
+            # ``MAINT_DOSE`` that would otherwise silently no-op inside
+            # remote workers (eval() failure is logged at debug level only).
+            try:
+                with open(model_filepath) as _mf:
+                    _model_json = json.load(_mf)
+                _model_place_ids = {p.get('id') for p in _model_json.get('places', [])
+                                    if p.get('id')}
+                _model_place_names = {p.get('name') for p in _model_json.get('places', [])
+                                      if p.get('name')}
+                import re as _re
+                _token_re = _re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+                _BUILTINS = {'t', 'time', 'and', 'or', 'not', 'True', 'False',
+                             'min', 'max', 'abs', 'log', 'exp', 'sqrt', 'if',
+                             'else', 'None'}
+                for _ev in _exported.get('events') or []:
+                    _refs: set = set()
+                    _refs.update(_token_re.findall(_ev.get('trigger', '') or ''))
+                    for _k, _v in (_ev.get('assignments', {}) or {}).items():
+                        _refs.add(_k)
+                        _refs.update(_token_re.findall(str(_v)))
+                    _missing = sorted(
+                        t for t in _refs
+                        if t not in _model_place_ids
+                        and t not in _model_place_names
+                        and not t.isdigit()
+                        and t not in _BUILTINS
+                    )
+                    if _missing:
+                        _msg = (
+                            f"[EVENT_DISPATCH] event {_ev.get('id', '?')!r} "
+                            f"references token(s) not present in model "
+                            f"{Path(model_filepath).name!r}: {_missing}. "
+                            f"These will silently no-op on workers (eval "
+                            f"NameError logged at debug level only). "
+                            f"Likely a typo in trigger/assignment expression "
+                            f"or a missing parameter place."
+                        )
+                        logger.warning(_msg)
+                        self._emit(progress_cb, _msg)
+            except Exception as _exc:
+                logger.warning(
+                    "[EVENT_DISPATCH] event sanity check skipped (%s): %s",
+                    type(_exc).__name__, _exc,
+                )
+
             # ── 2b. Pre-flight validation ────────────────────────────
             # Detect duplicate snapshots (common when user clicks Generate
             # multiple times before the dedup fix).
@@ -369,6 +420,93 @@ class RemoteSweepDispatcher:
             self._scp_to(host, str(config_path),
                          f"{remote_project}/sweep_config.json",
                          password=ssh_password)
+
+            # Upload the model file too. Without this, the remote uses
+            # whatever stale revision is checked out in its working tree
+            # (events, edits, parameter overrides applied locally would
+            # silently no-op). Uploads to the relative path encoded in
+            # the sweep config (model_rel_to_project) so the worker's
+            # `model_path` resolves to the freshly uploaded file.
+            remote_model_path = f"{remote_project}/{model_rel_to_project}"
+            remote_model_dir = str(Path(remote_model_path).parent).replace('\\', '/')
+            self._ssh(host, f"mkdir -p {remote_model_dir}",
+                      password=ssh_password)
+            self._emit(progress_cb,
+                       f'Uploading model file ({Path(model_filepath).name})...')
+            self._scp_to(host, str(model_abs), remote_model_path,
+                         password=ssh_password)
+            logger.info("[MODEL_DISPATCH] uploaded %s -> %s",
+                        model_filepath, remote_model_path)
+
+            # ── Provenance: git context (client + server) + digests ──
+            # Hybrid sync model: SCP delivers the model, git remains the
+            # canonical history. Provenance ties each run to a (client
+            # SHA, server SHA, model sha256) triple so any run can be
+            # reconstructed regardless of subsequent edits/commits.
+            self._emit(progress_cb, 'Collecting provenance...')
+            client_git = self._local_git_context(repo_root)
+            server_git = self._remote_git_context(
+                host, remote_repo, password=ssh_password)
+            model_sha = self._sha256_file(model_abs)
+            try:
+                model_size = model_abs.stat().st_size
+            except OSError:
+                model_size = -1
+            config_sha = self._sha256_file(config_path)
+            provenance = self._build_provenance(
+                client_git=client_git,
+                server_git=server_git,
+                model_filepath=str(model_abs),
+                model_sha256=model_sha,
+                model_size_bytes=model_size,
+                remote_model_path=remote_model_path,
+                sweep_config_sha256=config_sha,
+                host=host,
+            )
+
+            # Dirty-tree warnings — non-blocking. Interactive science
+            # often runs from a dirty tree; we only flag it loudly so
+            # results stay traceable.
+            if client_git.get('dirty'):
+                msg = (f"Client repo {repo_root} has uncommitted changes "
+                       f"({len(client_git.get('dirty_paths', []))} path(s)). "
+                       f"Run will be marked dirty in provenance.json.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+            if server_git.get('dirty'):
+                msg = (f"Server repo {remote_repo} has uncommitted changes "
+                       f"({len(server_git.get('dirty_paths', []))} path(s)). "
+                       f"Engine code may differ from client.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+            client_sha = client_git.get('head_sha')
+            server_sha = server_git.get('head_sha')
+            if client_sha and server_sha and client_sha != server_sha:
+                msg = (f"Client/server git HEAD diverge "
+                       f"({client_sha[:8]} vs {server_sha[:8]}). "
+                       f"Engine semantics may differ from local expectations.")
+                logger.warning("[PROVENANCE] %s", msg)
+                self._emit(progress_cb, f"⚠ {msg}")
+
+            # Stage + upload provenance.json next to sweep_config.json.
+            # The CLI sweep_runner copies it into the run dir on startup.
+            provenance_path = staging / 'provenance.json'
+            try:
+                with open(provenance_path, 'w') as _pf:
+                    json.dump(provenance, _pf, indent=2, sort_keys=True)
+                self._scp_to(host, str(provenance_path),
+                             f"{remote_project}/provenance.json",
+                             password=ssh_password)
+                logger.info(
+                    "[PROVENANCE] client=%s%s server=%s%s model_sha256=%s",
+                    (client_sha or 'n/a')[:8],
+                    '+dirty' if client_git.get('dirty') else '',
+                    (server_sha or 'n/a')[:8],
+                    '+dirty' if server_git.get('dirty') else '',
+                    (model_sha or 'n/a')[:12],
+                )
+            except OSError as exc:
+                logger.warning("Could not write/upload provenance.json: %s", exc)
 
             if self._cancel.is_set():
                 raise InterruptedError('Cancelled')
@@ -591,6 +729,137 @@ class RemoteSweepDispatcher:
             if (parent / '.git').is_dir():
                 return parent
         return None
+
+    # ── provenance: git context + file digests ───────────────────────
+    @staticmethod
+    def _sha256_file(path: Path, *, chunk: int = 1 << 20) -> Optional[str]:
+        """Return hex sha256 of *path* or ``None`` on read failure."""
+        try:
+            h = hashlib.sha256()
+            with open(path, 'rb') as f:
+                for buf in iter(lambda: f.read(chunk), b''):
+                    h.update(buf)
+            return h.hexdigest()
+        except OSError as exc:
+            logger.warning("Could not hash %s: %s", path, exc)
+            return None
+
+    @staticmethod
+    def _local_git_context(repo_root: Path) -> dict:
+        """Capture ``HEAD`` SHA, branch, dirty flag for *repo_root*.
+
+        Never raises. Missing git / non-repo / disconnected state are
+        all reported as ``None`` fields with a ``status`` annotation.
+        """
+        ctx: dict = {
+            'repo_root': str(repo_root),
+            'head_sha': None,
+            'branch': None,
+            'dirty': None,
+            'dirty_paths': [],
+            'status': 'ok',
+        }
+        try:
+            head = subprocess.run(
+                ['git', '-C', str(repo_root), 'rev-parse', 'HEAD'],
+                capture_output=True, text=True, timeout=5)
+            if head.returncode == 0:
+                ctx['head_sha'] = head.stdout.strip()
+            branch = subprocess.run(
+                ['git', '-C', str(repo_root), 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True, text=True, timeout=5)
+            if branch.returncode == 0:
+                ctx['branch'] = branch.stdout.strip()
+            status = subprocess.run(
+                ['git', '-C', str(repo_root), 'status', '--porcelain'],
+                capture_output=True, text=True, timeout=5)
+            if status.returncode == 0:
+                lines = [ln for ln in status.stdout.splitlines() if ln.strip()]
+                ctx['dirty'] = len(lines) > 0
+                ctx['dirty_paths'] = lines[:50]  # cap
+        except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+            ctx['status'] = f'git probe failed: {exc}'
+        return ctx
+
+    def _remote_git_context(self, host: str, repo_root_remote: str,
+                            *, password: Optional[str]) -> dict:
+        """SSH-side equivalent of :meth:`_local_git_context`.
+
+        One round-trip: combines ``rev-parse``, ``rev-parse --abbrev-ref``
+        and ``status --porcelain`` into a single shell command.
+        Returns same shape as the local context.
+        """
+        ctx: dict = {
+            'repo_root': repo_root_remote,
+            'head_sha': None,
+            'branch': None,
+            'dirty': None,
+            'dirty_paths': [],
+            'status': 'ok',
+        }
+        cmd = (
+            f"cd {repo_root_remote} && "
+            "echo HEAD=$(git rev-parse HEAD 2>/dev/null) && "
+            "echo BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) && "
+            "echo --STATUS-- && "
+            "git status --porcelain 2>/dev/null | head -50"
+        )
+        try:
+            out = self._ssh(host, cmd, password=password, timeout=15)
+        except Exception as exc:
+            ctx['status'] = f'remote git probe failed: {exc}'
+            return ctx
+        in_status = False
+        dirty: list[str] = []
+        for line in out.splitlines():
+            if line.startswith('HEAD='):
+                v = line.split('=', 1)[1].strip()
+                ctx['head_sha'] = v or None
+            elif line.startswith('BRANCH='):
+                v = line.split('=', 1)[1].strip()
+                ctx['branch'] = v or None
+            elif line.strip() == '--STATUS--':
+                in_status = True
+            elif in_status and line.strip():
+                dirty.append(line)
+        ctx['dirty'] = bool(dirty) if ctx['head_sha'] else None
+        ctx['dirty_paths'] = dirty
+        return ctx
+
+    @staticmethod
+    def _build_provenance(
+        *,
+        client_git: dict,
+        server_git: dict,
+        model_filepath: str,
+        model_sha256: Optional[str],
+        model_size_bytes: int,
+        remote_model_path: str,
+        sweep_config_sha256: Optional[str],
+        host: str,
+    ) -> dict:
+        """Assemble the provenance record for a single dispatch."""
+        return {
+            'schema_version': 1,
+            'dispatched_at': datetime.now().isoformat(timespec='seconds'),
+            'client': {
+                'hostname': socket.gethostname(),
+                'platform': platform.platform(),
+                'python': platform.python_version(),
+                'git': client_git,
+            },
+            'server': {
+                'host': host,
+                'git': server_git,
+            },
+            'model': {
+                'source_path': str(model_filepath),
+                'remote_path': remote_model_path,
+                'sha256': model_sha256,
+                'size_bytes': model_size_bytes,
+            },
+            'sweep_config_sha256': sweep_config_sha256,
+        }
 
     # ── SSH ControlMaster multiplexing ───────────────────────────────
     def _ctl_socket_args(self) -> list[str]:

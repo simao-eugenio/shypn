@@ -1,20 +1,20 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-04-22T15:44:40.273915",
+    "created": "2026-04-23T15:37:37.925737",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
-      "places": 34,
+      "places": 37,
       "transitions": 45,
       "arcs": 100,
       "modules": 0
     }
   },
   "view_state": {
-    "zoom": 0.8857805000000165,
-    "pan_x": 2257.9171596218903,
-    "pan_y": 93.29413071929105,
+    "zoom": 0.5000000000000093,
+    "pan_x": 2567.8369673891766,
+    "pan_y": 589.5746401859672,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -69,6 +69,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -107,6 +110,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -145,6 +151,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -183,6 +192,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -220,6 +232,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -258,6 +273,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -294,6 +312,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -331,6 +352,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -371,6 +395,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -409,6 +436,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -447,6 +477,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -485,6 +518,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -523,6 +559,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -561,6 +600,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -597,6 +639,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -637,6 +682,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -675,6 +723,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -713,6 +764,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -750,6 +804,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -787,6 +844,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -823,6 +883,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -859,6 +922,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -896,6 +962,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -934,6 +1003,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -974,6 +1046,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1014,6 +1089,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1054,6 +1132,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1085,6 +1166,9 @@
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1112,9 +1196,9 @@
       "x": -1880.0,
       "y": 60.0,
       "radius": 40.0,
-      "marking": 7.0,
-      "tokens": 7.0,
-      "initial_marking": 7.0,
+      "marking": 7.4,
+      "tokens": 7.4,
+      "initial_marking": 7.4,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -1128,6 +1212,9 @@
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1183,6 +1270,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1198,9 +1288,9 @@
       "x": -1880.0,
       "y": 490.0,
       "radius": 40.0,
-      "marking": 65.0,
-      "tokens": 65.0,
-      "initial_marking": 65.0,
+      "marking": 75,
+      "tokens": 75,
+      "initial_marking": 75,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -1214,6 +1304,9 @@
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1257,6 +1350,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1288,6 +1384,9 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1319,12 +1418,150 @@
       "is_compartment_place": false,
       "is_regulatory_place": false,
       "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
       "compartment_volume": 500.0,
       "neighbor_compartments": [],
       "spatial_position": null
+    },
+    {
+      "id": "P35",
+      "name": "LOADING_DOSE",
+      "label": "Loading dose (\u00b5M)",
+      "object_type": "place",
+      "x": -1870.0,
+      "y": -430.0,
+      "radius": 40.0,
+      "marking": 10.0,
+      "tokens": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "dose",
+      "parameter_units": "\u00b5M",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P36",
+      "name": "MAINT_DOSE",
+      "label": "Maintenance dose (\u00b5M)",
+      "object_type": "place",
+      "x": -1870.0,
+      "y": -250.0,
+      "radius": 40.0,
+      "marking": 3,
+      "tokens": 3,
+      "initial_marking": 3,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "dose",
+      "parameter_units": "\u00b5M",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P37",
+      "name": "DOSE_INTERVAL",
+      "label": "Dose interval (s)",
+      "object_type": "place",
+      "x": -1870.0,
+      "y": -110.0,
+      "radius": 40.0,
+      "marking": 4300,
+      "tokens": 4300,
+      "initial_marking": 4300,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "interval",
+      "parameter_units": "s",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
     }
   ],
   "transitions": [
@@ -1475,9 +1712,9 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P29",
         "P28",
-        "P5"
+        "P5",
+        "P29"
       ],
       "is_environment_aware": true,
       "compartment": "extracellular",
@@ -1518,8 +1755,8 @@
         "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
       },
       "signal_places": [
-        "P29",
         "P28",
+        "P29",
         "P6"
       ],
       "is_environment_aware": true,
@@ -1599,8 +1836,8 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
-        "P28",
-        "P9"
+        "P9",
+        "P28"
       ],
       "is_environment_aware": true,
       "compartment": "nucleus",
@@ -1799,8 +2036,8 @@
         "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
       },
       "signal_places": [
-        "P28",
-        "P16"
+        "P16",
+        "P28"
       ],
       "is_environment_aware": true,
       "compartment": "nucleus",
@@ -2000,12 +2237,12 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P29",
         "P28",
+        "P11",
         "P6",
-        "P22",
+        "P29",
         "P31",
-        "P11"
+        "P22"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2046,10 +2283,10 @@
         "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
       },
       "signal_places": [
-        "P31",
+        "P27",
         "P26",
-        "P21",
-        "P27"
+        "P31",
+        "P21"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2128,12 +2365,12 @@
         "rate_function_display": "k_tox \u00d7 f([A\u03b2]) \u00d7 f([ROS]) \u00d7 f([TNF\u03b1])"
       },
       "signal_places": [
-        "P29",
         "P28",
-        "P19",
+        "P11",
         "P6",
+        "P29",
         "P31",
-        "P11"
+        "P19"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2174,9 +2411,9 @@
         "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
       },
       "signal_places": [
-        "P24",
+        "P23",
         "P28",
-        "P23"
+        "P24"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -5134,5 +5371,54 @@
     }
   ],
   "modules": [],
-  "events": []
+  "events": [
+    {
+      "id": "evt_load",
+      "name": "evt_load",
+      "trigger": "t >  0.1",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + LOADING_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_1",
+      "name": "evt_maint_1",
+      "trigger": "t >  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_2",
+      "name": "evt_maint_2",
+      "trigger": "t > 2 *  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_3",
+      "name": "evt_maint_3",
+      "trigger": "t >  3* DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    }
+  ]
 }

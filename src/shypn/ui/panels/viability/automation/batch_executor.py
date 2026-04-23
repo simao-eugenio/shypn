@@ -622,7 +622,47 @@ class BatchExecutor:
             
             if not subnet_data['transitions']:
                 raise RuntimeError("No transitions in subnet model")
-            
+
+            # Sanity check: warn (do not fail) when an event references a place
+            # that is not part of the dispatched subnet — it would silently
+            # no-op inside worker processes.  The Viability panel should have
+            # already pulled parameter places + event-targeted places into the
+            # subnet, so this is a defensive net for hand-edited models.
+            if subnet_data['events']:
+                import logging as _lg
+                import re as _re
+                _log = _lg.getLogger(__name__)
+                _subnet_ids = {p['id'] for p in subnet_data['places']}
+                _subnet_names = {p.get('name') for p in subnet_data['places']
+                                 if p.get('name')}
+                _token_re = _re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+                for _ev in subnet_data['events']:
+                    _refs: set = set()
+                    _refs.update(_token_re.findall(_ev.get('trigger', '') or ''))
+                    for _k, _v in (_ev.get('assignments', {}) or {}).items():
+                        _refs.add(_k)
+                        _refs.update(_token_re.findall(str(_v)))
+                    _missing = [
+                        t for t in _refs
+                        if t not in _subnet_ids
+                        and t not in _subnet_names
+                        and not t.isdigit()
+                    ]
+                    # Filter out common builtins / keywords that aren't place tokens
+                    _BUILTINS = {'t', 'time', 'and', 'or', 'not', 'True', 'False',
+                                 'min', 'max', 'abs', 'log', 'exp', 'sqrt', 'if',
+                                 'else', 'None'}
+                    _missing = [m for m in _missing if m not in _BUILTINS]
+                    if _missing:
+                        _log.warning(
+                            "[EVENT_DISPATCH] event %r references token(s) not "
+                            "present in dispatched subnet: %s — assignments may "
+                            "no-op. Add the locality that owns these places to "
+                            "the viability subnet, or flag them as parameter "
+                            "places in the Environment panel.",
+                            _ev.get('id', '?'), _missing,
+                        )
+
             # Save baseline parameters to reset between experiments
             # Use subnet_model (objects) not subnet_data (dicts) for parameter extraction
             baseline_params = self._save_current_parameters(subnet_model, subnet=None)

@@ -980,16 +980,51 @@ class ViabilityPanel(Gtk.Box):
         
         # SPECIAL CASE: If no localities selected, show entire model
         show_all_places = len(self.selected_localities) == 0
-        
+
+        # Collect IDs/names referenced by Environment-Panel events so those
+        # places are always sweepable from Viability even when they sit
+        # outside the selected localities (otherwise the user can never
+        # supply a sweep value for an event-driven knob like CBD_extracellular).
+        _event_ref_ids: set = set()
+        try:
+            _events = list(getattr(model, 'events', []) or [])
+            if _events:
+                import re as _re
+                _id_index = {p.id: p for p in model.places}
+                _name_index = {p.name: p for p in model.places
+                               if getattr(p, 'name', None)}
+                _token_re = _re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+                for ev in _events:
+                    refs: set = set()
+                    refs.update(_token_re.findall(getattr(ev, 'trigger', '') or ''))
+                    for k, v in (getattr(ev, 'assignments', {}) or {}).items():
+                        refs.add(k)
+                        refs.update(_token_re.findall(str(v)))
+                    for token in refs:
+                        place = _id_index.get(token) or _name_index.get(token)
+                        if place is not None:
+                            _event_ref_ids.add(place.id)
+        except Exception:
+            _event_ref_ids = set()
+
         # Populate Places table
         for place in model.places:
             # If localities selected: only show places in those localities
             # If no localities: show all places (entire model)
-            # ALWAYS include compartment places (e.g., Temperature, pH) — they are
-            # isolated (no arcs) but implicitly affect all rate functions via the
-            # engine's thermodynamic auto-detection, so they must be sweepable.
+            # ALWAYS include:
+            #   - compartment places (Temperature, pH) — isolated but implicitly
+            #     affect rate functions via thermodynamic auto-detection,
+            #   - parameter places (is_parameter_place=True) — user-declared
+            #     Environment-Panel knobs that must be sweepable from Viability,
+            #   - event-referenced places — targets/triggers of scheduled events.
             is_compartment = getattr(place, 'is_compartment_place', False)
-            if not show_all_places and place.id not in all_place_ids and not is_compartment:
+            is_param = getattr(place, 'is_parameter_place', False)
+            is_event_ref = place.id in _event_ref_ids
+            if (not show_all_places
+                    and place.id not in all_place_ids
+                    and not is_compartment
+                    and not is_param
+                    and not is_event_ref):
                 continue
             place_obj = place
             place_type = "Source" if hasattr(place_obj, 'is_source') and place_obj.is_source else "Normal"
@@ -1145,7 +1180,49 @@ class ViabilityPanel(Gtk.Box):
         # Copy environment events from the full document model so that every
         # simulation run on this subnet is aware of the user-defined event schedule.
         base_model = self._get_current_model()
-        model.events = list(getattr(base_model, 'events', []) or []) if base_model is not None else []
+        events = list(getattr(base_model, 'events', []) or []) if base_model is not None else []
+        model.events = events
+
+        # Augment the subnet with Environment-Panel-owned objects so that
+        # parameter places and event-referenced places are not silently dropped
+        # by the locality-only extraction:
+        #   1. Every place flagged ``is_parameter_place=True`` is included
+        #      (these are the user-declared sweep knobs).
+        #   2. Every place whose id or name appears in any event's trigger
+        #      expression or assignments dict is included (otherwise the
+        #      event would no-op in worker processes).
+        if base_model is not None:
+            existing_ids = {p.id for p in model.places}
+            additions: list = []
+
+            # 1. Parameter places
+            for p in getattr(base_model, 'places', []) or []:
+                if getattr(p, 'is_parameter_place', False) and p.id not in existing_ids:
+                    additions.append(p)
+                    existing_ids.add(p.id)
+
+            # 2. Event-referenced places (by id or name)
+            if events:
+                import re as _re
+                _id_index = {p.id: p for p in base_model.places}
+                _name_index = {p.name: p for p in base_model.places
+                               if getattr(p, 'name', None)}
+                _token_re = _re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+                for ev in events:
+                    refs: set = set()
+                    refs.update(_token_re.findall(getattr(ev, 'trigger', '') or ''))
+                    for k, v in (getattr(ev, 'assignments', {}) or {}).items():
+                        refs.add(k)
+                        refs.update(_token_re.findall(str(v)))
+                    for token in refs:
+                        place = _id_index.get(token) or _name_index.get(token)
+                        if place is not None and place.id not in existing_ids:
+                            additions.append(place)
+                            existing_ids.add(place.id)
+
+            if additions:
+                model.places = list(model.places) + additions
+
         self.subnet_model = model
         return model
     

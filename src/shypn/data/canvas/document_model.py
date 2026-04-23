@@ -999,6 +999,62 @@ class DocumentModel:
             Setting value or default
         """
         return self.thermodynamic_settings.get(key, default)
+
+    def _warn_parameter_naming_violations(self) -> None:
+        """Emit logging warnings for ALL_CAPS ⟺ is_parameter_place mismatches.
+
+        Convention:
+          - Parameter places (exogenous constants read by expressions/events) use
+            UPPER_SNAKE_CASE names (e.g. LOADING_DOSE, DOSE_INTERVAL).
+          - Regular biological species use mixed/lower case (e.g. CBD_intracellular,
+            ATP, ADP, Aβ42).
+
+        Warns when:
+          (a) place.is_parameter_place is True but the name contains lowercase
+              letters — convention recommends ALL_CAPS.
+          (b) the name is ALL_CAPS with an underscore (multi-word upper case)
+              but is_parameter_place is False — likely a forgotten flag.
+
+        Auto-generated IDs of the form P<digits> (e.g. P1, P35) are skipped.
+        Short all-caps biological abbreviations without underscores (ATP, NADH,
+        GTP, AMP) are skipped in check (b) to avoid false positives.
+        """
+        import logging
+        import re
+        logger = logging.getLogger(__name__)
+
+        auto_id_re = re.compile(r'^P\d+$')
+        multiword_caps_re = re.compile(r'^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$')
+
+        violations_a = []  # flagged param but not ALL_CAPS
+        violations_b = []  # ALL_CAPS multi-word but not flagged
+
+        for p in self.places:
+            name = p.name or ""
+            if auto_id_re.match(name):
+                continue
+
+            is_param = bool(getattr(p, 'is_parameter_place', False))
+            has_lower = any(c.islower() for c in name)
+
+            if is_param and has_lower:
+                violations_a.append(name)
+            elif not is_param and multiword_caps_re.match(name):
+                violations_b.append(name)
+
+        for name in violations_a:
+            logger.warning(
+                "Parameter naming convention: place '%s' has is_parameter_place=True "
+                "but name is not ALL_CAPS. Convention recommends UPPER_SNAKE_CASE "
+                "(e.g. LOADING_DOSE).", name
+            )
+        for name in violations_b:
+            logger.warning(
+                "Parameter naming convention: place '%s' looks like an ALL_CAPS "
+                "parameter name (UPPER_SNAKE_CASE) but is_parameter_place=False. "
+                "Did you forget to flag it as a parameter place?", name
+            )
+
     
     def save_to_file(self, filepath: str) -> None:
         """Save document to JSON file.
@@ -1021,6 +1077,13 @@ class DocumentModel:
             ColorSchemaManager.reset_transition_colors(transition)
         for arc in self.arcs:
             ColorSchemaManager.reset_arc_color(arc)
+
+        # Validate ALL_CAPS ⟺ is_parameter_place naming convention.
+        # Convention: parameter places (exogenous experimental constants referenced
+        # by name in expressions/events) are named in UPPER_SNAKE_CASE (e.g.
+        # LOADING_DOSE, DOSE_INTERVAL). Regular biological species use mixed case.
+        # Emits logging warnings only — never blocks the save.
+        self._warn_parameter_naming_violations()
         
         # Don't modify filepath - it should already have the correct extension (.shy)
         # The .shy extension is used for SHYpn Petri net files (which are JSON internally)

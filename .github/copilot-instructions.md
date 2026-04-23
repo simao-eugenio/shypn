@@ -84,9 +84,51 @@ asked.
 - `private` remote → `git@github.com:simao-eugenio/shypn-dev.git`
 - `public`  remote → `git@github.com:simao-eugenio/shypn.git`
 - Active branch: `Usability-and-enhancements`
-- Deploy to server: commit → `git push private` → SSH `git pull private --ff-only`
 - Server alias: `remote-gpu` → `simao@150.162.232.36`, repo at `~/shypn/`
 - Server venv: `~/shypn/.venv/` (CuPy 14.0.1, CUDA 12.9, RTX 5060 Ti)
+- **Code sync (engine, scripts, configs)**: still operator-driven —
+  commit → `git push private` → SSH `git pull private --ff-only`.
+- **Model sync (`.shy` files)**: handled automatically by
+  `RemoteSweepDispatcher` (hybrid model — see next section). Agents
+  must NOT manually `scp` `.shy` files unless the dispatcher path
+  is genuinely unavailable.
+
+## Hybrid sync model (sweep dispatch)
+
+As of April 2026 the dispatcher uses a **git + SCP hybrid**:
+
+1. **Git remains canonical** for engine code, CLI, scripts, and
+   long-term model history. Operators still commit/push/pull as before.
+2. **SCP delivers the `.shy` model at every dispatch** — the dispatcher
+   uploads `<project>/models/<file>.shy` to the matching server path
+   right after `sweep_config.json`. This eliminates the "stale model"
+   class of bugs where local edits silently no-op on the server.
+3. **Provenance is captured per dispatch**:
+   - `provenance.json` (sibling of `sweep_config.json`) records client
+     + server git HEAD, branch, dirty flag, dirty paths, model sha256,
+     config sha256, hostnames, dispatch timestamp.
+   - The CLI sweep_runner snapshots `model_snapshot.shy` and
+     `provenance.json` into each `run_<ts>/` directory, so every run
+     is **independently reconstructible** regardless of subsequent
+     edits or commits.
+4. **Non-blocking warnings** (logged + emitted to UI as `⚠`) when:
+   client tree dirty, server tree dirty, or client/server git HEADs
+   diverge. These do not abort the dispatch — interactive science
+   needs the escape hatch.
+
+Run-dir contents (each `run_<ts>/`):
+```
+run_<ts>/
+  config.json             ← exported sweep config used by the run
+  model_snapshot.shy      ← exact bytes the worker loaded
+  provenance.json         ← git context + sha256 of model + config
+  summary.csv
+  resource_usage.json
+  condition_<name>/...    ← per-condition replicates + statistics
+```
+
+Agents debugging a "wrong result" sweep: always check `provenance.json`
+first to confirm which model bytes / which engine SHAs actually ran.
 
 ## CLI cheatsheet
 
