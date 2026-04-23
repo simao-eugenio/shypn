@@ -136,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=output_dir,
         workers=args.workers,
         verbose=args.verbose or args.dry_run,
+        config_path=sweep_path,
     )
 
     if args.dry_run:

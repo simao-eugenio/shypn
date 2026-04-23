@@ -251,9 +251,27 @@ class ExperimentAutomationCategory:
                     iter = store.iter_next(iter)
         
         elif param_type == 'places':
+            # Build a quick lookup of which place IDs are flagged as
+            # Environment-Panel parameter places so we can surface them
+            # at the top of the dropdown with a [param] tag.
+            param_place_ids: set = set()
+            try:
+                _src_model = (
+                    getattr(self.parent_panel, 'subnet_model', None)
+                    or self.parent_panel._get_current_model()
+                )
+                if _src_model is not None:
+                    for _p in getattr(_src_model, 'places', []) or []:
+                        if getattr(_p, 'is_parameter_place', False):
+                            param_place_ids.add(_p.id)
+            except Exception:
+                param_place_ids = set()
+
             # Get from places_store
             if hasattr(self.parent_panel, 'places_store'):
                 store = self.parent_panel.places_store
+                _params_top: list = []
+                _params_rest: list = []
                 iter = store.get_iter_first()
                 while iter:
                     # Column 0 = ID (internal), Column 1 = Name (display)
@@ -261,8 +279,18 @@ class ExperimentAutomationCategory:
                     place_name = store.get_value(iter, 1)
                     if place_id and place_name:
                         # Places: Only initial_marking property
-                        params.append((f"{place_name}", f"{place_id}.initial_marking"))
+                        if place_id in param_place_ids:
+                            _params_top.append(
+                                (f"[param] {place_name}", f"{place_id}.initial_marking")
+                            )
+                        else:
+                            _params_rest.append(
+                                (f"{place_name}", f"{place_id}.initial_marking")
+                            )
                     iter = store.iter_next(iter)
+                # Parameter places first, then biological species
+                params.extend(_params_top)
+                params.extend(_params_rest)
         
         elif param_type == 'arcs':
             # Get from arcs_store

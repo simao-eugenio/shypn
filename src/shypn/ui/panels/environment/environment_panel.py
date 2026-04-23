@@ -19,6 +19,7 @@ from gi.repository import Gtk
 
 from shypn.ui.category_frame import CategoryFrame
 from .signal_places_category import SignalPlacesCategory
+from .parameter_places_category import ParameterPlacesCategory
 from .events_category import EventsCategory
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ class EnvironmentPanel(Gtk.Box):
         self.document_id = document_id
 
         self._signal_places_cat: SignalPlacesCategory | None = None
+        self._parameter_places_cat: ParameterPlacesCategory | None = None
         self._events_cat: EventsCategory | None = None
 
         self._build_ui()
@@ -102,7 +104,19 @@ class EnvironmentPanel(Gtk.Box):
         self._sp_frame.set_content(self._signal_places_cat.widget)
         self.categories_box.pack_start(self._sp_frame, False, False, 0)
 
-        # ── Category 2: ENVIRONMENT EVENTS ───────────────────────────────
+        # ── Category 2: PARAMETER PLACES (exogenous experimental constants) ──
+        self._parameter_places_cat = ParameterPlacesCategory(
+            model=self.model,
+            document_id=self.document_id,
+        )
+        self._pp_frame = CategoryFrame(
+            title='PARAMETER PLACES',
+            expanded=True,
+        )
+        self._pp_frame.set_content(self._parameter_places_cat.widget)
+        self.categories_box.pack_start(self._pp_frame, False, False, 0)
+
+        # ── Category 3: ENVIRONMENT EVENTS ───────────────────────────
         self._events_cat = EventsCategory(
             model=self.model,
             document_id=self.document_id,
@@ -116,6 +130,8 @@ class EnvironmentPanel(Gtk.Box):
 
         # Wire double-click on a signal place to jump to the events table
         self._signal_places_cat.set_on_place_activated(self._on_place_activated)
+        # Same for parameter places
+        self._parameter_places_cat.set_on_place_activated(self._on_place_activated)
 
         self.scrolled_window.add(self.categories_box)
         self.pack_start(self.scrolled_window, True, True, 0)
@@ -145,6 +161,8 @@ class EnvironmentPanel(Gtk.Box):
     def _sync_model(self, model) -> None:
         if self._signal_places_cat is not None:
             self._signal_places_cat.set_model(model)
+        if self._parameter_places_cat is not None:
+            self._parameter_places_cat.set_model(model)
         if self._events_cat is not None:
             self._events_cat.set_model(model)
 

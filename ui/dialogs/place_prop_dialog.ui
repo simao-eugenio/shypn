@@ -1867,6 +1867,144 @@ Use "Fetch from Database" to query eQuilibrator for experimental data. Set "Data
                 <property name="label" translatable="yes">Thermodynamics</property>
               </object>
             </child>
+
+            <!-- Parameter Tab (exogenous experimental constants for sweeps/events) -->
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="hscrollbar-policy">never</property>
+                <property name="vscrollbar-policy">automatic</property>
+                <child>
+                  <object class="GtkViewport">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">12</property>
+                        <property name="margin">12</property>
+
+                        <!-- Enable parameter mode -->
+                        <child>
+                          <object class="GtkCheckButton" id="parameter_place_checkbox">
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="label" translatable="yes">Treat this place as a parameter (exogenous constant)</property>
+                            <property name="tooltip-text">When enabled, this place is treated as a configurable scalar input read by events, triggers, or rate functions. It is NOT consumed or produced by reactions and is excluded from species/mass balance summaries. Its initial_marking is what sweep snapshots vary.</property>
+                          </object>
+                        </child>
+
+                        <!-- Parameter kind -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="spacing">6</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Parameter kind:</property>
+                                <property name="width-chars">20</property>
+                                <property name="xalign">0</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkComboBoxText" id="parameter_kind_combo">
+                                <property name="visible">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="has-entry">True</property>
+                                <property name="tooltip-text">Free-form classification. Suggested values: dose, interval, time, stressor, environment, threshold.</property>
+                                <items>
+                                  <item id="dose">dose</item>
+                                  <item id="interval">interval</item>
+                                  <item id="time">time</item>
+                                  <item id="stressor">stressor</item>
+                                  <item id="environment">environment</item>
+                                  <item id="threshold">threshold</item>
+                                </items>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                              </packing>
+                            </child>
+                          </object>
+                        </child>
+
+                        <!-- Parameter units -->
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="spacing">6</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label">Units:</property>
+                                <property name="width-chars">20</property>
+                                <property name="xalign">0</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkEntry" id="parameter_units_entry">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="placeholder-text">e.g., µM, s, mg/kg, K, pH</property>
+                                <property name="tooltip-text">Free-text unit string (documentation only — no unit checking is performed).</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                              </packing>
+                            </child>
+                          </object>
+                        </child>
+
+                        <!-- Help frame -->
+                        <child>
+                          <object class="GtkFrame">
+                            <property name="visible">True</property>
+                            <property name="label-xalign">0</property>
+                            <property name="margin-top">12</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="margin">10</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <property name="label" translatable="yes">Parameter places carry no biology — they hold a constant scalar that other parts of the model read.
+
+Typical uses:
+  • LOADING_DOSE / MAINT_DOSE — pharmacology event amplitudes
+  • REDOSE_TIME — event trigger time (read by trigger expressions)
+  • DOSE_INTERVAL — spacing between scheduled events
+  • Applied stressor magnitude, ambient pH/temperature when used as sweep knobs
+
+The factorial sweep CLI will iterate over the initial_marking field of any place — including parameter places — exactly the same way. The flag exists so that mass-balance, species counts, and visualisations can correctly exclude them from biological summaries.</property>
+                              </object>
+                            </child>
+                            <child type="label">
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="label" translatable="yes">About Parameter Places</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+
+            <child type="tab">
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="label" translatable="yes">Parameter</property>
+              </object>
+            </child>
           </object>
           
           <packing>
