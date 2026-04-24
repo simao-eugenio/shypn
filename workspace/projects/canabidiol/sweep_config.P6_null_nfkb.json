@@ -1,6 +1,6 @@
 {
   "mode": "single",
-  "model_path": "workspace/projects/canabidiol/models/cbd_ad_neuroprotection_v3_p6_null_nfkb.shy",
+  "model_path": "models/cbd_ad_neuroprotection_v3_p6_null_nfkb.shy",
   "replicates": 30,
   "duration": 14400,
   "termination": "time",
