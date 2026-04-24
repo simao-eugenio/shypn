@@ -101,7 +101,7 @@ def main(run_dir: str) -> None:
         print()
 
     print("=== Marginal drug effect on Neuron_Health (mean over Age) ===")
-    print(f"{'Sev':>3} {'Ld':>3} {'Mt':>3}  {'meanNeuH':>9}  {'delta':>+8}")
+    print(f"{'Sev':>3} {'Ld':>3} {'Mt':>3}  {'meanNeuH':>9}  {'delta':>8}")
     print('-' * 38)
     grouped: Dict[tuple, List[float]] = {}
     for r in rows:
