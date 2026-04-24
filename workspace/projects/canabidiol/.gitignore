@@ -1,0 +1,27 @@
+# Per-project ignores for the canabidiol project.
+#
+# Keep .shy models, scripts, docs, manuscript, metadata reference data,
+# sweep_config templates under source control.
+# Ignore generated, transient and local-only artefacts.
+
+# Editor / app local state
+models/.shypn/
+metadata/*.shypn
+
+# Backup files produced by patchers and hand-edits
+*.shy.bak.*
+*.bak.*
+
+# Last-dispatch artefacts left at the project root by RemoteSweepDispatcher
+# (each run_<ts>/ snapshots its own copy under experiments/results/)
+/sweep_config.json
+/provenance.json
+
+# Sweep results live under experiments/results/ (symlinked to HDD on server,
+# regular tree locally). Never commit them.
+experiments/results/
+
+# Python / OS junk
+__pycache__/
+*.pyc
+.DS_Store

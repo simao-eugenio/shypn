@@ -568,19 +568,26 @@ class ParameterSweepBuilder(Gtk.Box):
             if row[2] == param_id:  # Check ID column
                 return
         
-        # Check limit (max 3 parameters for factorial)
-        if len(self.factorial_list) >= 3:
+        # Soft warning when factorial design grows large (>=4 params).
+        # The CLI accepts arbitrary N; the cap was removed so protocols like
+        # P1 (severity × loading × maint × interval) can be configured here.
+        if len(self.factorial_list) >= 4:
             dialog = Gtk.MessageDialog(
                 transient_for=self.get_toplevel(),
                 flags=0,
                 message_type=Gtk.MessageType.WARNING,
-                buttons=Gtk.ButtonsType.OK,
-                text="Maximum 3 parameters for factorial design"
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=f"Adding a {len(self.factorial_list) + 1}\u1d57\u02b0 parameter to the factorial design"
             )
-            dialog.format_secondary_text("Factorial designs become very large with >3 parameters. For more parameters, consider fractional factorial designs or sequential optimization.")
-            dialog.run()
+            dialog.format_secondary_text(
+                "Full factorial designs grow as the product of all level counts "
+                "(condition_count = \u220f |levels_i|). Make sure the resulting "
+                "sweep size is what you intend, or consider a fractional/screening design."
+            )
+            response = dialog.run()
             dialog.destroy()
-            return
+            if response != Gtk.ResponseType.OK:
+                return
         
         # Detect parameter type from ID prefix
         if param_id.startswith('T'):
@@ -623,7 +630,7 @@ class ParameterSweepBuilder(Gtk.Box):
     def _update_factorial_preview(self):
         """Update preview for factorial design with example combinations."""
         if len(self.factorial_list) == 0:
-            self.preview_label.set_markup("<i>Add 2-3 parameters for factorial design</i>")
+            self.preview_label.set_markup("<i>Add 2 or more parameters for factorial design</i>")
             self.generate_button.set_sensitive(False)
             return
         
