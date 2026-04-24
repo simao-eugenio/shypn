@@ -274,6 +274,102 @@ MAINT_DOSE level → 4 × 4 × 3 × 2 = **96 cells × 30 = 2880 sims**.
 
 **Cost:** 4 × 4 × 4 × 1 × 3 = 192 conditions × 30 reps = **5760 sims**.
 
+### 4.4 P1 results — `run_20260424_005438`
+
+First full-factorial dispatch of P1 with the lifted ≥4-parameter cap
+(client+server git `fcf66a46`, model sha `a6b10f4c…`, 192 cells × 30
+reps = **5760/5760 OK**, ~20 min wall per cell, sim duration 4 h).
+
+**Disease burden, drug-naïve `Neuron_Health` at t = 4 h (mean of 30 reps):**
+
+| Age \ Sev | 0 | 1 | 2 | 3 |
+|---:|---:|---:|---:|---:|
+| 65 | 64.8 | 61.2 | 57.6 | 54.4 |
+| 75 | 55.5 | 52.0 | 48.5 | 45.4 |
+| 85 | 47.0 | 43.5 | 39.9 | 36.7 |
+
+* **Age dominates Severity ≈ 2:1.** Going Age 65 → 85 at fixed severity
+  costs ~18 NeuH points; Sev 0 → 3 at fixed age costs ~10. Future
+  protocols that need to *separate* groups should put Age on the inner
+  axis and use Severity as a secondary check.
+* **Sev = 0 is not a healthy steady state.** Even with the v3 healthy
+  M₀ + zero pathology install, NeuH drifts from 100 → 64.8 in 4 h. The
+  inflammatory loop is autonomous over this duration. Treat the
+  `(Sev=0, LD=0, MT=0)` cell as a **drug-naïve baseline**, not as an
+  asymptotically healthy reference. See action item §14.1.
+
+**Drug rescue (mean ΔNeuH over Age, max-dose corner LD=20 / MT=5):**
+
+| Sev | LD=0 MT=0 | LD=20 MT=5 | Δ |
+|---:|---:|---:|---:|
+| 0 | 55.8 | 93.1 | +37.3 |
+| 1 | 52.2 | 91.0 | +38.8 |
+| 2 | 48.7 | 89.1 | +40.4 |
+| 3 | 45.5 | 87.0 | +41.6 |
+
+CBD acts as a near-universal rescue: end-state NeuH is almost
+severity-independent (87–93) once dose is saturating. The drug ×
+disease interaction is small (+4 points across Sev 0 → 3).
+
+**Dose response saturates by LD ≈ 5–10, MT ≈ 1–3.** At Sev = 2,
+Age = 65:
+
+| LD \ MT | 0 | 1 | 3 | 5 |
+|---:|---:|---:|---:|---:|
+| 0  | 57.6 | 67.3 | 76.5 | 79.5 |
+| 5  | 88.1 | 89.6 | 90.4 | 91.0 |
+| 10 | 91.1 | 91.4 | 91.9 | 92.3 |
+| 20 | 92.6 | 92.8 | 93.1 | 93.3 |
+
+LD 0 → 5 buys +30 NeuH; LD 5 → 20 buys +4. Anything above LD = 10 /
+MT = 3 wastes simulation budget on a saturated regime.
+
+**Mechanism check ✅.** Drug induces M1 → M2 polarisation
+(M1: 50 → 9, M2: 0 → 41 at Sev=2/LD=20/MT=5), collapses ROS, TNFa,
+NFkB to floor, raises Glutathione. The model is mechanistically sound
+on the inflammation/oxidative arm.
+
+**Implications for P2/P3 design:** trim future dose grids to
+`LOADING_DOSE ∈ {0, 2, 5, 10}` and `MAINT_DOSE ∈ {0, 0.3, 1, 3}` — same
+information, half the runs. Implemented in §5 below.
+
+### 4.5 Time-course evidence (figures)
+
+Two figures generated from this run with
+[`scripts/plot_p1_timecourse.py`](../scripts/plot_p1_timecourse.py),
+overlaying CBD_extracellular, Abeta_Plaque and NFkB_p65 on a symlog y
+axis at Sev=2, Age=75:
+
+* [`figures/cbd_plaque_inflammation_timecourse_MT0.png`](../figures/cbd_plaque_inflammation_timecourse_MT0.png) — single-bolus only.
+  CBD shows mono-exponential decay (half-life ≈ 1 h). At LD ≥ 5 the
+  inflammatory cascade collapses 3 decades within ~5 min ("binary
+  collapse" of F3 in the deep-analysis doc); plaque pinned at floor.
+* [`figures/cbd_plaque_inflammation_timecourse_MT3.png`](../figures/cbd_plaque_inflammation_timecourse_MT3.png) — loading + 3 maintenance pulses
+  every `DOSE_INTERVAL = 4300 s`. Three saw-tooth CBD bumps confirm
+  the dosing schedule fires as designed. **`(LD=0, MT=3)` alone
+  outperforms `(LD=20, MT=0)` after t ≈ 1.5 h** — for sustained
+  suppression, the maintenance schedule matters more than the loading
+  bolus.
+
+**New finding from MT=3 trajectory: plaque is reversible.**
+Trajectory of `(Sev=2, LD=0, MT=3, Age=75)`:
+
+| t (h) | CBD (µM) | Plaque |
+|---:|---:|---:|
+| 1.0 | 0.0   | 19.3 |
+| 1.2 | 3.0 ← *first MT pulse* | 23.2 |
+| 2.0 | 0.8   | **31.8 ← peak** |
+| 3.0 | 1.6   | 26.0 |
+| 4.0 | 2.4   | **9.5 (and falling)** |
+
+The drug does not merely halt new plaque — it allows clearance
+pathways (autophagy / phagocytosis by polarised M2 microglia) to
+reduce existing plaque burden. The 4 h window catches only the
+descending limb; **extending duration to 12–24 h would reveal whether
+clearance reaches floor or stalls at a non-zero residual.** This
+informs Protocol P2 (withdrawal challenge) — the natural-history arm
+of P2 must be long enough to contrast clearance vs lock-in.
+
 ---
 
 ## 5. Protocol P2 — Withdrawal challenge across severities
@@ -310,8 +406,13 @@ and that cost scales with disease severity.
 | Sweep parameter | Path | Values | Levels |
 |---|---|---|---:|
 | `[param] Disease_Severity` | `Disease_Severity.initial_marking` | 1, 2, 3        | 3 |
-| `[param] LOADING_DOSE`     | `LOADING_DOSE.initial_marking`     | 0, 3, 10, 20   | 4 |
+| `[param] LOADING_DOSE`     | `LOADING_DOSE.initial_marking`     | 0, 2, 5, 10    | 4 |
 | `[param] Age`              | `Age.initial_marking`              | 65, 75, 85     | 3 |
+
+> Dose grid trimmed (was `0, 3, 10, 20`) per P1 results in §4.4 —
+> drug effect saturates above LD ≈ 10, so the high end is uninformative
+> for withdrawal characterisation. Sample density at the onset of
+> efficacy (LD = 2) is now where it matters.
 
 **Cells:** 3 × 4 × 3 = **36**  •  **Total sims:** 36 × 30 = **1080**
 
@@ -329,7 +430,7 @@ and that cost scales with disease severity.
   "max_tau": 0.1,
   "parameters": [
     {"type": "places", "path": "Disease_Severity.initial_marking", "values": [1, 2, 3]},
-    {"type": "places", "path": "LOADING_DOSE.initial_marking",     "values": [0, 3, 10, 20]},
+    {"type": "places", "path": "LOADING_DOSE.initial_marking",     "values": [0, 2, 5, 10]},
     {"type": "places", "path": "Age.initial_marking",              "values": [65, 75, 85]}
   ],
   "events": [
@@ -419,76 +520,15 @@ the **therapeutic time window** as a function of disease severity.
 
 ---
 
-## 7. Protocol P4 — Lock-in bifurcation map (fine dose scan, no events)
+## 7. Protocol P4′ — Lock-in bifurcation map (single-bolus, fine LD scan)
 
-**Hypothesis.** A bistable boundary exists between **clearing** and
-**locked** plaque trajectories, located at a severity-dependent
-critical CBD level. Map it.
-
-### 7.1 Environment Panel — parameter-place baselines & events
-
-**Parameter places:**
-
-| Place (ID) | Baseline | Units | Notes |
-|---|---:|---|---|
-| `Disease_Severity (P38)` | 2  | level | swept by Viability |
-| `Age (P31)`              | 75  | (signal) | swept by Viability |
-| `pH (P29)`               | 7.4 | (signal) | held constant |
-| `CBD_extracellular (P1)` | 3.0 | µM | **swept by Viability** (constant-exposure axis) |
-| `LOADING_DOSE / MAINT_DOSE / DOSE_INTERVAL` | – | – | unused (no dose events in P4) |
-
-**Events table (Environment Panel rows — 5 columns):**
-
-| id | trigger | target | expression | delay |
-|---|---|---|---|---:|
-| `evt_install_disease` | `t > 0.01` | (14 places — see §0) | `place + Disease_Severity × δ` | 0 |
-
-*(no drug events — constant exposure via `CBD_extracellular (P1).initial_marking`)*
-
-### 7.2 Viability Panel — sweep plan
-
-**Mode:** Factorial design  •  **Replicates:** 60  •  **Duration:** 14400 s  •  **Termination:** time
-
-| Sweep parameter | Path | Values | Levels |
-|---|---|---|---:|
-| `[param] Disease_Severity` | `Disease_Severity.initial_marking` | 1, 2, 3                                        | 3 |
-| `CBD_extracellular`        | `CBD_extracellular.initial_marking` | 0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0 | 10 |
-| `[param] Age`              | `Age.initial_marking`              | 65, 75, 85                                     | 3 |
-
-> `CBD_extracellular` is *not* a parameter place in v3 (no `[param]`
-> tag). To make it one, add `CBD_INIT (parameter place)` and a single
-> seed event — see the note at the end of §7.
-
-**Cells:** 3 × 10 × 3 = **90**  •  **Total sims:** 90 × 60 = **5400**
-
-### 7.3 Headless equivalent (`sweep_config.P4.json`)
-
-```json
-{
-  "mode": "factorial",
-  "model_path": "workspace/projects/canabidiol/models/cbd_ad_neuroprotection_v3.shy",
-  "replicates": 60,
-  "duration": 14400,
-  "termination": "time",
-  "seed_base": 42,
-  "tau_epsilon": 0.03,
-  "max_tau": 0.1,
-  "parameters": [
-    {"type": "places", "path": "Disease_Severity.initial_marking",   "values": [1, 2, 3]},
-    {"type": "places", "path": "CBD_extracellular.initial_marking",
-     "values": [0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0]},
-    {"type": "places", "path": "Age.initial_marking",                "values": [65, 75, 85]}
-  ],
-  "events": []
-}
-```
-
-**Cost:** 3 × 10 × 3 = 90 conditions × 60 reps = **5400 sims**.
-
-> If you want the sweep to vary a parameter place rather than the
-> regular `CBD_extracellular`, replace the second dimension with
-> `CBD_INIT.initial_marking` and add a single seed event
-> `{"id": "evt_init", "trigger": "t > 0.1", "assignments": {"CBD_extracellular": "CBD_INIT"}}`.
+> **Moved.** Full spec lives in
+> [`protocols/P4__v4_p4.md`](protocols/P4__v4_p4.md) (paired with
+> model `cbd_ad_neuroprotection_v4_p4.shy`). Per-experiment protocol
+> docs follow the convention `protocols/P<id>__<model_version>.md`.
+>
+> **TL;DR:** 45 cells × 60 reps = 2700 sims; **duration 14 400 s = 4 h**;
+> single-bolus model `v4_p4`; refines F1 lock-in finding from P1.
 
 ---
 
@@ -622,15 +662,15 @@ tolerance.
 
 ## 10. Total cost & run order
 
-| Protocol | Conditions | Reps | Sims | Notes |
-|---|---:|---:|---:|---|
-| P6 | 7   | 30 | 210  | Severity calibration (run first!) |
-| P5 | 12  | 30 | 360  | Acute kinetics (short duration) |
-| P2 | 36  | 30 | 1080 | Withdrawal cost |
-| P3 | 45  | 30 | 1350 | Therapeutic window |
-| P1 | 192 | 30 | 5760 | Full disease × dose × age factorial |
-| P4 | 90  | 60 | 5400 | Bifurcation map |
-| **Total** | **382** | – | **14160** | |
+| Protocol | Conditions | Reps | Sims | Duration | Notes |
+|---|---:|---:|---:|---:|---|
+| P6 | 7   | 30 | 210  | 14400 s | Severity calibration (run first!) |
+| P5 | 12  | 30 | 360  | 1800 s  | Acute kinetics (short duration) |
+| P2 | 36  | 30 | 1080 | 14400 s | Withdrawal cost |
+| P3 | 45  | 30 | 1350 | 14400 s | Therapeutic window |
+| P1 | 192 | 30 | 5760 | 14400 s | Full disease × dose × age factorial |
+| P4′ | 45  | 60 | 2700 | 14400 s | Bifurcation map (single-bolus, fine LD) |
+| **Total** | **337** | – | **11460** | – | |
 
 **Recommended order:** P6 → P5 → P2 → P3 → P1 → P4
 (calibration first, cheap kinetic sanity-check second, heavy bifurcation
@@ -695,3 +735,69 @@ Auto-IDs (`P1`, `P38`, …) and short single-word abbreviations (`ATP`,
 > (similar to `Age`, `Temperature`, `pH`). It IS still a parameter
 > place. The validator currently emits a soft warning for this; it can
 > be added to the exemption list in v3.1 if the warning is noisy.
+
+---
+
+## 14. Open issues raised by P1 results (`run_20260424_005438`)
+
+### 14.1 Sev = 0 drifts away from healthy in 4 h
+
+The `(Disease_Severity = 0, LOADING_DOSE = 0, MAINT_DOSE = 0)` cell
+ends at NeuH ≈ 65 (Age 65) instead of staying near 100. Either:
+
+* (a) the v3 "healthy" M₀ still seeds enough Aβ/ROS/M1 to drive the
+  inflammation loop autonomously, or
+* (b) 4 h is too short relative to the inflammation steady state and
+  the system is still on its initial transient.
+
+**Decision needed before P2/P3 dispatch:** run P6 (severity calibration,
+7 conditions × 30 reps = 210 sims) at **duration = 14400 s** *and* a
+second P6 variant at **86400 s (24 h sim)**, both with Sev = 0 only,
+to separate (a) from (b). If (a), revisit M₀ floors for ROS, M1, NFkB,
+Aβ_oligomer; if (b), bump P1 duration to ≥8 h and re-dispatch a
+trimmed grid.
+
+### 14.2 Drug × disease interaction is small (≤ +4 NeuH across Sev 0–3)
+
+P1 was designed to map this interaction; the interaction term is
+present but modest. Two consequences:
+
+* The P1 design over-samples severity × dose for interaction
+  estimation. Future replications can collapse to a 2 × 4 × 4 × 3 grid
+  (Sev ∈ {0, 3} only) for 96 cells × 30 reps = 2880 sims and lose
+  almost no information on the interaction.
+* The therapeutic story is **"saturating universal rescue"**, not
+  "severity-stratified rescue". This is a stronger claim biologically;
+  the manuscript wording should reflect it.
+
+### 14.3 Dose grid is over-extended at the top
+
+LD = 20 and MT = 5 are saturated regimes (≤ +1.5 NeuH over LD = 10 /
+MT = 3). For all *future* protocols, default `LOADING_DOSE ∈ {0, 2, 5,
+10}` and `MAINT_DOSE ∈ {0, 0.3, 1, 3}`. Already applied to P2 (§5).
+P3 / P5 / P6 left unchanged because they do not vary dose densely.
+
+### 14.4 Age × drug interaction is real and worth its own protocol
+
+At Sev=2, max dose: Age 65 → NeuH 93.3, Age 85 → NeuH 83.3. The drug
+does not eliminate the age penalty; it shrinks it from 18 points
+(no drug) to 10 points (max dose). A dedicated **Protocol P7** —
+Age × dose at fixed Sev = 2 — with a denser Age grid
+(`Age ∈ {55, 65, 70, 75, 80, 85, 90}`) would quantify the age-clearance
+relationship documented in T13/T17/T18/T20/T24/T25/T39. Specification
+deferred to v3.1 of this protocol document.
+
+### 14.5 4 h sim window catches only the descending limb of plaque clearance
+
+The MT=3 time-course (§4.5) shows plaque peaking at ~32 around t = 2 h
+and falling to ~9.5 by t = 4 h, **still on the way down**. To answer
+whether the model encodes complete plaque clearance or a non-zero
+residual, dispatch a **dedicated long-duration sub-protocol**:
+
+```
+Sev = 2, Age = 75, LD ∈ {0, 5}, MT ∈ {1, 3}, duration = 28 800 s (8 h)
+   = 2 × 2 × 30 reps = 120 sims, ~ 4 cell-hours wall
+```
+
+This is cheap and would clarify the long-term plaque dynamics without
+re-running all 192 P1 cells at extended duration.

@@ -1,0 +1,17 @@
+{
+  "_comment": "Protocol P4' (refined bifurcation map). Origin: F1 in p1_deep_analysis_run_20260424_005438.md — Aβ-plaque lock-in detected in 93/1152 cells of P1 at LD>=5. This sweep recentres on the transition zone LD in {3,4,5,6,7} with 60 replicates per cell to give better classification of cleared-vs-locked trajectories. Single-bolus design uses cbd_ad_neuroprotection_v4_p4.shy (v3 minus evt_maint_{1,2,3}). Duration kept at 4h (matches P1) so the same lock-in detector applies.",
+  "mode": "factorial",
+  "model_path": "workspace/projects/canabidiol/models/cbd_ad_neuroprotection_v4_p4.shy",
+  "replicates": 60,
+  "duration": 14400,
+  "termination": "time",
+  "seed_base": 42,
+  "tau_epsilon": 0.03,
+  "max_tau": 0.1,
+  "parameters": [
+    {"type": "places", "path": "Disease_Severity.initial_marking", "values": [1, 2, 3]},
+    {"type": "places", "path": "LOADING_DOSE.initial_marking",     "values": [3, 4, 5, 6, 7]},
+    {"type": "places", "path": "DOSE_INTERVAL.initial_marking",    "values": [4300]},
+    {"type": "places", "path": "Age.initial_marking",              "values": [65, 75, 85]}
+  ]
+}
