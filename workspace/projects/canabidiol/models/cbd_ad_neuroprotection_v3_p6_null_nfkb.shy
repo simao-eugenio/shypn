@@ -1161,14 +1161,13 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
-      "is_parameter_place": false,
-      "parameter_kind": null,
-      "parameter_units": null,
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "K",
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1207,14 +1206,13 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
-      "is_parameter_place": false,
-      "parameter_kind": null,
-      "parameter_units": null,
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "pH",
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1299,14 +1297,13 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
-      "is_parameter_place": false,
-      "parameter_kind": null,
-      "parameter_units": null,
+      "is_parameter_place": true,
+      "parameter_kind": "demographic",
+      "parameter_units": "year",
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1757,11 +1754,9 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P29",
-        "P28",
         "P5"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "extracellular",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -1800,11 +1795,9 @@
         "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
       },
       "signal_places": [
-        "P6",
-        "P28",
-        "P29"
+        "P6"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "extracellular",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -1881,10 +1874,9 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
-        "P9",
-        "P28"
+        "P9"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "nucleus",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2081,10 +2073,9 @@
         "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
       },
       "signal_places": [
-        "P16",
-        "P28"
+        "P16"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "nucleus",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2164,7 +2155,7 @@
         "P11",
         "P6"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "mitochondria",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2283,13 +2274,10 @@
       },
       "signal_places": [
         "P22",
-        "P28",
-        "P29",
-        "P31",
         "P6",
         "P11"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "brain_parenchyma",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2330,10 +2318,9 @@
       "signal_places": [
         "P26",
         "P21",
-        "P27",
-        "P31"
+        "P27"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "brain_parenchyma",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2410,14 +2397,11 @@
         "rate_function_display": "k_tox \u00d7 f([A\u03b2]) \u00d7 f([ROS]) \u00d7 f([TNF\u03b1])"
       },
       "signal_places": [
-        "P28",
-        "P29",
-        "P31",
         "P6",
         "P11",
         "P19"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "brain_parenchyma",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -2457,10 +2441,9 @@
       },
       "signal_places": [
         "P23",
-        "P24",
-        "P28"
+        "P24"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "brain_parenchyma",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -3136,7 +3119,7 @@
         "rate_function": "(0.005 * Microglia_M2 * Abeta_Plaque / (100 + Abeta_Plaque) * 2**(((Temperature - 273.15) - 37)/10)) / (1 + 0.02*(Age - 65))",
         "rate_function_display": "k_clear \u00d7 [M2] \u00d7 [Plaque]/(Km+[Plaque]) \u00d7 Q10 / Age_factor"
       },
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "extracellular",
       "adaptive_filter": null,
       "volume_threshold": null,
@@ -3177,7 +3160,7 @@
       "signal_places": [
         "P19"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "cytoplasm",
       "adaptive_filter": null,
       "volume_threshold": null,

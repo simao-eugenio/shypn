@@ -212,7 +212,10 @@ class Place(PetriNetObject):
         
         # Add glow effect for colored objects (CSS-like styling)
         if display_color != self.DEFAULT_BORDER_COLOR:
-            if self.is_signal_place:
+            if self.is_parameter_place:
+                # Rounded square for parameter places (experiment-plan, NOT object-net)
+                self._draw_rounded_square_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_signal_place:
                 # Hexagons only for signal places (no arcs)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
             elif self.is_regulatory_place:
@@ -226,8 +229,13 @@ class Place(PetriNetObject):
             cr.set_line_width((self.border_width + 2) / max(zoom, 1e-6))
             cr.stroke()
         
-        # Draw shape based on type
-        if self.is_signal_place:
+        # Draw shape based on type — parameter places take priority over signal places
+        # because they are NOT part of the object-net topology and must be visually
+        # distinct from any biological place (circle or hexagon).
+        if self.is_parameter_place:
+            # Rounded square for parameter places (experiment-plan metadata)
+            self._draw_rounded_square_path(cr, self.x, self.y, self.radius)
+        elif self.is_signal_place:
             # Draw hexagon ONLY for signal places (no arcs - Bio-PN Ψ)
             self._draw_hexagon_path(cr, self.x, self.y, self.radius)
         else:
@@ -387,10 +395,45 @@ class Place(PetriNetObject):
         
         cr.close_path()
     
+    def _draw_rounded_square_path(self, cr, x: float, y: float, radius: float):
+        """Draw a rounded-square path for parameter places.
+        
+        Parameter places carry experiment-planning metadata (DSev, dose,
+        env knobs). They are NOT part of the object-net topology and must
+        not be confused with biological places (circles) or signal places
+        (hexagons). The rounded square is the visual marker that this node
+        sits outside both the execution graph G_E and the information
+        graph G_s.
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Half-side of the bounding square (world space)
+        """
+        # Square inscribed in the radius bounding box, with corner radius
+        # ~25% of the side length so the rounding is clearly visible.
+        side = 2.0 * radius
+        half = radius
+        cr_corner = side * 0.25
+        
+        x0 = x - half
+        y0 = y - half
+        x1 = x + half
+        y1 = y + half
+        
+        # Trace clockwise from top-left arc end
+        cr.new_sub_path()
+        cr.arc(x0 + cr_corner, y0 + cr_corner, cr_corner, math.pi,         3 * math.pi / 2)
+        cr.arc(x1 - cr_corner, y0 + cr_corner, cr_corner, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(x1 - cr_corner, y1 - cr_corner, cr_corner, 0,               math.pi / 2)
+        cr.arc(x0 + cr_corner, y1 - cr_corner, cr_corner, math.pi / 2,     math.pi)
+        cr.close_path()
+    
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is inside this place.
         
         For signal places (hexagons), uses approximate circular hit testing.
+        For parameter places (rounded squares), uses square bounding-box test.
         For regular places, uses exact circular hit testing.
         
         Args:
@@ -401,6 +444,11 @@ class Place(PetriNetObject):
         """
         dx = x - self.x
         dy = y - self.y
+        
+        # Parameter places: square bounding-box test (rounded square shape)
+        if self.is_parameter_place:
+            return abs(dx) <= self.radius and abs(dy) <= self.radius
+        
         distance = math.sqrt(dx * dx + dy * dy)
         
         # For hexagons, use inscribed circle for hit testing (conservative)

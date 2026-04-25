@@ -6,7 +6,7 @@ file used. Convention: `P<id>__<model_version>.md`.
 | Protocol | Model | Sims | Status | File |
 |---|---|---:|---|---|
 | P1 — Pulse-maintenance factorial | `v3` | 5760 | ✅ run_20260424_005438 | [P1__v3.md](P1__v3.md) |
-| P2 — Withdrawal challenge | `v3` (needs `_p2` variant) | 1080 | ⏸ pending model variant | [P2__v3.md](P2__v3.md) |
+| P2 — Withdrawal challenge | `v3_p2` | 1080 | ⏸ model ready, awaiting dispatch | [P2__v3.md](P2__v3.md) |
 | P3 — Late rescue | `v3` (needs `_p3` variant + `RESCUE_DELAY`) | 1350 | ⏸ pending model | [P3__v3.md](P3__v3.md) |
 | P4′ — Lock-in bifurcation map | `v4_p4` | 2700 | ✅ run_20260424_165603 | [P4__v4_p4.md](P4__v4_p4.md) |
 | P5 — Acute kinetic capture | `v3` (needs `_p5` variant) | 360 | ⏸ pending model | [P5__v3.md](P5__v3.md) |
@@ -31,6 +31,6 @@ that protocol:
 |---|---|---|---|
 | `v4_p4` | v3 minus `evt_maint_{1,2,3}` | Single-bolus only | P4 |
 | `v3_p6` | v3 with `LOADING_DOSE=0`, `MAINT_DOSE=0`, `DOSE_INTERVAL=1e9` | Drug-free | P6 |
-| `v3_p2` | v3 with `MAINT_DOSE=0`, `DOSE_INTERVAL=1e9` (TBD) | No scheduled redose | P2 |
+| `v3_p2` | v3 with `MAINT_DOSE=0`, `DOSE_INTERVAL=1e9`, +`evt_washout` | No scheduled redose; withdrawal at `t = 5400 s` | P2 |
 | `v3_p3` | v3 minus `evt_load` and `evt_maint_*`, plus `RESCUE_DELAY` (TBD) | Late-rescue only | P3 |
 | `v3_p5` | v3 with `MAINT_DOSE=0`, `DOSE_INTERVAL=1e9` (TBD) | Acute single-bolus | P5 |

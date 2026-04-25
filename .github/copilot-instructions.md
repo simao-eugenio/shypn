@@ -213,3 +213,85 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
   beyond direct signal predecessors. Multi-layer enforcement requires
   the signal hierarchy layer-assignment infrastructure in the simulation
   context (not yet wired in).
+
+## Experiment plan vs object-net (STRICT, 2026-04-25)
+
+Full text: [`doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md`](../doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md).
+Per Simão 2025 §"Connected vs. Remote Information Access".
+
+A `.shy` file bundles **two architecturally separate artifacts**:
+
+1. **Object-net** — biology. Reusable. Dynamics emerge **entirely** from
+   its own topology (places, transitions, arcs, intrinsic Φ over its
+   own places).
+2. **Experiment plan** — parameter places (`is_parameter_place=True`)
+   + events. Run-specific. Encodes the protocol.
+
+Parameter places (`Disease_Severity`, `Age`, `Temperature`, `pH`,
+dose knobs) belong to **neither** $G_E = (P, T, F)$ nor
+$G_s = (\Psi, F_s)$. They render as **rounded squares ▢** on the
+canvas (vs. circle ○ for biological, hexagon ⬡ for signal).
+
+### Forbidden patterns
+
+- Parameter-place name appearing in any **object-net** rate function
+  $\Phi$ (even though remote sensing is formally legal, biology rates
+  must not depend on experiment metadata — breaks reusability).
+- $F$, $F_s$, or $F_t$ arcs to/from parameter places.
+- Parameter places listed in any object-net transition's `signal_places`.
+- `is_environment_aware=True` flag and hard-coded `Q10` / `Temperature`
+  / `pH` / `Age` / `DSev` symbols inside object-net rate strings —
+  these are parameter-place backdoors.
+
+### The only legal bridge: events
+
+Events read parameter-place values and apply discrete interventions
+(set marking, add/remove tokens) to biological places at scheduled
+times. Example: `evt_install_disease` reads `DSev`, sets
+`Aβ_Monomer := DSev * 5.0` once at $t=0$.
+
+### One concept ↔ one carrier (no semantic mirroring)
+
+A conceptual quantity (`Age`, `Temperature`, `pH`, `Disease_Severity`,
+…) is represented by **exactly one** carrier. The three legal carriers
+are mutually exclusive per concept:
+
+1. **Pure parameter place ▢** — no arcs, never in any $\Phi$.
+2. **Signal place ⬡** — in $\Psi$, has $F_s$ arcs, participates in
+   `PreemptionCheck`. May also be referenced in $\Phi$.
+3. **Remote-sensed regular place ○** — referenced by name inside $\Phi$.
+
+Forbidden: two carriers for the same concept (e.g. `Age` signal place
+*and* `Age_param` parameter place). Sweeping `X.initial_marking` of a
+topology-coupled place is **legal** — it is an initial-condition
+perturbation of $M_0$, not a superposition violation. If you find
+yourself wanting to add a parameter mirror so a topology place becomes
+sweepable, sweep `initial_marking` directly instead.
+
+### Diagnostic consequence
+
+If the object-net does not exhibit a desired behaviour (e.g. healthy
+fixed point at `NH=100` when initialised healthy with no events firing),
+the **topology is wrong** — add sinks, clearance arcs, rebalance
+reactions, or add the missing $F_s$ with the right $\theta$. **Never**
+patch via parameter-place multipliers or rate-function shortcuts.
+
+### Sweep ↔ model superposition rule
+
+When a sweep targets an experiment-plan object (parameter-place value
+or event field), the **sweep value is canonical for that dispatch**
+and the model's static value is **suppressed**.
+
+Required:
+- Engine logs `[override] X = sweep_value (was static_value in model)`.
+- Provenance records `parameter_sources: {X: "sweep" | "model_default"}`
+  per condition.
+- Validator emits notice on redundant override (sweep == static default).
+- Baseline cell named `ModelDefaults` to avoid confusion with swept
+  conditions.
+
+Exception: superposition allowed only when it demonstrably reduces
+simulation complexity (e.g. nested factorial sharing a fixed level)
+and is declared explicitly in sweep config:
+`"superposition_intent": "complexity_reduction"`. Without explicit
+declaration, superposition is treated as a configuration smell.
