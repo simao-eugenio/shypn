@@ -281,16 +281,23 @@ class PlacePropDialogLoader(GObject.GObject):
             # If enabling signal place, set signal type
             if is_signal:
                 signal_type_combo = self.builder.get_object('signal_type_combo')
+                from shypn.netobjs.signal_type import SignalType
                 if signal_type_combo:
-                    from shypn.netobjs.signal_type import SignalType
                     active_idx = signal_type_combo.get_active()
                     type_map = [SignalType.ENERGY, SignalType.REGULATORY, SignalType.QUORUM, SignalType.SPATIAL]
                     if 0 <= active_idx < len(type_map):
                         self.place_obj.signal_type = type_map[active_idx]
                     else:
                         self.place_obj.signal_type = SignalType.ENERGY  # Default
-                # Apply signal place visual schema: hexagon + blue border
-                self.place_obj.shape = 'hexagon'
+                # Visual schema: ◇ for spatial signal places, ⬡ for the rest.
+                # Spatial signal places ◇ are environmental scalars excluded
+                # from the cascade (formalism doc §5.4 carrier 3) — they get
+                # a distinct glyph so they can't be visually confused with
+                # biological signal hubs ⬡.
+                if self.place_obj.signal_type == SignalType.SPATIAL:
+                    self.place_obj.shape = 'diamond'
+                else:
+                    self.place_obj.shape = 'hexagon'
             else:
                 # Clear signal type and restore default circle shape
                 self.place_obj.signal_type = None
@@ -305,10 +312,16 @@ class PlacePropDialogLoader(GObject.GObject):
             if hasattr(self.place_obj, '_manager') and self.place_obj._manager:
                 self.place_obj._manager.mark_needs_redraw()
 
-        # AUTOMATIC ARC TRANSFORMATION: When place becomes signal place
-        # Convert all connected arcs to signal flow arcs (formalism requirement)
+        # AUTOMATIC ARC TRANSFORMATION: When a regular place becomes a
+        # BIOLOGICAL signal place, convert all connected arcs to signal-flow
+        # arcs (formalism requirement). Spatial signal places ◇ MUST NOT
+        # have F_s arcs (audit code C10), so we skip the conversion when
+        # the new signal_type is SPATIAL — the canonical pattern is
+        # ▢ + event → ◇ → Φ, no arcs touching the spatial place.
         if not was_signal_place and self.place_obj.is_signal_place:
-            self._convert_connected_arcs_to_signal_flow()
+            from shypn.netobjs.signal_type import SignalType as _ST
+            if getattr(self.place_obj, 'signal_type', None) != _ST.SPATIAL:
+                self._convert_connected_arcs_to_signal_flow()
 
         # Notify listeners that this place was modified (e.g. EnvironmentPanel)
         try:
