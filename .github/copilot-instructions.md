@@ -268,6 +268,29 @@ perturbation of $M_0$, not a superposition violation. If you find
 yourself wanting to add a parameter mirror so a topology place becomes
 sweepable, sweep `initial_marking` directly instead.
 
+### Remote sensing requires topology membership
+
+A symbol may appear inside any object-net rate function $\Phi$ only if
+the corresponding place has at least one $F$, $F_s$, or $F_t$ arc
+(i.e. is part of $G_E$ or $G_s$), or is itself the producer/consumer
+of the transition under that rate. A name appearing in a rate string
+while the underlying place has **zero arcs of any kind** is a
+parameter-place backdoor wearing the wrong glyph.
+
+Canonical bridge for protocol-driven kinetics — **▢ + event → ○ → $\Phi$**:
+
+1. Keep the protocol metadata as a parameter place ▢
+   (e.g. `Temperature = 310.15 K`).
+2. Add a kinetic regular place ○ (e.g. `k_polym_eff = 1.0`).
+3. Reference the kinetic place — **not** the parameter — inside $\Phi$
+   (e.g. `rate = k_polym_eff * Aβ_Monomer**2`).
+4. Add an event that reads the parameter and writes the kinetic place
+   at $t = 0$ (or on demand):
+   `evt_apply_thermodynamics: k_polym_eff := k_base * Q10**((Temperature-310)/10)`.
+
+The biology stays generic; only the event encodes the protocol. The
+audit code **C9 — disconnected remote sensing** flags violations.
+
 ### Diagnostic consequence
 
 If the object-net does not exhibit a desired behaviour (e.g. healthy

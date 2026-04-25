@@ -163,3 +163,11 @@ benchmark_results/
 # patches and editor saves. Keep on disk locally; do not push.
 *.bak
 *.bak.*
+
+# UI state — recent project list, churns on every workspace open;
+# not worth tracking.
+workspace/projects/recent_projects.json
+
+# .preserved-<ts> sidecars — produced by ad-hoc cleanup scripts when
+# a file is replaced in place. Keep on disk locally; do not push.
+*.preserved-*

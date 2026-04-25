@@ -23,6 +23,11 @@ Checks (per doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md):
       of a topology place's name (e.g. `Age` topology place and
       `Age_param` parameter place), or when both a parameter place and
       a topology place share the same conceptual stem.
+  C9  Disconnected remote sensing. A place referenced by name inside
+      some Φ but with ZERO arcs of any type ($F$, $F_s$, $F_t$) is a
+      parameter-place backdoor wearing the wrong glyph. Remote sensing
+      is legal only when the sensed place is a member of $G_E$ or
+      $G_s$ — i.e., it has at least one incident arc.
 
 Exit code 0 if every model is clean, 1 otherwise.
 """
@@ -194,11 +199,17 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
         if p.get("is_parameter_place"):
             continue
         if p["name"] in referenced_in_phi:
-            # Legal remote-sensed regular/signal place: no arcs, but biology
-            # rates depend on its marking via Phi.
+            # C9: disconnected remote sensing — referenced by name in Phi
+            # but with no arcs at all. Per the formalism doc §5.5, this is
+            # a parameter-place backdoor: either wire the place into the
+            # topology with the relevant arcs, or reclassify it as ▢ and
+            # bridge through a kinetic place + event.
+            n += 1
             lines.append(
-                f"  [C7 info] place '{p['name']}' has no arcs but is"
-                " remote-sensed via Φ (legal per Simao 2025)"
+                f"  [C9] place '{p['name']}' is referenced inside some Φ"
+                " but has ZERO arcs — disconnected remote sensing."
+                " Add the missing F/F_s/F_t arc(s), or reclassify as ▢"
+                " and bridge through ▢ + event → ○ → Φ."
             )
             continue
         n += 1

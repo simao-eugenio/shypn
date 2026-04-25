@@ -172,6 +172,63 @@ if `X` has no arcs and is not referenced in any $\Phi$, it is not a
 topology element; flag it `is_parameter_place=true` and remove the
 signal/regular flag.
 
+### 5.5 Remote sensing requires topology membership
+
+Remote sensing in $\Phi$ (per §3) is a legitimate channel **only when
+the sensed place is a member of the object-net topology** — i.e. the
+place participates in at least one arc of $G_E$ ($F$ or $F_t$) **or**
+of $G_s$ ($F_s$). A name appearing inside a rate string while the
+underlying place has **zero arcs of any kind** is not "remote-sensed
+biology"; it is a parameter-place backdoor wearing the wrong glyph.
+
+Operational rule:
+
+> A symbol may appear inside any object-net rate function $\Phi$ only
+> if the corresponding place has **at least one** $F$, $F_s$, or $F_t$
+> arc, or is itself the producer/consumer of the transition under that
+> rate. Disconnected-but-named places must be reclassified as
+> parameter places (▢) and exposed to the dynamics through events, not
+> through $\Phi$.
+
+Why this matters:
+
+- **Mass / signal accountability**: a remote-sensed regular place can
+  legitimately be held constant by the absence of producers/consumers,
+  but it must still be visible to topology-level analyses
+  (conservation, reachability, bipartite layout). A place with **no
+  arcs at all** is invisible to those analyses and is therefore not
+  part of the model in any topological sense.
+- **Reusability**: if the same `.shy` file is opened in a workspace
+  where the disconnected "place" has been renamed or deleted, the
+  rate function silently fails (NameError or, worse, the engine
+  inserts a default 0 / 1). Coupling through arcs makes the dependency
+  explicit.
+- **Sweep semantics**: a topology-coupled place is sweepable via
+  `initial_marking` (§5.4 corollary). A disconnected named symbol is
+  not — the only way to perturb it is to edit the rate string, which
+  defeats the whole point of having a separable experiment plan.
+
+**Audit code (added in this revision): C9 — disconnected remote
+sensing.** The compliance script in
+`workspace/projects/canabidiol/scripts/audit_formalism_compliance.py`
+flags any place whose name appears in some $\Phi$ but which has no
+incident arc of any type. The fix is one of:
+
+1. Add the missing $F$ / $F_s$ / $F_t$ arc(s) so the place becomes a
+   real topology member.
+2. Reclassify it as a parameter place and rewrite the dependency: add
+   a kinetic place (e.g. `k_eff`) that carries the converted value,
+   reference `k_eff` in $\Phi$, and add an event that reads the
+   parameter and writes `k_eff := f(parameter)` at $t = 0$ (or on
+   demand).
+
+The second pattern is the canonical "▢ + event → ○ → $\Phi$" bridge:
+the parameter (e.g. `Temperature`) is read once by an event
+(`evt_apply_thermodynamics`), which writes the kinetic state
+(`k_polym_eff := k_base * Q10**((Temperature-310)/10)`); the rate
+function reads the kinetic state, never the parameter. The biology
+remains generic; only the event encodes the protocol.
+
 ---
 
 ## 6. Sweep ↔ model superposition
