@@ -158,3 +158,8 @@ benchmark_results/
 # Often very large; pushes frequently fail. Keep CSVs local; share via
 # the run dir on the GPU server / HDD store, not via git.
 *.csv
+
+# Backup files (timestamped or plain) — created by in-place model
+# patches and editor saves. Keep on disk locally; do not push.
+*.bak
+*.bak.*
