@@ -1,5 +1,0 @@
-condition,replicates_ok,replicates_error,wall_seconds
-Glucose.initial_marking=50,10,0,7.25
-Glucose.initial_marking=100,10,0,6.93
-Glucose.initial_marking=200,10,0,6.96
-Glucose.initial_marking=500,10,0,6.93
