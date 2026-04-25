@@ -76,15 +76,37 @@ def name_in_expr(name: str, expr: str) -> bool:
     return re.search(rf"\b{re.escape(name)}\b", expr) is not None
 
 
-def collect_rate_fields(t: dict) -> list[tuple[str, str]]:
-    """Return [(field_name, expression_string), ...] for a transition."""
+def collect_rate_fields(t: dict, executable_only: bool = False) -> list[tuple[str, str]]:
+    """Return [(field_name, expression_string), ...] for a transition.
+
+    Schemas seen in the wild:
+      * top-level ``rate_function`` / ``rate_expression`` / ``rate`` etc.
+      * nested ``properties.rate_function`` / ``properties.rate_function_display``
+        (canonical .shy file format produced by the GUI),
+      * nested ``kinetics.{rate_function,expression,formula}`` (legacy).
+
+    When ``executable_only`` is True, drop ``*_display`` fields — those are
+    human-readable labels (LaTeX-ish, may contain ``Q10``, ``[X]``) that the
+    engine never evaluates, so they should not raise C1 / C5 violations.
+    """
     out = []
     for key in ("rate_function", "rate_expression", "rate", "kinetic_law",
                 "propensity", "guard", "guard_function"):
         v = t.get(key)
         if isinstance(v, str) and v.strip():
             out.append((key, v))
-    # Some files nest under "kinetics"
+    # Canonical .shy schema: the GUI persists rate functions under
+    # ``properties.rate_function`` (numeric / executable) and
+    # ``properties.rate_function_display`` (human-readable).
+    props = t.get("properties")
+    if isinstance(props, dict):
+        keys = ("rate_function", "rate_expression") if executable_only else (
+            "rate_function", "rate_function_display", "rate_expression")
+        for key in keys:
+            v = props.get(key)
+            if isinstance(v, str) and v.strip():
+                out.append((f"properties.{key}", v))
+    # Legacy nested 'kinetics' container
     kin = t.get("kinetics")
     if isinstance(kin, dict):
         for key in ("rate_function", "expression", "formula"):
@@ -122,7 +144,7 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
     # C1: parameter-place name in any rate function
     # ------------------------------------------------------------------
     for t in transitions:
-        rates = collect_rate_fields(t)
+        rates = collect_rate_fields(t, executable_only=True)
         for field, expr in rates:
             for pname in param_names:
                 if name_in_expr(pname, expr):
@@ -176,7 +198,7 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
     # C5: hard-coded environment symbols in rate expressions
     # ------------------------------------------------------------------
     for t in transitions:
-        rates = collect_rate_fields(t)
+        rates = collect_rate_fields(t, executable_only=True)
         for field, expr in rates:
             for sym in ENV_SYMBOLS:
                 # If sym is also a declared parameter place, C1 already

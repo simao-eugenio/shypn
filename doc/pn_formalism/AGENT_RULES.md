@@ -150,10 +150,58 @@ an auto-loaded breadcrumb for new agent sessions.
 
 ---
 
-## 6. Change log
+## 6. Analysis eligibility (Viability / structural / liveness)
+
+Three orthogonal layers of variation exist in a shypn experiment.
+Each lives at a different layer; **only the dynamic layer is visible
+to structural / Viability analysis**.
+
+| Layer                               | Mechanism            | What varies                              | Where it lives          | Visible to Viability? |
+|-------------------------------------|----------------------|------------------------------------------|-------------------------|-----------------------|
+| Protocol (inter-trajectory)         | sweep                | ▢ `initial_marking`, event field values  | `sweep_config.json`     | ✗ — collapses to a constant per run |
+| Discrete intervention (intra)       | events               | ○ ⬡ ◇ markings at scheduled $t$          | experiment plan (Φ_e)   | ✗ — discontinuous jumps, not flow   |
+| Dynamic execution (intra)           | transitions firing   | ○ ⬡ markings via $F$, $F_s$              | object-net $G_E ∪ G_s$  | ✓ — the *only* analyzed layer       |
+
+**Rule.** Viability / P-T-invariant / liveness / reachability analysis
+operates over $G_E ∪ G_s$ only. ▢ has no rows in the incidence matrix
+(no $F$, $F_s$, $F_t$ arcs by construction) — it is **structurally
+invisible** to the dynamic subnet. ◇ also lacks $F_s$ arcs and is
+excluded from the cascade hierarchy, but it does appear in Φ; treat
+its inclusion in Viability as a soft case (panel currently omits it
+via the same locality test that omits ▢).
+
+**Sweep nuance.** Sweeps do vary ▢ across conditions, but the
+variation occurs *between* trajectories, not *during* one. Inside any
+single trajectory the ▢ is a constant (or is read once by an event to
+seed biology). There is therefore no dynamic for Viability to analyze
+on ▢. Highlighting ▢ in the Viability Places table would be a
+category error — it would advertise structural coupling that does not
+exist.
+
+UI consequence — Viability panel filter (`viability_panel.py`):
+
+- Include: places with ≥1 incident $F$, $F_s$, or $F_t$ arc inside
+  the active locality (i.e. members of $G_E ∪ G_s$).
+- Exclude: `is_parameter_place=True` (▢) — protocol layer.
+- Exclude: places referenced only by events with no arcs — protocol
+  layer (event-only sinks/sources are interventions, not dynamics).
+- Stale flags such as `is_compartment_place` MUST NOT pull a place
+  back into the table; the locality + arc test is canonical.
+
+---
+
+## 7. Change log
 
 - **2026-04-25**: Initial canonical version. Captures the
   four-carrier model (○ ⬡ ◇ ▢), Pattern A discipline, and audit
   codes C1–C12. Created in response to the spatial signal place
   split + Pattern A discipline refinement landed in commits
   `2480d5bd`, `76ac57b3`, `7165f059`, `567c76da`.
+- **2026-04-25**: Added §6 "Analysis eligibility" codifying the
+  three-layer variation model (protocol / event / dynamic) and the
+  rule that Viability operates over $G_E ∪ G_s$ only. Triggered by
+  the P6 sweep field-test where the panel auto-selected
+  Temperature/pH/Age via a stale `is_compartment_place` flag —
+  resolved by panel filter cleanup + `cbd_ad_neuroprotection_v3_p7.shy`
+  Pattern A migration (4 ◇ spatial signal places +
+  `evt_apply_thermodynamics`).
