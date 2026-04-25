@@ -23,11 +23,21 @@ Checks (per doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md):
       of a topology place's name (e.g. `Age` topology place and
       `Age_param` parameter place), or when both a parameter place and
       a topology place share the same conceptual stem.
-  C9  Disconnected remote sensing. A place referenced by name inside
-      some Φ but with ZERO arcs of any type ($F$, $F_s$, $F_t$) is a
-      parameter-place backdoor wearing the wrong glyph. Remote sensing
-      is legal only when the sensed place is a member of $G_E$ or
-      $G_s$ — i.e., it has at least one incident arc.
+  C9  Disconnected remote sensing. A REGULAR ○ place referenced by name
+      inside some Φ but with ZERO arcs of any type ($F$, $F_s$, $F_t$)
+      is a parameter-place backdoor wearing the wrong glyph. Signal
+      places (⬡ biological and ◇ spatial) are exempt: Ψ membership
+      itself declares "informational state, designed to be read by many
+      transitions." Fix a flagged ○ by adding the missing arc, by
+      reclassifying as ◇ spatial signal (event-fed kinetic scalar
+      shared by N rates), or by reclassifying as ▢ parameter.
+  C10 Spatial signal places ◇ must NOT have F_s arcs. ◇ places are
+      environmental scalars excluded from the biological cascade
+      (PreemptionCheck and POSet); an F_s arc would smuggle them back
+      into the hierarchy.
+  C11 Every spatial signal place ◇ must be either referenced by some
+      Φ or written by some event. An unused ◇ is an inert scalar —
+      promote to ▢ or delete.
 
 Exit code 0 if every model is clean, 1 otherwise.
 """
@@ -198,18 +208,32 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
             continue
         if p.get("is_parameter_place"):
             continue
+        # Signal places (⬡ biological and ◇ spatial) are exempt from C9 by
+        # design — Ψ membership declares "informational state, designed to
+        # be read by many transitions" (formalism doc §5.5). For spatial
+        # signal places ◇ this is the canonical event-fed kinetic-scalar
+        # pattern; for biological signal places ⬡ the lack of F_s arcs is
+        # unusual but legal.
+        if p.get("is_signal_place"):
+            if p["name"] in referenced_in_phi:
+                continue  # legal remote sensing of a signal hub
+            # signal place not referenced anywhere → flag via C11 below
+            continue
         if p["name"] in referenced_in_phi:
-            # C9: disconnected remote sensing — referenced by name in Phi
-            # but with no arcs at all. Per the formalism doc §5.5, this is
-            # a parameter-place backdoor: either wire the place into the
-            # topology with the relevant arcs, or reclassify it as ▢ and
-            # bridge through a kinetic place + event.
+            # C9: disconnected remote sensing of a REGULAR ○ place.
+            # Per the formalism doc §5.5, the fix is one of:
+            #   1. Add the missing F/F_s/F_t arc(s).
+            #   2. Reclassify as ◇ spatial signal (is_signal_place=true,
+            #      signal_type=SPATIAL) — for event-fed kinetic scalars
+            #      shared by many rates.
+            #   3. Reclassify as ▢ parameter — for values read by events
+            #      only, not by Φ.
             n += 1
             lines.append(
-                f"  [C9] place '{p['name']}' is referenced inside some Φ"
-                " but has ZERO arcs — disconnected remote sensing."
-                " Add the missing F/F_s/F_t arc(s), or reclassify as ▢"
-                " and bridge through ▢ + event → ○ → Φ."
+                f"  [C9] regular ○ place '{p['name']}' is referenced inside"
+                " some Φ but has ZERO arcs — disconnected remote sensing."
+                " Fix: add F/F_s/F_t arc, or reclassify as ◇ spatial signal,"
+                " or as ▢ parameter."
             )
             continue
         n += 1
@@ -250,6 +274,58 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
                 f"  [C8] parameter place '{pp['name']}' mirrors topology"
                 f" place '{topology_stems[s]}' (shared stem '{s}') —"
                 " collapse to one carrier per §5.4 of the formalism doc"
+            )
+
+    # ------------------------------------------------------------------
+    # C10: spatial signal places (◇) must NOT have F_s arcs.
+    # Per formalism doc §5.4 carrier 3, ◇ places are environmental
+    # scalars excluded from the biological cascade; an F_s arc would
+    # smuggle them back into PreemptionCheck and POSet layering.
+    # ------------------------------------------------------------------
+    spatial_ids = {
+        p["id"] for p in places
+        if p.get("is_signal_place")
+        and (p.get("signal_type") or "").lower() == "spatial"
+    }
+    if spatial_ids:
+        for a in arcs:
+            if a.get("arc_type") != "signal_flow":
+                continue
+            sp_id = a.get("source_id")
+            tg_id = a.get("target_id")
+            if sp_id in spatial_ids or tg_id in spatial_ids:
+                n += 1
+                offender = sp_id if sp_id in spatial_ids else tg_id
+                lines.append(
+                    f"  [C10] signal_flow arc {sp_id} → {tg_id} touches"
+                    f" spatial signal place '{offender}'. Spatial places"
+                    " are excluded from the biological cascade and must"
+                    " not have F_s arcs (formalism doc §5.4 carrier 3)."
+                )
+
+    # ------------------------------------------------------------------
+    # C11: every spatial signal place ◇ must be either referenced by a Φ
+    # or written by an event — otherwise it is an inert scalar that
+    # should be promoted to ▢ or deleted.
+    # ------------------------------------------------------------------
+    if events:
+        evt_text_all = json.dumps(events)
+    else:
+        evt_text_all = ""
+    for p in places:
+        if not p.get("is_signal_place"):
+            continue
+        if (p.get("signal_type") or "").lower() != "spatial":
+            continue
+        in_phi = p["name"] in referenced_in_phi
+        in_evt = bool(evt_text_all) and name_in_expr(p["name"], evt_text_all)
+        if not in_phi and not in_evt:
+            n += 1
+            lines.append(
+                f"  [C11] spatial signal place ◇ '{p['name']}' is neither"
+                " referenced in any Φ nor written by any event — it is"
+                " inert. Either use it (read in Φ / write from event), or"
+                " reclassify as ▢ parameter, or delete it."
             )
 
     # ------------------------------------------------------------------

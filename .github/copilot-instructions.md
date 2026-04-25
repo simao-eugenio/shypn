@@ -253,43 +253,60 @@ times. Example: `evt_install_disease` reads `DSev`, sets
 ### One concept ↔ one carrier (no semantic mirroring)
 
 A conceptual quantity (`Age`, `Temperature`, `pH`, `Disease_Severity`,
-…) is represented by **exactly one** carrier. The three legal carriers
-are mutually exclusive per concept:
+`k_polym_eff`, …) is represented by **exactly one** carrier. The four
+legal carriers are mutually exclusive per concept:
 
-1. **Pure parameter place ▢** — no arcs, never in any $\Phi$.
-2. **Signal place ⬡** — in $\Psi$, has $F_s$ arcs, participates in
-   `PreemptionCheck`. May also be referenced in $\Phi$.
-3. **Remote-sensed regular place ○** — referenced by name inside $\Phi$.
+1. **Pure parameter place ▢** — no arcs, never in any $\Phi$. Read by
+   events only.
+2. **Biological signal place ⬡** — in $\Psi$, has $F_s$ arcs,
+   participates in `PreemptionCheck` and the layered hierarchy
+   $\lambda$. May also be referenced in $\Phi$.
+3. **Spatial signal place ◇** — in $\Psi$ but flagged
+   `signal_type == SignalType.SPATIAL`. **No $F_s$ arcs.** Excluded
+   from `PreemptionCheck` and from POSet layering. Read remotely by
+   $\Phi$ from many transitions; written by events. The canonical home
+   for event-fed kinetic / environmental scalars
+   (`k_aggregation_eff`, `Temperature_factor`, `O2_level`, …).
+4. **Remote-sensed regular place ○** — referenced by name in $\Phi$;
+   has its own dynamics through $F$ arcs.
 
-Forbidden: two carriers for the same concept (e.g. `Age` signal place
-*and* `Age_param` parameter place). Sweeping `X.initial_marking` of a
-topology-coupled place is **legal** — it is an initial-condition
-perturbation of $M_0$, not a superposition violation. If you find
-yourself wanting to add a parameter mirror so a topology place becomes
-sweepable, sweep `initial_marking` directly instead.
+Forbidden: two carriers for the same concept (e.g. ⬡ `Age` *and* ▢
+`Age_param`). Sweeping `X.initial_marking` of a topology-coupled
+place is **legal** — initial-condition perturbation of $M_0$, not a
+superposition violation. If you want to make a topology place
+sweepable, sweep `initial_marking` directly; do not add a parameter
+mirror.
 
-### Remote sensing requires topology membership
+### Remote sensing requires topology membership (regular places only)
 
-A symbol may appear inside any object-net rate function $\Phi$ only if
-the corresponding place has at least one $F$, $F_s$, or $F_t$ arc
-(i.e. is part of $G_E$ or $G_s$), or is itself the producer/consumer
-of the transition under that rate. A name appearing in a rate string
-while the underlying place has **zero arcs of any kind** is a
-parameter-place backdoor wearing the wrong glyph.
+A **regular ○** place's name may appear inside any $\Phi$ only if it
+has at least one $F$, $F_s$, or $F_t$ arc, or is the producer/consumer
+of the transition under that rate. A circle ○ with zero arcs that
+appears in a rate string is a backdoor — fix by adding the missing
+arc, or by reclassifying as ◇ (spatial signal) when the value is an
+event-fed scalar shared by many rates, or as ▢ when it is read by
+events only.
 
-Canonical bridge for protocol-driven kinetics — **▢ + event → ○ → $\Phi$**:
+Signal places (⬡ and ◇) are exempt from the arc requirement: $\Psi$
+membership itself declares "informational state, designed to be read
+by many transitions." Forcing a $F_t$ arc per reader to a single hub
+would create visual hairballs without adding semantics.
 
-1. Keep the protocol metadata as a parameter place ▢
-   (e.g. `Temperature = 310.15 K`).
-2. Add a kinetic regular place ○ (e.g. `k_polym_eff = 1.0`).
-3. Reference the kinetic place — **not** the parameter — inside $\Phi$
+Canonical bridge for protocol-driven kinetics — **▢ + event → ◇ → $\Phi$**:
+
+1. Keep protocol metadata as ▢ (e.g. `Temperature = 310.15 K`).
+2. Add a spatial signal place ◇ for the kinetic scalar
+   (e.g. `k_polym_eff`, `is_signal_place=true`,
+   `signal_type=SPATIAL`, no $F_s$ arcs).
+3. Reference the ◇ place — **not** the parameter — inside $\Phi$
    (e.g. `rate = k_polym_eff * Aβ_Monomer**2`).
-4. Add an event that reads the parameter and writes the kinetic place
-   at $t = 0$ (or on demand):
+4. Add an event that reads ▢ and writes ◇ at $t = 0$ (or on demand):
    `evt_apply_thermodynamics: k_polym_eff := k_base * Q10**((Temperature-310)/10)`.
 
 The biology stays generic; only the event encodes the protocol. The
-audit code **C9 — disconnected remote sensing** flags violations.
+audit code **C9 — disconnected remote sensing** flags only **regular
+○** places referenced in $\Phi$ with zero arcs; ⬡/◇ are exempt by
+design.
 
 ### Diagnostic consequence
 
