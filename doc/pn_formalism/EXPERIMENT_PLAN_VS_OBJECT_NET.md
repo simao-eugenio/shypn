@@ -276,6 +276,63 @@ The canonical bridge for protocol-driven kinetics is
 The diamond ◇ scales: one node feeds N rates without N test arcs. The
 biology stays generic; only the event encodes the protocol.
 
+### 5.6 Pattern A discipline — events MUST NOT perform stateful algebra
+
+Events are **discrete protocol interventions**, not a back-channel for
+continuous dynamics. They may:
+
+- read parameter places ▢ (protocol metadata),
+- set / add / remove tokens at scheduled times (once at $t=0$, on a
+  dose schedule, on a step change),
+
+and **nothing else**. If a quantity changes as the simulation
+progresses, it must change because **transitions fire** — values
+emerge from $G_E = (P, T, F)$ + $\Phi$. An event that performs
+arithmetic on simulation state is acting as a hidden ODE integrator,
+doing the topology's job, and the topology is wrong.
+
+The only legal RHS in an event assignment `target := expr` is one
+whose variable references are a subset of
+
+$$\{\text{target}\}\;\cup\;\{\text{parameter places } \square\}$$
+
+Examples (all legal, all used in canabidiol):
+
+```
+Aβ_Monomer        := Aβ_Monomer + Disease_Severity * 0.125   ✓
+CBD_extracellular := CBD_extracellular + LOADING_DOSE        ✓
+target            := constant                                ✓
+target            := f(▢, …▢)                                ✓
+```
+
+Examples (illegal — flagged by audit code **C12**):
+
+```
+Aβ_Monomer        := Aβ_Monomer * NFkB_p65 * 0.01            ✗  (RHS reads ○ NFkB_p65)
+k_polym_eff       := k_polym_eff + d_t * (Aβ - Aβ_eq)        ✗  (Euler step in disguise)
+NFkB_p65          := max(NFkB_p65, IκB)                      ✗  (RHS reads non-target state place)
+```
+
+#### Consequence for the spatial signal place ◇
+
+The "▢ + event → ◇ → Φ" bridge (§5.5) is legal **only** when the
+event computes the ◇ value from ▢ values alone — typically once at
+$t=0$ when the protocol is installed, or at a discrete protocol step
+("switch the heater on at $t=600\,\text{s}$"). The moment you want
+the ◇ value to drift continuously with simulation time, the event
+pattern collapses and the temperature/scalar must be promoted to a
+regular ○ place with its own dynamics (transitions producing /
+consuming it), with the temperature-sensitive Arrhenius algebra moved
+into the rate function $\Phi$:
+
+```
+T_polym.rate = k_base * exp(-Ea / (R * Temperature)) * Aβ²
+                                       ↑ ○ Temperature, has arcs, evolves by topology
+```
+
+The event's role then reduces to setting the **initial marking** of
+`Temperature` from a ▢ `Initial_Temperature` constant at $t=0$.
+
 ---
 
 ## 6. Sweep ↔ model superposition

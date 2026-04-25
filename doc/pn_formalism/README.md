@@ -4,7 +4,19 @@ This directory contains formal documentation about Petri net theory and implemen
 
 ## Documents
 
-### 0. [SHPN_FORMALISM_CANONICAL.md](SHPN_FORMALISM_CANONICAL.md) ⭐ CANONICAL
+### 0. [AGENT_RULES.md](AGENT_RULES.md) ⭐ READ FIRST every agent session
+**Agent rules — formalism + events refactoring (canonical).**
+
+The single-screen distillation every agent must consult before editing
+transition rates Φ, events, or place-type flags. Captures the
+four-carrier model (○ ⬡ ◇ ▢), the three legal sensing channels into Φ,
+the **Pattern A discipline** (events are not ODE integrators), and the
+full audit-code list **C1–C12** with severities. The source of truth
+the auditor implements; mirrored in condensed form in
+`.github/copilot-instructions.md` and pointed to from
+`/memories/repo/formalism_carriers_and_audit.md`.
+
+### 1. [SHPN_FORMALISM_CANONICAL.md](SHPN_FORMALISM_CANONICAL.md) ⭐ CANONICAL
 **Signal Hierarchical Petri Net (SHPN) — Canonical 13-tuple, enablement, firing rule, basin boundary, invariants.**
 
 The single source of truth for the SHYPN Petri-net formalism inside the
@@ -21,7 +33,7 @@ engine PR must respect.
 that document remains useful for the signal-place taxonomy and bug-fix
 history but is no longer authoritative for the tuple itself.
 
-### 1. [PETRI_NET_INCIDENCE_MATRIX_APPROACH.md](PETRI_NET_INCIDENCE_MATRIX_APPROACH.md)
+### 2. [PETRI_NET_INCIDENCE_MATRIX_APPROACH.md](PETRI_NET_INCIDENCE_MATRIX_APPROACH.md)
 **Formal Petri Net Semantics Using Incidence Matrices**
 
 Describes the mathematical foundation of Petri nets and proposes a matrix-based approach:

@@ -216,7 +216,12 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
 
 ## Experiment plan vs object-net (STRICT, 2026-04-25)
 
-Full text: [`doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md`](../doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md).
+**READ FIRST every session that touches Φ / events / place-type flags:**
+[`doc/pn_formalism/AGENT_RULES.md`](../doc/pn_formalism/AGENT_RULES.md)
+— canonical four-carrier table (○ ⬡ ◇ ▢), Pattern A discipline,
+audit codes C1–C12, and the workflow checklist.
+
+Long-form derivation: [`doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md`](../doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md).
 Per Simão 2025 §"Connected vs. Remote Information Access".
 
 A `.shy` file bundles **two architecturally separate artifacts**:
@@ -249,6 +254,31 @@ Events read parameter-place values and apply discrete interventions
 (set marking, add/remove tokens) to biological places at scheduled
 times. Example: `evt_install_disease` reads `DSev`, sets
 `Aβ_Monomer := DSev * 5.0` once at $t=0$.
+
+### Pattern A discipline — events MUST NOT do stateful algebra
+
+Events are discrete protocol interventions, not a back-channel for
+continuous dynamics. The only legal RHS in an event assignment
+`target := expr` is one whose variable references are a subset of
+`{target} ∪ {parameter places ▢}`. Examples:
+
+```
+✓  Aβ_Monomer        := Aβ_Monomer + Disease_Severity * 0.125
+✓  CBD_extracellular := CBD_extracellular + LOADING_DOSE
+✓  target            := f(▢, …▢)
+✗  Aβ_Monomer        := Aβ_Monomer * NFkB_p65 * 0.01    (RHS reads ○)
+✗  k_polym_eff       := k_polym_eff + dt * (Aβ - Aβ_eq) (Euler in disguise)
+```
+
+If a quantity changes during a run, it must change because
+**transitions fire** — not because an event computes the change.
+Audit code **C12** flags any event whose RHS references a non-target
+state place (○, ⬡, ◇).
+
+The "▢ + event → ◇ → Φ" bridge is legal **only** at $t=0$ or at a
+discrete protocol step (the heater switches on); for time-varying
+environmental quantities, promote to a regular ○ with its own
+producing/consuming transitions and put the algebra inside Φ.
 
 ### One concept ↔ one carrier (no semantic mirroring)
 
