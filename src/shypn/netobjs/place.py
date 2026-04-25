@@ -215,8 +215,12 @@ class Place(PetriNetObject):
             if self.is_parameter_place:
                 # Rounded square for parameter places (experiment-plan, NOT object-net)
                 self._draw_rounded_square_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_signal_place and self._is_spatial_carrier():
+                # Diamond for SPATIAL signal places (environmental scalar,
+                # NOT in cascade preemption / POSet, may be remote-sensed via Φ)
+                self._draw_diamond_path(cr, self.x, self.y, self.radius + 2 / zoom)
             elif self.is_signal_place:
-                # Hexagons only for signal places (no arcs)
+                # Hexagons only for biological signal places (Ψ, in cascade)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
             elif self.is_regulatory_place:
                 # Double circles for regulatory places (genes/resources)
@@ -235,8 +239,13 @@ class Place(PetriNetObject):
         if self.is_parameter_place:
             # Rounded square for parameter places (experiment-plan metadata)
             self._draw_rounded_square_path(cr, self.x, self.y, self.radius)
+        elif self.is_signal_place and self._is_spatial_carrier():
+            # Diamond for SPATIAL signal places: environmental/spatial scalar,
+            # outside the biological cascade (no PreemptionCheck, no POSet layer).
+            # Read remotely by Φ in many transitions, written by events.
+            self._draw_diamond_path(cr, self.x, self.y, self.radius)
         elif self.is_signal_place:
-            # Draw hexagon ONLY for signal places (no arcs - Bio-PN Ψ)
+            # Draw hexagon for biological signal places (Ψ, in cascade)
             self._draw_hexagon_path(cr, self.x, self.y, self.radius)
         else:
             # Draw circle for all other places (including compartment places with arcs)
@@ -395,6 +404,51 @@ class Place(PetriNetObject):
         
         cr.close_path()
     
+    def _is_spatial_carrier(self) -> bool:
+        """True iff this place is a SPATIAL signal carrier.
+
+        Per HPN formalism doc §3 and the spatial-vs-biological signal split:
+        a signal place flagged as ``signal_type == SignalType.SPATIAL`` is an
+        **environmental scalar** — it carries protocol-derived (event-fed)
+        values that biology rates may remote-sense via Φ, but it does **not**
+        participate in the cascade preemption (PreemptionCheck) nor in the
+        POSet layer assignment. This distinguishes it from biological
+        signal places (NFkB_p65, Aβ_Oligomer, …) that *are* commitment
+        signals in the layered information graph G_s.
+
+        Returns:
+            bool: True if this is a signal place AND its signal_type is
+            SignalType.SPATIAL.
+        """
+        if not getattr(self, 'is_signal_place', False):
+            return False
+        try:
+            from shypn.netobjs.signal_type import SignalType
+            return getattr(self, 'signal_type', None) == SignalType.SPATIAL
+        except ImportError:
+            return False
+
+    def _draw_diamond_path(self, cr, x: float, y: float, radius: float):
+        """Draw a diamond (rotated square) path for SPATIAL signal places.
+
+        The diamond glyph marks signal places whose ``signal_type`` is
+        ``SignalType.SPATIAL`` — environmental / spatial scalars that
+        biology rates may read via Φ but that do not participate in the
+        biological cascade (no PreemptionCheck, no POSet layer). Visually
+        distinct from the hexagon ⬡ (biological signal place, in cascade)
+        and the rounded square ▢ (parameter place, outside both graphs).
+
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Distance from center to vertex (world space)
+        """
+        cr.move_to(x, y - radius)        # top
+        cr.line_to(x + radius, y)        # right
+        cr.line_to(x, y + radius)        # bottom
+        cr.line_to(x - radius, y)        # left
+        cr.close_path()
+
     def _draw_rounded_square_path(self, cr, x: float, y: float, radius: float):
         """Draw a rounded-square path for parameter places.
         
@@ -448,6 +502,10 @@ class Place(PetriNetObject):
         # Parameter places: square bounding-box test (rounded square shape)
         if self.is_parameter_place:
             return abs(dx) <= self.radius and abs(dy) <= self.radius
+        
+        # Spatial signal places: diamond hit-test (|dx| + |dy| <= radius)
+        if self._is_spatial_carrier():
+            return abs(dx) + abs(dy) <= self.radius
         
         distance = math.sqrt(dx * dx + dy * dy)
         
