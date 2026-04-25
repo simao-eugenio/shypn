@@ -38,6 +38,12 @@ Checks (per doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md):
   C11 Every spatial signal place ◇ must be either referenced by some
       Φ or written by some event. An unused ◇ is an inert scalar —
       promote to ▢ or delete.
+  C12 Events must not perform stateful algebra. Per "Pattern A
+      discipline", an event assignment `target := expr` may only read
+      parameter places ▢ and the target itself (additive update). Any
+      reference to a non-target state place (○, ⬡, ◇) on the RHS means
+      the event is acting as a hidden ODE integrator — that algebra
+      belongs in a transition rate Φ.
 
 Exit code 0 if every model is clean, 1 otherwise.
 """
@@ -327,6 +333,59 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
                 " inert. Either use it (read in Φ / write from event), or"
                 " reclassify as ▢ parameter, or delete it."
             )
+
+    # ------------------------------------------------------------------
+    # C12: events must not perform stateful algebra. Event bodies are
+    # discrete protocol interventions, not a back-channel for continuous
+    # dynamics. Per formalism doc §"Pattern A discipline": the only
+    # legal RHS in an event assignment `target := expr` is one whose
+    # variable references are a subset of
+    #     {target}  ∪  {parameter places ▢}
+    # i.e. constants, parameters, and self-referential additive updates
+    # like `Abeta_Monomer + Disease_Severity * 0.125`. Any reference to
+    # another simulation-state place (○, ⬡, or ◇) on the RHS means the
+    # event is doing the topology's job — that algebra belongs in Φ.
+    # ------------------------------------------------------------------
+    import ast as _ast
+    state_place_names = {
+        p["name"] for p in places if not p.get("is_parameter_place")
+    }
+    for ev in events or []:
+        assigns = ev.get("assignments") or {}
+        if not isinstance(assigns, dict):
+            continue
+        ev_label = ev.get("name", ev.get("id", "?"))
+        for target, expr in assigns.items():
+            if not isinstance(expr, str) or not expr.strip():
+                continue
+            # Strip any leading 'target :=' / 'target =' if the engine
+            # stores the full statement form (defensive — current shy
+            # files store RHS only).
+            rhs = expr
+            for sep in (":=", "="):
+                if sep in rhs and rhs.split(sep, 1)[0].strip() == target:
+                    rhs = rhs.split(sep, 1)[1]
+                    break
+            try:
+                tree = _ast.parse(rhs, mode="eval")
+            except SyntaxError:
+                # Non-Python expression syntax — skip rather than false-flag.
+                continue
+            referenced = {
+                node.id for node in _ast.walk(tree)
+                if isinstance(node, _ast.Name)
+            }
+            illegal = (referenced & state_place_names) - {target}
+            if illegal:
+                n += 1
+                lines.append(
+                    f"  [C12] event '{ev_label}' assignment to '{target}'"
+                    f" references state place(s) {sorted(illegal)} on the"
+                    " RHS. Events may only read parameter places ▢ and the"
+                    " target itself (additive updates). Move the algebra"
+                    " into a transition rate Φ instead — values must"
+                    " emerge from the topology, not from event arithmetic."
+                )
 
     # ------------------------------------------------------------------
     # C6 (info): events that read parameter places
