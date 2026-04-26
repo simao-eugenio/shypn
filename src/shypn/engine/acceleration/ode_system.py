@@ -152,6 +152,10 @@ class OdeSystemAccelerator:
         self._build_error: Optional[str] = None
         # Kinetic parameters from transition.kinetic_metadata.parameters
         self._model_kinetic_params: Dict[str, float] = {}
+        # Accelerability audit (Phase-1 formalism gate): reasons collected by
+        # _analyse_model.  Non-empty ⇒ build() returns False so caller falls
+        # back to the Python ContinuousBehavior path.
+        self._unsafe_reasons: List[str] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -394,6 +398,94 @@ class OdeSystemAccelerator:
             consume: List[Tuple[str, float]] = []
             produce: List[Tuple[str, float]] = []
 
+            # ── Accelerability audit (Phase-1 formalism gate) ────────
+            # The C-compiled RHS encodes only stoichiometry + the rate
+            # expression.  It does NOT honour structural disablement
+            # guards (inhibitor arcs, θ_eff floor on signal_flow,
+            # PreemptionCheck, transition guard, min_token_threshold,
+            # spatial boundary).  Any continuous transition that depends
+            # on such a guard would silently get *different* dynamics
+            # from the Python ContinuousBehavior path.  Refuse to build
+            # in that case so the caller falls back to Python.
+            for pid, w, at in arc_in.get(tid, []):
+                if "inhibitor" in at:
+                    self._unsafe_reasons.append(
+                        f"  • {t.id} ({getattr(t, 'name', '')}): "
+                        f"inhibitor arc from place {pid} — engine ignores "
+                        f"M(p) ≥ θ disablement"
+                    )
+                    break  # one reason per transition is enough for the log
+            else:
+                # signal_flow with non-zero θ_eff or temperature-dependent θ_eff
+                for pid, w, at in arc_in.get(tid, []):
+                    if at != "signal_flow":
+                        continue
+                    arc_obj = self._get_arc_by_endpoints(pid, tid)
+                    if arc_obj is None:
+                        continue
+                    theta = float(getattr(arc_obj, "theta_eff", 0.0) or 0.0)
+                    e_a   = float(getattr(arc_obj, "activation_energy", 0.0) or 0.0)
+                    if theta != 0.0 or e_a != 0.0:
+                        self._unsafe_reasons.append(
+                            f"  • {t.id} ({getattr(t, 'name', '')}): "
+                            f"signal_flow arc from {pid} has θ_eff={theta}, "
+                            f"E_a={e_a} — engine ignores basin floor"
+                        )
+                        break
+
+            # PreemptionCheck non-vacuous?  Any non-spatial signal_flow input.
+            for pid, w, at in arc_in.get(tid, []):
+                if at != "signal_flow":
+                    continue
+                p = places.get(pid)
+                if p is None:
+                    continue
+                stype = getattr(p, "signal_type", None)
+                stype_val = getattr(stype, "value", stype)
+                if stype_val not in ("spatial", "SPATIAL", None):
+                    self._unsafe_reasons.append(
+                        f"  • {t.id} ({getattr(t, 'name', '')}): non-spatial "
+                        f"signal_flow input from {pid} (signal_type={stype_val!r}) "
+                        f"— PreemptionCheck not encoded in C"
+                    )
+                    break
+
+            # Non-trivial transition guard?
+            guard = getattr(t, "guard", 1)
+            if not _is_trivial_guard(guard):
+                self._unsafe_reasons.append(
+                    f"  • {t.id} ({getattr(t, 'name', '')}): "
+                    f"non-trivial guard {guard!r} — engine never evaluates it"
+                )
+
+            # min_token_threshold > 0?
+            mtt = float(props.get("min_token_threshold", 0.0) or 0.0)
+            if mtt > 0.0:
+                self._unsafe_reasons.append(
+                    f"  • {t.id} ({getattr(t, 'name', '')}): "
+                    f"min_token_threshold={mtt} > 0 — engine ignores it"
+                )
+
+            # Non-trivial spatial boundary on any arc-touched place?
+            touched_pids = (
+                [p for p, _, _ in arc_in.get(tid, [])]
+                + [p for p, _, _ in arc_out.get(tid, [])]
+            )
+            for pid in touched_pids:
+                p = places.get(pid)
+                if p is None:
+                    continue
+                btype = getattr(p, "boundary_type", None)
+                btype_val = getattr(btype, "value", btype)
+                if btype_val not in (None, "", "permeable"):
+                    self._unsafe_reasons.append(
+                        f"  • {t.id} ({getattr(t, 'name', '')}): "
+                        f"place {pid} has boundary_type={btype_val!r} — "
+                        f"engine never invokes BoundaryValidator"
+                    )
+                    break
+            # ── End accelerability audit ────────────────────────────
+
             for pid, w, at in arc_in.get(tid, []):
                 # Skip inhibitor and test arcs — they don't move tokens
                 if "inhibitor" in at or at == "test":
@@ -418,6 +510,20 @@ class OdeSystemAccelerator:
                 is_source=bool(getattr(t, "is_source", False)),
                 is_sink=bool(getattr(t, "is_sink", False)),
             ))
+
+        # ── Phase-1 accelerability gate ───────────────────────────────
+        # Refuse to build if any continuous transition relies on a
+        # structural disablement guard the C path doesn't honour.
+        # Caller falls back to Python ContinuousBehavior automatically.
+        if self._unsafe_reasons:
+            n = len(self._unsafe_reasons)
+            raise RuntimeError(
+                f"ODE accelerator refuses to build: {n} formalism guard(s) "
+                f"cannot be encoded in C and would silently change dynamics:\n"
+                + "\n".join(self._unsafe_reasons)
+                + "\n  → Falling back to Python ContinuousBehavior path "
+                  "(slower but formalism-faithful)."
+            )
 
         # Assign state-vector indices (sorted for determinism)
         self._ode_place_ids = sorted(ode_place_ids_set)
@@ -658,6 +764,18 @@ class OdeSystemAccelerator:
         self.update_thermo_params()
         self.update_extras()
 
+    # ------------------------------------------------------------------
+    # Internal: accelerability helpers (Phase-1 gate)
+    # ------------------------------------------------------------------
+
+    def _get_arc_by_endpoints(self, source_id: str, target_id: str) -> Any:
+        """Return the first model arc with matching (source_id, target_id)."""
+        for arc in getattr(self._model, "arcs", []) or []:
+            if (getattr(arc, "source_id", None) == source_id
+                    and getattr(arc, "target_id", None) == target_id):
+                return arc
+        return None
+
 
 # ===========================================================================
 # Helpers
@@ -693,3 +811,19 @@ def _is_transition_id(node_id: str, model: Any) -> bool:
 
 def _short_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def _is_trivial_guard(guard: Any) -> bool:
+    """Return True if `guard` is one of the always-pass sentinel values.
+
+    Trivial guards: None, True, 1, 1.0, "", "1", "True", "true".
+    Anything else (string expression, callable, dict, …) is treated as
+    non-trivial and the C path cannot honour it.
+    """
+    if guard is None or guard is True:
+        return True
+    if isinstance(guard, (int, float)) and guard == 1:
+        return True
+    if isinstance(guard, str):
+        return guard.strip().lower() in ("", "1", "true")
+    return False
