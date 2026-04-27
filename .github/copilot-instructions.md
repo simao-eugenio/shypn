@@ -93,6 +93,79 @@ asked.
   must NOT manually `scp` `.shy` files unless the dispatcher path
   is genuinely unavailable.
 
+## Programmatic `.shy` patching — property scope rules (STRICT)
+
+When editing `.shy` files outside the GUI (multi_replace, jq, scripts),
+agents MUST respect the dual-scope storage layout. Properties live in
+**either** the top-level object dict **or** a nested `"properties": {}`
+dict, and the engine deserializer reads from both with a fallback chain
+(see e.g. `transition.py` `from_dict()`: top-level wins, then
+`properties[name]`, then default). Patching the wrong layer is a
+silent no-op.
+
+### Per-object canonical layer
+
+| Object        | Top-level keys (canonical)                                                                                              | `properties` dict (rate logic & overflow)                                                                                              |
+|---------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **Arc**       | `arc_type`, `weight`, `threshold`, `consumes`, `produces`, `source_id`, `target_id`, `color`                            | `kind` (legacy alias of `arc_type`)                                                                                                    |
+| **Transition**| `transition_type`, `is_source`, `is_sink`, `guard`, `enabled`, `priority`, `firing_policy`, `prefer_continuous`         | `rate_function`, `rate_function_display`, `rate_forward`, `rate_reverse`, `min_token_threshold`, `max_rate`, `min_rate`, `compartment`, `is_environment_aware`, `adaptive_filter`, `volume_threshold` |
+| **Place**     | `initial_marking`, `is_signal_place`, `signal_type`, `is_parameter_place`, `place_type`                                 | `compartment_volume`, `boundary_type`, `gradient_vector`, `diffusion_coefficient`                                                      |
+| **Model**     | `metadata.notes` (free text), `thermodynamic_settings`                                                                  | —                                                                                                                                      |
+
+### Rules
+
+1. **Rate functions live ONLY under `properties.rate_function`** —
+   there is no top-level alias. Patching `transition["rate_function"]`
+   is silently ignored. Always edit
+   `transition["properties"]["rate_function"]` (and its
+   `rate_function_display` sibling for the GUI label).
+
+2. **Arc enablement uses dual-lookup `kind ?? properties.kind ?? arc_type`.**
+   When changing `arc_type`, also clear/update any legacy
+   `properties.kind` on the same arc to avoid two sources of truth
+   disagreeing. Bare `arc_type` edits are safe only when
+   `properties.kind` is absent.
+
+3. **`arc.threshold` supersedes `arc.weight` for enablement** when
+   non-null. Setting `threshold: 1` on a test arc with `weight: 1.0`
+   is a redundant explicit; setting `threshold: 0` makes the arc fire
+   on any positive marking regardless of weight. Patches that change
+   `arc_type` should leave `threshold` set explicitly to the intended
+   value, not rely on the `weight` fallback.
+
+4. **`color` is GUI-only but identifies arc class on the canvas.**
+   Update it together with `arc_type`:
+   - `normal` → `[0.0, 0.0, 0.0]` (black)
+   - `test` → `[0.0, 0.0, 1.0]` (blue)
+   - `signal_flow` → `[0.7, 0.7, 0.7]` (light grey)
+   - `inhibitor` → `[1.0, 0.0, 0.0]` (red)
+
+   A stale colour misleads visual diagnosis even when the engine
+   semantics are correct.
+
+5. **The running engine reads from the in-memory model, not from disk.**
+   After a programmatic patch the GUI/CLI must reload the model
+   (File → Open, or restart `python src/shypn.py`) before the next
+   simulation. The `.shy` file mtime being newer than the CSV is
+   **not** sufficient evidence the patch ran — only firing-count
+   changes for the patched transitions confirm the engine saw it.
+   Agents that patch a model and request a re-run MUST tell the
+   operator explicitly to reload the model first.
+
+6. **Validation roundtrip after every patch.** Read the file back and
+   assert the field landed in the layer the engine reads from. For
+   arcs:
+   ```python
+   assert arc["arc_type"] == "normal"
+   assert arc.get("properties", {}).get("kind") in (None, "normal")
+   ```
+   For transitions:
+   ```python
+   assert t["properties"]["rate_function"] == "<expected>"
+   ```
+   Skipping this check is how the third-round P7 sweep ran against a
+   stale model and reported zero T28 firings (2026-04-26).
+
 ## Hybrid sync model (sweep dispatch)
 
 As of April 2026 the dispatcher uses a **git + SCP hybrid**:
