@@ -920,18 +920,22 @@ class TauLeapingEngine:
         is_sink = getattr(transition, 'is_sink', False)
         
         # Phase 1: Consume tokens (skip if source)
+        # Per 13-tuple Bio-PN formalism: only TEST arcs are non-consuming.
+        # signal_flow and inhibitor arcs consume tokens (see SignalFlowArc
+        # docstring + immediate_behavior.py "v2.1.1: Only TEST arcs skip").
+        # Use the cached arc_type property as the single source of truth;
+        # the legacy properties['kind'] alias is intentionally NOT consulted
+        # here to avoid silent dual-source-of-truth divergence.
         if not is_source:
             for arc in input_arcs:
-                # Skip test arcs and inhibitor arcs (they don't consume)
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
                 arc_type = getattr(arc, 'arc_type', 'normal')
-                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                if arc_type == 'test':
                     continue
-                
+
                 source_place = arc.source
                 if source_place is None:
                     continue
-                
+
                 amount = arc.weight * num_firings
                 source_place.set_tokens(source_place.tokens - amount)
                 consumed_map[source_place.id] = float(amount)

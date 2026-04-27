@@ -1314,6 +1314,37 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             trigger_expr = getattr(event, 'trigger', '')
             if not trigger_expr:
                 continue
+
+            # Footgun guard: warn once if the trigger is a constant numeric/string
+            # literal (e.g. "0.0", "1", "'true'") rather than a boolean expression.
+            # Such a trigger is constant-False (e.g. 0.0) or constant-True every
+            # step — almost always a user mistake. Edge-triggered semantics mean
+            # constant-False never fires; constant-True fires once at t=0 and
+            # never again. Suggest a real predicate like ``t < 1e-9`` for a
+            # one-shot at t=0, or ``t >= some_time`` for a delayed one-shot.
+            if not hasattr(self, '_event_trigger_warned'):
+                self._event_trigger_warned: set = set()
+            if event.id not in self._event_trigger_warned:
+                try:
+                    import ast as _ast
+                    parsed = _ast.parse(trigger_expr.strip(), mode='eval')
+                    body = parsed.body
+                    is_constant_literal = (
+                        isinstance(body, _ast.Constant)
+                        and not isinstance(body.value, bool)
+                    )
+                    if is_constant_literal:
+                        lg.warning(
+                            f"[ENV_EVENT] event {event.id!r}: trigger {trigger_expr!r} "
+                            f"is a bare constant ({body.value!r}), not a boolean expression. "
+                            f"This evaluates to {bool(body.value)} every step and will "
+                            f"{'fire once at t=0 then never again' if bool(body.value) else 'NEVER fire'}. "
+                            f"Use 't < 1e-9' for a one-shot at t=0, or 't >= <time>' for a delayed one-shot."
+                        )
+                except (SyntaxError, ValueError):
+                    pass
+                self._event_trigger_warned.add(event.id)
+
             try:
                 fired = bool(eval(trigger_expr, {"__builtins__": {}}, ns))  # noqa: S307
             except Exception as exc:
@@ -1345,6 +1376,21 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         place_by_name = {p.name: p for p in self.model.places}
         place_by_id = {str(p.id): p for p in self.model.places}
 
+        # Safe math namespace for event RHS expressions. Without this, the
+        # ``__builtins__: {}`` sandbox strips ``max``, ``min``, ``abs``,
+        # ``round`` — which are routinely used in Pattern A bridge formulas
+        # (e.g. ``max(0, 7.0 - PH)`` for ``pH_acidosis``). Numeric helpers
+        # from ``math`` are also exposed for kinetic Q10/Arrhenius formulas.
+        import math as _math
+        safe_builtins = {
+            'max': max, 'min': min, 'abs': abs, 'round': round,
+            'pow': pow, 'int': int, 'float': float, 'bool': bool,
+        }
+        for _name in ('exp', 'log', 'log10', 'sqrt', 'sin', 'cos',
+                      'tan', 'pi', 'e', 'floor', 'ceil'):
+            if hasattr(_math, _name):
+                safe_builtins[_name] = getattr(_math, _name)
+
         for target, expr in assignments.items():
             # Resolve target place
             place = place_by_name.get(target) or place_by_id.get(str(target))
@@ -1352,13 +1398,15 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                 lg.debug(f"[ENV_EVENT] assignment target {target!r} not found in model")
                 continue
             try:
-                new_val = float(eval(str(expr), {"__builtins__": {}}, ns))  # noqa: S307
+                new_val = float(eval(str(expr), {"__builtins__": safe_builtins}, ns))  # noqa: S307
                 place.tokens = new_val
                 # Update namespace so later assignments in same event see the change
                 ns[place.name] = new_val
                 ns[str(place.id)] = new_val
             except Exception as exc:
-                lg.debug(f"[ENV_EVENT] assignment eval failed for {target!r}={expr!r}: {exc}")
+                lg.warning(
+                    f"[ENV_EVENT] assignment eval failed for {target!r}={expr!r}: {exc}"
+                )
 
     def _exhaust_immediate_transitions(self) -> int:
         """Execute all enabled immediate transitions in zero time.
