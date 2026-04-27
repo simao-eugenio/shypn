@@ -820,18 +820,32 @@ class StochasticBehavior(TransitionBehavior):
                             return False, f"insufficient-catalyst-{arc.source_id}"
                 else:
                     # NORMAL ARC: Check sufficient tokens for burst firing.
-                    # Hybrid PN: stochastic transitions are discrete — floor fractional tokens
-                    # so that a place with e.g. 1.5 µM contributes 1 countable token.
-                    # Signal flow arcs additionally require θ_eff tokens as basin
-                    # floor (formalism: M(ps) ≥ θ_eff + Ws·burst). θ_eff = 0 by default.
-                    # When activation_energy > 0, θ_eff is temperature-dependent.
+                    # Two semantic regimes (mirror of test-arc treatment above):
+                    #
+                    # ADAPTIVE transition in stochastic-mode fallback: tokens are
+                    # CONCENTRATIONS (mM/µM), not integer molecule counts. Use a
+                    # scale-invariant check — `floor(0.81) = 0` would wrongly block a
+                    # transition with 0.81 µM substrate, even though biochemically the
+                    # substrate is abundant (~10⁸ molecules in a typical cellular volume).
+                    #
+                    # STOCHASTIC transition (classic discrete PN semantics): tokens are
+                    # integer counts; floor fractional tokens before comparison.
+                    #
+                    # Signal flow arcs additionally require θ_eff tokens as basin floor
+                    # (formalism: M(ps) ≥ θ_eff + Ws·burst). θ_eff = 0 by default.
                     # NOTE: θ_eff is the basin floor (a single minimum, not per-firing).
                     # For n burst firings: M(ps) ≥ θ_eff + Ws·n, NOT (θ_eff + Ws)·n.
                     theta = self._get_theta_eff(arc)
                     required = arc.weight * burst + theta
-                    logger.debug(f"    → Normal: checking burst requirement={required} (θ_eff={theta})")
-                    if math.floor(source_place.tokens) < required:
-                        return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+                    trans_type = getattr(self.transition, 'transition_type', 'stochastic')
+                    if trans_type == 'adaptive':
+                        logger.debug(f"    → Normal (adaptive): scale-invariant check {source_place.tokens:.4g} >= {required} (θ_eff={theta})")
+                        if source_place.tokens < required:
+                            return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+                    else:
+                        logger.debug(f"    → Normal (stochastic): floor({source_place.tokens:.4g}) >= {required} (θ_eff={theta})")
+                        if math.floor(source_place.tokens) < required:
+                            return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
         # PreemptionCheck: single-layer verification of signal-producing predecessors
         preempt_ok, preempt_reason = self._check_preemption()

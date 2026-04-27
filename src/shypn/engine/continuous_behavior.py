@@ -780,12 +780,38 @@ class ContinuousBehavior(TransitionBehavior):
             if hasattr(self.transition, 'rate_reverse') else set()
         )
 
+        # Per 13-tuple Bio-PN formalism, signal_flow arcs are dual-role:
+        # they consume/produce tokens AND are visible to the signal hierarchy.
+        # The directional-rate filter (regex over rate_forward/rate_reverse
+        # text) can omit signal_flow arcs when the signal place name does not
+        # appear in the directional split, which would silently break mass
+        # balance for the signal place. Always retain signal_flow arcs in
+        # both consume and produce sets regardless of name-based matching.
+        def _is_signal_flow(a) -> bool:
+            return getattr(a, 'arc_type', 'normal') == 'signal_flow'
+
         if reverse_direction:
-            consume_arcs = [a for a in output_arcs if a.target_id in product_places] or output_arcs
-            produce_arcs = [a for a in input_arcs if a.source_id in substrate_places] or input_arcs
+            matched_out = [a for a in output_arcs if a.target_id in product_places]
+            matched_in = [a for a in input_arcs if a.source_id in substrate_places]
+            consume_arcs = matched_out or output_arcs
+            produce_arcs = matched_in or input_arcs
+            for a in output_arcs:
+                if _is_signal_flow(a) and a not in consume_arcs:
+                    consume_arcs.append(a)
+            for a in input_arcs:
+                if _is_signal_flow(a) and a not in produce_arcs:
+                    produce_arcs.append(a)
         else:
-            consume_arcs = [a for a in input_arcs if a.source_id in substrate_places] or input_arcs
-            produce_arcs = [a for a in output_arcs if a.target_id in product_places] or output_arcs
+            matched_in = [a for a in input_arcs if a.source_id in substrate_places]
+            matched_out = [a for a in output_arcs if a.target_id in product_places]
+            consume_arcs = matched_in or input_arcs
+            produce_arcs = matched_out or output_arcs
+            for a in input_arcs:
+                if _is_signal_flow(a) and a not in consume_arcs:
+                    consume_arcs.append(a)
+            for a in output_arcs:
+                if _is_signal_flow(a) and a not in produce_arcs:
+                    produce_arcs.append(a)
 
         return consume_arcs, produce_arcs, reverse_direction, flow_magnitude
 
@@ -924,8 +950,10 @@ class ContinuousBehavior(TransitionBehavior):
         predicted_produced = {}
         
         for arc in self.get_input_arcs():
-            kind = getattr(arc, 'kind', 'normal')
-            if kind == 'normal':
+            # Per formalism: only TEST arcs are non-consuming.
+            # signal_flow and inhibitor arcs DO consume tokens.
+            arc_type = getattr(arc, 'arc_type', 'normal')
+            if arc_type != 'test':
                 predicted_consumed[arc.source_id] = arc.weight * rate * dt
         
         for arc in self.get_output_arcs():
