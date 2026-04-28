@@ -9,7 +9,11 @@
       "transitions": 45,
       "arcs": 100,
       "modules": 0
-    }
+    },
+    "notes": "Phase 1 (P8 — Healthy environment envelope) validates the legal Pattern-A bridge ▢ TEMPERATURE/PH/AGE → evt_apply_thermodynamics → ◇ Temperature_factor / pH_acidosis / pH_neutrality / Age_factor → Φ. No biology changes from phase-0. Object-net sha is identical (modulo metadata bytes). Sweep config: workspace/projects/canabidiol/sweep_config.phase1.json",
+    "derived_from": "canabidiol-phase-0.shy (sha256 c49df7f817566c56f1d0f3e394a88354e609ee733481f15d27c860431ba09389)",
+    "phase": "phase-1",
+    "description": "CBD-AD neuroprotection model — Phase 1 (healthy environment envelope). Same biology as phase-0; sweep target: TEMPERATURE × PH × AGE at DISEASE_SEVERITY=0, 0 dose, 4 h horizon."
   },
   "view_state": {
     "zoom": 0.8052550000000156,
@@ -134,7 +138,7 @@
     {
       "id": "P3",
       "name": "Gamma_Secretase",
-      "label": "\u03b3-Secretase\n(active)",
+      "label": "γ-Secretase\n(active)",
       "metadata": {
         "kegg_id": "K04505",
         "compound_name": "Presenilin-1 complex",
@@ -216,7 +220,7 @@
     {
       "id": "P5",
       "name": "Abeta_Monomer",
-      "label": "A\u03b2 Monomer\n0",
+      "label": "Aβ Monomer\n0",
       "metadata": {
         "kegg_id": "C16239",
         "compound_name": "Amyloid beta peptide",
@@ -256,7 +260,7 @@
     {
       "id": "P6",
       "name": "Abeta_Oligomer",
-      "label": "A\u03b2 Oligomer\n(toxic)\n0",
+      "label": "Aβ Oligomer\n(toxic)\n0",
       "metadata": {
         "compound_name": "Amyloid beta oligomers",
         "function": "neurotoxic_signal",
@@ -297,7 +301,7 @@
     {
       "id": "P7",
       "name": "Abeta_Plaque",
-      "label": "A\u03b2 Plaque\n(irreversible)\n0",
+      "label": "Aβ Plaque\n(irreversible)\n0",
       "metadata": {
         "compound_name": "Amyloid plaque deposits",
         "function": "irreversible_aggregation_trap",
@@ -336,7 +340,7 @@
     {
       "id": "P8",
       "name": "NFkB_IkB",
-      "label": "NF\u03baB:I\u03baB\n(inactive complex)\n80",
+      "label": "NFκB:IκB\n(inactive complex)\n80",
       "metadata": {
         "compound_name": "NFkB-IkBalpha complex",
         "kegg_id": "C00000",
@@ -376,7 +380,7 @@
     {
       "id": "P9",
       "name": "NFkB_p65",
-      "label": "NF\u03baB p65\n(nuclear/active)\n0",
+      "label": "NFκB p65\n(nuclear/active)\n0",
       "metadata": {
         "kegg_id": "K04735",
         "gene_symbol": "RELA",
@@ -460,7 +464,7 @@
     {
       "id": "P11",
       "name": "TNFa",
-      "label": "TNF\u03b1\n0",
+      "label": "TNFα\n0",
       "metadata": {
         "kegg_id": "C00000",
         "gene_symbol": "TNF",
@@ -501,7 +505,7 @@
     {
       "id": "P12",
       "name": "IL1b",
-      "label": "IL-1\u03b2\n0",
+      "label": "IL-1β\n0",
       "metadata": {
         "kegg_id": "C00000",
         "gene_symbol": "IL1B",
@@ -1070,7 +1074,7 @@
     {
       "id": "P26",
       "name": "PPARg_active",
-      "label": "PPAR\u03b3\n(CBD-activated)",
+      "label": "PPARγ\n(CBD-activated)",
       "metadata": {
         "kegg_id": "K08530",
         "gene_symbol": "PPARG",
@@ -1156,7 +1160,7 @@
     {
       "id": "P28",
       "name": "TEMPERATURE",
-      "label": "Temperature\n312.15 K (39 \u00b0C)",
+      "label": "Temperature\n312.15 K (39 °C)",
       "object_type": "place",
       "x": -1880.0,
       "y": 270.0,
@@ -1442,7 +1446,7 @@
     {
       "id": "P35",
       "name": "LOADING_DOSE",
-      "label": "Loading dose (\u00b5M)",
+      "label": "Loading dose (µM)",
       "object_type": "place",
       "x": -1440.0,
       "y": -140.0,
@@ -1465,7 +1469,7 @@
       "is_energy_place": false,
       "is_parameter_place": true,
       "parameter_kind": "dose",
-      "parameter_units": "\u00b5M",
+      "parameter_units": "µM",
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1487,7 +1491,7 @@
     {
       "id": "P36",
       "name": "MAINT_DOSE",
-      "label": "Maintenance dose (\u00b5M)",
+      "label": "Maintenance dose (µM)",
       "object_type": "place",
       "x": -1880.0,
       "y": -280.0,
@@ -1510,7 +1514,7 @@
       "is_energy_place": false,
       "is_parameter_place": true,
       "parameter_kind": "dose",
-      "parameter_units": "\u00b5M",
+      "parameter_units": "µM",
       "diffusion_coefficient": null,
       "boundary_type": null,
       "gradient_vector": null,
@@ -1727,7 +1731,7 @@
     {
       "id": "P42",
       "name": "pH_neutrality",
-      "label": "1 - 0.3\u00b7|pH-7.4|",
+      "label": "1 - 0.3·|pH-7.4|",
       "object_type": "place",
       "x": -2200.0,
       "y": 210.0,
@@ -1764,7 +1768,7 @@
     {
       "id": "T1",
       "name": "CBD_inactivates_GPR3",
-      "label": "CBD \u2192 GPR3\ninactivation\n(reversible)",
+      "label": "CBD → GPR3\ninactivation\n(reversible)",
       "object_type": "transition",
       "x": -1140.0,
       "y": 450.0,
@@ -1791,7 +1795,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.01 * CBD_extracellular * GPR3",
-        "rate_function_display": "k_inv \u00d7 [CBD] \u00d7 [GPR3]"
+        "rate_function_display": "k_inv × [CBD] × [GPR3]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -1802,7 +1806,7 @@
     {
       "id": "T2",
       "name": "GPR3_activates_gamma_sec",
-      "label": "GPR3 \u2192 \u03b3-Sec\nactivation",
+      "label": "GPR3 → γ-Sec\nactivation",
       "object_type": "transition",
       "x": -840.0,
       "y": -90.0,
@@ -1829,7 +1833,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.5 * GPR3 / (20 + GPR3)",
-        "rate_function_display": "k_act \u00d7 [GPR3]"
+        "rate_function_display": "k_act × [GPR3]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -1840,7 +1844,7 @@
     {
       "id": "T3",
       "name": "Abeta_Production",
-      "label": "APP cleavage\n\u2192 A\u03b2 monomer",
+      "label": "APP cleavage\n→ Aβ monomer",
       "object_type": "transition",
       "x": 280.0,
       "y": -160.0,
@@ -1867,7 +1871,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.1 * Gamma_Secretase / (50 + Gamma_Secretase) * APP / (100 + APP) * Temperature_factor * Age_factor",
-        "rate_function_display": "k_cleavage \u00d7 [\u03b3-Sec]"
+        "rate_function_display": "k_cleavage × [γ-Sec]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -1878,7 +1882,7 @@
     {
       "id": "T4",
       "name": "Abeta_Aggregation",
-      "label": "A\u03b2 aggregation\n(monomer \u2192 oligomer)",
+      "label": "Aβ aggregation\n(monomer → oligomer)",
       "object_type": "transition",
       "x": 390.0,
       "y": 950.0,
@@ -1905,7 +1909,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.05 * Abeta_Monomer * Abeta_Monomer * Temperature_factor * (1 + 0.5*pH_acidosis)",
-        "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
+        "rate_function_display": "k_agg × [Aβ]²"
       },
       "signal_places": [
         "P41",
@@ -1948,7 +1952,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.02 * Abeta_Oligomer / (100 + Abeta_Oligomer) * Temperature_factor * (1 + 0.3*pH_acidosis)",
-        "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
+        "rate_function_display": "k_plaque × [Aβ_olig]"
       },
       "signal_places": [
         "P41",
@@ -1964,7 +1968,7 @@
     {
       "id": "T6",
       "name": "IKK_phosphorylates_IkB",
-      "label": "IKK \u2192 I\u03baB phosph.\n(NF\u03baB release)",
+      "label": "IKK → IκB phosph.\n(NFκB release)",
       "object_type": "transition",
       "x": 180.0,
       "y": 860.0,
@@ -1991,7 +1995,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.2 * IKK / (50 + IKK) * NFkB_IkB / (20 + NFkB_IkB) * Temperature_factor",
-        "rate_function_display": "Michaelis-Menten: Vmax\u00d7[IKK]\u00d7[I\u03baB] / (Km + [I\u03baB])"
+        "rate_function_display": "Michaelis-Menten: Vmax×[IKK]×[IκB] / (Km + [IκB])"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -2002,7 +2006,7 @@
     {
       "id": "T7",
       "name": "NFkB_transcription",
-      "label": "NF\u03baB \u2192 cytokines\n(TNF\u03b1, IL-1\u03b2, IL-6, COX-2)",
+      "label": "NFκB → cytokines\n(TNFα, IL-1β, IL-6, COX-2)",
       "object_type": "transition",
       "x": 520.0,
       "y": 650.0,
@@ -2029,7 +2033,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.5 * NFkB_p65 / (20 + NFkB_p65) * Temperature_factor",
-        "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
+        "rate_function_display": "k_tx × [NFκB_p65]"
       },
       "signal_places": [
         "P9",
@@ -2044,7 +2048,7 @@
     {
       "id": "T8",
       "name": "Abeta_activates_IKK",
-      "label": "A\u03b2 oligomers\n\u2192 IKK activation",
+      "label": "Aβ oligomers\n→ IKK activation",
       "object_type": "transition",
       "x": -550.0,
       "y": 1140.0,
@@ -2071,7 +2075,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.1 * Abeta_Oligomer / (50 + Abeta_Oligomer)",
-        "rate_function_display": "k_ikk \u00d7 [A\u03b2_olig]"
+        "rate_function_display": "k_ikk × [Aβ_olig]"
       },
       "signal_places": [
         "P6"
@@ -2085,7 +2089,7 @@
     {
       "id": "T9",
       "name": "PPARg_inhibits_NFkB",
-      "label": "PPAR\u03b3 \u2192 p65\nubiquitination",
+      "label": "PPARγ → p65\nubiquitination",
       "object_type": "transition",
       "x": -220.0,
       "y": 490.0,
@@ -2112,7 +2116,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "(0.005 + 0.3 * PPARg_active) * NFkB_p65",
-        "rate_function_display": "(k_basal + k_ubiq \u00d7 [PPAR\u03b3]) \u00d7 [NF\u03baB_p65]"
+        "rate_function_display": "(k_basal + k_ubiq × [PPARγ]) × [NFκB_p65]"
       },
       "signal_places": [
         "P26"
@@ -2126,7 +2130,7 @@
     {
       "id": "T10",
       "name": "CBD_activates_PPARg",
-      "label": "CBD \u2192 PPAR\u03b3\nagonism",
+      "label": "CBD → PPARγ\nagonism",
       "object_type": "transition",
       "x": -650.0,
       "y": 640.0,
@@ -2153,7 +2157,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.02 * CBD_intracellular / (20 + CBD_intracellular)",
-        "rate_function_display": "k_PPARg \u00d7 [CBD]"
+        "rate_function_display": "k_PPARg × [CBD]"
       },
       "is_environment_aware": false,
       "compartment": "nucleus",
@@ -2164,7 +2168,7 @@
     {
       "id": "T11",
       "name": "ROS_releases_Nrf2",
-      "label": "ROS + CBD\n\u2192 Nrf2 release",
+      "label": "ROS + CBD\n→ Nrf2 release",
       "object_type": "transition",
       "x": 270.0,
       "y": 1510.0,
@@ -2191,7 +2195,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.15 * Keap1_Nrf2 * (ROS / (10 + ROS) + 0.3 * CBD_intracellular / (50 + CBD_intracellular)) * Temperature_factor",
-        "rate_function_display": "k_nrf2 \u00d7 [Keap1:Nrf2] \u00d7 (f(ROS) + f(CBD))"
+        "rate_function_display": "k_nrf2 × [Keap1:Nrf2] × (f(ROS) + f(CBD))"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -2202,7 +2206,7 @@
     {
       "id": "T12",
       "name": "Nrf2_ARE_transcription",
-      "label": "Nrf2 \u2192 ARE\n(HO-1, SOD, GSH)",
+      "label": "Nrf2 → ARE\n(HO-1, SOD, GSH)",
       "object_type": "transition",
       "x": 630.0,
       "y": 1680.0,
@@ -2229,7 +2233,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.4 * Nrf2_free / (10 + Nrf2_free) * Temperature_factor",
-        "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
+        "rate_function_display": "k_ARE × [Nrf2_free]"
       },
       "signal_places": [
         "P16",
@@ -2244,7 +2248,7 @@
     {
       "id": "T13",
       "name": "Antioxidant_Scavenging",
-      "label": "SOD + GSH + HO-1\n\u2192 ROS clearance",
+      "label": "SOD + GSH + HO-1\n→ ROS clearance",
       "object_type": "transition",
       "x": 1160.0,
       "y": 1680.0,
@@ -2271,7 +2275,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "((0.1 * (SOD + HO1) * ROS / (5 + ROS) + 0.05 * Glutathione * ROS / (5 + ROS)) * Temperature_factor * pH_neutrality) / Age_factor",
-        "rate_function_display": "k_scav \u00d7 ([SOD]+[HO-1]+[GSH]) \u00d7 f([ROS])"
+        "rate_function_display": "((0.1 * (SOD + HO1) * ROS / (5 + ROS) + 0.05 * Glutathione * ROS / (5 + ROS)) * Temperature_factor * pH_neutrality) / Age_factor"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -2308,8 +2312,8 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "(2.0 + 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer) + 0.3 * TNFa / (15 + TNFa)) * Temperature_factor",
-        "rate_function_display": "(basal + k_Ab \u00d7 [A\u03b2_olig] + k_TNF \u00d7 [TNF\u03b1]/(Km+[TNF\u03b1])) \u00d7 Q10"
+        "rate_function": "(2.0 + 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer) + 0.3 * TNFa / (15 + TNFa)) * Temperature_factor / (1 + ROS / 2.0)",
+        "rate_function_display": "(2.0 + 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer) + 0.3 * TNFa / (15 + TNFa)) * Temperature_factor / (1 + ROS / 2.0)"
       },
       "signal_places": [
         "P11",
@@ -2324,7 +2328,7 @@
     {
       "id": "T15",
       "name": "CBD_activates_5HT1A",
-      "label": "CBD \u2192 5-HT1A\nagonism",
+      "label": "CBD → 5-HT1A\nagonism",
       "object_type": "transition",
       "x": -1290.0,
       "y": 1080.0,
@@ -2351,7 +2355,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.015 * CBD_extracellular / (20 + CBD_extracellular)",
-        "rate_function_display": "k_5HT1A \u00d7 [CBD]"
+        "rate_function_display": "k_5HT1A × [CBD]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -2362,7 +2366,7 @@
     {
       "id": "T16",
       "name": "HT1A_BDNF_production",
-      "label": "5-HT1A \u2192 BDNF\nupregulation",
+      "label": "5-HT1A → BDNF\nupregulation",
       "object_type": "transition",
       "x": -30.0,
       "y": 1690.0,
@@ -2389,7 +2393,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.1 + 0.3 * HT1A_active / (10 + HT1A_active)",
-        "rate_function_display": "k_basal + k_BDNF \u00d7 [5-HT1A]"
+        "rate_function_display": "k_basal + k_BDNF × [5-HT1A]"
       },
       "signal_places": [
         "P25"
@@ -2403,7 +2407,7 @@
     {
       "id": "T17",
       "name": "M2_to_M1_polarization",
-      "label": "M2 \u2192 M1\n(A\u03b2 + cytokine driven)",
+      "label": "M2 → M1\n(Aβ + cytokine driven)",
       "object_type": "transition",
       "x": -800.0,
       "y": 1910.0,
@@ -2430,7 +2434,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.1 * Microglia_M2 * (Abeta_Oligomer / (10 + Abeta_Oligomer) + TNFa / (20 + TNFa)) * Temperature_factor * (1 + 0.3*pH_acidosis) * Age_factor",
-        "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
+        "rate_function_display": "k_pol × [M2] × (f([Aβ_olig]) + f([TNFα]))"
       },
       "signal_places": [
         "P41",
@@ -2449,7 +2453,7 @@
     {
       "id": "T18",
       "name": "M1_to_M2_resolution",
-      "label": "M1 \u2192 M2\n(CBD/PPAR\u03b3/A2A driven)",
+      "label": "M1 → M2\n(CBD/PPARγ/A2A driven)",
       "object_type": "transition",
       "x": -1410.0,
       "y": 1880.0,
@@ -2476,7 +2480,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "(0.005 * Microglia_M1 + 0.05 * Microglia_M1 * (PPARg_active / (5 + PPARg_active) + A2A_active / (5 + A2A_active))) / Age_factor",
-        "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
+        "rate_function_display": "k_res × [M1] × (f([PPARγ]) + f([A2A]))"
       },
       "signal_places": [
         "P40",
@@ -2493,7 +2497,7 @@
     {
       "id": "T19",
       "name": "CBD_activates_A2A",
-      "label": "CBD \u2192 A2A\nagonism",
+      "label": "CBD → A2A\nagonism",
       "object_type": "transition",
       "x": -1640.0,
       "y": 1220.0,
@@ -2520,7 +2524,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.012 * CBD_extracellular / (20 + CBD_extracellular)",
-        "rate_function_display": "k_A2A \u00d7 [CBD]"
+        "rate_function_display": "k_A2A × [CBD]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -2531,7 +2535,7 @@
     {
       "id": "T20",
       "name": "Neurotoxicity",
-      "label": "Neurotoxicity\n(A\u03b2 + ROS + cytokines)",
+      "label": "Neurotoxicity\n(Aβ + ROS + cytokines)",
       "object_type": "transition",
       "x": 1420.0,
       "y": 1190.0,
@@ -2557,8 +2561,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (ROS / (15 + ROS)) + 0.003 * (TNFa / (10 + TNFa))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor",
-        "rate_function_display": "k_tox \u00d7 f([A\u03b2]) \u00d7 f([ROS]) \u00d7 f([TNF\u03b1])"
+        "rate_function": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor",
+        "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
         "P41",
@@ -2577,7 +2581,7 @@
     {
       "id": "T21",
       "name": "BDNF_neuroprotection",
-      "label": "BDNF \u2192 Neuron\nsurvival",
+      "label": "BDNF → Neuron\nsurvival",
       "object_type": "transition",
       "x": 150.0,
       "y": 2130.0,
@@ -2604,7 +2608,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor",
-        "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
+        "rate_function_display": "k_surv × [BDNF] × (1 - [Neuron]/max)"
       },
       "signal_places": [
         "P23",
@@ -2646,8 +2650,8 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.1 * Nrf2_free * Temperature_factor",
-        "rate_function_display": "k_deg \u00d7 [Nrf2]"
+        "rate_function": "0.15 * Nrf2_free * Temperature_factor",
+        "rate_function_display": "0.15 * Nrf2_free * Temperature_factor"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -2685,7 +2689,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.05 * (IL1b + IL6 + COX2) * Temperature_factor",
-        "rate_function_display": "k_deg \u00d7 ([IL-1\u03b2] + [IL-6] + [COX-2])  (TNF\u03b1 sink owned by T17/T20)"
+        "rate_function_display": "k_deg × ([IL-1β] + [IL-6] + [COX-2])  (TNFα sink owned by T17/T20)"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2696,7 +2700,7 @@
     {
       "id": "T24",
       "name": "Abeta_Oligomer_Clearance",
-      "label": "A\u03b2 oligomer\nclearance\n(M2 phagocytosis)",
+      "label": "Aβ oligomer\nclearance\n(M2 phagocytosis)",
       "object_type": "transition",
       "x": -870.0,
       "y": 1390.0,
@@ -2723,7 +2727,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "(0.03 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
-        "rate_function_display": "k_phago \u00d7 [M2] \u00d7 [A\u03b2_olig] / (Km + [A\u03b2_olig])"
+        "rate_function_display": "k_phago × [M2] × [Aβ_olig] / (Km + [Aβ_olig])"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2734,7 +2738,7 @@
     {
       "id": "T25",
       "name": "Abeta_Monomer_Clearance",
-      "label": "A\u03b2 monomer\ndegradation\n(neprilysin)",
+      "label": "Aβ monomer\ndegradation\n(neprilysin)",
       "object_type": "transition",
       "x": 850.0,
       "y": 300.0,
@@ -2761,7 +2765,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "(0.05 * Abeta_Monomer) / Age_factor",
-        "rate_function_display": "k_nep \u00d7 [A\u03b2_mono]"
+        "rate_function_display": "k_nep × [Aβ_mono]"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2799,7 +2803,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.02 * BDNF",
-        "rate_function_display": "k_deg \u00d7 [BDNF]"
+        "rate_function_display": "k_deg × [BDNF]"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2837,7 +2841,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.008 * (IKK - 10) * (IKK > 10) * Temperature_factor",
-        "rate_function_display": "k_dephos \u00d7 max(0, [IKK] - IKK_basal)"
+        "rate_function_display": "k_dephos × max(0, [IKK] - IKK_basal)"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -2992,7 +2996,7 @@
     {
       "id": "T32",
       "name": "PPARg_Degradation",
-      "label": "PPAR\u03b3\nturnover",
+      "label": "PPARγ\nturnover",
       "object_type": "transition",
       "x": -340.0,
       "y": 880.0,
@@ -3019,7 +3023,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.005 * PPARg_active * Temperature_factor",
-        "rate_function_display": "k_deg_PPARg \u00d7 [PPAR\u03b3_act] \u00d7 Q10"
+        "rate_function_display": "k_deg_PPARg × [PPARγ_act] × Q10"
       },
       "is_environment_aware": false,
       "compartment": "nucleus",
@@ -3057,7 +3061,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.01 * HT1A_active",
-        "rate_function_display": "k_desens \u00d7 [5-HT1A_act]"
+        "rate_function_display": "k_desens × [5-HT1A_act]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -3095,7 +3099,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.008 * A2A_active",
-        "rate_function_display": "k_desens \u00d7 [A2A_act]"
+        "rate_function_display": "k_desens × [A2A_act]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -3106,7 +3110,7 @@
     {
       "id": "T35",
       "name": "GammaSec_Turnover",
-      "label": "\u03b3-secretase\nturnover",
+      "label": "γ-secretase\nturnover",
       "object_type": "transition",
       "x": -380.0,
       "y": -70.0,
@@ -3133,7 +3137,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.01 * (Gamma_Secretase - 30) * (Gamma_Secretase > 30)",
-        "rate_function_display": "k_turn \u00d7 ([\u03b3-sec] - basal) \u00d7 H(excess)"
+        "rate_function_display": "k_turn × ([γ-sec] - basal) × H(excess)"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -3170,8 +3174,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.003 * HO1 * Temperature_factor",
-        "rate_function_display": "k_deg \u00d7 [HO1] \u00d7 Q10"
+        "rate_function": "0.0045 * HO1 * Temperature_factor",
+        "rate_function_display": "0.0045 * HO1 * Temperature_factor"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -3208,8 +3212,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.002 * SOD",
-        "rate_function_display": "k_deg \u00d7 ([SOD] - basal) \u00d7 H(excess)"
+        "rate_function": "0.0067 * SOD",
+        "rate_function_display": "0.0067 * SOD"
       },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
@@ -3247,7 +3251,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.005 * GPR3_inactive",
-        "rate_function_display": "k_synth \u00d7 (basal - [GPR3]) \u00d7 H(deficit)"
+        "rate_function_display": "k_synth × (basal - [GPR3]) × H(deficit)"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -3285,7 +3289,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "(0.0005 * Abeta_Plaque + 0.005 * Microglia_M2 * Abeta_Plaque / (100 + Abeta_Plaque) * Temperature_factor) / Age_factor",
-        "rate_function_display": "k_clear \u00d7 [M2] \u00d7 [Plaque]/(Km+[Plaque]) \u00d7 Q10 / Age_factor"
+        "rate_function_display": "k_clear × [M2] × [Plaque]/(Km+[Plaque]) × Q10 / Age_factor"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -3296,7 +3300,7 @@
     {
       "id": "T40",
       "name": "ROS_activates_IKK",
-      "label": "ROS \u2192 IKK\n(oxidative activation)",
+      "label": "ROS → IKK\n(oxidative activation)",
       "object_type": "transition",
       "x": 320.0,
       "y": 1140.0,
@@ -3323,7 +3327,7 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.05 * ROS / (20 + ROS) * Temperature_factor",
-        "rate_function_display": "k_ox \u00d7 [ROS]/(Km+[ROS]) \u00d7 Q10"
+        "rate_function_display": "k_ox × [ROS]/(Km+[ROS]) × Q10"
       },
       "signal_places": [
         "P19"
@@ -3363,7 +3367,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.05 * GSSG"
+        "rate_function": "0.06 * GSSG"
       },
       "is_environment_aware": false,
       "compartment": "intracellular",
@@ -5579,7 +5583,7 @@
         "group": "install_disease",
         "target": "Abeta_Monomer",
         "delta_per_severity_unit": 0.125,
-        "purpose": "Install AD pathology in Abeta_Monomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Abeta_Monomer. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5596,7 +5600,7 @@
         "group": "install_disease",
         "target": "Abeta_Oligomer",
         "delta_per_severity_unit": 7.25,
-        "purpose": "Install AD pathology in Abeta_Oligomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Abeta_Oligomer. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5613,7 +5617,7 @@
         "group": "install_disease",
         "target": "Abeta_Plaque",
         "delta_per_severity_unit": 2.5,
-        "purpose": "Install AD pathology in Abeta_Plaque. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Abeta_Plaque. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5630,7 +5634,7 @@
         "group": "install_disease",
         "target": "NFkB_p65",
         "delta_per_severity_unit": 12.5,
-        "purpose": "Install AD pathology in NFkB_p65. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in NFkB_p65. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5647,7 +5651,7 @@
         "group": "install_disease",
         "target": "ROS",
         "delta_per_severity_unit": 2.0,
-        "purpose": "Install AD pathology in ROS. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in ROS. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5664,7 +5668,7 @@
         "group": "install_disease",
         "target": "Microglia_M1",
         "delta_per_severity_unit": 10.0,
-        "purpose": "Install AD pathology in Microglia_M1. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Microglia_M1. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5681,7 +5685,7 @@
         "group": "install_disease",
         "target": "Microglia_M2",
         "delta_per_severity_unit": -7.5,
-        "purpose": "Install AD pathology in Microglia_M2. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Microglia_M2. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5698,7 +5702,7 @@
         "group": "install_disease",
         "target": "Glutathione",
         "delta_per_severity_unit": -15.0,
-        "purpose": "Install AD pathology in Glutathione. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Glutathione. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5715,7 +5719,7 @@
         "group": "install_disease",
         "target": "Neuron_Health",
         "delta_per_severity_unit": -2.5,
-        "purpose": "Install AD pathology in Neuron_Health. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in Neuron_Health. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5732,7 +5736,7 @@
         "group": "install_disease",
         "target": "TNFa",
         "delta_per_severity_unit": 0.25,
-        "purpose": "Install AD pathology in TNFa. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in TNFa. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5749,7 +5753,7 @@
         "group": "install_disease",
         "target": "IL1b",
         "delta_per_severity_unit": 0.25,
-        "purpose": "Install AD pathology in IL1b. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in IL1b. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5766,7 +5770,7 @@
         "group": "install_disease",
         "target": "IL6",
         "delta_per_severity_unit": 0.25,
-        "purpose": "Install AD pathology in IL6. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in IL6. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5783,7 +5787,7 @@
         "group": "install_disease",
         "target": "COX2",
         "delta_per_severity_unit": 0.25,
-        "purpose": "Install AD pathology in COX2. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in COX2. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {
@@ -5800,7 +5804,7 @@
         "group": "install_disease",
         "target": "APP_mRNA",
         "delta_per_severity_unit": 2.0,
-        "purpose": "Install AD pathology in APP_mRNA. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+        "purpose": "Install AD pathology in APP_mRNA. Severity=0 → no-op (healthy control); Severity=2 → reproduces v2 AD baseline; Severity=3 → ~150% AD."
       }
     },
     {

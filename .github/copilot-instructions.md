@@ -96,75 +96,136 @@ asked.
 ## Programmatic `.shy` patching — property scope rules (STRICT)
 
 When editing `.shy` files outside the GUI (multi_replace, jq, scripts),
-agents MUST respect the dual-scope storage layout. Properties live in
-**either** the top-level object dict **or** a nested `"properties": {}`
-dict, and the engine deserializer reads from both with a fallback chain
-(see e.g. `transition.py` `from_dict()`: top-level wins, then
-`properties[name]`, then default). Patching the wrong layer is a
-silent no-op.
+agents MUST respect the **loader scope** for every field. The loaders
+in `src/shypn/netobjs/{place,transition,arc,signal_flow_arc}.py` and
+`src/shypn/data/canvas/document_model.py` decide where a JSON key is
+read from. Writing to the wrong scope is a silent no-op — the file
+saves cleanly, the next save round-trips, and the engine ignores it.
 
-### Per-object canonical layer
+### Loader-derived scope table (audited 2026-04-28 from `*.from_dict()`)
 
-| Object        | Top-level keys (canonical)                                                                                              | `properties` dict (rate logic & overflow)                                                                                              |
-|---------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **Arc**       | `arc_type`, `weight`, `threshold`, `consumes`, `produces`, `source_id`, `target_id`, `color`                            | `kind` (legacy alias of `arc_type`)                                                                                                    |
-| **Transition**| `transition_type`, `is_source`, `is_sink`, `guard`, `enabled`, `priority`, `firing_policy`, `prefer_continuous`         | `rate_function`, `rate_function_display`, `rate_forward`, `rate_reverse`, `min_token_threshold`, `max_rate`, `min_rate`, `compartment`, `is_environment_aware`, `adaptive_filter`, `volume_threshold` |
-| **Place**     | `initial_marking`, `is_signal_place`, `signal_type`, `is_parameter_place`, `place_type`                                 | `compartment_volume`, `boundary_type`, `gradient_vector`, `diffusion_coefficient`                                                      |
-| **Model**     | `metadata.notes` (free text), `thermodynamic_settings`                                                                  | —                                                                                                                                      |
+#### Transition (`transition.py::Transition.from_dict`)
 
-### Rules
+| Field                                                                   | Read from                  | Notes                                                                 |
+|-------------------------------------------------------------------------|----------------------------|-----------------------------------------------------------------------|
+| `id`, `name`, `x`, `y`, `width`, `height`, `label`, `horizontal`        | top-level **only**         | constructor args                                                      |
+| `enabled`, `fill_color`, `border_color`, `border_width`                 | top-level **only**         |                                                                       |
+| `transition_type`, `priority`, `firing_policy`, `guard`                 | top-level **only**         |                                                                       |
+| `is_source`, `is_sink`                                                  | top-level **only**         |                                                                       |
+| `earliest_time`, `latest_time` (TPN window)                             | top-level **only**         |                                                                       |
+| `signal_places`, `is_environment_aware`, `module_id`, `compartment`     | top-level **only**         |                                                                       |
+| `kinetic_metadata`, `metadata`                                          | top-level **only**         |                                                                       |
+| `adaptive_filter`, `volume_threshold`, `prefer_continuous`              | top-level **then** `properties` | top-level wins; properties is legacy fallback                  |
+| **`rate_function`**                                                     | **`properties` only**      | top-level `rate_function` migrated **iff** `properties.rate_function` absent; once present, top-level edits are ignored |
+| `rate_forward`, `rate_reverse`                                          | **`properties` only**      | same migration rule as `rate_function`                                |
+| `rate` (deprecated numeric)                                             | top-level → migrated to `properties.rate_function` | only if no `rate_function` exists                |
+| `formula`                                                               | top-level **only**         | legacy                                                                |
 
-1. **Rate functions live ONLY under `properties.rate_function`** —
-   there is no top-level alias. Patching `transition["rate_function"]`
-   is silently ignored. Always edit
-   `transition["properties"]["rate_function"]` (and its
-   `rate_function_display` sibling for the GUI label).
+#### Place (`place.py::Place.from_dict`)
 
-2. **Arc enablement uses dual-lookup `kind ?? properties.kind ?? arc_type`.**
-   When changing `arc_type`, also clear/update any legacy
-   `properties.kind` on the same arc to avoid two sources of truth
-   disagreeing. Bare `arc_type` edits are safe only when
-   `properties.kind` is absent.
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `id`, `name`, `x`, `y`, `radius`, `label`                                          | top-level **only**         |                                                      |
+| `initial_marking` (or legacy `marking`)                                            | top-level **only**         | `tokens` is a transient runtime field, ignore it     |
+| `is_catalyst`, `is_signal_place`, `is_energy_place`                                | top-level **only**         |                                                      |
+| `is_compartment_place`, `is_regulatory_place`                                      | top-level **only**         |                                                      |
+| `is_parameter_place`, `parameter_kind`, `parameter_units`                          | top-level **only**         |                                                      |
+| `capacity`, `border_color`, `border_width`                                         | top-level **only**         |                                                      |
+| `diffusion_coefficient`, `gradient_vector`, `neighbor_compartments`,`spatial_position` | top-level **only**     |                                                      |
+| `boundary_type`                                                                    | top-level **only**         |                                                      |
+| `compartment`, `metadata`                                                          | top-level **only**         |                                                      |
+| `signal_type`                                                                      | top-level **then** `properties` | top-level wins                                  |
+| `compartment_volume`                                                               | top-level **then** `properties` | top-level wins                                  |
+| `properties` (passthrough dict for thermodynamic / custom data)                    | `properties` **only**      | not interpreted by the loader; engine reads ad-hoc   |
 
-3. **`arc.threshold` supersedes `arc.weight` for enablement** when
-   non-null. Setting `threshold: 1` on a test arc with `weight: 1.0`
-   is a redundant explicit; setting `threshold: 0` makes the arc fire
-   on any positive marking regardless of weight. Patches that change
-   `arc_type` should leave `threshold` set explicitly to the intended
-   value, not rely on the `weight` fallback.
+#### Arc (`arc.py::Arc.from_dict`)
 
-4. **`color` is GUI-only but identifies arc class on the canvas.**
-   Update it together with `arc_type`:
-   - `normal` → `[0.0, 0.0, 0.0]` (black)
-   - `test` → `[0.0, 0.0, 1.0]` (blue)
-   - `signal_flow` → `[0.7, 0.7, 0.7]` (light grey)
-   - `inhibitor` → `[1.0, 0.0, 0.0]` (red)
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `id`, `name`, `arc_type`                                                           | top-level **only**         | `arc_type` selects the **subclass** (TestArc, SignalFlowArc, …) |
+| `source_id`, `target_id`, `source_type`, `target_type`                             | top-level **only**         | `*_type` inferred from ID prefix if missing          |
+| `weight`, `threshold`, `color`, `width`, `control_points`                          | top-level **only**         |                                                      |
+| `properties` dict on arcs                                                          | **NOT READ by loader**     | the loader never deserializes `arc["properties"]`. Edits there are ignored at load. The engine's *runtime* fallback chain `kind ?? properties.kind ?? arc_type` is irrelevant once `arc_type` selects the right subclass. |
 
-   A stale colour misleads visual diagnosis even when the engine
-   semantics are correct.
+##### SignalFlowArc / CurvedSignalFlowArc additional fields
 
-5. **The running engine reads from the in-memory model, not from disk.**
-   After a programmatic patch the GUI/CLI must reload the model
-   (File → Open, or restart `python src/shypn.py`) before the next
-   simulation. The `.shy` file mtime being newer than the CSV is
-   **not** sufficient evidence the patch ran — only firing-count
-   changes for the patched transitions confirm the engine saw it.
-   Agents that patch a model and request a re-run MUST tell the
-   operator explicitly to reload the model first.
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `michaelis_K`, `hill_n`, `suppression_epsilon` (Γ tuple)                           | top-level **only**         | default 0, 1, 0                                      |
+| `activation_energy`, `reference_temperature` (Arrhenius)                           | top-level **only**         | default 0, 298.15                                    |
 
-6. **Validation roundtrip after every patch.** Read the file back and
-   assert the field landed in the layer the engine reads from. For
-   arcs:
-   ```python
-   assert arc["arc_type"] == "normal"
-   assert arc.get("properties", {}).get("kind") in (None, "normal")
-   ```
-   For transitions:
-   ```python
-   assert t["properties"]["rate_function"] == "<expected>"
-   ```
-   Skipping this check is how the third-round P7 sweep ran against a
-   stale model and reported zero T28 firings (2026-04-26).
+#### DocumentModel (`document_model.py::DocumentModel.from_dict`)
+
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `places`, `transitions`, `arcs`, `modules`, `events`                               | top-level **only**         | lists at root                                        |
+| `view_state`, `thermodynamic_settings`, `compound_mappings`, `metadata`            | top-level **only**         |                                                      |
+
+### Decision rule for any patch
+
+Before editing field `F` on object `O`:
+
+1. **Look up `F` in the table above.** If unlisted, grep `from_dict()`
+   for the source class — *do not guess*.
+2. **Apply at the loader's read scope.** Mirror to the alternate scope
+   only when the table's "Notes" column says it's a fallback (e.g.
+   `signal_type` should be set top-level; properties mirror is optional).
+3. **Run the roundtrip assertion** below before saving.
+4. **Never write to a scope the loader ignores** (e.g.
+   `arc["properties"]`, `transition["rate_function"]` when
+   `properties.rate_function` exists). These are silent no-ops.
+
+### Boilerplate validation snippet (mandatory in every patch script)
+
+```python
+# After json.dumps and write, re-read and assert at the loader's read scope.
+m2 = json.loads(path.read_text())
+
+# 1. Rate-function patches (properties-only)
+t = next(t for t in m2['transitions'] if t['name'] == NAME)
+assert t['properties']['rate_function'] == NEW_RATE, \
+    f"rate_function did not land in properties on {NAME}"
+
+# 2. Arc retyping (top-level + clear properties.kind)
+a = next(a for a in m2['arcs'] if a['id'] == ARC_ID)
+assert a['arc_type'] == NEW_TYPE
+assert a.get('properties', {}).get('kind') in (None, NEW_TYPE), \
+    f"stale properties.kind on arc {ARC_ID} disagrees with arc_type"
+
+# 3. New transition added (must have id starting 'T', properties dict)
+new_t = next(t for t in m2['transitions'] if t['id'] == NEW_TID)
+assert new_t['transition_type'] in ('continuous', 'stochastic', 'immediate', 'timed', 'adaptive')
+if new_t['transition_type'] in ('continuous', 'adaptive'):
+    assert new_t['properties'].get('rate_function'), \
+        "continuous/adaptive transition needs properties.rate_function"
+
+# 4. New arc added (top-level fields complete; do NOT add properties)
+new_a = next(a for a in m2['arcs'] if a['id'] == NEW_AID)
+for k in ('id', 'arc_type', 'source_id', 'target_id', 'weight'):
+    assert k in new_a, f"new arc missing top-level {k}"
+```
+
+### Operational rules
+
+- **`color` is GUI-only but identifies arc class on the canvas.** Update
+  it together with `arc_type`:
+  - `normal` → `[0.0, 0.0, 0.0]` (black)
+  - `test` → `[0.0, 0.0, 1.0]` (blue)
+  - `signal_flow` → `[0.7, 0.7, 0.7]` (light grey)
+  - `inhibitor` → `[1.0, 0.0, 0.0]` (red)
+
+- **The running engine reads from the in-memory model, not from disk.**
+  After a programmatic patch the GUI/CLI must reload the model
+  (File → Open, or restart `python src/shypn.py`) before the next
+  simulation. Newer `.shy` mtime is **not** sufficient evidence — only
+  changed firing counts / endpoint markers confirm the engine saw it.
+  Agents that patch a model and request a re-run MUST tell the
+  operator explicitly to reload the model first.
+
+- **Skipping the roundtrip check is how the third-round P7 sweep ran
+  against a stale model and reported zero T28 firings (2026-04-26),
+  and how the v3_p9 GSH-floor patch silently produced ROS=17 instead
+  of ROS=0 (2026-04-28).**
 
 ## Hybrid sync model (sweep dispatch)
 

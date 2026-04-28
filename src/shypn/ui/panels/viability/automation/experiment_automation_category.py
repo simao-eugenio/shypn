@@ -136,7 +136,17 @@ class ExperimentAutomationCategory:
         self.sweep_builder.viability_panel = self.parent_panel  # Set reference for auto-prediction
         self.sweep_builder.parent_category = self  # Set reference for refresh callback
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
-        self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
+        # Full sweep-plan clear: empty the queue AND wipe the activity log so
+        # no leftover from a previous or cancelled sweep can mislead the next
+        # run. The sweep_builder's own _on_clear_clicked has already reset its
+        # parameter lists, design mode, and solver settings before this fires.
+        def _on_sweep_plan_cleared():
+            self.queue_view.clear_queue()
+            try:
+                self.queue_view.clear_status()
+            except Exception:
+                pass
+        self.sweep_builder.set_clear_callback(_on_sweep_plan_cleared)
         
         # Connect type change to parameter refresh AND clear queue
         self.sweep_builder.type_combo.connect("changed", self._on_object_type_changed)
@@ -917,6 +927,7 @@ class ExperimentAutomationCategory:
             'seed_base': 42,
             'tau_epsilon': 0.03,
             'max_tau': 0.1,
+            'output_tier': 'G3',
         }
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
@@ -955,6 +966,13 @@ class ExperimentAutomationCategory:
                 if 0 < v <= 100:
                     params['max_tau'] = v
             except (ValueError, AttributeError):
+                pass
+        if hasattr(self.sweep_builder, 'output_tier_combo'):
+            try:
+                tier = self.sweep_builder.output_tier_combo.get_active_id()
+                if tier:
+                    params['output_tier'] = tier
+            except AttributeError:
                 pass
         return params
 

@@ -542,6 +542,7 @@ class ExperimentManager:
         tau_epsilon: float = 0.03,
         max_tau: float = 0.1,
         events: list = None,
+        output_tier: str = 'G3',
     ):
         """Export a CLI-ready sweep configuration JSON.
 
@@ -584,6 +585,10 @@ class ExperimentManager:
             # sweep worker installs them on model.events before each run
             # so the engine's _evaluate_environment_events picks them up.
             config['events'] = list(events)
+        # Output granularity: only emit when non-default to keep configs tidy.
+        # Read by SweepConfig.from_dict → OutputOptions; gates worker writes.
+        if output_tier and output_tier != 'G3':
+            config['output'] = {'tier': output_tier}
 
         config['exported_from'] = 'viability_panel'
         config['exported_date'] = datetime.now().isoformat()

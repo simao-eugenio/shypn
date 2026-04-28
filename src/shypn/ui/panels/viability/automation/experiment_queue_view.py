@@ -124,15 +124,26 @@ class ExperimentQueueView(Gtk.Box):
         self.cancel_button.connect("clicked", self._on_cancel_clicked)
         button_box.pack_start(self.cancel_button, False, False, 0)
         
-        # Clear Completed button
+        # Clear Completed button — finer-grained: only removes already-
+        # finished rows (keeps pending + running + cancelled). For a full
+        # fresh-start use "Clear Sweep Plan" in the sweep builder above.
         clear_button = Gtk.Button(label="Clear Completed")
-        clear_button.set_tooltip_text("Remove completed experiments from queue")
+        clear_button.set_tooltip_text(
+            "Remove only completed experiments from the queue.\n"
+            "Pending, running, failed, and cancelled rows are kept.\n"
+            "For a full reset (queue + sweep plan + log), use\n"
+            "‘Clear Sweep Plan’ in the sweep builder above."
+        )
         clear_button.connect("clicked", self._on_clear_clicked)
         button_box.pack_start(clear_button, False, False, 0)
         
-        # Reset All button
+        # Reset All button — in-place restart of completed/failed rows.
         reset_button = Gtk.Button(label="⟲ Reset All")
-        reset_button.set_tooltip_text("Reset all completed/failed experiments back to pending")
+        reset_button.set_tooltip_text(
+            "Reset completed/failed experiments back to pending so they\n"
+            "can be re-run without rebuilding the sweep plan.\n"
+            "Does not remove or alter the sweep parameters."
+        )
         reset_button.connect("clicked", self._on_reset_clicked)
         button_box.pack_start(reset_button, False, False, 0)
         
