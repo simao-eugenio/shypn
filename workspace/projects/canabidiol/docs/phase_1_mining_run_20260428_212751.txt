@@ -1,0 +1,197 @@
+# Phase-1 envelope mining: run_20260428_212751
+  dispatched: 2026-04-28T18:27:50
+  model sha:  41f2eb8330cf1b8d
+  server git: 4ddd3c28
+  envelope conditions: 80 | horizon: 4.0 h
+
+## 1. 'Baseline' condition vs Phase-0
+marker                   phase0_24h phase1_4h(B)   phase1_t1h
+Neuron_Health               100.000       96.067       98.300
+ROS                           0.000        2.894        2.894
+Abeta_Monomer                 0.780        0.766        0.766
+Abeta_Oligomer                0.000        0.000        0.000
+Abeta_Plaque                  0.000        0.000        0.000
+NFkB_p65                      0.000        0.065        0.065
+TNFa                          0.500        0.500        0.500
+IL1b                          0.000        0.013        0.002
+IL6                           0.000        0.013        0.002
+COX2                          0.000        0.013        0.002
+Microglia_M1                  0.000        0.067        0.200
+Microglia_M2                 45.000       44.933       44.800
+BDNF                          4.140        4.856        4.856
+Glutathione                 305.800       69.484       56.656
+GSSG                         33.500       29.314       28.407
+Nrf2_free                     6.000        1.671        2.021
+Keap1_Nrf2_complex           54.000                          
+SOD                          21.600        8.848       10.735
+HO1                          32.400       13.089       15.910
+CBD_intracellular             9.980        9.980        9.980
+Temperature_factor              n/a        1.000        1.000
+pH_acidosis                     n/a        0.000        0.000
+Age_factor                      n/a        1.200        1.200
+
+## 2. Reference physiological condition T=310.15 A=75.0 pH=7.4
+marker                   phase0_24h    p1_ref_4h   p1_ref_t1h    delta_vs_p0
+Neuron_Health               100.000       96.200       98.633         -3.800
+ROS                           0.000        2.894        2.894          2.894
+Abeta_Monomer                 0.780        0.766        0.766         -0.014
+Abeta_Oligomer                0.000        0.000        0.000          0.000
+Abeta_Plaque                  0.000        0.000        0.000          0.000
+NFkB_p65                      0.000        0.065        0.065          0.065
+TNFa                          0.500        0.500        0.500          0.000
+IL1b                          0.000        0.001        0.019          0.001
+IL6                           0.000        0.001        0.019          0.001
+COX2                          0.000        0.001        0.019          0.001
+Microglia_M1                  0.000        0.200        0.100          0.200
+Microglia_M2                 45.000       44.800       44.900         -0.200
+BDNF                          4.140        4.856        4.856          0.716
+Glutathione                 305.800       69.449       57.326       -236.351
+GSSG                         33.500       29.275       27.686         -4.225
+Nrf2_free                     6.000        1.685        2.316         -4.315
+Keap1_Nrf2_complex           54.000                                         
+SOD                          21.600        8.834        9.935        -12.766
+HO1                          32.400       13.130       14.878        -19.270
+CBD_intracellular             9.980        9.980        9.980          0.000
+Temperature_factor              n/a        1.000        1.000               
+pH_acidosis                     n/a        0.000        0.000               
+Age_factor                      n/a        1.200        1.200               
+
+## 3. Marginal effects (mean across the other two axes)
+
+### Neuron_Health
+  Temperature(K)    300= 99.458±0.28    305= 98.296±0.75 310.15= 96.212±2.04    315= 92.819±3.84    320= 88.846±6.12  | slope=-0.5334 per unit
+  Age(y)             30= 98.708±0.92     60= 96.042±3.08     75= 93.825±5.16     85= 91.930±6.55  | slope=-0.1199 per unit
+  pH                6.5= 94.328±5.89      7= 95.332±4.92    7.4= 95.343±5.00    7.8= 95.502±4.55  | slope=+0.8476 per unit
+
+### ROS
+  Temperature(K)    300=  1.433±0.00    305=  2.025±0.00 310.15=  2.896±0.00    315=  4.058±0.01    320=  5.744±0.02  | slope=+0.2129 per unit
+  Age(y)             30=  3.227±1.53     60=  3.227±1.53     75=  3.232±1.54     85=  3.240±1.54  | slope=+0.000212 per unit
+  pH                6.5=  3.232±1.54      7=  3.231±1.54    7.4=  3.231±1.54    7.8=  3.231±1.54  | slope=-0.0002328 per unit
+
+### Abeta_Oligomer
+  Temperature(K)    300=  0.000±0.00    305=  0.000±0.00 310.15=  0.132±0.23    315=  0.404±0.45    320=  0.570±0.61  | slope=+0.0308 per unit
+  Age(y)             30=  0.000±0.00     60=  0.000±0.00     75=  0.269±0.35     85=  0.615±0.58  | slope=+0.009973 per unit
+  pH                6.5=  0.226±0.42      7=  0.207±0.41    7.4=  0.227±0.43    7.8=  0.224±0.44  | slope=+0.002737 per unit
+
+### Glutathione
+  Temperature(K)    300= 81.137±10.54    305= 75.495±11.95 310.15= 66.298±12.88    315= 54.397±13.93    320= 39.504±14.66  | slope=-2.085 per unit
+  Age(y)             30= 43.451±16.77     60= 62.865±15.97     75= 71.204±14.78     85= 75.946±13.73  | slope=+0.5968 per unit
+  pH                6.5= 67.496±20.14      7= 62.935±19.54    7.4= 60.073±19.10    7.8= 62.961±19.48  | slope=-3.996 per unit
+
+### Nrf2_free
+  Temperature(K)    300=  3.330±2.07    305=  2.289±1.50 310.15=  1.520±1.04    315=  1.093±0.74    320=  0.889±0.53  | slope=-0.1217 per unit
+  Age(y)             30=  0.040±0.08     60=  1.699±0.94     75=  2.537±1.32     85=  3.022±1.47  | slope=+0.05459 per unit
+  pH                6.5=  2.241±1.80      7=  1.772±1.53    7.4=  1.502±1.33    7.8=  1.783±1.53  | slope=-0.3996 per unit
+
+### Microglia_M1
+  Temperature(K)    300=  0.015±0.02    305=  0.035±0.04 310.15=  0.098±0.07    315=  0.302±0.18    320=  1.081±0.52  | slope=+0.04787 per unit
+  Age(y)             30=  0.098±0.15     60=  0.277±0.38     75=  0.405±0.56     85=  0.445±0.57  | slope=+0.006486 per unit
+  pH                6.5=  0.270±0.42      7=  0.305±0.43    7.4=  0.325±0.45    7.8=  0.325±0.57  | slope=+0.0438 per unit
+
+### BDNF
+  Temperature(K)    300=  4.856±0.00    305=  4.856±0.00 310.15=  4.856±0.00    315=  4.856±0.00    320=  4.856±0.00  | slope=+0 per unit
+  Age(y)             30=  4.856±0.00     60=  4.856±0.00     75=  4.856±0.00     85=  4.856±0.00  | slope=+0 per unit
+  pH                6.5=  4.856±0.00      7=  4.856±0.00    7.4=  4.856±0.00    7.8=  4.856±0.00  | slope=+0 per unit
+
+### Temperature_factor
+  Temperature(K)    300=  0.495±0.00    305=  0.700±0.00 310.15=  1.000±0.00    315=  1.400±0.00    320=  1.979±0.00  | slope=+0.0733 per unit
+  Age(y)             30=  1.115±0.53     60=  1.115±0.53     75=  1.115±0.53     85=  1.115±0.53  | slope=+0 per unit
+  pH                6.5=  1.115±0.53      7=  1.115±0.53    7.4=  1.115±0.53    7.8=  1.115±0.53  | slope=+0 per unit
+
+### Age_factor
+  Temperature(K)    300=  0.950±0.42    305=  0.950±0.42 310.15=  0.950±0.42    315=  0.950±0.42    320=  0.950±0.42  | slope=+0 per unit
+  Age(y)             30=  0.300±0.00     60=  0.900±0.00     75=  1.200±0.00     85=  1.400±0.00  | slope=+0.02 per unit
+  pH                6.5=  0.950±0.42      7=  0.950±0.42    7.4=  0.950±0.42    7.8=  0.950±0.42  | slope=+0 per unit
+
+### pH_acidosis
+  Temperature(K)    300=  0.125±0.22    305=  0.125±0.22 310.15=  0.125±0.22    315=  0.125±0.22    320=  0.125±0.22  | slope=+0 per unit
+  Age(y)             30=  0.125±0.22     60=  0.125±0.22     75=  0.125±0.22     85=  0.125±0.22  | slope=+0 per unit
+  pH                6.5=  0.500±0.00      7=  0.000±0.00    7.4=  0.000±0.00    7.8=  0.000±0.00  | slope=-0.3639 per unit
+
+## 4. 2-way interactions on Neuron_Health
+  slope(NH vs Temperature(K)) at each level of Age(y):
+    Age(y)=    30  slope=-0.1252
+    Age(y)=    60  slope=-0.4202
+    Age(y)=    75  slope=-0.6986
+    Age(y)=    85  slope=-0.8893
+    -> interaction range = 0.7641  (STRONG)
+  slope(NH vs Temperature(K)) at each level of pH:
+    pH=   6.5  slope=-0.6161
+    pH=     7  slope=-0.5154
+    pH=   7.4  slope=-0.517
+    pH=   7.8  slope=-0.4849
+    -> interaction range = 0.1312  (STRONG)
+  slope(NH vs Age(y)) at each level of pH:
+    pH=   6.5  slope=-0.1387
+    pH=     7  slope=-0.1153
+    pH=   7.4  slope=-0.1193
+    pH=   7.8  slope=-0.1064
+    -> interaction range = 0.03223  (modest)
+
+## 5. Top corners by Neuron_Health
+  10 most stressful:
+    T=   320 A=  85 pH=6.5   NH= 77.73  ROS= 5.77  AbOlig= 1.42  GSH=  62.0
+    T=   320 A=  85 pH=7.4   NH= 82.13  ROS= 5.77  AbOlig= 1.42  GSH=  48.0
+    T=   320 A=  85 pH=7     NH= 82.87  ROS= 5.77  AbOlig= 1.41  GSH=  53.4
+    T=   320 A=  85 pH=7.8   NH= 83.20  ROS= 5.77  AbOlig= 1.53  GSH=  53.7
+    T=   320 A=  75 pH=6.5   NH= 84.30  ROS= 5.75  AbOlig= 0.88  GSH=  55.7
+    T=   320 A=  75 pH=7.4   NH= 85.17  ROS= 5.75  AbOlig= 0.84  GSH=  42.6
+    T=   320 A=  75 pH=7     NH= 85.47  ROS= 5.75  AbOlig= 0.80  GSH=  47.2
+    T=   315 A=  85 pH=6.5   NH= 86.47  ROS= 4.07  AbOlig= 1.09  GSH=  75.8
+    T=   320 A=  75 pH=7.8   NH= 86.63  ROS= 5.75  AbOlig= 0.81  GSH=  47.4
+    T=   315 A=  85 pH=7     NH= 87.53  ROS= 4.07  AbOlig= 1.07  GSH=  67.7
+  10 most protective:
+    T=   305 A=  30 pH=7.4   NH= 99.37  ROS= 2.03  AbOlig= 0.00  GSH=  56.6
+    T=   305 A=  30 pH=7     NH= 99.40  ROS= 2.03  AbOlig= 0.00  GSH=  56.6
+    T=   305 A=  30 pH=7.8   NH= 99.47  ROS= 2.03  AbOlig= 0.00  GSH=  56.6
+    T=   300 A=  60 pH=7.4   NH= 99.67  ROS= 1.43  AbOlig= 0.00  GSH=  79.4
+    T=   300 A=  30 pH=6.5   NH= 99.70  ROS= 1.43  AbOlig= 0.00  GSH=  65.4
+    T=   300 A=  60 pH=7.8   NH= 99.70  ROS= 1.43  AbOlig= 0.00  GSH=  81.9
+    T=   300 A=  60 pH=7     NH= 99.73  ROS= 1.43  AbOlig= 0.00  GSH=  81.9
+    T=   300 A=  30 pH=7.8   NH= 99.77  ROS= 1.43  AbOlig= 0.00  GSH=  63.4
+    T=   300 A=  30 pH=7     NH= 99.87  ROS= 1.43  AbOlig= 0.00  GSH=  63.4
+    T=   300 A=  30 pH=7.4   NH= 99.87  ROS= 1.43  AbOlig= 0.00  GSH=  63.4
+
+## 6. Bridge (▢→event→◇) functional verification
+  Check that Temperature_factor / Age_factor / pH_acidosis values track inputs:
+  Temperature_factor      drives by Temperature(K) value-range=1.484  verdict=ACTIVE
+    Temperature(K)=   300  Temperature_factor=0.4948
+    Temperature(K)=   305  Temperature_factor=0.6998
+    Temperature(K)=310.15  Temperature_factor=1
+    Temperature(K)=   315  Temperature_factor=1.4
+    Temperature(K)=   320  Temperature_factor=1.979
+  Age_factor              drives by Age(y)         value-range=1.1  verdict=ACTIVE
+    Age(y)=    30  Age_factor=0.3
+    Age(y)=    60  Age_factor=0.9
+    Age(y)=    75  Age_factor=1.2
+    Age(y)=    85  Age_factor=1.4
+  pH_acidosis             drives by pH             value-range=0.5  verdict=ACTIVE
+    pH=   6.5  pH_acidosis=0.5
+    pH=     7  pH_acidosis=0
+    pH=   7.4  pH_acidosis=0
+    pH=   7.8  pH_acidosis=0
+
+## 7. Endpoint envelope across 80 conditions
+marker                        min       mean        max    CV% bound          pass
+Neuron_Health              77.733     95.126     99.867   5.4  [95.0,-]        VIO
+ROS                         1.432      3.231      5.768  47.5  [-,5.0]         VIO
+Abeta_Monomer               0.017      0.460      0.923  66.4                     
+Abeta_Oligomer              0.000      0.221      1.531 191.3  [-,1.0]         VIO
+Abeta_Plaque                0.000      0.015      0.190 259.5                     
+NFkB_p65                    0.018      0.102      0.267  88.7                     
+TNFa                        0.500      0.511      0.633   5.0                     
+IL1b                        0.000      0.017      0.119 151.9                     
+IL6                         0.000      0.017      0.119 151.9                     
+COX2                        0.000      0.017      0.119 151.9                     
+Microglia_M1                0.000      0.306      2.033 153.7  [-,5.0]          OK
+Microglia_M2               42.967     44.694     45.000   1.1  [40.0,-]         OK
+BDNF                        4.856      4.856      4.856   0.0                     
+Glutathione                15.460     63.366     93.372  31.2                     
+GSSG                        8.756     33.360     66.058  53.6                     
+Nrf2_free                   0.000      1.825      6.163  86.5                     
+SOD                         0.000      7.687     16.819  63.0                     
+HO1                         0.000     12.439     33.686  77.3                     
+CBD_intracellular           9.980      9.980      9.980   0.0                     
+Temperature_factor          0.495      1.115      1.979  47.4                     
+pH_acidosis                 0.000      0.125      0.500 173.2                     
+Age_factor                  0.300      0.950      1.400  43.7                     
