@@ -191,18 +191,20 @@ class SweepRunner:
     def _compute_safe_workers() -> int:
         """Compute max workers from CPU and memory constraints.
 
-        Policy:
-          - CPU: use *physical* cores minus a reserve of 8 threads for
-            system/sshd.  On hybrid CPUs (e.g. i9-14900K: 8P+16E = 24
-            physical cores, 32 threads) this prevents all-core saturation
-            that causes SSH banner-exchange timeouts.
-          - Memory: estimate per-worker RSS (~8 GB for complex models),
-            cap to fit in available RAM + swap minus a 10 GB system reserve.
-            NVMe swap is fast enough for simulation workloads.
+        Policy (recalibrated 2026-04-28 against measured RSS on remote-gpu
+        — 16 workers running canabidiol-phase-1 averaged ~0.9 GB / 1.6 GB
+        peak per worker, total 14 GB out of 49 GB available):
+          - CPU: use *physical* cores minus a reserve of 4 threads for
+            sshd / journald / system. Earlier 8-thread reserve was a
+            workaround for SSH lockout that turned out to be a memory
+            (swap-thrashing) problem, not a CPU-starvation problem.
+          - Memory: estimate per-worker peak RSS at 1.5 GB (measured
+            peak ~1.6 GB on the largest CBD-AD condition, with ~67%
+            headroom). Cap to fit in available RAM minus a 12 GB
+            system / page-cache / parent-process reserve.
+            Swap is intentionally *not* counted — swap thrashing
+            collapses throughput (~5× slowdown observed previously).
           - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
-
-        This prevents memory exhaustion that causes swap thrashing,
-        OOM kills, and SSH lockout.
         """
         # Detect physical cores (not logical threads)
         _logical = os.cpu_count() or 4
@@ -223,9 +225,12 @@ class SweepRunner:
         except Exception:
             physical = _logical
 
-        # Reserve 8 threads for system/sshd to prevent SSH lockout
-        _reserved = 8
-        cpu_cap = max(1, min(physical - _reserved, int(physical * 0.70)))
+        # Reserve 4 threads for sshd / system services. The earlier
+        # 8-thread reserve was over-conservative — the real cause of
+        # SSH lockout under load was memory-driven swap thrashing,
+        # not CPU starvation.
+        _reserved = 4
+        cpu_cap = max(1, min(physical - _reserved, int(physical * 0.85)))
 
         # Memory-based cap
         try:
@@ -266,14 +271,13 @@ class SweepRunner:
             # Reserve 12 GB for OS, sshd, page cache, kernel buffers,
             # and the parent process (which holds model metadata + IPC).
             usable_gb = max(1.0, mem_available_gb - 12.0)
-            # Estimate per-worker peak RSS.  With worker-side disk flush
-            # (results written to disk in worker, then freed), peak is
-            # 1 condition's trajectory: 30 replicates × ~15 MB each for
-            # a 34-place/45-transition model at 60k steps ≈ 500 MB active
-            # data + ~300 MB model/controller/accelerator overhead ≈ 1 GB.
-            # Use 3 GB as safety margin for Python heap fragmentation and
-            # larger models.
-            per_worker_gb = 3.0
+            # Per-worker peak RSS estimate, calibrated against measured
+            # values on remote-gpu running canabidiol-phase-1 (32 cores,
+            # 42 places, 45 transitions, 30 replicates × 4 h horizon):
+            # observed peak 1.6 GB, mean 0.9 GB. 1.5 GB gives ~67%
+            # headroom for Python heap fragmentation and larger models
+            # while still allowing 24 workers on a 49 GB-available host.
+            per_worker_gb = 1.5
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
@@ -401,6 +405,20 @@ class SweepRunner:
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
         n_workers = min(self.workers, n_conditions)
 
+        # Adaptive replicate distribution: when there are fewer conditions
+        # than total workers, spread the leftover budget across replicates
+        # *within* each condition.  This eliminates the slow gating-run
+        # case (1 condition × N replicates pinning only 1 outer worker).
+        # Multi-condition sweeps where n_conditions >= self.workers keep
+        # replicate_pool_size == 1 — unchanged behaviour.
+        replicate_pool_size = max(1, self.workers // max(1, n_workers))
+        if self.verbose and replicate_pool_size > 1:
+            print(
+                f"[adaptive] {n_conditions} condition(s) × {sim.replicates} reps → "
+                f"{n_workers} cond-worker(s) × {replicate_pool_size} rep-worker(s) "
+                f"per condition (total = {n_workers * replicate_pool_size}/{self.workers})"
+            )
+
         # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
         gpu_sampler = _GpuSampler.start(period_ms=500)
 
@@ -432,6 +450,8 @@ class SweepRunner:
                     output_dir=str(output.run_dir),
                     verbose=self.verbose,
                     events=list(getattr(self.config, 'events', []) or []),
+                    output_options=self.config.output.to_dict(),
+                    replicate_pool_size=replicate_pool_size,
                 )
                 futures_map[fut] = idx
 
@@ -683,6 +703,42 @@ def _sanitise_condition_name(name: str) -> str:
     )[:120]
 
 
+def _strip_to_endpoint(stats: dict) -> dict:
+    """Reduce per-step statistics to endpoint-only (G2 tier).
+
+    Keeps only the last time-point of each trajectory array. Cuts
+    statistics.json size by O(n_time_points) — typically ~1000×.
+    """
+    if not isinstance(stats, dict):
+        return stats
+    out: dict = {}
+    for k, v in stats.items():
+        if k == 'time_points' and isinstance(v, list) and v:
+            out[k] = [v[-1]]
+        elif k == 'species_statistics' and isinstance(v, dict):
+            new_species = {}
+            for sid, sdict in v.items():
+                if not isinstance(sdict, dict):
+                    new_species[sid] = sdict
+                    continue
+                slim = {}
+                for field_name, arr in sdict.items():
+                    if field_name == 'percentiles' and isinstance(arr, dict):
+                        slim[field_name] = {
+                            p: ([pa[-1]] if isinstance(pa, list) and pa else pa)
+                            for p, pa in arr.items()
+                        }
+                    elif isinstance(arr, list) and arr:
+                        slim[field_name] = [arr[-1]]
+                    else:
+                        slim[field_name] = arr
+                new_species[sid] = slim
+            out[k] = new_species
+        else:
+            out[k] = v
+    return out
+
+
 def _run_single_condition(
     *,
     model_path: str,
@@ -694,6 +750,8 @@ def _run_single_condition(
     output_dir: str,
     verbose: bool,
     events: list = None,
+    output_options: dict = None,
+    replicate_pool_size: int = 1,
 ) -> dict:
     """Execute one condition in a worker process.
 
@@ -752,6 +810,12 @@ def _run_single_condition(
             )
 
     # Run replicates
+    # Override the pool-worker gate to grant this worker an explicit inner
+    # replicate-pool budget. _worker_init() set this to '1' (sequential),
+    # which is the right default; here we widen it only when the dispatcher
+    # has computed leftover capacity (replicate_pool_size > 1).
+    if replicate_pool_size and replicate_pool_size > 1:
+        os.environ['_SHYPN_IN_POOL_WORKER'] = str(int(replicate_pool_size))
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
     runner = ReplicateRunner(model)
     results = runner.run_replicates(
@@ -786,8 +850,17 @@ def _run_single_condition(
     cond_dir = run_dir / f"condition_{safe_name}"
     cond_dir.mkdir(parents=True, exist_ok=True)
 
-    SweepOutputManager._write_replicates_csv(cond_dir, results, model)
-    SweepOutputManager._write_statistics_json(cond_dir, stats)
+    # Output-tier gate: see OutputOptions in sweep_config.py for tier→writes.
+    from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+    _opts = _OutputOptions.from_dict(output_options)
+    if _opts.write_replicates_csv:
+        SweepOutputManager._write_replicates_csv(cond_dir, results, model)
+    if _opts.write_statistics_json:
+        if _opts.statistics_endpoint_only:
+            stats_to_write = _strip_to_endpoint(stats)
+        else:
+            stats_to_write = stats
+        SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
 
     # Free trajectory data immediately — this is the critical memory
     # reclamation point.  Without this, the worker holds ~0.5–1.5 GB
