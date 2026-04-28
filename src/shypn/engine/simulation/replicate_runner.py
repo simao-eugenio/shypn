@@ -350,14 +350,35 @@ class ReplicateRunner:
                 print("  GPU declined — using CPU path")
 
         # ── CPU parallel path: distribute replicates across cores ────
-        _in_pool = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        # Pool-worker gate semantics:
+        #   unset       → top-level dispatch (free to spawn full pool)
+        #   '1'         → inside an outer pool worker, sequential only
+        #   '<int> > 1' → inside an outer pool worker that has *explicitly
+        #                 granted* this worker a per-condition replicate
+        #                 budget (sweep_runner adaptive split).  Treat the
+        #                 value as the cap for the inner pool size.
+        _in_pool_raw = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        try:
+            _in_pool_cap = int(_in_pool_raw) if _in_pool_raw else 0
+        except (TypeError, ValueError):
+            _in_pool_cap = 1 if _in_pool_raw else 0
+        # Treat '1' as the legacy "no nesting" sentinel.
+        _allow_nested = _in_pool_cap > 1
+        _in_pool = bool(_in_pool_raw) and not _allow_nested
         _cpu_count = os.cpu_count() or 1
         if n > 1 and not _in_pool and _cpu_count > 1:
-            # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
-            _max_workers = max(1, min(_cpu_count - 4, int(_cpu_count * 0.70)))
+            if _allow_nested:
+                # Sweep dispatcher granted us a per-condition replicate cap.
+                # Honour it verbatim — the outer cap already accounts for
+                # CPU/RAM/SSH reserve.
+                _max_workers = _in_pool_cap
+            else:
+                # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
+                _max_workers = max(1, min(_cpu_count - 4, int(_cpu_count * 0.70)))
             n_workers = min(_max_workers, n)
             if verbose:
-                print(f"  CPU parallel: {n_workers} workers for {n} replicates")
+                _src = 'sweep-grant' if _allow_nested else 'auto'
+                print(f"  CPU parallel: {n_workers} workers for {n} replicates ({_src})")
 
             model_dict = self.model.to_dict()
 

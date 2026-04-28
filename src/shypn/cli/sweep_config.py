@@ -56,6 +56,75 @@ class ParameterSpec:
             raise ValueError("values list must not be empty")
 
 
+# ── Output granularity ───────────────────────────────────────────────────
+
+# Output tier hierarchy — controls per-condition disk footprint.
+# Each tier is the previous tier plus more artefacts.
+#
+#   G0 — summary.csv only (run-level, one row per condition)
+#   G1 — + replicates.csv (per-replicate endpoint scalars: *_final, *_firings)
+#   G2 — + statistics.json with endpoint-only stats (no per-step arrays)
+#   G3 — + statistics.json with full per-step time-series stats   ← current default
+#   G4 — RESERVED: + per-replicate trajectory CSVs (every dt, all places)
+#   G5 — RESERVED: + covariance / cross-correlation matrices
+#
+# Backwards compatibility: missing output_tier in config → G3.
+OUTPUT_TIERS = ('G0', 'G1', 'G2', 'G3', 'G4', 'G5')
+DEFAULT_OUTPUT_TIER = 'G3'
+
+
+@dataclass(frozen=True)
+class OutputOptions:
+    """Run-level output granularity controls.
+
+    Decoupled from :class:`SimulationParams` because granularity is a
+    storage / analysis concern, not an engine concern. The Viability
+    Panel binds to this; engines stay oblivious.
+    """
+
+    tier: str = DEFAULT_OUTPUT_TIER
+    # G2/G4 future use:
+    trajectory_places: Optional[List[str]] = None   # subset to record (G4)
+    trajectory_thin_seconds: Optional[float] = None  # downsample dt (G4)
+
+    def __post_init__(self) -> None:
+        if self.tier not in OUTPUT_TIERS:
+            raise ValueError(
+                f"output_tier must be one of {OUTPUT_TIERS}, got '{self.tier}'"
+            )
+
+    # Convenience predicates the worker uses to gate writes.
+    @property
+    def write_replicates_csv(self) -> bool:
+        return self.tier >= 'G1'
+
+    @property
+    def write_statistics_json(self) -> bool:
+        return self.tier >= 'G2'
+
+    @property
+    def statistics_endpoint_only(self) -> bool:
+        return self.tier == 'G2'
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {'tier': self.tier}
+        if self.trajectory_places is not None:
+            d['trajectory_places'] = list(self.trajectory_places)
+        if self.trajectory_thin_seconds is not None:
+            d['trajectory_thin_seconds'] = self.trajectory_thin_seconds
+        return d
+
+    @staticmethod
+    def from_dict(data: Optional[Dict[str, Any]]) -> 'OutputOptions':
+        if not data:
+            return OutputOptions()
+        return OutputOptions(
+            tier=data.get('tier', DEFAULT_OUTPUT_TIER),
+            trajectory_places=data.get('trajectory_places'),
+            trajectory_thin_seconds=data.get('trajectory_thin_seconds'),
+        )
+
+
 # ── Abstract base ─────────────────────────────────────────────────────────
 
 class SweepConfig(ABC):
@@ -69,8 +138,10 @@ class SweepConfig(ABC):
     JSON (de)serialisation dispatch.
     """
 
-    def __init__(self, sim_params: SimulationParams) -> None:
+    def __init__(self, sim_params: SimulationParams,
+                 output: Optional[OutputOptions] = None) -> None:
         self.sim_params = sim_params
+        self.output = output if output is not None else OutputOptions()
         # Top-level environment events captured from the model at dispatch
         # time.  Each entry is a dict produced by Event.to_dict().  Applied
         # to every condition (per-snapshot override is not yet implemented).
@@ -119,6 +190,11 @@ class SweepConfig(ABC):
         }
         if self.events:
             d['events'] = list(self.events)
+        # Output granularity (only emitted if non-default to keep configs tidy)
+        if self.output.tier != DEFAULT_OUTPUT_TIER \
+                or self.output.trajectory_places is not None \
+                or self.output.trajectory_thin_seconds is not None:
+            d['output'] = self.output.to_dict()
         return d
 
     @staticmethod
@@ -157,6 +233,9 @@ class SweepConfig(ABC):
         events = data.get('events') or []
         if events:
             result.events = list(events)
+        # Hydrate output options if present
+        if 'output' in data:
+            result.output = OutputOptions.from_dict(data['output'])
         return result
 
     @staticmethod

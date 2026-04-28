@@ -287,6 +287,28 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry.set_tooltip_text("Maximum simulation time in seconds (can stop earlier if condition met)")
         top_grid.attach(self.duration_entry, 3, 0, 1, 1)
 
+        # Output granularity (G0…G5) — controls per-condition disk footprint.
+        # Plumbing: writes through to sweep_config.json `output.tier`,
+        # gated in the worker by sweep_runner._run_single_condition.
+        top_grid.attach(Gtk.Label(label="Output:", xalign=0), 4, 0, 1, 1)
+        self.output_tier_combo = Gtk.ComboBoxText()
+        self.output_tier_combo.append("G0", "G0 — summary only")
+        self.output_tier_combo.append("G1", "G1 — + endpoint scalars")
+        self.output_tier_combo.append("G2", "G2 — + endpoint stats")
+        self.output_tier_combo.append("G3", "G3 — + per-step stats (default)")
+        self.output_tier_combo.append("G4", "G4 — + trajectories (reserved)")
+        self.output_tier_combo.append("G5", "G5 — + covariance (reserved)")
+        self.output_tier_combo.set_active_id("G3")
+        self.output_tier_combo.set_tooltip_text(
+            "Disk-footprint tier per condition.\n"
+            "G0: summary.csv only (run-level).\n"
+            "G1: + replicates.csv with per-replicate endpoint scalars.\n"
+            "G2: + statistics.json with endpoint-only stats.\n"
+            "G3: + statistics.json with full per-step time series (default).\n"
+            "G4/G5: reserved for trajectories and covariance."
+        )
+        top_grid.attach(self.output_tier_combo, 5, 0, 1, 1)
+
         top_grid.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
         self.termination_combo = Gtk.ComboBoxText()
         self.termination_combo.append("time_only", "Time limit only")
@@ -461,8 +483,20 @@ class ParameterSweepBuilder(Gtk.Box):
         self.generate_button.connect("clicked", self._on_generate_clicked)
         action_box.pack_end(self.generate_button, False, False, 0)
         
-        # Clear button
-        clear_button = Gtk.Button(label="Clear")
+        # Clear button — full wipe of the sweep plan (single + factorial
+        # lists, design mode, solver settings, generated queue, activity log).
+        # The queue-view's "Clear Completed" / "Reset All" buttons remain
+        # available for finer-grained operations on a partially-run plan.
+        clear_button = Gtk.Button(label="Clear Sweep Plan")
+        clear_button.set_tooltip_text(
+            "Reset the entire sweep plan to a clean state:\n"
+            "  • clears single + factorial parameter lists\n"
+            "  • resets design mode to single, solver settings to defaults\n"
+            "  • empties the experiment queue (any leftover from a previous\n"
+            "    or cancelled sweep is removed)\n"
+            "  • clears the activity log\n"
+            "Use this before starting a new sweep to guarantee no carry-over."
+        )
         clear_button.connect("clicked", self._on_clear_clicked)
         action_box.pack_end(clear_button, False, False, 0)
         
@@ -1011,17 +1045,72 @@ class ParameterSweepBuilder(Gtk.Box):
         self.on_generate_callback(factorial_config)
     
     def _on_clear_clicked(self, button):
-        """Clear all inputs and notify parent to clear queue."""
-        # Clear single parameter list
+        """Full wipe of the sweep plan — no leftovers from a previous or
+        cancelled sweep are allowed to survive.
+
+        Resets:
+          - single parameter list and factorial parameter list (incl. their
+            per-row range_config dicts)
+          - design mode → 'single'
+          - simulation settings (replicates, duration, termination, output tier)
+          - solver settings (dt mode → auto, ε, max τ, seed)
+          - parameter type combo and parameter-name combo
+          - preview label / generate button enabled state
+        Then calls ``on_clear_callback`` so the parent category can wipe the
+        experiment queue (and the queue-view's activity log).
+        """
+        # 1. Parameter lists (both modes — wipe both regardless of current mode
+        #    so a stale factorial plan can't survive a clear made from single).
         self.single_list.clear()
-        
+        if hasattr(self, 'factorial_list'):
+            self.factorial_list.clear()
+
+        # 2. Design mode back to single (re-show single box, hide factorial).
+        if hasattr(self, 'single_radio'):
+            self.single_radio.set_active(True)
+        self.design_mode = 'single'
+        if hasattr(self, 'single_param_box'):
+            self.single_param_box.show_all()
+        if hasattr(self, 'factorial_box'):
+            self.factorial_box.hide()
+
+        # 3. Simulation settings (top grid).
         self.replicates_entry.set_text("3")
         self.duration_entry.set_text("60.0")
         self.termination_combo.set_active_id("deadlock")
+        if hasattr(self, 'output_tier_combo'):
+            self.output_tier_combo.set_active_id("G3")
+
+        # 4. Solver settings.
+        if hasattr(self, 'sweep_dt_auto_radio'):
+            self.sweep_dt_auto_radio.set_active(True)
+        if hasattr(self, 'sweep_dt_manual_entry'):
+            self.sweep_dt_manual_entry.set_text("0.01")
+            self.sweep_dt_manual_entry.set_sensitive(False)
+        if hasattr(self, 'sweep_tau_epsilon_entry'):
+            self.sweep_tau_epsilon_entry.set_text("0.03")
+        if hasattr(self, 'sweep_max_tau_entry'):
+            self.sweep_max_tau_entry.set_text("0.1")
+        if hasattr(self, 'sweep_seed_entry'):
+            self.sweep_seed_entry.set_text("42")
+
+        # 5. Parameter selectors (drop any stale highlight).
+        if hasattr(self, 'name_combo'):
+            try:
+                self.name_combo.set_active(-1)
+            except Exception:
+                pass
+        if hasattr(self, 'factorial_add_combo'):
+            try:
+                self.factorial_add_combo.set_active(-1)
+            except Exception:
+                pass
+
+        # 6. Preview / generate state.
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
-        
-        # Notify parent to clear the experiment queue
+
+        # 7. Notify parent — wipes queue + activity log.
         if self.on_clear_callback:
             self.on_clear_callback()
     
