@@ -286,6 +286,54 @@ python -m shypn.cli.sweep --project … --sweep … --output <abs-or-rel-path>
 - Per-condition resource metrics land in `summary.csv` and
   `resource_usage.json` inside each run dir.
 
+### Low-copy / sub-µM caveats (audit 2026-04-29)
+
+Reference: [`doc/engine_stability_audit.md`](../doc/engine_stability_audit.md).
+Seven failure modes (F1–F7) characterised; phased remediation S1–S7.
+Phase A (S4 + S5 + S7) implemented in this commit; **S1, S2, S3, S6
+NOT YET IMPLEMENTED** — agents must remain alert to these traps when
+debugging low-copy results.
+
+- **F1 — silent adaptive mode default:** an `adaptive` transition
+  whose connected places lack `compartment_volume` falls back to
+  `'continuous' if prefer_continuous else 'stochastic'` *without*
+  raising. Always set `compartment_volume` on at least one input place
+  for adaptive transitions, or prepare to be surprised by the default.
+- **F3 — Poisson over-sampling is silently truncated.** When sampled
+  firings exceed `floor((M − θ) / W)` they are clamped without error.
+  S4 now exposes this:
+  - `TauLeapingEngine.stats['requested_firings']`,
+    `['truncated_firings']`, `['truncation_events']`.
+  - Each replicate result dict carries `engine_stats` with
+    `truncation_fraction = truncated / requested`.
+  - Replicate-level warning fires when `truncation_fraction > 5 %`
+    (`RuntimeWarning` in chunked path; printed line in main runner).
+  - **A high truncation fraction is the canonical signature of low-copy
+    bias.** Always check it before trusting a sweep at sub-µM
+    concentrations.
+- **F4 — Skellam reversibility detector is permissive.** Triggers on
+  `' - '` substring + `kf_*` / `kr_*` naming. Rate strings of the form
+  `k * (A - K_eq)` or `0.1 * X / (50 + X) - 0.05 * Y` will be
+  misclassified as reversible and sampled with **2× variance**.
+  Inspect the engine log for `Detected reversible:` lines on any
+  unfamiliar model.
+- **F5 — operator-split cascade lag.** Per `dt`: continuous flow →
+  stochastic τ-leap → finalize. Continuous transitions read the
+  *start-of-step* marking; stochastic transitions read the
+  post-continuous marking. A `stochastic → continuous` chain therefore
+  carries a **one-step lag per cascade level**. Invisible at high
+  copy / fast equilibration; severe at low copy.
+- **F7 — coarse data-collector decimation hides transients.** Default
+  `recording_time_interval = 0.05 s`; a 4-day horizon retains <100
+  recorded points. Use S5 to capture transients:
+  `RecordingConfig(adaptive_tau_threshold=1e-3)` force-records every
+  step whose engine `τ < 1 ms` (transient regime), while leaving
+  coarse decimation intact during equilibrium phases.
+
+When a sweep returns bit-identical downstream values across a
+substrate gradient, suspect F1 + F5 + F7 *before* re-checking the
+topology.
+
 ## Formalism (13-tuple Bio-PN, Simão 2025)
 
 Reference: `manuscript/main_plos_one.tex`. Full audit:
