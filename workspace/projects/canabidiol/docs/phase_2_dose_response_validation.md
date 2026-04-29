@@ -174,45 +174,65 @@ ROS=1.0, M1=5→peaks at 10 from random fluctuation, M2 unchanged).
 Aβ_Oligomer PEAK = 0.50 = its `initial_marking` — *no* monomer →
 oligomer aggregation occurs at any amplitude.
 
-**Interpretation under the literal copilot-instructions rule.** The
-rule forbids using parameter multipliers (the ▢ → event bridge,
-specifically) as a shortcut to compensate for missing $F$/$F_s$
-arcs. *Adjusting* a parameter that the topology was *designed* to
-expose as a knob remains legitimate; the diagnostic above
-distinguishes the two cases:
+### CORRECTION (post-review): not an architectural disconnect
 
-- **Parameter case (legitimate tuning)**: amplitude *would* have
-  changed downstream markers if topology were correct. Then resizing
-  the `evt_install_*` deltas is allowed.
-- **Topology case (this Phase-2 model)**: amplitude has zero
-  measurable effect on the cascade. The Aβ pool is *architecturally
-  disconnected* from NFkB / IL1b / ROS — no producing transition
-  reads from `Abeta_Monomer`, `Abeta_Oligomer`, or `Abeta_Plaque`.
-  Resizing event deltas would be the forbidden shortcut.
+*An earlier draft of this section claimed the Aβ pool was
+architecturally disconnected from the cascade. **That claim was
+wrong** and is retracted.* A direct topology comparison shows:
 
-**Required Phase-3 repairs (object-net only, no parameter band-aids):**
+| Aspect                       | Phase-0 (`4ddd3c28`) | Phase-2 (current) |
+|------------------------------|----------------------|-------------------|
+| Places / Transitions / Arcs  | 42 / 45 / 100        | 42 / 45 / 100     |
+| Signal-place set (Ψ)         | NFkB_p65, Nrf2_free, CBD_intracellular, T_factor, Age_factor, pH_acid, pH_neut | **identical** |
+| `CBD_extracellular` kind     | regular ○            | regular ○ (never reclassified) |
+| Edge set                     | 100 edges            | **identical 100 edges** |
+| Δ initial markings           | —                    | only `DISEASE_SEVERITY: 0→0.5`, `MAINT_DOSE: 0→5.0` |
 
-1. **Add the Aβ → NFkB activation pathway.** The model needs at
-   least one transition `T: Aβ_Oligomer / Aβ_Plaque → NFkB_p65`
-   (or `→ Microglia_M1` activation, with M1 then driving NFkB),
-   with realistic Hill kinetics on the oligomer concentration.
-   Currently no such arc exists.
-2. **Add Aβ aggregation arcs.** `T_aggregate: Aβ_Mono → Aβ_Oligo`
-   and `T_fibrillize: Aβ_Oligo → Aβ_Plaque` are missing or
-   threshold-blocked at every amplitude. Verify $\theta$ values on
-   any signal-flow arcs gating these transitions.
-3. **Verify the inflammation downstream is real.** With NFkB pinned
-   to 5.0 (its init) and IL1b producer transitions reading from
-   NFkB, the entire `NFkB → IL1b/IL6/COX2/TNFα` cascade may be at
-   a fixed point that produces a flat 0.5-token output. If this is
-   intentional ("baseline immune tone") then no fix needed; if the
-   cascade was supposed to amplify, $\Phi$ on those transitions
-   needs review.
-4. **Re-test Aβ → cascade after (1)–(3).** Re-run
-   `diagnose_phase2_topology.py`. A correct topology should show
-   monotonic increase of NFkB/IL1b PEAK with `Abeta_Monomer.init_marking`.
-5. **Only after the diagnostic passes**, re-instate events and
-   re-run the (DSEV × MD) factorial.
+The two models are **topologically identical**. The Aβ → IKK →
+NFkB → cytokines cascade is fully wired:
+`Aβ_Monomer → Aggregation → Aβ_Oligomer → Abeta_activates_IKK → IKK
+→ IKK_phosphorylates_IkB →[signal_flow] NFkB_p65 → NFkB_transcription
+→ TNFα/IL1b/IL6/COX2`. No arcs are missing.
+
+### Real cause — under investigation
+
+The diagnostic's bit-identical downstream values across a 2000×
+amplitude sweep is a real and reproducible observation, but the
+correct interpretation is *not* topology absence. Candidate
+explanations under investigation:
+
+1. **Adaptive transition gating.** `Abeta_Aggregation` is type
+   `adaptive` with rate `0.05·Aβ_Mono²·T_factor·(1+0.5·pH_acidosis)`.
+   At Aβ=100, propensity ≈ 500/s — likely held in stochastic mode
+   by the volume-threshold selector. With τ_max = 0.1 s the
+   aggregation should drain the monomer pool in <1 s of simulated
+   time, but the recorded trajectory may have sub-sampled past it.
+2. **Data-collector decimation.** A 4-day run at sub-second τ
+   produces millions of state samples; the data collector likely
+   keeps a windowed slice. `max(traj)` over a decimated array
+   misses transient peaks.
+3. **Continuous-mode mass conservation.** With `Aβ_Mono → Aβ_Oligo`
+   running in continuous mode (Python ContinuousBehavior fallback,
+   noted in the run logs because of the 4 PreemptionCheck-blocked
+   ODE accelerator entries), arc-flow apportionment over a single
+   time-step might saturate before producing measurable oligomer
+   if the clearance arc fires in the same step.
+
+### Required Phase-3 actions (in order)
+
+1. **Re-run diagnostic with explicit fine-grained recording**
+   (e.g. record every 1 s for the first 60 s, then sparser) to
+   confirm aggregation does fire and oligomer transiently rises.
+2. **Check adaptive-mode selection logs** for `Abeta_Aggregation`
+   on a single replicate.
+3. **Only if (1) confirms the cascade does fire transiently** but
+   the steady-state is restored to 0 by aggressive clearance: the
+   fix is rebalancing clearance/production rates (legitimate
+   parameter tuning of $\Phi$ within transitions that already
+   exist).
+4. **If (1) shows no aggregation firings at all**: investigate the
+   adaptive mode selector / volume threshold — the rate function is
+   correct but the firing path is gated.
 
 ## 7. Resource performance
 
