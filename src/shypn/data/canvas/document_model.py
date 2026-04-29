@@ -663,10 +663,18 @@ class DocumentModel:
             with suspend_lifecycle_delegation():
                 document.id_manager.register_transition_id(transition.id)
         
-        # Restore arcs last (they depend on places and transitions)
+        # Restore arcs last (they depend on places and transitions).
+        # Track which arc IDs had an explicit arc_type='normal' in the source
+        # data, so the post-load auto-conversion below does NOT silently
+        # promote them to SignalFlowArc. This respects the modeller's
+        # intentional choice of `normal` for basal turnover/degradation arcs
+        # touching signal places (AGENT_RULES.md §8 Rule M2).
+        explicit_normal_arc_ids: set = set()
         for arc_data in data.get("arcs", []):
             arc = Arc.from_dict(arc_data, places=places_dict, transitions=transitions_dict)
             document.arcs.append(arc)
+            if arc_data.get("arc_type") == "normal":
+                explicit_normal_arc_ids.add(arc.id)
             # Register ID to update counter (LOCAL ONLY)
             with suspend_lifecycle_delegation():
                 document.id_manager.register_arc_id(arc.id)
@@ -715,23 +723,30 @@ class DocumentModel:
             if metadata:
                 document.metadata = metadata
         
-        # POST-LOAD FIX: Convert regular Arcs to SignalFlowArcs if connecting to signal places
-        # This fixes files saved before SignalFlowArc auto-detection was implemented
+        # POST-LOAD FIX: Convert regular Arcs to SignalFlowArcs if connecting
+        # to signal places — ONLY for legacy files where arc_type was missing
+        # or unspecified. Arcs that explicitly carry `arc_type: "normal"` in
+        # the source dict are respected as the modeller's deliberate choice
+        # (AGENT_RULES.md §8 Rule M2: basal turnover/degradation MUST use
+        # `normal` arcs even when touching signal places).
         from shypn.netobjs.signal_flow_arc import SignalFlowArc
         from shypn.utils.color_schema_manager import ColorSchemaManager
-        
+
         arcs_to_convert = []
         for i, arc in enumerate(document.arcs):
             # Skip if already a SignalFlowArc or TestArc or InhibitorArc
             if not isinstance(arc, Arc) or arc.__class__ != Arc:
                 continue
-            
+            # Respect explicit arc_type='normal' in source dict (no auto-promote)
+            if arc.id in explicit_normal_arc_ids:
+                continue
+
             # Check if arc connects to/from signal place
-            source_is_signal = (isinstance(arc.source, Place) and 
+            source_is_signal = (isinstance(arc.source, Place) and
                                getattr(arc.source, 'is_signal_place', False))
-            target_is_signal = (isinstance(arc.target, Place) and 
+            target_is_signal = (isinstance(arc.target, Place) and
                                getattr(arc.target, 'is_signal_place', False))
-            
+
             if source_is_signal or target_is_signal:
                 # Convert to SignalFlowArc
                 signal_arc = SignalFlowArc(

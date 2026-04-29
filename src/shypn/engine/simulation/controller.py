@@ -285,6 +285,16 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             model.register_observer(self._on_model_changed)
         # Build place→transition index for incremental enablement checking
         self._rebuild_place_index()
+
+        # Load-time structural audit (AGENT_RULES.md §8 — arc-type misuse).
+        # Non-blocking: emits WARNING-level log entries only.
+        try:
+            from shypn.engine.simulation.checkers import audit_arc_types
+            audit_arc_types(self.model)
+        except Exception:  # pragma: no cover - audit must never break load
+            logging.getLogger(__name__).debug(
+                "arc_type audit skipped due to exception", exc_info=True
+            )
     
     # ==================== Lifecycle Management ====================
     

@@ -388,6 +388,46 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
 
 6. **Reversible reactions** use Skellam sampler (Poisson(fwd) − Poisson(rev)).
 
+7. **Arc-type selection is not interchangeable (modeller rule, see
+   [`AGENT_RULES.md` §8](../doc/pn_formalism/AGENT_RULES.md)).**
+   Picking the wrong arc type is silent — model loads, runs, gives
+   wrong numbers. Decision table:
+
+   | Source-place role                         | Cascade-gated? | Arc type      |
+   |-------------------------------------------|----------------|---------------|
+   | Substrate (consumed)                      | no             | `normal`      |
+   | Catalyst / regulator presence (read only) | no             | `test`        |
+   | Inhibitor (presence disables)             | no             | `inhibitor`   |
+   | Regulatory signal in a hierarchy          | **yes**        | `signal_flow` |
+
+   The four canonical mistakes:
+
+   - **M1 — Catalyst as `normal`** → catalyst drains in seconds,
+     transition starves itself. (e.g. ROS oxidising Keap1 must be
+     `test`, never `normal`.)
+   - **M2 — Basal turnover/degradation as `signal_flow`** → opts the
+     sink into `PreemptionCheck`; engine silently disables it
+     whenever any upstream signal producer of the same place is
+     disabled, deadlocking the cycle. (e.g. `Nrf2_degradation` input
+     arc must be `normal`, not `signal_flow`.)
+   - **M3 — Substrate as `test`** → mass never leaves; downstream
+     products materialise from nowhere.
+   - **M4 — Inhibitor as `normal`/`test`** → consumes the inhibitor
+     or makes its presence required (opposite of intent).
+
+   Use `signal_flow` **only** when all three hold: (a) source is a ⬡
+   signal place (`is_signal_place=true`, non-spatial), (b) the
+   transition genuinely participates in a layered cascade and *should*
+   be gated by `PreemptionCheck`, (c) mass transfer of the signal
+   token is biologically meaningful. Otherwise pick `test` (sense
+   without consuming) or `normal` (consume without cascade gating).
+
+   The Phase-0 4-day audit (2026-04-29) traced an apparent "engine
+   regression" to model-side M1 + M2 misuse on Keap1↔Nrf2 cycle —
+   ROS-as-substrate (M1) drained ROS to 0; signal_flow on Nrf2
+   turnover (M2) deadlocked the cycle via PreemptionCheck. **Always
+   suspect arc-type selection before suspecting the engine.**
+
 ### Open gap
 
 - **C1 — Multi-layer signal hierarchy:** the current single-layer

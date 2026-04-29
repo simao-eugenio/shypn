@@ -205,3 +205,154 @@ UI consequence — Viability panel filter (`viability_panel.py`):
   resolved by panel filter cleanup + `cbd_ad_neuroprotection_v3_p7.shy`
   Pattern A migration (4 ◇ spatial signal places +
   `evt_apply_thermodynamics`).
+- **2026-04-29**: Added §8 "Arc-type selection rules for modellers"
+  after the Phase-0 4-day audit revealed silent regulatory deadlock
+  in `canabidiol-phase-0.shy` caused by misuse of `signal_flow` on
+  basal turnover transitions (T22 `Nrf2_degradation` preempted by
+  T11 `ROS_releases_Nrf2` because both cycled through the same Ψ
+  carrier P16 with `signal_flow` arcs, and T11 itself was disabled
+  once ROS drained). Companion bug: catalysts (e.g. ROS oxidising
+  Keap1) were attached via `normal` arcs and consumed.
+
+---
+
+## 8. Arc-type selection rules for modellers (STRICT, 2026-04-29)
+
+The four arc types are not interchangeable. Picking the wrong type
+either silently breaks mass balance, silently disables a transition
+through `PreemptionCheck`, or silently consumes a catalyst. None of
+these failure modes raises an error — the model loads, runs, and
+produces wrong numbers.
+
+### 8.1 Decision table
+
+For every arc you draw, answer **two** questions: what is the
+**physical role** of the source place in the reaction, and does
+this transition need to be **gated by the upstream regulatory
+cascade**?
+
+| Physical role of source place                              | Cascade-gated? | Arc type        | Engine effect                                           |
+|------------------------------------------------------------|----------------|-----------------|---------------------------------------------------------|
+| **Substrate** (consumed, mass leaves)                      | no             | `normal`        | debits source by `weight × flow`                        |
+| **Catalyst / regulator presence** (read but not consumed)  | no             | `test`          | requires `M(p) ≥ τ_t`; Δ = 0 on firing                  |
+| **Inhibitor** (presence disables)                          | no             | `inhibitor`     | `M(p) ≥ threshold ⇒ disabled`                           |
+| **Regulatory signal**, transition belongs to a hierarchy   | **yes**        | `signal_flow`   | debits source AND triggers `PreemptionCheck` on upstream signal producers |
+
+Same table for output arcs:
+
+| Physical role of target place                              | Arc type      |
+|------------------------------------------------------------|---------------|
+| Product (mass arrives)                                     | `normal`      |
+| Regulatory signal *produced* into a downstream cascade     | `signal_flow` |
+| (Test and inhibitor arcs are input-only)                   | —             |
+
+### 8.2 The four canonical mistakes
+
+#### M1 — Catalyst attached as `normal`
+
+A catalyst is consumed every firing → species drains in seconds, the
+transition starves itself, and downstream rates collapse to zero.
+Symptoms: a reactant pool the modeller "knows" is catalytic goes to
+zero almost immediately; numerical results look like the catalyst
+was never there.
+
+> **Rule M1.** If the species is biologically a catalyst, cofactor,
+> enzyme, or signal that *triggers* the reaction without being
+> stoichiometrically consumed, use `test`. Never `normal`.
+
+#### M2 — Basal turnover/degradation attached as `signal_flow`
+
+A degradation/turnover/clearance transition exists to drain a pool
+unconditionally — proteasomal degradation, dilution, washout,
+metabolism. Wiring its input arc as `signal_flow` opts the
+transition into `PreemptionCheck`: the engine then disables it
+whenever any upstream `signal_flow` producer of the same place is
+itself disabled, which is almost always not what you want for a
+basal sink.
+
+> **Rule M2.** Basal turnover, degradation, and clearance
+> transitions MUST use `normal` input arcs. They are not
+> regulatory; they have no upstream cascade. Reserve `signal_flow`
+> for transitions that genuinely participate in a layered signaling
+> cascade.
+
+#### M3 — Substrate attached as `test`
+
+A test arc never debits — the transition appears to fire but mass
+doesn't move. Symptoms: a substrate's pool grows or stays flat
+despite the rate function being non-zero; downstream products
+appear from "nowhere".
+
+> **Rule M3.** Anything physically consumed by the reaction must be
+> `normal` (or `signal_flow` only when the cascade gating is
+> intentional).
+
+#### M4 — Inhibitor attached as `normal` or `test`
+
+Wiring an inhibitor as `normal` consumes it on every firing of a
+reaction it is supposed to block. Wiring as `test` makes its
+presence a *requirement* (opposite of intent).
+
+> **Rule M4.** Negative regulation = `inhibitor`. The arc fires only
+> while `M(p) < threshold`.
+
+### 8.3 When to use `signal_flow`
+
+Use `signal_flow` only when **all** of the following are true:
+
+1. The source place is a designated regulatory signal (`is_signal_place=true`,
+   non-spatial — i.e. a ⬡ carrier, **not** ◇).
+2. You want this transition's enablement to be gated by the
+   `PreemptionCheck`: i.e. it should **not** fire while the upstream
+   producer of that signal is itself disabled.
+3. Mass transfer of the signal token is biologically meaningful in
+   the cascade (the signal "is consumed" by being read into the
+   downstream layer).
+
+If any of (1)–(3) is false, use `test` (sense without consuming) or
+`normal` (consume without cascade gating). When in doubt, use `test`
+for a regulator and `normal` for a substrate; promote to
+`signal_flow` only when you explicitly want the cascade interlock.
+
+### 8.4 The deadlock pattern to memorise
+
+```
+T_release : Keap1_Nrf2 + ROS  ─signal_flow→  Nrf2_free        (Φ depends on ROS)
+T_turnover: Nrf2_free         ─signal_flow→  Keap1_Nrf2       (constant rate)
+```
+
+Both transitions touch the same Ψ carrier `Nrf2_free` via
+`signal_flow`. As soon as `ROS → 0` drives `T_release` below its
+enablement threshold, `T_turnover`'s `PreemptionCheck` fires (because
+its only upstream signal producer is now disabled) and it freezes.
+The cycle deadlocks at `Keap1_Nrf2 = 0, Nrf2_free = pool`.
+
+**Fix.** `T_turnover` is basal degradation, not a signal. Its input
+arc must be `normal`. After the fix, T_turnover runs unconditionally
+and the cycle reaches its true steady state.
+
+### 8.5 Modeller checklist for every transition
+
+1. List each input place. For each, classify role
+   (substrate / catalyst / inhibitor / regulatory-signal).
+2. Pick arc type from §8.1.
+3. If you chose `signal_flow`, justify all three conditions in §8.3
+   in a comment in the model metadata or the audit script. If you
+   cannot justify one, downgrade to `normal` or `test`.
+4. List each output place. Almost always `normal`. Only use
+   `signal_flow` when emitting into a downstream cascade with
+   intentional preemption coordination.
+5. Confirm catalysts use `test`, not `normal` (Rule M1).
+6. Confirm degradation/turnover uses `normal` inputs, not
+   `signal_flow` (Rule M2).
+
+### 8.6 Audit support (planned)
+
+The auditor will gain new codes (target: next commit):
+
+| Code | Severity | Meaning                                                                                |
+|------|----------|----------------------------------------------------------------------------------------|
+| C13  | warning  | continuous transition with **only** `signal_flow` input arcs — deadlock risk via PreemptionCheck |
+| C14  | warning  | place flagged as catalyst in metadata but attached via `normal` input arc (Rule M1 candidate) |
+| C15  | info     | basal sink transition (single input, no output, name matches `*_degradation/_turnover/_clearance/_metabolism`) using `signal_flow` input — Rule M2 candidate |
+
