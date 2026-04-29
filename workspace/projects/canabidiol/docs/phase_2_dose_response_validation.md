@@ -152,26 +152,67 @@ Phase-1 envelope insights.
 
 ## 6. Diagnostic implication for the model
 
-Per the formalism rule in `.github/copilot-instructions.md`
-("If the object-net does not exhibit a desired behaviour, the
-**topology is wrong** — never patch via parameter-place multipliers"),
-the correct fix is **not** to scale the install events up by 10×.
-The right repair touches the object-net itself:
+The naïve interpretation "events were under-sized → raise the install
+deltas" was tested directly with `scripts/diagnose_phase2_topology.py`
+(events stripped, `Abeta_Monomer.initial_marking` swept across
+`{0.05, 1, 5, 25, 100}`, n=5 replicates × 4 d horizon, n2=750 PEAK
+samples per amplitude). **The result is conclusive: amplitude is
+irrelevant.**
 
-1. **Re-baseline the Aβ_Monomer pool**. Phase-3 should start with a
-   non-zero `Abeta_Monomer.initial_marking` in the *diseased*
-   conditions, or add a continuous Aβ_Monomer source transition
-   (`APP → Aβ_Monomer` in `Phi`) that the events can amplify.
-2. **Verify the Aβ → NFkB → IL1b cascade fires**. The events deposit
-   M1 microglia and Aβ_Oligomer pulses at DSEV=1, but neither
-   triggers downstream activation. Either the activation arcs have
-   weights too high (placed via `signal_flow` arcs with thresholds
-   above the event-deposited level) or the pulse decays faster than
-   the transition latency.
-3. **Verify Abeta_Plaque is not a rapid sink**. With
-   `Δ_oligomer = 7.25` per DSEV unit and endpoint = 0, plaques are
-   either silently sequestering all Aβ or the events failed to fire.
-   Add a per-replicate logger of all events firing in Phase-3.
+| amp     | Aβ_Olig PEAK | NFkB PEAK | IL1b PEAK | ROS PEAK | M1 PEAK |
+|---------|--------------|-----------|-----------|----------|---------|
+| 0.05    | 0.50         | 5.08      | 5.20      | 1.70     | 10.40   |
+| 1.0     | 0.50         | 5.08      | 5.20      | 1.70     | 10.40   |
+| 5.0     | 0.50         | 5.08      | 5.20      | 1.70     | 10.40   |
+| 25.0    | 0.50         | 5.08      | 5.20      | 1.70     | 10.40   |
+| 100.0   | 0.50         | 5.08      | 5.20      | 1.70     | 10.40   |
+
+*Bit-identical* across a 2000× substrate sweep. Aβ_Mono decays from
+its starting amplitude to zero in every case; downstream markers
+remain pinned to **their initial markings** (NFkB=5, IL1b=0.5,
+ROS=1.0, M1=5→peaks at 10 from random fluctuation, M2 unchanged).
+Aβ_Oligomer PEAK = 0.50 = its `initial_marking` — *no* monomer →
+oligomer aggregation occurs at any amplitude.
+
+**Interpretation under the literal copilot-instructions rule.** The
+rule forbids using parameter multipliers (the ▢ → event bridge,
+specifically) as a shortcut to compensate for missing $F$/$F_s$
+arcs. *Adjusting* a parameter that the topology was *designed* to
+expose as a knob remains legitimate; the diagnostic above
+distinguishes the two cases:
+
+- **Parameter case (legitimate tuning)**: amplitude *would* have
+  changed downstream markers if topology were correct. Then resizing
+  the `evt_install_*` deltas is allowed.
+- **Topology case (this Phase-2 model)**: amplitude has zero
+  measurable effect on the cascade. The Aβ pool is *architecturally
+  disconnected* from NFkB / IL1b / ROS — no producing transition
+  reads from `Abeta_Monomer`, `Abeta_Oligomer`, or `Abeta_Plaque`.
+  Resizing event deltas would be the forbidden shortcut.
+
+**Required Phase-3 repairs (object-net only, no parameter band-aids):**
+
+1. **Add the Aβ → NFkB activation pathway.** The model needs at
+   least one transition `T: Aβ_Oligomer / Aβ_Plaque → NFkB_p65`
+   (or `→ Microglia_M1` activation, with M1 then driving NFkB),
+   with realistic Hill kinetics on the oligomer concentration.
+   Currently no such arc exists.
+2. **Add Aβ aggregation arcs.** `T_aggregate: Aβ_Mono → Aβ_Oligo`
+   and `T_fibrillize: Aβ_Oligo → Aβ_Plaque` are missing or
+   threshold-blocked at every amplitude. Verify $\theta$ values on
+   any signal-flow arcs gating these transitions.
+3. **Verify the inflammation downstream is real.** With NFkB pinned
+   to 5.0 (its init) and IL1b producer transitions reading from
+   NFkB, the entire `NFkB → IL1b/IL6/COX2/TNFα` cascade may be at
+   a fixed point that produces a flat 0.5-token output. If this is
+   intentional ("baseline immune tone") then no fix needed; if the
+   cascade was supposed to amplify, $\Phi$ on those transitions
+   needs review.
+4. **Re-test Aβ → cascade after (1)–(3).** Re-run
+   `diagnose_phase2_topology.py`. A correct topology should show
+   monotonic increase of NFkB/IL1b PEAK with `Abeta_Monomer.init_marking`.
+5. **Only after the diagnostic passes**, re-instate events and
+   re-run the (DSEV × MD) factorial.
 
 ## 7. Resource performance
 
