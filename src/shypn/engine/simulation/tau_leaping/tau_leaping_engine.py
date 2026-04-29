@@ -96,7 +96,13 @@ class TauLeapingEngine:
             'mean_tau': 0.0,
             'exact_ssa_fallbacks': 0,
             'reversible_reactions': 0,  # Count of Skellam samples
-            'irreversible_reactions': 0  # Count of Poisson samples
+            'irreversible_reactions': 0,  # Count of Poisson samples
+            # S4 (engine_stability_audit 2026-04-29):
+            # Track Poisson over-sampling that gets silently clamped by the
+            # token-availability cap.  Used to surface low-copy bias.
+            'requested_firings': 0,    # Sum of Poisson/Skellam draws BEFORE clamping
+            'truncated_firings': 0,    # Sum of (requested - actual) when clamp triggered
+            'truncation_events': 0,    # Number of (transition, leap) pairs that clamped
         }
     
     def execute_step(
@@ -237,6 +243,12 @@ class TauLeapingEngine:
         # Step 4: Advance time (only if enabled - disabled for hybrid models)
         if self._advance_time:
             controller.time += tau
+
+        # S5 (engine_stability_audit 2026-04-29): expose τ so the data
+        # collector can force-record transient steps.
+        _dc = getattr(controller, 'data_collector', None)
+        if _dc is not None and hasattr(_dc, 'notify_step_size'):
+            _dc.notify_step_size(tau)
         
         # Step 4.5: Update assignment rule-defined species (Option 3)
         if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
@@ -680,6 +692,11 @@ class TauLeapingEngine:
                 if _w > 0.0:
                     max_poss = min(max_poss, int(_p.tokens // _w))
             actual = max(0, min(num_firings, max_poss))
+            # S4: track Poisson over-sampling clamped by token availability.
+            self.stats['requested_firings'] += int(num_firings)
+            if actual < num_firings:
+                self.stats['truncated_firings'] += int(num_firings - actual)
+                self.stats['truncation_events'] += 1
             if actual == 0:
                 continue
 
@@ -793,9 +810,13 @@ class TauLeapingEngine:
             )
             
             actual_firings = min(num_firings, max_possible_firings)
-            
-            # Log if we had to cap firings due to insufficient tokens (debug level only)
+
+            # S4: track Poisson over-sampling clamped by token availability.
+            self.stats['requested_firings'] += int(num_firings)
             if actual_firings < num_firings:
+                self.stats['truncated_firings'] += int(num_firings - actual_firings)
+                self.stats['truncation_events'] += 1
+                # Log if we had to cap firings due to insufficient tokens (debug level only)
                 self.logger.debug(
                     f"τ-leaping: Capped {transition.name} firings from {num_firings} to {actual_firings} "
                     f"(insufficient tokens). Consider reducing tau or epsilon."

@@ -203,6 +203,23 @@ def _run_replicate_chunk(
         controller.data_collector.stop_collection()
         rep_elapsed = _time.time() - rep_start
 
+        # S4 (engine_stability_audit 2026-04-29): capture tau-leaping engine
+        # stats so the caller can detect Poisson-truncation bias at low copy.
+        _eng = getattr(controller, '_tau_leaping_engine', None)
+        engine_stats = dict(getattr(_eng, 'stats', {})) if _eng is not None else {}
+        _req = engine_stats.get('requested_firings', 0)
+        _trunc = engine_stats.get('truncated_firings', 0)
+        engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+        if engine_stats['truncation_fraction'] > 0.05:
+            import warnings as _w
+            _w.warn(
+                f"[low-copy bias] replicate {i}: "
+                f"{_trunc}/{_req} requested firings truncated by token cap "
+                f"({engine_stats['truncation_fraction']:.1%}). "
+                f"Consider smaller max_tau or epsilon.",
+                RuntimeWarning, stacklevel=2,
+            )
+
         results.append({
             'replicate_id': i,
             'seed': seed_base + i,
@@ -228,6 +245,7 @@ def _run_replicate_chunk(
             },
             'stopped_reason': stopped_reason,
             'elapsed_time': rep_elapsed,
+            'engine_stats': engine_stats,
         })
 
     return results
@@ -634,7 +652,21 @@ class ReplicateRunner:
 
             # Calculate elapsed wall-clock time for this replicate
             replicate_elapsed = time.time() - replicate_start_time
-            
+
+            # S4 (engine_stability_audit 2026-04-29): capture tau-leaping engine
+            # stats so the caller can detect Poisson-truncation bias at low copy.
+            _eng = getattr(controller, '_tau_leaping_engine', None)
+            engine_stats = dict(getattr(_eng, 'stats', {})) if _eng is not None else {}
+            _req = engine_stats.get('requested_firings', 0)
+            _trunc = engine_stats.get('truncated_firings', 0)
+            engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+            if engine_stats['truncation_fraction'] > 0.05 and verbose:
+                print(
+                    f"  ⚠ [low-copy bias] replicate {i}: "
+                    f"{_trunc}/{_req} firings truncated "
+                    f"({engine_stats['truncation_fraction']:.1%})"
+                )
+
             # Collect results
             result = {
                 'replicate_id': i,
@@ -660,7 +692,8 @@ class ReplicateRunner:
                     for t in self.model.transitions
                 },
                 'stopped_reason': stopped_reason,
-                'elapsed_time': replicate_elapsed  # Wall-clock time in seconds
+                'elapsed_time': replicate_elapsed,  # Wall-clock time in seconds
+                'engine_stats': engine_stats,
             }
             
             results.append(result)
