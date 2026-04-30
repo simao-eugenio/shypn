@@ -3519,6 +3519,82 @@
       "adaptive_filter": null,
       "volume_threshold": null,
       "prefer_continuous": null
+    },
+    {
+      "id": "T46",
+      "name": "Basal_SOD_Transcription",
+      "label": "Basal\nSOD\nTranscription",
+      "object_type": "transition",
+      "x": 810.0,
+      "y": 1680.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.5 * Temperature_factor",
+        "rate_function_display": "k_basal"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T47",
+      "name": "Basal_HO1_Transcription",
+      "label": "Basal\nHO1\nTranscription",
+      "object_type": "transition",
+      "x": 800.0,
+      "y": 1480.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.3 * Temperature_factor",
+        "rate_function_display": "k_basal"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
     }
   ],
   "arcs": [
@@ -5561,6 +5637,44 @@
         0.0
       ],
       "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A101",
+      "name": "A101",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T46",
+      "target_id": "P18",
+      "source_type": "transition",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A102",
+      "name": "A102",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T47",
+      "target_id": "P17",
+      "source_type": "transition",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
       "control_points": []
     }
   ],
