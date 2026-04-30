@@ -3549,7 +3549,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.5 * Temperature_factor",
+        "rate_function": "0.13 * Temperature_factor",
         "rate_function_display": "k_basal"
       },
       "is_environment_aware": false,
@@ -3587,7 +3587,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.3 * Temperature_factor",
+        "rate_function": "0.135 * Temperature_factor",
         "rate_function_display": "k_basal"
       },
       "is_environment_aware": false,
@@ -4161,7 +4161,7 @@
       "target_id": "T11",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": 0,
       "color": [
         0.0,
         0.0,
