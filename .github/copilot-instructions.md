@@ -126,7 +126,7 @@ saves cleanly, the next save round-trips, and the engine ignores it.
 | Field                                                                              | Read from                  | Notes                                                |
 |------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
 | `id`, `name`, `x`, `y`, `radius`, `label`                                          | top-level **only**         |                                                      |
-| `initial_marking` (or legacy `marking`)                                            | top-level **only**         | `tokens` is a transient runtime field, ignore it     |
+| `initial_marking` (or legacy `marking`)                                            | top-level **only**         | **see `tokens` vs `initial_marking` policy below** — `tokens` in a saved file is a corruption signature, NEVER a value source |
 | `is_catalyst`, `is_signal_place`, `is_energy_place`                                | top-level **only**         |                                                      |
 | `is_compartment_place`, `is_regulatory_place`                                      | top-level **only**         |                                                      |
 | `is_parameter_place`, `parameter_kind`, `parameter_units`                          | top-level **only**         |                                                      |
@@ -160,6 +160,51 @@ saves cleanly, the next save round-trips, and the engine ignores it.
 |------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
 | `places`, `transitions`, `arcs`, `modules`, `events`                               | top-level **only**         | lists at root                                        |
 | `view_state`, `thermodynamic_settings`, `compound_mappings`, `metadata`            | top-level **only**         |                                                      |
+
+### `tokens` vs `initial_marking` policy on places (STRICT)
+
+Recurring trap (audited 2026-04-30, run_20260430_154220 zero-variance
+sweep): a programmatic patch wrote `place["tokens"] = X` thinking it
+would change the basal value. The loader read `initial_marking` (still
+0), the engine started M_0 at 0, and the entire MAINT_DOSE sweep was a
+silent no-op despite Layer-D provenance reporting the override applied.
+
+Canonical policy:
+
+* **`initial_marking`** is the **only** marking field the loader reads
+  to populate $M_0$. It is the **basal value of the object-net** at
+  design time, the static reference of the model.
+* **`tokens`** is **transient runtime state** — the live value at a
+  place during a session. It is used by interactive editing to poke
+  values mid-run. **It is NEVER persisted to a `.shy` file.**
+* On save (`Place.to_dict`), `tokens` is dropped. If
+  `tokens != initial_marking` the writer logs a WARNING (the GUI
+  surfaces this divergence pre-save via a Promote/Discard/Cancel
+  dialog).
+* On load (`Place.from_dict`), the presence of a `tokens` key with
+  `tokens != initial_marking` is the **signature of a wrong-scope
+  programmatic patch** (legacy or corrupted file). The loader uses
+  `initial_marking` and logs a WARNING; in-memory `place.tokens` is
+  reconciled to `place.initial_marking`.
+* **Programmatic writers MUST use the canonical helper** —
+  `shypn.netobjs.patch.set_place_value(model, name_or_id, value)` —
+  which writes top-level `initial_marking`, mirrors `marking`, and
+  strips any stale `tokens` key. **Do NOT write `place["tokens"] = X`
+  in jq scripts, multi_replace, or anywhere else.**
+* GUI flow: when the modeller wants to persist a runtime change, the
+  pre-save dialog promotes `initial_marking := tokens` (with explicit
+  consent — never silent). This is the *only* legal path for
+  runtime → basal promotion.
+
+Quick patch idiom:
+```python
+from shypn.netobjs.patch import patch_shy_file
+patch_shy_file(
+    "workspace/projects/<proj>/models/<file>.shy",
+    {"LOADING_DOSE": 10.0, "MAINT_DOSE": 5.0},
+)
+# .shy.bak written, file rewritten with initial_marking set, tokens stripped
+```
 
 ### Decision rule for any patch
 

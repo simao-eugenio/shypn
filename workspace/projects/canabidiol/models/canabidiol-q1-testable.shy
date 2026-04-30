@@ -1,0 +1,5981 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created": "2026-04-26T14:18:09.475390",
+    "source": "manual",
+    "model_type": "Petri Net",
+    "object_counts": {
+      "places": 42,
+      "transitions": 45,
+      "arcs": 100,
+      "modules": 0
+    },
+    "notes": "[v3_p9 2026-04-28] Healthy-baseline rebalance:\n  - Basal_ROS_Production: + ROS self-saturation /(1+ROS/2)\n  - Nrf2_degradation: 0.10 -> 0.15\n  - SOD_Degradation: 0.002 -> 0.0067\n  - HO1_Degradation: 0.003 -> 0.0045\n  - Glutathione_Reductase: 0.05 -> 0.06\n  - Neurotoxicity: ROS and TNFa basal floors (max(0, x - x_basal))\nGoal: NH=100 stable at DSev=0; ROS settles ~0.65; antioxidants at fixed point.\n\n[v3_p9 patch 2026-04-28 #2] GSH basal turnover:\n  - Antioxidant_Scavenging GSH term gains ROS-floor: (ROS+0.5)/(5+ROS+0.5)\n  - Yields ~0.32/s basal GSH\u2192GSSG flow at ROS=0; balances Reductase\n  - GSH expected steady-state ~70, GSSG ~5\n\n[v3_p9 patch 2026-04-28 #3] GSH basal turnover (topology fix):\n  - REVERT prior GSH-floor patch on Antioxidant_Scavenging (consumed-arc bug).\n  - ADD T46 Glutathione_basal_turnover (continuous): rate=0.005*Glutathione\n  - ADD A101 P20(GSH)->T46, A102 T46->P33(GSSG)\n  - At G=70: 0.35/s outflow; balances Reductase 0.06*GSSG => GSSG~5.8\n  - Topology fix per AGENT_RULES (Phi-only insufficient when arc enablement gates the rate)."
+  },
+  "view_state": {
+    "zoom": 0.8052550000000156,
+    "pan_x": 2229.3178210355813,
+    "pan_y": -213.46455613644912,
+    "transformations": {
+      "rotation": {
+        "type": "rotation",
+        "angle_degrees": 0.0,
+        "enabled": false
+      }
+    }
+  },
+  "thermodynamic_settings": {
+    "ph": 7.0,
+    "temperature": 298.15,
+    "ionic_strength": 0.1,
+    "tolerance": 0.5,
+    "enable_validation": true,
+    "preset": "biochemical_standard"
+  },
+  "compound_mappings": {},
+  "places": [
+    {
+      "id": "P1",
+      "name": "CBD_extracellular",
+      "label": "CBD_extracellular\n(Cannabidiol)\nworking scale: 1 token = 1 uM",
+      "metadata": {
+        "kegg_id": "D10915",
+        "chebi_id": "CHEBI:69478",
+        "pubchem_cid": "644019",
+        "compound_name": "Cannabidiol",
+        "formula": "C21H30O2",
+        "mw": 314.469,
+        "partition": "peripheral_pk",
+        "function": "PK_compartment_extracellular",
+        "hierarchy_layer": null,
+        "compartment": "extracellular"
+      },
+      "object_type": "place",
+      "x": -1880.0,
+      "y": 810.0,
+      "radius": 40.0,
+      "marking": 10,
+      "tokens": 10,
+      "initial_marking": 10,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 5.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P2",
+      "name": "GPR3",
+      "label": "GPR3\n(constitutive)",
+      "metadata": {
+        "gene_symbol": "GPR3",
+        "uniprot": "P46089",
+        "function": "constitutive_gamma_secretase_activator",
+        "compartment": "plasma_membrane",
+        "hierarchy_layer": 2
+      },
+      "object_type": "place",
+      "x": -940.0,
+      "y": 190.0,
+      "radius": 40.0,
+      "marking": 50.0,
+      "tokens": 50.0,
+      "initial_marking": 50.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P3",
+      "name": "Gamma_Secretase",
+      "label": "\u03b3-Secretase\n(active)",
+      "metadata": {
+        "kegg_id": "K04505",
+        "compound_name": "Presenilin-1 complex",
+        "function": "APP_cleavage",
+        "compartment": "plasma_membrane",
+        "hierarchy_layer": 1
+      },
+      "object_type": "place",
+      "x": -390.0,
+      "y": -290.0,
+      "radius": 40.0,
+      "marking": 50.0,
+      "tokens": 50.0,
+      "initial_marking": 50.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P4",
+      "name": "APP",
+      "label": "APP\n(Amyloid Precursor\nProtein)",
+      "metadata": {
+        "kegg_id": "K04520",
+        "gene_symbol": "APP",
+        "uniprot": "P05067",
+        "compound_name": "Amyloid precursor protein",
+        "compartment": "plasma_membrane"
+      },
+      "object_type": "place",
+      "x": -60.0,
+      "y": -10.0,
+      "radius": 40.0,
+      "marking": 90.0,
+      "tokens": 90.0,
+      "initial_marking": 90.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P5",
+      "name": "Abeta_Monomer",
+      "label": "A\u03b2 Monomer\n0",
+      "metadata": {
+        "kegg_id": "C16239",
+        "compound_name": "Amyloid beta peptide",
+        "compartment": "extracellular",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 530.0,
+      "y": 60.0,
+      "radius": 40.0,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 0.1,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P6",
+      "name": "Abeta_Oligomer",
+      "label": "A\u03b2 Oligomer\n(toxic)\n0",
+      "metadata": {
+        "compound_name": "Amyloid beta oligomers",
+        "function": "neurotoxic_signal",
+        "compartment": "extracellular",
+        "partition": "signal",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": -100.0,
+      "y": 1360.0,
+      "radius": 40.0,
+      "marking": 0.5,
+      "tokens": 0.5,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 0.1,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P7",
+      "name": "Abeta_Plaque",
+      "label": "A\u03b2 Plaque\n(irreversible)\n0",
+      "metadata": {
+        "compound_name": "Amyloid plaque deposits",
+        "function": "irreversible_aggregation_trap",
+        "compartment": "extracellular"
+      },
+      "object_type": "place",
+      "x": -710.0,
+      "y": 1490.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 5.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P8",
+      "name": "NFkB_IkB",
+      "label": "NF\u03baB:I\u03baB\n(inactive complex)\n80",
+      "metadata": {
+        "compound_name": "NFkB-IkBalpha complex",
+        "kegg_id": "C00000",
+        "function": "sequestered_inactive_NFkB",
+        "compartment": "cytoplasm"
+      },
+      "object_type": "place",
+      "x": -60.0,
+      "y": 710.0,
+      "radius": 40.0,
+      "marking": 50.0,
+      "tokens": 50.0,
+      "initial_marking": 50.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P9",
+      "name": "NFkB_p65",
+      "label": "NF\u03baB p65\n(nuclear/active)\n0",
+      "metadata": {
+        "kegg_id": "K04735",
+        "gene_symbol": "RELA",
+        "compound_name": "NF-kappa-B p65 subunit",
+        "function": "master_inflammatory_TF",
+        "partition": "signal",
+        "compartment": "nucleus",
+        "hierarchy_layer": 1
+      },
+      "object_type": "place",
+      "x": 240.0,
+      "y": 490.0,
+      "radius": 40.0,
+      "marking": 5.0,
+      "tokens": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "regulatory",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 500.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P10",
+      "name": "IKK",
+      "label": "IKK\n(kinase)\n10",
+      "metadata": {
+        "kegg_id": "K07209",
+        "gene_symbol": "IKBKB",
+        "compound_name": "IKK-beta",
+        "function": "IkB_kinase",
+        "compartment": "cytoplasm"
+      },
+      "object_type": "place",
+      "x": -90.0,
+      "y": 970.0,
+      "radius": 40.0,
+      "marking": 15.0,
+      "tokens": 15.0,
+      "initial_marking": 15.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P11",
+      "name": "TNFa",
+      "label": "TNF\u03b1\n0",
+      "metadata": {
+        "kegg_id": "C00000",
+        "gene_symbol": "TNF",
+        "compound_name": "Tumor necrosis factor alpha",
+        "compartment": "extracellular",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 880.0,
+      "y": 1040.0,
+      "radius": 40.0,
+      "marking": 0.5,
+      "tokens": 0.5,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P12",
+      "name": "IL1b",
+      "label": "IL-1\u03b2\n0",
+      "metadata": {
+        "kegg_id": "C00000",
+        "gene_symbol": "IL1B",
+        "compound_name": "Interleukin-1 beta",
+        "compartment": "extracellular",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 870.0,
+      "y": 470.0,
+      "radius": 40.0,
+      "marking": 0.5,
+      "tokens": 0.5,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P13",
+      "name": "IL6",
+      "label": "IL-6\n0",
+      "metadata": {
+        "kegg_id": "C00000",
+        "gene_symbol": "IL6",
+        "compound_name": "Interleukin-6",
+        "compartment": "extracellular",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 870.0,
+      "y": 680.0,
+      "radius": 40.0,
+      "marking": 0.5,
+      "tokens": 0.5,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P14",
+      "name": "COX2",
+      "label": "COX-2\n0",
+      "metadata": {
+        "kegg_id": "K11987",
+        "gene_symbol": "PTGS2",
+        "compound_name": "Cyclooxygenase-2",
+        "compartment": "cytoplasm",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 880.0,
+      "y": 870.0,
+      "radius": 40.0,
+      "marking": 0.5,
+      "tokens": 0.5,
+      "initial_marking": 0.5,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P15",
+      "name": "Keap1_Nrf2",
+      "label": "Keap1:Nrf2\n(sequestered)\n60",
+      "metadata": {
+        "compound_name": "Keap1-Nrf2 complex",
+        "function": "Nrf2_sequestration",
+        "compartment": "cytoplasm"
+      },
+      "object_type": "place",
+      "x": 120.0,
+      "y": 1680.0,
+      "radius": 40.0,
+      "marking": 55.0,
+      "tokens": 55.0,
+      "initial_marking": 55.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P16",
+      "name": "Nrf2_free",
+      "label": "Nrf2\n(nuclear/active)\n0",
+      "metadata": {
+        "kegg_id": "K05638",
+        "gene_symbol": "NFE2L2",
+        "compound_name": "Nuclear factor erythroid 2-related factor 2",
+        "function": "master_antioxidant_TF",
+        "partition": "signal",
+        "compartment": "nucleus",
+        "hierarchy_layer": 1
+      },
+      "object_type": "place",
+      "x": 430.0,
+      "y": 1680.0,
+      "radius": 40.0,
+      "marking": 5.0,
+      "tokens": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "regulatory",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 500.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P17",
+      "name": "HO1",
+      "label": "HO-1\n(Heme Oxygenase)\n0",
+      "metadata": {
+        "kegg_id": "K00510",
+        "gene_symbol": "HMOX1",
+        "compound_name": "Heme oxygenase 1",
+        "compartment": "cytoplasm",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 880.0,
+      "y": 1480.0,
+      "radius": 40.0,
+      "marking": 30.0,
+      "tokens": 30.0,
+      "initial_marking": 30.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P18",
+      "name": "SOD",
+      "label": "SOD\n(Superoxide\nDismutase)\n5",
+      "metadata": {
+        "kegg_id": "K04565",
+        "gene_symbol": "SOD1",
+        "compound_name": "Superoxide dismutase",
+        "compartment": "cytoplasm",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 890.0,
+      "y": 1680.0,
+      "radius": 40.0,
+      "marking": 20.0,
+      "tokens": 20.0,
+      "initial_marking": 20.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": true,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P19",
+      "name": "ROS",
+      "label": "ROS\n(Reactive Oxygen\nSpecies)\n10",
+      "metadata": {
+        "compound_name": "Reactive oxygen species",
+        "function": "oxidative_stress_marker",
+        "compartment": "cytoplasm",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": 880.0,
+      "y": 1330.0,
+      "radius": 40.0,
+      "marking": 1.0,
+      "tokens": 1.0,
+      "initial_marking": 1.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P20",
+      "name": "Glutathione",
+      "label": "GSH\n(Glutathione)\n50",
+      "metadata": {
+        "kegg_id": "C00051",
+        "chebi_id": "CHEBI:16856",
+        "compound_name": "Glutathione (reduced)",
+        "compartment": "cytoplasm"
+      },
+      "object_type": "place",
+      "x": 890.0,
+      "y": 1930.0,
+      "radius": 40.0,
+      "marking": 70.0,
+      "tokens": 70.0,
+      "initial_marking": 70.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P21",
+      "name": "Microglia_M1",
+      "label": "Microglia M1\n(pro-inflammatory)\n5",
+      "metadata": {
+        "compound_name": "M1 microglia (classically activated)",
+        "function": "pro_inflammatory_phenotype",
+        "compartment": "brain_parenchyma"
+      },
+      "object_type": "place",
+      "x": -1100.0,
+      "y": 2120.0,
+      "radius": 40.0,
+      "marking": 5.0,
+      "tokens": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 50000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P22",
+      "name": "Microglia_M2",
+      "label": "Microglia M2\n(neuroprotective)\n45",
+      "metadata": {
+        "compound_name": "M2 microglia (alternatively activated)",
+        "function": "neuroprotective_phenotype",
+        "compartment": "brain_parenchyma"
+      },
+      "object_type": "place",
+      "x": -1120.0,
+      "y": 1630.0,
+      "radius": 40.0,
+      "marking": 40.0,
+      "tokens": 40.0,
+      "initial_marking": 40.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 4.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 50000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P23",
+      "name": "Neuron_Health",
+      "label": "Neuron Health\n(viability index)\n100",
+      "metadata": {
+        "compound_name": "Neuronal viability index",
+        "function": "siphon_target",
+        "compartment": "brain_parenchyma",
+        "note": "Forms a siphon: once empty, cannot be recovered"
+      },
+      "object_type": "place",
+      "x": 1610.0,
+      "y": 2130.0,
+      "radius": 40.0,
+      "marking": 100.0,
+      "tokens": 100.0,
+      "initial_marking": 100.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 5.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 50000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P24",
+      "name": "BDNF",
+      "label": "BDNF\n(Brain-Derived\nNeurotrophic Factor)\n10",
+      "metadata": {
+        "kegg_id": "K04355",
+        "gene_symbol": "BDNF",
+        "compound_name": "Brain-derived neurotrophic factor",
+        "compartment": "extracellular",
+        "hierarchy_layer": 0
+      },
+      "object_type": "place",
+      "x": -40.0,
+      "y": 1910.0,
+      "radius": 40.0,
+      "marking": 5.0,
+      "tokens": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P25",
+      "name": "HT1A_active",
+      "label": "5-HT1A\n(CBD-activated)",
+      "metadata": {
+        "kegg_id": "K04153",
+        "gene_symbol": "HTR1A",
+        "compound_name": "5-hydroxytryptamine receptor 1A",
+        "function": "anxiolytic_neuroprotective",
+        "partition": "signal",
+        "compartment": "plasma_membrane",
+        "hierarchy_layer": 2
+      },
+      "object_type": "place",
+      "x": -1140.0,
+      "y": 1190.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P26",
+      "name": "PPARg_active",
+      "label": "PPAR\u03b3\n(CBD-activated)",
+      "metadata": {
+        "kegg_id": "K08530",
+        "gene_symbol": "PPARG",
+        "compound_name": "Peroxisome proliferator-activated receptor gamma",
+        "function": "anti_inflammatory_TF",
+        "partition": "signal",
+        "compartment": "nucleus",
+        "hierarchy_layer": 2
+      },
+      "object_type": "place",
+      "x": -450.0,
+      "y": 770.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 500.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P27",
+      "name": "A2A_active",
+      "label": "A2A\n(CBD-activated)",
+      "metadata": {
+        "kegg_id": "K04266",
+        "gene_symbol": "ADORA2A",
+        "compound_name": "Adenosine receptor A2a",
+        "function": "microglial_anti_inflammatory",
+        "partition": "signal",
+        "compartment": "plasma_membrane",
+        "hierarchy_layer": 2
+      },
+      "object_type": "place",
+      "x": -1910.0,
+      "y": 1450.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P28",
+      "name": "TEMPERATURE",
+      "label": "Temperature\n312.15 K (39 \u00b0C)",
+      "object_type": "place",
+      "x": -1880.0,
+      "y": 270.0,
+      "radius": 40.0,
+      "marking": 310.15,
+      "tokens": 310.15,
+      "initial_marking": 310.15,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "K",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment",
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P29",
+      "name": "PH",
+      "label": "pH\n7.0",
+      "object_type": "place",
+      "x": -1880.0,
+      "y": 60.0,
+      "radius": 40.0,
+      "marking": 7.4,
+      "tokens": 7.4,
+      "initial_marking": 7.4,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "pH",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment",
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P30",
+      "name": "CBD_intracellular",
+      "label": "CBD_intracellular\n(cytoplasmic CBD)\nworking scale: 1 token = 1 uM",
+      "metadata": {
+        "kegg_id": "D10915",
+        "chebi_id": "CHEBI:69478",
+        "pubchem_cid": "644019",
+        "compound_name": "Cannabidiol (intracellular)",
+        "formula": "C21H30O2",
+        "mw": 314.469,
+        "partition": "signal",
+        "function": "intracellular_effector",
+        "hierarchy_layer": 3,
+        "compartment": "intracellular"
+      },
+      "object_type": "place",
+      "x": -810.0,
+      "y": 800.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 5.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "regulatory",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P31",
+      "name": "AGE",
+      "label": "Age\n65 years",
+      "object_type": "place",
+      "x": -1880.0,
+      "y": 490.0,
+      "radius": 40.0,
+      "marking": 75.0,
+      "tokens": 75.0,
+      "initial_marking": 75.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "demographic",
+      "parameter_units": "year",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment",
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P32",
+      "name": "GPR3_inactive",
+      "label": "GPR3_inactive",
+      "object_type": "place",
+      "x": -1400.0,
+      "y": 300.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P33",
+      "name": "GSSG",
+      "label": "GSSG",
+      "object_type": "place",
+      "x": 1420.0,
+      "y": 1930.0,
+      "radius": 40.0,
+      "marking": 10.0,
+      "tokens": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 1000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P34",
+      "name": "APP_mRNA",
+      "label": "APP_mRNA",
+      "object_type": "place",
+      "x": -520.0,
+      "y": 350.0,
+      "radius": 40.0,
+      "marking": 4.0,
+      "tokens": 4.0,
+      "initial_marking": 4.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 500.0,
+      "neighbor_compartments": [],
+      "spatial_position": null
+    },
+    {
+      "id": "P35",
+      "name": "LOADING_DOSE",
+      "label": "Loading dose (\u00b5M)",
+      "object_type": "place",
+      "x": -1440.0,
+      "y": -140.0,
+      "radius": 40.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "dose",
+      "parameter_units": "\u00b5M",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P36",
+      "name": "MAINT_DOSE",
+      "label": "Maintenance dose (\u00b5M)",
+      "object_type": "place",
+      "x": -1880.0,
+      "y": -280.0,
+      "radius": 40.0,
+      "marking": 5.0,
+      "initial_marking": 5.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "dose",
+      "parameter_units": "\u00b5M",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P37",
+      "name": "DOSE_INTERVAL",
+      "label": "Dose interval (s)",
+      "object_type": "place",
+      "x": -1870.0,
+      "y": -100.0,
+      "radius": 40.0,
+      "marking": 86400.0,
+      "tokens": 86400.0,
+      "initial_marking": 86400.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "interval",
+      "parameter_units": "s",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P38",
+      "name": "DISEASE_SEVERITY",
+      "label": "Disease severity (0=healthy, 2=AD)",
+      "object_type": "place",
+      "x": -1470.0,
+      "y": -310.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
+      "parameter_kind": "severity",
+      "parameter_units": "level",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P39",
+      "name": "Temperature_factor",
+      "label": "Q10 thermo",
+      "object_type": "place",
+      "x": -2210.0,
+      "y": -260.0,
+      "radius": 25.0,
+      "marking": 1.0,
+      "tokens": 1.0,
+      "initial_marking": 1.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "spatial",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment"
+    },
+    {
+      "id": "P40",
+      "name": "Age_factor",
+      "label": "age multiplier",
+      "object_type": "place",
+      "x": -2200.0,
+      "y": -110.0,
+      "radius": 25.0,
+      "marking": 1.2,
+      "tokens": 1.2,
+      "initial_marking": 1.2,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "spatial",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment"
+    },
+    {
+      "id": "P41",
+      "name": "pH_acidosis",
+      "label": "max(0, 7-pH)",
+      "object_type": "place",
+      "x": -2200.0,
+      "y": 50.0,
+      "radius": 25.0,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "spatial",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment"
+    },
+    {
+      "id": "P42",
+      "name": "pH_neutrality",
+      "label": "1 - 0.3\u00b7|pH-7.4|",
+      "object_type": "place",
+      "x": -2200.0,
+      "y": 210.0,
+      "radius": 25.0,
+      "marking": 1.0,
+      "tokens": 1.0,
+      "initial_marking": 1.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": true,
+      "signal_type": "spatial",
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "environment"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "T1",
+      "name": "CBD_inactivates_GPR3",
+      "label": "CBD \u2192 GPR3\ninactivation\n(reversible)",
+      "object_type": "transition",
+      "x": -1140.0,
+      "y": 450.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 3,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.01 * CBD_extracellular * GPR3",
+        "rate_function_display": "k_inv \u00d7 [CBD] \u00d7 [GPR3]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T2",
+      "name": "GPR3_activates_gamma_sec",
+      "label": "GPR3 \u2192 \u03b3-Sec\nactivation",
+      "object_type": "transition",
+      "x": -840.0,
+      "y": -90.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.5 * GPR3 / (20 + GPR3)",
+        "rate_function_display": "k_act \u00d7 [GPR3]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T3",
+      "name": "Abeta_Production",
+      "label": "APP cleavage\n\u2192 A\u03b2 monomer",
+      "object_type": "transition",
+      "x": 280.0,
+      "y": -160.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.1 * Gamma_Secretase / (50 + Gamma_Secretase) * APP / (100 + APP) * Temperature_factor * Age_factor",
+        "rate_function_display": "k_cleavage \u00d7 [\u03b3-Sec]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T4",
+      "name": "Abeta_Aggregation",
+      "label": "A\u03b2 aggregation\n(monomer \u2192 oligomer)",
+      "object_type": "transition",
+      "x": 390.0,
+      "y": 950.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "adaptive",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * Abeta_Monomer * Abeta_Monomer * Temperature_factor * (1 + 0.5*pH_acidosis)",
+        "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
+      },
+      "signal_places": [
+        "P41",
+        "P5",
+        "P39"
+      ],
+      "is_environment_aware": true,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
+    },
+    {
+      "id": "T5",
+      "name": "Plaque_Formation",
+      "label": "Plaque deposition\n(irreversible)",
+      "object_type": "transition",
+      "x": -470.0,
+      "y": 1650.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.02 * Abeta_Oligomer / (100 + Abeta_Oligomer) * Temperature_factor * (1 + 0.3*pH_acidosis)",
+        "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
+      },
+      "signal_places": [
+        "P41",
+        "P6",
+        "P39"
+      ],
+      "is_environment_aware": true,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T6",
+      "name": "IKK_phosphorylates_IkB",
+      "label": "IKK \u2192 I\u03baB phosph.\n(NF\u03baB release)",
+      "object_type": "transition",
+      "x": 180.0,
+      "y": 860.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.2 * IKK / (50 + IKK) * NFkB_IkB / (20 + NFkB_IkB) * Temperature_factor",
+        "rate_function_display": "Michaelis-Menten: Vmax\u00d7[IKK]\u00d7[I\u03baB] / (Km + [I\u03baB])"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T7",
+      "name": "NFkB_transcription",
+      "label": "NF\u03baB \u2192 cytokines\n(TNF\u03b1, IL-1\u03b2, IL-6, COX-2)",
+      "object_type": "transition",
+      "x": 520.0,
+      "y": 650.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.5 * NFkB_p65 / (20 + NFkB_p65) * Temperature_factor",
+        "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
+      },
+      "signal_places": [
+        "P9",
+        "P39"
+      ],
+      "is_environment_aware": true,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T8",
+      "name": "Abeta_activates_IKK",
+      "label": "A\u03b2 oligomers\n\u2192 IKK activation",
+      "object_type": "transition",
+      "x": -550.0,
+      "y": 1140.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.1 * Abeta_Oligomer / (50 + Abeta_Oligomer)",
+        "rate_function_display": "k_ikk \u00d7 [A\u03b2_olig]"
+      },
+      "signal_places": [
+        "P6"
+      ],
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T9",
+      "name": "PPARg_inhibits_NFkB",
+      "label": "PPAR\u03b3 \u2192 p65\nubiquitination",
+      "object_type": "transition",
+      "x": -220.0,
+      "y": 490.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 2,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.005 + 0.3 * PPARg_active) * NFkB_p65",
+        "rate_function_display": "(k_basal + k_ubiq \u00d7 [PPAR\u03b3]) \u00d7 [NF\u03baB_p65]"
+      },
+      "signal_places": [
+        "P26"
+      ],
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T10",
+      "name": "CBD_activates_PPARg",
+      "label": "CBD \u2192 PPAR\u03b3\nagonism",
+      "object_type": "transition",
+      "x": -650.0,
+      "y": 640.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 3,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.02 * CBD_intracellular / (20 + CBD_intracellular)",
+        "rate_function_display": "k_PPARg \u00d7 [CBD]"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T11",
+      "name": "ROS_releases_Nrf2",
+      "label": "ROS + CBD\n\u2192 Nrf2 release",
+      "object_type": "transition",
+      "x": 270.0,
+      "y": 1510.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.15 * Keap1_Nrf2 * (ROS / (10 + ROS) + 0.3 * CBD_intracellular / (50 + CBD_intracellular)) * Temperature_factor",
+        "rate_function_display": "k_nrf2 \u00d7 [Keap1:Nrf2] \u00d7 (f(ROS) + f(CBD))"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T12",
+      "name": "Nrf2_ARE_transcription",
+      "label": "Nrf2 \u2192 ARE\n(HO-1, SOD, GSH)",
+      "object_type": "transition",
+      "x": 630.0,
+      "y": 1680.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.4 * Nrf2_free / (10 + Nrf2_free) * Temperature_factor",
+        "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
+      },
+      "signal_places": [
+        "P16",
+        "P39"
+      ],
+      "is_environment_aware": true,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T13",
+      "name": "Antioxidant_Scavenging",
+      "label": "SOD + GSH + HO-1\n\u2192 ROS clearance",
+      "object_type": "transition",
+      "x": 1160.0,
+      "y": 1680.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "((0.1 * (SOD + HO1) * ROS / (5 + ROS) + 0.05 * Glutathione * ROS / (5 + ROS)) * Temperature_factor * pH_neutrality) / Age_factor",
+        "rate_function_display": "((0.1 * (SOD + HO1) * ROS / (5 + ROS) + 0.05 * Glutathione * ROS / (5 + ROS)) * Temperature_factor * pH_neutrality) / Age_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T14",
+      "name": "Basal_ROS_Production",
+      "label": "Basal ROS\n(mitochondria)",
+      "object_type": "transition",
+      "x": 880.0,
+      "y": 1190.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(2.0 + 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer) + 0.3 * TNFa / (15 + TNFa)) * Temperature_factor / (1 + ROS / 2.0)",
+        "rate_function_display": "(2.0 + 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer) + 0.3 * TNFa / (15 + TNFa)) * Temperature_factor / (1 + ROS / 2.0)"
+      },
+      "signal_places": [
+        "P11",
+        "P6"
+      ],
+      "is_environment_aware": false,
+      "compartment": "mitochondria",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T15",
+      "name": "CBD_activates_5HT1A",
+      "label": "CBD \u2192 5-HT1A\nagonism",
+      "object_type": "transition",
+      "x": -1290.0,
+      "y": 1080.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 3,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.015 * CBD_extracellular / (20 + CBD_extracellular)",
+        "rate_function_display": "k_5HT1A \u00d7 [CBD]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T16",
+      "name": "HT1A_BDNF_production",
+      "label": "5-HT1A \u2192 BDNF\nupregulation",
+      "object_type": "transition",
+      "x": -30.0,
+      "y": 1690.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.1 + 0.3 * HT1A_active / (10 + HT1A_active)",
+        "rate_function_display": "k_basal + k_BDNF \u00d7 [5-HT1A]"
+      },
+      "signal_places": [
+        "P25"
+      ],
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T17",
+      "name": "M2_to_M1_polarization",
+      "label": "M2 \u2192 M1\n(A\u03b2 + cytokine driven)",
+      "object_type": "transition",
+      "x": -800.0,
+      "y": 1910.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.1 * Microglia_M2 * (Abeta_Oligomer / (10 + Abeta_Oligomer) + TNFa / (20 + TNFa)) * Temperature_factor * (1 + 0.3*pH_acidosis) * Age_factor",
+        "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
+      },
+      "signal_places": [
+        "P41",
+        "P6",
+        "P39",
+        "P11",
+        "P40",
+        "P22"
+      ],
+      "is_environment_aware": true,
+      "compartment": "brain_parenchyma",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T18",
+      "name": "M1_to_M2_resolution",
+      "label": "M1 \u2192 M2\n(CBD/PPAR\u03b3/A2A driven)",
+      "object_type": "transition",
+      "x": -1410.0,
+      "y": 1880.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 2,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.005 * Microglia_M1 + 0.05 * Microglia_M1 * (PPARg_active / (5 + PPARg_active) + A2A_active / (5 + A2A_active))) / Age_factor",
+        "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
+      },
+      "signal_places": [
+        "P40",
+        "P27",
+        "P26",
+        "P21"
+      ],
+      "is_environment_aware": true,
+      "compartment": "brain_parenchyma",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T19",
+      "name": "CBD_activates_A2A",
+      "label": "CBD \u2192 A2A\nagonism",
+      "object_type": "transition",
+      "x": -1640.0,
+      "y": 1220.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 3,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.012 * CBD_extracellular / (20 + CBD_extracellular)",
+        "rate_function_display": "k_A2A \u00d7 [CBD]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T20",
+      "name": "Neurotoxicity",
+      "label": "Neurotoxicity\n(A\u03b2 + ROS + cytokines)",
+      "object_type": "transition",
+      "x": 1420.0,
+      "y": 1190.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor",
+        "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
+      },
+      "signal_places": [
+        "P41",
+        "P6",
+        "P19",
+        "P39",
+        "P11",
+        "P40"
+      ],
+      "is_environment_aware": true,
+      "compartment": "brain_parenchyma",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T21",
+      "name": "BDNF_neuroprotection",
+      "label": "BDNF \u2192 Neuron\nsurvival",
+      "object_type": "transition",
+      "x": 150.0,
+      "y": 2130.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "stochastic",
+      "priority": 1,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor",
+        "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
+      },
+      "signal_places": [
+        "P23",
+        "P24",
+        "P39"
+      ],
+      "is_environment_aware": true,
+      "compartment": "brain_parenchyma",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T22",
+      "name": "Nrf2_degradation",
+      "label": "Nrf2 turnover\n(re-sequestration)",
+      "object_type": "transition",
+      "x": 290.0,
+      "y": 1900.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.15 * Nrf2_free * Temperature_factor",
+        "rate_function_display": "0.15 * Nrf2_free * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T23",
+      "name": "Cytokine_Degradation",
+      "label": "Cytokine\ndegradation\n(proteolysis)",
+      "object_type": "transition",
+      "x": 1250.0,
+      "y": 640.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * (IL1b + IL6 + COX2) * Temperature_factor",
+        "rate_function_display": "k_deg \u00d7 ([IL-1\u03b2] + [IL-6] + [COX-2])  (TNF\u03b1 sink owned by T17/T20)"
+      },
+      "is_environment_aware": false,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T24",
+      "name": "Abeta_Oligomer_Clearance",
+      "label": "A\u03b2 oligomer\nclearance\n(M2 phagocytosis)",
+      "object_type": "transition",
+      "x": -870.0,
+      "y": 1390.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.03 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
+        "rate_function_display": "k_phago \u00d7 [M2] \u00d7 [A\u03b2_olig] / (Km + [A\u03b2_olig])"
+      },
+      "is_environment_aware": false,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T25",
+      "name": "Abeta_Monomer_Clearance",
+      "label": "A\u03b2 monomer\ndegradation\n(neprilysin)",
+      "object_type": "transition",
+      "x": 850.0,
+      "y": 300.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.05 * Abeta_Monomer) / Age_factor",
+        "rate_function_display": "k_nep \u00d7 [A\u03b2_mono]"
+      },
+      "is_environment_aware": false,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T26",
+      "name": "BDNF_Turnover",
+      "label": "BDNF\nturnover",
+      "object_type": "transition",
+      "x": -230.0,
+      "y": 2120.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.02 * BDNF",
+        "rate_function_display": "k_deg \u00d7 [BDNF]"
+      },
+      "is_environment_aware": false,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T27",
+      "name": "IKK_Dephosphorylation",
+      "label": "IKK\ndephosphorylation\n(turnover)",
+      "object_type": "transition",
+      "x": -80.0,
+      "y": 1120.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.008 * (IKK - 10) * (IKK > 10) * Temperature_factor",
+        "rate_function_display": "k_dephos \u00d7 max(0, [IKK] - IKK_basal)"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T28",
+      "name": "CBD_Absorption",
+      "label": "CBD_Absorption\n(membrane permeation)\nFick's law",
+      "object_type": "transition",
+      "x": -1200.0,
+      "y": 930.0,
+      "width": 15.0,
+      "height": 60.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 1.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race_with_resampling",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * CBD_extracellular * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
+    },
+    {
+      "id": "T29",
+      "name": "CBD_Efflux",
+      "label": "CBD_Efflux\n(back-transport)\npassive diffusion",
+      "object_type": "transition",
+      "x": -1210.0,
+      "y": 690.0,
+      "width": 15.0,
+      "height": 60.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 1.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race_with_resampling",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.0003 * CBD_intracellular * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
+    },
+    {
+      "id": "T30",
+      "name": "CBD_Systemic_Clearance",
+      "label": "CBD_Systemic_Clearance\n(hepatic CYP3A4)\nelimination",
+      "object_type": "transition",
+      "x": -2080.0,
+      "y": 1070.0,
+      "width": 15.0,
+      "height": 60.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 1.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race_with_resampling",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.00003 * CBD_extracellular * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
+    },
+    {
+      "id": "T31",
+      "name": "CBD_Brain_Metabolism",
+      "label": "CBD_Brain_Metabolism\n(local CYP450)\nmetabolism",
+      "object_type": "transition",
+      "x": -820.0,
+      "y": 1030.0,
+      "width": 15.0,
+      "height": 60.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 1.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race_with_resampling",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.00005 * CBD_intracellular * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
+    },
+    {
+      "id": "T32",
+      "name": "PPARg_Degradation",
+      "label": "PPAR\u03b3\nturnover",
+      "object_type": "transition",
+      "x": -340.0,
+      "y": 880.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.005 * PPARg_active * Temperature_factor",
+        "rate_function_display": "k_deg_PPARg \u00d7 [PPAR\u03b3_act] \u00d7 Q10"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T33",
+      "name": "HT1A_Desensitization",
+      "label": "5-HT1A\ndesensitization",
+      "object_type": "transition",
+      "x": -1220.0,
+      "y": 1350.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.01 * HT1A_active",
+        "rate_function_display": "k_desens \u00d7 [5-HT1A_act]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T34",
+      "name": "A2A_Desensitization",
+      "label": "A2A\ndesensitization",
+      "object_type": "transition",
+      "x": -1910.0,
+      "y": 1690.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.008 * A2A_active",
+        "rate_function_display": "k_desens \u00d7 [A2A_act]"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T35",
+      "name": "GammaSec_Turnover",
+      "label": "\u03b3-secretase\nturnover",
+      "object_type": "transition",
+      "x": -380.0,
+      "y": -70.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.01 * (Gamma_Secretase - 30) * (Gamma_Secretase > 30)",
+        "rate_function_display": "k_turn \u00d7 ([\u03b3-sec] - basal) \u00d7 H(excess)"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T36",
+      "name": "HO1_Degradation",
+      "label": "HO-1\nturnover",
+      "object_type": "transition",
+      "x": 880.0,
+      "y": 1600.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.0045 * HO1 * Temperature_factor",
+        "rate_function_display": "0.0045 * HO1 * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T37",
+      "name": "SOD_Degradation",
+      "label": "SOD\nturnover",
+      "object_type": "transition",
+      "x": 890.0,
+      "y": 1810.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.0067 * SOD",
+        "rate_function_display": "0.0067 * SOD"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T38",
+      "name": "GPR3_Recycling",
+      "label": "GPR3\nrecycling",
+      "object_type": "transition",
+      "x": -1250.0,
+      "y": 40.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.005 * GPR3_inactive",
+        "rate_function_display": "k_synth \u00d7 (basal - [GPR3]) \u00d7 H(deficit)"
+      },
+      "is_environment_aware": false,
+      "compartment": "plasma_membrane",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T39",
+      "name": "Plaque_Clearance",
+      "label": "Plaque\nclearance (M2)",
+      "object_type": "transition",
+      "x": -850.0,
+      "y": 1690.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.0005 * Abeta_Plaque + 0.005 * Microglia_M2 * Abeta_Plaque / (100 + Abeta_Plaque) * Temperature_factor) / Age_factor",
+        "rate_function_display": "k_clear \u00d7 [M2] \u00d7 [Plaque]/(Km+[Plaque]) \u00d7 Q10 / Age_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T40",
+      "name": "ROS_activates_IKK",
+      "label": "ROS \u2192 IKK\n(oxidative activation)",
+      "object_type": "transition",
+      "x": 320.0,
+      "y": 1140.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * ROS / (20 + ROS) * Temperature_factor",
+        "rate_function_display": "k_ox \u00d7 [ROS]/(Km+[ROS]) \u00d7 Q10"
+      },
+      "signal_places": [
+        "P19"
+      ],
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T41",
+      "name": "Glutathione_Reductase",
+      "label": "Glutathione\nReductase",
+      "object_type": "transition",
+      "x": 1150.0,
+      "y": 2040.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.06 * GSSG"
+      },
+      "is_environment_aware": false,
+      "compartment": "intracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T42",
+      "name": "APP_Transcription",
+      "label": "APP gene\ntranscription",
+      "object_type": "transition",
+      "x": -140.0,
+      "y": 230.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "(0.05 + 0.02 * NFkB_p65 / (10 + NFkB_p65)) * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T43",
+      "name": "APP_Translation",
+      "label": "APP\ntranslation",
+      "object_type": "transition",
+      "x": -520.0,
+      "y": 140.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.5 * APP_mRNA / (5 + APP_mRNA) * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T44",
+      "name": "APP_Degradation",
+      "label": "APP\ndegradation",
+      "object_type": "transition",
+      "x": 70.0,
+      "y": 150.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.003 * APP * Temperature_factor"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T45",
+      "name": "APP_mRNA_Degradation",
+      "label": "APP mRNA\ndegradation",
+      "object_type": "transition",
+      "x": -730.0,
+      "y": 440.0,
+      "width": 60.0,
+      "height": 20.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": false,
+      "is_sink": true,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.005 * APP_mRNA"
+      },
+      "is_environment_aware": false,
+      "compartment": "nucleus",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T46",
+      "name": "Basal_SOD_Transcription",
+      "label": "Basal\nSOD\nTranscription",
+      "object_type": "transition",
+      "x": 810.0,
+      "y": 1680.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.13 * Temperature_factor",
+        "rate_function_display": "k_basal"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    },
+    {
+      "id": "T47",
+      "name": "Basal_HO1_Transcription",
+      "label": "Basal\nHO1\nTranscription",
+      "object_type": "transition",
+      "x": 800.0,
+      "y": 1480.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.8,
+        0.0
+      ],
+      "border_width": 3.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race",
+      "is_source": true,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.135 * Temperature_factor",
+        "rate_function_display": "k_basal"
+      },
+      "is_environment_aware": false,
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
+    }
+  ],
+  "arcs": [
+    {
+      "id": "A1",
+      "name": "CBD_to_T1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A2",
+      "name": "GPR3_to_T1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T1",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A3",
+      "name": "GPR3_to_T2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P2",
+      "source_type": "place",
+      "target_id": "T2",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A4",
+      "name": "T2_to_GammaSec",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T2",
+      "source_type": "transition",
+      "target_id": "P3",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A5",
+      "name": "GammaSec_to_T3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A7",
+      "name": "T3_to_Abeta",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T3",
+      "source_type": "transition",
+      "target_id": "P5",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A8",
+      "name": "Abeta_to_T4",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T4",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A9",
+      "name": "T4_to_Oligomer",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T4",
+      "source_type": "transition",
+      "target_id": "P6",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A10",
+      "name": "Oligomer_to_T5",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T5",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A11",
+      "name": "T5_to_Plaque",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T5",
+      "source_type": "transition",
+      "target_id": "P7",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A12",
+      "name": "NFkB_IkB_to_T6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P8",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A13",
+      "name": "IKK_to_T6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T6",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A14",
+      "name": "T6_to_NFkB_p65",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T6",
+      "source_type": "transition",
+      "target_id": "P9",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A15",
+      "name": "NFkB_to_T7",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T7",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A16",
+      "name": "T7_to_TNFa",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P11",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A17",
+      "name": "T7_to_IL1b",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P12",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A18",
+      "name": "T7_to_IL6",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P13",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A19",
+      "name": "T7_to_COX2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T7",
+      "source_type": "transition",
+      "target_id": "P14",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A20",
+      "name": "Abeta_olig_to_T8",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T8",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A21",
+      "name": "T8_to_IKK",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T8",
+      "source_type": "transition",
+      "target_id": "P10",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A22",
+      "name": "PPARg_to_T9",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P26",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A23",
+      "name": "NFkB_to_T9",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T9",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A24",
+      "name": "T9_to_NFkB_IkB",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T9",
+      "source_type": "transition",
+      "target_id": "P8",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A25",
+      "name": "CBD_intra_to_PPARg_activation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P30",
+      "source_type": "place",
+      "target_id": "T10",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A26",
+      "name": "T10_to_PPARg",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T10",
+      "source_type": "transition",
+      "target_id": "P26",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A27",
+      "name": "Keap1Nrf2_to_T11",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P15",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A28",
+      "name": "ROS_to_T11",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P19",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A29",
+      "name": "CBD_intra_to_Nrf2_release",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P30",
+      "source_type": "place",
+      "target_id": "T11",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 0,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A30",
+      "name": "T11_to_Nrf2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T11",
+      "source_type": "transition",
+      "target_id": "P16",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A31",
+      "name": "Nrf2_to_T12",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P16",
+      "source_type": "place",
+      "target_id": "T12",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A32",
+      "name": "T12_to_HO1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P17",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A33",
+      "name": "T12_to_SOD",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P18",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A34",
+      "name": "T12_to_GSH",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T12",
+      "source_type": "transition",
+      "target_id": "P20",
+      "target_type": "place",
+      "weight": 0.02,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A35",
+      "name": "SOD_to_T13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P18",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A36",
+      "name": "HO1_to_T13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P17",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A37",
+      "name": "GSH_to_T13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P20",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A38",
+      "name": "ROS_to_T13",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P19",
+      "source_type": "place",
+      "target_id": "T13",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A39",
+      "name": "T14_to_ROS",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T14",
+      "source_type": "transition",
+      "target_id": "P19",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A40",
+      "name": "CBD_to_T15",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T15",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A41",
+      "name": "T15_to_5HT1A",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T15",
+      "source_type": "transition",
+      "target_id": "P25",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A42",
+      "name": "HT1A_to_T16",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P25",
+      "source_type": "place",
+      "target_id": "T16",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A43",
+      "name": "T16_to_BDNF",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T16",
+      "source_type": "transition",
+      "target_id": "P24",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A44",
+      "name": "M2_to_T17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A45",
+      "name": "Abeta_olig_to_T17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A46",
+      "name": "TNFa_to_T17",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T17",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A47",
+      "name": "T17_to_M1",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T17",
+      "source_type": "transition",
+      "target_id": "P21",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A48",
+      "name": "M1_to_T18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P21",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A49",
+      "name": "PPARg_to_T18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P26",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A50",
+      "name": "A2A_to_T18",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P27",
+      "source_type": "place",
+      "target_id": "T18",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A51",
+      "name": "T18_to_M2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T18",
+      "source_type": "transition",
+      "target_id": "P22",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A52",
+      "name": "CBD_to_T19",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T19",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A53",
+      "name": "T19_to_A2A",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T19",
+      "source_type": "transition",
+      "target_id": "P27",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A54",
+      "name": "Abeta_olig_to_T20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T20",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A55",
+      "name": "ROS_to_T20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P19",
+      "source_type": "place",
+      "target_id": "T20",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A56",
+      "name": "TNFa_to_T20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T20",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A57",
+      "name": "T20_drains_Neuron",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P23",
+      "source_type": "place",
+      "target_id": "T20",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 4.0,
+      "control_points": []
+    },
+    {
+      "id": "A58",
+      "name": "BDNF_to_T21",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P24",
+      "source_type": "place",
+      "target_id": "T21",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A59",
+      "name": "T21_to_Neuron",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T21",
+      "source_type": "transition",
+      "target_id": "P23",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 4.0,
+      "control_points": []
+    },
+    {
+      "id": "A60",
+      "name": "Nrf2_to_T22",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P16",
+      "source_type": "place",
+      "target_id": "T22",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A61",
+      "name": "T22_to_Keap1Nrf2",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T22",
+      "source_type": "transition",
+      "target_id": "P15",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A62",
+      "name": "TNFa_to_T23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T23",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A63",
+      "name": "IL1b_to_T23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P12",
+      "source_type": "place",
+      "target_id": "T23",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A64",
+      "name": "IL6_to_T23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P13",
+      "source_type": "place",
+      "target_id": "T23",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A65",
+      "name": "COX2_to_T23",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P14",
+      "source_type": "place",
+      "target_id": "T23",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A66",
+      "name": "Abeta_olig_to_T24",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T24",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A67",
+      "name": "M2_to_T24",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T24",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 2.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A68",
+      "name": "Abeta_mono_to_T25",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P5",
+      "source_type": "place",
+      "target_id": "T25",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A69",
+      "name": "BDNF_to_T26",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P24",
+      "source_type": "place",
+      "target_id": "T26",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A70",
+      "name": "IKK_to_T27",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P10",
+      "source_type": "place",
+      "target_id": "T27",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A71",
+      "name": "CBD_extra_to_Absorption",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T28",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": []
+    },
+    {
+      "id": "A72",
+      "name": "Absorption_to_CBD_intra",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "signal_flow",
+      "source_id": "T28",
+      "source_type": "transition",
+      "target_id": "P30",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "width": 3.000000000000001,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A73",
+      "name": "CBD_intra_to_Efflux",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P30",
+      "source_type": "place",
+      "target_id": "T29",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A74",
+      "name": "Efflux_to_CBD_extra",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T29",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": []
+    },
+    {
+      "id": "A75",
+      "name": "CBD_extra_to_SysClearance",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P1",
+      "source_type": "place",
+      "target_id": "T30",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": []
+    },
+    {
+      "id": "A76",
+      "name": "CBD_intra_to_BrainMet",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P30",
+      "source_type": "place",
+      "target_id": "T31",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": [],
+      "consumes": true,
+      "produces": true
+    },
+    {
+      "id": "A77",
+      "name": "PPARg_to_T32",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P26",
+      "source_type": "place",
+      "target_id": "T32",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A78",
+      "name": "HT1A_to_T33",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P25",
+      "source_type": "place",
+      "target_id": "T33",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A79",
+      "name": "A2A_to_T34",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P27",
+      "source_type": "place",
+      "target_id": "T34",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A80",
+      "name": "GammaSec_to_T35",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P3",
+      "source_type": "place",
+      "target_id": "T35",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A81",
+      "name": "HO1_to_T36",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P17",
+      "source_type": "place",
+      "target_id": "T36",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A82",
+      "name": "SOD_to_T37",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P18",
+      "source_type": "place",
+      "target_id": "T37",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A83",
+      "name": "T38_to_GPR3",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T38",
+      "source_type": "transition",
+      "target_id": "P2",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A84",
+      "name": "Plaque_to_T39",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P7",
+      "source_type": "place",
+      "target_id": "T39",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A85",
+      "name": "M2_to_T39",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P22",
+      "source_type": "place",
+      "target_id": "T39",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A86",
+      "name": "ROS_to_T40",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P19",
+      "source_type": "place",
+      "target_id": "T40",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A87",
+      "name": "T40_to_IKK",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T40",
+      "source_type": "transition",
+      "target_id": "P10",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A88",
+      "name": "TNFa_to_T14",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P11",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A89",
+      "name": "Abeta_Olig_to_T14",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P6",
+      "source_type": "place",
+      "target_id": "T14",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A90",
+      "name": "T1_to_P32",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T1",
+      "source_type": "transition",
+      "target_id": "P32",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A91",
+      "name": "P32_to_T38",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P32",
+      "source_type": "place",
+      "target_id": "T38",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A92",
+      "name": "T13_to_P33",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T13",
+      "source_type": "transition",
+      "target_id": "P33",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A93",
+      "name": "P33_to_T41",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P33",
+      "source_type": "place",
+      "target_id": "T41",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A94",
+      "name": "T41_to_P20",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T41",
+      "source_type": "transition",
+      "target_id": "P20",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 1,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A95",
+      "name": "NFkB_p65_to_APP_Transcription",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P9",
+      "source_type": "place",
+      "target_id": "T42",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A96",
+      "name": "APP_Transcription_to_APP_mRNA",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T42",
+      "source_type": "transition",
+      "target_id": "P34",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A97",
+      "name": "APP_mRNA_to_APP_Translation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "test",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T43",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "width": 3.0,
+      "control_points": [],
+      "consumes": false
+    },
+    {
+      "id": "A98",
+      "name": "APP_Translation_to_APP",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T43",
+      "source_type": "transition",
+      "target_id": "P4",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A99",
+      "name": "APP_to_APP_Degradation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T44",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A100",
+      "name": "APP_mRNA_to_APP_mRNA_Degradation",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P34",
+      "source_type": "place",
+      "target_id": "T45",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A6",
+      "name": "APP_to_Abeta_Production",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P4",
+      "source_type": "place",
+      "target_id": "T3",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A101",
+      "name": "A101",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T46",
+      "target_id": "P18",
+      "source_type": "transition",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A102",
+      "name": "A102",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T47",
+      "target_id": "P17",
+      "source_type": "transition",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 2.0,
+      "control_points": []
+    }
+  ],
+  "modules": [],
+  "events": [
+    {
+      "id": "evt_install_Abeta_Monomer",
+      "name": "evt_install_Abeta_Monomer",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Abeta_Monomer": "Abeta_Monomer + DISEASE_SEVERITY * 5.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Abeta_Monomer",
+        "delta_per_severity_unit": 0.125,
+        "purpose": "Install AD pathology in Abeta_Monomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Abeta_Oligomer",
+      "name": "evt_install_Abeta_Oligomer",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Abeta_Oligomer": "Abeta_Oligomer + DISEASE_SEVERITY * 2.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Abeta_Oligomer",
+        "delta_per_severity_unit": 7.25,
+        "purpose": "Install AD pathology in Abeta_Oligomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Abeta_Plaque",
+      "name": "evt_install_Abeta_Plaque",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Abeta_Plaque": "Abeta_Plaque + DISEASE_SEVERITY * 2.5000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Abeta_Plaque",
+        "delta_per_severity_unit": 2.5,
+        "purpose": "Install AD pathology in Abeta_Plaque. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_NFkB_p65",
+      "name": "evt_install_NFkB_p65",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "NFkB_p65": "NFkB_p65 + DISEASE_SEVERITY * 20.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "NFkB_p65",
+        "delta_per_severity_unit": 12.5,
+        "purpose": "Install AD pathology in NFkB_p65. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_ROS",
+      "name": "evt_install_ROS",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "ROS": "ROS + DISEASE_SEVERITY * 5.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "ROS",
+        "delta_per_severity_unit": 2.0,
+        "purpose": "Install AD pathology in ROS. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Microglia_M1",
+      "name": "evt_install_Microglia_M1",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Microglia_M1": "Microglia_M1 + DISEASE_SEVERITY * 15.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Microglia_M1",
+        "delta_per_severity_unit": 10.0,
+        "purpose": "Install AD pathology in Microglia_M1. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Microglia_M2",
+      "name": "evt_install_Microglia_M2",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Microglia_M2": "Microglia_M2 + DISEASE_SEVERITY * -10.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Microglia_M2",
+        "delta_per_severity_unit": -7.5,
+        "purpose": "Install AD pathology in Microglia_M2. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Glutathione",
+      "name": "evt_install_Glutathione",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Glutathione": "Glutathione + DISEASE_SEVERITY * -15.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Glutathione",
+        "delta_per_severity_unit": -15.0,
+        "purpose": "Install AD pathology in Glutathione. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_Neuron_Health",
+      "name": "evt_install_Neuron_Health",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "Neuron_Health": "Neuron_Health + DISEASE_SEVERITY * -5.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "Neuron_Health",
+        "delta_per_severity_unit": -2.5,
+        "purpose": "Install AD pathology in Neuron_Health. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_TNFa",
+      "name": "evt_install_TNFa",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "TNFa": "TNFa + DISEASE_SEVERITY * 0.2500"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "TNFa",
+        "delta_per_severity_unit": 0.25,
+        "purpose": "Install AD pathology in TNFa. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_IL1b",
+      "name": "evt_install_IL1b",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "IL1b": "IL1b + DISEASE_SEVERITY * 0.2500"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "IL1b",
+        "delta_per_severity_unit": 0.25,
+        "purpose": "Install AD pathology in IL1b. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_IL6",
+      "name": "evt_install_IL6",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "IL6": "IL6 + DISEASE_SEVERITY * 0.2500"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "IL6",
+        "delta_per_severity_unit": 0.25,
+        "purpose": "Install AD pathology in IL6. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_COX2",
+      "name": "evt_install_COX2",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "COX2": "COX2 + DISEASE_SEVERITY * 0.2500"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "COX2",
+        "delta_per_severity_unit": 0.25,
+        "purpose": "Install AD pathology in COX2. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_install_APP_mRNA",
+      "name": "evt_install_APP_mRNA",
+      "trigger": "t > 0.01",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 10,
+      "assignments": {
+        "APP_mRNA": "APP_mRNA + DISEASE_SEVERITY * 2.0000"
+      },
+      "metadata": {
+        "group": "install_disease",
+        "target": "APP_mRNA",
+        "delta_per_severity_unit": 2.0,
+        "purpose": "Install AD pathology in APP_mRNA. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
+      }
+    },
+    {
+      "id": "evt_load",
+      "name": "evt_load",
+      "trigger": "t >  0.1",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + LOADING_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_1",
+      "name": "evt_maint_1",
+      "trigger": "t >  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_2",
+      "name": "evt_maint_2",
+      "trigger": "t > 2 *  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_3",
+      "name": "evt_maint_3",
+      "trigger": "t >  3* DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_apply_thermodynamics",
+      "name": "evt_apply_thermodynamics",
+      "trigger": "t < 1e-9",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "Temperature_factor": "2**(((TEMPERATURE - 273.15) - 37)/10)",
+        "Age_factor": "1 + 0.02*(AGE - 65)",
+        "pH_acidosis": "max(0, 7.0 - PH)",
+        "pH_neutrality": "1 - 0.3*abs(PH - 7.4)"
+      },
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "_comment_purpose": "Q1 acceptance test — CBD IC50 on NFkB at fixed mid-disease (DSEV=0.5).",
+  "_comment_anchor":  "Wet-lab: Kozela 2010 (BV-2, IC50 ~1 uM TNFa); Esposito 2006 (PC12, NFkB sig. at 1 uM).",
+  "_comment_accept":  "PASS if NFkB_p65 endpoint > 50 at CBD=0 AND < 5 at CBD>=1 AND monotone in between.",
+  "_comment_horizon": "4 h — long enough for Aβ→IKK→NFkB ignition under DSEV=0.5; short enough for fast iteration.",
+
+  "mode": "factorial",
+  "model_path": "workspace/projects/canabidiol/models/canabidiol-q1-testable.shy",
+  "replicates": 30,
+  "duration": 14400,
+  "termination": "time",
+  "seed_base": 42,
+  "tau_epsilon": 0.03,
+  "max_tau": 0.1,
+
+  "parameters": [
+    {
+      "type": "places",
+      "path": "MAINT_DOSE.initial_marking",
+      "values": [0.0, 0.5, 1.0, 2.0, 5.0, 15.0]
+    }
+  ],
+
+  "property_overrides": {
+    "DISEASE_SEVERITY.initial_marking": 0.5,
+    "TEMPERATURE.initial_marking": 310.15,
+    "AGE.initial_marking": 75.0,
+    "PH.initial_marking": 7.4,
+    "LOADING_DOSE.initial_marking": 0.0,
+    "DOSE_INTERVAL.initial_marking": 86400.0
+  },
+
+  "events": []
+}

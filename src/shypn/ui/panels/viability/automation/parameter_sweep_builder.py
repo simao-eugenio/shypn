@@ -1701,8 +1701,11 @@ class ParameterSweepBuilder(Gtk.Box):
         - **R3** (warning): an event is disabled (``enabled=False``) but
           a sweep targets one of its fields.  Sweep value is silently
           unused.
-        - **R4** (warning): two events assign to the same place.  Last
-          one in event order wins; user probably meant only one.
+        - **R4** (warning): two events assign to the same place **at
+          the same scheduled time** (same ``trigger`` string and same
+          ``delay``).  Distinct trigger times are a legitimate dosing /
+          perturbation schedule (loading + maintenance doses) and are
+          NOT flagged.
         """
         issues = []
 
@@ -1721,20 +1724,29 @@ class ParameterSweepBuilder(Gtk.Box):
             sweep_meta.setdefault(path, {'type': 'places', 'id': path,
                                         'source': 'fixed_override'})
 
-        # Walk events.  Each event has assignments {target: expr}.
-        event_targets = {}  # target_id → list of (event_id, enabled)
+        # Walk events.  Capture trigger + delay so we can distinguish a
+        # legitimate dose schedule (same target, different times) from a
+        # genuine duplicate writer (same target, same trigger+delay).
+        # event_targets[target] = list of (event_id, enabled, trigger, delay)
+        event_targets = {}
         for evt in events or []:
             evt_id = evt.get('id') or '?'
             enabled = evt.get('enabled', True)
+            trigger = (evt.get('trigger') or '').strip()
+            delay = float(evt.get('delay') or 0.0)
             assignments = evt.get('assignments') or {}
             for tgt in assignments:
-                event_targets.setdefault(tgt, []).append((evt_id, enabled))
+                event_targets.setdefault(tgt, []).append(
+                    (evt_id, enabled, trigger, delay)
+                )
 
         # R1: sweep target collides with any event assignment target.
         for path in sweep_paths:
             head = path.split('.', 1)[0]
             if head in event_targets:
-                writers = ', '.join(eid for eid, _ in event_targets[head])
+                writers = ', '.join(
+                    eid for (eid, _en, _tr, _dl) in event_targets[head]
+                )
                 issues.append({
                     'severity': 'error',
                     'code': 'R1',
@@ -1778,18 +1790,32 @@ class ParameterSweepBuilder(Gtk.Box):
                         ),
                     })
 
-        # R4: two events writing the same target.
+        # R4: two events writing the same target *at the same time*.
+        # A dose schedule (loading + maintenance doses) writes the same
+        # target at distinct times — that is the entire point and must
+        # NOT trigger this warning.  Group writers by (trigger, delay)
+        # and only warn on a duplicate within a single time-bucket.
         for tgt, writers in event_targets.items():
-            if len(writers) >= 2:
-                ids = ', '.join(eid for eid, _ in writers)
+            buckets: Dict[tuple, List[str]] = {}
+            for (eid, _enabled, trigger, delay) in writers:
+                buckets.setdefault((trigger, delay), []).append(eid)
+            for (trigger, delay), eids in buckets.items():
+                if len(eids) < 2:
+                    continue
+                ids_str = ', '.join(eids)
+                trig_desc = (f"trigger={trigger!r}, delay={delay}"
+                             if trigger else f"delay={delay}")
                 issues.append({
                     'severity': 'warning',
                     'code': 'R4',
                     'path': tgt,
                     'message': (
-                        f"Two or more events write to '{tgt}': {ids}. "
-                        "Last event in execution order wins; if that is "
-                        "not intentional, disable or remove the duplicates."
+                        f"Events {ids_str} all write to '{tgt}' at the "
+                        f"same scheduled time ({trig_desc}). Last event "
+                        "in execution order wins; if that is not "
+                        "intentional, disable or remove the duplicates. "
+                        "(Distinct trigger times — e.g. loading vs. "
+                        "maintenance doses — are NOT flagged here.)"
                     ),
                 })
 

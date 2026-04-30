@@ -2240,6 +2240,111 @@ class FileExplorerPanel:
             traceback.print_exc()
             return False
 
+    def _handle_runtime_token_divergence(self, document) -> bool:
+        """Pre-save check: prompt to promote/discard places whose runtime
+        ``tokens`` value diverges from ``initial_marking``.
+
+        Policy (canonical, see copilot-instructions.md):
+            * ``initial_marking`` is the basal value of the object-net (M_0) —
+              the only marking field the loader reads.
+            * ``tokens`` is transient runtime state, never persisted to .shy.
+            * On save, divergence is surfaced to the modeller. Three choices:
+                - Promote: ``initial_marking := tokens`` (persist runtime drift).
+                - Discard: ``tokens := initial_marking`` (keep design baseline).
+                - Cancel: abort the save.
+
+        Returns:
+            True if save should proceed, False if the modeller cancelled.
+        """
+        try:
+            from shypn.netobjs.patch import find_runtime_divergence
+        except ImportError:
+            return True
+        diverged = find_runtime_divergence(getattr(document, 'places', []) or [])
+        if not diverged:
+            return True
+
+        try:
+            from gi.repository import Gtk  # noqa: F401  (verified GTK available)
+        except Exception:
+            # Headless / GTK unavailable: discard runtime drift defensively
+            # (matches the warning logged by Place.to_dict).
+            for pl in diverged:
+                pl.discard_runtime_tokens()
+            return True
+
+        # Build the listing
+        lines = []
+        for pl in diverged[:50]:
+            lines.append(
+                f"  {getattr(pl, 'name', pl.id)}  ({pl.id}):  "
+                f"runtime tokens = {pl.tokens}   |   "
+                f"initial_marking = {pl.initial_marking}"
+            )
+        if len(diverged) > 50:
+            lines.append(f"  …and {len(diverged) - 50} more")
+        listing = "\n".join(lines)
+
+        dialog = Gtk.Dialog(
+            title="Persist runtime values?",
+            transient_for=getattr(self, 'parent_window', None),
+            modal=True,
+        )
+        dialog.add_button("Cancel save", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Discard runtime", Gtk.ResponseType.NO)
+        promote_btn = dialog.add_button("Promote to initial_marking", Gtk.ResponseType.YES)
+        promote_btn.get_style_context().add_class('suggested-action')
+
+        content = dialog.get_content_area()
+        content.set_spacing(8)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+
+        header = Gtk.Label()
+        header.set_markup(
+            f"<b>{len(diverged)} place(s) have runtime values that differ "
+            f"from their initial_marking.</b>\n\n"
+            "On save, only <tt>initial_marking</tt> is persisted "
+            "(<tt>tokens</tt> is transient runtime state).\n\n"
+            "Choose:\n"
+            "  • <b>Promote</b> — set <tt>initial_marking := tokens</tt> "
+            "(persist the new basal value).\n"
+            "  • <b>Discard</b> — set <tt>tokens := initial_marking</tt> "
+            "(keep the design baseline).\n"
+            "  • <b>Cancel</b> — do not save."
+        )
+        header.set_xalign(0)
+        header.set_line_wrap(True)
+        content.add(header)
+
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_min_content_height(180)
+        scroller.set_min_content_width(520)
+        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        view = Gtk.TextView()
+        view.set_editable(False)
+        view.set_monospace(True)
+        view.set_cursor_visible(False)
+        view.get_buffer().set_text(listing)
+        scroller.add(view)
+        content.add(scroller)
+
+        dialog.show_all()
+        response = dialog.run()
+        dialog.destroy()
+
+        if response == Gtk.ResponseType.YES:
+            for pl in diverged:
+                pl.promote_runtime_tokens()
+            return True
+        if response == Gtk.ResponseType.NO:
+            for pl in diverged:
+                pl.discard_runtime_tokens()
+            return True
+        return False  # Cancel
+
     def save_current_document(self):
         """Save the current document using per-document state.
         
@@ -2266,7 +2371,11 @@ class FileExplorerPanel:
             
             # Convert canvas state to document model
             document = manager.to_document_model()
-            
+
+            # Pre-save: surface runtime tokens vs initial_marking divergence
+            if not self._handle_runtime_token_divergence(document):
+                return  # modeller cancelled
+
             # Determine if we need to auto-generate a filepath
             needs_new_filepath = not manager.has_filepath() or manager.is_default_filename()
             

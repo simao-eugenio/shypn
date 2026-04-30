@@ -666,7 +666,32 @@ class Place(PetriNetObject):
     # ============================================================================
     # Serialization
     # ============================================================================
-    
+
+    def has_runtime_divergence(self) -> bool:
+        """True iff ``self.tokens`` has drifted from ``self.initial_marking``.
+
+        Used by GUI save flow to detect places whose runtime value would be
+        silently dropped on save unless promoted.
+        """
+        return float(self.tokens) != float(self.initial_marking)
+
+    def promote_runtime_tokens(self) -> None:
+        """Promote the live runtime ``tokens`` value to ``initial_marking``.
+
+        After this call the place's basal value (M_0) equals the value the
+        modeller saw at the moment of save. The next ``to_dict()`` will
+        persist that value cleanly with no warning.
+        """
+        self.initial_marking = float(self.tokens)
+
+    def discard_runtime_tokens(self) -> None:
+        """Discard runtime drift: snap ``tokens`` back to ``initial_marking``.
+
+        Use when the modeller explicitly wants to keep the design-time
+        baseline and throw away mid-session pokes.
+        """
+        self.tokens = float(self.initial_marking)
+
     def _serialize_signal_type(self) -> Optional[str]:
         """Serialize signal_type to string for persistence.
         
@@ -692,24 +717,43 @@ class Place(PetriNetObject):
     
     def to_dict(self) -> dict:
         """Serialize place to dictionary for persistence.
-        
+
+        POLICY (canonical, see copilot-instructions.md):
+            * `initial_marking` is the **only** persisted marking field. It is the
+              basal value of the object-net at design time — what the engine reads
+              into M_0 on load.
+            * `tokens` is **transient runtime state** and is **never** written to
+              the .shy file. To persist a runtime change, the modeller must first
+              promote it to `initial_marking` (GUI: confirmation dialog;
+              programmatic: ``Place.promote_runtime_tokens()`` or the
+              ``set_place_value`` helper).
+            * If ``self.tokens != self.initial_marking`` at save time, a WARNING
+              is logged and the runtime value is *dropped*. The save still
+              succeeds — the GUI catches divergence pre-save and prompts the
+              modeller; this log is the safety net for non-GUI callers.
+
         Returns:
             dict: Dictionary containing all place properties
         """
+        if float(self.tokens) != float(self.initial_marking):
+            import logging
+            logging.getLogger(__name__).warning(
+                "Place %s (%s): runtime tokens=%s diverges from initial_marking=%s; "
+                "tokens NOT persisted. Call promote_runtime_tokens() before save "
+                "to persist the runtime value.",
+                self.id, self.name, self.tokens, self.initial_marking,
+            )
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
             "object_type": "place",  # Renamed from "type" to avoid confusion
             "x": self.x,
             "y": self.y,
             "radius": self.radius,
-            # CRITICAL DISTINCTION:
-            # - initial_marking: Static design-time baseline (used for simulation reset)
-            # - marking/tokens: Transient runtime state (may be mid-simulation)
-            # For file persistence, we save initial_marking as the canonical baseline
-            # and also save current tokens for recovery of in-progress states
-            "marking": self.initial_marking,  # Use initial_marking as canonical baseline
-            "tokens": self.tokens,  # Also save current transient state for recovery
-            "initial_marking": self.initial_marking,  # Explicit field for clarity
+            # initial_marking is the ONLY persisted marking field (see policy above).
+            # Legacy `marking` mirror retained for forward-compat with old loaders;
+            # `tokens` is intentionally absent.
+            "marking": self.initial_marking,
+            "initial_marking": self.initial_marking,
             "capacity": "Infinity" if self.capacity == float('inf') else self.capacity,  # Normalize infinity to string for JSON
             "border_color": list(self.border_color),
             "border_width": self.border_width,
@@ -794,16 +838,36 @@ class Place(PetriNetObject):
             label=str(data.get("label", ""))
         )
         
-        # Restore optional properties with CLEAR SEPARATION of static vs transient data
-        # Priority: initial_marking (design-time) > marking (legacy compatibility) > tokens (transient)
+        # Restore optional properties with CLEAR SEPARATION of static vs transient data.
+        #
+        # POLICY (canonical, see copilot-instructions.md):
+        #   * `initial_marking` is the loader's authoritative read scope. It is
+        #     the basal value of the object-net (M_0) at design time.
+        #   * `tokens` in a .shy file is a legacy / corruption indicator: modern
+        #     `Place.to_dict()` never writes it. If it appears AND diverges from
+        #     `initial_marking`, that is the signature of a programmatic patch
+        #     that wrote to the wrong scope (e.g. a script that set
+        #     `place["tokens"] = X` thinking it would change the start value).
+        #     We log a WARNING, IGNORE the tokens key, and reconcile in-memory
+        #     `place.tokens = place.initial_marking` so the runtime starts clean.
+        # Priority: initial_marking (design-time) > marking (legacy) > tokens (transient/corrupted)
         if "initial_marking" in data:
-            # Modern format: initial_marking is the authoritative baseline
             place.initial_marking = float(data["initial_marking"])
-            # Set tokens from saved transient state if available, else use initial_marking
-            place.tokens = float(data.get("tokens", place.initial_marking))
+            if "tokens" in data:
+                file_tokens = float(data["tokens"])
+                if file_tokens != place.initial_marking:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Place %s (%s): file has tokens=%s but initial_marking=%s; "
+                        "loader uses initial_marking. This is the signature of a "
+                        "programmatic patch that wrote to the wrong scope — re-save "
+                        "the model from the GUI (with Promote) or use "
+                        "shypn.netobjs.patch.set_place_value() to fix.",
+                        place_id, name, file_tokens, place.initial_marking,
+                    )
+            place.tokens = place.initial_marking
         elif "marking" in data:
             # Legacy format: marking was used for both (ambiguous)
-            # Assume marking is the baseline and use it for both
             place.initial_marking = float(data["marking"])
             place.tokens = float(data["marking"])
         else:
