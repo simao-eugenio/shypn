@@ -34,6 +34,10 @@ from shypn.ui.panels.viability.automation.property_path_parser import parse_prop
 class FactorialSweep(SweepConfig):
     """Full factorial design across multiple parameter axes."""
 
+    # Top-level JSON keys this mode recognises in addition to the
+    # universal set declared in sweep_config._UNIVERSAL_TOP_LEVEL_KEYS.
+    KNOWN_KEYS: frozenset = frozenset({'parameters'})
+
     def __init__(
         self,
         sim_params: SimulationParams,
@@ -41,7 +45,10 @@ class FactorialSweep(SweepConfig):
     ) -> None:
         super().__init__(sim_params)
         if len(parameters) < 2:
-            raise ValueError("Factorial sweep requires at least 2 parameters")
+            raise ValueError(
+                "factorial mode requires ≥2 parameters; "
+                "use mode:'single' for a one-axis sweep"
+            )
         self.parameters = parameters
 
     # ── SweepConfig interface ────────────────────────────────────────
@@ -70,6 +77,12 @@ class FactorialSweep(SweepConfig):
             snap.arc_weights = baseline.arc_weights.copy()
             snap.transition_rates = baseline.transition_rates.copy()
             snap.property_overrides = getattr(baseline, 'property_overrides', {}).copy()
+            # Layer B: sweep-wide fixed overrides apply to every snapshot
+            # *before* the swept axes. Swept values are written last and
+            # therefore win on collision (which the UI collision detector
+            # in parameter_sweep_builder forbids in the first place).
+            for fp, fv in self.fixed_overrides.items():
+                snap.property_overrides[fp] = fv
 
             for (spec, obj_id, prop_name), value in zip(parsed, combo):
                 snap.property_overrides[f"{obj_id}.{prop_name}"] = value

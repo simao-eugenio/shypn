@@ -200,6 +200,7 @@ class RemoteSweepDispatcher:
         complete_cb: Optional[Callable[[bool, str, str], None]] = None,
         ssh_password: Optional[str] = None,
         events: Optional[list] = None,
+        fixed_overrides: Optional[dict] = None,
     ):
         """Launch the remote sweep pipeline on a background thread.
 
@@ -231,7 +232,8 @@ class RemoteSweepDispatcher:
             target=self._run_pipeline,
             args=(model_filepath, project_folder, experiment_manager,
                   sim_params, progress_cb, complete_cb, ssh_password,
-                  list(events) if events else []),
+                  list(events) if events else [],
+                  dict(fixed_overrides) if fixed_overrides else None),
             daemon=True,
         )
         self._thread.start()
@@ -247,6 +249,7 @@ class RemoteSweepDispatcher:
         complete_cb,
         ssh_password: Optional[str] = None,
         events: Optional[list] = None,
+        fixed_overrides: Optional[dict] = None,
     ):
         staging = None
         host = self.settings.ssh_host
@@ -313,6 +316,7 @@ class RemoteSweepDispatcher:
                 filepath=str(config_path),
                 model_path=model_rel_to_project,
                 events=events or None,
+                fixed_overrides=fixed_overrides or None,
                 **sim_params,
             )
             # Audit log: dump event count + ids straight from the file

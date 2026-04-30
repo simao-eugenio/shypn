@@ -543,6 +543,7 @@ class ExperimentManager:
         max_tau: float = 0.1,
         events: list = None,
         output_tier: str = 'G3',
+        fixed_overrides: dict = None,
     ):
         """Export a CLI-ready sweep configuration JSON.
 
@@ -585,6 +586,20 @@ class ExperimentManager:
             # sweep worker installs them on model.events before each run
             # so the engine's _evaluate_environment_events picks them up.
             config['events'] = list(events)
+        if fixed_overrides:
+            # Sweep-wide constants — applied to every condition before the
+            # swept axis layers on (see SweepConfig.fixed_overrides /
+            # generate_snapshots in the engine).  Coerce values to float
+            # here so a stray string from a Gtk.Entry surfaces as a
+            # dispatch-side error rather than a silent runtime no-op.
+            try:
+                config['fixed_overrides'] = {
+                    str(k): float(v) for k, v in fixed_overrides.items()
+                }
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"fixed_overrides values must be numeric: {exc}"
+                ) from exc
         # Output granularity: only emit when non-default to keep configs tidy.
         # Read by SweepConfig.from_dict → OutputOptions; gates worker writes.
         if output_tier and output_tier != 'G3':

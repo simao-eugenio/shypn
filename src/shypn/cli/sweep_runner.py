@@ -403,6 +403,9 @@ class SweepRunner:
         sim_dict = asdict(sim)
 
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
+        # Layer D: aggregate per-condition parameter_sources for provenance.
+        # Keyed by condition name → {prop_path: {source, value, prior}}.
+        sources_by_condition: Dict[str, Dict[str, Any]] = {}
         n_workers = min(self.workers, n_conditions)
 
         # Adaptive replicate distribution: when there are fewer conditions
@@ -484,6 +487,9 @@ class SweepRunner:
                         'cpu_seconds': round(cpu_s, 2),
                         'peak_rss_mib': round(peak_mib, 1),
                     }
+                    sources_by_condition[label] = result_payload.get(
+                        'parameter_sources', {}
+                    )
 
                     if self.verbose:
                         cpu_pct = (cpu_s / cond_elapsed * 100.0) if cond_elapsed > 0 else 0.0
@@ -574,6 +580,36 @@ class SweepRunner:
         except Exception as _exc:
             logger.warning("Failed to write resource_usage.json: %s", _exc)
 
+        # ── Layer D: parameter_sources audit ─────────────────────────
+        # Persist per-condition source map so analysts (and the
+        # 'reload-and-rerun' path) can confirm at a glance which knobs
+        # actually moved away from the model defaults. Augments
+        # provenance.json if it was uploaded; otherwise written
+        # standalone next to it. Keys in the per-condition dict are
+        # full property paths (e.g. "P38.initial_marking"); each value
+        # is {source: 'sweep'|'fixed_override'|'event'|'snapshot',
+        #     value: applied, prior: model-default}.
+        try:
+            import json as _json_ps2
+            prov_file = output.run_dir / 'provenance.json'
+            if prov_file.is_file():
+                with open(prov_file, 'r') as _pf:
+                    prov_doc = _json_ps2.load(_pf)
+            else:
+                prov_doc = {}
+            prov_doc['parameter_sources'] = sources_by_condition
+            with open(prov_file, 'w') as _pf:
+                _json_ps2.dump(prov_doc, _pf, indent=2, sort_keys=True)
+            if self.verbose:
+                n_overrides = sum(len(v) for v in sources_by_condition.values())
+                print(
+                    f"Provenance: parameter_sources written "
+                    f"({len(sources_by_condition)} conditions, "
+                    f"{n_overrides} overrides total)"
+                )
+        except Exception as _exc:
+            logger.warning("Failed to augment provenance.json: %s", _exc)
+
         if self.verbose:
             print(f"\nSweep complete in {wall_total:.1f}s")
             print(f"Results: {output.run_dir}")
@@ -609,8 +645,20 @@ class SweepRunner:
         model: Any,
         snapshot: ExperimentSnapshot,
         baseline: ExperimentSnapshot,
-    ) -> None:
-        """Apply a snapshot's overrides to the live model."""
+    ) -> Dict[str, Any]:
+        """Apply a snapshot's overrides to the live model.
+
+        Returns:
+            ``parameter_sources``: dict mapping each property path that
+            differs from the model default to the metadata needed for
+            provenance — origin tag (``'sweep'`` / ``'fixed_override'`` /
+            ``'snapshot'`` / ``'event'``), the applied value, and the
+            prior model value.  Written into ``provenance.json`` alongside
+            ``model_sha256`` so every run can be audited for which knobs
+            actually moved.  See instructions §"Sweep \u2194 model
+            superposition rule" (Layer D of the 2026-04-30 sweep-pipeline
+            audit).
+        """
         # First restore baseline so previous condition's overrides don't leak
         for p in model.places:
             p.tokens = baseline.place_markings.get(p.id, p.tokens)
@@ -635,13 +683,53 @@ class SweepRunner:
             if a.id in snapshot.arc_weights:
                 a.weight = float(snapshot.arc_weights[a.id])
 
-        # Apply property overrides (takes precedence)
+        # ── Apply property_overrides (highest precedence) ─────────────
+        # Tracks each applied override so the worker can write
+        # parameter_sources into provenance.json.  An override is tagged
+        # 'sweep' if its path matches snapshot.swept_parameter, otherwise
+        # 'fixed_override' for sweep-wide constants or 'snapshot' for
+        # bespoke per-condition values from mode:snapshots.
+        param_sources: Dict[str, Any] = {}
+        swept_path: Optional[str] = None
+        swept_meta = getattr(snapshot, 'swept_parameter', None)
+        if isinstance(swept_meta, dict):
+            swept_id = swept_meta.get('id', '')
+            # factorial uses '; '-joined ids; record each separately
+            swept_path = swept_id
+
         for prop_path, value in getattr(snapshot, 'property_overrides', {}).items():
+            origin = (
+                'sweep'
+                if swept_path and (
+                    prop_path == swept_path
+                    or (isinstance(swept_path, str) and prop_path in swept_path)
+                )
+                else 'fixed_override'
+            )
             try:
-                obj_id, prop_name = parse_property_path(prop_path)
-                obj = resolve_object(model, obj_id)
-                if obj is not None:
+                if _is_event_path(prop_path):
+                    prior = _apply_event_override(model, prop_path, value)
+                    origin = 'event'  # event-field sweeps are still 'event'-typed
+                else:
+                    obj_id, prop_name = parse_property_path(prop_path)
+                    obj = resolve_object(model, obj_id)
+                    if obj is None:
+                        logger.warning(
+                            "Override target %s not found in model", prop_path
+                        )
+                        continue
+                    prior = _read_property(obj, prop_name)
                     apply_property_to_object(obj, prop_name, value)
+                logger.info(
+                    "[override] %s = %s (was %s, source=%s)",
+                    prop_path, value, prior, origin,
+                )
+                param_sources[prop_path] = {
+                    'source': origin,
+                    'value': float(value)
+                              if isinstance(value, (int, float)) else value,
+                    'prior': prior,
+                }
             except Exception as exc:
                 logger.warning("Failed to apply %s=%s: %s", prop_path, value, exc)
 
@@ -653,6 +741,8 @@ class SweepRunner:
                 p.initial_tokens = p.tokens
             if hasattr(p, 'initial_marking'):
                 p.initial_marking = p.tokens
+
+        return param_sources
 
     @staticmethod
     def _restore_baseline(model: Any, baseline: ExperimentSnapshot) -> None:
@@ -688,6 +778,70 @@ def _dict_to_snapshot(d: dict) -> ExperimentSnapshot:
     snap.arc_weights = d['arc_weights']
     snap.property_overrides = d.get('property_overrides', {})
     return snap
+
+
+# ── Event-field override helpers (Layer B+) ──────────────────────────
+# A path is treated as an event-field override iff its first dotted
+# component matches an event id present on the model.  Supported fields
+# (the second component) are listed in _EVENT_SWEEPABLE_FIELDS.  All
+# other event fields raise to keep the sweep error-loud.
+#
+# Canonical "sweep an event payload value" pattern: do **not** sweep an
+# assignment expression directly — instead introduce a ▢ parameter place
+# that the assignment RHS reads (Pattern A bridge per AGENT_RULES.md),
+# and sweep that ▢ place's initial_marking.  This keeps event RHS
+# deterministic and biologically-meaningful.
+_EVENT_SWEEPABLE_FIELDS = frozenset({'delay', 'priority'})
+
+
+def _is_event_path(prop_path: str) -> bool:
+    """Heuristic: treat any path whose head starts with 'evt_' as an event override.
+
+    The dispatcher / UI uses a stable ``evt_*`` prefix on every event id
+    (see ui/panels/environment/events_category). Anything else falls
+    through to the place/transition/arc resolver.
+    """
+    head = prop_path.split('.', 1)[0]
+    return head.startswith('evt_')
+
+
+def _apply_event_override(model: Any, prop_path: str, value: Any) -> Any:
+    """Mutate one field on a ``model.events`` entry; return the prior value.
+
+    Raises:
+        ValueError: if the event id or field is unknown / unsupported.
+    """
+    parts = prop_path.split('.', 1)
+    if len(parts) != 2:
+        raise ValueError(
+            f"event override path must be '<evt_id>.<field>', got {prop_path!r}"
+        )
+    evt_id, field = parts
+    if field not in _EVENT_SWEEPABLE_FIELDS:
+        raise ValueError(
+            f"event field {field!r} is not sweepable; "
+            f"supported fields: {sorted(_EVENT_SWEEPABLE_FIELDS)}. "
+            f"For payload-value sweeps, sweep a ▢ parameter place that "
+            f"the event RHS reads (Pattern A bridge)."
+        )
+    events = getattr(model, 'events', None) or []
+    target = next((e for e in events if getattr(e, 'id', None) == evt_id), None)
+    if target is None:
+        raise ValueError(
+            f"event {evt_id!r} not found on model "
+            f"(known: {[getattr(e, 'id', '?') for e in events]})"
+        )
+    prior = getattr(target, field, None)
+    setattr(target, field, float(value) if field == 'delay' else int(value))
+    return prior
+
+
+def _read_property(obj: Any, prop_name: str) -> Any:
+    """Best-effort read of a property's prior value before override."""
+    # Mirror the alias collapse done in apply_property_to_object
+    if prop_name == 'initial_marking':
+        return getattr(obj, 'tokens', getattr(obj, 'initial_marking', None))
+    return getattr(obj, prop_name, None)
 
 
 def _sanitise_condition_name(name: str) -> str:
@@ -782,8 +936,8 @@ def _run_single_condition(
     baseline = _dict_to_snapshot(baseline_dict)
     snapshot = _dict_to_snapshot(snapshot_dict)
 
-    # Apply overrides
-    SweepRunner._apply_snapshot(model, snapshot, baseline)
+    # Apply overrides; capture per-path origin info for provenance (Layer D).
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline)
 
     # Install environment events forwarded from the dispatching client.
     # These are defined on the GUI Environment Panel and travel inside
@@ -862,6 +1016,22 @@ def _run_single_condition(
             stats_to_write = stats
         SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
 
+    # Persist parameter_sources alongside statistics for provenance.
+    # Empty dict still written so downstream tooling can rely on the
+    # file's existence as evidence the new code path ran.
+    try:
+        import json as _json_ps
+        with open(cond_dir / 'parameter_sources.json', 'w') as _psf:
+            _json_ps.dump({
+                'condition': snapshot.name,
+                'sources': param_sources,
+            }, _psf, indent=2, sort_keys=True)
+    except OSError as _exc:
+        import logging as _lg2
+        _lg2.getLogger(__name__).warning(
+            "Failed to write parameter_sources.json: %s", _exc
+        )
+
     # Free trajectory data immediately — this is the critical memory
     # reclamation point.  Without this, the worker holds ~0.5–1.5 GB
     # of trajectory arrays until the function returns.
@@ -882,4 +1052,5 @@ def _run_single_condition(
         'peak_rss_mib': peak_rss_mib,
         'replicates_ok': n_ok,
         'replicates_error': n_err,
+        'parameter_sources': param_sources,
     }
