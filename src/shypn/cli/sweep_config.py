@@ -39,18 +39,31 @@ class SimulationParams:
             raise ValueError(f"tau_epsilon must be in (0, 1], got {self.tau_epsilon}")
 
 
+# Allowed sweep target types.
+#   places       — place property (e.g. "P5.initial_marking")
+#   transitions  — transition property (e.g. "T12.rate")
+#   arcs         — arc property (e.g. "A34.weight")
+#   events       — environment-event field (e.g. "evt_loading_dose.delay").
+#                  See sweep_runner._apply_snapshot for the supported field
+#                  set; canonical ‘sweep an event payload value’ uses the
+#                  Pattern A bridge: sweep a ▢ parameter place that the
+#                  event RHS reads (e.g. LOADING_DOSE.initial_marking).
+PARAMETER_SWEEP_TYPES = ('places', 'transitions', 'arcs', 'events')
+
+
 @dataclass(frozen=True)
 class ParameterSpec:
     """One swept parameter axis: type, property path, and values."""
 
-    param_type: str          # 'places', 'transitions', 'arcs'
-    path: str                # e.g. 'P_EPO.initial_marking' or 'EPO_external.initial_marking'
+    param_type: str          # see PARAMETER_SWEEP_TYPES
+    path: str                # e.g. 'P_EPO.initial_marking' or 'evt_loading_dose.delay'
     values: List[float]
 
     def __post_init__(self) -> None:
-        if self.param_type not in ('places', 'transitions', 'arcs'):
+        if self.param_type not in PARAMETER_SWEEP_TYPES:
             raise ValueError(
-                f"param_type must be places|transitions|arcs, got '{self.param_type}'"
+                f"param_type must be one of {PARAMETER_SWEEP_TYPES}, "
+                f"got '{self.param_type}'"
             )
         if not self.values:
             raise ValueError("values list must not be empty")
@@ -146,6 +159,16 @@ class SweepConfig(ABC):
         # time.  Each entry is a dict produced by Event.to_dict().  Applied
         # to every condition (per-snapshot override is not yet implemented).
         self.events: List[Dict[str, Any]] = []
+        # Top-level **fixed** property overrides — applied to every
+        # snapshot before the swept axis layers on. Use this for sweep-wide
+        # constants (e.g. DISEASE_SEVERITY=0.5, TEMPERATURE=310.15) that
+        # the user wants to differ from the model defaults but should NOT
+        # vary across conditions. Keys are full property paths
+        # ("P38.initial_marking"); values are floats.
+        # Precedence at apply-time:
+        #   model defaults < fixed_overrides < per-snapshot overrides
+        #     < swept axis  < events fired during the run
+        self.fixed_overrides: Dict[str, float] = {}
 
     # ── abstract contract ─────────────────────────────────────────────
 
@@ -190,6 +213,8 @@ class SweepConfig(ABC):
         }
         if self.events:
             d['events'] = list(self.events)
+        if self.fixed_overrides:
+            d['fixed_overrides'] = dict(self.fixed_overrides)
         # Output granularity (only emitted if non-default to keep configs tidy)
         if self.output.tier != DEFAULT_OUTPUT_TIER \
                 or self.output.trajectory_places is not None \
@@ -202,7 +227,10 @@ class SweepConfig(ABC):
         """Dispatch to the correct subclass based on ``mode`` key.
 
         Raises:
-            ValueError: If ``mode`` is missing or unrecognised.
+            ValueError: If ``mode`` is missing, unrecognised, or any
+                top-level key is not a recognised configuration field
+                (silent-drop guardrail — see Layer A of the 2026-04-30
+                sweep-pipeline audit).
         """
         from shypn.cli.sweep_single import SingleParameterSweep
         from shypn.cli.sweep_factorial import FactorialSweep
@@ -223,6 +251,29 @@ class SweepConfig(ABC):
                 f"Unknown sweep mode '{mode}'. "
                 f"Supported: {', '.join(dispatch)}"
             )
+
+        # ── Layer A guardrail: reject unknown top-level keys ────────────
+        # Computed as the union of the universal top-level keys and the
+        # subclass's mode-specific keys. Any leftover key is almost always
+        # a typo or a deprecated/unmigrated payload — failing loudly is
+        # far safer than silently dropping it (Q1 sweep, run_20260430_135106:
+        # 30 reps × 7 conditions × 4 h GPU time wasted because top-level
+        # `property_overrides` was silently ignored by this very loader).
+        known = set(_UNIVERSAL_TOP_LEVEL_KEYS) | set(
+            getattr(cls, 'KNOWN_KEYS', ())
+        )
+        unknown = set(data.keys()) - known
+        if unknown:
+            raise ValueError(
+                f"Unrecognised top-level keys in sweep config: "
+                f"{sorted(unknown)}.\n"
+                f"Recognised keys for mode='{mode}': {sorted(known)}.\n"
+                f"Hint: per-condition overrides belong under 'snapshots' "
+                f"(mode:snapshots) or are derived from 'parameter'/'parameters' "
+                f"(mode:single/factorial); sweep-wide constants belong under "
+                f"'fixed_overrides'."
+            )
+
         result = cls.from_dict(data)  # type: ignore[attr-defined]
         # Preserve model_path from JSON so CLI can pick it up
         if 'model_path' in data:
@@ -233,6 +284,25 @@ class SweepConfig(ABC):
         events = data.get('events') or []
         if events:
             result.events = list(events)
+        # Sweep-wide fixed property overrides (Layer B). Validated as
+        # {full_path: numeric_value}. Empty / missing → no overrides.
+        fixed = data.get('fixed_overrides') or {}
+        if fixed:
+            if not isinstance(fixed, dict):
+                raise ValueError(
+                    f"'fixed_overrides' must be a JSON object "
+                    f"({{path: value}}), got {type(fixed).__name__}"
+                )
+            normalised: Dict[str, float] = {}
+            for k, v in fixed.items():
+                try:
+                    normalised[str(k)] = float(v)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"fixed_overrides[{k!r}] must be numeric, "
+                        f"got {v!r} ({exc})"
+                    )
+            result.fixed_overrides = normalised
         # Hydrate output options if present
         if 'output' in data:
             result.output = OutputOptions.from_dict(data['output'])
@@ -257,3 +327,26 @@ def _build_sim_params(data: Dict[str, Any]) -> SimulationParams:
         max_tau=float(data.get('max_tau', 0.1)),
         time_step=float(data['time_step']) if data.get('time_step') is not None else None,
     )
+
+
+# ── Top-level schema (Layer A: silent-drop guardrail) ──────────────────
+#
+# Universal keys accepted at the JSON root regardless of sweep mode.
+# Subclasses (SingleParameterSweep, FactorialSweep, SnapshotsSweep) extend
+# this set via a class-level ``KNOWN_KEYS`` attribute.  Anything else
+# triggers a hard ValueError in :meth:`SweepConfig.from_dict` — see the
+# 2026-04-30 sweep-pipeline audit (Layer A) for the rationale.
+_UNIVERSAL_TOP_LEVEL_KEYS = frozenset({
+    # SimulationParams fields
+    'replicates', 'duration', 'termination', 'seed_base',
+    'tau_epsilon', 'max_tau', 'time_step',
+    # SweepConfig dispatch + plumbing
+    'mode', 'model_path', 'events', 'output',
+    'fixed_overrides',
+    # Optional metadata emitted by ExperimentManager.export_to_json
+    'exported_from', 'exported_date',
+    # Optional escape hatch for documented superposition (see
+    # /memories/repo/hpn_experiment_plan_rule.md and the project
+    # instructions §"Sweep ↔ model superposition rule").
+    'superposition_intent',
+})

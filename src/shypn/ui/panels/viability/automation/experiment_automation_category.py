@@ -344,6 +344,18 @@ class ExperimentAutomationCategory:
             if hasattr(self.sweep_builder, 'name_combo'):
                 self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
                 self.sweep_builder.name_combo.set_active(0)
+
+        # Re-populate the fixed-overrides section (▢ parameter places)
+        # whenever the model topology changes — same trigger as the main
+        # parameter list refresh.
+        if hasattr(self.sweep_builder, 'refresh_fixed_overrides'):
+            try:
+                self.sweep_builder.refresh_fixed_overrides()
+            except Exception as exc:
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "refresh_fixed_overrides failed: %s", exc
+                )
     
     def _on_sweep_generate(self, config):
         """Handle parameter sweep generation (single or factorial).
@@ -877,6 +889,34 @@ class ExperimentAutomationCategory:
                 return False
             GLib.idle_add(_ui)
 
+        # ── Collect fixed_overrides + run collision detector ────────
+        # Layer C: catches the silent-superposition cases (sweep target
+        # == event assignment target) before bytes leave the box.  Hard
+        # error on R1 unless the operator explicitly opts in via the
+        # confirmation dialog.
+        try:
+            fixed_overrides = self.sweep_builder.get_fixed_overrides() \
+                if self.sweep_builder else {}
+        except ValueError as exc:
+            self._show_error(f"Invalid fixed-override value:\n\n{exc}")
+            return
+
+        events = self._collect_model_events()
+        if self.sweep_builder is not None:
+            issues = self.sweep_builder.detect_sweep_event_collisions(
+                snapshots=self.experiment_manager.snapshots,
+                events=events,
+                fixed_overrides=fixed_overrides,
+            )
+        else:
+            issues = []
+        errors = [i for i in issues if i.get('severity') == 'error']
+        warnings = [i for i in issues if i.get('severity') == 'warning']
+        if errors or warnings:
+            allow = self._confirm_sweep_event_collisions(errors, warnings)
+            if not allow:
+                return
+
         self._remote_dispatcher.dispatch(
             model_filepath=model_filepath,
             project_folder=project_folder,
@@ -885,7 +925,8 @@ class ExperimentAutomationCategory:
             progress_cb=on_progress,
             complete_cb=on_complete,
             ssh_password=ssh_password or None,
-            events=self._collect_model_events(),
+            events=events,
+            fixed_overrides=fixed_overrides or None,
         )
 
     def _collect_model_events(self) -> list:
@@ -2200,6 +2241,65 @@ class ExperimentAutomationCategory:
             self.sweep_builder.preview_label.set_markup(
                 f"<span foreground='red'>Error: {message}</span>"
             )
+
+    def _confirm_sweep_event_collisions(self, errors, warnings) -> bool:
+        """Show a modal explaining sweep / event collisions.
+
+        Returns ``True`` if the operator chooses to dispatch anyway
+        (errors are demoted to a warning recorded in the config as
+        ``superposition_intent: 'complexity_reduction'``), ``False`` if
+        they cancel.
+
+        Pure errors must be acknowledged with a separate explicit
+        "Dispatch anyway" button so a casual click on "OK" cannot bypass
+        the safety check.
+        """
+        lines = []
+        if errors:
+            lines.append('<b><span foreground="red">Errors</span></b> '
+                         '(would silently superimpose two writers):')
+            for it in errors:
+                lines.append(
+                    f'  • [<tt>{it.get("code", "")}</tt>] '
+                    f'{GLib.markup_escape_text(it.get("message", ""))}'
+                )
+            lines.append('')
+        if warnings:
+            lines.append('<b><span foreground="#a0760a">Warnings</span></b>:')
+            for it in warnings:
+                lines.append(
+                    f'  • [<tt>{it.get("code", "")}</tt>] '
+                    f'{GLib.markup_escape_text(it.get("message", ""))}'
+                )
+            lines.append('')
+        if errors:
+            lines.append(
+                'Recommended actions: change the sweep target, or '
+                'remove/disable the colliding event(s).  Click '
+                '<b>Dispatch anyway</b> only if the superposition is '
+                'genuinely intentional — it will be recorded in the '
+                'sweep config.'
+            )
+
+        dialog = Gtk.MessageDialog(
+            transient_for=self.get_widget().get_toplevel() if self.get_widget() else None,
+            flags=Gtk.DialogFlags.MODAL,
+            message_type=(Gtk.MessageType.ERROR if errors else Gtk.MessageType.WARNING),
+            buttons=Gtk.ButtonsType.NONE,
+            text=('Sweep / event collision detected'
+                  if errors else 'Sweep / event configuration warnings'),
+        )
+        dialog.format_secondary_markup('\n'.join(lines))
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        if errors:
+            dialog.add_button('Dispatch anyway', Gtk.ResponseType.OK)
+        else:
+            dialog.add_button('Continue', Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.CANCEL)
+
+        response = dialog.run()
+        dialog.destroy()
+        return response == Gtk.ResponseType.OK
     
     def get_widget(self):
         """Get the category widget for packing into parent panel.

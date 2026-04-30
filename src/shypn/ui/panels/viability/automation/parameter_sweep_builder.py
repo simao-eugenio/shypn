@@ -461,7 +461,15 @@ class ParameterSweepBuilder(Gtk.Box):
         sim_outer_vbox.pack_start(subgroups_hbox, False, False, 0)
         sim_frame.add(sim_outer_vbox)
         self.pack_start(sim_frame, False, False, 0)
-        
+
+        # === FIXED ENVIRONMENT VALUES (▢ parameter places) ===========
+        # Sweep-wide constants applied to every condition before the swept
+        # axis layers on.  The legitimate channel for the use case that
+        # used to be smuggled in via top-level ``property_overrides`` (the
+        # silent-drop bug that wasted the Q1 sweep, run_20260430_135106).
+        # See SweepConfig.fixed_overrides on the engine side.
+        self._build_fixed_overrides_section()
+
         # === PREVIEW AND ACTIONS ===
         action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         action_box.set_margin_top(6)
@@ -1521,6 +1529,272 @@ class ParameterSweepBuilder(Gtk.Box):
             self.factorial_add_combo.append("none", placeholder_msg)
             self.factorial_add_combo.set_active(0)
     
+    # ── Fixed-overrides section (▢ parameter places) ─────────────────
+
+    def _build_fixed_overrides_section(self):
+        """Build the collapsible 'Fixed environment values' section.
+
+        Lists every place flagged ``is_parameter_place=True`` (the ▢
+        carrier in the formalism) with an editable numeric entry.  Values
+        entered here become the ``fixed_overrides`` block of the exported
+        sweep config and are applied to every condition before the swept
+        axis layers on (engine: SweepConfig.fixed_overrides).
+
+        The section is hidden by default (Gtk.Expander collapsed) so it
+        does not crowd the existing UI.  Empty when the model has no
+        parameter places.
+        """
+        self._fixed_override_rows = []  # list of (place_id, place_name, Gtk.Entry, baseline_str)
+
+        self.fixed_expander = Gtk.Expander()
+        self.fixed_expander.set_label('Fixed environment values (▢ parameter places)')
+        self.fixed_expander.set_tooltip_text(
+            'Sweep-wide constants applied to every condition before the\n'
+            'swept axis layers on. Use this for protocol metadata that is\n'
+            'shared across all conditions (e.g. Disease_Severity, Age,\n'
+            'Temperature). Lists every ▢ place — leave entries blank to\n'
+            "keep the model's static value."
+        )
+        self.fixed_expander.set_expanded(False)
+        self.fixed_expander.set_margin_top(6)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        outer.set_margin_start(12)
+        outer.set_margin_end(12)
+        outer.set_margin_top(4)
+        outer.set_margin_bottom(4)
+
+        self._fixed_overrides_grid = Gtk.Grid()
+        self._fixed_overrides_grid.set_column_spacing(8)
+        self._fixed_overrides_grid.set_row_spacing(4)
+        outer.pack_start(self._fixed_overrides_grid, False, False, 0)
+
+        self._fixed_overrides_empty_label = Gtk.Label(
+            label='(no parameter places ▢ in the current model)'
+        )
+        self._fixed_overrides_empty_label.set_xalign(0)
+        self._fixed_overrides_empty_label.set_sensitive(False)
+        outer.pack_start(self._fixed_overrides_empty_label, False, False, 0)
+
+        self.fixed_expander.add(outer)
+        self.pack_start(self.fixed_expander, False, False, 0)
+
+    def refresh_fixed_overrides(self):
+        """Re-populate the fixed-overrides section from the current model.
+
+        Idempotent: safe to call from the parent category whenever the
+        model changes.  Preserves user-entered values that still match a
+        live parameter place by id.
+        """
+        if not hasattr(self, '_fixed_overrides_grid'):
+            return
+        # Capture any currently-typed values so we don't clobber user input
+        # on a refresh triggered by a topology change.
+        prior = {pid: entry.get_text().strip()
+                 for (pid, _name, entry, _base) in self._fixed_override_rows}
+
+        for child in list(self._fixed_overrides_grid.get_children()):
+            self._fixed_overrides_grid.remove(child)
+        self._fixed_override_rows = []
+
+        model = None
+        if self.viability_panel is not None:
+            canvas = getattr(self.viability_panel, 'canvas', None)
+            if canvas is not None:
+                model = getattr(canvas, 'model', None)
+        places = getattr(model, 'places', None) or []
+        param_places = [p for p in places
+                        if getattr(p, 'is_parameter_place', False)]
+
+        if not param_places:
+            self._fixed_overrides_empty_label.show()
+            return
+        self._fixed_overrides_empty_label.hide()
+
+        # Header
+        for col, txt in enumerate(('Place (▢)', 'Baseline', 'Override value')):
+            lbl = Gtk.Label()
+            lbl.set_markup(f'<b>{txt}</b>')
+            lbl.set_xalign(0)
+            self._fixed_overrides_grid.attach(lbl, col, 0, 1, 1)
+
+        for row_idx, place in enumerate(param_places, start=1):
+            pid = getattr(place, 'id', '')
+            pname = getattr(place, 'name', '') or pid
+            baseline = getattr(place, 'tokens', None)
+            if baseline is None:
+                baseline = getattr(place, 'initial_marking', 0.0)
+            try:
+                baseline_f = float(baseline)
+            except (TypeError, ValueError):
+                baseline_f = 0.0
+            baseline_str = f'{baseline_f:g}'
+
+            name_lbl = Gtk.Label(label=pname)
+            name_lbl.set_xalign(0)
+            name_lbl.set_tooltip_text(f'{pid} (initial_marking)')
+            self._fixed_overrides_grid.attach(name_lbl, 0, row_idx, 1, 1)
+
+            base_lbl = Gtk.Label(label=baseline_str)
+            base_lbl.set_xalign(0)
+            base_lbl.set_sensitive(False)
+            self._fixed_overrides_grid.attach(base_lbl, 1, row_idx, 1, 1)
+
+            entry = Gtk.Entry()
+            entry.set_width_chars(10)
+            entry.set_placeholder_text(baseline_str)
+            entry.set_tooltip_text(
+                'Numeric override applied to every sweep condition.\n'
+                "Leave blank to keep the model's baseline."
+            )
+            # Restore prior user input on refresh.
+            if pid in prior and prior[pid]:
+                entry.set_text(prior[pid])
+            self._fixed_overrides_grid.attach(entry, 2, row_idx, 1, 1)
+
+            self._fixed_override_rows.append((pid, pname, entry, baseline_str))
+
+        self._fixed_overrides_grid.show_all()
+
+    def get_fixed_overrides(self) -> dict:
+        """Return ``{path: float}`` for non-blank fixed-override entries.
+
+        Path is canonical ``<place_id>.initial_marking`` (matching what
+        the engine's ``_apply_snapshot`` expects).  Skips rows whose entry
+        equals the baseline string (would be a redundant override flagged
+        by the engine validator).  Raises ``ValueError`` on a non-numeric
+        entry — surface as a dialog before dispatch.
+        """
+        if not getattr(self, '_fixed_override_rows', None):
+            return {}
+        out = {}
+        for pid, pname, entry, baseline_str in self._fixed_override_rows:
+            txt = entry.get_text().strip()
+            if not txt or txt == baseline_str:
+                continue
+            try:
+                out[f'{pid}.initial_marking'] = float(txt)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Fixed override for {pname} ({pid}) "
+                    f"is not numeric: {txt!r}"
+                ) from exc
+        return out
+
+    # ── Sweep / event collision detector ─────────────────────────────
+
+    def detect_sweep_event_collisions(
+        self,
+        snapshots,
+        events,
+        fixed_overrides,
+    ):
+        """Walk the planned sweep + events and report collisions.
+
+        Returns a list of dicts ``{severity, code, message}`` where
+        severity is ``'error'`` (R1 — sweep target == event assignment
+        target, hard-blocks dispatch unless the operator explicitly opts
+        into superposition) or ``'warning'`` (R3, R4 — soft).
+
+        - **R1** (error): a swept parameter targets the same place that an
+          event also writes to.  Two writers ⇒ unintended superposition.
+        - **R3** (warning): an event is disabled (``enabled=False``) but
+          a sweep targets one of its fields.  Sweep value is silently
+          unused.
+        - **R4** (warning): two events assign to the same place.  Last
+          one in event order wins; user probably meant only one.
+        """
+        issues = []
+
+        # Collect every sweep-target path (snapshots + fixed overrides).
+        sweep_paths = set()
+        sweep_meta = {}
+        for snap in snapshots or []:
+            sp = getattr(snap, 'swept_parameter', None) or {}
+            pid = sp.get('id') or sp.get('path')
+            if pid:
+                sweep_paths.add(pid)
+                sweep_meta.setdefault(pid, sp)
+        # Fixed overrides also count as writers for collision purposes.
+        for path in (fixed_overrides or {}):
+            sweep_paths.add(path)
+            sweep_meta.setdefault(path, {'type': 'places', 'id': path,
+                                        'source': 'fixed_override'})
+
+        # Walk events.  Each event has assignments {target: expr}.
+        event_targets = {}  # target_id → list of (event_id, enabled)
+        for evt in events or []:
+            evt_id = evt.get('id') or '?'
+            enabled = evt.get('enabled', True)
+            assignments = evt.get('assignments') or {}
+            for tgt in assignments:
+                event_targets.setdefault(tgt, []).append((evt_id, enabled))
+
+        # R1: sweep target collides with any event assignment target.
+        for path in sweep_paths:
+            head = path.split('.', 1)[0]
+            if head in event_targets:
+                writers = ', '.join(eid for eid, _ in event_targets[head])
+                issues.append({
+                    'severity': 'error',
+                    'code': 'R1',
+                    'path': path,
+                    'message': (
+                        f"Sweep / fixed-override targets '{head}' which is "
+                        f"also written by event(s): {writers}. Dispatching "
+                        "as-is would silently superimpose two writers; the "
+                        "engine has no defined precedence between them."
+                    ),
+                })
+
+        # R3: event field swept but event is disabled.
+        for path in sweep_paths:
+            head = path.split('.', 1)[0]
+            if head.startswith('evt_'):
+                # Look up the event by id
+                target_evt = next(
+                    (e for e in (events or []) if e.get('id') == head),
+                    None,
+                )
+                if target_evt and not target_evt.get('enabled', True):
+                    issues.append({
+                        'severity': 'warning',
+                        'code': 'R3',
+                        'path': path,
+                        'message': (
+                            f"Sweep targets event field '{path}' but event "
+                            f"'{head}' is disabled — values will not affect "
+                            "the run."
+                        ),
+                    })
+                if target_evt is None:
+                    issues.append({
+                        'severity': 'error',
+                        'code': 'R3b',
+                        'path': path,
+                        'message': (
+                            f"Sweep targets unknown event id '{head}'. "
+                            "Did the event get deleted?"
+                        ),
+                    })
+
+        # R4: two events writing the same target.
+        for tgt, writers in event_targets.items():
+            if len(writers) >= 2:
+                ids = ', '.join(eid for eid, _ in writers)
+                issues.append({
+                    'severity': 'warning',
+                    'code': 'R4',
+                    'path': tgt,
+                    'message': (
+                        f"Two or more events write to '{tgt}': {ids}. "
+                        "Last event in execution order wins; if that is "
+                        "not intentional, disable or remove the duplicates."
+                    ),
+                })
+
+        return issues
+
     def set_generate_callback(self, callback):
         """Set callback for generate button.
         
