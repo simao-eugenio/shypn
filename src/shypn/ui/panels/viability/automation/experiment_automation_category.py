@@ -2253,43 +2253,103 @@ class ExperimentAutomationCategory:
         Pure errors must be acknowledged with a separate explicit
         "Dispatch anyway" button so a casual click on "OK" cannot bypass
         the safety check.
+
+        The detail text is rendered in a selectable, copy-able TextView
+        and **also** logged to the Python logger at WARNING level so the
+        operator can scroll back through the launching terminal even
+        after dismissing the dialog.
         """
-        lines = []
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
+
+        # ── Plain-text payload (logged + clipboard-copyable) ─────────
+        plain_lines = []
         if errors:
-            lines.append('<b><span foreground="red">Errors</span></b> '
-                         '(would silently superimpose two writers):')
+            plain_lines.append('ERRORS (would silently superimpose two writers):')
             for it in errors:
-                lines.append(
-                    f'  • [<tt>{it.get("code", "")}</tt>] '
-                    f'{GLib.markup_escape_text(it.get("message", ""))}'
+                plain_lines.append(
+                    f"  [{it.get('code', '')}] "
+                    f"path={it.get('path', '?')}: {it.get('message', '')}"
                 )
-            lines.append('')
+            plain_lines.append('')
         if warnings:
-            lines.append('<b><span foreground="#a0760a">Warnings</span></b>:')
+            plain_lines.append('WARNINGS:')
             for it in warnings:
-                lines.append(
-                    f'  • [<tt>{it.get("code", "")}</tt>] '
-                    f'{GLib.markup_escape_text(it.get("message", ""))}'
+                plain_lines.append(
+                    f"  [{it.get('code', '')}] "
+                    f"path={it.get('path', '?')}: {it.get('message', '')}"
                 )
-            lines.append('')
+            plain_lines.append('')
         if errors:
-            lines.append(
+            plain_lines.append(
                 'Recommended actions: change the sweep target, or '
                 'remove/disable the colliding event(s).  Click '
-                '<b>Dispatch anyway</b> only if the superposition is '
+                "'Dispatch anyway' only if the superposition is "
                 'genuinely intentional — it will be recorded in the '
                 'sweep config.'
             )
+        plain_text = '\n'.join(plain_lines)
 
-        dialog = Gtk.MessageDialog(
-            transient_for=self.get_widget().get_toplevel() if self.get_widget() else None,
+        # Persist to the launching terminal so the user can review later.
+        for it in errors:
+            _log.warning("[COLLISION/%s] %s",
+                         it.get('code'), it.get('message'))
+        for it in warnings:
+            _log.warning("[COLLISION/%s] %s",
+                         it.get('code'), it.get('message'))
+
+        # ── Build the dialog with a selectable TextView ──────────────
+        dialog = Gtk.Dialog(
+            title=('Sweep / event collision detected'
+                   if errors else 'Sweep / event configuration warnings'),
+            transient_for=(self.get_widget().get_toplevel()
+                           if self.get_widget() else None),
             flags=Gtk.DialogFlags.MODAL,
-            message_type=(Gtk.MessageType.ERROR if errors else Gtk.MessageType.WARNING),
-            buttons=Gtk.ButtonsType.NONE,
-            text=('Sweep / event collision detected'
-                  if errors else 'Sweep / event configuration warnings'),
         )
-        dialog.format_secondary_markup('\n'.join(lines))
+        dialog.set_default_size(640, 360)
+
+        # Header row with icon + summary
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        header.set_margin_start(12)
+        header.set_margin_end(12)
+        header.set_margin_top(12)
+        header.set_margin_bottom(6)
+        icon_name = 'dialog-error' if errors else 'dialog-warning'
+        header.pack_start(
+            Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG),
+            False, False, 0,
+        )
+        summary = Gtk.Label()
+        summary.set_xalign(0)
+        n_e, n_w = len(errors), len(warnings)
+        summary.set_markup(
+            f"<b>{n_e} error(s) and {n_w} warning(s) detected</b>\n"
+            "Details below are <i>selectable / copyable</i>; the same "
+            "text was also logged to the launching terminal."
+        )
+        summary.set_line_wrap(True)
+        header.pack_start(summary, True, True, 0)
+        dialog.get_content_area().pack_start(header, False, False, 0)
+
+        # Scrollable selectable detail view
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_margin_start(12)
+        scroller.set_margin_end(12)
+        scroller.set_hexpand(True)
+        scroller.set_vexpand(True)
+
+        text_view = Gtk.TextView()
+        text_view.set_editable(False)
+        text_view.set_cursor_visible(True)
+        text_view.set_monospace(True)
+        text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        text_view.get_buffer().set_text(plain_text)
+        scroller.add(text_view)
+        dialog.get_content_area().pack_start(scroller, True, True, 0)
+
+        # Buttons
+        copy_btn = dialog.add_button('Copy to clipboard', 1)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         if errors:
             dialog.add_button('Dispatch anyway', Gtk.ResponseType.OK)
@@ -2297,7 +2357,23 @@ class ExperimentAutomationCategory:
             dialog.add_button('Continue', Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.CANCEL)
 
-        response = dialog.run()
+        def _on_copy(_btn):
+            try:
+                from gi.repository import Gdk
+                clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+                clip.set_text(plain_text, -1)
+                copy_btn.set_label('Copied ✓')
+            except Exception as exc:
+                _log.warning("clipboard copy failed: %s", exc)
+        copy_btn.connect('clicked', _on_copy)
+
+        dialog.show_all()
+        # Loop until the user picks a non-Copy button (Copy returns 1
+        # but should not close the dialog).
+        while True:
+            response = dialog.run()
+            if response != 1:
+                break
         dialog.destroy()
         return response == Gtk.ResponseType.OK
     
