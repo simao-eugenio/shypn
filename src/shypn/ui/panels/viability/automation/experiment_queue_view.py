@@ -277,8 +277,25 @@ class ExperimentQueueView(Gtk.Box):
             self.add_experiment(name, snapshot_index)
     
     def clear_queue(self):
-        """Clear all experiments from queue."""
+        """Clear all experiments from queue.
+
+        Also restores the control buttons to a clean idle state so a new
+        sweep plan can be dispatched immediately afterwards. Without this
+        reset, ``run_remote_button`` (or ``run_button``) could remain
+        disabled if a previous dispatch error path skipped its
+        re-enable hook (see ``_on_queue_run_remote``'s ``on_complete``).
+        """
         self.queue_store.clear()
+        # Idle state: both Run paths enabled, Cancel/Pause disabled.
+        try:
+            self.run_button.set_sensitive(True)
+            self.run_remote_button.set_sensitive(True)
+            self.cancel_button.set_sensitive(False)
+            self.pause_button.set_sensitive(False)
+            self.pause_button.set_label("⏸ Pause")
+        except Exception:
+            # Defensive: if the queue view is being torn down, ignore.
+            pass
         self._update_status_label()
     
     def clear_completed(self):
@@ -362,8 +379,12 @@ class ExperimentQueueView(Gtk.Box):
             is_running: True if execution is running or paused
             is_paused: True if execution is paused (requires is_running=True)
         """
-        # Button states
+        # Button states. Both Run paths share the same gate: a sweep
+        # is either running locally OR remotely; in either case both
+        # entry buttons must stay disabled until the run finishes /
+        # is cancelled, otherwise the operator can double-dispatch.
         self.run_button.set_sensitive(not is_running)
+        self.run_remote_button.set_sensitive(not is_running)
         self.cancel_button.set_sensitive(is_running)
         self.pause_button.set_sensitive(is_running)  # Stage 3
         
@@ -601,11 +622,34 @@ class ExperimentQueueView(Gtk.Box):
             if pending:
                 self.on_run_remote_callback(pending)
             else:
+                # Surface the empty-queue case as a modal dialog rather
+                # than a one-line status message — operators commonly
+                # miss the status line and re-click Remote, then think
+                # the dialog is broken (it is the QUEUE that is empty).
                 total = len(self.queue_store)
                 if total == 0:
-                    self.status_label.set_markup("<i>Queue empty - generate experiments first</i>")
+                    msg = ("Queue is empty.\n\n"
+                           "Click 'Generate Experiments' first to build\n"
+                           "the sweep plan, then click 'Run Remote'.")
                 else:
-                    self.status_label.set_markup("<i>No pending experiments - use 'Reset All' to re-run</i>")
+                    msg = ("No pending experiments.\n\n"
+                           "All rows are completed/failed/cancelled.\n"
+                           "Use 'Reset All' to re-run them, or 'Clear\n"
+                           "Sweep Plan' to start over.")
+                d = Gtk.MessageDialog(
+                    transient_for=self.get_toplevel(),
+                    flags=0,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Cannot dispatch remote sweep",
+                )
+                d.format_secondary_text(msg)
+                d.run()
+                d.destroy()
+                # Mirror to the activity log for the audit trail.
+                self.status_label.set_markup(
+                    f"<i>{GLib.markup_escape_text(msg.splitlines()[0])}</i>"
+                )
 
     # ── Public status API ────────────────────────────────────────────
 

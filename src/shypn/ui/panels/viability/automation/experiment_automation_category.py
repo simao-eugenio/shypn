@@ -748,8 +748,45 @@ class ExperimentAutomationCategory:
         from .remote_sweep_dispatcher import RemoteSweepSettings, RemoteSweepDispatcher
 
         if self._remote_dispatcher and self._remote_dispatcher.is_running:
-            self._show_error("A remote sweep is already running.")
-            return
+            # Thread is alive — but it can be stuck (e.g. SSH fallback
+            # blocked on a password prompt that never surfaced after
+            # `ControlMaster exited early`). Offer a forced reset so
+            # the operator isn't permanently locked out without having
+            # to restart the GUI.
+            dialog = Gtk.MessageDialog(
+                transient_for=self.sweep_builder.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.NONE,
+                text="A previous remote dispatch is still marked as running.",
+            )
+            dialog.format_secondary_text(
+                "If the server fans are silent and no progress is being\n"
+                "reported, the SSH thread is likely stuck (e.g. waiting\n"
+                "on a password prompt after a ControlMaster fallback).\n\n"
+                "Choose:\n"
+                "  • Cancel & Reset — kill the stuck dispatcher and start fresh\n"
+                "  • Wait — keep the existing dispatch (do nothing)"
+            )
+            dialog.add_button("Wait", Gtk.ResponseType.CANCEL)
+            reset_btn = dialog.add_button("Cancel & Reset", Gtk.ResponseType.OK)
+            reset_btn.get_style_context().add_class("destructive-action")
+            response = dialog.run()
+            dialog.destroy()
+            if response != Gtk.ResponseType.OK:
+                return
+            # Forced reset: ask the dispatcher to cancel (which sends a
+            # remote pkill and tears down the local SSH stream), abandon
+            # the thread reference, and reset the UI buttons.
+            try:
+                self._remote_dispatcher.cancel()
+            except Exception:
+                pass
+            self._remote_dispatcher = None
+            if self.queue_view:
+                self.queue_view.run_button.set_sensitive(True)
+                self.queue_view.run_remote_button.set_sensitive(True)
+                self.queue_view.cancel_button.set_sensitive(False)
 
         # ── Validate prerequisites ───────────────────────────────────
         project_folder = self._get_project_folder()
@@ -917,17 +954,27 @@ class ExperimentAutomationCategory:
             if not allow:
                 return
 
-        self._remote_dispatcher.dispatch(
-            model_filepath=model_filepath,
-            project_folder=project_folder,
-            experiment_manager=self.experiment_manager,
-            sim_params=sim_params,
-            progress_cb=on_progress,
-            complete_cb=on_complete,
-            ssh_password=ssh_password or None,
-            events=events,
-            fixed_overrides=fixed_overrides or None,
-        )
+        try:
+            self._remote_dispatcher.dispatch(
+                model_filepath=model_filepath,
+                project_folder=project_folder,
+                experiment_manager=self.experiment_manager,
+                sim_params=sim_params,
+                progress_cb=on_progress,
+                complete_cb=on_complete,
+                ssh_password=ssh_password or None,
+                events=events,
+                fixed_overrides=fixed_overrides or None,
+            )
+        except Exception as exc:
+            # Dispatch never started — restore the idle button state so
+            # the operator can retry without first running Clear Sweep
+            # Plan to unstick the UI.
+            if self.queue_view:
+                self.queue_view.run_button.set_sensitive(True)
+                self.queue_view.run_remote_button.set_sensitive(True)
+                self.queue_view.cancel_button.set_sensitive(False)
+            self._show_error(f"Remote dispatch failed to start:\n\n{exc}")
 
     def _collect_model_events(self) -> list:
         """Serialise the current model's environment events for dispatch.

@@ -1,21 +1,20 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-04-26T14:18:09.475390",
+    "created": "2026-04-30T14:47:04.774319",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
       "places": 42,
-      "transitions": 45,
-      "arcs": 100,
+      "transitions": 47,
+      "arcs": 102,
       "modules": 0
-    },
-    "notes": "[v3_p9 2026-04-28] Healthy-baseline rebalance:\n  - Basal_ROS_Production: + ROS self-saturation /(1+ROS/2)\n  - Nrf2_degradation: 0.10 -> 0.15\n  - SOD_Degradation: 0.002 -> 0.0067\n  - HO1_Degradation: 0.003 -> 0.0045\n  - Glutathione_Reductase: 0.05 -> 0.06\n  - Neurotoxicity: ROS and TNFa basal floors (max(0, x - x_basal))\nGoal: NH=100 stable at DSev=0; ROS settles ~0.65; antioxidants at fixed point.\n\n[v3_p9 patch 2026-04-28 #2] GSH basal turnover:\n  - Antioxidant_Scavenging GSH term gains ROS-floor: (ROS+0.5)/(5+ROS+0.5)\n  - Yields ~0.32/s basal GSH\u2192GSSG flow at ROS=0; balances Reductase\n  - GSH expected steady-state ~70, GSSG ~5\n\n[v3_p9 patch 2026-04-28 #3] GSH basal turnover (topology fix):\n  - REVERT prior GSH-floor patch on Antioxidant_Scavenging (consumed-arc bug).\n  - ADD T46 Glutathione_basal_turnover (continuous): rate=0.005*Glutathione\n  - ADD A101 P20(GSH)->T46, A102 T46->P33(GSSG)\n  - At G=70: 0.35/s outflow; balances Reductase 0.06*GSSG => GSSG~5.8\n  - Topology fix per AGENT_RULES (Phi-only insufficient when arc enablement gates the rate)."
+    }
   },
   "view_state": {
-    "zoom": 0.8052550000000156,
-    "pan_x": 2229.3178210355813,
-    "pan_y": -213.46455613644912,
+    "zoom": 0.8857805000000175,
+    "pan_x": 2456.7513669309765,
+    "pan_y": 576.4358044648767,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -54,9 +53,8 @@
       "x": -1880.0,
       "y": 810.0,
       "radius": 40.0,
-      "marking": 10,
-      "tokens": 10,
-      "initial_marking": 10,
+      "marking": 10.0,
+      "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -107,7 +105,6 @@
       "y": 190.0,
       "radius": 40.0,
       "marking": 50.0,
-      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -148,7 +145,6 @@
       "y": -290.0,
       "radius": 40.0,
       "marking": 50.0,
-      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -189,7 +185,6 @@
       "y": -10.0,
       "radius": 40.0,
       "marking": 90.0,
-      "tokens": 90.0,
       "initial_marking": 90.0,
       "capacity": "Infinity",
       "border_color": [
@@ -228,6 +223,7 @@
       "x": 530.0,
       "y": 60.0,
       "radius": 40.0,
+      "marking": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -268,7 +264,6 @@
       "y": 1360.0,
       "radius": 40.0,
       "marking": 0.5,
-      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -307,7 +302,6 @@
       "y": 1490.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -347,7 +341,6 @@
       "y": 710.0,
       "radius": 40.0,
       "marking": 50.0,
-      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -390,7 +383,6 @@
       "y": 490.0,
       "radius": 40.0,
       "marking": 5.0,
-      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -431,7 +423,6 @@
       "y": 970.0,
       "radius": 40.0,
       "marking": 15.0,
-      "tokens": 15.0,
       "initial_marking": 15.0,
       "capacity": "Infinity",
       "border_color": [
@@ -472,7 +463,6 @@
       "y": 1040.0,
       "radius": 40.0,
       "marking": 0.5,
-      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -513,7 +503,6 @@
       "y": 470.0,
       "radius": 40.0,
       "marking": 0.5,
-      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -554,7 +543,6 @@
       "y": 680.0,
       "radius": 40.0,
       "marking": 0.5,
-      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -595,7 +583,6 @@
       "y": 870.0,
       "radius": 40.0,
       "marking": 0.5,
-      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -634,7 +621,6 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 55.0,
-      "tokens": 55.0,
       "initial_marking": 55.0,
       "capacity": "Infinity",
       "border_color": [
@@ -677,7 +663,6 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 5.0,
-      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -718,7 +703,6 @@
       "y": 1480.0,
       "radius": 40.0,
       "marking": 30.0,
-      "tokens": 30.0,
       "initial_marking": 30.0,
       "capacity": "Infinity",
       "border_color": [
@@ -759,7 +743,6 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 20.0,
-      "tokens": 20.0,
       "initial_marking": 20.0,
       "capacity": "Infinity",
       "border_color": [
@@ -799,7 +782,6 @@
       "y": 1330.0,
       "radius": 40.0,
       "marking": 1.0,
-      "tokens": 1.0,
       "initial_marking": 1.0,
       "capacity": "Infinity",
       "border_color": [
@@ -839,7 +821,6 @@
       "y": 1930.0,
       "radius": 40.0,
       "marking": 70.0,
-      "tokens": 70.0,
       "initial_marking": 70.0,
       "capacity": "Infinity",
       "border_color": [
@@ -878,7 +859,6 @@
       "y": 2120.0,
       "radius": 40.0,
       "marking": 5.0,
-      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -917,7 +897,6 @@
       "y": 1630.0,
       "radius": 40.0,
       "marking": 40.0,
-      "tokens": 40.0,
       "initial_marking": 40.0,
       "capacity": "Infinity",
       "border_color": [
@@ -957,7 +936,6 @@
       "y": 2130.0,
       "radius": 40.0,
       "marking": 100.0,
-      "tokens": 100.0,
       "initial_marking": 100.0,
       "capacity": "Infinity",
       "border_color": [
@@ -998,7 +976,6 @@
       "y": 1910.0,
       "radius": 40.0,
       "marking": 5.0,
-      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1041,7 +1018,6 @@
       "y": 1190.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1084,7 +1060,6 @@
       "y": 770.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1127,7 +1102,6 @@
       "y": 1450.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1161,7 +1135,6 @@
       "y": 270.0,
       "radius": 40.0,
       "marking": 310.15,
-      "tokens": 310.15,
       "initial_marking": 310.15,
       "capacity": "Infinity",
       "border_color": [
@@ -1207,7 +1180,6 @@
       "y": 60.0,
       "radius": 40.0,
       "marking": 7.4,
-      "tokens": 7.4,
       "initial_marking": 7.4,
       "capacity": "Infinity",
       "border_color": [
@@ -1265,7 +1237,6 @@
       "y": 800.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1299,7 +1270,6 @@
       "y": 490.0,
       "radius": 40.0,
       "marking": 75.0,
-      "tokens": 75.0,
       "initial_marking": 75.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1345,7 +1315,6 @@
       "y": 300.0,
       "radius": 40.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1379,7 +1348,6 @@
       "y": 1930.0,
       "radius": 40.0,
       "marking": 10.0,
-      "tokens": 10.0,
       "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1413,7 +1381,6 @@
       "y": 350.0,
       "radius": 40.0,
       "marking": 4.0,
-      "tokens": 4.0,
       "initial_marking": 4.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1534,9 +1501,8 @@
       "x": -1870.0,
       "y": -100.0,
       "radius": 40.0,
-      "marking": 86400.0,
-      "tokens": 86400.0,
-      "initial_marking": 86400.0,
+      "marking": 21600.0,
+      "initial_marking": 21600.0,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1579,9 +1545,8 @@
       "x": -1470.0,
       "y": -310.0,
       "radius": 40.0,
-      "marking": 0.0,
-      "tokens": 0.0,
-      "initial_marking": 0.0,
+      "marking": 0.5,
+      "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1625,7 +1590,6 @@
       "y": -260.0,
       "radius": 25.0,
       "marking": 1.0,
-      "tokens": 1.0,
       "initial_marking": 1.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1660,7 +1624,6 @@
       "y": -110.0,
       "radius": 25.0,
       "marking": 1.2,
-      "tokens": 1.2,
       "initial_marking": 1.2,
       "capacity": "Infinity",
       "border_color": [
@@ -1695,7 +1658,6 @@
       "y": 50.0,
       "radius": 25.0,
       "marking": 0.0,
-      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1730,7 +1692,6 @@
       "y": 210.0,
       "radius": 25.0,
       "marking": 1.0,
-      "tokens": 1.0,
       "initial_marking": 1.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1905,9 +1866,9 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P41",
+        "P39",
         "P5",
-        "P39"
+        "P41"
       ],
       "is_environment_aware": true,
       "compartment": "extracellular",
@@ -1948,9 +1909,9 @@
         "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
       },
       "signal_places": [
-        "P41",
         "P6",
-        "P39"
+        "P39",
+        "P41"
       ],
       "is_environment_aware": true,
       "compartment": "extracellular",
@@ -2430,11 +2391,11 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P41",
-        "P6",
-        "P39",
         "P11",
         "P40",
+        "P39",
+        "P41",
+        "P6",
         "P22"
       ],
       "is_environment_aware": true,
@@ -2476,10 +2437,10 @@
         "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
       },
       "signal_places": [
-        "P40",
         "P27",
+        "P21",
         "P26",
-        "P21"
+        "P40"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2558,12 +2519,12 @@
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
+        "P11",
+        "P40",
+        "P39",
         "P41",
         "P6",
-        "P19",
-        "P39",
-        "P11",
-        "P40"
+        "P19"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -4144,7 +4105,8 @@
         1.0
       ],
       "width": 2.0,
-      "control_points": []
+      "control_points": [],
+      "consumes": false
     },
     {
       "id": "A29",
@@ -4799,9 +4761,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A61",
@@ -5065,9 +5025,7 @@
         0.0
       ],
       "width": 3.000000000000001,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A74",
@@ -5127,9 +5085,7 @@
         0.0
       ],
       "width": 3.000000000000001,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A77",
@@ -5330,7 +5286,8 @@
         1.0
       ],
       "width": 3.0,
-      "control_points": []
+      "control_points": [],
+      "consumes": false
     },
     {
       "id": "A87",
@@ -5638,11 +5595,12 @@
     {
       "id": "A101",
       "name": "A101",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "T46",
-      "target_id": "P18",
       "source_type": "transition",
+      "target_id": "P18",
       "target_type": "place",
       "weight": 1.0,
       "threshold": 0.0,
@@ -5657,11 +5615,12 @@
     {
       "id": "A102",
       "name": "A102",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "T47",
-      "target_id": "P17",
       "source_type": "transition",
+      "target_id": "P17",
       "target_type": "place",
       "weight": 1.0,
       "threshold": 0.0,
