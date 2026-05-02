@@ -1389,23 +1389,36 @@ class ReplicateRunner:
                   f"({accel._n_transitions} transitions, "
                   f"{n_places_accel} places)")
 
+        # Pre-allocated scratch for the batched C call.  Sized lazily on
+        # first use because the GPU sub-batch size is decided per dispatch.
+        _scratch = {"af": None, "ar": None, "y": None}
+
         def _propensity_fn(
             y_host: np.ndarray,   # [N, P]
             t_host: np.ndarray,   # [N]
         ) -> tuple:
             N = y_host.shape[0]
-            a_fwd_out = np.zeros((N, M), dtype=np.float64)
-            a_rev_out = np.zeros((N, M), dtype=np.float64)
-
-            for r in range(N):
-                # Copy replicate r's state into the accelerator's y[]
-                accel._y_arr[place_idx_map] = y_host[r]
-                accel.update_thermo_params()
-                a_net, a_fwd, a_rev = accel.compute(float(t_host[r]))
-                a_fwd_out[r] = a_fwd[trans_idx_map]
-                a_rev_out[r] = a_rev[trans_idx_map]
-
-            return a_fwd_out, a_rev_out
+            M_accel = accel._n_transitions
+            # Refresh thermo once per step (params are batch-invariant).
+            accel.update_thermo_params()
+            # Resize scratch on demand.
+            if _scratch["af"] is None or _scratch["af"].shape != (N, M_accel):
+                _scratch["af"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["ar"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["y"]  = np.zeros((N, n_places_accel), dtype=np.float64)
+            # Remap caller's [N, P] state into the accelerator's column
+            # order using a single vectorized fancy-index copy.
+            np.take(y_host, place_idx_map, axis=1, out=_scratch["y"])
+            # One C call evaluates all N replicates.
+            accel.compute_batch(
+                t_host.astype(np.float64, copy=False),
+                _scratch["y"],
+                _scratch["af"],
+                _scratch["ar"],
+            )
+            # Reorder columns to engine's transition order.
+            return (_scratch["af"][:, trans_idx_map],
+                    _scratch["ar"][:, trans_idx_map])
 
         return _propensity_fn
 
@@ -1464,22 +1477,29 @@ class ReplicateRunner:
             print(f"  GPU hybrid stoch: C propensity accelerator ready "
                   f"({M_stoch} stochastic transitions)")
 
+        n_places_accel = accel._n_places
+        M_accel = accel._n_transitions
+        _scratch = {"af": None, "ar": None, "y": None}
+
         def _stoch_propensity_fn(
             y_host: np.ndarray,   # [N, P]
             t_host: np.ndarray,   # [N]
         ) -> tuple:
             N = y_host.shape[0]
-            a_fwd_out = np.zeros((N, M_stoch), dtype=np.float64)
-            a_rev_out = np.zeros((N, M_stoch), dtype=np.float64)
-
-            for r in range(N):
-                accel._y_arr[place_idx_map] = y_host[r]
-                accel.update_thermo_params()
-                a_net, a_fwd, a_rev = accel.compute(float(t_host[r]))
-                a_fwd_out[r] = a_fwd[trans_idx_map]
-                a_rev_out[r] = a_rev[trans_idx_map]
-
-            return a_fwd_out, a_rev_out
+            accel.update_thermo_params()
+            if _scratch["af"] is None or _scratch["af"].shape != (N, M_accel):
+                _scratch["af"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["ar"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["y"]  = np.zeros((N, n_places_accel), dtype=np.float64)
+            np.take(y_host, place_idx_map, axis=1, out=_scratch["y"])
+            accel.compute_batch(
+                t_host.astype(np.float64, copy=False),
+                _scratch["y"],
+                _scratch["af"],
+                _scratch["ar"],
+            )
+            return (_scratch["af"][:, trans_idx_map],
+                    _scratch["ar"][:, trans_idx_map])
 
         return _stoch_propensity_fn
 

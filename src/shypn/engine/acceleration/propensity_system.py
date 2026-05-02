@@ -352,6 +352,57 @@ class PropensityAccelerator:
         )
         return self._a_net_arr, self._a_fwd_arr, self._a_rev_arr
 
+    def compute_batch(
+        self,
+        t_batch: np.ndarray,            # [N] float64, replicate times
+        y_batch: np.ndarray,            # [N, P] float64, full place markings
+        a_fwd_out: np.ndarray,          # [N, M] float64, written in-place
+        a_rev_out: np.ndarray,          # [N, M] float64, written in-place
+    ) -> None:
+        """Evaluate propensities for N replicates in a single C call.
+
+        Hot-path entry for ``GPUHybridEngine``.  Replaces a ``for r in
+        range(N): self.compute(...)`` Python loop (~µs per iteration in
+        ctypes overhead alone) with one batched dispatch.
+
+        ``y_batch`` columns must be aligned with ``self._all_place_index``
+        — the caller is expected to have done the place-id remap once
+        at setup time using fancy indexing.
+
+        ``a_fwd_out`` and ``a_rev_out`` columns are aligned with
+        ``self.transition_ids_order`` (i.e. the C function's spec
+        order).  No remap is performed here; the caller's hybrid
+        engine builds its stoichiometry against the same order.
+
+        ``update_thermo_params()`` should be called once per dt step
+        before this method (params are constant across replicates).
+        """
+        N, P = y_batch.shape
+        M = self._n_transitions
+        # Lazily allocate / resize the per-call a_net scratch.
+        scratch = getattr(self, "_a_net_scratch", None)
+        if scratch is None or scratch.shape[0] != M:
+            scratch = np.zeros(max(M, 1), dtype=np.float64)
+            self._a_net_scratch = scratch
+
+        # Ensure C-contiguous float64 input (most callers already are).
+        if not y_batch.flags["C_CONTIGUOUS"] or y_batch.dtype != np.float64:
+            y_batch = np.ascontiguousarray(y_batch, dtype=np.float64)
+        if not t_batch.flags["C_CONTIGUOUS"] or t_batch.dtype != np.float64:
+            t_batch = np.ascontiguousarray(t_batch, dtype=np.float64)
+
+        self._c_func_batch(
+            ctypes.c_int(N),
+            ctypes.c_int(M),
+            ctypes.c_int(P),
+            t_batch.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            y_batch.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            a_fwd_out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            a_rev_out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            self._params_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            scratch.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+        )
+
     # ------------------------------------------------------------------
     # Internal: model analysis
     # ------------------------------------------------------------------
@@ -567,34 +618,38 @@ class PropensityAccelerator:
     # ------------------------------------------------------------------
 
     def _generate_c(self) -> str:
-        """Generate the complete C source for the propensity function."""
+        """Generate the complete C source for the propensity function.
+
+        Emits three symbols:
+
+        * ``static inline _propensity_one(...)`` — per-replicate body,
+          contains thermo + kinetic-param decls + the per-spec rate
+          expressions.  The compiler inlines this into both entry
+          points at -O3.
+        * ``propensity_fn(...)`` — single-replicate ABI (legacy).
+        * ``propensity_fn_batch(...)`` — N-replicate batched ABI.
+          Used by ``compute_batch()`` to evaluate all replicates of a
+          single hybrid step in one C call (eliminates the Python
+          per-replicate dispatch overhead, ~10⁶ calls/sim).
+        """
         name_to_index = self._name_to_index
         c_thermo = THERMO_LOCALS
 
         lines: List[str] = []
         lines.append("#include <math.h>")
+        lines.append("#include <stddef.h>")
         lines.append("")
         lines.append(C_HELPERS)
         lines.append("")
         lines.append("/* params: [T=0, pH=1, ionic_strength=2] */")
         lines.append("")
-        lines.append(
-            "#if defined(__GNUC__)"
-        )
-        lines.append(
-            "__attribute__((visibility(\"default\")))"
-        )
-        lines.append(
-            "#endif"
-        )
-        lines.append(
-            "void propensity_fn(int n, double t, double *y,"
-        )
-        lines.append(
-            "                   double *a_net, double *a_fwd, double *a_rev,"
-        )
-        lines.append("                   double *params) {")
-        lines.append("    (void)n; (void)t;")
+        # ── per-replicate helper ─────────────────────────────────────
+        lines.append("static inline void _propensity_one(")
+        lines.append("        double t, const double *y,")
+        lines.append("        double *a_net, double *a_fwd, double *a_rev,")
+        lines.append("        const double *params)")
+        lines.append("{")
+        lines.append("    (void)t;")
         lines.append("")
         lines.append("    /* Thermodynamic locals */")
         lines.append("    double T            = params[0];")
@@ -681,7 +736,54 @@ class PropensityAccelerator:
             lines.append("    }")
             lines.append("")
 
+        lines.append("}")  # end _propensity_one
+        lines.append("")
+
+        # ── Single-replicate entry (legacy ABI) ───────────────────────
+        lines.append("#if defined(__GNUC__)")
+        lines.append("__attribute__((visibility(\"default\")))")
+        lines.append("#endif")
+        lines.append(
+            "void propensity_fn(int n, double t, double *y,"
+        )
+        lines.append(
+            "                   double *a_net, double *a_fwd, double *a_rev,"
+        )
+        lines.append("                   double *params) {")
+        lines.append("    (void)n;")
+        lines.append(
+            "    _propensity_one(t, y, a_net, a_fwd, a_rev, params);"
+        )
         lines.append("}")
+        lines.append("")
+
+        # ── Batched entry: N replicates in one C call ─────────────────
+        # Layout: y_batch is [N, P] row-major, a_*_batch are [N, M].
+        # a_net_scratch is a caller-provided [M] buffer used per
+        # replicate (we don't return a_net to the batched caller —
+        # the GPU hybrid path doesn't need it; tau-leap consumes
+        # a_fwd / a_rev separately).
+        lines.append("#if defined(__GNUC__)")
+        lines.append("__attribute__((visibility(\"default\")))")
+        lines.append("#endif")
+        lines.append("void propensity_fn_batch(")
+        lines.append("        int N, int M, int P,")
+        lines.append("        const double *t_batch,")
+        lines.append("        const double *y_batch,")
+        lines.append("        double *a_fwd_batch,")
+        lines.append("        double *a_rev_batch,")
+        lines.append("        const double *params,")
+        lines.append("        double *a_net_scratch)")
+        lines.append("{")
+        lines.append("    for (int r = 0; r < N; r++) {")
+        lines.append("        const double *y_r = y_batch + (size_t)r * (size_t)P;")
+        lines.append("        double *af_r = a_fwd_batch + (size_t)r * (size_t)M;")
+        lines.append("        double *ar_r = a_rev_batch + (size_t)r * (size_t)M;")
+        lines.append("        _propensity_one(t_batch[r], y_r,")
+        lines.append("                        a_net_scratch, af_r, ar_r, params);")
+        lines.append("    }")
+        lines.append("}")
+        lines.append("")
 
         return "\n".join(lines)
 
@@ -702,8 +804,23 @@ class PropensityAccelerator:
             ctypes.POINTER(ctypes.c_double),         # a_rev
             ctypes.POINTER(ctypes.c_double),         # params
         ]
+        # Batched entry — one C call evaluates N replicates.
+        fn_b = lib.propensity_fn_batch
+        fn_b.restype = None
+        fn_b.argtypes = [
+            ctypes.c_int,                            # N
+            ctypes.c_int,                            # M
+            ctypes.c_int,                            # P
+            ctypes.POINTER(ctypes.c_double),         # t_batch [N]
+            ctypes.POINTER(ctypes.c_double),         # y_batch [N*P]
+            ctypes.POINTER(ctypes.c_double),         # a_fwd_batch [N*M]
+            ctypes.POINTER(ctypes.c_double),         # a_rev_batch [N*M]
+            ctypes.POINTER(ctypes.c_double),         # params [3]
+            ctypes.POINTER(ctypes.c_double),         # a_net_scratch [M]
+        ]
         self._lib = lib
         self._c_func = fn
+        self._c_func_batch = fn_b
 
     def _alloc_arrays(self) -> None:
         n = self._n_transitions
