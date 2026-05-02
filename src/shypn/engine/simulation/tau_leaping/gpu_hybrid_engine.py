@@ -140,10 +140,11 @@ class GPUHybridEngine:
 
         # g_vec for tau-selection (max stoich order per place)
         g_vec = np.ones(n_places, dtype=np.float64)
-        for i in range(n_places):
-            col_max = np.max(np.abs(stoch_S[i, :]))
-            if col_max > 1:
-                g_vec[i] = col_max
+        if self._M_stoch > 0:
+            for i in range(n_places):
+                col_max = np.max(np.abs(stoch_S[i, :]))
+                if col_max > 1:
+                    g_vec[i] = col_max
         self._d_g_vec = cp.asarray(g_vec)
 
         logger.info(
