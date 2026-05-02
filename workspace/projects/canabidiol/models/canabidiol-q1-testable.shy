@@ -2736,8 +2736,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "(0.03 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
-        "rate_function_display": "k_phago \u00d7 [M2] \u00d7 [A\u03b2_olig] / (Km + [A\u03b2_olig])"
+        "rate_function": "(0.006 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
+        "rate_function_display": "Slowed 5x for cascade gating"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2850,7 +2850,7 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.008 * (IKK - 10) * (IKK > 10) * Temperature_factor",
+        "rate_function": "0.008 * (IKK - 1) * (IKK > 1) * Temperature_factor",
         "rate_function_display": "k_dephos \u00d7 max(0, [IKK] - IKK_basal)"
       },
       "is_environment_aware": false,
@@ -4027,7 +4027,7 @@
       "target_id": "T8",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": 0.1,
       "color": [
         0.0,
         0.0,
@@ -5406,17 +5406,17 @@
       "name": "TNFa_to_T14",
       "label": "",
       "object_type": "arc",
-      "arc_type": "normal",
+      "arc_type": "test",
       "source_id": "P11",
       "source_type": "place",
       "target_id": "T14",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": null,
+      "threshold": 0.0,
       "color": [
         0.0,
         0.0,
-        0.0
+        1.0
       ],
       "width": 3.0,
       "control_points": []
@@ -5432,7 +5432,7 @@
       "target_id": "T14",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 1,
+      "threshold": 0.1,
       "color": [
         0.0,
         0.0,
@@ -5792,12 +5792,12 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Abeta_Oligomer": "Abeta_Oligomer + DISEASE_SEVERITY * 2.0000"
+        "Abeta_Oligomer": "Abeta_Oligomer + DISEASE_SEVERITY * 10.0000"
       },
       "metadata": {
         "group": "install_disease",
         "target": "Abeta_Oligomer",
-        "delta_per_severity_unit": 7.25,
+        "delta_per_severity_unit": 10.0,
         "purpose": "Install AD pathology in Abeta_Oligomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
       }
     },
