@@ -2617,7 +2617,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor",
+        "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor * (1 - NFkB_p65 / (0.1 + NFkB_p65))",
         "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
       },
       "signal_places": [
