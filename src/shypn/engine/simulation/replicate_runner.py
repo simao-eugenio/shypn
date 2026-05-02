@@ -1281,10 +1281,31 @@ class ReplicateRunner:
         settings = self.default_settings
         dt = time_step if time_step else settings.get_effective_dt()
 
+        # Auto-decimate snapshots so wall time and memory don't explode on
+        # long horizons.  Target ~5 000 records per replicate regardless
+        # of duration / dt.  E.g.:
+        #   duration=86400 s, dt=0.05  → 1.73 M steps → snap every 346 → ~5000 pts
+        #   duration=  100 s, dt=0.01  → 10 000 steps → snap every  2 → ~5000 pts
+        # User-set recording_time_interval (controller.data_collector) wins
+        # if explicitly different from the engine default 0.05.
+        TARGET_SNAPSHOTS = 5000
+        rec_iv = getattr(
+            getattr(controller, "data_collector", None),
+            "recording_time_interval", 0.05,
+        )
+        if rec_iv and rec_iv != 0.05:
+            snapshot_interval = max(1, int(round(rec_iv / dt)))
+        else:
+            n_steps_total = max(1, int(duration / dt))
+            snapshot_interval = max(1, n_steps_total // TARGET_SNAPSHOTS)
+
         if verbose:
             _mode = "CPU+GPU (symbolic)" if stoch_propensity_fn else "GPU (mass-action)"
+            est_records = int(duration / dt) // snapshot_interval
             print(f"  GPU hybrid: {len(ode_place_indices)} ODE places, "
                   f"{n_stoch} stochastic transitions, dt={dt}, "
+                  f"snapshot_interval={snapshot_interval} "
+                  f"(~{est_records} records/replicate), "
                   f"propensities={_mode}")
 
         try:
@@ -1315,6 +1336,7 @@ class ReplicateRunner:
                 duration=duration,
                 dt=dt,
                 seed_base=seed_base,
+                snapshot_interval=snapshot_interval,
                 verbose=verbose,
                 progress_callback=progress_callback,
             )
