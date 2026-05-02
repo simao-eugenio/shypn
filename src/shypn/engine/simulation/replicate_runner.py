@@ -1056,13 +1056,22 @@ class ReplicateRunner:
             return None
 
         # ── Hybrid GPU path for ODE+stochastic models ────────────────
-        # If the model has continuous transitions, try the GPU hybrid
-        # engine that combines RK4 ODE integration with GPU τ-leaping.
-        n_continuous = sum(
+        # If the model has any ODE-eligible transitions, try the GPU
+        # hybrid engine that combines RK4 ODE integration with GPU
+        # τ-leaping.  Adaptive transitions count here too: when their
+        # configured mode is continuous they are integrated by the ODE
+        # accelerator (see OdeSystemAccelerator.build), and when they
+        # leap they ride the same GPU τ-leap batch as pure stochastic
+        # transitions (gpu_hybrid_engine includes them in
+        # `stoch_transitions`).  Counting only literal 'continuous'
+        # caused all-adaptive models to bypass this path entirely and
+        # fall onto the pure-stochastic GPUReplicateEngine with a CPU
+        # symbolic-propensity callback (~50× slower).
+        n_ode_eligible = sum(
             1 for t in self.model.transitions
-            if getattr(t, 'transition_type', '') == 'continuous'
+            if getattr(t, 'transition_type', '') in ('continuous', 'adaptive')
         )
-        if n_continuous > 0:
+        if n_ode_eligible > 0:
             hybrid_results = self._try_gpu_hybrid(
                 gpu_backend,
                 n=n, duration=duration,
