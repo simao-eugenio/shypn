@@ -221,6 +221,22 @@ class OdeSystemAccelerator:
     def build_error(self) -> Optional[str]:
         return self._build_error
 
+    @property
+    def ode_transition_ids(self) -> List[str]:
+        """IDs of transitions integrated by the C ODE RHS.
+
+        For pure ``continuous`` transitions this is just their id.
+        For ``adaptive`` transitions, only those whose configured /
+        cached mode is ``continuous`` are included (i.e. they're being
+        treated as ODE flows for this build).  The complementary set —
+        adaptive transitions in stochastic mode — must be routed to the
+        τ-leap batch by the caller, and pure ``continuous`` transitions
+        must NEVER be in the τ-leap batch.
+
+        Returns an empty list before :meth:`build` succeeds.
+        """
+        return [spec.tid for spec in getattr(self, "_specs", [])]
+
     def update_thermo_params(self) -> None:
         """Refresh the params[] array from the model's thermodynamic settings.
 

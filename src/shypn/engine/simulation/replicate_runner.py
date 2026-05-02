@@ -1194,18 +1194,40 @@ class ReplicateRunner:
             if pid in place_id_to_global
         ]
 
-        # Build stochastic transition matrices
+        # Build stochastic transition matrices.
+        #
+        # Routing invariant (operator split correctness): every transition
+        # must fire through exactly ONE channel per dt.  The ODE
+        # accelerator already includes pure-continuous transitions AND
+        # adaptive transitions in continuous mode (see
+        # OdeSystemAccelerator._analyse_model).  Re-listing them in the
+        # τ-leap batch would double-fire the reaction every step
+        # (ODE consumes + stoch consumes from the post-flow marking)
+        # and pay the CPU symbolic-propensity cost twice.  So we
+        # subtract the ODE-covered set from the stochastic batch.
+        ode_covered = set(ode_accel.ode_transition_ids)
         stoch_transitions = [
             t for t in self.model.transitions
-            if getattr(t, 'transition_type', '') in ('stochastic', 'adaptive')
+            if (
+                getattr(t, 'transition_type', '') == 'stochastic'
+                or (
+                    getattr(t, 'transition_type', '') == 'adaptive'
+                    and t.id not in ode_covered
+                )
+            )
         ]
         n_stoch = len(stoch_transitions)
 
         if n_stoch == 0:
-            logger.info("GPU hybrid: no stochastic transitions — pure ODE")
+            # All ODE-eligible transitions covered by the C accelerator
+            # and no pure-stochastic transitions remain.  This is a
+            # valid pure-ODE batch — every replicate evolves the same
+            # deterministic trajectory.  GPUHybridEngine handles M=0
+            # in run_batch (phase 2 short-circuits on `if M > 0`); we
+            # just need to feed it empty stoch arrays.
             if verbose:
-                print("  GPU hybrid: no stochastic transitions (using CPU)")
-            return None
+                print("  GPU hybrid: no stochastic transitions — pure ODE batch")
+            logger.info("GPU hybrid: pure ODE batch (no stochastic transitions)")
 
         # Build stoichiometry matrix for stochastic transitions
         import numpy as _np
