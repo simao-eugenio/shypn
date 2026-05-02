@@ -6018,42 +6018,6 @@
       "metadata": {}
     },
     {
-      "id": "evt_maint_1",
-      "name": "evt_maint_1",
-      "trigger": "t >  DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {}
-    },
-    {
-      "id": "evt_maint_2",
-      "name": "evt_maint_2",
-      "trigger": "t > 2 *  DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {}
-    },
-    {
-      "id": "evt_maint_3",
-      "name": "evt_maint_3",
-      "trigger": "t >  3* DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {}
-    },
-    {
       "id": "evt_apply_thermodynamics",
       "name": "evt_apply_thermodynamics",
       "trigger": "t < 1e-9",
@@ -6067,6 +6031,492 @@
         "pH_neutrality": "1 - 0.3*abs(PH - 7.4)"
       },
       "metadata": {}
+    },
+    {
+      "name": "evt_maint_01",
+      "trigger": "t > 1 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 1,
+        "nominal_time_hours": 6
+      },
+      "id": "evt_maint_01"
+    },
+    {
+      "name": "evt_maint_02",
+      "trigger": "t > 2 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 2,
+        "nominal_time_hours": 12
+      },
+      "id": "evt_maint_02"
+    },
+    {
+      "name": "evt_maint_03",
+      "trigger": "t > 3 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 3,
+        "nominal_time_hours": 18
+      },
+      "id": "evt_maint_03"
+    },
+    {
+      "name": "evt_maint_04",
+      "trigger": "t > 4 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 4,
+        "nominal_time_hours": 24
+      },
+      "id": "evt_maint_04"
+    },
+    {
+      "name": "evt_maint_05",
+      "trigger": "t > 5 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 5,
+        "nominal_time_hours": 30
+      },
+      "id": "evt_maint_05"
+    },
+    {
+      "name": "evt_maint_06",
+      "trigger": "t > 6 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 6,
+        "nominal_time_hours": 36
+      },
+      "id": "evt_maint_06"
+    },
+    {
+      "name": "evt_maint_07",
+      "trigger": "t > 7 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 7,
+        "nominal_time_hours": 42
+      },
+      "id": "evt_maint_07"
+    },
+    {
+      "name": "evt_maint_08",
+      "trigger": "t > 8 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 8,
+        "nominal_time_hours": 48
+      },
+      "id": "evt_maint_08"
+    },
+    {
+      "name": "evt_maint_09",
+      "trigger": "t > 9 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 9,
+        "nominal_time_hours": 54
+      },
+      "id": "evt_maint_09"
+    },
+    {
+      "name": "evt_maint_10",
+      "trigger": "t > 10 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 10,
+        "nominal_time_hours": 60
+      },
+      "id": "evt_maint_10"
+    },
+    {
+      "name": "evt_maint_11",
+      "trigger": "t > 11 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 11,
+        "nominal_time_hours": 66
+      },
+      "id": "evt_maint_11"
+    },
+    {
+      "name": "evt_maint_12",
+      "trigger": "t > 12 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 12,
+        "nominal_time_hours": 72
+      },
+      "id": "evt_maint_12"
+    },
+    {
+      "name": "evt_maint_13",
+      "trigger": "t > 13 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 13,
+        "nominal_time_hours": 78
+      },
+      "id": "evt_maint_13"
+    },
+    {
+      "name": "evt_maint_14",
+      "trigger": "t > 14 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 14,
+        "nominal_time_hours": 84
+      },
+      "id": "evt_maint_14"
+    },
+    {
+      "name": "evt_maint_15",
+      "trigger": "t > 15 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 15,
+        "nominal_time_hours": 90
+      },
+      "id": "evt_maint_15"
+    },
+    {
+      "name": "evt_maint_16",
+      "trigger": "t > 16 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 16,
+        "nominal_time_hours": 96
+      },
+      "id": "evt_maint_16"
+    },
+    {
+      "name": "evt_maint_17",
+      "trigger": "t > 17 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 17,
+        "nominal_time_hours": 102
+      },
+      "id": "evt_maint_17"
+    },
+    {
+      "name": "evt_maint_18",
+      "trigger": "t > 18 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 18,
+        "nominal_time_hours": 108
+      },
+      "id": "evt_maint_18"
+    },
+    {
+      "name": "evt_maint_19",
+      "trigger": "t > 19 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 19,
+        "nominal_time_hours": 114
+      },
+      "id": "evt_maint_19"
+    },
+    {
+      "name": "evt_maint_20",
+      "trigger": "t > 20 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 20,
+        "nominal_time_hours": 120
+      },
+      "id": "evt_maint_20"
+    },
+    {
+      "name": "evt_maint_21",
+      "trigger": "t > 21 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 21,
+        "nominal_time_hours": 126
+      },
+      "id": "evt_maint_21"
+    },
+    {
+      "name": "evt_maint_22",
+      "trigger": "t > 22 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 22,
+        "nominal_time_hours": 132
+      },
+      "id": "evt_maint_22"
+    },
+    {
+      "name": "evt_maint_23",
+      "trigger": "t > 23 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 23,
+        "nominal_time_hours": 138
+      },
+      "id": "evt_maint_23"
+    },
+    {
+      "name": "evt_maint_24",
+      "trigger": "t > 24 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 24,
+        "nominal_time_hours": 144
+      },
+      "id": "evt_maint_24"
+    },
+    {
+      "name": "evt_maint_25",
+      "trigger": "t > 25 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 25,
+        "nominal_time_hours": 150
+      },
+      "id": "evt_maint_25"
+    },
+    {
+      "name": "evt_maint_26",
+      "trigger": "t > 26 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 26,
+        "nominal_time_hours": 156
+      },
+      "id": "evt_maint_26"
+    },
+    {
+      "name": "evt_maint_27",
+      "trigger": "t > 27 * DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
+      },
+      "metadata": {
+        "group": "maintenance_dose",
+        "target": "CBD_plasma",
+        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
+        "dose_index": 27,
+        "nominal_time_hours": 162
+      },
+      "id": "evt_maint_27"
     }
   ]
 }
