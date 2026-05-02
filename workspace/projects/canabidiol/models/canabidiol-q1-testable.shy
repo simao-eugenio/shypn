@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-02T10:35:47.298715",
+    "created": "2026-05-02T11:30:13.121563",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -12,9 +12,9 @@
     }
   },
   "view_state": {
-    "zoom": 0.8857805000000175,
-    "pan_x": 2386.7565996043095,
-    "pan_y": 593.3700223664897,
+    "zoom": 0.8052550000000159,
+    "pan_x": 2375.9881304406736,
+    "pan_y": 346.6427575418569,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -53,8 +53,8 @@
       "x": -1880.0,
       "y": 810.0,
       "radius": 40.0,
-      "marking": 10.0,
-      "initial_marking": 10.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -1501,8 +1501,8 @@
       "x": -1870.0,
       "y": -100.0,
       "radius": 40.0,
-      "marking": 7200,
-      "initial_marking": 7200,
+      "marking": 21600,
+      "initial_marking": 21600,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1716,6 +1716,62 @@
       "neighbor_compartments": [],
       "spatial_position": null,
       "compartment": "environment"
+    },
+    {
+      "id": "P43",
+      "name": "CBD_plasma",
+      "label": "CBD_extracellular\n(Cannabidiol)\nworking scale: 1 token = 1 uM",
+      "metadata": {
+        "kegg_id": "D10915",
+        "chebi_id": "CHEBI:69478",
+        "pubchem_cid": "644019",
+        "compound_name": "Cannabidiol",
+        "formula": "C21H30O2",
+        "mw": 314.469,
+        "partition": "peripheral_pk",
+        "function": "PK_compartment_extracellular",
+        "hierarchy_layer": null,
+        "compartment": "extracellular"
+      },
+      "object_type": "place",
+      "x": -2200.0,
+      "y": 810.0,
+      "radius": 40.0,
+      "marking": 0.0,
+      "initial_marking": 0.0,
+      "capacity": "Infinity",
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 5.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": 10000.0,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
     }
   ],
   "transitions": [
@@ -2877,7 +2933,7 @@
     },
     {
       "id": "T30",
-      "name": "CBD_Systemic_Clearance",
+      "name": "CBD_Plasma_Clearance",
       "label": "CBD_Systemic_Clearance\n(hepatic CYP3A4)\nelimination",
       "object_type": "transition",
       "x": -2080.0,
@@ -2904,7 +2960,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.00003 * CBD_extracellular * Temperature_factor"
+        "rate_function": "0.00003 * CBD_plasma * Temperature_factor",
+        "rate_function_display": "k_clear \u00d7 [CBD_plasma]"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -3552,6 +3609,43 @@
       "adaptive_filter": null,
       "volume_threshold": null,
       "prefer_continuous": null
+    },
+    {
+      "id": "T48",
+      "name": "CBD_BBB_Transfer",
+      "label": "CBD_Absorption\n(membrane permeation)\nFick's law",
+      "object_type": "transition",
+      "x": -2040.0,
+      "y": 810.0,
+      "width": 15.0,
+      "height": 60.0,
+      "horizontal": false,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 1.0,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "race_with_resampling",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "properties": {
+        "rate_function": "0.0005 * CBD_plasma * Temperature_factor",
+        "rate_function_display": "k_BBB \u00d7 [CBD_plasma]"
+      },
+      "is_environment_aware": false,
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": true
     }
   ],
   "arcs": [
@@ -5003,9 +5097,7 @@
         0.0
       ],
       "width": 3.000000000000001,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A73",
@@ -5053,7 +5145,7 @@
       "label": "",
       "object_type": "arc",
       "arc_type": "normal",
-      "source_id": "P1",
+      "source_id": "P43",
       "source_type": "place",
       "target_id": "T30",
       "target_type": "transition",
@@ -5631,6 +5723,46 @@
       ],
       "width": 2.0,
       "control_points": []
+    },
+    {
+      "id": "A103",
+      "name": "Plasma_to_BBB",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P43",
+      "source_type": "place",
+      "target_id": "T48",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": []
+    },
+    {
+      "id": "A104",
+      "name": "BBB_to_Extracellular",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T48",
+      "source_type": "transition",
+      "target_id": "P1",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": null,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.000000000000001,
+      "control_points": []
     }
   ],
   "modules": [],
@@ -5881,7 +6013,7 @@
       "use_values_from_trigger_time": true,
       "priority": 0,
       "assignments": {
-        "CBD_extracellular": "CBD_extracellular + LOADING_DOSE"
+        "CBD_plasma": "CBD_plasma + LOADING_DOSE"
       },
       "metadata": {}
     },
@@ -5893,7 +6025,7 @@
       "use_values_from_trigger_time": true,
       "priority": 0,
       "assignments": {
-        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
       },
       "metadata": {}
     },
@@ -5905,7 +6037,7 @@
       "use_values_from_trigger_time": true,
       "priority": 0,
       "assignments": {
-        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
       },
       "metadata": {}
     },
@@ -5917,7 +6049,7 @@
       "use_values_from_trigger_time": true,
       "priority": 0,
       "assignments": {
-        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
       },
       "metadata": {}
     },
