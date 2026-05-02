@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-04-30T14:47:04.774319",
+    "created": "2026-05-02T10:35:47.298715",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -13,8 +13,8 @@
   },
   "view_state": {
     "zoom": 0.8857805000000175,
-    "pan_x": 2456.7513669309765,
-    "pan_y": 576.4358044648767,
+    "pan_x": 2386.7565996043095,
+    "pan_y": 593.3700223664897,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1501,8 +1501,8 @@
       "x": -1870.0,
       "y": -100.0,
       "radius": 40.0,
-      "marking": 21600.0,
-      "initial_marking": 21600.0,
+      "marking": 7200,
+      "initial_marking": 7200,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1866,8 +1866,8 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P39",
         "P5",
+        "P39",
         "P41"
       ],
       "is_environment_aware": true,
@@ -1909,8 +1909,8 @@
         "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
       },
       "signal_places": [
-        "P6",
         "P39",
+        "P6",
         "P41"
       ],
       "is_environment_aware": true,
@@ -1990,8 +1990,8 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
-        "P9",
-        "P39"
+        "P39",
+        "P9"
       ],
       "is_environment_aware": true,
       "compartment": "nucleus",
@@ -2391,12 +2391,12 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P11",
-        "P40",
         "P39",
         "P41",
+        "P40",
+        "P22",
         "P6",
-        "P22"
+        "P11"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2437,10 +2437,10 @@
         "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
       },
       "signal_places": [
-        "P27",
-        "P21",
         "P26",
-        "P40"
+        "P21",
+        "P40",
+        "P27"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2519,10 +2519,10 @@
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
-        "P11",
-        "P40",
         "P39",
+        "P11",
         "P41",
+        "P40",
         "P6",
         "P19"
       ],
@@ -2566,8 +2566,8 @@
       },
       "signal_places": [
         "P23",
-        "P24",
-        "P39"
+        "P39",
+        "P24"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -4990,7 +4990,7 @@
       "name": "Absorption_to_CBD_intra",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "T28",
       "source_type": "transition",
       "target_id": "P30",
@@ -4998,9 +4998,9 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.000000000000001,
       "control_points": [],
