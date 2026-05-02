@@ -54,11 +54,14 @@ Mechanism:
 weighted.** Biologically NH should fall at DSEV=5 from Aβ-mediated
 damage even with NFkB suppressed. Worth auditing the topology.
 
-### 🚩 Methodology issue: empty provenance
+### Methodology note (corrected after audit)
 
-`provenance.json` and `sweep_config.json` are missing/empty in the run
-dir. Dispatcher didn't capture git context for this run. Pre-G2 sweeps
-captured them correctly. Worth investigating dispatcher snapshot logic.
+*Initial worry about "empty provenance" was a false alarm.* The runner
+saves the input sweep config as `config.json` (not `sweep_config.json`)
+inside the run dir, and `provenance.json` uses a nested schema
+(`client.git.head_sha`, `server.git.head_sha`, `model.sha256`,
+`parameter_sources`). All fields are populated for this run; both
+client and server are at `da69698f` on `Usability-and-enhancements`.
 
 ### Stochastic discrepancy
 
@@ -73,8 +76,23 @@ insufficient. Recommend ≥20 replicates for the headline figure.
 - CBD anti-inflammatory ceiling (NFkB ≤ 0.25 across all DSEV)
 - Mechanistic story (PPARg → ↓M1 → ↑NH at high DSEV)
 
+## G3 audit (post-hoc)
+
+**AbO→NH damage path EXISTS** via T20 `Neurotoxicity` (consumes NH;
+rate references AbO + ROS + TNFa). Topology is fine.
+
+**Why NH rises with DSEV:** T21 `BDNF_neuroprotection` has a
+self-amplifying `(100−NH)/100` term and BDNF is **not disease-coupled**
+(stays ~30 across all DSEV). At DSEV=5: T20 = 377 firings/day damage;
+T21 = 638 firings/day recovery → net +261 NH/day.
+
+Real AD biology has NFkB / TNFa / Aβ suppressing BDNF expression. The
+model is missing this coupling — **G3 model gap**.
+
 ## Outstanding
 
-1. Audit AbO→NH direct toxicity arc (G3 candidate patch)
-2. Diagnose missing provenance in dispatcher
-3. Q4 — factorial DSEV × MAINT at chronic horizon (see protocol)
+1. ~~Diagnose missing provenance~~ — resolved (false alarm)
+2. G3 patch — add disease → ↓BDNF coupling so NH actually falls under
+   pathology load. Three options: (G3a) NFkB inhibitor arc on T21,
+   (G3b) couple T21 rate to `1 − NFkB/(K+NFkB)`, (G3c) couple to AbO.
+3. Q4 — factorial DSEV × MAINT at chronic horizon
