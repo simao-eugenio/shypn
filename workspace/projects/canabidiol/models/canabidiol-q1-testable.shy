@@ -2571,7 +2571,7 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor",
+        "rate_function": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.001 * (max(0, ROS - 20.0) / (15 + max(0, ROS - 20.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor",
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
