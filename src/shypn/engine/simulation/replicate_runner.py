@@ -330,9 +330,21 @@ class ReplicateRunner:
             print(f"  Duration: {duration} {time_units.value}")
         
         # ── GPU detection ────────────────────────────────────────────
+        # Skip GPU when we are inside a sweep worker pool: N sibling
+        # workers contending for one GPU is dramatically slower than
+        # CPU-fork with one worker per condition (verified: ~0.3-2.2 s
+        # /replicate-day on CPU-fork @ 8-13 workers vs ~30+ s on GPU
+        # hybrid @ 20 workers contending; canabidiol Q1, May 2026).
+        # The user can still force GPU with use_gpu='force', and
+        # single-condition / GUI runs are unaffected.
         gpu_backend = None
         _gpu_mode = getattr(self.default_settings, 'use_gpu', 'auto')
-        if _gpu_mode != 'off':
+        _in_sweep_pool = bool(os.environ.get('_SHYPN_IN_POOL_WORKER'))
+        if _gpu_mode == 'auto' and _in_sweep_pool:
+            if verbose:
+                print("  GPU skipped: inside sweep worker pool "
+                      "(use_gpu='force' to override)")
+        elif _gpu_mode != 'off':
             from shypn.engine.acceleration.gpu import detect_gpu
             gpu_backend = detect_gpu()
             if gpu_backend is not None:
