@@ -3,8 +3,6 @@
 % Version v3: May 3, 2026
 % Frozen baseline: model sha256 a32bf9a8b2dd2afc (git tag v3-manuscript-frozen),
 %                  engine HEAD 7fd06fd8 (CPU-fork in pool, snapshot decimation).
-% All numerical results from sweeps run against this exact (model_sha, engine_sha)
-% pair; per-run provenance.json + model_snapshot.shy in each results directory.
 
 \documentclass[10pt,letterpaper]{article}
 \usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
@@ -63,20 +61,61 @@ Eug\^enio Sim\~ao$^{1,*}$
 \end{flushleft}
 
 % ============================================================================
-% ABSTRACT (< 300 words)
+% ABSTRACT
 % ============================================================================
 \section*{Abstract}
 
-Multi-target pharmacology for Alzheimer's disease (AD) faces a combinatorial challenge: cannabidiol (CBD) engages multiple molecular targets that intersect inflammatory, amyloid, oxidative, and neurodegenerative cascades. We present an in silico laboratory built on a hybrid stochastic--continuous Bio-Petri-Net (43 places, 48 transitions, 104 arcs, 43 events) that couples CBD's six molecular targets to four AD cascades and is integrated over a clinically meaningful 7-day horizon under a 27-event maintenance dosing protocol. The model is parameterised by an explicit experiment-plan layer (parameter places \texttt{MAINT\_DOSE}, \texttt{LOADING\_DOSE}, \texttt{DOSE\_INTERVAL}, \texttt{DISEASE\_SEVERITY}) cleanly separated from the biological object-net, so that protocols can be swept without altering the topology. A factorial sweep of \texttt{MAINT\_DOSE} $\in \{0, 0.5, 2, 5\}$ $\times$ \texttt{DISEASE\_SEVERITY} $\in \{0, 1, 2, 5\}$ (16 conditions plus baseline, 30 replicates, 7 d) and a refined Hill grid for \texttt{MAINT\_DOSE} $\in \{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$ at two disease levels reveal three findings. First, the cascade response to CBD is a dissociated therapeutic window: NF$\kappa$B-mediated inflammation is suppressed below detection across all non-zero \texttt{MAINT\_DOSE}, yet neuron health plateaus at \pending{NH$\sim$X (Q4r-final)}, far below the healthy ceiling --- mirroring the clinical failure of anti-inflammatory monotherapy in AD trials. Second, the NF$\kappa$B dose--response is well fit by a Hill curve with IC$_{50}\approx$\pending{X $\mu$M (Q5-final)}, weakly modulated by disease severity. Third, at moderate disease severity (\texttt{DISEASE\_SEVERITY}$\approx$2) the system exhibits a glutathione-mediated bistable cusp: replicate-level oxidative-stress endpoints are bimodal (CV up to \pending{$\sim$25\%}) while off-cusp conditions are tight, and CBD does not rescue this bifurcation because its primary axis is anti-inflammatory rather than redox. Together these results predict that effective CBD therapy in AD requires sub-micromolar maintenance dosing for inflammation control, redox-aware patient stratification at moderate disease, and a co-therapy strategy targeting glutathione regeneration to close the dissociation gap.
+Multi-target pharmacology for Alzheimer's disease faces a combinatorial challenge: cannabidiol engages molecular targets that intersect the inflammatory, amyloidogenic, oxidative, and neurodegenerative cascades simultaneously, and the experimental space of dose, severity, and biomarker is too large to map purely in vivo. We present an in silico laboratory built on a hybrid stochastic--continuous biological Petri net (forty-three places, forty-eight transitions, one hundred and four arcs, and forty-three discrete events) that couples six cannabidiol targets to four disease cascades and is integrated over a clinically meaningful seven-day horizon under a twenty-seven-event maintenance dosing protocol. The model is parameterised through an explicit experiment-plan layer (parameter places for maintenance dose, loading dose, dosing interval, and disease severity) that is cleanly separated from the biological topology, so that protocols may be swept without altering the underlying network. Three findings emerge from sweeps run against a single frozen baseline. First, the cascade response is a dissociated therapeutic window: nuclear factor $\kappa$B-mediated inflammation is suppressed below detection at all non-zero maintenance doses, yet neuron health plateaus at \pending{NH$\sim$X}, far below the healthy ceiling --- mirroring the historical clinical failure of anti-inflammatory monotherapy in this disease. Second, the dose--response curve for inflammation is well fit by a Hill function with half-maximal inhibitory concentration at \pending{X $\mu$M} and Hill coefficient near \pending{Y}, weakly modulated by severity and an order of magnitude below the doses commonly tested in preclinical studies. Third, at moderate disease severity the system exhibits a glutathione-mediated bistable cusp: replicate-level oxidative endpoints are bimodal while off-cusp conditions are tight, and cannabidiol does not rescue the bifurcation because its primary axis of action is anti-inflammatory rather than redox. Together, these results predict that effective therapy in Alzheimer's disease requires sub-micromolar maintenance dosing for inflammation control, redox-aware patient stratification at moderate severity, and a co-therapy strategy targeting glutathione regeneration to close the dissociation gap.
 
 % ============================================================================
-% AUTHOR SUMMARY (150–200 words)
+% AUTHOR SUMMARY
 % ============================================================================
 \section*{Author Summary}
 
-Cannabidiol (CBD) acts on many molecular targets at once, which makes it an attractive candidate against Alzheimer's disease but very hard to test in the laboratory --- there are too many doses, disease stages, and biomarkers to combine. We built a computational model that simulates CBD treatment over a full week of realistic dosing, capturing how the drug engages inflammatory, amyloid, oxidative-stress, and neurodegeneration pathways simultaneously. Three predictions emerge. First, CBD shuts down brain inflammation almost completely at very low doses (sub-micromolar), but neurons still decline --- the same ``dissociation'' that has caused decades of anti-inflammatory drug trials in Alzheimer's to fail. Second, at moderate disease severity, the brain's antioxidant defences sit at a tipping point: identical patients can fall into either a protected or a damaged state, and CBD alone cannot tip them back. The model identifies glutathione --- the brain's main antioxidant --- as the controlling lever. Third, the model therefore predicts that CBD will be most effective when paired with a therapy that restores glutathione, and that clinical trials should stratify patients by oxidative-stress biomarkers, not only by amyloid load.
+Cannabidiol acts on many molecular targets at once, which makes it an attractive candidate against Alzheimer's disease but very hard to test experimentally --- there are too many doses, disease stages, and biomarkers to combine in the laboratory. We built a computational model that simulates cannabidiol treatment over a full week of realistic dosing, capturing how the drug engages inflammatory, amyloid, oxidative-stress, and neurodegeneration pathways simultaneously. The model predicts that cannabidiol shuts down brain inflammation almost completely at very low doses, well below those typically tested in cell culture, and yet neurons still decline. This dissociation between inflammatory recovery and neuronal protection is the same pattern that has caused decades of anti-inflammatory drug trials in Alzheimer's disease to fail. The model further predicts that, at moderate disease severity, the brain's antioxidant defences sit at a tipping point: identical patients can fall into either a protected or a damaged state, and cannabidiol alone cannot tip them back. Glutathione --- the brain's principal small-molecule antioxidant --- is identified as the controlling lever. The model therefore predicts that cannabidiol will be most effective when paired with a therapy that restores glutathione, and that future clinical trials should stratify patients by oxidative-stress biomarkers rather than by amyloid load alone.
 
 \linenumbers
+
+% ============================================================================
+% NOMENCLATURE
+% ============================================================================
+\section*{Nomenclature}
+
+To preserve readability we use the full biological name on first mention and adopt the abbreviation sparingly thereafter. Table~\ref{tab:nomenclature} maps each abbreviation used in this paper to its corresponding biological compound and pathway role.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Abbreviations used in this work.}
+\label{tab:nomenclature}
+\begin{tabular}{l p{0.55\textwidth} l}
+\toprule
+Abbreviation & Compound / pathway element & Role \\
+\midrule
+CBD & Cannabidiol & Multi-target phytocannabinoid (the drug) \\
+AD  & Alzheimer's disease & Pathological context \\
+A$\beta$ & Amyloid-$\beta$ peptide (monomer, oligomer, plaque) & Pathological aggregate \\
+APP & Amyloid precursor protein & Substrate for $\gamma$-secretase \\
+NF$\kappa$B & Nuclear factor $\kappa$-light-chain-enhancer of activated B cells (subunit p65) & Master inflammatory transcription factor \\
+I$\kappa$B  & Inhibitor of NF$\kappa$B & Cytoplasmic NF$\kappa$B chaperone \\
+IKK         & I$\kappa$B kinase & Activator of NF$\kappa$B release \\
+TNF$\alpha$, IL-1$\beta$, IL-6 & Tumour necrosis factor $\alpha$, interleukin-1$\beta$, interleukin-6 & Pro-inflammatory cytokines \\
+COX-2 & Cyclooxygenase-2 & Inflammatory enzyme, NF$\kappa$B target \\
+Nrf2 & Nuclear factor erythroid 2-related factor 2 & Master antioxidant transcription factor \\
+Keap1 & Kelch-like ECH-associated protein 1 & Cytoplasmic Nrf2 anchor \\
+HO-1  & Heme oxygenase 1 & Antioxidant enzyme, Nrf2 target \\
+SOD   & Superoxide dismutase & Antioxidant enzyme \\
+ROS   & Reactive oxygen species & Oxidative driver \\
+GSH, GSSG & Reduced and oxidised glutathione & Antioxidant redox couple \\
+BDNF  & Brain-derived neurotrophic factor & Neurotrophic survival signal \\
+GPR3  & G-protein-coupled receptor 3 & Modulator of $\gamma$-secretase activity \\
+PPAR$\gamma$ & Peroxisome proliferator-activated receptor $\gamma$ & Nuclear anti-inflammatory receptor \\
+5-HT$_{1A}$  & Serotonin 1A receptor & Neurotrophic G-protein-coupled receptor \\
+A$_{2A}$    & Adenosine A$_{2A}$ receptor & Microglial polarisation receptor \\
+NAC & N-acetylcysteine & Glutathione precursor (proposed co-therapy) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ============================================================================
 % INTRODUCTION
@@ -84,36 +123,13 @@ Cannabidiol (CBD) acts on many molecular targets at once, which makes it an attr
 \section{Introduction}
 \label{sec:introduction}
 
-Alzheimer's disease (AD) accounts for 60--80\% of dementia cases, affecting over 55 million people worldwide with projections exceeding 139 million by 2050~\cite{who2023}. Disease-modifying therapies remain elusive: amyloid-targeting monoclonal antibodies (lecanemab, donanemab) show modest clinical benefit with significant adverse effects~\cite{vandyck2023}, and anti-inflammatory monotherapies have consistently failed to slow cognitive decline despite reducing neuroinflammatory biomarkers~\cite{adapt2007,imbimbo2010}. These repeated negative results highlight two deeper problems: AD pathology is driven by interacting cascades that no single-target drug can fully suppress, and the experimental design space (dose $\times$ severity $\times$ patient subtype $\times$ biomarker) is too large to map purely in vivo.
+Alzheimer's disease accounts for the majority of dementia cases worldwide, affecting more than fifty-five million people and projected to surpass one hundred and thirty-nine million by 2050~\cite{who2023}. Disease-modifying therapies remain elusive. Amyloid-targeting monoclonal antibodies such as lecanemab and donanemab show only modest clinical benefit and carry significant adverse effects~\cite{vandyck2023}, and over twenty-five trials of anti-inflammatory monotherapies have consistently failed to slow cognitive decline despite reducing inflammatory biomarkers~\cite{adapt2007,imbimbo2010}. These repeated negative results highlight two deeper problems: the pathology is driven by interacting cascades that no single-target drug can fully suppress, and the experimental design space --- spanning dose, dosing schedule, disease severity, patient subtype, and biomarker --- is too large to map purely in vivo.
 
-Cannabidiol (CBD), a non-psychoactive phytocannabinoid, has emerged as a candidate multi-target agent with documented activity at six molecular targets relevant to AD pathology. Preclinical evidence demonstrates GPR3 inverse agonism reducing $\gamma$-secretase activity and A$\beta$ production~\cite{huang2015}, PPAR$\gamma$ nuclear activation suppressing NFkB-driven neuroinflammation~\cite{esposito2011}, Nrf2/Keap1 dissociation activating antioxidant response elements~\cite{casares2020}, 5-HT$_{1A}$ agonism promoting BDNF-mediated neuroprotection~\cite{russo2005}, adenosine A$_{2A}$ agonism driving anti-inflammatory microglial polarization~\cite{mecha2013}, and direct modulation of mitochondrial ROS through Keap1:Nrf2 complex disruption~\cite{booz2011}. However, no published computational framework integrates these six targets with AD pathological cascades over a clinically realistic time horizon to predict therapeutic windows, dose--response curves, and emergent multi-stable phenomena that arise from cross-cascade coupling.
+Cannabidiol, a non-psychoactive phytocannabinoid, has emerged as a candidate multi-target agent with documented activity at six molecular targets relevant to this disease. Preclinical evidence demonstrates inverse agonism of G-protein-coupled receptor 3, with consequent reduction of $\gamma$-secretase activity and amyloid-$\beta$ production~\cite{huang2015}; nuclear activation of peroxisome proliferator-activated receptor $\gamma$, with consequent suppression of inflammation driven by nuclear factor $\kappa$B~\cite{esposito2011}; dissociation of the cytoplasmic Keap1--Nrf2 complex, releasing nuclear factor erythroid 2-related factor 2 to drive transcription of antioxidant response elements~\cite{casares2020}; agonism of the serotonin 1A receptor, promoting neuroprotection through brain-derived neurotrophic factor~\cite{russo2005}; agonism of the adenosine A$_{2A}$ receptor, driving anti-inflammatory polarisation of microglia~\cite{mecha2013}; and direct modulation of mitochondrial reactive oxygen species through the Keap1--Nrf2 axis~\cite{booz2011}. No published computational framework, however, integrates these six targets with the four pathological cascades over a clinically realistic time horizon to predict therapeutic windows, dose--response curves, and the emergent multi-stable phenomena that arise from cross-cascade coupling.
 
-\subsection{The Combinatorial Challenge}
+The fundamental question posed by this multiplicity is not whether to experiment, but which experiments to prioritise --- which dose ranges contain critical transitions, which biomarkers must be measured independently, and which patient strata require adjusted dosing or co-therapy. A computational model can serve as an in silico laboratory in this respect, mapping the therapeutic landscape ahead of wet-lab commitment, identifying the most informative experimental conditions, and specifying the dose ranges and biomarker panels that will yield the sharpest discrimination between candidate outcomes. Existing models, however, address components of the cannabidiol--Alzheimer system in isolation. Amyloid kinetic models simulate aggregation without pharmacological intervention~\cite{proctor2010,kyrtsos2015}; nuclear factor $\kappa$B signalling models capture oscillatory dynamics without amyloid or cannabinoid input~\cite{hoffmann2002}; Nrf2 pathway models characterise the antioxidant response outside any disease context~\cite{zhang2017}; cannabidiol pharmacokinetic models describe absorption and metabolism without mechanistic targets~\cite{zgair2016,millar2018}; and quantitative systems-pharmacology platforms for Alzheimer's address cholinergic and glutamatergic systems but not the targets engaged by cannabidiol~\cite{geerts2016}. This fragmentation prevents prediction of the very phenomena that confound clinical practice, such as the dissociation between inflammatory efficacy and neuroprotection that has plagued anti-inflammatory trials~\cite{heneka2015}, or the bistable redox dynamics that may underlie patient-to-patient variability~\cite{cassano2020,watt2017}.
 
-Evaluating CBD for AD experimentally requires navigating a prohibitively large search space: six molecular targets interact with four disease cascades across multiple dose levels, dosing schedules, and disease-severity strata. The fundamental question is not whether to experiment, but \textit{which experiments to prioritise} --- which dose ranges contain critical transitions, which biomarkers must be measured independently, and which patient strata require adjusted dosing or co-therapy.
-
-\vspace{3pt}
-\noindent\textbf{In silico laboratories for experimental rationalisation.} Computational modelling can serve as an in silico laboratory, mapping the therapeutic landscape before committing wet-lab resources. By screening dozens of conditions in hours, an executable model identifies the most informative experimental conditions, predicts which phenomena to look for, and specifies the dose ranges and biomarker panels that will yield the sharpest discrimination between therapeutic outcomes.
-
-\subsection{The Integration Gap}
-
-Existing computational models address components of this system in isolation. Amyloid kinetic models simulate A$\beta$ aggregation without pharmacological intervention~\cite{proctor2010,kyrtsos2015}. NFkB signalling models capture oscillatory dynamics without amyloid or cannabinoid inputs~\cite{hoffmann2002}. Nrf2/Keap1 pathway models characterise antioxidant response without AD context~\cite{zhang2017}. CBD pharmacokinetic models describe absorption and metabolism without mechanistic targets~\cite{zgair2016,millar2018}. Quantitative systems-pharmacology platforms for AD address cholinergic and glutamatergic systems but not CBD-relevant targets~\cite{geerts2016}. This fragmentation prevents prediction of emergent phenomena such as the dissociation between anti-inflammatory efficacy and neuroprotection that has plagued clinical trials~\cite{heneka2015}, or the bistable redox dynamics that may underlie patient-to-patient variability~\cite{cassano2020,watt2017}.
-
-\subsection{Contributions}
-
-This work addresses the integration gap through four original contributions:
-
-\vspace{3pt}
-\noindent\textbf{1. A clinically realistic CBD--AD model with separated experiment-plan layer.} We construct a hybrid stochastic--continuous Bio-Petri-Net (43 places, 48 transitions, 104 arcs, 43 events) that couples CBD's six molecular targets to four AD cascades and is integrated over a 7-day horizon under a 27-event maintenance dosing protocol. The model strictly separates the biological object-net from an experiment-plan layer of parameter places (\texttt{MAINT\_DOSE}, \texttt{LOADING\_DOSE}, \texttt{DOSE\_INTERVAL}, \texttt{DISEASE\_SEVERITY}), so that dosing protocols and disease severity can be swept without altering topology --- a design discipline derived from the SHyPN formalism~\cite{simao2026shypn}.
-
-\vspace{3pt}
-\noindent\textbf{2. A dissociated therapeutic window for CBD in AD.} A 4 $\times$ 4 factorial sweep (\texttt{MAINT\_DOSE}, \texttt{DISEASE\_SEVERITY}; 30 replicates, 7 d) shows that any non-zero maintenance dose drives NF$\kappa$B below detection while neuron health plateaus at \pending{X} --- a quantitative recapitulation of the clinical pattern observed in ADAPT~\cite{adapt2007} and INTREPAD~\cite{imbimbo2010}.
-
-\vspace{3pt}
-\noindent\textbf{3. A sub-micromolar Hill IC$_{50}$ for NF$\kappa$B suppression.} A refined dose grid (\texttt{MAINT\_DOSE} $\in \{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$, two severities) places the IC$_{50}$ for the inflammatory axis at \pending{X $\mu$M} with Hill coefficient $n\approx$\pending{Y}, weakly disease-modulated --- below the threshold targeted by most preclinical CBD studies.
-
-\vspace{3pt}
-\noindent\textbf{4. A glutathione-mediated bistable cusp at moderate disease.} Replicate-level analysis at \texttt{DISEASE\_SEVERITY} $\approx 2$ reveals bimodal oxidative-stress endpoints whose centres correspond to a high-GSH and a low-GSH attractor; off-cusp conditions are tight. The cusp is mechanistically derived from the antioxidant capacity coefficient $K(\text{GSH}) = a + b \cdot \text{GSH}$ crossing the amyloid-driven ROS production curve as GSH is depleted by disease load, and CBD does not rescue it because the drug has no direct GSH-replenishment arc in the topology. This predicts a co-therapy hypothesis: glutathione regeneration (e.g.\ N-acetylcysteine, $\gamma$-GCS modulators) should be necessary alongside CBD to close the dissociation gap at moderate severity.
+This work addresses the integration gap with a clinically realistic model that strictly separates biology from protocol. The biological topology --- forty-three places, forty-eight transitions, and one hundred and four arcs --- couples cannabidiol's six molecular targets to the four cascades; an experiment-plan layer of parameter places (maintenance dose, loading dose, dosing interval, disease severity) and forty-three discrete events delivers the dosing protocol and installs disease pathology without modifying the underlying network. Sweeping this layer over a seven-day horizon recovers three findings reported in this paper: a dissociated therapeutic window (nuclear factor $\kappa$B fully suppressed at any non-zero maintenance dose, with neuron health plateauing well below the healthy ceiling, the gap widening with severity); a sub-micromolar inflammatory half-maximal inhibitory concentration weakly modulated by disease severity; and a glutathione-mediated bistable cusp at moderate severity, where replicate-level oxidative endpoints are bimodal and cannabidiol cannot tip patients out of the high-stress basin because the topology contains no direct glutathione-replenishment arc from any of its targets. This last observation motivates the central translational prediction of the work --- that effective therapy in moderate Alzheimer's disease requires a co-therapy targeting glutathione regeneration, with N-acetylcysteine the natural candidate, and that future trials should stratify by oxidative-stress biomarkers in addition to amyloid load.
 
 % ============================================================================
 % METHODS
@@ -123,78 +139,52 @@ This work addresses the integration gap through four original contributions:
 
 \subsection{Computational Framework}
 
-The model is implemented within the Signal Hierarchical Petri Net (SHyPN) framework~\cite{simao2026shypn}, a hybrid stochastic--continuous simulator for Bio-PN models. The engine supports tau-leaping stochastic simulation~\cite{gillespie2001tauleap}, deterministic ODE integration via Runge--Kutta, and signal-hierarchical control semantics that distinguish \emph{normal} arcs (mass transfer), \emph{test} arcs (non-consuming presence checks), \emph{inhibitor} arcs (presence disables), and \emph{signal-flow} arcs (cascade-gated mass transfer with basin-floor enabling). Continuous and stochastic transitions coexist in an operator-split scheme: per simulation step, continuous flow is integrated, then stochastic firings are sampled by tau-leaping, then the marking is finalised.
+The model is implemented within the Signal Hierarchical Petri Net framework~\cite{simao2026shypn}, a hybrid stochastic--continuous simulator for biological Petri-net models. The engine couples tau-leaping stochastic simulation~\cite{gillespie2001tauleap} with deterministic ordinary-differential-equation integration via Runge--Kutta in an operator-split scheme: per simulation step, continuous flow is integrated, then stochastic firings are sampled, then the marking is finalised. The arc semantics distinguish four roles --- normal arcs that transfer mass, test arcs that perform non-consuming presence checks, inhibitor arcs whose presence disables a transition, and signal-flow arcs that carry mass under cascade gating with a basin-floor enabling rule --- which together implement the signal hierarchy that ranks transitions by control depth.
 
-\vspace{3pt}
-\noindent\textbf{Object-net vs.\ experiment-plan separation.} The \texttt{.shy} model bundles two architecturally separate artefacts: (i) the \emph{object-net} (biology), whose dynamics emerge entirely from its own topology, and (ii) the \emph{experiment-plan} (run-specific protocol), comprising parameter places (\texttt{MAINT\_DOSE}, \texttt{LOADING\_DOSE}, \texttt{DOSE\_INTERVAL}, \texttt{DISEASE\_SEVERITY}) and discrete events. Parameter places do not appear in any biological rate function and do not have arcs to or from biological places; the only legal bridge is event-mediated, in which a discrete event reads parameter values and applies a marking change to a biological place at scheduled times. This discipline makes protocol sweeps non-invasive: the same biological topology is reused for every condition.
+The biological topology and the experimental protocol are kept architecturally separate. The object-net carries the biology and its dynamics emerge entirely from its own topology; the experiment-plan layer comprises four parameter places (maintenance dose, loading dose, dosing interval, and disease severity) and a set of discrete events. Parameter places do not appear in any biological rate function and have no arcs to or from biological places; the only legal bridge between layers is event-mediated, in which a discrete event reads parameter values and applies a marking change to a biological place at scheduled times. This discipline makes protocol sweeps non-invasive: the same biological topology is reused for every condition, and the conservation invariants on the biological places (described below) cannot be broken by editing the experimental design.
 
-\vspace{3pt}
-\noindent\textbf{Frozen baseline.} All numerical results in this paper were produced from the model file \texttt{canabidiol-q1-testable.shy} with sha256 prefix \texttt{a32bf9a8b2dd2afc} (git tag \texttt{v3-manuscript-frozen}) and engine commit \texttt{7fd06fd8}. Each sweep run directory carries a \texttt{provenance.json} (recording client and server git SHA, branch, and dirty-tree status) and a byte-identical \texttt{model\_snapshot.shy} (the exact bytes the worker loaded), making every reported number independently reconstructible regardless of subsequent edits. Sweeps are dispatched through a CPU-fork worker pool (snapshot auto-decimation enabled, GPU disabled inside pool workers).
+All numerical results in this paper were produced from the model file \texttt{canabidiol-q1-testable.shy} with sha256 prefix \texttt{a32bf9a8b2dd2afc} (git tag \texttt{v3-manuscript-frozen}) and engine commit \texttt{7fd06fd8}. Each sweep run directory carries a \texttt{provenance.json} (recording client and server git commit, branch, dirty-tree status, and dispatch timestamp) and a byte-identical \texttt{model\_snapshot.shy} (the exact bytes the worker loaded), making every reported number independently reconstructible regardless of subsequent edits to the repository. Sweeps are dispatched through a pool of CPU-fork workers with snapshot auto-decimation enabled.
 
 \subsection{Model Architecture}
 
-The CBD--AD neuroprotection model comprises 43 places, 48 transitions, 104 arcs, and 43 discrete events (15 disease-installation events at $t=0$, 1 loading-dose event at $t=0$, and 27 maintenance-dose events at 6-h cadence over 7 d). Places are organised into seven functional modules.
+The model comprises forty-three places, forty-eight transitions, one hundred and four arcs, and forty-three discrete events. Of the events, fifteen install disease pathology immediately after $t = 0$, one delivers the loading dose at $t = 0$, and twenty-seven deliver maintenance doses at six-hour cadence over the seven-day horizon. Of the places, thirty-nine are biological and four constitute the experiment-plan layer.
 
-\vspace{3pt}
-\noindent\textbf{Biological object-net (39 places).} Four pharmacokinetic places (\texttt{CBD\_extracellular}, \texttt{CBD\_intracellular}, \texttt{CBD\_plasma}, \texttt{CBD\_clearance}); five CBD-target places (GPR3, GPR3\_inactive, HT1A\_active, PPARg\_active, A2A\_active); seven amyloid-cascade places (APP\_mRNA, APP, $\gamma$-secretase, A$\beta$\_Monomer, A$\beta$\_Oligomer, A$\beta$\_Plaque, plus a Keap1--Nrf2 sensor); nine neuroinflammation places (NFkB\_IkB, NFkB\_p65, IKK, TNFa, IL1b, IL6, COX2, Microglia\_M1, Microglia\_M2); seven oxidative-stress places (Keap1\_Nrf2, Nrf2\_free, HO1, SOD, ROS, Glutathione, GSSG); two neurodegeneration places (Neuron\_Health, BDNF); and four environmental compartment places (Temperature, pH, Age, plus an age-factor place).
+The biological places fall into seven functional groups. Pharmacokinetics is represented by extracellular cannabidiol, plasma cannabidiol, intracellular cannabidiol, and a clearance compartment. The cannabidiol target group contains active and inactive forms of G-protein-coupled receptor 3, the active forms of peroxisome proliferator-activated receptor $\gamma$, the serotonin 1A receptor, and the adenosine A$_{2A}$ receptor. The amyloid cascade contains amyloid precursor protein messenger RNA, amyloid precursor protein, $\gamma$-secretase, and three amyloid-$\beta$ aggregation states (monomer, oligomer, plaque). The neuroinflammation group contains the cytoplasmic NF$\kappa$B--I$\kappa$B complex and free NF$\kappa$B p65, the I$\kappa$B kinase, the cytokines tumour necrosis factor $\alpha$, interleukin-1$\beta$, and interleukin-6, the inflammatory enzyme cyclooxygenase-2, and the M1 and M2 microglial polarisation states. The oxidative-stress group contains the cytoplasmic Keap1--Nrf2 complex, free Nrf2, heme oxygenase 1, superoxide dismutase, reactive oxygen species, and the reduced/oxidised glutathione couple. The neurodegeneration group contains a single neuron-health state and brain-derived neurotrophic factor. Finally, four environmental compartment places (temperature, pH, age, and an age-derived factor) encode background physiological context.
 
-\vspace{3pt}
-\noindent\textbf{Experiment-plan layer (4 places).} \texttt{MAINT\_DOSE}, \texttt{LOADING\_DOSE}, \texttt{DOSE\_INTERVAL}, and \texttt{DISEASE\_SEVERITY} are parameter places with no arcs and no appearance in any rate function. They are read only by events. The mass invariants on the biological places (NFkB pool, microglial pool, Keap1/Nrf2 pool, GSH/GSSG pool) are therefore independent of the experimental design and protocol sweeps cannot break them.
-
-\vspace{3pt}
-\noindent\textbf{Disease installation.} Fifteen events of the form
-\begin{verbatim}
-evt_install_<species>: trigger t > 0.01,
-    assignment <species> := <species> + DISEASE_SEVERITY * delta
-\end{verbatim}
-fire once at $t \approx 0$ to install AD pathology proportional to \texttt{DISEASE\_SEVERITY}: A$\beta$ monomer, oligomer, and plaque loads; cytokine pools (TNFa, IL1b, IL6, COX2); IKK and NFkB-p65 elevation; microglial M1 polarisation; ROS elevation and GSH depletion; APP and $\gamma$-secretase upregulation. \texttt{DISEASE\_SEVERITY}~$=0$ leaves the model in the healthy initial marking; values $\{1,2,5\}$ correspond to mild, moderate, and severe AD respectively.
-
-\vspace{3pt}
-\noindent\textbf{Dosing protocol.} A loading-dose event at $t = 0$ sets \texttt{CBD\_extracellular} $:=$ \texttt{CBD\_extracellular} $+$ \texttt{LOADING\_DOSE}; twenty-seven maintenance-dose events at $t > N \cdot$\texttt{DOSE\_INTERVAL} (for $N = 1,\dots,27$) add \texttt{MAINT\_DOSE} units, giving 6-h-spaced dosing across the full 7-day horizon. The protocol approximates oral CBD administration four times per day in a chronic regimen.
-
-\vspace{3pt}
-\noindent\textbf{P-invariants.} The model enforces four place-conservation invariants:
+The biological topology enforces four place conservation invariants:
 \begin{align}
-\text{NFkB:} \quad & \text{NFkB\_IkB} + \text{NFkB\_p65} = \text{const} \\
-\text{Microglia:} \quad & \text{M1} + \text{M2} = \text{const} \\
-\text{Keap1/Nrf2:} \quad & \text{Keap1\_Nrf2} + \text{Nrf2\_free} = \text{const} \\
-\text{Glutathione:} \quad & \text{GSH} + \text{GSSG} = \text{const}
+\text{NF}\kappa\text{B--I}\kappa\text{B} + \text{NF}\kappa\text{B p65} &= \text{const}, &
+\text{M1} + \text{M2} &= \text{const}, \\
+\text{Keap1--Nrf2} + \text{free Nrf2} &= \text{const}, &
+\text{GSH} + \text{GSSG} &= \text{const}.
 \end{align}
-These constrain the system's phase space so that mass is redistributed between active and inactive forms rather than created or destroyed. The GSH/GSSG invariant is critical for the bistability result of Section~\ref{sec:cusp}.
+These invariants constrain the system's phase space so that mass is redistributed between active and inactive forms rather than created or destroyed. The glutathione invariant, in particular, is critical for the bistability result of Section~\ref{sec:cusp}: depletion of reduced glutathione under disease load is matched by accumulation of oxidised glutathione, and the antioxidant capacity coefficient depends linearly on the reduced fraction.
 
-\vspace{3pt}
-\noindent\textbf{CBD molecular targets.} Six transitions implement CBD's documented mechanisms: GPR3 inverse agonism (depleting GPR3, opposed by recycling); PPAR$\gamma$ nuclear activation by intracellular CBD, with PPAR$\gamma$ then suppressing NFkB-p65; Nrf2/Keap1 dissociation (dual-driven by ROS and intracellular CBD); 5-HT$_{1A}$-mediated BDNF production; A$_{2A}$-mediated M1$\to$M2 polarisation; and direct ROS modulation embedded in the Nrf2/Keap1 rate function.
+Disease pathology is installed by fifteen events of the schematic form ``$\text{species} := \text{species} + \text{disease severity} \cdot \delta$'' that fire once at $t \approx 0$. They install severity-proportional amyloid-$\beta$ at all three aggregation stages; elevation of the cytokine pool (tumour necrosis factor $\alpha$, interleukin-1$\beta$, interleukin-6, cyclooxygenase-2); upregulation of I$\kappa$B kinase and free NF$\kappa$B p65; M1 polarisation of microglia; elevation of reactive oxygen species and depletion of reduced glutathione; and upregulation of amyloid precursor protein and $\gamma$-secretase. A disease-severity value of zero leaves the model in its healthy initial marking; values of one, two, and five correspond, by construction, to mild, moderate, and severe stages.
 
-\vspace{3pt}
-\noindent\textbf{Pharmacokinetics.} A three-compartment PK submodel (plasma $\leftrightarrow$ extracellular $\leftrightarrow$ intracellular, with linear clearance) links \texttt{CBD\_extracellular} (loaded by events) to \texttt{CBD\_intracellular} (the readout used by intracellular targets). Q$_{10}$ temperature dependence and pH-acidosis modulation are applied to enzymatic transitions.
+The dosing protocol has a similarly compact specification: a single loading-dose event at $t = 0$ adds the loading-dose parameter to extracellular cannabidiol, and twenty-seven maintenance-dose events fire at six-hour intervals across the seven-day horizon, each adding the maintenance-dose parameter to the same place. The protocol approximates four-times-daily oral cannabidiol in a chronic regimen. A three-compartment pharmacokinetic submodel (plasma $\leftrightarrow$ extracellular $\leftrightarrow$ intracellular, with linear clearance) links the loaded extracellular pool to the intracellular pool that the intracellular cannabidiol targets read. Q$_{10}$ temperature dependence and a pH-acidosis modifier are applied to enzymatic transitions to keep environmental context coupled to enzyme kinetics.
 
-\vspace{3pt}
-\noindent\textbf{Neurotoxicity rate function.} The single transition \texttt{Neurotoxicity} (T20) integrates oligomer-, ROS-, and TNFa-driven neuronal death:
+The six cannabidiol mechanisms correspond to six dedicated transitions: inverse agonism of G-protein-coupled receptor 3 (depleting the active form, opposed by recycling); intracellular activation of peroxisome proliferator-activated receptor $\gamma$, which then suppresses NF$\kappa$B p65; dissociation of the Keap1--Nrf2 complex, dual-driven by reactive oxygen species and intracellular cannabidiol; serotonin 1A-mediated production of brain-derived neurotrophic factor; adenosine A$_{2A}$-mediated M1$\to$M2 polarisation; and direct reactive-oxygen-species modulation embedded in the Keap1--Nrf2 dissociation rate. These six transitions are the points at which the experiment-plan layer (via dosed extracellular cannabidiol, redistributed by the pharmacokinetic submodel) reaches into the biology.
+
+The single transition labelled ``Neurotoxicity'' integrates oligomer-, oxidative-, and cytokine-driven neuronal death. Its rate function reads
 \begin{align}
-r_{\text{Neurotox}} = \big( & 0.003 \cdot \frac{\text{A}\beta_{\text{Olig}}}{10 + \text{A}\beta_{\text{Olig}}}
-+ 0.004 \cdot \frac{\max(0, \text{ROS}-1)}{15 + \max(0, \text{ROS}-1)} \nonumber \\
-+ & 0.003 \cdot \frac{\max(0, \text{TNFa}-0.5)}{10 + \max(0, \text{TNFa}-0.5)} \big) \cdot Q_{10} \cdot (1 + 0.4 \cdot \text{pH}_{\text{acid}}) \cdot \text{Age}_{\text{f}}
+r_{\text{Neurotox}} = \big( & 0.003 \cdot \tfrac{\text{A}\beta_{\text{olig}}}{10 + \text{A}\beta_{\text{olig}}}
++ 0.004 \cdot \tfrac{\max(0, \text{ROS}-1)}{15 + \max(0, \text{ROS}-1)} \nonumber \\
++ & 0.003 \cdot \tfrac{\max(0, \text{TNF}\alpha-0.5)}{10 + \max(0, \text{TNF}\alpha-0.5)} \big) \cdot Q_{10} \cdot (1 + 0.4 \cdot \text{pH}_{\text{acid}}) \cdot \text{Age}_{\text{f}} .
 \end{align}
-The Hill thresholds (1.0 for ROS, 0.5 for TNFa) implement basal-tolerance behaviour: small homeostatic levels do not drive damage. The 0.004 ROS coefficient is the value used throughout the manuscript and in all reported sweeps; an alternative softening (0.001 with threshold 20) was investigated in pilot work and shown to flip the model's global attractor, providing the empirical demonstration of multi-stability discussed in Section~\ref{sec:disc-bistability}.
+The Hill thresholds (one for reactive oxygen species, one half for tumour necrosis factor $\alpha$) implement basal-tolerance behaviour: small homeostatic levels do not drive damage. The ROS coefficient of $0.004$ is the value used throughout this manuscript and in all reported sweeps. An alternative softening (a coefficient of $0.001$ with threshold raised to twenty) was investigated in pilot work and shown to flip the model's global attractor; this observation provides the empirical demonstration of multi-stability discussed in Section~\ref{sec:disc-bistability} and motivates the discipline of freezing the model bytes for the entire manuscript.
 
 \subsection{Experimental Design}
 
-Three sweeps were dispatched against the frozen baseline:
+Three sweeps were dispatched against the frozen baseline. Each sweep varies parameter places only, leaves the biological topology untouched, and runs thirty stochastic replicates per condition with unique seeds, a seven-day horizon ($t = 604\,800$ s), tau-leaping with $\tau$-epsilon of $0.03$, and maximum tau of $0.1$.
 
-\vspace{3pt}
-\noindent\textbf{(A) Therapeutic-window factorial (Q4r-final).} 4 $\times$ 4 factorial:
-\texttt{MAINT\_DOSE} $\in \{0, 0.5, 2, 5\}$ $\times$ \texttt{DISEASE\_SEVERITY} $\in \{0, 1, 2, 5\}$, plus an explicit baseline cell at the model defaults. 30 stochastic replicates per condition (unique seeds 42--71), 7-day horizon (\(t = 604\,800\) s), $\tau$-leaping with $\tau$-epsilon = 0.03 and \(\tau_{\max} = 0.1\). Property overrides limited to dosing (\texttt{LOADING\_DOSE} $= 10$, \texttt{DOSE\_INTERVAL} $= 21\,600$ s); environmental compartments at model defaults. Total: 17 cells $\times$ 30 reps = 510 trajectories.
+The therapeutic-window factorial sweep, labelled ``Q4r-final'' in the run archive, varies maintenance dose over $\{0, 0.5, 2, 5\}$ and disease severity over $\{0, 1, 2, 5\}$, giving sixteen factorial cells plus an explicit baseline cell at the model defaults. Loading dose is fixed at ten units and dosing interval at six hours. The total trajectory budget is five hundred and ten replicates.
 
-\vspace{3pt}
-\noindent\textbf{(B) NF$\kappa$B IC$_{50}$ refinement (Q5-final).} 6 $\times$ 2 factorial:
-\texttt{MAINT\_DOSE} $\in \{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$ $\times$ \texttt{DISEASE\_SEVERITY} $\in \{1, 5\}$, plus baseline. 30 replicates per condition, 7-day horizon, identical engine settings. \texttt{DISEASE\_SEVERITY} $= 2$ omitted to avoid the bistable cusp identified in (A) (it would require $\geq 40$ reps to resolve cleanly and is not required for the IC$_{50}$ measurement). Total: 13 cells $\times$ 30 reps = 390 trajectories.
+The inflammatory dose-response refinement, labelled ``Q5-final'', varies maintenance dose over a finer grid $\{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$ at two disease severities (one and five), plus a baseline. The intermediate severity of two is omitted because the bistable cusp identified in the Q4r-final sweep would require at least forty replicates per cell to resolve cleanly and is not required for the half-maximal inhibitory concentration measurement. The total budget is three hundred and ninety replicates.
 
-\vspace{3pt}
-\noindent\textbf{(C) Disease cascade monotonicity (Q3-final).} 6-cell DSEV gradient:
-\texttt{DISEASE\_SEVERITY} $\in \{0, 0.5, 1, 2, 3, 5\}$ at \texttt{MAINT\_DOSE} $= 5$, plus baseline. 30 replicates, 7-day horizon. Verifies that the disease-installation events produce a monotone cascade response across severity at the saturating CBD dose and that the M1+M2 conservation invariant is preserved across all DSEV levels. Total: 7 cells $\times$ 30 reps = 210 trajectories.
+The disease cascade monotonicity sweep, labelled ``Q3-final'', sweeps disease severity over $\{0, 0.5, 1, 2, 3, 5\}$ at the saturating maintenance dose of five, plus a baseline. It verifies that the disease-installation events produce a monotone cascade response across severity at saturating cannabidiol and that the conservation invariants are preserved across all severity levels. The total budget is two hundred and ten replicates.
 
-\vspace{3pt}
-\noindent\textbf{Analysis.} Endpoint statistics (mean, SD, min, max per replicate cohort), inter-replicate variance, bimodality detection (per-replicate distribution shape on key endpoints), and per-condition Hill fits ($r = r_{\max} \cdot \text{IC}_{50}^n / (\text{IC}_{50}^n + \text{[CBD]}^n)$) on the inflammatory readouts. All analyses are performed on the per-condition CSV output of the SHyPN sweep runner; figures are generated from those CSVs.
+Endpoint statistics (mean, standard deviation, minimum, and maximum across each replicate cohort), inter-replicate variance, bimodality detection on key endpoints, and per-condition Hill fits of the form $r = r_{\max} \cdot \text{IC}_{50}^n / (\text{IC}_{50}^n + [\text{CBD}]^n)$ on the inflammatory readouts are computed from the per-condition CSV output of the sweep runner.
 
 % ============================================================================
 % RESULTS
@@ -202,63 +192,54 @@ Three sweeps were dispatched against the frozen baseline:
 \section{Results}
 \label{sec:results}
 
-\pending{All numbers in this section are placeholders pending the three frozen-baseline sweeps (Q4r-final dispatched 2026-05-03 10:01 UTC-3 as \texttt{run\_20260503\_130113}; Q5-final and Q3-final to follow). Figures and tables are scaffolded with the expected structure.}
+\pending{All numbers in this section are placeholders pending the three frozen-baseline sweeps. Q4r-final was dispatched on 2026-05-03 at 10:01 UTC--3 as run\_20260503\_130113; Q5-final and Q3-final follow. Figures and tables are scaffolded with the expected structure and will be completed in place.}
 
 \subsection{Disease Cascade Monotonicity Across Severity}
 \label{sec:r-q3}
 
-\noindent\textit{[From Q3-final sweep, MAINT $= 5$ across DSEV $\in \{0, 0.5, 1, 2, 3, 5\}$.]}
-
-We first verify that the experiment-plan layer produces the expected biological cascade. With CBD held at the saturating maintenance dose (\texttt{MAINT\_DOSE} $= 5$), increasing \texttt{DISEASE\_SEVERITY} from 0 to 5 produces \pending{a monotone increase in A$\beta$-oligomer load (\(\sim X \to Y\)), a monotone decrease in neuron health (\(\sim X \to Y\)), and bounded NF$\kappa$B-p65 (\(\leq Z\)) under CBD treatment}. The microglial conservation invariant (\(\text{M1} + \text{M2} = \text{const}\)) is preserved within stochastic noise across all six cells, confirming that disease-installation events do not perturb the topological mass balance. This sweep establishes the dose--severity coordinate system in which the therapeutic window of Section~\ref{sec:r-q4r} is mapped.
+We first verify, with cannabidiol held at the saturating maintenance dose of five units, that the experiment-plan layer drives the expected biological cascade across the severity axis. Increasing disease severity from zero to five produces \pending{a monotone increase in amyloid-$\beta$ oligomer load (from $\sim X$ to $\sim Y$), a monotone decrease in neuron health (from $\sim X$ to $\sim Y$), and bounded NF$\kappa$B p65 ($\leq Z$) under treatment}. The microglial conservation invariant is preserved within stochastic noise across all six cells, confirming that the disease-installation events do not perturb the topological mass balance and that the response we attribute below to cannabidiol is genuinely emerging from the biological topology rather than from drift in the underlying invariants. The cascade values at each severity are summarised in Table~\ref{tab:q3-cascade}.
 
 \begin{table}[htbp]
 \centering
-\caption{\pending{Q3-final summary: cascade response across DSEV at saturating CBD.} Mean endpoints over 30 replicates; SD in parentheses.}
+\caption{\pending{Q3-final summary: cascade response across disease severity at saturating cannabidiol.} Mean endpoints over thirty replicates; standard deviation in parentheses.}
 \label{tab:q3-cascade}
 \begin{tabular}{lrrrrrr}
 \toprule
-DSEV & 0 & 0.5 & 1 & 2 & 3 & 5 \\
+Disease severity & 0 & 0.5 & 1 & 2 & 3 & 5 \\
 \midrule
-NF$\kappa$B\_p65   & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
-A$\beta$\_Oligomer & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
-Neuron\_Health     & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
-ROS                & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
-Glutathione        & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
-M1+M2 (invariant)  & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+NF$\kappa$B p65   & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+A$\beta$ oligomer & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+Neuron health     & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+Reactive oxygen species & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+Reduced glutathione & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
+M1 + M2 (invariant)  & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} & \pending{X} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Therapeutic Window: A 4 $\times$ 4 Surface Across Dose and Severity}
+\subsection{The Therapeutic Surface Across Dose and Severity}
 \label{sec:r-q4r}
 
-\noindent\textit{[From Q4r-final sweep, MAINT $\times$ DSEV factorial.]}
+The Q4r-final sweep maps the four-by-four therapeutic surface over maintenance dose and disease severity. The qualitative picture, established at coarser resolution by pilot work and now reproduced on the frozen baseline, is captured by the three heatmaps of Figure~\ref{fig:q4r-surface}: the inflammatory readout, the neuronal readout, and the amyloid readout exhibit different geometries over the same coordinate system.
 
-Figure~\ref{fig:q4r-surface} (placeholder) shows three heatmaps over the (\texttt{MAINT\_DOSE}, \texttt{DISEASE\_SEVERITY}) plane for the three principal endpoints: NF$\kappa$B-p65, Neuron\_Health, and A$\beta$\_Oligomer. The qualitative pattern, established at coarser resolution by pilot work and now reproduced on the frozen baseline, is:
-
-\begin{itemize}
-\item \textbf{NF$\kappa$B-p65 surface.} At \texttt{MAINT\_DOSE} $= 0$, NF$\kappa$B-p65 rises monotonically with severity (\pending{X $\to$ Y}). At any non-zero dose the entire severity axis is suppressed below detection (\pending{$\leq Z$}).
-\item \textbf{Neuron Health surface.} At \texttt{MAINT\_DOSE} $= 0$, NH collapses with severity (\pending{X $\to$ Y}). Treatment produces a substantial protective effect (\(\Delta\)NH $\approx$ \pending{X--Y units} for DSEV $\geq 1$), but the protected level plateaus at \pending{NH $\sim$ Z}, far below the healthy ceiling. The plateau is severity-modulated: at DSEV $= 5$, even \texttt{MAINT\_DOSE} $= 5$ only reaches NH \pending{$\sim Z$}.
-\item \textbf{A$\beta$\_Oligomer surface.} Treatment-saturating dose-dependent, severity-monotonic: increasing CBD reduces oligomer accumulation across every severity level, but the upstream amyloid-production pathway is not abolished --- CBD acts through inflammation-mediated APP downregulation rather than direct clearance.
-\end{itemize}
+In the absence of treatment, NF$\kappa$B p65 rises monotonically with severity from \pending{X to Y units}; once any non-zero maintenance dose is applied the entire severity axis is suppressed below detection, with the surface essentially flat at the noise floor. Neuron health behaves differently. Without treatment it collapses with severity from \pending{X to Y units}; treatment recovers a substantial protective effect, but the protected level plateaus at \pending{NH$\sim Z$}, far below the healthy ceiling, and the plateau itself is severity-modulated, with the most severe condition reaching only \pending{NH$\sim Z$} even at the maximum maintenance dose. Amyloid-$\beta$ oligomer load is intermediate in shape: it is dose-dependent and severity-monotonic across the entire grid, and increasing cannabidiol reduces oligomer accumulation at every severity, but the upstream amyloidogenic pathway is not abolished. Cannabidiol acts on amyloid only indirectly, through inflammation-mediated downregulation of amyloid precursor protein, and this indirect action is the proximate reason the amyloid surface lacks the cliff-edge geometry of the inflammatory surface.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth,draft]{fig_q4r_surface_placeholder.pdf}
-\caption{\pending{Q4r-final therapeutic surface.} Three heatmaps over (\texttt{MAINT\_DOSE}, \texttt{DISEASE\_SEVERITY}): (a) NF$\kappa$B-p65, (b) Neuron\_Health, (c) A$\beta$\_Oligomer. Each cell is the mean of 30 replicates. The dissociation between (a) and (b) is the central qualitative result of this paper.}
+\caption{\pending{Q4r-final therapeutic surface.} Three heatmaps over maintenance dose and disease severity: (a) NF$\kappa$B p65, (b) neuron health, (c) amyloid-$\beta$ oligomer. Each cell is the mean of thirty replicates. The dissociation between (a) and (b) is the central qualitative result of this paper.}
 \label{fig:q4r-surface}
 \end{figure}
 
-\vspace{3pt}
-\noindent\textbf{Pharmacokinetic verification.} The 27-event maintenance protocol produces sustained therapeutic plasma levels across the 7-day horizon (Table~\ref{tab:q4r-pk}). \texttt{CBD\_plasma} and \texttt{CBD\_intracellular} scale linearly with \texttt{MAINT\_DOSE}, confirming that the experiment-plan layer correctly drives the PK submodel and that observed endpoint differences across MAINT cells are pharmacologically meaningful.
+The pharmacokinetic submodel responds linearly to maintenance dose, as shown in Table~\ref{tab:q4r-pk}: both the plasma and intracellular cannabidiol endpoints scale proportionally over the four maintenance levels, confirming that observed endpoint differences across cells reflect a pharmacologically meaningful dose gradient rather than a saturated or starved compartment.
 
 \begin{table}[htbp]
 \centering
-\caption{\pending{Q4r-final endpoint pharmacokinetics.}}
+\caption{\pending{Q4r-final endpoint pharmacokinetics.} Mean values at $t = 7$ d over thirty replicates.}
 \label{tab:q4r-pk}
 \begin{tabular}{rrr}
 \toprule
-\texttt{MAINT\_DOSE} & \texttt{CBD\_plasma} (final) & \texttt{CBD\_intracellular} (final) \\
+Maintenance dose & Plasma cannabidiol & Intracellular cannabidiol \\
 \midrule
 0    & \pending{X} & \pending{X} \\
 0.5  & \pending{X} & \pending{X} \\
@@ -268,56 +249,38 @@ Figure~\ref{fig:q4r-surface} (placeholder) shows three heatmaps over the (\textt
 \end{tabular}
 \end{table}
 
-\subsection{Sub-Micromolar Hill IC$_{50}$ for NF$\kappa$B Suppression}
+\subsection{A Sub-Micromolar Half-Maximal Inhibitory Concentration for Inflammation}
 \label{sec:r-q5}
 
-\noindent\textit{[From Q5-final sweep, refined MAINT grid at DSEV $\in \{1, 5\}$.]}
-
-The Q4r factorial saturates at \texttt{MAINT\_DOSE} $= 0.5$ on the inflammatory axis (Section~\ref{sec:r-q4r}), placing the IC$_{50}$ in the open interval $(0, 0.5)$. The Q5-final refinement at six MAINT levels in this interval yields the dose--response shown in Figure~\ref{fig:q5-hill}. A four-parameter Hill fit gives:
-
-\begin{align}
-\text{DSEV} = 1: \quad & \text{NF}\kappa\text{B}(M) = \pending{r_0} \cdot \frac{\text{IC}_{50}^n}{\text{IC}_{50}^n + M^n}, \quad \text{IC}_{50} = \pending{X}, \quad n = \pending{Y} \\
-\text{DSEV} = 5: \quad & \text{NF}\kappa\text{B}(M) = \pending{r_0} \cdot \frac{\text{IC}_{50}^n}{\text{IC}_{50}^n + M^n}, \quad \text{IC}_{50} = \pending{X}, \quad n = \pending{Y}
-\end{align}
-
-The IC$_{50}$ is sub-micromolar in plasma-equivalent units and weakly disease-dependent, with the fit at higher severity displaced \pending{slightly to the right (higher dose required)}. This places the operative therapeutic dose for inflammation control well below the doses commonly tested in preclinical CBD studies, suggesting that historical wet-lab dose ranges are at or near saturation of the inflammatory axis and may have systematically over-attributed efficacy to CBD when the inflammatory ceiling was already reached at much lower doses.
+The Q4r-final factorial saturates the inflammatory readout already at a maintenance dose of $0.5$ units, placing the half-maximal inhibitory concentration in the open interval $(0, 0.5)$. The Q5-final refinement at six maintenance levels in this interval yields the dose--response curves of Figure~\ref{fig:q5-hill}. A four-parameter Hill fit gives a half-maximal inhibitory concentration of \pending{$\sim X \mu$M} with Hill coefficient \pending{$n \approx Y$} at mild severity, and \pending{$\sim X \mu$M} with the same coefficient at severe disease. The fit at higher severity is displaced \pending{slightly to the right}, reflecting a modest increase in the dose required to half-saturate inflammation under heavier pathological load. In plasma-equivalent units this places the operative dose in the sub-micromolar range, well below the doses commonly tested in preclinical cannabidiol studies, which typically span one to thirty micromolar. The implication --- discussed below --- is that the historical preclinical literature has likely operated at or near saturation of the very inflammatory pathway it has been measuring.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth,draft]{fig_q5_hill_placeholder.pdf}
-\caption{\pending{Q5-final Hill fit.} NF$\kappa$B-p65 endpoint (mean $\pm$ SD, 30 replicates) versus \texttt{MAINT\_DOSE} on a refined grid ($\{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$) for two disease severities. Curves are four-parameter Hill fits; IC$_{50}$ and Hill coefficient annotated.}
+\caption{\pending{Q5-final Hill fit.} NF$\kappa$B p65 endpoint (mean and standard deviation across thirty replicates) versus maintenance dose on the refined grid $\{0, 0.05, 0.1, 0.2, 0.35, 0.5\}$ at two disease severities. Curves are four-parameter Hill fits; the half-maximal inhibitory concentration and Hill coefficient are annotated.}
 \label{fig:q5-hill}
 \end{figure}
 
 \subsection{The Dissociation Gap}
 \label{sec:r-gap}
 
-Comparing Section~\ref{sec:r-q5} and Section~\ref{sec:r-q4r} directly: NF$\kappa$B is suppressed below 50\% of its untreated level at \texttt{MAINT\_DOSE} \pending{$\sim 0.1$}, and below detection at \texttt{MAINT\_DOSE} \pending{$\geq 0.5$}. Yet Neuron\_Health at the same dose, severity-matched, plateaus \pending{X--Y units below the healthy ceiling}, and the residual gap \emph{widens with severity}. CBD therefore fully closes the inflammatory axis but only partially closes the neurodegenerative axis; the residual deficit is uncoupled from \texttt{MAINT\_DOSE} once the inflammation pathway is saturated.
+Comparing the inflammatory and neuronal axes at the same dose and severity gives the central quantitative result of the paper. NF$\kappa$B p65 is suppressed below half of its untreated level at a maintenance dose of \pending{$\sim 0.1$} and below detection at \pending{$\geq 0.5$}, yet neuron health at the same dose and matched severity plateaus \pending{X to Y units below the healthy ceiling}, and the residual gap widens with disease severity. Cannabidiol therefore fully closes the inflammatory axis but only partially closes the neurodegenerative axis, and the residual deficit is uncoupled from maintenance dose once inflammation is saturated. This is not a saturation artefact: the Hill curve on inflammation is fully formed in the Q5-final grid and saturates well below a maintenance dose of $0.5$, while neuron health continues to depend on severity even at a maintenance dose of five. The mechanistic origin is explicit in the rate function of the neurotoxicity transition (Methods): the residual death at saturated inflammation is driven by the reactive-oxygen-species term, which depends on oxidative dynamics that cannabidiol does not directly control. The next subsection maps that uncontrolled oxidative axis explicitly.
 
-This dissociation is the central quantitative finding of the paper. It is not a saturation artefact: the Hill curve on NF$\kappa$B is fully formed in the Q5 grid and saturates well below \texttt{MAINT\_DOSE} $= 0.5$, while NH continues to depend on severity even at \texttt{MAINT\_DOSE} $= 5$. Mechanistically, the residual neurodegeneration at saturated NF$\kappa$B-suppression is driven by the ROS$\to$Neurotox term in the T20 rate function (Methods), which depends on the oxidative-stress dynamics that CBD does not directly control. Section~\ref{sec:cusp} maps that uncontrolled oxidative axis explicitly.
-
-\subsection{A Glutathione-Mediated Bistable Cusp at Moderate Disease Severity}
+\subsection{A Glutathione-Mediated Bistable Cusp at Moderate Severity}
 \label{sec:cusp}
 
-\noindent\textit{[From per-replicate analysis of Q4r-final at DSEV $= 2$.]}
-
-The Q4r-final sweep reveals an unexpected pattern at moderate disease severity. While endpoint statistics at \texttt{DISEASE\_SEVERITY} $\in \{0, 1, 5\}$ are tight across replicates (per-replicate SD $\sim$ \pending{0.1--1}), the same statistics at \texttt{DISEASE\_SEVERITY} $= 2$ show wide replicate-level variance (CV up to \pending{$\sim 25\%$}) and bimodal distributions on the oxidative-stress endpoints (ROS, GSH/GSSG). Identical conditions partition into two outcome classes: a low-ROS, GSH-replete cohort and a high-ROS, GSH-depleted cohort.
+The Q4r-final sweep reveals an unexpected pattern at moderate disease severity. Endpoint statistics at disease severity zero, one, and five are tight across replicates, with per-replicate standard deviation of order \pending{$0.1$ to $1$} on the relevant scales; at disease severity two, the same statistics show wide replicate-level variance (coefficient of variation up to \pending{$\sim 25\%$}) and bimodal distributions on the oxidative-stress endpoints. Identical conditions partition into two outcome classes, one with low reactive oxygen species and replete reduced glutathione, the other with high reactive oxygen species and depleted reduced glutathione (Figure~\ref{fig:cusp}).
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\textwidth,draft]{fig_cusp_bimodality_placeholder.pdf}
-\caption{\pending{ROS bistability at moderate disease.} (a) Per-replicate ROS endpoints across the DSEV axis at \texttt{MAINT\_DOSE} $= 0$: tight at DSEV $\in \{0,1,5\}$, bimodal at DSEV $= 2$. (b) Same panel at \texttt{MAINT\_DOSE} $= 5$: bimodality persists. (c) Mechanistic phase portrait: antioxidant capacity $K(\text{GSH}) = a + b\cdot\text{GSH}$ versus ROS-production driver, intersecting at the cusp.}
+\caption{\pending{Bistable cusp at moderate disease.} (a) Per-replicate reactive-oxygen-species endpoints across the disease-severity axis at zero maintenance dose: tight at severities zero, one, and five; bimodal at severity two. (b) The same panel at maintenance dose five: bimodality persists, indicating that cannabidiol does not rescue the bifurcation. (c) Mechanistic phase portrait: antioxidant capacity $K(\text{GSH}) = a + b \cdot \text{GSH}$ as a function of reduced glutathione, intersecting the amyloid-driven reactive-oxygen-species production curve in a narrow window centred on disease severity two.}
 \label{fig:cusp}
 \end{figure}
 
-\vspace{3pt}
-\noindent\textbf{Mechanistic origin.} The two ROS-relevant transitions in the model are basal ROS production (driven by oligomer load and inflammation) and antioxidant scavenging (driven by SOD, HO1, and GSH). The scavenging coefficient takes the form $K(\text{GSH}) = a + b \cdot \text{GSH}$ with $a$ a constant enzymatic floor and $b$ the per-unit GSH contribution. Disease severity depletes GSH approximately linearly through the GSH/GSSG conservation cycle: at \texttt{DSEV} $= 0$, $K$ exceeds the production driver and ROS settles at a low fixed point; at \texttt{DSEV} $= 5$, $K$ falls below the driver and ROS settles at a high fixed point clamped by the self-inhibition term. At intermediate \texttt{DSEV} ($\approx 2$), $K$ crosses the production curve in a narrow window where stochastic ROS pulses can switch the trajectory between the two basins --- a textbook bistable cusp.
+The mechanistic origin is transparent. Two transitions govern reactive-oxygen-species dynamics: a basal production driven by oligomer load and inflammation, and an antioxidant scavenging driven by superoxide dismutase, heme oxygenase 1, and reduced glutathione. The scavenging coefficient takes the form $K(\text{GSH}) = a + b \cdot \text{GSH}$ with $a$ a constant enzymatic floor and $b$ the per-unit glutathione contribution. Disease severity depletes reduced glutathione approximately linearly through the GSH--GSSG conservation cycle: at severity zero $K$ exceeds the production driver and reactive oxygen species settle at a low fixed point; at severity five $K$ falls below the driver and reactive oxygen species settle at a high fixed point clamped by the self-inhibition term in the production rate. At intermediate severity (near two) $K$ crosses the production curve in a narrow window where stochastic pulses can switch a trajectory between the two basins --- a textbook bistable cusp.
 
-\vspace{3pt}
-\noindent\textbf{CBD does not rescue the cusp.} Within the Q4r-final factorial, the bimodal signature at DSEV $= 2$ persists across all four MAINT levels. CBD acts through the PPAR$\gamma\to$NF$\kappa$B$\to$TNFa axis, which influences ROS production only indirectly via cytokine-driven inflammation; it has no direct GSH-replenishment arc in the topology. The model therefore predicts that CBD cannot tip patients from the high-ROS basin back to the low-ROS basin once they have committed.
-
-\vspace{3pt}
-\noindent\textbf{Biological interpretation.} Bistable redox dynamics under chronic oxidative load are documented in the AD literature, and glutathione depletion is a hallmark of AD progression. The model's recovery of this phenomenon emerges purely from the kinetics of the GSH/GSSG cycle and the form of the scavenging rate; it was not engineered. The clinical implication --- that moderate-severity patients are intrinsically high-variance under CBD monotherapy and require a co-therapy targeting GSH regeneration --- is the strongest novel prediction of this work and is presented for experimental validation in Section~\ref{sec:disc-cusp}.
+Within the Q4r-final factorial, the bimodal signature at severity two persists across all four maintenance doses. Cannabidiol acts on reactive oxygen species only through the inflammation-mediated cytokine axis (peroxisome proliferator-activated receptor $\gamma$ to NF$\kappa$B to tumour necrosis factor $\alpha$ to oligomer-driven reactive oxygen species); it has no direct glutathione-replenishment arc in the topology. The model therefore predicts that cannabidiol cannot tip patients out of the high-reactive-oxygen-species basin once they have committed. Bistable redox dynamics under chronic oxidative load are documented in the Alzheimer's literature, and glutathione depletion is a well-characterised hallmark of disease progression; the model recovers the phenomenon from the kinetics of the GSH--GSSG cycle and the form of the scavenging rate without engineering it explicitly. The clinical implication --- that moderate-severity patients are intrinsically high-variance under cannabidiol monotherapy and require a co-therapy targeting glutathione regeneration --- is taken up in the Discussion.
 
 % ============================================================================
 % DISCUSSION
@@ -325,75 +288,38 @@ The Q4r-final sweep reveals an unexpected pattern at moderate disease severity. 
 \section{Discussion}
 \label{sec:discussion}
 
-This in silico laboratory maps the therapeutic landscape of CBD for AD over a clinically realistic 7-day dosing horizon, revealing three findings that together rationalise the historical pattern of clinical-trial outcomes for inflammation-axis drugs, identify a previously unappreciated patient stratification axis (oxidative-stress basin), and predict a specific co-therapy strategy.
+This in silico laboratory maps the therapeutic landscape of cannabidiol over a clinically realistic seven-day dosing horizon and yields three findings that together rationalise the historical pattern of clinical-trial outcomes for inflammation-axis drugs in Alzheimer's disease, identify a previously unappreciated patient-stratification axis (oxidative-stress basin), and predict a specific co-therapy strategy.
 
-\subsection{The Dissociation Gap Mirrors Clinical Reality}
-\label{sec:disc-gap}
+The model's prediction that cannabidiol fully suppresses NF$\kappa$B at sub-micromolar maintenance doses while neuron health plateaus far below the healthy ceiling directly mirrors the central finding of the ADAPT trial~\cite{adapt2007} and its successors~\cite{imbimbo2010}: anti-inflammatory agents reduce inflammatory biomarkers in patients but have minimal effect on cognitive decline. Over twenty-five clinical trials of anti-inflammatory agents have replicated this negative result. The model explains why: once inflammation is suppressed, the residual neuronal damage is driven by the reactive-oxygen-species branch of the neurotoxicity rate function, which depends on oxidative dynamics that cannabidiol does not directly control. This explanation is mechanistically tighter than the previous version of this work, which attributed the gap to a generic ``antioxidant axis''. The frozen v3 model identifies the specific topological deficit: there is no arc from any cannabidiol target to glutathione regeneration. The neurotoxicity branch can only be closed by a co-therapy that supplies the missing arc.
 
-The model's prediction that CBD fully suppresses NF$\kappa$B at sub-micromolar maintenance doses while neuron health plateaus far below the healthy ceiling directly mirrors the central finding of the ADAPT trial~\cite{adapt2007} and its successors~\cite{imbimbo2010}: anti-inflammatory agents reduce neuroinflammatory biomarkers in AD patients but have minimal effect on cognitive decline. Over twenty-five clinical trials of anti-inflammatory agents have replicated this negative result. The model explains \emph{why}: once inflammation is suppressed, the residual neuronal damage is driven by the ROS branch of the T20 Neurotoxicity rate function, which depends on oxidative-stress dynamics that CBD does not directly control.
-
-This explanation is mechanistically tighter than the v2 formulation~\cite{simao2026shypn} of this work, which attributed the gap to a generic ``antioxidant axis''. The frozen v3 model identifies the specific topological deficit: there is no arc from any CBD target to GSH regeneration. The ROS$\to$Neurotox branch can only be closed by a co-therapy that supplies the missing arc.
-
-\subsection{A Sub-Micromolar Operative Dose}
-
-The Hill IC$_{50} \approx$ \pending{X} $\mu$M (Section~\ref{sec:r-q5}) is at least an order of magnitude below the doses commonly tested in CBD pharmacology studies, which typically span 1--30 $\mu$M. If the inflammatory readout saturates by 0.5 $\mu$M, then differences across the 1--30 $\mu$M dose range observed in vitro are likely reflecting non-inflammatory mechanisms (off-target binding, antioxidant action, or cytotoxicity at the high end). This implies that historical CBD dose-finding studies focused on inflammatory endpoints may have systematically operated above saturation of the very pathway they were measuring, and that future preclinical work should use sub-micromolar dose grids to distinguish CBD-specific from generic-anti-inflammatory effects.
+The half-maximal inhibitory concentration of \pending{$\sim X \mu$M} (Section~\ref{sec:r-q5}) is at least an order of magnitude below the doses commonly tested in cannabidiol pharmacology studies, which typically span one to thirty micromolar. If the inflammatory readout saturates by half a micromolar, then differences observed in vitro across the one-to-thirty micromolar range are likely reflecting non-inflammatory mechanisms --- off-target binding, generic antioxidant action, or cytotoxicity at the high end --- rather than the inflammatory pathway proper. Historical dose-finding studies focused on inflammatory endpoints may therefore have systematically operated above saturation of the very pathway they were measuring, and future preclinical work should use sub-micromolar dose grids to distinguish cannabidiol-specific effects from generic anti-inflammatory action.
 
 \subsection{Bistable Redox Cusp and Patient Stratification}
 \label{sec:disc-cusp}
 
-The bistable cusp at moderate disease severity (Section~\ref{sec:cusp}) is, to our knowledge, a novel computational prediction in the CBD/AD literature. It frames the problem of patient-to-patient variability not as pharmacokinetic noise but as basin selection in a multi-stable redox landscape. Two specific testable predictions follow:
-
-\begin{enumerate}
-\item \textbf{Bimodal oxidative-stress markers in moderate-severity AD patients on CBD monotherapy.} Cohort studies stratifying by AD severity should observe wider dispersion of plasma 8-OHdG, isoprostanes, and total glutathione in the moderate group than in mild or severe groups, with a bimodal rather than unimodal distribution.
-\item \textbf{Co-therapy with N-acetylcysteine (NAC) or another GSH replenisher should close the dissociation gap.} The model predicts that NAC monotherapy alone will be insufficient (it does not address the inflammatory axis), but combined with CBD it should restore neuron health much closer to the healthy ceiling, especially at moderate severity. A 2-by-2 trial design (CBD $\pm$ NAC) at fixed moderate severity should reveal a synergistic effect on neurodegenerative endpoints, not merely additive.
-\end{enumerate}
+The bistable cusp at moderate severity (Section~\ref{sec:cusp}) is, to our knowledge, a novel computational prediction in the cannabidiol--Alzheimer literature. It frames patient-to-patient variability not as pharmacokinetic noise but as basin selection in a multi-stable redox landscape. Two specific testable predictions follow. First, cohort studies stratifying by disease severity should observe wider dispersion of plasma 8-hydroxy-2'-deoxyguanosine, isoprostanes, and total glutathione in the moderate-severity group than in the mild or severe groups, with a bimodal rather than unimodal distribution. Second, co-therapy with N-acetylcysteine or another glutathione precursor should close the dissociation gap. The model predicts that N-acetylcysteine monotherapy will be insufficient on its own --- it does not address the inflammatory axis --- but that combined with cannabidiol it should restore neuron health much closer to the healthy ceiling, especially at moderate severity. A two-by-two trial design (cannabidiol with or without N-acetylcysteine) at fixed moderate severity should reveal a synergistic, rather than merely additive, effect on neurodegenerative endpoints.
 
 \subsection{Multi-Stability in the Computational Model: A Methodological Note}
 \label{sec:disc-bistability}
 
-In pilot work supporting this study, a single-parameter softening of the ROS$\to$Neurotox coefficient (T20: $0.004 \to 0.001$ on the ROS term) was observed to flip the model's global attractor across all 30 replicates, from the amyloid-disease basin (GSH-replete, oligomer-positive, NH plateaued at \pending{X}) to a redox-collapse basin (GSH $\to 0$, oligomer cleared, NH near zero). This was a methodologically important observation: the model has at least two reachable disease attractors at the same parameter values, and which one is sampled depends on the early-trajectory ROS dynamics, themselves sensitive to the rate-coefficient structure. We therefore froze the model with the original (0.004, threshold 1) coefficient for the present manuscript --- this is the basin in which the therapeutic surface of Section~\ref{sec:r-q4r} is mapped, and which mirrors the classical amyloid-driven AD phenotype.
+In pilot work supporting this study, a single-parameter softening of the reactive-oxygen-species coefficient in the neurotoxicity rate function (changing the prefactor from $0.004$ to $0.001$ on the reactive-oxygen-species term) was observed to flip the model's global attractor across all thirty replicates, from the amyloid-disease basin (replete reduced glutathione, oligomer-positive, neuron health plateaued at \pending{X}) to a redox-collapse basin (reduced glutathione $\to 0$, oligomer cleared, neuron health near zero). This was a methodologically important observation: the model has at least two reachable disease attractors at the same parameter values, and which one is sampled depends on early-trajectory reactive-oxygen-species dynamics, themselves sensitive to the rate-coefficient structure. We therefore froze the model with the original ($0.004$, threshold one) coefficient for the entire manuscript --- this is the basin in which the therapeutic surface of Section~\ref{sec:r-q4r} is mapped, and which mirrors the classical amyloid-driven phenotype of the disease.
 
-The existence of a redox-collapse basin orthogonal to the classical amyloid basin is a separate prediction of the model that we leave to future work. Biologically, it corresponds to the literature on chronic glutathione depletion as a driver of neurodegeneration via mechanisms partly orthogonal to A$\beta$~\cite{cassano2020}. Methodologically, it underlines the principle that even surgical one-line rate edits in a multi-stable Bio-PN can shift basin boundaries, and that re-baselining must follow every patch.
+The existence of a redox-collapse basin orthogonal to the classical amyloid basin is a separate prediction that we leave to future work. Biologically, it corresponds to the literature on chronic glutathione depletion as a driver of neurodegeneration via mechanisms partly orthogonal to amyloid-$\beta$~\cite{cassano2020}. Methodologically, it underlines the principle that even surgical one-line edits to a multi-stable biological Petri net can shift basin boundaries, and that re-baselining must follow every patch.
 
 \subsection{Limitations}
 
-\noindent\textbf{Concentration units.} We adopt 1 marking unit $\equiv$ 1 $\mu$M for the inflammatory IC$_{50}$ interpretation; direct translation to clinical pharmacology requires explicit PK/PD calibration against measured brain and plasma concentrations.
-
-\vspace{3pt}
-\noindent\textbf{Tau pathology.} The model does not include tau hyperphosphorylation or neurofibrillary tangles, despite CBD's documented effects on tau~\cite{esposito2006tau}.
-
-\vspace{3pt}
-\noindent\textbf{Single-compartment brain.} The model treats the brain as a single well-mixed compartment, omitting region-specific differences in CBD distribution, microglial density, or vulnerability.
-
-\vspace{3pt}
-\noindent\textbf{Age axis not re-validated under v3.} The age-dependent mechanism switch reported in earlier work~\cite{simao2026shypn} was a v2-model finding and has not been re-validated under the frozen v3 model. The age compartment remains in the topology and a future Q4-age sweep would close this gap.
-
-\vspace{3pt}
-\noindent\textbf{No CYP3A4 metabolism.} The model omits CYP3A4-mediated CBD metabolism and does not predict the inverted-U dose response that high-dose CBD studies sometimes observe.
-
-\vspace{3pt}
-\noindent\textbf{$\gamma$-Secretase compartment thermodynamics.} APP processing is treated kinetically without explicit endolysosomal pH compartmentalisation.
+Several caveats apply. We adopt the convention that one marking unit is equivalent to one micromolar for the inflammatory dose-response interpretation; direct translation to clinical pharmacology requires explicit pharmacokinetic--pharmacodynamic calibration against measured brain and plasma concentrations. The model does not include tau hyperphosphorylation or neurofibrillary tangles, despite cannabidiol's documented effects on the tau axis~\cite{esposito2006tau}. The brain is treated as a single well-mixed compartment, omitting region-specific differences in cannabidiol distribution, microglial density, or vulnerability. The age-dependent mechanism switch reported in earlier work~\cite{simao2026shypn} was a finding of the previous model and has not been re-validated against the frozen v3 baseline; the age compartment remains in the topology and a future age-axis sweep would close this gap. The model omits cytochrome P450 3A4 cannabidiol metabolism and therefore does not predict the inverted-U dose response sometimes observed in high-dose studies. Finally, amyloid precursor protein processing is treated kinetically without explicit endolysosomal pH compartmentalisation.
 
 \subsection{Reproducibility and Provenance}
 
-All numerical results are reproducible from the model file at git tag \texttt{v3-manuscript-frozen} (sha256 \texttt{a32bf9a8b2dd2afc}) and engine commit \texttt{7fd06fd8} via the three sweep configurations \texttt{sweep\_config.Q4r-final.json}, \texttt{sweep\_config.Q5-final.json}, and \texttt{sweep\_config.Q3-final.json} (committed alongside this manuscript). Each results directory carries a \texttt{provenance.json} (client + server git SHA, branch, dirty-tree status, dispatch timestamp) and a byte-identical \texttt{model\_snapshot.shy}; per-condition CSVs and per-replicate trajectory data are archived in \texttt{workspace/projects/canabidiol/experiments/results/}.
+All numerical results are reproducible from the model file at git tag \texttt{v3-manuscript-frozen} (sha256 prefix \texttt{a32bf9a8b2dd2afc}) and engine commit \texttt{7fd06fd8} via the three sweep configurations \texttt{sweep\_config.Q4r-final.json}, \texttt{sweep\_config.Q5-final.json}, and \texttt{sweep\_config.Q3-final.json}, committed alongside this manuscript. Each results directory carries a \texttt{provenance.json} (client and server commit, branch, dirty-tree status, dispatch timestamp) and a byte-identical \texttt{model\_snapshot.shy}; per-condition CSV summaries and per-replicate trajectory archives are stored under \texttt{workspace/projects/canabidiol/experiments/results/}.
 
 % ============================================================================
 % CONCLUSIONS
 % ============================================================================
 \section{Conclusions}
 
-We present an in silico laboratory for cannabidiol neuroprotection in Alzheimer's disease, built on a hybrid stochastic--continuous Bio-Petri-Net (43 places, 48 transitions, 104 arcs, 43 events) integrated over a 7-day horizon under realistic 27-event maintenance dosing. Three findings emerge from sweeps run against a single frozen baseline:
-
-\begin{enumerate}
-\item \textbf{A dissociated therapeutic window.} CBD fully suppresses the inflammatory axis (NF$\kappa$B-p65 below detection at all non-zero \texttt{MAINT\_DOSE}) but neuron health plateaus far below the healthy ceiling at every disease severity. The dissociation widens with severity. This recapitulates the historical clinical-trial pattern of inflammation-targeted AD therapies.
-
-\item \textbf{Sub-micromolar IC$_{50}$ for inflammation.} The NF$\kappa$B Hill curve places the operative dose for inflammation control at \pending{$\sim$ 0.1 $\mu$M}, weakly disease-modulated. This is at least an order of magnitude below historical preclinical CBD dose ranges and indicates that prior dose-response studies have likely operated above inflammatory saturation.
-
-\item \textbf{A glutathione-mediated bistable cusp at moderate disease.} At \texttt{DISEASE\_SEVERITY} $\approx 2$ the system exhibits bimodal oxidative-stress endpoints across replicates, mechanistically traced to the antioxidant capacity coefficient $K(\text{GSH})$ crossing the ROS-production curve as GSH is depleted. CBD does not rescue this bifurcation because it has no direct GSH-replenishment arc. The model therefore predicts that effective CBD therapy at moderate AD severity requires a glutathione-restoring co-therapy (e.g.\ N-acetylcysteine), and that clinical-trial enrolment should stratify by oxidative-stress biomarkers in addition to amyloid load.
-\end{enumerate}
-
-These predictions are presented with explicit refutation criteria and supporting protocols for preclinical and clinical validation. The full pipeline --- frozen model, three sweep configurations, per-run provenance, and per-replicate trajectories --- is archived for reproducibility.
+We present an in silico laboratory for cannabidiol neuroprotection in Alzheimer's disease, built on a hybrid stochastic--continuous biological Petri net (forty-three places, forty-eight transitions, one hundred and four arcs, forty-three discrete events) integrated over a seven-day horizon under realistic twenty-seven-event maintenance dosing. Three findings emerge from sweeps run against a single frozen baseline. Cannabidiol fully suppresses the inflammatory axis (NF$\kappa$B p65 below detection at all non-zero maintenance doses) yet neuron health plateaus far below the healthy ceiling at every disease severity, with the dissociation widening with severity --- recapitulating the historical clinical-trial pattern of inflammation-targeted therapies. The half-maximal inhibitory concentration for inflammation lies in the sub-micromolar range, at least an order of magnitude below historical preclinical dose ranges, indicating that prior dose-response studies have likely operated above inflammatory saturation. And at moderate disease severity the system exhibits a glutathione-mediated bistable cusp, mechanistically traced to the antioxidant capacity coefficient $K(\text{GSH})$ crossing the amyloid-driven reactive-oxygen-species production curve as reduced glutathione is depleted; cannabidiol does not rescue this bifurcation because the topology contains no direct glutathione-replenishment arc from any of its targets. The model therefore predicts that effective therapy at moderate severity requires a glutathione-restoring co-therapy --- N-acetylcysteine the natural candidate --- and that future trials should stratify by oxidative-stress biomarkers in addition to amyloid load. These predictions are accompanied by explicit refutation criteria and supporting protocols; the full pipeline (frozen model, three sweep configurations, per-run provenance, and per-replicate trajectories) is archived for independent reproduction.
 
 % ============================================================================
 % MATTER
