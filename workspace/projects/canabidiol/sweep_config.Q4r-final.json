@@ -1,0 +1,36 @@
+{
+  "_comment_purpose": "Q4r-final — Therapeutic-window factorial on v3-manuscript-frozen baseline. Reproduces Q4-redux (run_20260502_171610) at 30 replicates on the post-revert model.",
+  "_comment_design":  "4x4 MAINT_DOSE x DISEASE_SEVERITY = 16 cells + Baseline. DSEV=2 retained: bistable ROS cusp is a manuscript headline (F-NEW-1).",
+  "_comment_horizon": "7 d (604800 s) under 27-event maintenance dosing (G4) at 6 h cadence.",
+  "_comment_model":   "git tag v3-manuscript-frozen, sha256 a32bf9a8b2dd2afc; engine HEAD 7fd06fd8 (CPU-fork in pool, snapshot decimation).",
+  "_comment_accept":  "A1 NH(D=0,M=5)>=55. A2 untreated cascade monotone in DSEV. A3 NH(M=5)-NH(M=0)>=10 for DSEV>=1. A4 NFkB(M=5)<NFkB(M=0)/2. A5 plaque monotone in (DSEV,-MAINT). A6 NH(D=5,M=5)<NH(D=1,M=5).",
+
+  "mode": "factorial",
+  "model_path": "workspace/projects/canabidiol/models/canabidiol-q1-testable.shy",
+  "replicates": 30,
+  "duration": 604800,
+  "termination": "time",
+  "seed_base": 42,
+  "tau_epsilon": 0.03,
+  "max_tau": 0.1,
+
+  "parameters": [
+    {
+      "type": "places",
+      "path": "MAINT_DOSE.initial_marking",
+      "values": [0.0, 0.5, 2.0, 5.0]
+    },
+    {
+      "type": "places",
+      "path": "DISEASE_SEVERITY.initial_marking",
+      "values": [0.0, 1.0, 2.0, 5.0]
+    }
+  ],
+
+  "property_overrides": {
+    "LOADING_DOSE.initial_marking": 10.0,
+    "DOSE_INTERVAL.initial_marking": 21600.0
+  },
+
+  "events": []
+}
