@@ -35,6 +35,11 @@ class SimulationSettings:
     DEFAULT_DT_MANUAL = 0.1
     DEFAULT_TIME_SCALE = 1.0
     DEFAULT_STEPS_TARGET = 10000  # Target number of steps for auto dt
+    # Hard cap on auto-derived dt (seconds).  Prevents catastrophic
+    # over-stepping on multi-day horizons where duration/STEPS_TARGET
+    # would produce dt much larger than 1/k for typical biological
+    # rate constants (k ≈ 0.1–10 /s).
+    DEFAULT_DT_AUTO_CAP = 1.0
     
     # τ-Leaping defaults - ALWAYS ENABLED (it's the stochastic engine, not an option)
     # τ-leaping is 10-100× faster than exact SSA and enables continuous+stochastic concurrency
@@ -399,7 +404,19 @@ class SimulationSettings:
             if duration_seconds is not None and duration_seconds > 0:
                 # Auto: duration / target steps
                 dt = duration_seconds / self.DEFAULT_STEPS_TARGET
-                
+
+                # Bug-fix 2026-05-04: hard cap on auto-dt for long horizons.
+                # For multi-day biological simulations, duration/STEPS_TARGET
+                # produces dt ≫ 1/k for typical kinetics (k ≈ 0.1–10 /s),
+                # which causes Phase-1 substrate clamping in
+                # ContinuousBehavior to drain entire pools per step and
+                # collapses the dynamics to a fixed point independent of
+                # parameters. Cap at DEFAULT_DT_AUTO_CAP (1.0 s) — fast
+                # enough for second-scale biology, still gives 86 400
+                # steps/day which is fine performance-wise.
+                if dt > self.DEFAULT_DT_AUTO_CAP:
+                    dt = self.DEFAULT_DT_AUTO_CAP
+
                 # Validate
                 is_valid, _ = TimeValidator.validate_time_step(dt)
                 if is_valid:

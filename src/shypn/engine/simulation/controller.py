@@ -2403,7 +2403,20 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         places_map: Dict[str, Any] = {p.id: p for p in self.model.places}
 
         # Collect every place that any member of this group touches.
+        # Bug-fix 2026-05-04: this set was previously initialised empty and
+        # never populated, so the snapshot/restore/commit phases below were
+        # all no-ops — group transitions silently fired sequentially on
+        # live state, breaking the documented parallel-reaction semantics.
         touched_ids: Set[Any] = set()
+        for _t, _beh, _in_arcs, _out_arcs in group:
+            for _arc in _in_arcs:
+                _pid = getattr(_arc, 'source_id', None)
+                if _pid is not None and _pid in places_map:
+                    touched_ids.add(_pid)
+            for _arc in _out_arcs:
+                _pid = getattr(_arc, 'target_id', None)
+                if _pid is not None and _pid in places_map:
+                    touched_ids.add(_pid)
 
         # Phase 1: snapshot
         snapshot: Dict[str, float] = {pid: places_map[pid].tokens for pid in touched_ids}
