@@ -72,14 +72,20 @@ class ParameterSpec:
 # ── Output granularity ───────────────────────────────────────────────────
 
 # Output tier hierarchy — controls per-condition disk footprint.
-# Each tier is the previous tier plus more artefacts.
+# Each tier is the previous tier plus more artefacts. Same ladder is honoured
+# by both the CLI/remote sweep path (sweep_runner + SweepOutputManager) and
+# the local viability sweep path (_auto_save_experiment).
 #
 #   G0 — summary.csv only (run-level, one row per condition)
 #   G1 — + replicates.csv (per-replicate endpoint scalars: *_final, *_firings)
 #   G2 — + statistics.json with endpoint-only stats (no per-step arrays)
 #   G3 — + statistics.json with full per-step time-series stats   ← current default
-#   G4 — RESERVED: + per-replicate trajectory CSVs (every dt, all places)
-#   G5 — RESERVED: + covariance / cross-correlation matrices
+#   G4 — + per-replicate trajectory CSVs (every dt, all places) under
+#        replicates_trajectories/run_NNN.csv. Honours trajectory_places
+#        (subset filter) and trajectory_thin_seconds (decimation step) when
+#        set on OutputOptions.
+#   G5 — + covariance.json with mean / covariance / correlation matrices over
+#        per-replicate final-state place values, plus n_replicates.
 #
 # Backwards compatibility: missing output_tier in config → G3.
 OUTPUT_TIERS = ('G0', 'G1', 'G2', 'G3', 'G4', 'G5')
@@ -96,14 +102,20 @@ class OutputOptions:
     """
 
     tier: str = DEFAULT_OUTPUT_TIER
-    # G2/G4 future use:
-    trajectory_places: Optional[List[str]] = None   # subset to record (G4)
-    trajectory_thin_seconds: Optional[float] = None  # downsample dt (G4)
+    # G4 trajectory shaping (optional — None means "all places, no thinning"):
+    trajectory_places: Optional[List[str]] = None   # subset of place IDs/names
+    trajectory_thin_seconds: Optional[float] = None  # min Δt between samples
 
     def __post_init__(self) -> None:
         if self.tier not in OUTPUT_TIERS:
             raise ValueError(
                 f"output_tier must be one of {OUTPUT_TIERS}, got '{self.tier}'"
+            )
+        if self.trajectory_thin_seconds is not None \
+                and self.trajectory_thin_seconds < 0:
+            raise ValueError(
+                f"trajectory_thin_seconds must be >= 0, "
+                f"got {self.trajectory_thin_seconds}"
             )
 
     # Convenience predicates the worker uses to gate writes.
@@ -118,6 +130,16 @@ class OutputOptions:
     @property
     def statistics_endpoint_only(self) -> bool:
         return self.tier == 'G2'
+
+    @property
+    def write_per_replicate_trajectories(self) -> bool:
+        """G4+ — one CSV per replicate under replicates_trajectories/."""
+        return self.tier >= 'G4'
+
+    @property
+    def write_covariance(self) -> bool:
+        """G5+ — covariance.json over per-replicate final-state values."""
+        return self.tier >= 'G5'
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {'tier': self.tier}
