@@ -541,6 +541,7 @@ class ExperimentManager:
         seed_base: int = 42,
         tau_epsilon: float = 0.03,
         max_tau: float = 0.1,
+        time_step: float = None,
         events: list = None,
         output_tier: str = 'G3',
         fixed_overrides: dict = None,
@@ -567,6 +568,12 @@ class ExperimentManager:
             seed_base: Base random seed.
             tau_epsilon: Tau-leaping epsilon.
             max_tau: Maximum tau leap size.
+            time_step: Manual integrator dt (seconds). ``None`` ⇒ engine
+                auto-derives dt = duration / STEPS_TARGET, capped at
+                ``SimulationSettings.DEFAULT_DT_AUTO_CAP`` (1.0 s). Set
+                explicitly when the operator wants finer/coarser control
+                than the safety default — e.g. 5.0 s for slow signalling
+                models, 0.01 s for fast enzyme kinetics.
         """
         sim_block = {
             'replicates': replicates,
@@ -576,6 +583,12 @@ class ExperimentManager:
             'tau_epsilon': tau_epsilon,
             'max_tau': max_tau,
         }
+        if time_step is not None:
+            # Only emit the key when the user opted in to a manual dt.
+            # Absence ⇒ engine auto-dt with cap; presence ⇒ explicit
+            # override threaded all the way down to SimulationParams /
+            # SimulationSettings.
+            sim_block['time_step'] = float(time_step)
 
         config = self._infer_sweep_config(sim_block)
         if model_path:

@@ -115,7 +115,20 @@ class ParameterSweepBuilder(Gtk.Box):
         self.type_combo.set_active(0)
         self.type_combo.connect("changed", self._on_type_changed)
         type_box.pack_start(self.type_combo, True, True, 0)
-        
+
+        # Manual refresh button — re-pulls parameter names + current values
+        # from the loaded model. Use after editing places/transitions on
+        # the canvas without reloading the file (e.g. tweaking an
+        # initial_marking) so the sweep builder picks up the new values.
+        self.refresh_button = Gtk.Button(label="\u21bb")
+        self.refresh_button.set_tooltip_text(
+            "Refresh parameter list and current values from the loaded model.\n"
+            "Use after editing places/transitions on the canvas."
+        )
+        self.refresh_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.refresh_button.connect("clicked", self._on_refresh_clicked)
+        type_box.pack_start(self.refresh_button, False, False, 0)
+
         selection_box.pack_start(type_box, False, False, 0)
         self.type_box = type_box  # Store reference for show/hide
         
@@ -314,8 +327,17 @@ class ParameterSweepBuilder(Gtk.Box):
         self.termination_combo.append("time_only", "Time limit only")
         self.termination_combo.append("deadlock", "Deadlock or time limit")
         self.termination_combo.append("steady_state", "Steady state or time limit")
-        self.termination_combo.set_active_id("deadlock")
-        self.termination_combo.set_tooltip_text("When to stop the simulation")
+        # Default = time_only: long-horizon biological sweeps should run
+        # for the full configured duration regardless of transient empty
+        # states.  Deadlock-stopping was the previous default and silently
+        # truncated the canabidiol 7-d sweep run_20260504_163215 (it was
+        # luck the model did not deadlock first).
+        self.termination_combo.set_active_id("time_only")
+        self.termination_combo.set_tooltip_text(
+            "When to stop the simulation. Default 'Time limit only' is the safe "
+            "choice for protocol-driven biological sweeps; pick 'Deadlock' only "
+            "when the net is expected to terminate before the time horizon."
+        )
         top_grid.attach(self.termination_combo, 1, 1, 3, 1)
 
         sim_outer_vbox.pack_start(top_grid, False, False, 0)
@@ -528,7 +550,24 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
-    
+
+    def _on_refresh_clicked(self, button):
+        """Manual refresh: re-pull parameter names + values from the model.
+
+        Delegates to the parent category's ``refresh_parameters`` (which
+        re-reads the loaded ``DocumentModel`` via the viability panel) so
+        edits made on the canvas — e.g. tweaking a place's
+        ``initial_marking`` — show up in the sweep builder without
+        forcing a model reload.
+        """
+        cat = getattr(self, 'parent_category', None)
+        if cat is not None and hasattr(cat, 'refresh_parameters'):
+            try:
+                cat.refresh_parameters()
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+
     def _on_single_set_parameter_clicked(self, button):
         """Add/update parameter in single parameter mode."""
         param_id = self.name_combo.get_active_id()

@@ -77,8 +77,24 @@ class ExperimentAutomationCategory:
         # Per-run isolation: one folder created at batch start, shared by all experiments in the run
         self._current_run_folder = None  # Path | None
 
-        # Remote sweep dispatcher (lazy init)
+        # Remote sweep dispatcher (lazy init). Owns SSH/ControlMaster +
+        # the results proxy used by the lazy-fetch results browser. Set
+        # by the remote controller's ``.underlying`` after dispatch
+        # starts; kept separate from ``_controller`` so result-browsing
+        # code can keep using the SSH dispatcher even after the
+        # controller's lifecycle has completed.
         self._remote_dispatcher = None
+
+        # Active dispatch controller (local or remote). None when idle.
+        # Single source of truth for in-flight sweep state — the legacy
+        # ``_remote_dispatcher`` attribute is kept as a read-only alias
+        # below for callers that haven't migrated yet.
+        self._controller = None  # type: Optional[SweepDispatchController]
+
+        # Single source of truth for whether a sweep dispatch is in flight
+        # (local or remote). Drives Cancel button sensitivity so row-level
+        # status updates can't accidentally disable Cancel mid-sweep.
+        self._dispatch_active = False
 
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
@@ -140,7 +156,26 @@ class ExperimentAutomationCategory:
         # no leftover from a previous or cancelled sweep can mislead the next
         # run. The sweep_builder's own _on_clear_clicked has already reset its
         # parameter lists, design mode, and solver settings before this fires.
+        # If a remote dispatcher is still alive (running OR stuck in a stale
+        # is_running state), cancel it first so the next dispatch isn't
+        # blocked by the "previous dispatch still marked as running" dialog.
         def _on_sweep_plan_cleared():
+            ctrl = getattr(self, '_controller', None)
+            if ctrl is not None and ctrl.is_active:
+                try:
+                    ctrl.cancel()
+                except Exception:
+                    pass
+            self._controller = None
+            disp = getattr(self, '_remote_dispatcher', None)
+            if disp is not None:
+                try:
+                    if getattr(disp, 'is_running', False):
+                        disp.cancel()
+                except Exception:
+                    pass
+                self._remote_dispatcher = None
+            self._dispatch_active = False
             self.queue_view.clear_queue()
             try:
                 self.queue_view.clear_status()
@@ -203,18 +238,38 @@ class ExperimentAutomationCategory:
     
     def _on_object_type_changed(self, combo):
         """Handle object type change - clear queue and refresh parameters.
-        
-        When switching between places, transitions, arcs, the old experiments
-        are no longer valid, so clear the queue.
+
+        Only clears when the type *actually* changes. Programmatic combo
+        refreshes (e.g. after refresh_parameters()) used to fire 'changed'
+        with the same active item, silently wiping the user's queue.
+
+        Also refuses to clear while a dispatch is in flight — the user
+        cannot have switched type meaningfully under a running sweep, so
+        treat it as a spurious re-fire and skip the destructive action.
         """
+        try:
+            new_type = combo.get_active_text()
+        except Exception:
+            new_type = None
+
+        # Spurious / programmatic re-fire on the same type → no-op.
+        if new_type is not None and getattr(self, '_last_object_type', None) == new_type:
+            return
+        # Don't wipe queue mid-dispatch.
+        if getattr(self, '_dispatch_active', False):
+            self._last_object_type = new_type
+            return
+
+        self._last_object_type = new_type
+
         # Clear experiment queue
         if hasattr(self, 'queue_view'):
             self.queue_view.clear_queue()
-        
+
         # Clear results browser
         if hasattr(self, 'results_browser'):
             self.results_browser.clear_results()
-        
+
         # Refresh parameters for new object type
         self.refresh_parameters()
     
@@ -552,7 +607,7 @@ class ExperimentAutomationCategory:
         # Get replicates and duration from sweep builder
         replicates = 3
         duration = 60.0
-        termination_condition = "deadlock"  # Default
+        termination_condition = "time_only"  # Default — see parameter_sweep_builder.py rationale
         
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
@@ -578,7 +633,7 @@ class ExperimentAutomationCategory:
         
         if hasattr(self.sweep_builder, 'termination_combo'):
             try:
-                termination_condition = self.sweep_builder.termination_combo.get_active_id() or "deadlock"
+                termination_condition = self.sweep_builder.termination_combo.get_active_id() or "time_only"
             except Exception as e:
                 print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
@@ -738,14 +793,20 @@ class ExperimentAutomationCategory:
     def _on_queue_run_remote(self, pending_experiments):
         """Handle Run Remote button — dispatch sweep to remote server via SSH.
 
-        Shows a confirmation dialog with SSH settings, then:
-          1. Exports sweep config JSON (from ExperimentManager snapshots)
-          2. SCPs model + config to remote
-          3. SSH runs CLI sweep
-          4. SCPs results back to local project folder
-          5. Loads results into ResultsBrowserView
+        Thin orchestration: validates prerequisites, shows the SSH
+        confirmation dialog, builds a typed ``DispatchRequest``, then
+        hands off to ``RemoteSweepDispatchController``. All progress /
+        completion handling now lives in the controller + observer
+        methods (``on_status``, ``on_row_started``, ``on_row_completed``,
+        ``on_dispatch_complete``) on this class.
         """
-        from .remote_sweep_dispatcher import RemoteSweepSettings, RemoteSweepDispatcher
+        from .remote_sweep_dispatcher import RemoteSweepSettings
+        from .dispatch import (
+            RemoteSweepDispatchController,
+            DispatchRequest,
+            DispatchAlreadyActive,
+            DispatchValidationError,
+        )
 
         if self._remote_dispatcher and self._remote_dispatcher.is_running:
             # Thread is alive — but it can be stuck (e.g. SSH fallback
@@ -783,10 +844,10 @@ class ExperimentAutomationCategory:
             except Exception:
                 pass
             self._remote_dispatcher = None
+            self._controller = None
+            self._dispatch_active = False
             if self.queue_view:
-                self.queue_view.run_button.set_sensitive(True)
-                self.queue_view.run_remote_button.set_sensitive(True)
-                self.queue_view.cancel_button.set_sensitive(False)
+                self.queue_view.set_running(False)
 
         # ── Validate prerequisites ───────────────────────────────────
         project_folder = self._get_project_folder()
@@ -830,107 +891,9 @@ class ExperimentAutomationCategory:
 
         settings.save()
 
-        # ── Dispatch ─────────────────────────────────────────────────
-        self._remote_dispatcher = RemoteSweepDispatcher(settings)
-
-        # UI feedback
-        if self.queue_view:
-            self.queue_view.run_button.set_sensitive(False)
-            self.queue_view.run_remote_button.set_sensitive(False)
-            self.queue_view.cancel_button.set_sensitive(True)
-            self.queue_view.status_label.set_markup(
-                "<span foreground='blue'><b>Remote sweep dispatching...</b></span>"
-            )
-
-        # Mark all queue rows as "running" before dispatch
-        n_total = len(pending_experiments)
-        if self.queue_view:
-            for i in range(n_total):
-                self.queue_view.update_experiment_status(i, 'pending', '—')
-
-        import re as _re
-
-        def on_progress(msg):
-            """Parse CLI progress lines and update individual queue rows.
-
-            Expected patterns from --verbose:
-              [1/4] Condition.name=50 (10 replicates)...
-                done in 7.2s (10 ok, 0 errors)
-              Sweep complete in 28.3s
-            """
-            # Match "[idx/total] condition_name ..."  → mark row as running
-            m_start = _re.match(r'^\[(\d+)/(\d+)\]\s+(.+?)\s+\(', msg)
-            if m_start:
-                cond_idx = int(m_start.group(1)) - 1  # 0-based
-                def _ui_start(idx=cond_idx):
-                    if self.queue_view and 0 <= idx < n_total:
-                        self.queue_view.update_experiment_status(
-                            idx, 'running', 'running…')
-                    return False
-                GLib.idle_add(_ui_start)
-
-            # Match "  done in Xs (N ok, M errors)" → mark previous row done
-            m_done = _re.match(
-                r'^\s*done in ([\d.]+)s\s+\((\d+)\s+ok,\s+(\d+)\s+error', msg)
-            if m_done:
-                wall = m_done.group(1)
-                ok = int(m_done.group(2))
-                errors = int(m_done.group(3))
-                # The "done" line follows the "[idx/total]" line, so find
-                # the last row that is 'running'
-                def _ui_done():
-                    if not self.queue_view:
-                        return False
-                    for i in range(n_total):
-                        try:
-                            it = self.queue_view.queue_store.get_iter(i)
-                            st = self.queue_view.queue_store.get_value(it, 1)
-                            if st == 'running':
-                                status = 'completed' if errors == 0 else 'failed'
-                                prog = f"{ok} ok, {errors} err — {wall}s"
-                                self.queue_view.update_experiment_status(
-                                    i, status, prog)
-                                break
-                        except Exception:
-                            break
-                    return False
-                GLib.idle_add(_ui_done)
-
-            # Always update the status label with the raw line
-            GLib.idle_add(
-                lambda m=msg: (
-                    self.queue_view.status_label.set_markup(
-                        f"<span foreground='blue'><b>Remote:</b> {GLib.markup_escape_text(str(m))}</span>"
-                    ) if self.queue_view else None
-                ) or False
-            )
-
-        def on_complete(success, local_results_dir, message):
-            def _ui():
-                if self.queue_view:
-                    self.queue_view.run_button.set_sensitive(True)
-                    self.queue_view.run_remote_button.set_sensitive(True)
-                    self.queue_view.cancel_button.set_sensitive(False)
-                if success:
-                    if self.queue_view:
-                        self.queue_view.status_label.set_markup(
-                            f"<span foreground='green'><b>✓</b> {GLib.markup_escape_text(str(message))}</span>"
-                        )
-                    # Load results into browser
-                    self._load_remote_results(local_results_dir)
-                else:
-                    if self.queue_view:
-                        self.queue_view.status_label.set_markup(
-                            f"<span foreground='red'><b>✗</b> {GLib.markup_escape_text(str(message))}</span>"
-                        )
-                return False
-            GLib.idle_add(_ui)
-
-        # ── Collect fixed_overrides + run collision detector ────────
-        # Layer C: catches the silent-superposition cases (sweep target
-        # == event assignment target) before bytes leave the box.  Hard
-        # error on R1 unless the operator explicitly opts in via the
-        # confirmation dialog.
+        # ── Collect events + fixed overrides + run collision detector ──
+        # Layer C: catches silent-superposition cases (sweep target ==
+        # event assignment target) before bytes leave the box.
         try:
             fixed_overrides = self.sweep_builder.get_fixed_overrides() \
                 if self.sweep_builder else {}
@@ -954,27 +917,134 @@ class ExperimentAutomationCategory:
             if not allow:
                 return
 
-        try:
-            self._remote_dispatcher.dispatch(
-                model_filepath=model_filepath,
-                project_folder=project_folder,
-                experiment_manager=self.experiment_manager,
-                sim_params=sim_params,
-                progress_cb=on_progress,
-                complete_cb=on_complete,
-                ssh_password=ssh_password or None,
-                events=events,
-                fixed_overrides=fixed_overrides or None,
+        # ── Build typed request + hand off to controller ─────────────
+        from .dispatch import SimulationParams as _SP
+        request = DispatchRequest(
+            experiments=list(pending_experiments),
+            sim_params=_SP(**sim_params),
+            model_filepath=model_filepath,
+            project_folder=project_folder,
+            events=events or [],
+            fixed_overrides=fixed_overrides or {},
+            ssh_password=ssh_password or None,
+        )
+
+        controller = RemoteSweepDispatchController(
+            observer=self,
+            settings=settings,
+            experiment_manager=self.experiment_manager,
+        )
+        # Keep ``_remote_dispatcher`` pointing at the underlying SSH
+        # dispatcher so existing results-browser / proxy code still
+        # works unchanged.
+        self._remote_dispatcher = controller.underlying
+        self._controller = controller
+
+        # UI feedback. Use set_running() so all four buttons (Run, Run
+        # Remote, Pause, Cancel) move together; this keeps Cancel
+        # enabled regardless of subsequent row-status updates.
+        self._dispatch_active = True
+        if self.queue_view:
+            self.queue_view.set_running(True)
+            self.queue_view.status_label.set_markup(
+                "<span foreground='blue'><b>Remote sweep dispatching...</b></span>"
             )
+            # Mark all queue rows as 'pending' before dispatch — the
+            # controller will flip them to 'running' as the CLI emits
+            # per-condition progress lines.
+            for i in range(len(pending_experiments)):
+                self.queue_view.update_experiment_status(i, 'pending', '—')
+
+        try:
+            controller.start(request)
+        except DispatchAlreadyActive as exc:
+            self._show_error(f"Cannot start dispatch:\n\n{exc}")
+        except DispatchValidationError as exc:
+            # Controller already emitted on_dispatch_complete → idle UI restored.
+            self._show_error(f"Invalid dispatch request:\n\n{exc}")
         except Exception as exc:
-            # Dispatch never started — restore the idle button state so
-            # the operator can retry without first running Clear Sweep
-            # Plan to unstick the UI.
-            if self.queue_view:
-                self.queue_view.run_button.set_sensitive(True)
-                self.queue_view.run_remote_button.set_sensitive(True)
-                self.queue_view.cancel_button.set_sensitive(False)
+            # Controller already emitted on_dispatch_complete → idle UI restored.
             self._show_error(f"Remote dispatch failed to start:\n\n{exc}")
+
+    # ── DispatchObserver implementation ──────────────────────────────
+    # All methods are called on the GTK main thread by the active
+    # controller. They are the *only* place the queue view gets updated
+    # in response to dispatch events — keeping this surface tight
+    # prevents the local/remote drift that bit us before.
+
+    def on_status(self, message: str, level: str = 'info') -> None:
+        """Activity-log line from the active controller."""
+        if not self.queue_view:
+            return
+        colour = {
+            'success': 'green',
+            'warning': '#ce5c00',
+            'error': 'red',
+        }.get(level, 'blue')
+        try:
+            self.queue_view.status_label.set_markup(
+                f"<span foreground='{colour}'><b>Sweep:</b> "
+                f"{GLib.markup_escape_text(str(message))}</span>"
+            )
+        except Exception:
+            pass
+
+    def on_row_started(self, row_index: int) -> None:
+        if self.queue_view:
+            try:
+                self.queue_view.update_experiment_status(
+                    row_index, 'running', 'running…')
+            except Exception:
+                pass
+
+    def on_row_completed(
+        self, row_index: int, ok_replicates: int,
+        error_replicates: int, wall_seconds: float,
+    ) -> None:
+        if not self.queue_view:
+            return
+        status = 'completed' if error_replicates == 0 else 'failed'
+        prog = f"{ok_replicates} ok, {error_replicates} err — {wall_seconds:.1f}s"
+        try:
+            self.queue_view.update_experiment_status(row_index, status, prog)
+        except Exception:
+            pass
+
+    def on_dispatch_complete(
+        self, success: bool, results_dir, message: str,
+    ) -> None:
+        # Drop dispatch state so the next sweep can launch.
+        self._dispatch_active = False
+        self._controller = None
+        if self.queue_view:
+            self.queue_view.set_running(False)
+            # Reconcile any rows the progress parser missed (last row
+            # without a 'done in Xs' line, or local cancellation).
+            try:
+                store = self.queue_view.queue_store
+                terminal = 'completed' if success else 'failed'
+                for i in range(len(store)):
+                    it = store.get_iter(i)
+                    st = store.get_value(it, 1)
+                    if st in ('running', 'pending'):
+                        store.set_value(it, 1, terminal)
+                        if not store.get_value(it, 2):
+                            store.set_value(
+                                it, 2, 'done' if success else 'no result')
+                self.queue_view._update_status_label()
+            except Exception:
+                pass
+            try:
+                colour = 'green' if success else 'red'
+                glyph = '✓' if success else '✗'
+                self.queue_view.status_label.set_markup(
+                    f"<span foreground='{colour}'><b>{glyph}</b> "
+                    f"{GLib.markup_escape_text(str(message))}</span>"
+                )
+            except Exception:
+                pass
+        if success and results_dir:
+            self._load_remote_results(results_dir)
 
     def _collect_model_events(self) -> list:
         """Serialise the current model's environment events for dispatch.
@@ -1007,62 +1077,14 @@ class ExperimentAutomationCategory:
         return payload
 
     def _collect_sim_params(self) -> dict:
-        """Read simulation parameters from sweep builder widgets."""
-        params = {
-            'replicates': 200,
-            'duration': 2000.0,
-            'termination': 'deadlock',
-            'seed_base': 42,
-            'tau_epsilon': 0.03,
-            'max_tau': 0.1,
-            'output_tier': 'G3',
-        }
-        if hasattr(self.sweep_builder, 'replicates_entry'):
-            try:
-                v = int(self.sweep_builder.replicates_entry.get_text().strip())
-                if v > 0:
-                    params['replicates'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'duration_entry'):
-            try:
-                v = float(self.sweep_builder.duration_entry.get_text().strip())
-                if v > 0:
-                    params['duration'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'termination_combo'):
-            try:
-                params['termination'] = self.sweep_builder.termination_combo.get_active_id() or 'deadlock'
-            except (AttributeError,):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_seed_entry'):
-            try:
-                params['seed_base'] = int(self.sweep_builder.sweep_seed_entry.get_text().strip())
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_tau_epsilon_entry'):
-            try:
-                v = float(self.sweep_builder.sweep_tau_epsilon_entry.get_text().strip())
-                if 0 < v <= 1:
-                    params['tau_epsilon'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_max_tau_entry'):
-            try:
-                v = float(self.sweep_builder.sweep_max_tau_entry.get_text().strip())
-                if 0 < v <= 100:
-                    params['max_tau'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'output_tier_combo'):
-            try:
-                tier = self.sweep_builder.output_tier_combo.get_active_id()
-                if tier:
-                    params['output_tier'] = tier
-            except AttributeError:
-                pass
-        return params
+        """Read simulation parameters from sweep builder widgets.
+
+        Thin wrapper around :class:`WidgetParamCollector` — kept for
+        backward compatibility with callers that still expect a
+        plain dict (e.g. the remote-dispatch confirmation dialog).
+        """
+        from .dispatch import WidgetParamCollector
+        return WidgetParamCollector.collect(self.sweep_builder).to_dict()
 
     def _show_remote_sweep_dialog(self, settings, sim_params, n_experiments):
         """Show a GTK dialog to confirm/edit remote sweep settings.
@@ -1352,17 +1374,31 @@ class ExperimentAutomationCategory:
         GLib.idle_add(_hydrate)
 
     def _on_queue_cancel(self):
-        """Handle queue cancel request."""
+        """Handle queue cancel request.
+
+        Routes through the active dispatch controller when one exists
+        (covers both local and remote uniformly). Falls back to legacy
+        direct-cancel paths for any controller-less code path.
+        """
+        # Preferred: ask the active controller to cancel itself. The
+        # controller will emit on_dispatch_complete(False, ...) which
+        # restores idle UI and reconciles row statuses.
+        ctrl = getattr(self, '_controller', None)
+        if ctrl is not None and ctrl.is_active:
+            ctrl.cancel()
+            return
+
+        # Legacy fallbacks (no controller in use, e.g. local dispatch
+        # not yet migrated). Cancel the SSH dispatcher and the
+        # in-process batch executor directly.
         if self._remote_dispatcher and self._remote_dispatcher.is_running:
             self._remote_dispatcher.cancel()
 
         if not self.batch_executor:
             return
-        
-        # Cancel the batch execution
+
         self.batch_executor.cancel()
-        
-        # Update UI immediately (completion callback will be called by executor)
+
         if self.queue_view:
             GLib.idle_add(lambda: self.queue_view.set_running(False) or False)
     
