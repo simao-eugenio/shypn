@@ -356,3 +356,95 @@ The auditor will gain new codes (target: next commit):
 | C14  | warning  | place flagged as catalyst in metadata but attached via `normal` input arc (Rule M1 candidate) |
 | C15  | info     | basal sink transition (single input, no output, name matches `*_degradation/_turnover/_clearance/_metabolism`) using `signal_flow` input — Rule M2 candidate |
 
+
+---
+
+## 9. Property scope discipline — object-net vs experiment-plan (STRICT, 2026-05-04)
+
+A `.shy` carries two architecturally separate artifacts (see §1 of
+`EXPERIMENT_PLAN_VS_OBJECT_NET.md`). **Every numeric / textual
+property on every object lives in exactly ONE of them.** Cross-scope
+duplication is the canonical source of label-vs-value drift,
+preset-vs-▢ mismatch, and "wrong number quoted in the manuscript"
+bugs (audited 2026-05-04 on `canabidiol-q1-testable.shy`).
+
+### 9.1 Scope assignment (definitive)
+
+**Object-net (intrinsic, reusable across runs):**
+
+| Object   | Intrinsic property                                                                  |
+|----------|-------------------------------------------------------------------------------------|
+| ○ / ⬡    | `compartment_volume`, top-level `compartment`, `properties.thermodynamics.charge`, `properties.thermodynamics.n_protons`, `metadata.{kegg_id,formula,mw,gene_symbol,…}`, `metadata.hierarchy_layer` |
+| transition | `transition_type`, `properties.rate_function` (the *form*), arc topology, `kinetic_metadata` (literature Km, Vmax, kcat) |
+| arc      | `arc_type`, `weight` (stoichiometry), `michaelis_K`, `hill_n`, `suppression_epsilon` |
+
+**Experiment plan (exogenous, per-run):**
+
+| Object | Exogenous property                                                                    |
+|--------|---------------------------------------------------------------------------------------|
+| ▢      | `initial_marking` (TEMPERATURE, PH, AGE, DOSE, INTERVAL, DISEASE_SEVERITY, …)         |
+| ◇      | `initial_marking` (Q10 factor, pH factor, age factor — written by events from ▢)      |
+| events | All assignments (`evt_apply_thermodynamics`, `evt_install_disease`, `evt_dose_*`)     |
+| top-level `thermodynamic_settings` | `temperature`, `ph`, `ionic_strength`, `tolerance`, `enable_validation`, `preset` — **the THERMODYNAMIC REFERENCE STATE** for ΔG° tabulation; not the physiological state |
+| top-level `view_state`             | UI defaults for this dispatch                                            |
+| top-level `metadata`               | Run-level provenance                                                     |
+
+### 9.2 The single rule
+
+> A quantity must live in exactly **ONE** scope. If the same concept
+> appears in both, the **experiment-plan scope is canonical** and the
+> object-net scope must be **derived** from it (via event at $t=0$),
+> not duplicated.
+
+Corollaries:
+
+- **▢ TEMPERATURE / PH / AGE are PHYSIOLOGICAL** (e.g. 310.15 K, 7.4).
+- **`thermodynamic_settings.temperature / .ph` are the REFERENCE state**
+  used to derive ΔG° lookups (e.g. 298.15 K, 7.0; preset
+  `biochemical_standard`).
+- These are **two different concepts** — keep both, but document the
+  distinction in the model README. They MUST NOT be confused as
+  redundant copies of the same number.
+- The **▢ → ◇ → Φ** bridge (via `evt_apply_thermodynamics`) is what
+  converts physiological ▢ into kinetic factors (Q10, pH factor) that
+  multiply rates derived at the reference state.
+
+### 9.3 Forbidden patterns (enforced at audit)
+
+| # | Pattern                                                              | Why wrong                                                |
+|---|----------------------------------------------------------------------|----------------------------------------------------------|
+| P1 | `properties.thermodynamics` block on a ▢ parameter place             | ▢ has no chemistry (no charge, no n_protons). Noise.    |
+| P2 | `properties.thermodynamics.conditions` on ○/⬡ equal verbatim to global `thermodynamic_settings` | Redundant; clutter; mask local overrides |
+| P3 | Place `label` text disagreeing with `initial_marking` value          | Manuscript-misquote trap                                 |
+| P4 | Top-level `compartment` on some places, `metadata.compartment` on others (split) | Loader reads top-level only; routing inconsistent |
+| P5 | `kinetic_metadata` populated on some transitions, absent on others, with no documented rationale | Half-filled metadata is worse than uniformly absent |
+| P6 | Sweep config overriding an object-net property (rate_function string, arc weight, kinetic_metadata) | Object-net is reusable invariant; sweep targets experiment-plan only |
+| P7 | Rate function Φ referencing a ▢ parameter place by name              | Object-net must not depend on experiment metadata; route through ◇ instead |
+| P8 | Event RHS computing kinetics from a non-target ○/⬡ state place       | Pattern A violation (see §3); audit code C12             |
+
+### 9.4 Cleanup workflow (when audit finds violations)
+
+1. **Decide the canonical scope** for each concept. Default: protocol
+   metadata → ▢; reference thermodynamics → top-level
+   `thermodynamic_settings`; chemistry per molecule → metabolite ○ only.
+2. **Strip wrong-scope copies** (P1, P2 above).
+3. **Regenerate labels from values** (P3) — never edit a label without
+   editing the value through it.
+4. **Promote `metadata.compartment` → top-level `compartment`** uniformly
+   (P4).
+5. **Either populate `kinetic_metadata` for all parameterised
+   transitions, or drop the field everywhere** (P5).
+6. **Sweep configs target only experiment-plan keys** (P6).
+7. **Remove ▢ names from Φ; route via ◇ + `evt_apply_thermodynamics`**
+   (P7).
+8. **Refactor offending events to Pattern A** (P8) — see §3.
+
+### 9.5 Audit codes (planned)
+
+| Code | Severity | Meaning                                                                |
+|------|----------|------------------------------------------------------------------------|
+| C16  | warning  | ▢ parameter place carries a `properties.thermodynamics` block (P1)     |
+| C17  | info     | ○/⬡ has `properties.thermodynamics.conditions` equal to global (P2)    |
+| C18  | warning  | place `label` numeric token disagrees with `initial_marking` (P3)      |
+| C19  | warning  | inconsistent compartment-field location across places (P4)             |
+| C20  | info     | partial `kinetic_metadata` coverage on transitions (P5)                |
