@@ -79,6 +79,7 @@ class LocalSweepDispatchController(SweepDispatchController):
             compressor_epsilon=sp.compressor_epsilon,
             compressor_min_gap=sp.compressor_min_gap,
             compressor_max_gap=sp.compressor_max_gap,
+            output_tier=sp.output_tier,
         )
 
     def _cancel_impl(self) -> None:

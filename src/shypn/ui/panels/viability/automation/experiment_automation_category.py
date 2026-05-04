@@ -1563,6 +1563,11 @@ class ExperimentAutomationCategory:
                     (_xt.id, getattr(_xt, 'name', _xt.id), 'transition')
                 )
         _sem = self._auto_save_semaphore
+        # Output granularity tier (G0..G5) snapshotted on the GTK main thread
+        # so the background save thread never touches BatchExecutor live state.
+        # Default G3 preserves legacy behaviour when the executor predates the
+        # tier plumbing (defensive getattr).
+        _output_tier_snapshot = getattr(self.batch_executor, '_output_tier', 'G3')
 
         def _throttled_save():
             _sem.acquire()
@@ -1574,6 +1579,7 @@ class ExperimentAutomationCategory:
                     compressed_trajectories=_compressed_traj,
                     species_statistics_full=_ss_full,
                     time_points_full=_tp_full,
+                    output_tier=_output_tier_snapshot,
                 )
             finally:
                 _sem.release()
@@ -1597,6 +1603,7 @@ class ExperimentAutomationCategory:
         compressed_trajectories=None,
         species_statistics_full=None,
         time_points_full=None,
+        output_tier: str = 'G3',
     ):
         """Auto-save experiment results to disk — all CSV format for easy analysis.
 
@@ -1634,6 +1641,36 @@ class ExperimentAutomationCategory:
             id_to_name = {}
         if names_csv_rows is None:
             names_csv_rows = []
+
+        # Output-tier gating (G0..G5) — single canonical authority shared with
+        # the CLI / remote sweep path (shypn.cli.sweep_runner). Falls back to
+        # G3 (legacy "everything") on any malformed tier string so callers
+        # cannot accidentally lose data via a typo.
+        try:
+            from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+            _opts = _OutputOptions.from_dict({'tier': output_tier})
+        except Exception:
+            from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+            _opts = _OutputOptions()  # default G3
+        _tier = _opts.tier
+        # Tier predicates for the local writer:
+        #   results.csv (full per-step mean/std trajectories) → G3+ only
+        #   replicates.csv (per-replicate scalars)            → G1+
+        #   fate_summary.csv (population fate stats)          → G1+ (paired with replicates.csv)
+        #   mean_final_state.csv (endpoint stats)             → G2+
+        #   replicates_trajectories/run_NNN.csv               → G4+
+        #   config.csv, names.csv, .complete sentinel         → always
+        _write_results_csv     = _tier >= 'G3'
+        _write_replicates_csv  = _opts.write_replicates_csv          # G1+
+        _write_endpoint_stats  = _opts.write_statistics_json         # G2+
+        _write_per_rep_traj    = _opts.write_per_replicate_trajectories  # G4+
+        _write_covariance      = _opts.write_covariance              # G5+
+
+        # Sentinel raised inside a write block to signal a tier-gated skip.
+        # Lets each existing try/except keep its current shape (the only
+        # alternative would be a wholesale 12-space reindent of every block).
+        class _TierSkip(Exception):
+            pass
 
         def _fsync(path):
             """Flush write buffers for path.  No OS-level fsync to avoid
@@ -1677,7 +1714,10 @@ class ExperimentAutomationCategory:
         save_errors = []
 
         # ── results.csv ── mean + std trajectories (mixed-format, section-aware)
+        # G3+ only: this is the full per-step time-series export.
         try:
+            if not _write_results_csv:
+                raise _TierSkip()
             # _export_csv needs the full species_statistics and time_points.
             # Both were extracted by the GTK main thread and passed in as params;
             # build a temporary enriched view of result for this call only.
@@ -1693,12 +1733,18 @@ class ExperimentAutomationCategory:
                 _result_for_export = result
             self._export_csv(str(batch_path / 'results.csv'), name, _result_for_export)
             _fsync(batch_path / 'results.csv')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'results.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save results.csv: {e}')
 
         # ── replicates.csv ── per-replicate outcomes (standard tabular)
+        # G1+ only. At G0 the entire per-replicate scalar export is skipped
+        # (along with fate_summary.csv which lives inside the same try-block).
         try:
+            if not _write_replicates_csv:
+                raise _TierSkip()
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
             # Use the explicitly-passed compressed_trajectories (extracted on GTK
@@ -1805,6 +1851,8 @@ class ExperimentAutomationCategory:
                 _fsync(batch_path / 'fate_summary.csv')
             except Exception as _fse:
                 print(f'[AUTO-SAVE] Warning: Failed to save fate_summary.csv: {_fse}')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'replicates.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}')
@@ -1860,7 +1908,10 @@ class ExperimentAutomationCategory:
         # ── mean_final_state.csv ── flat, easily parseable final SS summary
         # Standard tabular CSV: pandas.read_csv(path, comment='#') works directly.
         # One row per species with final-timepoint mean and std.
+        # G2+ only (endpoint statistics tier).
         try:
+            if not _write_endpoint_stats:
+                raise _TierSkip()
             stats = result.get('statistics', {})
             species_stats = species_statistics_full if species_statistics_full is not None else stats.get('species_statistics', {})
             if species_stats:
@@ -1891,6 +1942,8 @@ class ExperimentAutomationCategory:
                             mean_val, std_val, min_val, max_val
                         ])
                 _fsync(batch_path / 'mean_final_state.csv')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'mean_final_state.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save mean_final_state.csv: {e}')
@@ -1899,7 +1952,10 @@ class ExperimentAutomationCategory:
         # Each file is self-describing (comment header + col_schema line) so
         # analysis scripts need no external sidecar.  Skipped gracefully when
         # no compressed data is available (e.g. on error runs).
+        # G4+ only (per-replicate trajectory tier).
         try:
+            if not _write_per_rep_traj:
+                raise _TierSkip()
             compressed_trajectories_data = compressed_trajectories if compressed_trajectories is not None else []
             if compressed_trajectories_data:
                 from shypn.helpers.compressor import CompressedTrajectoryWriter
@@ -1931,9 +1987,78 @@ class ExperimentAutomationCategory:
                     # disks, causing the app to appear frozen and be killed.
                     # The OS page-cache flushes these files within seconds anyway.
                 print(f'[AUTO-SAVE] Saved {len(compressed_trajectories_data)} compressed trajectories → {traj_dir.name}/')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'replicates_trajectories/: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates_trajectories/: {e}')
+
+        # ── covariance.json ── G5+ — mean / cov / corr over per-replicate
+        # final-state place values. Schema matches the CLI/remote writer
+        # (SweepOutputManager._write_covariance) so downstream analysis is
+        # path-agnostic. Skipped when fewer than 2 replicates have usable
+        # final values.
+        try:
+            if not _write_covariance:
+                raise _TierSkip()
+            _ct = compressed_trajectories if compressed_trajectories is not None else []
+            if len(_ct) < 2:
+                raise _TierSkip()
+            import numpy as _np
+            # Stable column order: union of keys across replicates, sorted.
+            _all_pids: set = set()
+            for _cr in _ct:
+                _all_pids.update(_cr.final_values().keys())
+            _pids = sorted(_all_pids)
+            if not _pids:
+                raise _TierSkip()
+            _N = len(_ct)
+            _P = len(_pids)
+            _finals = _np.full((_N, _P), _np.nan, dtype=float)
+            for _ri, _cr in enumerate(_ct):
+                _fv = _cr.final_values()
+                for _ci, _pid in enumerate(_pids):
+                    _v = _fv.get(_pid)
+                    if _v is not None:
+                        try:
+                            _finals[_ri, _ci] = float(_v)
+                        except (TypeError, ValueError):
+                            pass
+            _valid = ~_np.isnan(_finals).any(axis=1)
+            _clean = _finals[_valid]
+            if _clean.shape[0] < 2:
+                raise _TierSkip()
+            _mean = _clean.mean(axis=0)
+            _cov = _np.atleast_2d(_np.cov(_clean, rowvar=False, ddof=1))
+            _std = _np.sqrt(_np.diag(_cov))
+            with _np.errstate(divide='ignore', invalid='ignore'):
+                _denom = _np.outer(_std, _std)
+                _corr = _np.where(_denom > 0, _cov / _denom, _np.nan)
+
+            import json as _json_cov
+            _payload = {
+                'n_replicates': int(_clean.shape[0]),
+                'n_replicates_dropped': int((~_valid).sum()),
+                'place_ids': _pids,
+                'place_names': [
+                    (locals().get('_id_to_name_early') or id_to_name).get(_pid, _pid)
+                    for _pid in _pids
+                ],
+                'mean': [float(v) for v in _mean],
+                'covariance': [[float(v) for v in row] for row in _cov],
+                'correlation': [
+                    [None if _np.isnan(v) else float(v) for v in row]
+                    for row in _corr
+                ],
+            }
+            with open(batch_path / 'covariance.json', 'w', encoding='utf-8') as _cf:
+                _json_cov.dump(_payload, _cf, indent=2)
+            _fsync(batch_path / 'covariance.json')
+        except _TierSkip:
+            pass
+        except Exception as e:
+            save_errors.append(f'covariance.json: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save covariance.json: {e}')
 
         # ── .complete / .partial sentinel ──────────────────────────────────
         # .complete is written ONLY when every file succeeded.

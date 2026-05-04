@@ -1015,6 +1015,14 @@ def _run_single_condition(
         else:
             stats_to_write = stats
         SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
+    if _opts.write_per_replicate_trajectories:
+        SweepOutputManager._write_per_replicate_trajectories(
+            cond_dir, results, model,
+            trajectory_places=_opts.trajectory_places,
+            trajectory_thin_seconds=_opts.trajectory_thin_seconds,
+        )
+    if _opts.write_covariance:
+        SweepOutputManager._write_covariance(cond_dir, results, model)
 
     # Persist parameter_sources alongside statistics for provenance.
     # Empty dict still written so downstream tooling can rely on the
