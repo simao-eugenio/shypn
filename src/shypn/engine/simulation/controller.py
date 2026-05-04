@@ -1791,31 +1791,91 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                     self._tau_leaping_engine.execute_step(self)
                     tau_leaping_advanced_time = True
                 else:
-                    # ── F3 fix: operator splitting for hybrid models ──
-                    # Instead of clamping tau = dt (which suppresses
-                    # stochastic dynamics), let tau-leaping choose its
-                    # own adaptive tau up to the remaining dt window.
-                    # The ODE phase already advanced the continuous
-                    # state; now we let the stochastic engine advance
-                    # within the same [t, t+dt] window.
-                    original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                    original_min_tau = self._tau_leaping_engine.leap_selector.min_tau
-                    # Cap max_tau at the ODE step size (don't overshoot)
-                    # but let min_tau stay at its configured value so
-                    # the algorithm can take sub-steps if needed.
-                    self._tau_leaping_engine.leap_selector.max_tau = time_step
-                    
-                    # Prevent tau-leaping from advancing the controller
-                    # clock — the finalize phase handles that.
-                    self._tau_leaping_engine._advance_time = False
-                    self._tau_leaping_engine.execute_step(self)
+                    # ── Hybrid operator splitting (F5 fix, 2026-05-04) ──
+                    # Old behaviour fired exactly ONE τ-leap per master dt
+                    # window, regardless of how small the chosen τ was. With
+                    # user max_tau ≪ dt (e.g. 0.1 s vs 5 s) this silently
+                    # discarded ~98 % of the stochastic time inside each
+                    # window — the documented F5 trap.
+                    #
+                    # Correct semantics (Haseltine–Rawlings / Salis–
+                    # Kaznessis hybrid): the ODE phase has already advanced
+                    # the continuous state by `time_step`. Now repeatedly
+                    # fire τ-leaps inside the same [t, t+dt] window until
+                    # the window is exhausted, no stochastic transition is
+                    # enabled, or the engine refuses to make further
+                    # progress.
+                    #
+                    # Correctness invariants:
+                    #   • The user-configured max_tau (Cao leap-validity
+                    #     bound) is preserved — never widened to dt.
+                    #   • Each inner leap is additionally capped at the
+                    #     remaining window so the loop never overshoots.
+                    #   • τ-leap advances controller.time inside the loop
+                    #     (_advance_time=True), so the finalize phase must
+                    #     NOT re-add `time_step` (signal that via
+                    #     tau_leaping_advanced_time=True).
+                    #   • Defensive guards prevent infinite loops when the
+                    #     engine returns False or selects τ ≈ 0.
+                    user_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                    t_target = self.time + time_step
+                    # 1 ns relative tolerance keeps the loop from spinning on
+                    # floating-point residue at the window boundary.
+                    eps_done = max(1e-12, 1e-9 * abs(time_step))
                     self._tau_leaping_engine._advance_time = True
-                    
-                    # Restore original tau bounds
-                    self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
-                    self._tau_leaping_engine.leap_selector.min_tau = original_min_tau
-                    tau_leaping_advanced_time = False
-                
+                    n_inner_leaps = 0
+                    max_inner_leaps = max(
+                        16,
+                        int(time_step / max(user_max_tau, 1e-12)) + 8,
+                    )
+                    try:
+                        while self.time + eps_done < t_target:
+                            remaining = t_target - self.time
+                            # Cap each leap at min(user_max_tau, remaining
+                            # window). The latter prevents overshoot; the
+                            # former preserves the Cao validity bound.
+                            self._tau_leaping_engine.leap_selector.max_tau = min(
+                                user_max_tau, remaining
+                            )
+                            t_before = self.time
+                            cont = self._tau_leaping_engine.execute_step(self)
+                            n_inner_leaps += 1
+                            # Engine signalled "no stochastic transitions"
+                            # — nothing more to fire in this window.
+                            if cont is False:
+                                break
+                            # Progress guard: if τ-leap fell back to exact
+                            # SSA with no firing or otherwise stalled, give
+                            # up rather than spin.
+                            if self.time - t_before < eps_done:
+                                break
+                            # Hard cap on inner iterations as a final
+                            # safety net (should never trigger under
+                            # well-behaved propensities).
+                            if n_inner_leaps >= max_inner_leaps:
+                                if self.verbose:
+                                    self.logger.warning(
+                                        "Hybrid τ-leap inner loop hit "
+                                        "max_inner_leaps=%d at t=%.6g "
+                                        "(window dt=%.6g, user max_tau=%.6g); "
+                                        "advancing to t_target. Consider "
+                                        "raising max_tau or lowering dt.",
+                                        max_inner_leaps, self.time,
+                                        time_step, user_max_tau,
+                                    )
+                                break
+                    finally:
+                        # Always restore user max_tau, even on exception.
+                        self._tau_leaping_engine.leap_selector.max_tau = user_max_tau
+
+                    # Snap to the exact target if any residue remains. This
+                    # keeps the master clock aligned with the recording grid
+                    # and ensures the finalize phase sees a fully-consumed
+                    # window.
+                    if self.time < t_target:
+                        self.time = t_target
+                    tau_leaping_advanced_time = True
+
                 discrete_fired = True
         
         return discrete_fired, tau_leaping_advanced_time
