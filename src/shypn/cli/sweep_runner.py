@@ -182,13 +182,16 @@ class SweepRunner:
         self.config = config
         self.config_path = config_path
         self.output_dir = output_dir
-        safe = self._compute_safe_workers()
+        # Pass duration to the worker-cap heuristic so long horizons get
+        # a more conservative per-worker memory budget.
+        _duration_s = float(getattr(self.config.sim_params, 'duration', 0.0) or 0.0)
+        safe = self._compute_safe_workers(duration_seconds=_duration_s)
         # User value acts as ceiling; never exceed memory-safe auto cap
         self.workers = min(workers, safe) if workers else safe
         self.verbose = verbose
 
     @staticmethod
-    def _compute_safe_workers() -> int:
+    def _compute_safe_workers(duration_seconds: float = 0.0) -> int:
         """Compute max workers from CPU and memory constraints.
 
         Policy (recalibrated 2026-04-28 against measured RSS on remote-gpu
@@ -204,7 +207,17 @@ class SweepRunner:
             system / page-cache / parent-process reserve.
             Swap is intentionally *not* counted — swap thrashing
             collapses throughput (~5× slowdown observed previously).
-          - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
+          - Final worker count = min(cpu_cap, mem_cap, hard_max)
+
+        Bug-fix 2026-05-05: ``duration_seconds`` is now consulted.  A
+        7-day × 60-rep × 10-cond sweep (run_20260505_014609) silently
+        OOM-thrashed on remote-gpu at the previous flat 1.5 GB / worker
+        estimate (real per-worker peak ≈ 10 GB pre-decimation).  Even
+        with the data-collector decimation now in place (replicate_runner
+        ~5 000 records / replicate), long horizons still grow C-side
+        propensity-accelerator state and intermediate Python objects,
+        so we apply a duration-tier multiplier to ``per_worker_gb`` and
+        a tighter ``hard_max``.
         """
         # Detect physical cores (not logical threads)
         _logical = os.cpu_count() or 4
@@ -278,11 +291,28 @@ class SweepRunner:
             # headroom for Python heap fragmentation and larger models
             # while still allowing 24 workers on a 49 GB-available host.
             per_worker_gb = 1.5
+            # Duration-tier multiplier (2026-05-05): long horizons grow
+            # propensity-accelerator C state and intermediate float
+            # arrays even after data-collector decimation.
+            #     ≤  4 h  → 1.0×  (calibration regime)
+            #     ≤ 24 h  → 1.5×
+            #     ≤ 72 h  → 2.0×
+            #     >  72 h → 3.0×
+            _h = (duration_seconds or 0.0) / 3600.0
+            if _h > 72.0:
+                per_worker_gb *= 3.0
+            elif _h > 24.0:
+                per_worker_gb *= 2.0
+            elif _h > 4.0:
+                per_worker_gb *= 1.5
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
 
-        workers = min(cpu_cap, mem_cap, 24)
+        # Hard ceiling: 24 workers on short runs, 12 on long-horizon runs
+        # (limit IPC pickling + GC contention from the parent process).
+        _hard_max = 12 if (duration_seconds or 0.0) > 24 * 3600 else 24
+        workers = min(cpu_cap, mem_cap, _hard_max)
         return workers
 
     # ── public API ───────────────────────────────────────────────────
