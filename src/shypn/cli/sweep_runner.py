@@ -523,8 +523,13 @@ class SweepRunner:
 
                     if self.verbose:
                         cpu_pct = (cpu_s / cond_elapsed * 100.0) if cond_elapsed > 0 else 0.0
+                        # Explicit row index in the done line so a UI
+                        # parser can pair start/done events under wide-
+                        # pool parallelism (where many [i/N] lines emit
+                        # before any condition finishes).
                         print(
-                            f"  done in {cond_elapsed:.1f}s "
+                            f"[done {idx + 1}/{n_conditions}] {label} "
+                            f"in {cond_elapsed:.1f}s "
                             f"({n_ok} ok, {n_err} errors) "
                             f"[cpu={cpu_s:.0f}s {cpu_pct:.0f}%, rss={peak_mib:.0f} MiB]",
                             flush=True,
@@ -541,7 +546,8 @@ class SweepRunner:
                     }
                     if self.verbose:
                         print(
-                            f"  done in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
+                            f"[done {idx + 1}/{n_conditions}] {label} "
+                            f"in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
                             flush=True,
                         )
 
