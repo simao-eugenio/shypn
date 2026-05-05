@@ -416,40 +416,59 @@ class SweepRunner:
         except OSError as _exc:
             print(f"WARNING: could not snapshot provenance: {_exc}")
 
-        # 4. Dispatch conditions in bounded batches across worker processes.
-        #    Each worker loads its own model copy — no shared mutable state.
-        #    Workers write results directly to disk and return only a light
-        #    summary payload, preventing IPC memory pressure from full
-        #    trajectory data being pickled back to the parent.
+        # 4. Flat replicate dispatch (Strategy A — May 2026).
         #
-        #    Sliding-window dispatch: at most `n_workers` conditions are
-        #    in-flight simultaneously.  As each finishes, the next is
-        #    submitted immediately — no straggler idle time.  Workers
-        #    flush results to disk before returning, so parent memory
-        #    stays bounded.
+        #    A single ProcessPool of `self.workers` processes consumes a
+        #    flat queue of (condition, replicate) work units. Each worker
+        #    loads the baseline model exactly once via the pool
+        #    initialiser; per-work-unit cost is from_dict(baseline) +
+        #    apply_snapshot + run one replicate.
+        #
+        #    Why: under the legacy outer/inner two-tier design, an outer
+        #    pool of `min(workers, n_conditions)` was the bottleneck
+        #    when workers > n_conditions (e.g. 26 workers / 8 conditions
+        #    pinned to 8 outer slots, each running 30 reps sequentially
+        #    in a single subprocess). Flat dispatch saturates all cores
+        #    for any C × R ≥ workers and removes the brittle nested-pool
+        #    plumbing entirely.
+        #
+        #    Memory bound (main process buffer): up to C × R full
+        #    per-replicate trajectory dicts during the worst case — but
+        #    a condition is finalised the moment its R-th replicate
+        #    arrives, so its buffer is freed promptly. Round-robin
+        #    submission (r=0 across all C, then r=1, ...) keeps
+        #    conditions advancing together so they finalise in clusters
+        #    near the end of the sweep.
         _apply_cpu_affinity()
         import gc
+        import time as _time_mod
+        from collections import defaultdict
         from dataclasses import asdict
         sim_dict = asdict(sim)
+        events_list = list(getattr(self.config, 'events', []) or [])
+        # SimulationParams has no time_units field — sweeps assume seconds
+        # (matches ReplicateRunner.run_replicates' default). The enum
+        # value is a tuple ('seconds', 's', 1.0); pass it verbatim so the
+        # worker can rehydrate via TimeUnits(value).
+        from shypn.utils.time_utils import TimeUnits as _TU
+        time_units_value = _TU.SECONDS.value
 
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
         # Layer D: aggregate per-condition parameter_sources for provenance.
-        # Keyed by condition name → {prop_path: {source, value, prior}}.
         sources_by_condition: Dict[str, Dict[str, Any]] = {}
-        n_workers = min(self.workers, n_conditions)
-
-        # Adaptive replicate distribution: when there are fewer conditions
-        # than total workers, spread the leftover budget across replicates
-        # *within* each condition.  This eliminates the slow gating-run
-        # case (1 condition × N replicates pinning only 1 outer worker).
-        # Multi-condition sweeps where n_conditions >= self.workers keep
-        # replicate_pool_size == 1 — unchanged behaviour.
-        replicate_pool_size = max(1, self.workers // max(1, n_workers))
-        if self.verbose and replicate_pool_size > 1:
+        # Per-condition main-process buffer of replicate result dicts.
+        results_by_cond: Dict[int, List[dict]] = defaultdict(list)
+        # Per-condition wall-clock window (start = first rep submitted,
+        # end = R-th rep arrived).
+        cond_t0: Dict[int, float] = {}
+        # Pre-serialise snapshots once.
+        snapshot_dicts = [_snapshot_to_dict(s) for s in snapshots]
+        n_workers = min(self.workers, n_conditions * sim.replicates)
+        if self.verbose:
             print(
-                f"[adaptive] {n_conditions} condition(s) × {sim.replicates} reps → "
-                f"{n_workers} cond-worker(s) × {replicate_pool_size} rep-worker(s) "
-                f"per condition (total = {n_workers * replicate_pool_size}/{self.workers})"
+                f"[flat-dispatch] {n_conditions} cond × {sim.replicates} reps "
+                f"= {n_conditions * sim.replicates} work units, "
+                f"pool={n_workers}"
             )
 
         # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
@@ -457,107 +476,135 @@ class SweepRunner:
 
         with ProcessPoolExecutor(
             max_workers=n_workers,
-            initializer=_worker_init,
+            initializer=_replicate_pool_init,
+            initargs=(str(self.model_path),),
         ) as pool:
-            # Sliding window: submit up to n_workers, then for each
-            # completion, submit the next pending condition.
-            futures_map: Dict[Any, int] = {}
-            next_idx = 0  # index of the next condition to submit
+            futures_map: Dict[Any, tuple] = {}
 
-            def _submit_one(idx: int) -> None:
-                snapshot = snapshots[idx]
+            # Submit all (cond, rep) work units in round-robin order so
+            # every condition has reps in flight from t=0. Pool queues
+            # the surplus internally; only n_workers run concurrently.
+            for r in range(sim.replicates):
+                for c in range(n_conditions):
+                    if r == 0:
+                        cond_t0[c] = _time_mod.monotonic()
+                        if self.verbose:
+                            print(
+                                f"[{c + 1}/{n_conditions}] {snapshots[c].name} "
+                                f"({sim.replicates} replicates)...",
+                                flush=True,
+                            )
+                    fut = pool.submit(
+                        _run_one_replicate,
+                        cond_idx=c,
+                        rep_idx=r,
+                        cond_name=snapshots[c].name,
+                        baseline_dict_inline=None,  # use cached
+                        snapshot_dict=snapshot_dicts[c],
+                        sim_params=sim_dict,
+                        events=events_list,
+                        time_units_value=time_units_value,
+                    )
+                    futures_map[fut] = (c, r)
+
+            # Process replicate completions; finalise each condition
+            # the moment its R-th replicate arrives.
+            for fut in as_completed(futures_map):
+                c, r = futures_map.pop(fut)
+                label = snapshots[c].name
+                try:
+                    payload = fut.result()
+                    results_by_cond[c].append(payload['result'])
+                    if 'param_sources' in payload:
+                        sources_by_condition[label] = payload['param_sources']
+                except Exception as exc:
+                    logger.exception(
+                        "Condition %d (%s) replicate %d failed",
+                        c, label, r,
+                    )
+                    # Inject a synthetic error result so the condition
+                    # still finalises with the right replicate count.
+                    results_by_cond[c].append({
+                        'replicate_id': r,
+                        'seed': sim_dict['seed_base'] + r,
+                        'elapsed_time': 0.0,
+                        'error': str(exc),
+                    })
+
+                # Has this condition completed?
+                if len(results_by_cond[c]) < sim.replicates:
+                    continue
+
+                cond_results = results_by_cond.pop(c)
+                n_ok = sum(1 for x in cond_results if 'error' not in x)
+                n_err = len(cond_results) - n_ok
+                cond_wall = _time_mod.monotonic() - cond_t0.get(c, _time_mod.monotonic())
+                # Sum of per-replicate elapsed times approximates per-condition
+                # CPU; not strictly process_time but a useful aggregate.
+                cond_cpu = sum(float(x.get('elapsed_time', 0.0))
+                               for x in cond_results)
+
+                # Finalise: compute statistics + write per-condition outputs.
+                # We need a model instance for compute_statistics + writers;
+                # load lazily and reuse across remaining finalisations.
+                if not hasattr(self, '_finalise_model'):
+                    from shypn.data.canvas.document_model import DocumentModel
+                    self._finalise_model = DocumentModel.load_from_file(
+                        str(self.model_path))
+                _finalize_condition(
+                    model=self._finalise_model,
+                    snapshot=snapshots[c],
+                    cond_results=cond_results,
+                    output_run_dir=output.run_dir,
+                    output_options=self.config.output.to_dict(),
+                )
+
+                # Persist parameter_sources alongside statistics.
+                try:
+                    import json as _json_ps
+                    safe_name = _sanitise_condition_name(label)
+                    cond_dir = output.run_dir / f"condition_{safe_name}"
+                    with open(cond_dir / 'parameter_sources.json', 'w') as _psf:
+                        _json_ps.dump({
+                            'condition': label,
+                            'sources': sources_by_condition.get(label, {}),
+                        }, _psf, indent=2, sort_keys=True)
+                except OSError as _exc:
+                    logger.warning(
+                        "Failed to write parameter_sources.json for %s: %s",
+                        label, _exc,
+                    )
+
+                summary_rows[c] = {
+                    'condition': label,
+                    'replicates_ok': n_ok,
+                    'replicates_error': n_err,
+                    'wall_seconds': round(cond_wall, 2),
+                    'cpu_seconds': round(cond_cpu, 2),
+                    # peak_rss is a per-process metric; the flat pool
+                    # makes it ill-defined per-condition. Report 0.0 here
+                    # and rely on resource_usage.json's children_peak_rss
+                    # for the true aggregate.
+                    'peak_rss_mib': 0.0,
+                }
+
                 if self.verbose:
+                    cpu_pct = (cond_cpu / cond_wall * 100.0) if cond_wall > 0 else 0.0
                     print(
-                        f"[{idx + 1}/{n_conditions}] {snapshot.name} "
-                        f"({sim.replicates} replicates)...",
+                        f"[done {c + 1}/{n_conditions}] {label} "
+                        f"in {cond_wall:.1f}s "
+                        f"({n_ok} ok, {n_err} errors) "
+                        f"[cpu={cond_cpu:.0f}s {cpu_pct:.0f}%]",
                         flush=True,
                     )
-                fut = pool.submit(
-                    _run_single_condition,
-                    model_path=str(self.model_path),
-                    baseline_dict=_snapshot_to_dict(baseline),
-                    snapshot_dict=_snapshot_to_dict(snapshot),
-                    sim_params=sim_dict,
-                    condition_index=idx,
-                    n_conditions=n_conditions,
-                    output_dir=str(output.run_dir),
-                    verbose=self.verbose,
-                    events=list(getattr(self.config, 'events', []) or []),
-                    output_options=self.config.output.to_dict(),
-                    replicate_pool_size=replicate_pool_size,
-                )
-                futures_map[fut] = idx
 
-            # Fill the initial window
-            while next_idx < min(n_workers, n_conditions):
-                _submit_one(next_idx)
-                next_idx += 1
-
-            # Process completions and refill the window
-            while futures_map:
-                # Wait for the next completion
-                done_iter = as_completed(futures_map)
-                fut = next(done_iter)
-                idx = futures_map.pop(fut)
-                label = snapshots[idx].name
-
-                try:
-                    result_payload = fut.result()
-                    cond_elapsed = result_payload['wall_seconds']
-                    n_ok = result_payload['replicates_ok']
-                    n_err = result_payload['replicates_error']
-                    cpu_s = result_payload.get('cpu_seconds', 0.0)
-                    peak_mib = result_payload.get('peak_rss_mib', 0.0)
-
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': n_ok,
-                        'replicates_error': n_err,
-                        'wall_seconds': round(cond_elapsed, 2),
-                        'cpu_seconds': round(cpu_s, 2),
-                        'peak_rss_mib': round(peak_mib, 1),
-                    }
-                    sources_by_condition[label] = result_payload.get(
-                        'parameter_sources', {}
-                    )
-
-                    if self.verbose:
-                        cpu_pct = (cpu_s / cond_elapsed * 100.0) if cond_elapsed > 0 else 0.0
-                        # Explicit row index in the done line so a UI
-                        # parser can pair start/done events under wide-
-                        # pool parallelism (where many [i/N] lines emit
-                        # before any condition finishes).
-                        print(
-                            f"[done {idx + 1}/{n_conditions}] {label} "
-                            f"in {cond_elapsed:.1f}s "
-                            f"({n_ok} ok, {n_err} errors) "
-                            f"[cpu={cpu_s:.0f}s {cpu_pct:.0f}%, rss={peak_mib:.0f} MiB]",
-                            flush=True,
-                        )
-                except Exception as exc:
-                    logger.exception("Condition %d (%s) failed", idx, label)
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': 0,
-                        'replicates_error': sim.replicates,
-                        'wall_seconds': 0.0,
-                        'cpu_seconds': 0.0,
-                        'peak_rss_mib': 0.0,
-                    }
-                    if self.verbose:
-                        print(
-                            f"[done {idx + 1}/{n_conditions}] {label} "
-                            f"in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
-                            flush=True,
-                        )
-
-                # Submit next condition if any remain
-                if next_idx < n_conditions:
-                    _submit_one(next_idx)
-                    next_idx += 1
-
-                # Incremental GC: reclaim IPC deserialization overhead
+                del cond_results
                 gc.collect()
+
+        # Drop the lazy finalisation model
+        if hasattr(self, '_finalise_model'):
+            del self._finalise_model
+            gc.collect()
 
         # 5. Summary
         output.write_summary([r for r in summary_rows if r is not None])
@@ -927,6 +974,219 @@ def _strip_to_endpoint(stats: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Flat replicate-level dispatch (Strategy A — May 2026)
+# ═════════════════════════════════════════════════════════════════════
+#
+# Previous design: ProcessPoolExecutor of size N submits one
+# `_run_single_condition` task per condition; that task internally
+# spawns a nested ProcessPool to parallelise its replicates. With
+# `workers >= n_conditions` (e.g. 26 workers / 8 conditions), the
+# outer pool was the bottleneck — only `n_conditions` workers were
+# ever active, each running its 30 reps sequentially. Measured wall
+# on the canabidiol Q1 sweep: 78 min where the theoretical lower
+# bound is ~25 min.
+#
+# Strategy A: a SINGLE flat ProcessPool of `workers` processes; the
+# unit of work is one (condition, replicate) pair. Total in-flight
+# = min(workers, C × R). For C=8, R=30, workers=26 → all 26 cores
+# saturated for the whole sweep, modulo the tail.
+#
+# - Each worker loads the baseline model exactly once via the pool
+#   initializer (`_replicate_pool_init`), caching the parsed dict in
+#   a module global. Per-replicate cost: from_dict(baseline) +
+#   apply_snapshot + run one replicate. Model-reload overhead is
+#   amortised (~ms per work unit).
+# - Worker returns the full per-replicate result dict via IPC. Main
+#   process buffers per-condition; when all R replicates for some
+#   condition arrive, it finalises (compute_statistics + write all
+#   per-condition output files) and frees the buffer.
+# - Memory bound (main process): C × R × ~trajectory_size. For
+#   canabidiol Q1 (44 places × 4 800 timepoints × 8 bytes ≈ 1.7 MiB
+#   per replicate), C=8, R=30 → ~400 MiB peak. Fine on the i9 server.
+# - Submission order: round-robin by replicate index (r=0 across all
+#   conditions, then r=1, ...). This keeps all conditions advancing
+#   together and roughly synchronises completion times.
+# - CLI emit format unchanged:
+#       [c+1/C] cond_name (R replicates)...     <- when r=0 submitted
+#       [done c+1/C] cond_name in Xs (n_ok ok, n_err errors) [...]
+#                                               <- when R-th rep arrives
+#   These pair correctly with the controller regex from
+#   dispatch/remote.py (commit a1a2d57b).
+
+
+# Module-global cache for the baseline model dict, populated by the
+# pool initialiser exactly once per worker process.
+_BASELINE_MODEL_DICT: Optional[dict] = None
+
+
+def _replicate_pool_init(model_path: str) -> None:
+    """Initialiser for the flat replicate ProcessPool.
+
+    Loads the baseline model from disk one time per worker, parses to
+    a dict, and stashes the dict for reuse across the worker's many
+    `_run_one_replicate` invocations. Also installs the standard
+    process guard / nice / CPU affinity so the worker is well-behaved
+    under SSH.
+    """
+    global _BASELINE_MODEL_DICT
+    os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
+    os.environ.setdefault('DISPLAY', '')
+    from shypn.engine.process_guard import install_process_guard
+    install_process_guard()
+    try:
+        os.nice(19)
+    except OSError:
+        pass
+    _apply_cpu_affinity()
+    # Logging quiet
+    import logging as _logging
+    _logging.basicConfig(level=_logging.WARNING)
+    for _name in ('shypn.engine.simulation.controller',
+                  'shypn.engine.acceleration'):
+        _logging.getLogger(_name).setLevel(_logging.ERROR)
+
+    from shypn.data.canvas.document_model import DocumentModel
+    model = DocumentModel.load_from_file(model_path)
+    _BASELINE_MODEL_DICT = model.to_dict()
+
+
+def _run_one_replicate(
+    *,
+    cond_idx: int,
+    rep_idx: int,
+    cond_name: str,
+    baseline_dict_inline: Optional[dict],
+    snapshot_dict: dict,
+    sim_params: dict,
+    events: list,
+    time_units_value: str,
+) -> dict:
+    """Execute exactly one (condition, replicate) work unit.
+
+    Args:
+        cond_idx, rep_idx: addressing.
+        cond_name: condition snapshot name (passed in to avoid an extra
+            pickled object).
+        baseline_dict_inline: optional inline baseline dict for callers
+            that did not use the pool initialiser (e.g. tests). When
+            ``None``, falls back to the worker's cached
+            ``_BASELINE_MODEL_DICT``.
+        snapshot_dict: serialised ExperimentSnapshot for this condition.
+        sim_params: as ``self.config.sim_params`` (asdict).
+        events: list of event dicts to install on the model.
+        time_units_value: ``TimeUnits`` enum value string.
+
+    Returns:
+        ``{cond_idx, rep_idx, cond_name, result, param_sources?}``
+        where ``result`` is the full per-replicate result dict from
+        :func:`_run_replicate_chunk` (single element). ``param_sources``
+        is included only on the first replicate (r=0) of each condition
+        to avoid redundant IPC.
+    """
+    baseline_dict = baseline_dict_inline or _BASELINE_MODEL_DICT
+    if baseline_dict is None:
+        raise RuntimeError(
+            "Replicate worker has no baseline model dict — "
+            "_replicate_pool_init was not invoked"
+        )
+
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import _run_replicate_chunk
+
+    # Reconstruct fresh model for this work unit (no shared state across
+    # replicates within a worker — necessary for clean re-application of
+    # the snapshot and event list, which mutate the model in place).
+    model = DocumentModel.from_dict(baseline_dict)
+
+    # Build a baseline snapshot from the in-worker model (used by
+    # _apply_snapshot to reset per-id markings before applying overrides).
+    baseline_snap = SweepRunner._capture_baseline(model)
+    snapshot = _dict_to_snapshot(snapshot_dict)
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline_snap)
+
+    # Install events forwarded from the dispatcher, exactly as the
+    # legacy per-condition path did.
+    if events:
+        from shypn.data.pathway.pathway_data import Event as _Event
+        try:
+            model.events = [_Event.from_dict(e) for e in events]
+        except Exception as _exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                "Failed to install %d events: %s", len(events), _exc
+            )
+
+    # Run exactly one replicate via the existing chunk runner.
+    chunk = _run_replicate_chunk(
+        model_dict=model.to_dict(),
+        replicate_ids=[rep_idx],
+        seed_base=sim_params['seed_base'],
+        duration=sim_params['duration'],
+        use_parallel=True,
+        use_tau_leaping=True,
+        termination_condition=sim_params['termination'],
+        time_step=sim_params.get('time_step'),
+        epsilon=sim_params['tau_epsilon'],
+        max_tau=sim_params['max_tau'],
+        time_units_value=time_units_value,
+    )
+
+    payload = {
+        'cond_idx': cond_idx,
+        'rep_idx': rep_idx,
+        'cond_name': cond_name,
+        'result': chunk[0],
+    }
+    # Carry parameter_sources only once per condition (with r=0) — saves
+    # ~C × (R-1) redundant IPC sends.
+    if rep_idx == 0:
+        payload['param_sources'] = param_sources
+    return payload
+
+
+def _finalize_condition(
+    *,
+    model: Any,
+    snapshot: ExperimentSnapshot,
+    cond_results: List[dict],
+    output_run_dir: Path,
+    output_options: dict,
+) -> None:
+    """Compute statistics and write per-condition outputs.
+
+    Mirrors the disk-write half of the legacy `_run_single_condition`,
+    but driven from the main process once all R replicates for a
+    condition have arrived from the flat pool.
+    """
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    from shypn.cli.sweep_output import SweepOutputManager
+    from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+
+    runner = ReplicateRunner(model)
+    stats = runner.compute_statistics(cond_results)
+
+    safe_name = _sanitise_condition_name(snapshot.name)
+    cond_dir = output_run_dir / f"condition_{safe_name}"
+    cond_dir.mkdir(parents=True, exist_ok=True)
+
+    _opts = _OutputOptions.from_dict(output_options)
+    if _opts.write_replicates_csv:
+        SweepOutputManager._write_replicates_csv(cond_dir, cond_results, model)
+    if _opts.write_statistics_json:
+        stats_to_write = (_strip_to_endpoint(stats)
+                          if _opts.statistics_endpoint_only else stats)
+        SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
+    if _opts.write_per_replicate_trajectories:
+        SweepOutputManager._write_per_replicate_trajectories(
+            cond_dir, cond_results, model,
+            trajectory_places=_opts.trajectory_places,
+            trajectory_thin_seconds=_opts.trajectory_thin_seconds,
+        )
+    if _opts.write_covariance:
+        SweepOutputManager._write_covariance(cond_dir, cond_results, model)
 
 
 def _run_single_condition(
