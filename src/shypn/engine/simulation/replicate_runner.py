@@ -101,6 +101,26 @@ def _run_replicate_chunk(
         controller.settings.dt_manual = time_step
 
     dt = time_step if time_step else controller.settings.get_effective_dt()
+
+    # Auto-couple max_tau to dt for coarse outer steps.
+    # The hybrid loop fires ceil(dt/max_tau) inner τ-leap iterations per
+    # outer dt (Haseltine–Rawlings / Salis–Kaznessis, F5-corrected).
+    # When max_tau is at the engine default (0.1 s) and the user chose a
+    # coarse dt (e.g. 10 s for a 7-day horizon), the inner loop wastes
+    # 100× work for accuracy the user didn't ask for. Raise max_tau to
+    # min(dt, 1.0) in that case so the τ-leap step matches the recording
+    # cadence. Numeric overrides (max_tau != 0.1) are honoured literally
+    # — they signal an explicit Cao-bound choice by the user.
+    _DEFAULT_MAX_TAU = 0.1
+    if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+        coupled = min(dt, 1.0)
+        print(
+            f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+            f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+        )
+        max_tau = coupled
+        controller.settings.max_tau = max_tau
+
     max_steps = int(duration / dt)
 
     # Auto-decimate snapshots for long horizons so the data-collector's
@@ -501,6 +521,21 @@ class ReplicateRunner:
 
         # Pre-calculate dt / max_steps (constant across replicates)
         dt = time_step if time_step else controller.settings.get_effective_dt()
+
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105 for
+        # rationale).  Same heuristic: default max_tau (0.1) + coarse dt
+        # (>0.1) → raise max_tau to min(dt, 1.0).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
+            controller.settings.max_tau = max_tau
+
         max_steps = int(duration / dt)
 
         # Auto-decimate snapshots for long horizons so the data-collector's
@@ -1148,6 +1183,17 @@ class ReplicateRunner:
         settings = self.default_settings
         dt = time_step if time_step else settings.get_effective_dt()
 
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
+
         try:
             engine = GPUReplicateEngine(
                 analysis,
@@ -1326,6 +1372,17 @@ class ReplicateRunner:
         # Compute dt
         settings = self.default_settings
         dt = time_step if time_step else settings.get_effective_dt()
+
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
 
         # Auto-decimate snapshots so wall time and memory don't explode on
         # long horizons.  Target ~5 000 records per replicate regardless
