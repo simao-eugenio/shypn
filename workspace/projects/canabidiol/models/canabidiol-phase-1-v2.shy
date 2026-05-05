@@ -1,20 +1,24 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-04T18:12:40.466018",
+    "created": "2026-04-26T14:18:09.475390",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
-      "places": 43,
-      "transitions": 48,
-      "arcs": 104,
+      "places": 42,
+      "transitions": 45,
+      "arcs": 100,
       "modules": 0
-    }
+    },
+    "notes": "Phase 1 (P8 \u2014 Healthy environment envelope) validates the legal Pattern-A bridge \u25a2 TEMPERATURE/PH/AGE \u2192 evt_apply_thermodynamics \u2192 \u25c7 Temperature_factor / pH_acidosis / pH_neutrality / Age_factor \u2192 \u03a6. No biology changes from phase-0. Object-net sha is identical (modulo metadata bytes). Sweep config: workspace/projects/canabidiol/sweep_config.phase1.json",
+    "derived_from": "canabidiol-phase-0.shy (sha256 c49df7f817566c56f1d0f3e394a88354e609ee733481f15d27c860431ba09389)",
+    "phase": "phase-1",
+    "description": "CBD-AD neuroprotection model \u2014 Phase 1 (healthy environment envelope). Same biology as phase-0; sweep target: TEMPERATURE \u00d7 PH \u00d7 AGE at DISEASE_SEVERITY=0, 0 dose, 4 h horizon."
   },
   "view_state": {
-    "zoom": 0.6655000000000132,
-    "pan_x": 2438.898078221189,
-    "pan_y": 464.45003598160315,
+    "zoom": 0.8052550000000156,
+    "pan_x": 2229.3178210355813,
+    "pan_y": -213.46455613644912,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -50,11 +54,12 @@
         "compartment": "extracellular"
       },
       "object_type": "place",
-      "x": -1680.0,
-      "y": 630.0,
+      "x": -1880.0,
+      "y": 810.0,
       "radius": 40.0,
-      "marking": 0.0,
-      "initial_marking": 0.0,
+      "marking": 10,
+      "tokens": 10,
+      "initial_marking": 10,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -105,6 +110,7 @@
       "y": 190.0,
       "radius": 40.0,
       "marking": 50.0,
+      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -145,6 +151,7 @@
       "y": -290.0,
       "radius": 40.0,
       "marking": 50.0,
+      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -185,6 +192,7 @@
       "y": -10.0,
       "radius": 40.0,
       "marking": 90.0,
+      "tokens": 90.0,
       "initial_marking": 90.0,
       "capacity": "Infinity",
       "border_color": [
@@ -223,8 +231,9 @@
       "x": 530.0,
       "y": 60.0,
       "radius": 40.0,
-      "marking": 0.5,
-      "initial_marking": 0.5,
+      "marking": 0.05,
+      "tokens": 0.05,
+      "initial_marking": 0.05,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -264,6 +273,7 @@
       "y": 1360.0,
       "radius": 40.0,
       "marking": 0.5,
+      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -302,6 +312,7 @@
       "y": 1490.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -341,6 +352,7 @@
       "y": 710.0,
       "radius": 40.0,
       "marking": 50.0,
+      "tokens": 50.0,
       "initial_marking": 50.0,
       "capacity": "Infinity",
       "border_color": [
@@ -383,6 +395,7 @@
       "y": 490.0,
       "radius": 40.0,
       "marking": 5.0,
+      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -423,6 +436,7 @@
       "y": 970.0,
       "radius": 40.0,
       "marking": 15.0,
+      "tokens": 15.0,
       "initial_marking": 15.0,
       "capacity": "Infinity",
       "border_color": [
@@ -463,6 +477,7 @@
       "y": 1040.0,
       "radius": 40.0,
       "marking": 0.5,
+      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -503,6 +518,7 @@
       "y": 470.0,
       "radius": 40.0,
       "marking": 0.5,
+      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -543,6 +559,7 @@
       "y": 680.0,
       "radius": 40.0,
       "marking": 0.5,
+      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -583,6 +600,7 @@
       "y": 870.0,
       "radius": 40.0,
       "marking": 0.5,
+      "tokens": 0.5,
       "initial_marking": 0.5,
       "capacity": "Infinity",
       "border_color": [
@@ -621,6 +639,7 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 55.0,
+      "tokens": 55.0,
       "initial_marking": 55.0,
       "capacity": "Infinity",
       "border_color": [
@@ -663,6 +682,7 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 5.0,
+      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -703,6 +723,7 @@
       "y": 1480.0,
       "radius": 40.0,
       "marking": 30.0,
+      "tokens": 30.0,
       "initial_marking": 30.0,
       "capacity": "Infinity",
       "border_color": [
@@ -743,6 +764,7 @@
       "y": 1680.0,
       "radius": 40.0,
       "marking": 20.0,
+      "tokens": 20.0,
       "initial_marking": 20.0,
       "capacity": "Infinity",
       "border_color": [
@@ -782,6 +804,7 @@
       "y": 1330.0,
       "radius": 40.0,
       "marking": 1.0,
+      "tokens": 1.0,
       "initial_marking": 1.0,
       "capacity": "Infinity",
       "border_color": [
@@ -821,6 +844,7 @@
       "y": 1930.0,
       "radius": 40.0,
       "marking": 70.0,
+      "tokens": 70.0,
       "initial_marking": 70.0,
       "capacity": "Infinity",
       "border_color": [
@@ -859,6 +883,7 @@
       "y": 2120.0,
       "radius": 40.0,
       "marking": 5.0,
+      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -897,6 +922,7 @@
       "y": 1630.0,
       "radius": 40.0,
       "marking": 40.0,
+      "tokens": 40.0,
       "initial_marking": 40.0,
       "capacity": "Infinity",
       "border_color": [
@@ -936,6 +962,7 @@
       "y": 2130.0,
       "radius": 40.0,
       "marking": 100.0,
+      "tokens": 100.0,
       "initial_marking": 100.0,
       "capacity": "Infinity",
       "border_color": [
@@ -976,6 +1003,7 @@
       "y": 1910.0,
       "radius": 40.0,
       "marking": 5.0,
+      "tokens": 5.0,
       "initial_marking": 5.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1018,6 +1046,7 @@
       "y": 1190.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1060,6 +1089,7 @@
       "y": 770.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1102,6 +1132,7 @@
       "y": 1450.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1135,6 +1166,7 @@
       "y": 270.0,
       "radius": 40.0,
       "marking": 310.15,
+      "tokens": 310.15,
       "initial_marking": 310.15,
       "capacity": "Infinity",
       "border_color": [
@@ -1180,6 +1212,7 @@
       "y": 60.0,
       "radius": 40.0,
       "marking": 7.4,
+      "tokens": 7.4,
       "initial_marking": 7.4,
       "capacity": "Infinity",
       "border_color": [
@@ -1237,6 +1270,7 @@
       "y": 800.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1270,6 +1304,7 @@
       "y": 490.0,
       "radius": 40.0,
       "marking": 75.0,
+      "tokens": 75.0,
       "initial_marking": 75.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1315,6 +1350,7 @@
       "y": 300.0,
       "radius": 40.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1348,6 +1384,7 @@
       "y": 1930.0,
       "radius": 40.0,
       "marking": 10.0,
+      "tokens": 10.0,
       "initial_marking": 10.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1381,6 +1418,7 @@
       "y": 350.0,
       "radius": 40.0,
       "marking": 4.0,
+      "tokens": 4.0,
       "initial_marking": 4.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1414,7 +1452,8 @@
       "y": -140.0,
       "radius": 40.0,
       "marking": 10.0,
-      "initial_marking": 10.0,
+      "tokens": 10.0,
+      "initial_marking": 0,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1457,8 +1496,9 @@
       "x": -1880.0,
       "y": -280.0,
       "radius": 40.0,
-      "marking": 0.0,
-      "initial_marking": 0.0,
+      "marking": 5.0,
+      "tokens": 5.0,
+      "initial_marking": 0,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1501,8 +1541,9 @@
       "x": -1870.0,
       "y": -100.0,
       "radius": 40.0,
-      "marking": 21600.0,
-      "initial_marking": 21600.0,
+      "marking": 86400.0,
+      "tokens": 86400.0,
+      "initial_marking": 86400.0,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1545,8 +1586,9 @@
       "x": -1470.0,
       "y": -310.0,
       "radius": 40.0,
-      "marking": 0.5,
-      "initial_marking": 0.5,
+      "marking": 0.0,
+      "tokens": 0.0,
+      "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1590,6 +1632,7 @@
       "y": -260.0,
       "radius": 25.0,
       "marking": 1.0,
+      "tokens": 1.0,
       "initial_marking": 1.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1624,6 +1667,7 @@
       "y": -110.0,
       "radius": 25.0,
       "marking": 1.2,
+      "tokens": 1.2,
       "initial_marking": 1.2,
       "capacity": "Infinity",
       "border_color": [
@@ -1658,6 +1702,7 @@
       "y": 50.0,
       "radius": 25.0,
       "marking": 0.0,
+      "tokens": 0.0,
       "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
@@ -1692,97 +1737,8 @@
       "y": 210.0,
       "radius": 25.0,
       "marking": 1.0,
+      "tokens": 1.0,
       "initial_marking": 1.0,
-      "capacity": "Infinity",
-      "border_color": [
-        0.0,
-        0.0,
-        1.0
-      ],
-      "border_width": 3.0,
-      "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
-      "is_compartment_place": false,
-      "is_regulatory_place": false,
-      "is_energy_place": false,
-      "is_parameter_place": false,
-      "parameter_kind": null,
-      "parameter_units": null,
-      "diffusion_coefficient": null,
-      "boundary_type": null,
-      "gradient_vector": null,
-      "compartment_volume": null,
-      "neighbor_compartments": [],
-      "spatial_position": null,
-      "compartment": "environment"
-    },
-    {
-      "id": "P43",
-      "name": "CBD_plasma",
-      "label": "CBD_extracellular\n(Cannabidiol)\nworking scale: 1 token = 1 uM",
-      "metadata": {
-        "kegg_id": "D10915",
-        "chebi_id": "CHEBI:69478",
-        "pubchem_cid": "644019",
-        "compound_name": "Cannabidiol",
-        "formula": "C21H30O2",
-        "mw": 314.469,
-        "partition": "peripheral_pk",
-        "function": "PK_compartment_extracellular",
-        "hierarchy_layer": null,
-        "compartment": "extracellular"
-      },
-      "object_type": "place",
-      "x": -2240.0,
-      "y": 640.0,
-      "radius": 40.0,
-      "marking": 0.0,
-      "initial_marking": 0.0,
-      "capacity": "Infinity",
-      "border_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_width": 5.0,
-      "is_catalyst": false,
-      "is_signal_place": false,
-      "signal_type": null,
-      "is_compartment_place": false,
-      "is_regulatory_place": false,
-      "is_energy_place": false,
-      "is_parameter_place": false,
-      "parameter_kind": null,
-      "parameter_units": null,
-      "diffusion_coefficient": null,
-      "boundary_type": null,
-      "gradient_vector": null,
-      "compartment_volume": 10000.0,
-      "neighbor_compartments": [],
-      "spatial_position": null,
-      "properties": {
-        "thermodynamics": {
-          "charge": 0,
-          "n_protons": 0,
-          "conditions": {
-            "pH": 7.0,
-            "temperature": 298.15,
-            "ionic_strength": 0.1
-          }
-        }
-      }
-    },
-    {
-      "id": "P0",
-      "name": "Disease_Drive",
-      "label": "Disease drive (\u25c7)",
-      "object_type": "place",
-      "x": -2210.0,
-      "y": -180.0,
-      "radius": 25.0,
-      "marking": 0.0,
-      "initial_marking": 0.0,
       "capacity": "Infinity",
       "border_color": [
         0.0,
@@ -1914,8 +1870,8 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "(1 + 2 * Disease_Drive) * 0.1 * Gamma_Secretase / (50 + Gamma_Secretase) * APP / (100 + APP) * Temperature_factor * Age_factor",
-        "rate_function_display": "(1+2\u00b7DSEV) \u00b7 k \u00b7 GS/(K+GS) \u00b7 APP/(K+APP) \u00b7 Tf \u00b7 Age"
+        "rate_function": "0.1 * Gamma_Secretase / (50 + Gamma_Secretase) * APP / (100 + APP) * Temperature_factor * Age_factor",
+        "rate_function_display": "k_cleavage \u00d7 [\u03b3-Sec]"
       },
       "is_environment_aware": false,
       "compartment": "plasma_membrane",
@@ -1956,9 +1912,9 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P39",
+        "P41",
         "P5",
-        "P41"
+        "P39"
       ],
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -1999,9 +1955,9 @@
         "rate_function_display": "k_plaque \u00d7 [A\u03b2_olig]"
       },
       "signal_places": [
-        "P39",
+        "P41",
         "P6",
-        "P41"
+        "P39"
       ],
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2080,8 +2036,8 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
-        "P39",
-        "P9"
+        "P9",
+        "P39"
       ],
       "is_environment_aware": false,
       "compartment": "nucleus",
@@ -2280,8 +2236,8 @@
         "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
       },
       "signal_places": [
-        "P39",
-        "P16"
+        "P16",
+        "P39"
       ],
       "is_environment_aware": false,
       "compartment": "nucleus",
@@ -2481,12 +2437,12 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P40",
         "P41",
         "P6",
-        "P22",
+        "P39",
         "P11",
-        "P39"
+        "P40",
+        "P22"
       ],
       "is_environment_aware": false,
       "compartment": "brain_parenchyma",
@@ -2528,9 +2484,9 @@
       },
       "signal_places": [
         "P40",
-        "P21",
         "P27",
-        "P26"
+        "P26",
+        "P21"
       ],
       "is_environment_aware": false,
       "compartment": "brain_parenchyma",
@@ -2609,12 +2565,12 @@
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
-        "P40",
         "P41",
         "P6",
-        "P11",
         "P19",
-        "P39"
+        "P39",
+        "P11",
+        "P40"
       ],
       "is_environment_aware": false,
       "compartment": "brain_parenchyma",
@@ -2651,14 +2607,13 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor * (1 - NFkB_p65 / (2.0 + NFkB_p65))",
+        "rate_function": "0.05 * BDNF / (20 + BDNF) * (100 - Neuron_Health) / 100 * Temperature_factor",
         "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
       },
       "signal_places": [
-        "P39",
         "P23",
         "P24",
-        "P9"
+        "P39"
       ],
       "is_environment_aware": false,
       "compartment": "brain_parenchyma",
@@ -2771,8 +2726,8 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "(0.006 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
-        "rate_function_display": "Slowed 5x for cascade gating"
+        "rate_function": "(0.03 * Microglia_M2 * Abeta_Oligomer / (50 + Abeta_Oligomer) * Temperature_factor) / Age_factor",
+        "rate_function_display": "k_phago \u00d7 [M2] \u00d7 [A\u03b2_olig] / (Km + [A\u03b2_olig])"
       },
       "is_environment_aware": false,
       "compartment": "extracellular",
@@ -2885,7 +2840,7 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.008 * (IKK - 1) * (IKK > 1) * Temperature_factor",
+        "rate_function": "0.008 * (IKK - 10) * (IKK > 10) * Temperature_factor",
         "rate_function_display": "k_dephos \u00d7 max(0, [IKK] - IKK_basal)"
       },
       "is_environment_aware": false,
@@ -2968,11 +2923,11 @@
     },
     {
       "id": "T30",
-      "name": "CBD_Plasma_Clearance",
+      "name": "CBD_Systemic_Clearance",
       "label": "CBD_Systemic_Clearance\n(hepatic CYP3A4)\nelimination",
       "object_type": "transition",
-      "x": -2370.0,
-      "y": 880.0,
+      "x": -2080.0,
+      "y": 1070.0,
       "width": 15.0,
       "height": 60.0,
       "horizontal": false,
@@ -2995,8 +2950,7 @@
       "is_sink": true,
       "guard": 1,
       "properties": {
-        "rate_function": "0.00001 * CBD_plasma * Temperature_factor",
-        "rate_function_display": "k_clear x [CBD_plasma] slow t12 19h"
+        "rate_function": "0.00003 * CBD_extracellular * Temperature_factor"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -3568,119 +3522,6 @@
       "adaptive_filter": null,
       "volume_threshold": null,
       "prefer_continuous": null
-    },
-    {
-      "id": "T46",
-      "name": "Basal_SOD_Transcription",
-      "label": "Basal\nSOD\nTranscription",
-      "object_type": "transition",
-      "x": 810.0,
-      "y": 1680.0,
-      "width": 60.0,
-      "height": 15.0,
-      "horizontal": true,
-      "enabled": true,
-      "fill_color": [
-        0.0,
-        0.8,
-        0.0
-      ],
-      "border_color": [
-        0.0,
-        0.8,
-        0.0
-      ],
-      "border_width": 3.0,
-      "transition_type": "continuous",
-      "priority": 0,
-      "firing_policy": "race",
-      "is_source": true,
-      "is_sink": false,
-      "guard": 1,
-      "properties": {
-        "rate_function": "0.13 * Temperature_factor",
-        "rate_function_display": "k_basal"
-      },
-      "is_environment_aware": false,
-      "compartment": "cytoplasm",
-      "adaptive_filter": null,
-      "volume_threshold": null,
-      "prefer_continuous": null
-    },
-    {
-      "id": "T47",
-      "name": "Basal_HO1_Transcription",
-      "label": "Basal\nHO1\nTranscription",
-      "object_type": "transition",
-      "x": 800.0,
-      "y": 1480.0,
-      "width": 60.0,
-      "height": 15.0,
-      "horizontal": true,
-      "enabled": true,
-      "fill_color": [
-        0.0,
-        0.8,
-        0.0
-      ],
-      "border_color": [
-        0.0,
-        0.8,
-        0.0
-      ],
-      "border_width": 3.0,
-      "transition_type": "continuous",
-      "priority": 0,
-      "firing_policy": "race",
-      "is_source": true,
-      "is_sink": false,
-      "guard": 1,
-      "properties": {
-        "rate_function": "0.135 * Temperature_factor",
-        "rate_function_display": "k_basal"
-      },
-      "is_environment_aware": false,
-      "compartment": "cytoplasm",
-      "adaptive_filter": null,
-      "volume_threshold": null,
-      "prefer_continuous": null
-    },
-    {
-      "id": "T48",
-      "name": "CBD_BBB_Transfer",
-      "label": "CBD_Absorption\n(membrane permeation)\nFick's law",
-      "object_type": "transition",
-      "x": -2040.0,
-      "y": 810.0,
-      "width": 15.0,
-      "height": 60.0,
-      "horizontal": false,
-      "enabled": true,
-      "fill_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_width": 1.0,
-      "transition_type": "continuous",
-      "priority": 0,
-      "firing_policy": "race_with_resampling",
-      "is_source": false,
-      "is_sink": false,
-      "guard": 1,
-      "properties": {
-        "rate_function": "0.00005 * CBD_plasma * Temperature_factor",
-        "rate_function_display": "k_BBB x [CBD_plasma] slow t12 3.85h"
-      },
-      "is_environment_aware": false,
-      "adaptive_filter": null,
-      "volume_threshold": null,
-      "prefer_continuous": true
     }
   ],
   "arcs": [
@@ -4062,7 +3903,7 @@
       "target_id": "T8",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 0.1,
+      "threshold": 1,
       "color": [
         0.0,
         0.0,
@@ -4221,7 +4062,7 @@
       "name": "ROS_to_T11",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P19",
       "source_type": "place",
       "target_id": "T11",
@@ -4231,11 +4072,10 @@
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 2.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A29",
@@ -4248,7 +4088,7 @@
       "target_id": "T11",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 0,
+      "threshold": 1,
       "color": [
         0.0,
         0.0,
@@ -4877,7 +4717,7 @@
       "name": "Nrf2_to_T22",
       "label": "",
       "object_type": "arc",
-      "arc_type": "normal",
+      "arc_type": "signal_flow",
       "source_id": "P16",
       "source_type": "place",
       "target_id": "T22",
@@ -4885,12 +4725,14 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.0,
-        0.0,
-        0.0
+        0.7,
+        0.7,
+        0.7
       ],
       "width": 3.0,
-      "control_points": []
+      "control_points": [],
+      "consumes": true,
+      "produces": true
     },
     {
       "id": "A61",
@@ -5119,7 +4961,7 @@
       "name": "Absorption_to_CBD_intra",
       "label": "",
       "object_type": "arc",
-      "arc_type": "normal",
+      "arc_type": "signal_flow",
       "source_id": "T28",
       "source_type": "transition",
       "target_id": "P30",
@@ -5127,19 +4969,21 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.0,
-        0.0,
-        0.0
+        0.7,
+        0.7,
+        0.7
       ],
       "width": 3.000000000000001,
-      "control_points": []
+      "control_points": [],
+      "consumes": true,
+      "produces": true
     },
     {
       "id": "A73",
       "name": "CBD_intra_to_Efflux",
       "label": "",
       "object_type": "arc",
-      "arc_type": "normal",
+      "arc_type": "signal_flow",
       "source_id": "P30",
       "source_type": "place",
       "target_id": "T29",
@@ -5147,12 +4991,14 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.0,
-        0.0,
-        0.0
+        0.7,
+        0.7,
+        0.7
       ],
       "width": 3.000000000000001,
-      "control_points": []
+      "control_points": [],
+      "consumes": true,
+      "produces": true
     },
     {
       "id": "A74",
@@ -5180,7 +5026,7 @@
       "label": "",
       "object_type": "arc",
       "arc_type": "normal",
-      "source_id": "P43",
+      "source_id": "P1",
       "source_type": "place",
       "target_id": "T30",
       "target_type": "transition",
@@ -5199,7 +5045,7 @@
       "name": "CBD_intra_to_BrainMet",
       "label": "",
       "object_type": "arc",
-      "arc_type": "normal",
+      "arc_type": "signal_flow",
       "source_id": "P30",
       "source_type": "place",
       "target_id": "T31",
@@ -5207,12 +5053,14 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.0,
-        0.0,
-        0.0
+        0.7,
+        0.7,
+        0.7
       ],
       "width": 3.000000000000001,
-      "control_points": []
+      "control_points": [],
+      "consumes": true,
+      "produces": true
     },
     {
       "id": "A77",
@@ -5400,7 +5248,7 @@
       "name": "ROS_to_T40",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P19",
       "source_type": "place",
       "target_id": "T40",
@@ -5410,11 +5258,10 @@
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A87",
@@ -5441,21 +5288,20 @@
       "name": "TNFa_to_T14",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P11",
       "source_type": "place",
       "target_id": "T14",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 0.0,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A89",
@@ -5468,7 +5314,7 @@
       "target_id": "T14",
       "target_type": "transition",
       "weight": 1.0,
-      "threshold": 0.1,
+      "threshold": 1,
       "color": [
         0.0,
         0.0,
@@ -5719,86 +5565,6 @@
       ],
       "width": 3.0,
       "control_points": []
-    },
-    {
-      "id": "A101",
-      "name": "A101",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "normal",
-      "source_id": "T46",
-      "source_type": "transition",
-      "target_id": "P18",
-      "target_type": "place",
-      "weight": 1.0,
-      "threshold": 0.0,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 2.0,
-      "control_points": []
-    },
-    {
-      "id": "A102",
-      "name": "A102",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "normal",
-      "source_id": "T47",
-      "source_type": "transition",
-      "target_id": "P17",
-      "target_type": "place",
-      "weight": 1.0,
-      "threshold": 0.0,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 2.0,
-      "control_points": []
-    },
-    {
-      "id": "A103",
-      "name": "Plasma_to_BBB",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "normal",
-      "source_id": "P43",
-      "source_type": "place",
-      "target_id": "T48",
-      "target_type": "transition",
-      "weight": 1.0,
-      "threshold": null,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 3.000000000000001,
-      "control_points": []
-    },
-    {
-      "id": "A104",
-      "name": "BBB_to_Extracellular",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "normal",
-      "source_id": "T48",
-      "source_type": "transition",
-      "target_id": "P1",
-      "target_type": "place",
-      "weight": 1.0,
-      "threshold": null,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 3.000000000000001,
-      "control_points": []
     }
   ],
   "modules": [],
@@ -5811,12 +5577,12 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Abeta_Monomer": "Abeta_Monomer + DISEASE_SEVERITY * 1.0000"
+        "Abeta_Monomer": "Abeta_Monomer + DISEASE_SEVERITY * 0.1250"
       },
       "metadata": {
         "group": "install_disease",
         "target": "Abeta_Monomer",
-        "delta_per_severity_unit": 1.0,
+        "delta_per_severity_unit": 0.125,
         "purpose": "Install AD pathology in Abeta_Monomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
       }
     },
@@ -5828,12 +5594,12 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Abeta_Oligomer": "Abeta_Oligomer + DISEASE_SEVERITY * 1.0000"
+        "Abeta_Oligomer": "Abeta_Oligomer + DISEASE_SEVERITY * 7.2500"
       },
       "metadata": {
         "group": "install_disease",
         "target": "Abeta_Oligomer",
-        "delta_per_severity_unit": 1.0,
+        "delta_per_severity_unit": 7.25,
         "purpose": "Install AD pathology in Abeta_Oligomer. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
       }
     },
@@ -5845,12 +5611,12 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Abeta_Plaque": "Abeta_Plaque + DISEASE_SEVERITY * 1.0000"
+        "Abeta_Plaque": "Abeta_Plaque + DISEASE_SEVERITY * 2.5000"
       },
       "metadata": {
         "group": "install_disease",
         "target": "Abeta_Plaque",
-        "delta_per_severity_unit": 1.0,
+        "delta_per_severity_unit": 2.5,
         "purpose": "Install AD pathology in Abeta_Plaque. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
       }
     },
@@ -5862,7 +5628,7 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "NFkB_p65": "NFkB_p65 + DISEASE_SEVERITY * 20.0000"
+        "NFkB_p65": "NFkB_p65 + DISEASE_SEVERITY * 12.5000"
       },
       "metadata": {
         "group": "install_disease",
@@ -5879,7 +5645,7 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "ROS": "ROS + DISEASE_SEVERITY * 5.0000"
+        "ROS": "ROS + DISEASE_SEVERITY * 2.0000"
       },
       "metadata": {
         "group": "install_disease",
@@ -5896,7 +5662,7 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Microglia_M1": "Microglia_M1 + DISEASE_SEVERITY * 15.0000"
+        "Microglia_M1": "Microglia_M1 + DISEASE_SEVERITY * 10.0000"
       },
       "metadata": {
         "group": "install_disease",
@@ -5913,7 +5679,7 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Microglia_M2": "Microglia_M2 + DISEASE_SEVERITY * -10.0000"
+        "Microglia_M2": "Microglia_M2 + DISEASE_SEVERITY * -7.5000"
       },
       "metadata": {
         "group": "install_disease",
@@ -5947,7 +5713,7 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "Neuron_Health": "Neuron_Health + DISEASE_SEVERITY * -5.0000"
+        "Neuron_Health": "Neuron_Health + DISEASE_SEVERITY * -2.5000"
       },
       "metadata": {
         "group": "install_disease",
@@ -6032,12 +5798,12 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "APP_mRNA": "APP_mRNA + DISEASE_SEVERITY * 0.5000"
+        "APP_mRNA": "APP_mRNA + DISEASE_SEVERITY * 2.0000"
       },
       "metadata": {
         "group": "install_disease",
         "target": "APP_mRNA",
-        "delta_per_severity_unit": 0.5,
+        "delta_per_severity_unit": 2.0,
         "purpose": "Install AD pathology in APP_mRNA. Severity=0 \u2192 no-op (healthy control); Severity=2 \u2192 reproduces v2 AD baseline; Severity=3 \u2192 ~150% AD."
       }
     },
@@ -6049,7 +5815,43 @@
       "use_values_from_trigger_time": true,
       "priority": 0,
       "assignments": {
-        "CBD_plasma": "CBD_plasma + LOADING_DOSE"
+        "CBD_extracellular": "CBD_extracellular + LOADING_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_1",
+      "name": "evt_maint_1",
+      "trigger": "t >  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_2",
+      "name": "evt_maint_2",
+      "trigger": "t > 2 *  DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
+      },
+      "metadata": {}
+    },
+    {
+      "id": "evt_maint_3",
+      "name": "evt_maint_3",
+      "trigger": "t >  3* DOSE_INTERVAL",
+      "delay": 0.0,
+      "use_values_from_trigger_time": true,
+      "priority": 0,
+      "assignments": {
+        "CBD_extracellular": "CBD_extracellular + MAINT_DOSE"
       },
       "metadata": {}
     },
@@ -6064,496 +5866,9 @@
         "Temperature_factor": "2**(((TEMPERATURE - 273.15) - 37)/10)",
         "Age_factor": "1 + 0.02*(AGE - 65)",
         "pH_acidosis": "max(0, 7.0 - PH)",
-        "pH_neutrality": "1 - 0.3*abs(PH - 7.4)",
-        "Disease_Drive": "DISEASE_SEVERITY"
+        "pH_neutrality": "1 - 0.3*abs(PH - 7.4)"
       },
       "metadata": {}
-    },
-    {
-      "id": "evt_maint_01",
-      "name": "evt_maint_01",
-      "trigger": "t > 1 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 1,
-        "nominal_time_hours": 6
-      }
-    },
-    {
-      "id": "evt_maint_02",
-      "name": "evt_maint_02",
-      "trigger": "t > 2 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 2,
-        "nominal_time_hours": 12
-      }
-    },
-    {
-      "id": "evt_maint_03",
-      "name": "evt_maint_03",
-      "trigger": "t > 3 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 3,
-        "nominal_time_hours": 18
-      }
-    },
-    {
-      "id": "evt_maint_04",
-      "name": "evt_maint_04",
-      "trigger": "t > 4 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 4,
-        "nominal_time_hours": 24
-      }
-    },
-    {
-      "id": "evt_maint_05",
-      "name": "evt_maint_05",
-      "trigger": "t > 5 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 5,
-        "nominal_time_hours": 30
-      }
-    },
-    {
-      "id": "evt_maint_06",
-      "name": "evt_maint_06",
-      "trigger": "t > 6 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 6,
-        "nominal_time_hours": 36
-      }
-    },
-    {
-      "id": "evt_maint_07",
-      "name": "evt_maint_07",
-      "trigger": "t > 7 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 7,
-        "nominal_time_hours": 42
-      }
-    },
-    {
-      "id": "evt_maint_08",
-      "name": "evt_maint_08",
-      "trigger": "t > 8 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 8,
-        "nominal_time_hours": 48
-      }
-    },
-    {
-      "id": "evt_maint_09",
-      "name": "evt_maint_09",
-      "trigger": "t > 9 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 9,
-        "nominal_time_hours": 54
-      }
-    },
-    {
-      "id": "evt_maint_10",
-      "name": "evt_maint_10",
-      "trigger": "t > 10 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 10,
-        "nominal_time_hours": 60
-      }
-    },
-    {
-      "id": "evt_maint_11",
-      "name": "evt_maint_11",
-      "trigger": "t > 11 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 11,
-        "nominal_time_hours": 66
-      }
-    },
-    {
-      "id": "evt_maint_12",
-      "name": "evt_maint_12",
-      "trigger": "t > 12 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 12,
-        "nominal_time_hours": 72
-      }
-    },
-    {
-      "id": "evt_maint_13",
-      "name": "evt_maint_13",
-      "trigger": "t > 13 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 13,
-        "nominal_time_hours": 78
-      }
-    },
-    {
-      "id": "evt_maint_14",
-      "name": "evt_maint_14",
-      "trigger": "t > 14 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 14,
-        "nominal_time_hours": 84
-      }
-    },
-    {
-      "id": "evt_maint_15",
-      "name": "evt_maint_15",
-      "trigger": "t > 15 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 15,
-        "nominal_time_hours": 90
-      }
-    },
-    {
-      "id": "evt_maint_16",
-      "name": "evt_maint_16",
-      "trigger": "t > 16 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 16,
-        "nominal_time_hours": 96
-      }
-    },
-    {
-      "id": "evt_maint_17",
-      "name": "evt_maint_17",
-      "trigger": "t > 17 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 17,
-        "nominal_time_hours": 102
-      }
-    },
-    {
-      "id": "evt_maint_18",
-      "name": "evt_maint_18",
-      "trigger": "t > 18 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 18,
-        "nominal_time_hours": 108
-      }
-    },
-    {
-      "id": "evt_maint_19",
-      "name": "evt_maint_19",
-      "trigger": "t > 19 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 19,
-        "nominal_time_hours": 114
-      }
-    },
-    {
-      "id": "evt_maint_20",
-      "name": "evt_maint_20",
-      "trigger": "t > 20 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 20,
-        "nominal_time_hours": 120
-      }
-    },
-    {
-      "id": "evt_maint_21",
-      "name": "evt_maint_21",
-      "trigger": "t > 21 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 21,
-        "nominal_time_hours": 126
-      }
-    },
-    {
-      "id": "evt_maint_22",
-      "name": "evt_maint_22",
-      "trigger": "t > 22 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 22,
-        "nominal_time_hours": 132
-      }
-    },
-    {
-      "id": "evt_maint_23",
-      "name": "evt_maint_23",
-      "trigger": "t > 23 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 23,
-        "nominal_time_hours": 138
-      }
-    },
-    {
-      "id": "evt_maint_24",
-      "name": "evt_maint_24",
-      "trigger": "t > 24 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 24,
-        "nominal_time_hours": 144
-      }
-    },
-    {
-      "id": "evt_maint_25",
-      "name": "evt_maint_25",
-      "trigger": "t > 25 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 25,
-        "nominal_time_hours": 150
-      }
-    },
-    {
-      "id": "evt_maint_26",
-      "name": "evt_maint_26",
-      "trigger": "t > 26 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 26,
-        "nominal_time_hours": 156
-      }
-    },
-    {
-      "id": "evt_maint_27",
-      "name": "evt_maint_27",
-      "trigger": "t > 27 * DOSE_INTERVAL",
-      "delay": 0.0,
-      "use_values_from_trigger_time": true,
-      "priority": 0,
-      "assignments": {
-        "CBD_plasma": "CBD_plasma + MAINT_DOSE"
-      },
-      "metadata": {
-        "group": "maintenance_dose",
-        "target": "CBD_plasma",
-        "purpose": "G4: chronic 7-d dosing \u2014 one event per 6h interval",
-        "dose_index": 27,
-        "nominal_time_hours": 162
-      }
     }
   ]
 }
