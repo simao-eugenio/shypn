@@ -103,6 +103,20 @@ def _run_replicate_chunk(
     dt = time_step if time_step else controller.settings.get_effective_dt()
     max_steps = int(duration / dt)
 
+    # Auto-decimate snapshots for long horizons so the data-collector's
+    # per-step append + pre-allocated numpy buffer don't explode RAM on
+    # multi-day runs.  Mirrors the GPU hybrid path (~L1297-1313).  Default
+    # ``recording_time_interval`` is 0.05 s (20 Hz), giving ~120 M records
+    # per replicate at 7-day horizons; cap at ~5 000 records / replicate.
+    # User-customized ``recording_time_interval`` (≠ 0.05) is respected.
+    _TARGET_SNAPSHOTS = 5000
+    _dc = controller.data_collector
+    _user_rec_iv = getattr(_dc, 'recording_time_interval', 0.05)
+    if _user_rec_iv == 0.05:
+        _dc.recording_time_interval = max(dt, duration / _TARGET_SNAPSHOTS)
+    _eff_rec_iv = _dc.recording_time_interval
+    n_records_hint = int(duration / max(_eff_rec_iv, dt)) + 16
+
     initial_marking = {p.id: p.tokens for p in model.places}
 
     # Pre-create tau-leaping engine (mirrors main-process logic)
@@ -154,7 +168,7 @@ def _run_replicate_chunk(
         # Data collection
         _use_buf = termination_condition != "steady_state"
         controller.data_collector.start_collection(
-            n_steps_hint=max_steps + 1 if _use_buf else None,
+            n_steps_hint=n_records_hint if _use_buf else None,
             skip_rate_eval=True,
         )
         controller.data_collector.record_state(controller.time)
@@ -489,6 +503,26 @@ class ReplicateRunner:
         dt = time_step if time_step else controller.settings.get_effective_dt()
         max_steps = int(duration / dt)
 
+        # Auto-decimate snapshots for long horizons so the data-collector's
+        # per-step append + pre-allocated numpy buffer don't explode RAM on
+        # multi-day runs.  Mirrors the GPU hybrid path (~L1297-1313).
+        # Default ``recording_time_interval`` is 0.05 s (20 Hz), giving ~120 M
+        # records per replicate at 7-day horizons; cap at ~5 000 records /
+        # replicate.  User-customized rec_iv (≠ 0.05) is respected.
+        _TARGET_SNAPSHOTS = 5000
+        _user_rec_iv = getattr(controller.data_collector, 'recording_time_interval', 0.05)
+        if _user_rec_iv == 0.05:
+            controller.data_collector.recording_time_interval = max(
+                dt, duration / _TARGET_SNAPSHOTS
+            )
+        _eff_rec_iv = controller.data_collector.recording_time_interval
+        n_records_hint = int(duration / max(_eff_rec_iv, dt)) + 16
+        if verbose:
+            print(
+                f"  CPU replicates: dt={dt}, recording_interval={_eff_rec_iv:.4g}s "
+                f"→ ~{n_records_hint} records/replicate (was {max_steps + 1})"
+            )
+
         # Snapshot the initial model marking so we can restore it each replicate
         initial_marking = {p.id: p.tokens for p in self.model.places}
 
@@ -580,7 +614,7 @@ class ReplicateRunner:
             # finalize_buf() converts the buffer to the dict format.
             _use_buf = termination_condition != "steady_state"
             controller.data_collector.start_collection(
-                n_steps_hint=max_steps + 1 if _use_buf else None,
+                n_steps_hint=n_records_hint if _use_buf else None,
                 skip_rate_eval=True,
             )
             # Record initial state at t=0
