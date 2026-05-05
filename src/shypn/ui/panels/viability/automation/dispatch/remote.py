@@ -28,8 +28,26 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 # Pre-compiled regexes — the hot path runs once per CLI line.
+#
+# CLI line shapes (sweep_runner.py, --verbose):
+#   start: "[1/8] Baseline (30 replicates)..."
+#   done : "[done 3/8] Baseline in 4681.9s (30 ok, 0 errors) [cpu=...]"
+#
+# The explicit row index on the *done* line is required because the
+# CLI submits conditions to a process pool with sliding-window
+# parallelism: when workers >= conditions, every [i/N] start line
+# emits before any condition finishes, so we cannot pair a bare
+# 'done in Xs' against the most-recent start.
 _RE_ROW_START = re.compile(r'^\[(\d+)/(\d+)\]\s+(.+?)\s+\(')
-_RE_ROW_DONE = re.compile(r'^\s*done in ([\d.]+)s\s+\((\d+)\s+ok,\s+(\d+)\s+error')
+_RE_ROW_DONE = re.compile(
+    r'^\[done\s+(\d+)/(\d+)\]\s+(.+?)\s+in\s+([\d.]+)s\s+'
+    r'\((\d+)\s+ok,\s+(\d+)\s+error'
+)
+# Legacy bare-form, kept so older server engines still produce some
+# (best-effort, last-row) progress instead of nothing.
+_RE_ROW_DONE_LEGACY = re.compile(
+    r'^\s*done in ([\d.]+)s\s+\((\d+)\s+ok,\s+(\d+)\s+error'
+)
 
 
 class RemoteSweepDispatchController(SweepDispatchController):
@@ -98,6 +116,8 @@ class RemoteSweepDispatchController(SweepDispatchController):
         m_start = _RE_ROW_START.match(text)
         if m_start:
             cond_idx = int(m_start.group(1)) - 1
+            # Track for the legacy fallback path only; the new explicit
+            # done-line carries its own index and does not consult this.
             self._current_row = cond_idx
             if 0 <= cond_idx < self._n_total:
                 GLib.idle_add(self._dispatch_row_started, cond_idx)
@@ -106,12 +126,25 @@ class RemoteSweepDispatchController(SweepDispatchController):
 
         m_done = _RE_ROW_DONE.match(text)
         if m_done:
-            wall = float(m_done.group(1))
-            ok = int(m_done.group(2))
-            errors = int(m_done.group(3))
+            row = int(m_done.group(1)) - 1
+            wall = float(m_done.group(4))
+            ok = int(m_done.group(5))
+            errors = int(m_done.group(6))
+            if 0 <= row < self._n_total:
+                GLib.idle_add(
+                    self._dispatch_row_completed, row, ok, errors, wall)
+            GLib.idle_add(self._dispatch_status, text, 'info')
+            return
+
+        m_done_legacy = _RE_ROW_DONE_LEGACY.match(text)
+        if m_done_legacy:
+            wall = float(m_done_legacy.group(1))
+            ok = int(m_done_legacy.group(2))
+            errors = int(m_done_legacy.group(3))
             row = self._current_row if self._current_row is not None else -1
             if 0 <= row < self._n_total:
-                GLib.idle_add(self._dispatch_row_completed, row, ok, errors, wall)
+                GLib.idle_add(
+                    self._dispatch_row_completed, row, ok, errors, wall)
             GLib.idle_add(self._dispatch_status, text, 'info')
             return
 
