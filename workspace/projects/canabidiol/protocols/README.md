@@ -1,7 +1,34 @@
 # Canabidiol-AD protocols — index
 
 One self-contained markdown per protocol, paired with the exact model
-file used. Convention: `P<id>__<model_version>.md`.
+file used. Convention: `P<id>__<model_version>.md` (early protocols)
+and `Q<n>__<model_tag>.md` (biological-question protocols against the
+calibrated model).
+
+## Active suite — calibrated model (post B1+B2+B3+B7)
+
+All five biological-question protocols below pair with
+[`models/canabidiol-q1-testable-pk-energy.shy`](../models/canabidiol-q1-testable-pk-energy.shy)
+as validated by `run_20260507_151546`. Dispatch from the Viability
+panel in the UI.
+
+| Question | Topic | Sims | File |
+|---|---|---:|---|
+| Q1 | CBD IC₅₀ on NFκB activation | 270 | [Q1__cal.md](Q1__cal.md) |
+| Q2 | Aβ aggregation as stochastic bistable switch | 600 | [Q2__cal.md](Q2__cal.md) |
+| Q3 | Microglial M1/M2 polarisation under CBD | 210 | [Q3__cal.md](Q3__cal.md) |
+| Q4 | Inflammation–neuroprotection dissociation (ADAPT-style) | 510 | [Q4__cal.md](Q4__cal.md) |
+| Q5 | Age-dependent CBD mechanism switch | 750 | [Q5__cal.md](Q5__cal.md) |
+
+**Total budget:** 2340 simulations across the five protocols.
+
+**Recommended dispatch order:** Q1 → Q3 → Q4 → Q2 → Q5.
+Q1 establishes IC₅₀ for the inflammatory arm; Q3 confirms the
+M1/M2 coupling; Q4 is the headline therapeutic-window factorial;
+Q2 (high-replicate, drug-free) tests intrinsic bistability;
+Q5 closes with the age axis (largest budget, deepest analysis).
+
+## Archived suite — pre-calibration
 
 | Protocol | Model | Sims | Status | File |
 |---|---|---:|---|---|
