@@ -244,6 +244,16 @@ def _run_replicate_chunk(
         _req = engine_stats.get('requested_firings', 0)
         _trunc = engine_stats.get('truncated_firings', 0)
         engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+        # TMD-1: attach the init-time timescale audit profile (if any)
+        # so sweep aggregators can surface C20/C21/C22 in summary.csv
+        # / provenance.json. Profile is identical across replicates of
+        # one condition (deterministic on M₀), but cheap to copy.
+        _tmd = getattr(controller, 'last_timescale_profile', None)
+        if _tmd is not None:
+            try:
+                engine_stats['timescale_audit'] = _tmd.to_dict()
+            except Exception:
+                pass
         if engine_stats['truncation_fraction'] > 0.05:
             import warnings as _w
             _w.warn(
@@ -741,6 +751,13 @@ class ReplicateRunner:
             _req = engine_stats.get('requested_firings', 0)
             _trunc = engine_stats.get('truncated_firings', 0)
             engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+            # TMD-1: see _run_replicate_chunk for rationale.
+            _tmd = getattr(controller, 'last_timescale_profile', None)
+            if _tmd is not None:
+                try:
+                    engine_stats['timescale_audit'] = _tmd.to_dict()
+                except Exception:
+                    pass
             if engine_stats['truncation_fraction'] > 0.05 and verbose:
                 print(
                     f"  ⚠ [low-copy bias] replicate {i}: "

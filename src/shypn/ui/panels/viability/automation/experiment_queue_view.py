@@ -256,6 +256,92 @@ class ExperimentQueueView(Gtk.Box):
         # Keep legacy attribute name for callers that do
         # ``self.queue_view.status_label.set_markup(...)``
         self.status_label = _StatusLabelCompat(self)
+
+        # ── TMD-1 (timescale-mismatch) EventBus subscription ──────────
+        # The simulation controller emits 'simulation.timescale_audit'
+        # at construction time (see engine/simulation/controller.py
+        # ::_run_timescale_audit). Mirror those findings into the
+        # activity log so modellers see them next to dispatch events
+        # without having to scroll through stderr.
+        self._tmd_subscribed = False
+        try:
+            from shypn.events import EventBus
+            EventBus.subscribe(
+                'simulation.timescale_audit',
+                self._on_timescale_audit_event,
+            )
+            self._tmd_subscribed = True
+        except Exception:  # pragma: no cover - never break panel build
+            pass
+
+        # Disconnect on widget destroy so handlers don't fire against
+        # a dead Gtk widget after the document is closed.
+        self.connect('destroy', self._on_destroy_unsub_tmd)
+
+    def _on_destroy_unsub_tmd(self, *_args):
+        if not getattr(self, '_tmd_subscribed', False):
+            return
+        try:
+            from shypn.events import EventBus
+            EventBus.unsubscribe(
+                'simulation.timescale_audit',
+                self._on_timescale_audit_event,
+            )
+        except Exception:
+            pass
+        self._tmd_subscribed = False
+
+    def _on_timescale_audit_event(self, data):
+        """Render a TMD-1 audit event into the activity log.
+
+        The payload shape (see SimulationController._run_timescale_audit):
+            {'profile': {...}, 'n_findings': int,
+             'critical_transitions': [tid, ...], 'mode': 'warn'|'error'|'off'}
+
+        Categorisation:
+            - critical (C20) → 'error' / red
+            - warnings only  → 'event' / orange
+            - clean          → 'info'  / grey (suppressed unless dt is
+              the recommended_dt — the no-news case is just noise)
+        """
+        try:
+            n_findings = int(data.get('n_findings', 0) or 0)
+            critical = list(data.get('critical_transitions') or [])
+            profile = data.get('profile') or {}
+            dt = profile.get('dt')
+            tau_min = profile.get('tau_min')
+            stiff = profile.get('stiffness_ratio') or 0.0
+            rec_dt = profile.get('recommended_dt')
+
+            def _fmt(x, fmt='.3g'):
+                if x is None:
+                    return '?'
+                try:
+                    return format(float(x), fmt)
+                except Exception:
+                    return str(x)
+
+            if critical:
+                msg = (f"TMD C20: {len(critical)} critical "
+                       f"τ < {_fmt(0.1 * float(dt)) if dt else '?'}s "
+                       f"(τ_min={_fmt(tau_min)}s, recommended dt ≤ "
+                       f"{_fmt(rec_dt)}s)")
+                category = 'error'
+            elif n_findings:
+                msg = (f"TMD: {n_findings} finding(s) "
+                       f"stiffness={_fmt(stiff)}, τ_min={_fmt(tau_min)}s, "
+                       f"recommended dt ≤ {_fmt(rec_dt)}s")
+                category = 'event'
+            else:
+                # Clean audit — suppress to keep the log focused.
+                return
+
+            # Marshal to GTK main thread; emit() warns on cross-thread
+            # but be defensive in case a background dispatcher slips one
+            # through.
+            GLib.idle_add(self.append_status, msg, category)
+        except Exception:
+            pass
     
     def add_experiment(self, name, snapshot_index):
         """Add experiment to queue.

@@ -167,10 +167,41 @@ class CSVSimulationExporter:
                     
                     writer.writerow(row)
             
+            # TMD-1 sidecar: drop <filepath>.tmd.json next to the CSV when
+            # an init-time timescale audit profile was captured. Keeps the
+            # CSV schema unchanged while making the diagnostic discoverable
+            # for any downstream analysis script (and for human review).
+            self._write_timescale_sidecar(filepath)
+
             return True
         except Exception as e:
             logger.error("Error exporting CSV (wide): %s", e)
             return False
+    
+    def _write_timescale_sidecar(self, csv_filepath: str) -> None:
+        """Write a TMD-1 sidecar JSON next to the CSV, if a profile is present.
+
+        The profile is the dict produced by
+        ``TimescaleProfile.to_dict()`` — see
+        ``engine/simulation/checkers/timescale_auditor.py`` for the schema
+        and codes (C20/C21/C22).
+
+        Sidecar path: ``<csv>.tmd.json``. Silent no-op when no profile.
+        Errors are logged but never raised — exporters must succeed even
+        if the sidecar fails.
+        """
+        profile = self.simulation_data.get('timescale_audit')
+        if not profile:
+            return
+        try:
+            import json
+            import os
+            sidecar = csv_filepath + '.tmd.json'
+            with open(sidecar, 'w', encoding='utf-8') as fh:
+                json.dump(profile, fh, indent=2, sort_keys=True)
+        except Exception as exc:  # pragma: no cover - sidecar must not break export
+            logger.warning("Failed to write TMD sidecar for %s: %s",
+                           csv_filepath, exc)
     
     def export_timeseries_long(self, filepath: str) -> bool:
         """Export time series in long/tidy format.
@@ -224,6 +255,7 @@ class CSVSimulationExporter:
                                 'firings'
                             ])
             
+            self._write_timescale_sidecar(filepath)
             return True
         except Exception as e:
             logger.error("Error exporting CSV (long): %s", e)
@@ -298,6 +330,7 @@ class CSVSimulationExporter:
                         'firings'
                     ])
             
+            self._write_timescale_sidecar(filepath)
             return True
         except Exception as e:
             logger.error("Error exporting CSV (summary): %s", e)

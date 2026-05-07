@@ -58,6 +58,16 @@ from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
 from shypn.engine.simulation.abstract_controller import AbstractSimulationController
 
+
+class TimescaleMismatchError(RuntimeError):
+    """TMD-1: raised when ``RecordingConfig.timescale_check == "error"``
+    and the init-time audit found at least one transition with
+    ``τ < safety_factor · dt``.
+
+    See ``checkers/timescale_auditor.py`` for codes C20/C21/C22.
+    """
+
+
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
     
@@ -295,9 +305,113 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             logging.getLogger(__name__).debug(
                 "arc_type audit skipped due to exception", exc_info=True
             )
+
+        # TMD-1 init-time integration-step adequacy audit.
+        # Non-blocking unless RecordingConfig.timescale_check == "error".
+        # Last assessment is cached on ``self.last_timescale_profile`` for
+        # the UI / sweep aggregator to surface.
+        self.last_timescale_profile: Optional[Any] = None
+        self._timescale_check_mode: str = getattr(
+            recording_config, "timescale_check", "warn"
+        )
+        self._timescale_safety_factor: float = float(
+            getattr(recording_config, "timescale_dt_safety_factor", 0.1)
+        )
+        try:
+            self._run_timescale_audit()
+        except Exception:  # pragma: no cover - audit must never break load
+            logging.getLogger(__name__).debug(
+                "timescale audit skipped due to exception", exc_info=True
+            )
     
     # ==================== Lifecycle Management ====================
     
+    def _run_timescale_audit(self) -> None:
+        """TMD-1 init-time integration-step adequacy audit.
+
+        Evaluates each continuous/adaptive transition's local timescale
+        ``τ = M / (W · r(M₀))`` against the configured ``dt`` and emits
+        warnings (or raises, depending on ``recording_config.timescale_check``)
+        for transitions whose τ < ``safety_factor · dt``.
+
+        The full TimescaleProfile is cached on
+        ``self.last_timescale_profile`` for downstream consumers
+        (UI panel, sweep summary, replicate engine_stats).
+
+        Skipped silently when ``timescale_check == "off"``.
+
+        See:
+            * ``checkers/timescale_auditor.py`` for codes C20/C21/C22.
+            * ``workspace/projects/canabidiol/docs/engine_time_and_stiffness.md``
+              for the full TMD design and rationale.
+        """
+        if self._timescale_check_mode == "off":
+            return
+
+        # Resolve effective dt — settings.get_effective_dt() if available,
+        # else fall back to the conservative default.
+        try:
+            dt = float(self.settings.get_effective_dt())
+        except Exception:  # noqa: BLE001
+            dt = 1.0
+        if dt <= 0:
+            return
+
+        from shypn.engine.simulation.checkers import audit_timescales
+        profile = audit_timescales(
+            self.model, dt=dt, safety_factor=self._timescale_safety_factor
+        )
+        self.last_timescale_profile = profile
+
+        # Emit a one-shot EventBus notification so the GUI status bar /
+        # notification panel can surface a "⚠ TMD: N findings" badge
+        # without having to poll the controller. Only emit when we have
+        # a real document_id (GUI canvas path); skip for sweep / headless
+        # controllers — they run on background threads and their findings
+        # are surfaced via provenance.json + summary.csv instead.
+        if self.document_id:
+            try:
+                EventBus.emit(
+                    'simulation.timescale_audit',
+                    {
+                        'profile': profile.to_dict(),
+                        'n_findings': len(profile.findings),
+                        'critical_transitions': list(profile.critical_transitions),
+                        'mode': self._timescale_check_mode,
+                    },
+                    document_id=self.document_id,
+                )
+            except Exception:  # pragma: no cover - never break load
+                logging.getLogger(__name__).debug(
+                    "EventBus emit for timescale_audit failed", exc_info=True
+                )
+
+        critical = profile.critical_transitions
+        if not critical:
+            return
+
+        if self._timescale_check_mode == "error":
+            tids = ", ".join(critical[:5]) + ("…" if len(critical) > 5 else "")
+            raise TimescaleMismatchError(
+                f"Timescale mismatch: {len(critical)} transition(s) "
+                f"violate τ < {self._timescale_safety_factor} · dt "
+                f"({tids}). Recommended dt ≤ {profile.recommended_dt:.3g}s. "
+                f"See log for per-transition decision recipes."
+            )
+
+        # mode == "warn" (default): emit one summary RuntimeWarning so it
+        # surfaces in `python -W error`/CI without spamming per-transition.
+        # Per-transition messages are already logged by the auditor.
+        import warnings
+        warnings.warn(
+            f"[TMD] Timescale mismatch: {len(critical)} transition(s) "
+            f"violate τ < {self._timescale_safety_factor} · dt={dt:.3g}s. "
+            f"Recommended dt ≤ {profile.recommended_dt:.3g}s. See log for "
+            f"per-transition recipes.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
     def reset(self) -> None:
         """Reset controller to initial state for new model load.
         
@@ -2532,6 +2646,23 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         Returns:
             bool: True if started successfully, False if already running
         """
+        # TMD-1: re-run the timescale audit at simulation-start. The
+        # __init__ pass may have fired against a still-empty model
+        # (canvas constructed before the .shy load completed), leaving
+        # ``last_timescale_profile`` with ``n_transitions_assessed=0``.
+        # By the time run() is invoked the model is fully populated and
+        # the configured dt is final, so the audit produces actionable
+        # numbers and the EventBus notification reaches the activity log
+        # right when the user presses Run.
+        try:
+            self._run_timescale_audit()
+        except TimescaleMismatchError:
+            raise  # 'error' mode — propagate to caller
+        except Exception:  # pragma: no cover - audit must never break run
+            logging.getLogger(__name__).debug(
+                "pre-run timescale audit skipped due to exception", exc_info=True
+            )
+
         return bool(self._continuous_executor.run(time_step, max_steps))
 
     def _simulation_loop(self) -> bool:
