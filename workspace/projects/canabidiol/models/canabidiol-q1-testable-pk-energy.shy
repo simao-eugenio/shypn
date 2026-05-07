@@ -1,20 +1,20 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-06T13:37:05.063773",
+    "created": "2026-05-07T09:25:43.300653",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
-      "places": 44,
-      "transitions": 48,
-      "arcs": 105,
+      "places": 46,
+      "transitions": 49,
+      "arcs": 109,
       "modules": 0
     }
   },
   "view_state": {
-    "zoom": 0.3104606615295841,
-    "pan_x": 3362.0042157899297,
-    "pan_y": 498.46308666823506,
+    "zoom": 0.8857805000000196,
+    "pan_x": 343.912211286663,
+    "pan_y": -1366.3267493751703,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1806,6 +1806,106 @@
       "neighbor_compartments": [],
       "spatial_position": null,
       "compartment": "environment"
+    },
+    {
+      "id": "P44",
+      "name": "NADPH",
+      "label": "NADPH",
+      "metadata": {
+        "kind": "energy_currency",
+        "added_by": "add_energy_pool.py"
+      },
+      "object_type": "place",
+      "x": 1060.0,
+      "y": 1920.0,
+      "radius": 40.0,
+      "marking": 100.0,
+      "initial_marking": 100.0,
+      "capacity": 1,
+      "border_color": [
+        0.8,
+        0.5,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": true,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "cytoplasm",
+      "properties": {
+        "thermodynamics": {
+          "compound_id": "C00005",
+          "compound_name": "NADPH",
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
+    },
+    {
+      "id": "P45",
+      "name": "NADP_plus",
+      "label": "NADP_plus",
+      "metadata": {
+        "kind": "energy_currency",
+        "added_by": "add_energy_pool.py"
+      },
+      "object_type": "place",
+      "x": 1250.0,
+      "y": 1920.0,
+      "radius": 40.0,
+      "marking": 10.0,
+      "initial_marking": 10.0,
+      "capacity": 1,
+      "border_color": [
+        0.8,
+        0.5,
+        0.0
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": true,
+      "is_parameter_place": false,
+      "parameter_kind": null,
+      "parameter_units": null,
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null,
+      "compartment": "cytoplasm",
+      "properties": {
+        "thermodynamics": {
+          "charge": 0,
+          "n_protons": 0,
+          "conditions": {
+            "pH": 7.0,
+            "temperature": 298.15,
+            "ionic_strength": 0.1
+          }
+        }
+      }
     }
   ],
   "transitions": [
@@ -1961,7 +2061,10 @@
         "P5"
       ],
       "is_environment_aware": true,
-      "compartment": "extracellular"
+      "compartment": "extracellular",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null
     },
     {
       "id": "T5",
@@ -2077,8 +2180,8 @@
         "rate_function_display": "k_tx \u00d7 [NF\u03baB_p65]"
       },
       "signal_places": [
-        "P9",
-        "P39"
+        "P39",
+        "P9"
       ],
       "is_environment_aware": true,
       "compartment": "nucleus",
@@ -2478,12 +2581,12 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
-        "P22",
+        "P11",
         "P39",
-        "P40",
-        "P6",
         "P41",
-        "P11"
+        "P22",
+        "P6",
+        "P40"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2524,10 +2627,10 @@
         "rate_function_display": "k_res \u00d7 [M1] \u00d7 (f([PPAR\u03b3]) + f([A2A]))"
       },
       "signal_places": [
-        "P21",
-        "P27",
+        "P26",
         "P40",
-        "P26"
+        "P21",
+        "P27"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2606,12 +2709,12 @@
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
+        "P11",
         "P39",
-        "P40",
-        "P6",
-        "P41",
         "P19",
-        "P11"
+        "P41",
+        "P6",
+        "P40"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2652,10 +2755,10 @@
         "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
       },
       "signal_places": [
-        "P9",
-        "P23",
         "P39",
-        "P24"
+        "P24",
+        "P9",
+        "P23"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2920,7 +3023,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "5.0 * CBD_extracellular * Temperature_factor"
+        "rate_function": "0.05 * CBD_extracellular * Temperature_factor"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -3410,7 +3513,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.06 * GSSG"
+        "rate_function": "0.06 * GSSG * NADPH / (50 + NADPH)"
       },
       "is_environment_aware": false,
       "compartment": "intracellular",
@@ -3671,13 +3774,72 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.000006 * CBD_plasma * Temperature_factor",
+        "rate_function": "0.0005 * CBD_plasma * Temperature_factor",
         "rate_function_display": "k_BBB x [CBD_plasma] slow t12 3.85h"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
       "volume_threshold": null,
       "prefer_continuous": true
+    },
+    {
+      "id": "T49",
+      "name": "NADPH_Regeneration",
+      "label": "NADPH_Regeneration",
+      "metadata": {
+        "added_by": "add_energy_pool.py"
+      },
+      "object_type": "transition",
+      "x": 1160.0,
+      "y": 1790.0,
+      "width": 60.0,
+      "height": 15.0,
+      "horizontal": true,
+      "enabled": true,
+      "fill_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "border_width": 1.5,
+      "transition_type": "continuous",
+      "priority": 0,
+      "firing_policy": "single",
+      "is_source": false,
+      "is_sink": false,
+      "guard": 1,
+      "earliest_time": 0.0,
+      "latest_time": 0.0,
+      "properties": {
+        "rate_function": "1.0 * NADP_plus / (5 + NADP_plus) * (1 - 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer)) * Temperature_factor",
+        "rate_function_display": "1.0 * NADP_plus / (5 + NADP_plus) * (1 - 0.5 * Abeta_Oligomer / (50 + Abeta_Oligomer)) * Temperature_factor",
+        "earliest_time": 0.0,
+        "latest_time": 0.0
+      },
+      "is_environment_aware": false,
+      "module_id": "",
+      "compartment": "cytoplasm",
+      "adaptive_filter": null,
+      "volume_threshold": null,
+      "prefer_continuous": null,
+      "kinetic_metadata": {
+        "source": "unknown",
+        "source_file": null,
+        "timestamp": "2026-05-07T09:19:24.271881",
+        "confidence": "unknown",
+        "confidence_score": 0.0,
+        "rate_type": null,
+        "formula": null,
+        "parameters": {},
+        "needs_review": false,
+        "manually_edited": false,
+        "locked": false
+      }
     }
   ],
   "arcs": [
@@ -5566,7 +5728,7 @@
         0.0,
         0.0
       ],
-      "width": 2.0,
+      "width": 3.0,
       "control_points": []
     },
     {
@@ -5586,7 +5748,7 @@
         0.0,
         0.0
       ],
-      "width": 2.0,
+      "width": 3.0,
       "control_points": []
     },
     {
@@ -5833,6 +5995,86 @@
         0.0
       ],
       "width": 2.0,
+      "control_points": []
+    },
+    {
+      "id": "A106",
+      "name": "A106",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P45",
+      "source_type": "place",
+      "target_id": "T49",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A107",
+      "name": "A107",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T49",
+      "source_type": "transition",
+      "target_id": "P44",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A108",
+      "name": "A108",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "P44",
+      "source_type": "place",
+      "target_id": "T41",
+      "target_type": "transition",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
+      "control_points": []
+    },
+    {
+      "id": "A109",
+      "name": "A109",
+      "label": "",
+      "object_type": "arc",
+      "arc_type": "normal",
+      "source_id": "T41",
+      "source_type": "transition",
+      "target_id": "P45",
+      "target_type": "place",
+      "weight": 1.0,
+      "threshold": 0.0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "width": 3.0,
       "control_points": []
     }
   ],

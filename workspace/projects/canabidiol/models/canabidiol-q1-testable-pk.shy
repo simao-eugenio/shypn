@@ -2920,7 +2920,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "5.0 * CBD_extracellular * Temperature_factor"
+        "rate_function": "0.05 * CBD_extracellular * Temperature_factor"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -3671,7 +3671,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "0.000006 * CBD_plasma * Temperature_factor",
+        "rate_function": "0.0005 * CBD_plasma * Temperature_factor",
         "rate_function_display": "k_BBB x [CBD_plasma] slow t12 3.85h"
       },
       "is_environment_aware": false,
