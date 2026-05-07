@@ -1,12 +1,17 @@
 # Protocol Q1 — CBD IC₅₀ on NFκB activation
 
 > **Pairing.** Model: [`models/canabidiol-q1-testable-pk-energy.shy`](../models/canabidiol-q1-testable-pk-energy.shy)
-> (calibrated, post **B1+B2+B3+B7**: NADPH/NADP+ capacity=∞;
-> TNFa→Cytokine_Degradation re-typed `normal`; per-cytokine
-> first-order degradation transitions T50–T52; new
-> `NFkB_dephosphorylation` (T53) closing the IκB cycle.)
-> Validated `run_20260507_151546`: NH=91, NFkB_p65≈0.13,
-> cytokines O(10⁻²), microglia M2-dominant.
+> (calibrated, post **B1+B2+B3+B7 + Calibration v2 (C1+C2+C4)**:
+> NADPH/NADP+ capacity=∞; TNFa→Cytokine_Degradation re-typed `normal`;
+> per-cytokine first-order degradation transitions T50–T52;
+> `NFkB_dephosphorylation` (T53) k=1e-3/s (IκB rebind t½ ≈ 12 min,
+> Hoffmann 2002); `Antioxidant_Scavenging` split into SOD/HO1 (T13)
+> + GSH (T54) so SOD baseline does not double-charge GSH consumption;
+> `NFkB_p65 → APP_Transcription` arc converted from `signal_flow`
+> w=0.01 to `test` arc (NFκB is a transcription factor, not a substrate).
+> Conservation post-patch: NFκB pool = 55 (no leaks); GSH+GSSG = 80
+> (residual +0.02 source via `Nrf2_ARE_transcription`, accepted as
+> coarse-grained de novo synthesis term — see C3 in audit).
 
 ## Hypothesis
 
@@ -24,7 +29,7 @@ The mechanism is the PPARγ ⊣ NFκB arm
 | `DISEASE_SEVERITY` | **1.0** | level | mid-disease driver (avoids cusp at 2; produces clear NFκB ignition without saturating) |
 | `LOADING_DOSE` | **10** | µM | standard bolus at t = 0 |
 | `MAINT_DOSE` | **swept** | µM | see Viability table |
-| `DOSE_INTERVAL` | **21600** | s | 6 h cadence (matches v3 manuscript convention) |
+| `DOSE_INTERVAL` | **3600** | s | 1 h cadence — sustains plasma > 0.5 µM throughout (PK t½ ≈ 17 min); 6 h cadence allows full washout between doses, masking dose-response |
 | `TEMPERATURE` | 310.15 | K | physiological |
 | `AGE` | 72 | y | adult cohort |
 | `PH` | 7.4 | — | normoxic |
@@ -32,7 +37,8 @@ The mechanism is the PPARγ ⊣ NFκB arm
 ## Viability panel — sweep plan
 
 **Mode:** Single-axis (`MAINT_DOSE`) • **Replicates:** 30 •
-**Duration:** 86400 s (24 h) • **Termination:** time
+**Duration:** 14400 s (4 h) • **Termination:** time •
+**Recording tier:** G3 (per-step capture of the active PK window)
 
 | Sweep parameter | Path | Values | Cells |
 |---|---|---|---:|
@@ -41,23 +47,34 @@ The mechanism is the PPARγ ⊣ NFκB arm
 **Cells:** 8 + Baseline = 9 • **Total sims:** 9 × 30 = **270**
 
 The grid spans three decades (0.05 → 5 µM) with a tighter low-end to
-locate IC₅₀; 24 h is sufficient for NFκB to reach steady state under
-LOADING_DOSE alone (PK half-life ≈ minutes) without committing to a
-7-day chronic-dosing horizon.
+locate IC₅₀. **Horizon revised from 24 h → 4 h** based on
+`run_20260507_161636` trajectory analysis: CBD plasma t½ ≈ 17 min, so
+at 24 h the network endpoint observes only the dead PK tail and is
+flat across MAINT (B3-amplified loss of dose-response). At 4 h with
+DOSE_INTERVAL=1 h, plasma sustains 0.5 – 3 µM through 4 maintenance
+pulses, and recording at the τ-leap step granularity preserves the
+NFκB transient-decay envelope (post-C4 t½ ≈ 12 min) where the IC₅₀
+separation is observable.
 
 ## Acceptance criteria
 
-Endpoint mean NFκB_p65 over 30 replicates per cell:
+Readout = mean NFκB_p65 trajectory over 30 replicates per cell,
+integrated AUC over t ∈ [60 s, 14400 s] (skips initial install
+transient).
 
 | Cell | Target | Tolerance |
 |---|---|---|
-| `MAINT_DOSE = 0` | ≥ 5 (clear NFκB ignition under DSEV=1) | −2 |
-| `MAINT_DOSE = 5` | ≤ 0.5 (saturating suppression) | +0.3 |
-| **Monotone-decreasing in MAINT_DOSE** | strict | none — single inversion fails Q1 |
-| Hill IC₅₀ fit | located in (0, 1] µM | report 95 % CI |
+| `MAINT_DOSE = 0` | AUC ≥ 5 µM·s × 14340 s (sustained NFκB drive under DSEV=1) | −30 % |
+| `MAINT_DOSE = 5` | AUC ≤ 30 % of MAINT=0 baseline | — |
+| **Monotone-decreasing AUC in MAINT_DOSE** | strict | none — single inversion fails Q1 |
+| Hill IC₅₀ fit on AUC | located in (0, 1] µM | report 95 % CI |
 
-**Conservation check:** `Microglia_M1 + Microglia_M2 = const` (±2)
-across all cells.
+**Conservation checks (must hold in EVERY trajectory, all cells):**
+- `Microglia_M1 + Microglia_M2 = 45` (±2)
+- `NFkB_p65 + NFkB_IkB = 55` (±1)
+- `NADPH + NADP_plus = 110` (±1)
+- `Glutathione + GSSG ≥ 60` throughout 4 h (post-C1 fix; was
+  dropping to 0.93 within 10 min pre-fix)
 
 ## Falsification
 
