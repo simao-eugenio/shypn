@@ -1821,7 +1821,7 @@
       "radius": 40.0,
       "marking": 100.0,
       "initial_marking": 100.0,
-      "capacity": 1,
+      "capacity": "Infinity",
       "border_color": [
         0.8,
         0.5,
@@ -1872,7 +1872,7 @@
       "radius": 40.0,
       "marking": 10.0,
       "initial_marking": 10.0,
-      "capacity": 1,
+      "capacity": "Infinity",
       "border_color": [
         0.8,
         0.5,
@@ -5090,7 +5090,7 @@
       "name": "TNFa_to_T23",
       "label": "",
       "object_type": "arc",
-      "arc_type": "test",
+      "arc_type": "normal",
       "source_id": "P11",
       "source_type": "place",
       "target_id": "T23",
@@ -5100,7 +5100,7 @@
       "color": [
         0.0,
         0.0,
-        1.0
+        0.0
       ],
       "width": 3.0,
       "control_points": [],
