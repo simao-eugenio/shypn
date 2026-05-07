@@ -879,14 +879,26 @@ class ExportToolbar(Gtk.Box):
                         accounting_report = None
                         if hasattr(category.controller, 'get_accounting_report'):
                             accounting_report = category.controller.get_accounting_report()
-                        
+
+                        # TMD-1: capture init-time timescale audit profile
+                        # so the CSV/JSON exporters can drop a sidecar.
+                        timescale_audit = None
+                        _profile = getattr(category.controller,
+                                           'last_timescale_profile', None)
+                        if _profile is not None:
+                            try:
+                                timescale_audit = _profile.to_dict()
+                            except Exception:
+                                timescale_audit = None
+
                         return {
                             'time_points': stored_data['time_points'] if stored_data else dc.time_points,
                             'place_data': stored_data['place_data'] if stored_data else dc.place_data,
                             'transition_data': stored_data['transition_data'] if stored_data else dc.transition_data,
                             'model': category.controller.model,
                             'metadata': stored_data.get('metadata', {}) if stored_data else {},
-                            'accounting_report': accounting_report
+                            'accounting_report': accounting_report,
+                            'timescale_audit': timescale_audit,
                         }
         return None
     

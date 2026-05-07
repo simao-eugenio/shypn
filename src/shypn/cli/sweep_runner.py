@@ -456,6 +456,10 @@ class SweepRunner:
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
         # Layer D: aggregate per-condition parameter_sources for provenance.
         sources_by_condition: Dict[str, Dict[str, Any]] = {}
+        # TMD-1: aggregate per-condition timescale_audit profile for provenance
+        # + summary.csv. Profile is identical across replicates of one
+        # condition (deterministic on M₀); we capture the first non-empty.
+        timescale_by_condition: Dict[str, Dict[str, Any]] = {}
         # Per-condition main-process buffer of replicate result dicts.
         results_by_cond: Dict[int, List[dict]] = defaultdict(list)
         # Per-condition wall-clock window (start = first rep submitted,
@@ -517,6 +521,13 @@ class SweepRunner:
                     results_by_cond[c].append(payload['result'])
                     if 'param_sources' in payload:
                         sources_by_condition[label] = payload['param_sources']
+                    # TMD-1: capture timescale_audit (first replicate carries it).
+                    if label not in timescale_by_condition:
+                        _tmd = (payload.get('result', {})
+                                .get('engine_stats', {})
+                                .get('timescale_audit'))
+                        if _tmd:
+                            timescale_by_condition[label] = _tmd
                 except Exception as exc:
                     logger.exception(
                         "Condition %d (%s) replicate %d failed",
@@ -586,6 +597,23 @@ class SweepRunner:
                     # and rely on resource_usage.json's children_peak_rss
                     # for the true aggregate.
                     'peak_rss_mib': 0.0,
+                    # TMD-1 surface (always present; zero/empty when audit
+                    # disabled or no continuous transitions).
+                    'tmd_critical_count': len(
+                        (timescale_by_condition.get(label) or {}).get(
+                            'critical_transitions', []
+                        )
+                    ),
+                    'tmd_stiffness_ratio': float(
+                        (timescale_by_condition.get(label) or {}).get(
+                            'stiffness_ratio', 0.0
+                        ) or 0.0
+                    ),
+                    'tmd_recommended_dt': (
+                        (timescale_by_condition.get(label) or {}).get(
+                            'recommended_dt'
+                        )
+                    ),
                 }
 
                 if self.verbose:
@@ -681,6 +709,11 @@ class SweepRunner:
             else:
                 prov_doc = {}
             prov_doc['parameter_sources'] = sources_by_condition
+            # TMD-1: persist per-condition timescale audit profiles so the
+            # 'reload-and-rerun' / analyst path can detect dt vs τ mismatches
+            # without re-running anything. Empty dict means audit disabled
+            # or no continuous transitions in the model.
+            prov_doc['timescale_audit'] = timescale_by_condition
             with open(prov_file, 'w') as _pf:
                 _json_ps2.dump(prov_doc, _pf, indent=2, sort_keys=True)
             if self.verbose:
