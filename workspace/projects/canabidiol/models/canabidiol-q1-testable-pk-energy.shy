@@ -1,20 +1,20 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-07T09:25:43.300653",
+    "created": "2026-05-08T10:21:47.788865",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
       "places": 46,
-      "transitions": 49,
-      "arcs": 109,
+      "transitions": 54,
+      "arcs": 112,
       "modules": 0
     }
   },
   "view_state": {
-    "zoom": 0.8857805000000196,
-    "pan_x": 343.912211286663,
-    "pan_y": -1366.3267493751703,
+    "zoom": 0.6050000000000134,
+    "pan_x": 2181.654180092664,
+    "pan_y": 520.7273232759695,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1501,8 +1501,8 @@
       "x": -1880.0,
       "y": -110.0,
       "radius": 40.0,
-      "marking": 43200.0,
-      "initial_marking": 43200.0,
+      "marking": 21600,
+      "initial_marking": 21600,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1542,11 +1542,11 @@
       "name": "DISEASE_SEVERITY",
       "label": "Disease severity (0=healthy, 2=AD)",
       "object_type": "place",
-      "x": -1330.0,
-      "y": -360.0,
+      "x": -1480.0,
+      "y": -300.0,
       "radius": 40.0,
-      "marking": 0.5,
-      "initial_marking": 0.5,
+      "marking": 2,
+      "initial_marking": 2,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -2380,8 +2380,8 @@
         "rate_function_display": "k_ARE \u00d7 [Nrf2_free]"
       },
       "signal_places": [
-        "P39",
-        "P16"
+        "P16",
+        "P39"
       ],
       "is_environment_aware": true,
       "compartment": "nucleus",
@@ -2581,11 +2581,11 @@
         "rate_function_display": "k_pol \u00d7 [M2] \u00d7 (f([A\u03b2_olig]) + f([TNF\u03b1]))"
       },
       "signal_places": [
+        "P41",
         "P11",
         "P39",
-        "P41",
-        "P22",
         "P6",
+        "P22",
         "P40"
       ],
       "is_environment_aware": true,
@@ -2629,8 +2629,8 @@
       "signal_places": [
         "P26",
         "P40",
-        "P21",
-        "P27"
+        "P27",
+        "P21"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2709,12 +2709,12 @@
         "rate_function_display": "(0.003 * (Abeta_Oligomer / (10 + Abeta_Oligomer)) + 0.004 * (max(0, ROS - 1.0) / (15 + max(0, ROS - 1.0))) + 0.003 * (max(0, TNFa - 0.5) / (10 + max(0, TNFa - 0.5)))) * Temperature_factor * (1 + 0.4*pH_acidosis) * Age_factor"
       },
       "signal_places": [
+        "P41",
         "P11",
         "P39",
-        "P19",
-        "P41",
         "P6",
-        "P40"
+        "P40",
+        "P19"
       ],
       "is_environment_aware": true,
       "compartment": "brain_parenchyma",
@@ -2755,8 +2755,8 @@
         "rate_function_display": "k_surv \u00d7 [BDNF] \u00d7 (1 - [Neuron]/max)"
       },
       "signal_places": [
-        "P39",
         "P24",
+        "P39",
         "P9",
         "P23"
       ],
@@ -3968,12 +3968,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -4021,15 +4021,15 @@
       "is_source": false,
       "is_sink": false,
       "guard": 1,
+      "properties": {
+        "rate_function": "0.05 * Glutathione * ROS / (5 + ROS) * Temperature_factor * pH_neutrality / Age_factor",
+        "rate_function_display": "k_gsh \u00d7 [GSH] \u00d7 ROS / (Km + ROS)"
+      },
       "is_environment_aware": false,
       "compartment": "cytoplasm",
       "adaptive_filter": null,
       "volume_threshold": null,
-      "prefer_continuous": null,
-      "properties": {
-        "rate_function": "0.05 * Glutathione * ROS / (5 + ROS) * Temperature_factor * pH_neutrality / Age_factor",
-        "rate_function_display": "k_gsh \u00d7 [GSH] \u00d7 ROS / (Km + ROS)"
-      }
+      "prefer_continuous": null
     }
   ],
   "arcs": [
@@ -5273,8 +5273,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": false
+      "control_points": []
     },
     {
       "id": "A66",
@@ -5860,11 +5859,7 @@
       ],
       "width": 3.0,
       "control_points": [],
-      "consumes": true,
-      "produces": true,
-      "michaelis_K": 0.5,
-      "hill_n": 1.0,
-      "suppression_epsilon": 0.0
+      "consumes": false
     },
     {
       "id": "A96",
@@ -6170,11 +6165,12 @@
     {
       "id": "A110",
       "name": "A110",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P12",
-      "target_id": "T50",
       "source_type": "place",
+      "target_id": "T50",
       "target_type": "transition",
       "weight": 1.0,
       "threshold": 0.0,
@@ -6189,11 +6185,12 @@
     {
       "id": "A111",
       "name": "A111",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P13",
-      "target_id": "T51",
       "source_type": "place",
+      "target_id": "T51",
       "target_type": "transition",
       "weight": 1.0,
       "threshold": 0.0,
@@ -6208,11 +6205,12 @@
     {
       "id": "A112",
       "name": "A112",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P14",
-      "target_id": "T52",
       "source_type": "place",
+      "target_id": "T52",
       "target_type": "transition",
       "weight": 1.0,
       "threshold": 0.0,
@@ -6227,11 +6225,12 @@
     {
       "id": "A113",
       "name": "A113",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P9",
-      "target_id": "T53",
       "source_type": "place",
+      "target_id": "T53",
       "target_type": "transition",
       "weight": 1.0,
       "threshold": 0.0,
@@ -6246,11 +6245,12 @@
     {
       "id": "A114",
       "name": "A114",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "T53",
-      "target_id": "P8",
       "source_type": "transition",
+      "target_id": "P8",
       "target_type": "place",
       "weight": 1.0,
       "threshold": 0.0,
@@ -6265,13 +6265,15 @@
     {
       "id": "A115",
       "name": "GSH\u2192GSH_Scav",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P20",
-      "target_id": "T54",
       "source_type": "place",
+      "target_id": "T54",
       "target_type": "transition",
       "weight": 1.0,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
@@ -6283,13 +6285,15 @@
     {
       "id": "A116",
       "name": "ROS\u2192GSH_Scav",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "P19",
-      "target_id": "T54",
       "source_type": "place",
+      "target_id": "T54",
       "target_type": "transition",
       "weight": 1.0,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
@@ -6301,13 +6305,15 @@
     {
       "id": "A117",
       "name": "GSH_Scav\u2192GSSG",
+      "label": "",
       "object_type": "arc",
       "arc_type": "normal",
       "source_id": "T54",
-      "target_id": "P33",
       "source_type": "transition",
+      "target_id": "P33",
       "target_type": "place",
       "weight": 1.0,
+      "threshold": null,
       "color": [
         0.0,
         0.0,
