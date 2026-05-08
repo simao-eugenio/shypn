@@ -567,24 +567,27 @@ class RemoteSweepDispatcher:
             # Pass user-specified workers as a ceiling hint; the server's
             # _compute_safe_workers() will cap it to a memory-safe value.
             workers_flag = f"--workers {workers}" if workers > 0 else ""
-            # Use 'exec' so Python replaces the bash process, becoming
-            # sshd's direct child.  Combined with process_guard's
-            # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
-            # cleanly when the SSH connection drops (no orphan zombies).
+            # setsid: detach the sweep from the SSH controlling tty so
+            # client disconnect (UI close, network drop, laptop sleep)
+            # does NOT propagate SIGHUP and kill the parent. Without
+            # this the previous design relied on PR_SET_PDEATHSIG to
+            # cascade-kill workers when the parent died, but in spawn
+            # mode workers exec a fresh interpreter and lose the prctl
+            # — leaving 10 sleeping zombies and zero output (observed
+            # 2026-05-08, run_20260508_133221).
             #
-            # nice -n 19 + ionice -c 3: run at lowest CPU and I/O
-            # priority so sshd (nice 0) always gets scheduled promptly,
-            # preventing the "banner exchange timeout" that locks the
-            # server out during heavy sweeps.
+            # exec: Python replaces the bash process so the sweep PID
+            # is sshd's grandchild via setsid (not buried under bash).
             #
-            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving CPUs
-            # 0-3 (first 2 P-cores on i9-14900K) exclusively for
-            # sshd/system tasks.  This guarantees SSH remains responsive
-            # even under full sweep load.
+            # nice -n 19 + ionice -c 3: lowest CPU/IO priority so sshd
+            # gets scheduled promptly under heavy sweep load.
+            #
+            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving 0-3
+            # (first 2 P-cores on i9-14900K) for sshd/system.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"exec nice -n 19 ionice -c 3 taskset -c 4-31 "
+                f"exec setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
                 f"{remote_venv} -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
