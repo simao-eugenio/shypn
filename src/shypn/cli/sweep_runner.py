@@ -371,27 +371,35 @@ class SweepRunner:
             print(f"Workers: {self.workers} (cpu_count={os.cpu_count()})")
             # GPU policy summary so operators see the effective decision
             # basis up-front (no need to grep for late warnings).
+            # NOTE: the dispatcher will route via 'condition-batch' (one
+            # work unit = R reps) when the condition-mode rule fires,
+            # so reps are batched on the GPU rather than shredded across
+            # CPU workers.
             _gpu_hint: str
+            _will_batch = (
+                self._gpu_mode == 'force'
+                or (self._gpu_mode == 'auto'
+                    and self.workers <= n_conditions)
+            )
             if self._gpu_mode == 'off':
-                _gpu_hint = "disabled (--use-gpu off)"
+                _gpu_hint = "disabled (--use-gpu off) → flat-dispatch"
             elif self._gpu_mode == 'force':
-                _gpu_hint = "forced (--use-gpu force)"
+                _gpu_hint = (
+                    "forced (--use-gpu force) → condition-batch "
+                    "(R reps per work unit)"
+                )
             else:
-                if self.workers <= 1:
+                if _will_batch:
                     _gpu_hint = (
-                        "auto → will USE GPU (sole pool worker, "
-                        "no contention)"
-                    )
-                elif sim.replicates >= 16:
-                    _gpu_hint = (
-                        f"auto → will USE GPU "
-                        f"(per-worker batch n={sim.replicates} ≥ 16)"
+                        f"auto → condition-batch "
+                        f"(workers={self.workers} ≤ conditions={n_conditions}; "
+                        f"R={sim.replicates} reps batched on GPU)"
                     )
                 else:
                     _gpu_hint = (
-                        f"auto → will SKIP GPU "
-                        f"({self.workers} workers contending, "
-                        f"n={sim.replicates} < 16)"
+                        f"auto → flat-dispatch "
+                        f"(workers={self.workers} > conditions={n_conditions}; "
+                        f"CPU parallelism wins)"
                     )
             print(f"GPU policy: {_gpu_hint}")
             # Show memory info for diagnostics
@@ -496,12 +504,39 @@ class SweepRunner:
         cond_t0: Dict[int, float] = {}
         # Pre-serialise snapshots once.
         snapshot_dicts = [_snapshot_to_dict(s) for s in snapshots]
-        n_workers = min(self.workers, n_conditions * sim.replicates)
+        # ── Dispatch-mode selection ──────────────────────────────────
+        # 'flat'      → R reps shred into R work units; saturates many
+        #               CPU cores; bypasses GPU.
+        # 'condition' → all R reps batched per condition into one work
+        #               unit; routes through ReplicateRunner.run_replicates
+        #               which can dispatch the whole batch to GPU.
+        #
+        # Selection rule (2026-05-09):
+        #   gpu_mode == 'off' or 'auto' with workers > n_conditions
+        #     → flat (CPU parallelism dominates)
+        #   gpu_mode == 'force' or 'auto' with workers ≤ n_conditions
+        #     → condition (GPU batching pays off; no parallelism lost)
+        if self._gpu_mode == 'off':
+            _dispatch_mode = 'flat'
+        elif self._gpu_mode == 'force':
+            _dispatch_mode = 'condition'
+        else:  # 'auto'
+            _dispatch_mode = (
+                'condition' if self.workers <= n_conditions else 'flat'
+            )
+
+        if _dispatch_mode == 'condition':
+            n_workers = min(self.workers, n_conditions)
+            n_units = n_conditions
+            _unit_label = "condition-batch"
+        else:
+            n_workers = min(self.workers, n_conditions * sim.replicates)
+            n_units = n_conditions * sim.replicates
+            _unit_label = "flat-dispatch"
         if self.verbose:
             print(
-                f"[flat-dispatch] {n_conditions} cond × {sim.replicates} reps "
-                f"= {n_conditions * sim.replicates} work units, "
-                f"pool={n_workers}"
+                f"[{_unit_label}] {n_conditions} cond × {sim.replicates} reps "
+                f"= {n_units} work units, pool={n_workers}"
             )
 
         # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
@@ -514,31 +549,54 @@ class SweepRunner:
         ) as pool:
             futures_map: Dict[Any, tuple] = {}
 
-            # Submit all (cond, rep) work units in round-robin order so
-            # every condition has reps in flight from t=0. Pool queues
-            # the surplus internally; only n_workers run concurrently.
-            for r in range(sim.replicates):
+            if _dispatch_mode == 'condition':
+                # One work unit per condition: all R reps batched.
                 for c in range(n_conditions):
-                    if r == 0:
-                        cond_t0[c] = _time_mod.monotonic()
-                        if self.verbose:
-                            print(
-                                f"[{c + 1}/{n_conditions}] {snapshots[c].name} "
-                                f"({sim.replicates} replicates)...",
-                                flush=True,
-                            )
+                    cond_t0[c] = _time_mod.monotonic()
+                    if self.verbose:
+                        print(
+                            f"[{c + 1}/{n_conditions}] {snapshots[c].name} "
+                            f"({sim.replicates} replicates, batched)...",
+                            flush=True,
+                        )
                     fut = pool.submit(
-                        _run_one_replicate,
+                        _run_one_condition_batch,
                         cond_idx=c,
-                        rep_idx=r,
                         cond_name=snapshots[c].name,
-                        baseline_dict_inline=None,  # use cached
+                        baseline_dict_inline=None,
                         snapshot_dict=snapshot_dicts[c],
                         sim_params=sim_dict,
                         events=events_list,
                         time_units_value=time_units_value,
                     )
-                    futures_map[fut] = (c, r)
+                    futures_map[fut] = (c, -1)  # rep=-1 sentinel for batch
+            else:
+                # Submit all (cond, rep) work units in round-robin order so
+                # every condition has reps in flight from t=0. Pool queues
+                # the surplus internally; only n_workers run concurrently.
+                for r in range(sim.replicates):
+                    for c in range(n_conditions):
+                        if r == 0:
+                            cond_t0[c] = _time_mod.monotonic()
+                            if self.verbose:
+                                print(
+                                    f"[{c + 1}/{n_conditions}] "
+                                    f"{snapshots[c].name} "
+                                    f"({sim.replicates} replicates)...",
+                                    flush=True,
+                                )
+                        fut = pool.submit(
+                            _run_one_replicate,
+                            cond_idx=c,
+                            rep_idx=r,
+                            cond_name=snapshots[c].name,
+                            baseline_dict_inline=None,
+                            snapshot_dict=snapshot_dicts[c],
+                            sim_params=sim_dict,
+                            events=events_list,
+                            time_units_value=time_units_value,
+                        )
+                        futures_map[fut] = (c, r)
 
             # Process replicate completions; finalise each condition
             # the moment its R-th replicate arrives.
@@ -547,29 +605,50 @@ class SweepRunner:
                 label = snapshots[c].name
                 try:
                     payload = fut.result()
-                    results_by_cond[c].append(payload['result'])
+                    if 'results' in payload:
+                        # Condition-batch payload: R results in one shot.
+                        for _res in payload['results']:
+                            results_by_cond[c].append(_res)
+                    else:
+                        # Flat-dispatch payload: one result.
+                        results_by_cond[c].append(payload['result'])
                     if 'param_sources' in payload:
                         sources_by_condition[label] = payload['param_sources']
                     # TMD-1: capture timescale_audit (first replicate carries it).
                     if label not in timescale_by_condition:
-                        _tmd = (payload.get('result', {})
-                                .get('engine_stats', {})
-                                .get('timescale_audit'))
-                        if _tmd:
-                            timescale_by_condition[label] = _tmd
+                        # Look in either shape (flat: 'result'; batch: 'results'[0]).
+                        _probe = payload.get('result') or (
+                            payload.get('results', [None])[0]
+                        )
+                        if _probe:
+                            _tmd = (_probe.get('engine_stats', {})
+                                    .get('timescale_audit'))
+                            if _tmd:
+                                timescale_by_condition[label] = _tmd
                 except Exception as exc:
                     logger.exception(
                         "Condition %d (%s) replicate %d failed",
                         c, label, r,
                     )
-                    # Inject a synthetic error result so the condition
+                    # Inject synthetic error result(s) so the condition
                     # still finalises with the right replicate count.
-                    results_by_cond[c].append({
-                        'replicate_id': r,
-                        'seed': sim_dict['seed_base'] + r,
-                        'elapsed_time': 0.0,
-                        'error': str(exc),
-                    })
+                    # In condition-batch mode (r=-1) the entire batch
+                    # failed → backfill all R reps as errors.
+                    if r < 0:
+                        for _r in range(sim.replicates):
+                            results_by_cond[c].append({
+                                'replicate_id': _r,
+                                'seed': sim_dict['seed_base'] + _r,
+                                'elapsed_time': 0.0,
+                                'error': str(exc),
+                            })
+                    else:
+                        results_by_cond[c].append({
+                            'replicate_id': r,
+                            'seed': sim_dict['seed_base'] + r,
+                            'elapsed_time': 0.0,
+                            'error': str(exc),
+                        })
 
                 # Has this condition completed?
                 if len(results_by_cond[c]) < sim.replicates:
@@ -1219,6 +1298,85 @@ def _run_one_replicate(
     if rep_idx == 0:
         payload['param_sources'] = param_sources
     return payload
+
+
+def _run_one_condition_batch(
+    *,
+    cond_idx: int,
+    cond_name: str,
+    baseline_dict_inline: Optional[dict],
+    snapshot_dict: dict,
+    sim_params: dict,
+    events: list,
+    time_units_value: str,
+) -> dict:
+    """Execute ALL R replicates of one condition in a single work unit.
+
+    Used by the GPU-aware dispatch path: when ``gpu_mode in {'force'}``
+    or ``gpu_mode == 'auto' and n_workers <= n_conditions``, we batch
+    all replicates per condition into one work unit and route through
+    :class:`ReplicateRunner.run_replicates`. That method houses the
+    GPU-vs-CPU heuristic and, when GPU is selected, dispatches the
+    full batch through the cupy hybrid engine (~100× per-replicate
+    speedup verified on canabidiol Q1, 2026-05-09).
+
+    Returns:
+        ``{cond_idx, cond_name, results, param_sources}`` where
+        ``results`` is the list of ALL R per-replicate result dicts.
+    """
+    baseline_dict = baseline_dict_inline or _BASELINE_MODEL_DICT
+    if baseline_dict is None:
+        raise RuntimeError(
+            "Condition-batch worker has no baseline model dict — "
+            "_replicate_pool_init was not invoked"
+        )
+
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    from shypn.engine.simulation.settings import SimulationSettings
+
+    model = DocumentModel.from_dict(baseline_dict)
+
+    baseline_snap = SweepRunner._capture_baseline(model)
+    snapshot = _dict_to_snapshot(snapshot_dict)
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline_snap)
+
+    if events:
+        from shypn.data.pathway.pathway_data import Event as _Event
+        try:
+            model.events = [_Event.from_dict(e) for e in events]
+        except Exception as _exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                "Failed to install %d events: %s", len(events), _exc
+            )
+
+    # Settings: pull GPU mode from env (set by _replicate_pool_init).
+    _settings = SimulationSettings()
+    _gpu_mode = os.environ.get('_SHYPN_USE_GPU', 'auto')
+    if _gpu_mode in ('auto', 'force', 'off'):
+        _settings.use_gpu = _gpu_mode  # type: ignore[assignment]
+
+    runner = ReplicateRunner(model, settings=_settings)
+    results = runner.run_replicates(
+        n=int(sim_params['replicates']),
+        use_parallel=True,
+        use_tau_leaping=True,
+        duration=sim_params['duration'],
+        termination_condition=sim_params['termination'],
+        epsilon=sim_params['tau_epsilon'],
+        max_tau=sim_params['max_tau'],
+        time_step=sim_params.get('time_step'),
+        seed_base=sim_params['seed_base'],
+        verbose=False,
+    )
+
+    return {
+        'cond_idx': cond_idx,
+        'cond_name': cond_name,
+        'results': results,
+        'param_sources': param_sources,
+    }
 
 
 def _finalize_condition(
