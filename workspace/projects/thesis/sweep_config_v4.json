@@ -1,0 +1,56 @@
+{
+  "_comment_purpose": "v4 thesis sweep — TRUE 3-axis factorial dispatched as a single sweep. Probes the formalism bridge end-to-end: Initial_Nutrients ▢ × Temperature_K ▢ × Sigma_halflife_min ▢ all flow through evt_init_kinetics → ◇ kinetic scalars → Φ. Each axis isolates one of the three new mechanisms in v4.",
+  "_comment_accept":  "PASS if (a) ATP+ADP within ±5% of 5995 across ALL 12 conditions (mass conservation); (b) σE endpoint < 1500 in all 30-min-halflife conditions, > 5000 in all 600-min-halflife conditions (decay scaling); (c) ATP basin floor at T=310.15 reproduces v3's 2.24±0.21 mM in the Nut sweep; (d) at T=320.15 the basin floor shifts upward by ~Q10 factor (Q10≈2 ⇒ ~2× regen flux); (e) all three axes show monotone separation in their primary readout.",
+  "_comment_horizon": "21600 s = 360 min — same as v3 run_20260509_125201 for direct comparability with deep_analysis_v3 baselines.",
+  "_comment_scope":   "3 × 2 × 3 = 18 conditions × 16 replicates = 288 runs. Single dispatch. On remote-gpu with workers ≤ 18, runs as condition-batch GPU mode.",
+
+  "model_path": "workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy",
+
+  "mode": "factorial",
+  "replicates": 16,
+  "duration": 21600.0,
+  "termination": "time_only",
+  "seed_base": 42,
+  "tau_epsilon": 0.03,
+  "max_tau": 0.1,
+  "time_step": null,
+
+  "parameters": [
+    {
+      "_axis":  "A. Dose-response — drives Nutrients ⬡ via evt_apply_initial_nutrients at t=0",
+      "type":   "places",
+      "path":   "Initial_Nutrients.initial_marking",
+      "values": [10.0, 100.0, 300.0]
+    },
+    {
+      "_axis":  "B. Q10 thermal — drives k_thermo_factor ◇ via evt_init_kinetics; Q10=2 ⇒ ratio ≈ 2.0",
+      "type":   "places",
+      "path":   "Temperature_K.initial_marking",
+      "values": [310.15, 320.15]
+    },
+    {
+      "_axis":  "C. Sigma decay — drives k_sigma_decay ◇ via evt_init_kinetics; 30/120/600 spans 20× rate range with the model default (120) as a v3-comparable anchor",
+      "type":   "places",
+      "path":   "Sigma_halflife_min.initial_marking",
+      "values": [30.0, 120.0, 600.0]
+    }
+  ],
+
+  "property_overrides": {
+    "ATP_setpoint.initial_marking": 4800.0
+  },
+
+  "events": [],
+
+  "_metadata": {
+    "model_version":     "v4_thesis",
+    "design":            "3-axis factorial: Initial_Nutrients × Temperature_K × Sigma_halflife_min",
+    "axes_count":        3,
+    "conditions":        18,
+    "replicates":        16,
+    "total_runs":        288,
+    "fixes_validated":   ["mass_conservation_ATP_ADP", "sigma_factor_degradation"],
+    "formalism_exposed": ["parameter_places ▢", "spatial_signals ◇", "event_bridge ▢→event→◇→Φ"],
+    "supersedes":        "run_20260509_125201 (v3, snapshots mode, 5 conditions, single axis)"
+  }
+}
