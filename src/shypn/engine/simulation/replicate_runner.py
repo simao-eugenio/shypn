@@ -374,20 +374,53 @@ class ReplicateRunner:
             print(f"  Duration: {duration} {time_units.value}")
         
         # ── GPU detection ────────────────────────────────────────────
-        # Skip GPU when we are inside a sweep worker pool: N sibling
-        # workers contending for one GPU is dramatically slower than
-        # CPU-fork with one worker per condition (verified: ~0.3-2.2 s
-        # /replicate-day on CPU-fork @ 8-13 workers vs ~30+ s on GPU
-        # hybrid @ 20 workers contending; canabidiol Q1, May 2026).
-        # The user can still force GPU with use_gpu='force', and
-        # single-condition / GUI runs are unaffected.
+        # 'auto' policy (refined 2026-05-09):
+        #   GPU is the SIMD-over-replicates winner when one process owns
+        #   the device and has a large enough per-call batch. Skip only
+        #   when MULTIPLE sibling pool workers would contend for one GPU.
+        #
+        #   Decision matrix (env vars set by sweep_runner):
+        #     _SHYPN_IN_POOL_WORKER         — set ('1' or budget) iff inside a pool worker
+        #     _SHYPN_POOL_WORKER_COUNT      — total sibling workers in the pool (≥ 1)
+        #
+        #   auto → use GPU iff (pool_worker_count ≤ 1) OR (n_replicates ≥ GPU_BATCH_THRESHOLD)
+        #   auto → skip GPU iff inside pool with sibling_count > 1 AND n < threshold
+        #
+        #   Rationale: with sibling_count == 1 (e.g. --workers 1 or single
+        #   condition) there is no contention; GPU SIMD wins by ~100×
+        #   on canabidiol Q1 (verified 2026-05-09: 4 reps × 60s in 0.8s
+        #   GPU vs 46.4s CPU pool worker).
+        #
+        #   force → always attempt GPU (raises if unavailable).
+        #   off   → never attempt GPU.
         gpu_backend = None
         _gpu_mode = getattr(self.default_settings, 'use_gpu', 'auto')
-        _in_sweep_pool = bool(os.environ.get('_SHYPN_IN_POOL_WORKER'))
+        _in_pool_raw_gpu = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        _in_sweep_pool = bool(_in_pool_raw_gpu)
+        try:
+            _pool_worker_count = int(os.environ.get('_SHYPN_POOL_WORKER_COUNT', '0'))
+        except (TypeError, ValueError):
+            _pool_worker_count = 0
+        # Threshold: minimum n_replicates that justifies serialising
+        # through the GPU even when sibling workers contend for it.
+        # Conservative default; can be tuned later.
+        _GPU_BATCH_THRESHOLD = 16
+        _gpu_skip_reason = None
         if _gpu_mode == 'auto' and _in_sweep_pool:
+            # Allow GPU if we are the sole pool worker (no contention)
+            # or the per-call batch is large enough to amortise.
+            _sole_worker = _pool_worker_count <= 1
+            _large_batch = n >= _GPU_BATCH_THRESHOLD
+            if not (_sole_worker or _large_batch):
+                _gpu_skip_reason = (
+                    f"in sweep pool with {_pool_worker_count} sibling workers "
+                    f"and n={n} < threshold {_GPU_BATCH_THRESHOLD} "
+                    f"(use_gpu='force' to override)"
+                )
+        if _gpu_skip_reason:
+            logger.info("GPU auto: skipping — %s", _gpu_skip_reason)
             if verbose:
-                print("  GPU skipped: inside sweep worker pool "
-                      "(use_gpu='force' to override)")
+                print(f"  GPU skipped (auto): {_gpu_skip_reason}")
         elif _gpu_mode != 'off':
             from shypn.engine.acceleration.gpu import detect_gpu
             gpu_backend = detect_gpu()

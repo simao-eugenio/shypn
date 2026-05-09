@@ -177,6 +177,7 @@ class SweepRunner:
         workers: Optional[int] = None,
         verbose: bool = False,
         config_path: Optional[Path] = None,
+        use_gpu: str = 'auto',
     ) -> None:
         self.model_path = model_path
         self.config = config
@@ -189,6 +190,9 @@ class SweepRunner:
         # User value acts as ceiling; never exceed memory-safe auto cap
         self.workers = min(workers, safe) if workers else safe
         self.verbose = verbose
+        if use_gpu not in ('auto', 'force', 'off'):
+            raise ValueError(f"use_gpu must be 'auto'|'force'|'off'; got {use_gpu!r}")
+        self._gpu_mode = use_gpu
 
     @staticmethod
     def _compute_safe_workers(duration_seconds: float = 0.0) -> int:
@@ -365,6 +369,31 @@ class SweepRunner:
                 f"{n_conditions * sim.replicates} total simulations"
             )
             print(f"Workers: {self.workers} (cpu_count={os.cpu_count()})")
+            # GPU policy summary so operators see the effective decision
+            # basis up-front (no need to grep for late warnings).
+            _gpu_hint: str
+            if self._gpu_mode == 'off':
+                _gpu_hint = "disabled (--use-gpu off)"
+            elif self._gpu_mode == 'force':
+                _gpu_hint = "forced (--use-gpu force)"
+            else:
+                if self.workers <= 1:
+                    _gpu_hint = (
+                        "auto → will USE GPU (sole pool worker, "
+                        "no contention)"
+                    )
+                elif sim.replicates >= 16:
+                    _gpu_hint = (
+                        f"auto → will USE GPU "
+                        f"(per-worker batch n={sim.replicates} ≥ 16)"
+                    )
+                else:
+                    _gpu_hint = (
+                        f"auto → will SKIP GPU "
+                        f"({self.workers} workers contending, "
+                        f"n={sim.replicates} < 16)"
+                    )
+            print(f"GPU policy: {_gpu_hint}")
             # Show memory info for diagnostics
             try:
                 with open('/proc/meminfo', 'r') as f:
@@ -481,7 +510,7 @@ class SweepRunner:
         with ProcessPoolExecutor(
             max_workers=n_workers,
             initializer=_replicate_pool_init,
-            initargs=(str(self.model_path),),
+            initargs=(str(self.model_path), int(n_workers), self._gpu_mode),
         ) as pool:
             futures_map: Dict[Any, tuple] = {}
 
@@ -1055,7 +1084,11 @@ def _strip_to_endpoint(stats: dict) -> dict:
 _BASELINE_MODEL_DICT: Optional[dict] = None
 
 
-def _replicate_pool_init(model_path: str) -> None:
+def _replicate_pool_init(
+    model_path: str,
+    pool_worker_count: int = 1,
+    gpu_mode: str = 'auto',
+) -> None:
     """Initialiser for the flat replicate ProcessPool.
 
     Loads the baseline model from disk one time per worker, parses to
@@ -1063,9 +1096,17 @@ def _replicate_pool_init(model_path: str) -> None:
     `_run_one_replicate` invocations. Also installs the standard
     process guard / nice / CPU affinity so the worker is well-behaved
     under SSH.
+
+    Publishes pool size and GPU mode to env vars so the inner
+    replicate_runner GPU 'auto' decision can distinguish a
+    sole-worker pool (no GPU contention → use GPU) from a
+    multi-worker pool (siblings contend for one GPU → skip).
     """
     global _BASELINE_MODEL_DICT
     os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
+    os.environ['_SHYPN_POOL_WORKER_COUNT'] = str(int(pool_worker_count))
+    if gpu_mode in ('auto', 'force', 'off'):
+        os.environ['_SHYPN_USE_GPU'] = gpu_mode
     os.environ.setdefault('DISPLAY', '')
     from shypn.engine.process_guard import install_process_guard
     install_process_guard()
@@ -1300,7 +1341,12 @@ def _run_single_condition(
     if replicate_pool_size and replicate_pool_size > 1:
         os.environ['_SHYPN_IN_POOL_WORKER'] = str(int(replicate_pool_size))
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
-    runner = ReplicateRunner(model)
+    from shypn.engine.simulation.settings import SimulationSettings
+    _settings = SimulationSettings()
+    _gpu_mode = os.environ.get('_SHYPN_USE_GPU', 'auto')
+    if _gpu_mode in ('auto', 'force', 'off'):
+        _settings.use_gpu = _gpu_mode  # type: ignore[assignment]
+    runner = ReplicateRunner(model, settings=_settings)
     results = runner.run_replicates(
         n=sim_params['replicates'],
         use_parallel=True,
