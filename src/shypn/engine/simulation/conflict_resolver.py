@@ -407,9 +407,12 @@ class ConflictResolver(AbstractConflictResolver):
                 for arc in self._model.arcs:
                     if arc.target is not transition:
                         continue
-                    arc_type = getattr(arc, "arc_type", "normal")
-                    if arc_type == "test":
-                        continue  # Read arc — no consumption
+                    # Per 13-tuple Bio-PN formalism + classical PN literature:
+                    # test and inhibitor (incl. curved_inhibitor_arc) arcs are
+                    # non-consuming. Use Arc.consumes_tokens() as single source
+                    # of truth.
+                    if not arc.consumes_tokens():
+                        continue
                     place = arc.source
                     tokens_consumed: int = getattr(arc, "weight", 1)
                     if place.tokens < tokens_consumed:

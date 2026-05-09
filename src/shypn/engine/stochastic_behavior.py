@@ -913,17 +913,14 @@ class StochasticBehavior(TransitionBehavior):
             # Phase 1: Consume tokens with burst multiplier (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    # Skip inhibitor arcs and test arcs (they don't consume)
-                    # Use defensive pattern: check kind, properties['kind'], and arc_type
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    # Per 13-tuple Bio-PN formalism + classical PN literature:
+                    # test and inhibitor (incl. curved_inhibitor_arc) arcs are
+                    # non-consuming. Use Arc.consumes_tokens() as single source
+                    # of truth (overridden by InhibitorArc / TestArc / etc.).
                     arc_type = getattr(arc, 'arc_type', 'normal')
-                    
-                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
-                    
-                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
-                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
-                    if arc_type == 'test':
-                        logger.debug("    → SKIP consumption (test arc - catalyst)")
+                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, arc_type={arc_type}")
+                    if not arc.consumes_tokens():
+                        logger.debug("    → SKIP consumption (non-consuming arc: test / inhibitor)")
                         continue
                     
                     logger.debug(f"    → CONSUMING {burst * arc.weight} tokens")

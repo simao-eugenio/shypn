@@ -864,9 +864,12 @@ class ContinuousBehavior(TransitionBehavior):
                 actual_flow = min(actual_flow, max_flow)
 
         # Phase 2: consume
+        # Per 13-tuple Bio-PN formalism: test and inhibitor (all variants) arcs
+        # are non-consuming. Use Arc.consumes_tokens() as the single source of
+        # truth for consumption semantics.
         if not is_source and actual_flow > 0:
             for arc in consume_arcs:
-                if getattr(arc, 'arc_type', 'normal') == 'test':
+                if not arc.consumes_tokens():
                     continue
                 place_id = arc.source_id if not reverse_direction else arc.target_id
                 src = self._get_place(place_id)
@@ -950,10 +953,10 @@ class ContinuousBehavior(TransitionBehavior):
         predicted_produced = {}
         
         for arc in self.get_input_arcs():
-            # Per formalism: only TEST arcs are non-consuming.
-            # signal_flow and inhibitor arcs DO consume tokens.
-            arc_type = getattr(arc, 'arc_type', 'normal')
-            if arc_type != 'test':
+            # Per 13-tuple Bio-PN formalism + classical PN literature:
+            # test and inhibitor arcs are non-consuming; signal_flow and
+            # normal arcs are consuming.
+            if arc.consumes_tokens():
                 predicted_consumed[arc.source_id] = arc.weight * rate * dt
         
         for arc in self.get_output_arcs():

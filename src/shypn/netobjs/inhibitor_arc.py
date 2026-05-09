@@ -69,6 +69,22 @@ class InhibitorArc(Arc):
             weight: Arc weight (threshold for surplus - default: 1)
         """
         super().__init__(source, target, id, name, weight)
+
+    def consumes_tokens(self) -> bool:
+        """Inhibitor arcs are non-consuming (classical PN semantics).
+        
+        Per the 13-tuple Bio-PN formalism (Simão 2025) and classical PN
+        literature (Murata 1989, ISO/IEC 15909, GreatSPN, Snoopy):
+        inhibitor arcs are presence-absence checks — they invert the
+        enablement predicate (``tokens >= threshold → disabled``) but
+        transfer **no mass** when the transition fires.
+        
+        SHyPN's only extension to the classical inhibitor arc is the
+        flexibility on threshold evaluation: ``threshold`` may be any
+        runtime expression (e.g. ``"4800 + 0.5 * ADP_pool"``) rather
+        than a static integer. Consumption semantics are unchanged.
+        """
+        return False
     
     @staticmethod
     def _validate_connection(source, target):

@@ -894,10 +894,12 @@ class TauLeapingEngine:
         max_firings = requested_firings
         
         for arc in input_arcs:
-            # Skip test arcs (don't consume tokens)
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            arc_type = getattr(arc, 'arc_type', 'normal')
-            if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+            # Per 13-tuple Bio-PN formalism + classical PN literature:
+            # test and inhibitor (incl. curved_inhibitor_arc) arcs are
+            # non-consuming presence/absence checks and therefore do NOT
+            # constrain max_firings. Use Arc.consumes_tokens() as the
+            # single source of truth (mirrors _fire_transition_multiple).
+            if not arc.consumes_tokens():
                 continue
             
             source_place = arc.source
@@ -949,8 +951,10 @@ class TauLeapingEngine:
         # here to avoid silent dual-source-of-truth divergence.
         if not is_source:
             for arc in input_arcs:
-                arc_type = getattr(arc, 'arc_type', 'normal')
-                if arc_type == 'test':
+                # Per 13-tuple Bio-PN formalism + classical PN literature:
+                # test and inhibitor (all variants) arcs are non-consuming.
+                # Use Arc.consumes_tokens() as single source of truth.
+                if not arc.consumes_tokens():
                     continue
 
                 source_place = arc.source
