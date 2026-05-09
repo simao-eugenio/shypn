@@ -1635,8 +1635,11 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                arc_type = getattr(arc, 'arc_type', 'normal')
-                                if arc_type == 'test':
+                                # Per 13-tuple Bio-PN formalism + classical PN literature:
+                                # test and inhibitor (incl. curved_inhibitor_arc) arcs
+                                # are non-consuming. Use Arc.consumes_tokens() as the
+                                # single source of truth.
+                                if not arc.consumes_tokens():
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
                                 if source_place is not None:
@@ -1860,8 +1863,12 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                     input_arcs = behavior.get_input_arcs()
                     structurally_enabled = True
                     for arc in input_arcs:
-                        arc_type = getattr(arc, 'arc_type', 'normal')
-                        if arc_type == 'test':
+                        # Skip non-consuming arcs (test / inhibitor variants);
+                        # their enablement contribution is computed elsewhere
+                        # (TransitionBehavior.is_enabled). A token check here
+                        # would mis-classify inhibitor arcs (whose semantics
+                        # are inverted: M(p) >= θ ⇒ DISABLED).
+                        if not arc.consumes_tokens():
                             continue
                         source_place = arc.source
                         if source_place and source_place.tokens < arc.weight:

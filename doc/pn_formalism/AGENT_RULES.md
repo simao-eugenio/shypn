@@ -235,7 +235,7 @@ cascade**?
 |------------------------------------------------------------|----------------|-----------------|---------------------------------------------------------|
 | **Substrate** (consumed, mass leaves)                      | no             | `normal`        | debits source by `weight × flow`                        |
 | **Catalyst / regulator presence** (read but not consumed)  | no             | `test`          | requires `M(p) ≥ τ_t`; Δ = 0 on firing                  |
-| **Inhibitor** (presence disables)                          | no             | `inhibitor`     | `M(p) ≥ threshold ⇒ disabled`                           |
+| **Inhibitor** (presence disables, **read but not consumed**) | no           | `inhibitor`     | `M(p) ≥ θ_eff ⇒ disabled`; **Δ = 0 on firing** (classical PN, Murata 1989). SHyPN extends only the *threshold evaluation* — `θ_eff` may be a runtime expression (e.g. `"4800 + 0.5 * ADP_pool"`). The `weight` attribute is irrelevant. |
 | **Regulatory signal**, transition belongs to a hierarchy   | **yes**        | `signal_flow`   | debits source AND triggers `PreemptionCheck` on upstream signal producers |
 
 Same table for output arcs:

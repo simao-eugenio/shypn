@@ -404,7 +404,28 @@ Enabled(t,M) ≡ NormalEnabled(t,M)
              ∧ PreemptionCheck(t,M)      — single-layer, non-recursive
 ```
 
-**Firing rule:** `M'(p) = M(p) + Δ_normal(p,t) + Δ_signal(p,t)` (test arcs Δ = 0).
+**Firing rule:** `M'(p) = M(p) + Δ_normal(p,t) + Δ_signal(p,t)` (test
+arcs Δ = 0; **inhibitor arcs Δ = 0** — they are non-consuming
+presence-absence checks per classical PN semantics; SHyPN extends only
+the threshold *evaluation* — `θ` may be a runtime expression — never
+the consumption semantics).
+
+**Consumption semantics by arc type (single source of truth:
+`Arc.consumes_tokens()`):**
+
+| Arc type                                             | Consumes? | Override site                       |
+|------------------------------------------------------|-----------|-------------------------------------|
+| `normal`                                             | yes       | `Arc.consumes_tokens()` default     |
+| `signal_flow` (incl. `curved_signal_flow_arc`)       | yes       | `SignalFlowArc.consumes_tokens()`   |
+| `test`                                               | **no**    | `TestArc.consumes_tokens()`         |
+| `inhibitor`                                          | **no**    | `InhibitorArc.consumes_tokens()`    |
+| `curved_inhibitor_arc`                               | **no**    | `CurvedInhibitorArc.consumes_tokens()` |
+
+The base `Arc.consumes_tokens()` ALSO recognises the string
+`'inhibitor' in arc_type` so plain `Arc` instances loaded from a `.shy`
+file (with `_arc_type_override = 'inhibitor'` /
+`'curved_inhibitor_arc'`) yield the correct answer regardless of
+subclass instantiation.
 
 **Dual arc case** (signal place in both `F` and `F_s`):
 ```
@@ -421,15 +442,31 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
 2. **Signal flow arcs consume tokens.** Do not skip them in consumption
    loops; do not document them as "read-only" or "without mass transfer".
 
-3. **Test arcs are the only non-consuming arc type** (`arc_type='test'`).
-   All `behavior.fire()` methods must `continue` past test arcs.
+3. **Test AND inhibitor arcs are non-consuming.** Both `arc_type='test'`
+   and any `'inhibitor' in arc_type` (`inhibitor`,
+   `curved_inhibitor_arc`, future variants) skip the consumption phase
+   in every behavior (`fire()` / `_fire_transition_multiple()` /
+   `_apply_flow_to_arcs()`). The single source of truth is
+   `arc.consumes_tokens()` — call it; do not re-derive the rule
+   inline. Also: τ-leaping `_calculate_max_firings` must skip
+   non-consuming arcs (failing to skip a `curved_inhibitor_arc` whose
+   source starts at 0 silently caps `max_firings = 0` and freezes the
+   transition forever — bug audit 2026-05-08, bacillus_sporulation_v2).
 
 4. **PreemptionCheck is single-layer and non-recursive.** Lives in
    `TransitionBehavior._check_preemption()`; called from every
    `can_fire()` (immediate, stochastic, continuous, timed). Vacuously
    true for Layer-0 transitions (no signal predecessors).
 
-5. **Inhibitor arcs invert:** `tokens >= threshold → disabled`.
+5. **Inhibitor arcs invert enablement, do NOT consume.** Predicate:
+   `M(p) ≥ θ_eff(arc) → disabled`. SHyPN extension over classical PN:
+   `θ_eff` may be a runtime expression
+   (e.g. `"4800 + 0.5 * ADP_pool"`) rather than a static integer. Mass
+   transfer on firing is **always zero** (Murata 1989, ISO/IEC 15909,
+   GreatSPN, Snoopy convention). The `weight` attribute on an
+   inhibitor arc is irrelevant to firing semantics — only `threshold`
+   matters. Pinned by `tests/test_inhibitor_non_consumption.py` and
+   `tests/test_classical_arc_semantics.py`.
 
 6. **Reversible reactions** use Skellam sampler (Poisson(fwd) − Poisson(rev)).
 

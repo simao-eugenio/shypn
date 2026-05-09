@@ -39,6 +39,10 @@ class CurvedInhibitorArc(CurvedArc):
         # Skip CurvedArc.__init__ to avoid double validation, call Arc.__init__ directly
         from shypn.netobjs.arc import Arc
         Arc.__init__(self, source, target, id, name, weight)
+
+    def consumes_tokens(self) -> bool:
+        """Curved inhibitor arcs are non-consuming (delegates to InhibitorArc)."""
+        return False
     
     def _render_arrowhead(self, cr, x: float, y: float, dx: float, dy: float, zoom: float = 1.0):
         """Render hollow circle marker instead of two-line arrowhead.
