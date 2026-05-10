@@ -18,7 +18,7 @@ from __future__ import annotations
 import csv, json, statistics, itertools, re
 from pathlib import Path
 
-ROOT = Path('/tmp/v4_factorial')
+ROOT = Path('/tmp/v4_1_factorial')
 OUT  = Path('/home/simao/projetos/shypn/workspace/projects/thesis/analysis/thesis_revision_v4_factorial')
 OUT.mkdir(parents=True, exist_ok=True)
 

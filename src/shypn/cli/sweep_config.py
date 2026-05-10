@@ -191,6 +191,10 @@ class SweepConfig(ABC):
         #   model defaults < fixed_overrides < per-snapshot overrides
         #     < swept axis  < events fired during the run
         self.fixed_overrides: Dict[str, float] = {}
+        # Opt-in observable reduction config (UI-only). The engine
+        # never reads this; the Results Browser uses it to compute
+        # endpoint / first-crossing scalars per condition.
+        self.primary_observables: Optional[Dict[str, Any]] = None
 
     # ── abstract contract ─────────────────────────────────────────────
 
@@ -242,6 +246,12 @@ class SweepConfig(ABC):
                 or self.output.trajectory_places is not None \
                 or self.output.trajectory_thin_seconds is not None:
             d['output'] = self.output.to_dict()
+        # Pass-through opt-in observable reduction config (UI-only;
+        # the engine never reads it). Lives on the instance as
+        # ``primary_observables`` when present.
+        po = getattr(self, 'primary_observables', None)
+        if po:
+            d['primary_observables'] = po
         return d
 
     @staticmethod
@@ -328,6 +338,16 @@ class SweepConfig(ABC):
         # Hydrate output options if present
         if 'output' in data:
             result.output = OutputOptions.from_dict(data['output'])
+        # Pass-through observable reduction config (UI-only; opaque to
+        # the engine). Validated as a dict if present.
+        po = data.get('primary_observables')
+        if po is not None:
+            if not isinstance(po, dict):
+                raise ValueError(
+                    f"'primary_observables' must be a JSON object, "
+                    f"got {type(po).__name__}"
+                )
+            result.primary_observables = dict(po)
         return result
 
     @staticmethod
@@ -371,4 +391,8 @@ _UNIVERSAL_TOP_LEVEL_KEYS = frozenset({
     # /memories/repo/hpn_experiment_plan_rule.md and the project
     # instructions §"Sweep ↔ model superposition rule").
     'superposition_intent',
+    # Opt-in primary-observable reduction config consumed by the
+    # Results Browser (UI side). Persisted as-is into
+    # run_<ts>/config.json so observables remain reproducible per run.
+    'primary_observables',
 })

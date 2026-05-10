@@ -185,14 +185,33 @@ def audit_model(path: Path) -> tuple[int, list[str]]:
 
     # ------------------------------------------------------------------
     # C4: is_environment_aware backdoor
+    #
+    # In the legacy formalism this flag was set manually to opt a
+    # transition into engine-side env-symbol injection (Temperature, pH,
+    # Q10, …). In the current code (2026-04+) the flag is purely a
+    # *derived* display attribute computed by the engine as
+    # ``len(signal_places) > 0`` — see
+    # ``builders/transition_builder.py:400`` and
+    # ``analysis/quorum_sensing.py:258``. It never gates execution.
+    #
+    # The genuine backdoor pattern is ``is_environment_aware=True`` with
+    # an EMPTY ``signal_places`` list — that combination cannot arise
+    # from the engine's auto-derivation and indicates a stale
+    # hand-edited flag from a pre-refactor model. With a non-empty
+    # ``signal_places`` the flag is benign bookkeeping.
     # ------------------------------------------------------------------
     for t in transitions:
-        if t.get("is_environment_aware"):
-            n += 1
-            lines.append(
-                f"  [C4] {t.get('name', t.get('id'))} has "
-                "is_environment_aware=True (parameter-place backdoor)"
-            )
+        if not t.get("is_environment_aware"):
+            continue
+        sp = t.get("signal_places") or []
+        if sp:
+            continue  # benign: flag matches engine-derived bookkeeping
+        n += 1
+        lines.append(
+            f"  [C4] {t.get('name', t.get('id'))} has "
+            "is_environment_aware=True but no signal_places "
+            "(stale legacy backdoor flag — clear it)"
+        )
 
     # ------------------------------------------------------------------
     # C5: hard-coded environment symbols in rate expressions

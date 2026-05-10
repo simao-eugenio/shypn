@@ -39,5 +39,15 @@
   "events": [],
   "fixed_overrides": {
     "ATP_setpoint.initial_marking": 4800.0
+  },
+  "primary_observables": {
+    "endpoint_place": "Outer_coat",
+    "endpoint_label": "Outer coat (final)",
+    "first_crossing": {
+      "place": "Mature_spore",
+      "threshold": 1.0,
+      "time_unit": "min",
+      "label": "t1 Mature spore (min)"
+    }
   }
 }

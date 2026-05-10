@@ -234,6 +234,7 @@ class ExperimentAutomationCategory:
         self.results_browser = ResultsBrowserView(model=model)
         self.results_browser.set_export_callback(self._on_export_results)
         self.results_browser.set_report_callback(self._on_add_to_report)
+        self.results_browser.on_reload_callback = self._scan_local_run_dirs
         self.content_box.pack_start(self.results_browser, True, True, 0)
     
     def _on_object_type_changed(self, combo):
@@ -1230,6 +1231,20 @@ class ExperimentAutomationCategory:
         proxy = (self._remote_dispatcher.results_proxy
                  if self._remote_dispatcher else None)
 
+        # Optional primary-observable reduction (config.json + model_snapshot.shy
+        # land alongside summary.csv in the run dir).
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            compute_observables, load_place_name_to_id, load_run_config,
+            load_project_observables_fallback,
+        )
+        run_cfg = load_run_config(results_path)
+        obs_cfg = (run_cfg or {}).get('primary_observables') or {}
+        if not obs_cfg:
+            obs_cfg = load_project_observables_fallback(results_path)
+        name_to_id = load_place_name_to_id(results_path) if obs_cfg else {}
+        if obs_cfg:
+            self._configure_observable_columns(obs_cfg)
+
         # Parse summary.csv and load each condition as a result entry
         import csv
         condition_names: list[str] = []
@@ -1244,6 +1259,13 @@ class ExperimentAutomationCategory:
 
                     condition_names.append(condition)
 
+                    cond_dir = (
+                        results_path /
+                        f'condition_{condition.replace("=", "_eq_")}'
+                    )
+                    obs = (compute_observables(cond_dir, obs_cfg, name_to_id)
+                           if obs_cfg else {})
+
                     # Create a minimal result dict for the browser
                     result = {
                         'name': condition,
@@ -1251,9 +1273,9 @@ class ExperimentAutomationCategory:
                         'errors': errors,
                         'wall_seconds': wall,
                         'source': 'remote',
-                        'results_dir': str(
-                            results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'results_dir': str(cond_dir),
                         'remote_only': proxy is not None,
+                        'primary_observables': obs,
                     }
                     self.results_browser.add_result(condition, result)
 
@@ -1265,6 +1287,152 @@ class ExperimentAutomationCategory:
 
         except Exception as e:
             logger.warning("Failed to load remote results: %s", e)
+
+    # ── Local run-dir scanning ───────────────────────────────────────
+
+    def _configure_observable_columns(self, obs_cfg: dict) -> None:
+        """Push observable column titles to the Results Browser.
+
+        Idempotent — repeated calls just refresh the headers, so it is
+        safe to call once per loaded run dir.
+        """
+        if not self.results_browser:
+            return
+        ep_cfg = obs_cfg.get('endpoint_place')
+        ep_label = obs_cfg.get('endpoint_label') if ep_cfg else None
+        if ep_cfg and not ep_label:
+            ep_label = f'{ep_cfg} (final)'
+        fc_cfg = obs_cfg.get('first_crossing') or {}
+        fc_label = fc_cfg.get('label')
+        if fc_cfg and not fc_label:
+            unit = fc_cfg.get('time_unit', 's')
+            fc_label = f"t1 {fc_cfg.get('place', '?')} ({unit})"
+        try:
+            self.results_browser.set_observable_headers(ep_label, fc_label)
+        except AttributeError:
+            # Older browser without observable columns
+            pass
+
+    def _scan_local_run_dirs(self, latest_only: bool = False) -> None:
+        """Walk ``<project>/experiments/results/`` and load sweep runs into the browser.
+
+        The Results Browser is otherwise event-driven (live sweeps +
+        pending-dispatch recovery), so historical runs and manually
+        rsynced run dirs would never appear.  This method bridges that
+        gap by treating each ``run_*/summary.csv`` like a remote
+        summary and pushing condition rows through the same
+        ``_load_remote_results`` path.
+
+        Condition names are prefixed with the run-dir name so multiple
+        runs can coexist in the browser without name collisions.
+
+        Args:
+            latest_only: If True, load only the most recently modified
+                run directory (typical startup behaviour). If False,
+                load every run dir found (manual Reload).
+        """
+        if not self.results_browser:
+            return
+        try:
+            from shypn.data.project_models import get_project_manager
+            project = get_project_manager().current_project
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Local run-dir scan skipped (no project): %s", exc)
+            return
+        if project is None or not getattr(project, 'base_path', None):
+            return
+
+        results_root = Path(project.base_path) / 'experiments' / 'results'
+        if not results_root.is_dir():
+            return
+
+        run_dirs = [
+            d for d in results_root.iterdir()
+            if d.is_dir() and d.name.startswith('run_')
+            and (d / 'summary.csv').is_file()
+        ]
+        if not run_dirs:
+            logger.debug("No on-disk sweep runs under %s", results_root)
+            return
+
+        run_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+        if latest_only:
+            run_dirs = run_dirs[:1]
+
+        loaded = 0
+        for run_dir in run_dirs:
+            try:
+                self._load_local_run_dir(run_dir)
+                loaded += 1
+            except Exception as exc:
+                logger.warning("Failed to load run dir %s: %s", run_dir, exc)
+        logger.info(
+            "Local run-dir scan: loaded %d/%d run(s) from %s",
+            loaded, len(run_dirs), results_root,
+        )
+
+    def _load_local_run_dir(self, run_dir: Path) -> None:
+        """Load one ``run_*`` directory's conditions into the browser.
+
+        Reads ``summary.csv`` and registers each condition as a local
+        result whose ``results_dir`` points at the per-condition folder
+        on disk.  Condition keys are prefixed with the run-dir name so
+        multiple runs coexist without overwriting each other.
+
+        Args:
+            run_dir: Absolute path to a ``run_<timestamp>/`` directory
+                containing at minimum ``summary.csv``.
+        """
+        import csv
+
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            compute_observables, load_place_name_to_id, load_run_config,
+            load_project_observables_fallback,
+        )
+
+        summary_csv = run_dir / 'summary.csv'
+        run_label = run_dir.name  # e.g. "run_20260510_002345"
+
+        run_cfg = load_run_config(run_dir)
+        obs_cfg = (run_cfg or {}).get('primary_observables') or {}
+        if not obs_cfg:
+            # Older runs were dispatched before the block existed; let
+            # the user retroactively see observables by reading from the
+            # project's live sweep_config*.json.
+            obs_cfg = load_project_observables_fallback(run_dir)
+        name_to_id = load_place_name_to_id(run_dir) if obs_cfg else {}
+        if obs_cfg:
+            self._configure_observable_columns(obs_cfg)
+
+        with summary_csv.open() as f:
+            for row in csv.DictReader(f):
+                condition = row.get('condition', 'unknown')
+                ok = int(row.get('replicates_ok') or 0)
+                errors = int(row.get('replicates_error') or 0)
+                wall = float(row.get('wall_seconds') or 0.0)
+
+                cond_dir_name = (
+                    f'condition_{condition.replace("=", "_eq_")}'
+                )
+                cond_dir = run_dir / cond_dir_name
+
+                obs = (compute_observables(cond_dir, obs_cfg, name_to_id)
+                       if obs_cfg else {})
+
+                # Composite key keeps runs disambiguated in the browser
+                browser_key = f'{run_label} / {condition}'
+                result = {
+                    'name': browser_key,
+                    'replicates': ok,
+                    'errors': errors,
+                    'wall_seconds': wall,
+                    'source': 'disk',
+                    'results_dir': str(cond_dir),
+                    'remote_only': False,
+                    'run_dir': str(run_dir),
+                    'primary_observables': obs,
+                }
+                self.results_browser.add_result(browser_key, result)
 
     # ── Pending-dispatch recovery ────────────────────────────────────
 
@@ -2618,6 +2786,11 @@ class ExperimentAutomationCategory:
         # config.json so the Experiment Results browser can list it.
         # Runs in a daemon thread so the UI stays responsive.
         self._schedule_pending_dispatch_recovery()
+
+        # Auto-load the most recent on-disk sweep run so the Results
+        # browser is populated when a project is opened (without
+        # requiring a sweep to be in flight or a manual reload).
+        self._scan_local_run_dirs(latest_only=True)
     
     def set_model_canvas(self, model_canvas):
         """Update model canvas reference.
