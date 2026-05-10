@@ -90,9 +90,12 @@ class ResultsBrowserView(BaseResultsView):
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_size_request(-1, 150)
         
-        # Create ListStore: selected (bool), name, replicates, duration, status, error_msg
-        # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str), 4=status (str), 5=error_msg (str)
-        self.results_store = Gtk.ListStore(bool, str, int, str, str, str)
+        # Create ListStore: selected (bool), name, replicates, duration, status, error_msg,
+        #                   endpoint_str, first_crossing_str
+        # Columns: 0=selected (bool), 1=name (str), 2=n_replicates (int), 3=duration (str),
+        #          4=status (str), 5=error_msg (str), 6=endpoint observable (str),
+        #          7=first-crossing observable (str)
+        self.results_store = Gtk.ListStore(bool, str, int, str, str, str, str, str)
         
         # Create TreeView with sortable columns
         self.results_tree = Gtk.TreeView(model=self.results_store)
@@ -144,6 +147,27 @@ class ResultsBrowserView(BaseResultsView):
         column_status.set_resizable(True)
         self.results_tree.append_column(column_status)
         self.results_tree.set_tooltip_column(5)  # Column 5 = error message
+
+        # Column 6: Endpoint observable (e.g. 'Outer_coat (final)')
+        # Header is updated dynamically by ``set_observable_headers``
+        # when a sweep config supplies a ``primary_observables`` block.
+        renderer_ep = Gtk.CellRendererText()
+        self._endpoint_column = Gtk.TreeViewColumn("Endpoint", renderer_ep, text=6)
+        self._endpoint_column.set_min_width(140)
+        self._endpoint_column.set_sort_column_id(6)
+        self._endpoint_column.set_resizable(True)
+        self._endpoint_column.set_visible(False)  # shown when configured
+        self.results_tree.append_column(self._endpoint_column)
+
+        # Column 7: First-crossing observable (e.g. 't1 Mature_spore (min)')
+        renderer_fc = Gtk.CellRendererText()
+        self._first_crossing_column = Gtk.TreeViewColumn(
+            "First crossing", renderer_fc, text=7)
+        self._first_crossing_column.set_min_width(120)
+        self._first_crossing_column.set_sort_column_id(7)
+        self._first_crossing_column.set_resizable(True)
+        self._first_crossing_column.set_visible(False)
+        self.results_tree.append_column(self._first_crossing_column)
         
         # Connect selection changed
         selection = self.results_tree.get_selection()
@@ -212,6 +236,32 @@ class ResultsBrowserView(BaseResultsView):
         self.report_button.set_sensitive(False)
         self.report_button.connect("clicked", self._on_report_clicked)
         button_box.pack_start(self.report_button, False, False, 0)
+
+        # Reload Results button — rescans <project>/experiments/results/
+        # and repopulates the list from disk.  Use after a manual
+        # rsync, or after restarting the GUI on a project whose
+        # previous sweeps were never registered as pending dispatches.
+        # Export Primary Observables CSV — flat one-row-per-condition
+        # dump of the configured primary observables across every
+        # currently loaded result. Lets a biologist get the table
+        # without leaving the GUI.
+        self.export_observables_button = Gtk.Button(label="📊 Export Observables CSV")
+        self.export_observables_button.set_tooltip_text(
+            "Export configured primary observables (endpoint, first crossing) "
+            "for all loaded conditions to a single CSV.")
+        self.export_observables_button.connect(
+            "clicked", self._on_export_observables_clicked)
+        button_box.pack_start(self.export_observables_button, False, False, 0)
+        self.on_export_observables_callback = None
+
+        self.reload_button = Gtk.Button(label="🔄 Reload Results")
+        self.reload_button.set_tooltip_text(
+            "Rescan project results directory and reload all sweep runs from disk"
+        )
+        self.reload_button.connect("clicked", self._on_reload_clicked)
+        button_box.pack_start(self.reload_button, False, False, 0)
+        # Callback registered by ExperimentAutomationCategory
+        self.on_reload_callback = None
         
         # Clear All button
         clear_button = Gtk.Button(label="Clear All")
@@ -1593,10 +1643,21 @@ class ResultsBrowserView(BaseResultsView):
         
         error_msg = result_data.get('error', '')
         status = "✗ Error" if error_msg else "✓ Completed"
-        
+
+        # Primary observables (optional, computed by the loader)
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            format_endpoint, format_first_crossing,
+        )
+        obs = result_data.get('primary_observables') or {}
+        endpoint_str = format_endpoint(obs.get('endpoint'))
+        first_crossing_str = format_first_crossing(obs.get('first_crossing'))
+
         # Add to store (default: not selected)
         # Include full error message in column 5 for tooltip
-        self.results_store.append([False, name, n_replicates, duration_str, status, error_msg])
+        self.results_store.append([
+            False, name, n_replicates, duration_str, status, error_msg,
+            endpoint_str, first_crossing_str,
+        ])
         
         self._update_status_label()
     
@@ -1817,6 +1878,22 @@ class ResultsBrowserView(BaseResultsView):
         
         # Build statistics text
         text = f"<b>{name}</b>\n\n"
+
+        # Primary observables (highlighted up-front)
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            format_endpoint, format_first_crossing,
+        )
+        obs = result.get('primary_observables') or {}
+        ep = obs.get('endpoint')
+        fc = obs.get('first_crossing')
+        if ep or fc:
+            text += "<b>Primary observables:</b>\n"
+            if ep:
+                text += f"  {ep.get('label', 'Endpoint')}: {format_endpoint(ep)}\n"
+            if fc:
+                text += f"  {fc.get('label', 'First crossing')}: {format_first_crossing(fc)}\n"
+            text += "\n"
+
         text += "<b>Execution:</b>\n"
         text += f"  Replicates: {n_reps}\n"
         text += f"  Execution Time: {elapsed:.2f}s\n\n"
@@ -2189,6 +2266,100 @@ class ResultsBrowserView(BaseResultsView):
         name, result = self.get_selected_result()
         if name and result and self.on_report_callback:
             self.on_report_callback(name, result)
+
+    def _on_reload_clicked(self, button):
+        """Handle Reload Results button click.
+
+        Delegates to the parent ExperimentAutomationCategory which owns
+        the project + filesystem context required to walk
+        ``<project>/experiments/results/``.
+        """
+        if self.on_reload_callback:
+            self.on_reload_callback()
+
+    def set_observable_headers(self, endpoint_label, first_crossing_label):
+        """Update observable column headers and visibility.
+
+        Called by the loader after parsing a sweep ``config.json``'s
+        ``primary_observables`` block. Pass ``None`` to leave a
+        column hidden.
+        """
+        if endpoint_label:
+            self._endpoint_column.set_title(endpoint_label)
+            self._endpoint_column.set_visible(True)
+        if first_crossing_label:
+            self._first_crossing_column.set_title(first_crossing_label)
+            self._first_crossing_column.set_visible(True)
+
+    def _on_export_observables_clicked(self, button):
+        """Export the configured primary observables for all loaded results.
+
+        Walks ``self.results`` and writes one row per condition with
+        the parsed endpoint / first-crossing values (numeric, not
+        formatted). No-op with a notice dialog if no result carries
+        a ``primary_observables`` block.
+        """
+        rows = []
+        for name, res in self.results.items():
+            obs = (res or {}).get('primary_observables') or {}
+            if not obs:
+                continue
+            row = {'condition': name}
+            ep = obs.get('endpoint')
+            if ep:
+                row['endpoint_species'] = ep.get('species', '')
+                row['endpoint_mean'] = ep.get('mean', '')
+                row['endpoint_std'] = ep.get('std', '')
+                row['endpoint_n'] = ep.get('n', '')
+            fc = obs.get('first_crossing')
+            if fc:
+                row['fc_species'] = fc.get('species', '')
+                row['fc_threshold'] = fc.get('threshold', '')
+                row['fc_time_s'] = fc.get('time_s', '')
+                row['fc_time_unit'] = fc.get('time_unit', '')
+            rows.append(row)
+
+        if not rows:
+            dlg = Gtk.MessageDialog(
+                transient_for=self.get_toplevel(), flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No primary observables to export.",
+            )
+            dlg.format_secondary_text(
+                "Add a 'primary_observables' block to the sweep config "
+                "and reload results.")
+            dlg.run()
+            dlg.destroy()
+            return
+
+        chooser = Gtk.FileChooserDialog(
+            title="Export Primary Observables CSV",
+            parent=self.get_toplevel(),
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        chooser.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE, Gtk.ResponseType.OK,
+        )
+        chooser.set_current_name("primary_observables.csv")
+        chooser.set_do_overwrite_confirmation(True)
+        try:
+            if chooser.run() == Gtk.ResponseType.OK:
+                path = chooser.get_filename()
+                fieldnames = []
+                for r in rows:
+                    for k in r.keys():
+                        if k not in fieldnames:
+                            fieldnames.append(k)
+                import csv as _csv
+                with open(path, 'w', newline='') as f:
+                    w = _csv.DictWriter(f, fieldnames=fieldnames)
+                    w.writeheader()
+                    for r in rows:
+                        w.writerow(r)
+        finally:
+            chooser.destroy()
     
     def _on_clear_clicked(self, button):
         """Handle Clear All button click."""
