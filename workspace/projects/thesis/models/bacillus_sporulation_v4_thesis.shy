@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-09T10:24:57.424492",
+    "created": "2026-05-12T12:00:25.803940",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -12,9 +12,9 @@
     }
   },
   "view_state": {
-    "zoom": 1.399522140629211,
-    "pan_x": -74.83766916199579,
-    "pan_y": -142.38109909725114,
+    "zoom": 0.5395763697276462,
+    "pan_x": 1385.403684287684,
+    "pan_y": -291.6421888262712,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -271,8 +271,8 @@
         "compartment": "cytoplasm"
       },
       "object_type": "place",
-      "x": -720.0,
-      "y": 870.0,
+      "x": -760.0,
+      "y": 880.0,
       "radius": 30.0,
       "marking": 20.0,
       "initial_marking": 20.0,
@@ -347,8 +347,8 @@
         "compartment": "cytoplasm"
       },
       "object_type": "place",
-      "x": -390.0,
-      "y": 1020.0,
+      "x": -440.0,
+      "y": 1000.0,
       "radius": 30.0,
       "marking": 15.0,
       "initial_marking": 15.0,
@@ -385,7 +385,7 @@
         "compartment": "cytoplasm"
       },
       "object_type": "place",
-      "x": -680.0,
+      "x": -700.0,
       "y": 1370.0,
       "radius": 30.0,
       "marking": 25.0,
@@ -1023,8 +1023,8 @@
     },
     {
       "id": "P27",
-      "name": "Initial_Nutrients",
-      "label": "Initial_Nutrients\n100.0",
+      "name": "INITIAL_NUTRIENTS",
+      "label": "INITIAL_NUTRIENTS\n100.0",
       "object_type": "place",
       "x": -790.0,
       "y": 0.0,
@@ -1056,10 +1056,10 @@
     },
     {
       "id": "P28",
-      "name": "Temperature_K",
-      "label": "Temperature_K\n310.15",
+      "name": "TEMPERATURE_K",
+      "label": "TEMPERATURE_K\n310.15",
       "object_type": "place",
-      "x": -490.0,
+      "x": -430.0,
       "y": 0.0,
       "radius": 30.0,
       "marking": 310.15,
@@ -1089,11 +1089,11 @@
     },
     {
       "id": "P29",
-      "name": "ATP_setpoint",
-      "label": "ATP_setpoint\n4800.0",
+      "name": "ATP_SETPOINT",
+      "label": "ATP_SETPOINT\n4800.0",
       "object_type": "place",
-      "x": -90.0,
-      "y": 10.0,
+      "x": -60.0,
+      "y": 0.0,
       "radius": 30.0,
       "marking": 4800.0,
       "initial_marking": 4800.0,
@@ -1122,11 +1122,11 @@
     },
     {
       "id": "P30",
-      "name": "Sigma_halflife_min",
-      "label": "Sigma_halflife_min\n120.0",
+      "name": "SIGMA_HALFLIFE_MIN",
+      "label": "SIGMA_HALFLIFE_MIN\n120.0",
       "object_type": "place",
-      "x": 210.0,
-      "y": 10.0,
+      "x": 250.0,
+      "y": 0.0,
       "radius": 30.0,
       "marking": 120.0,
       "initial_marking": 120.0,
@@ -1158,8 +1158,8 @@
       "name": "k_ATP_target",
       "label": "k_ATP_target\n4800.0",
       "object_type": "place",
-      "x": -100.0,
-      "y": 180.0,
+      "x": -30.0,
+      "y": 170.0,
       "radius": 30.0,
       "marking": 4800.0,
       "initial_marking": 4800.0,
@@ -1191,8 +1191,8 @@
       "name": "k_sigma_decay",
       "label": "k_sigma_decay\n0.0057762265046662105",
       "object_type": "place",
-      "x": -470.0,
-      "y": 180.0,
+      "x": -410.0,
+      "y": 170.0,
       "radius": 30.0,
       "marking": 0.0057762265046662105,
       "initial_marking": 0.0057762265046662105,
@@ -1225,7 +1225,7 @@
       "label": "k_thermo_factor\n1.0",
       "object_type": "place",
       "x": -800.0,
-      "y": 180.0,
+      "y": 170.0,
       "radius": 30.0,
       "marking": 1.0,
       "initial_marking": 1.0,
@@ -1286,9 +1286,9 @@
         "rate_function": "0.01 * KinA_kinase * (1 / (1 + Nutrients**2)) * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
+        "P3",
         "P1",
-        "P5",
-        "P3"
+        "P5"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1421,8 +1421,8 @@
       "name": "T_Spo0A_dephosphorylation",
       "label": "T_Spo0A_dephosphorylation",
       "object_type": "transition",
-      "x": -520.0,
-      "y": 1580.0,
+      "x": -550.0,
+      "y": 1590.0,
       "width": 40.0,
       "height": 20.0,
       "horizontal": true,
@@ -1527,10 +1527,10 @@
         "rate_function": "0.005 * SigmaH**2 * Cell_density * ATP_pool / (200 + ATP_pool) * GTP_pool / (100 + GTP_pool)"
       },
       "signal_places": [
-        "P2",
-        "P4",
         "P13",
-        "P1"
+        "P1",
+        "P2",
+        "P4"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1569,8 +1569,8 @@
         "rate_function": "0.02 * Septum * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
-        "P1",
-        "P14"
+        "P14",
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1609,9 +1609,9 @@
         "rate_function": "0.02 * SigmaF * Septum * GTP_pool / (50 + GTP_pool)"
       },
       "signal_places": [
+        "P14",
         "P2",
-        "P15",
-        "P14"
+        "P15"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1650,8 +1650,8 @@
         "rate_function": "0.01 * SigmaE * SigmaF * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P1",
         "P15",
+        "P1",
         "P16"
       ],
       "is_environment_aware": true,
@@ -1691,8 +1691,8 @@
         "rate_function": "0.008 * SigmaF * SigmaE * ATP_pool / (150 + ATP_pool)"
       },
       "signal_places": [
-        "P1",
         "P15",
+        "P1",
         "P16"
       ],
       "is_environment_aware": true,
@@ -1772,9 +1772,9 @@
         "rate_function": "0.01 * SigmaF * Septum * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
+        "P14",
         "P1",
-        "P15",
-        "P14"
+        "P15"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1813,9 +1813,9 @@
         "rate_function": "0.01 * SigmaE * Septum * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
+        "P14",
         "P1",
-        "P16",
-        "P14"
+        "P16"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1856,8 +1856,8 @@
         "guard_function": "1"
       },
       "signal_places": [
-        "P1",
         "P19",
+        "P1",
         "P17"
       ],
       "is_environment_aware": true,
@@ -1899,10 +1899,10 @@
         "guard_function": "1"
       },
       "signal_places": [
-        "P2",
         "P1",
-        "P20",
-        "P18"
+        "P18",
+        "P2",
+        "P20"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1943,8 +1943,8 @@
         "guard_function": "1"
       },
       "signal_places": [
-        "P2",
         "P22",
+        "P2",
         "P18"
       ],
       "is_environment_aware": true,
@@ -1984,9 +1984,9 @@
         "rate_function": "0.05 * Cortex * Outer_coat * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
+        "P21",
         "P1",
-        "P23",
-        "P21"
+        "P23"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -2035,8 +2035,8 @@
       "name": "Source_ATP_regen",
       "label": "Source_ATP_regen",
       "object_type": "transition",
-      "x": -120.0,
-      "y": 1260.0,
+      "x": -100.0,
+      "y": 1410.0,
       "width": 40.0,
       "height": 20.0,
       "horizontal": true,
@@ -2058,10 +2058,14 @@
       "is_source": false,
       "is_sink": false,
       "guard": "1",
+      "earliest_time": 1.0,
+      "latest_time": 1.0,
       "properties": {
         "rate_function_display": "4.4 * Nutrients / (10 + Nutrients)",
-        "rate_function": "4.4 * k_thermo_factor * Nutrients / (10 + Nutrients) * max(0, 1 - ATP_pool / (k_ATP_target + 0.5 * ADP_pool))",
-        "guard_function": "1"
+        "rate_function": "4.4 * k_thermo_factor * Nutrients / (10 + Nutrients)",
+        "guard_function": "1",
+        "earliest_time": 1.0,
+        "latest_time": 1.0
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -2109,10 +2113,10 @@
       "name": "Source_cell_density",
       "label": "Source_cell_density",
       "object_type": "transition",
-      "x": 1640.0,
-      "y": 620.0,
-      "width": 40.0,
-      "height": 20.0,
+      "x": 1610.0,
+      "y": 670.0,
+      "width": 20.0,
+      "height": 40.0,
       "horizontal": true,
       "enabled": true,
       "fill_color": [
@@ -2153,12 +2157,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -2183,33 +2187,36 @@
       "name": "T_SigmaH_decay",
       "label": "T_SigmaH_decay",
       "object_type": "transition",
-      "x": 1420.0,
-      "y": 1430.0,
-      "width": 60.0,
-      "height": 30.0,
+      "x": 1430.0,
+      "y": 1330.0,
+      "width": 40.0,
+      "height": 20.0,
       "horizontal": false,
       "enabled": true,
       "fill_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_width": 2.0,
       "transition_type": "continuous",
       "priority": 1,
-      "firing_policy": "default",
+      "firing_policy": "race",
       "is_source": false,
-      "is_sink": false,
-      "guard": "",
+      "is_sink": true,
+      "guard": 1,
       "earliest_time": 0.0,
       "latest_time": 0.0,
       "properties": {
-        "rate_function": "k_sigma_decay * SigmaH"
+        "rate_function": "k_sigma_decay * SigmaH",
+        "rate_function_display": "k_sigma_decay * SigmaH",
+        "earliest_time": 0.0,
+        "latest_time": 0.0
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -2234,33 +2241,37 @@
       "name": "T_SigmaF_decay",
       "label": "T_SigmaF_decay",
       "object_type": "transition",
-      "x": 1590.0,
-      "y": 930.0,
-      "width": 60.0,
-      "height": 30.0,
+      "x": 1610.0,
+      "y": 770.0,
+      "width": 40.0,
+      "height": 20.0,
       "horizontal": false,
       "enabled": true,
       "fill_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_width": 2.0,
       "transition_type": "continuous",
       "priority": 1,
-      "firing_policy": "default",
+      "firing_policy": "race",
       "is_source": false,
-      "is_sink": false,
-      "guard": "",
+      "is_sink": true,
+      "guard": "1",
       "earliest_time": 0.0,
       "latest_time": 0.0,
       "properties": {
-        "rate_function": "k_sigma_decay * SigmaF"
+        "rate_function": "k_sigma_decay * SigmaF",
+        "rate_function_display": "k_sigma_decay * SigmaF",
+        "earliest_time": 0.0,
+        "latest_time": 0.0,
+        "guard_function": "1"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -2285,8 +2296,8 @@
       "name": "T_SigmaE_decay",
       "label": "T_SigmaE_decay",
       "object_type": "transition",
-      "x": 1570.0,
-      "y": 550.0,
+      "x": 1600.0,
+      "y": 580.0,
       "width": 40.0,
       "height": 20.0,
       "horizontal": false,
@@ -2341,32 +2352,36 @@
       "label": "T_SigmaG_decay",
       "object_type": "transition",
       "x": 870.0,
-      "y": 1680.0,
-      "width": 60.0,
-      "height": 30.0,
+      "y": 1600.0,
+      "width": 40.0,
+      "height": 20.0,
       "horizontal": false,
       "enabled": true,
       "fill_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_width": 2.0,
       "transition_type": "continuous",
       "priority": 1,
-      "firing_policy": "default",
+      "firing_policy": "race",
       "is_source": false,
-      "is_sink": false,
-      "guard": "",
+      "is_sink": true,
+      "guard": "1",
       "earliest_time": 0.0,
       "latest_time": 0.0,
       "properties": {
-        "rate_function": "k_sigma_decay * SigmaG"
+        "rate_function": "k_sigma_decay * SigmaG",
+        "rate_function_display": "k_sigma_decay * SigmaG",
+        "earliest_time": 0.0,
+        "latest_time": 0.0,
+        "guard_function": "1"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -2391,33 +2406,36 @@
       "name": "T_SigmaK_decay",
       "label": "T_SigmaK_decay",
       "object_type": "transition",
-      "x": 1260.0,
-      "y": 1510.0,
-      "width": 60.0,
-      "height": 30.0,
+      "x": 1250.0,
+      "y": 1440.0,
+      "width": 40.0,
+      "height": 20.0,
       "horizontal": false,
       "enabled": true,
       "fill_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_color": [
         0.0,
-        0.0,
+        0.8,
         0.0
       ],
       "border_width": 2.0,
       "transition_type": "continuous",
       "priority": 1,
-      "firing_policy": "default",
+      "firing_policy": "race",
       "is_source": false,
-      "is_sink": false,
-      "guard": "",
+      "is_sink": true,
+      "guard": 1,
       "earliest_time": 0.0,
       "latest_time": 0.0,
       "properties": {
-        "rate_function": "k_sigma_decay * SigmaK"
+        "rate_function": "k_sigma_decay * SigmaK",
+        "rate_function_display": "k_sigma_decay * SigmaK",
+        "earliest_time": 0.0,
+        "latest_time": 0.0
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -4393,9 +4411,9 @@
       "use_values_from_trigger_time": true,
       "priority": 10,
       "assignments": {
-        "k_ATP_target": "ATP_setpoint",
-        "k_sigma_decay": "0.6931471805599453 / Sigma_halflife_min",
-        "k_thermo_factor": "2.0 ** ((Temperature_K - 310.15) / 10.0)"
+        "k_ATP_target": "ATP_SETPOINT",
+        "k_sigma_decay": "0.6931471805599453 / SIGMA_HALFLIFE_MIN",
+        "k_thermo_factor": "2.0 ** ((TEMPERATURE_K - 310.15) / 10.0)"
       },
       "metadata": {
         "purpose": "Pattern A bridge: parameter places \u2192 spatial signals"
@@ -4403,16 +4421,16 @@
     },
     {
       "id": "evt_apply_initial_nutrients",
-      "name": "Project Initial_Nutrients \u25a2 onto Nutrients \u25cb",
+      "name": "Project INITIAL_NUTRIENTS \u25a2 onto Nutrients \u25cb",
       "trigger": "t > 0",
       "delay": 0.0,
       "use_values_from_trigger_time": true,
       "priority": 5,
       "assignments": {
-        "Nutrients": "Initial_Nutrients"
+        "Nutrients": "INITIAL_NUTRIENTS"
       },
       "metadata": {
-        "purpose": "Sweep entrypoint: vary Initial_Nutrients \u25a2, Nutrients \u25cb inherits at t=0"
+        "purpose": "Sweep entrypoint: vary INITIAL_NUTRIENTS \u25a2, Nutrients \u25cb inherits at t=0"
       }
     }
   ]
