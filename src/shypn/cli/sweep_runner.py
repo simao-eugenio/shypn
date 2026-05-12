@@ -670,13 +670,33 @@ class SweepRunner:
                     from shypn.data.canvas.document_model import DocumentModel
                     self._finalise_model = DocumentModel.load_from_file(
                         str(self.model_path))
-                _finalize_condition(
-                    model=self._finalise_model,
-                    snapshot=snapshots[c],
-                    cond_results=cond_results,
-                    output_run_dir=output.run_dir,
-                    output_options=self.config.output.to_dict(),
-                )
+                # Isolate per-condition finalisation: a writer crash here
+                # (e.g. malformed trajectory data on G4, disk full, etc.)
+                # MUST NOT abort the remaining conditions or skip the
+                # final summary.csv / resource_usage.json writes. Any
+                # exception is logged loudly and the condition is marked
+                # with replicates_error += R; sweep continues.
+                _finalize_failed = False
+                try:
+                    _finalize_condition(
+                        model=self._finalise_model,
+                        snapshot=snapshots[c],
+                        cond_results=cond_results,
+                        output_run_dir=output.run_dir,
+                        output_options=self.config.output.to_dict(),
+                    )
+                except Exception as _fin_exc:
+                    _finalize_failed = True
+                    logger.exception(
+                        "Finalisation failed for condition %d (%s); "
+                        "sweep will continue with remaining conditions",
+                        c, label,
+                    )
+                    print(
+                        f"[ERROR finalise {c + 1}/{n_conditions}] "
+                        f"{label}: {type(_fin_exc).__name__}: {_fin_exc}",
+                        flush=True,
+                    )
 
                 # Persist parameter_sources alongside statistics.
                 try:
@@ -696,8 +716,8 @@ class SweepRunner:
 
                 summary_rows[c] = {
                     'condition': label,
-                    'replicates_ok': n_ok,
-                    'replicates_error': n_err,
+                    'replicates_ok': 0 if _finalize_failed else n_ok,
+                    'replicates_error': (n_ok + n_err) if _finalize_failed else n_err,
                     'wall_seconds': round(cond_wall, 2),
                     'cpu_seconds': round(cond_cpu, 2),
                     # peak_rss is a per-process metric; the flat pool

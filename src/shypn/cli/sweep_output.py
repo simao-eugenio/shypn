@@ -271,50 +271,107 @@ class SweepOutputManager:
 
         col_names = [id_to_name.get(pid, pid) for pid in place_ids]
 
+        # Robust flattener: engines may emit lists of floats, lists of
+        # (t, v) tuples, numpy arrays (1-D or 2-D), or contain Nones for
+        # failed steps. We coerce defensively and replace bad samples
+        # with NaN so the row alignment is preserved and a single bad
+        # value never aborts the whole sweep.
+        def _flat(series: Any) -> List[float]:
+            if series is None:
+                return []
+            try:
+                seq = list(series)
+            except TypeError:
+                return []
+            if not seq:
+                return []
+            head = seq[0]
+            out: List[float] = []
+            try:
+                if isinstance(head, tuple):
+                    for item in seq:
+                        try:
+                            out.append(float(item[1]))
+                        except (TypeError, ValueError, IndexError):
+                            out.append(float('nan'))
+                elif hasattr(head, '__len__') and not isinstance(head, (str, bytes)):
+                    # 2-D ndarray-like row → take last column (value)
+                    for item in seq:
+                        try:
+                            out.append(float(item[-1]))
+                        except (TypeError, ValueError, IndexError):
+                            out.append(float('nan'))
+                else:
+                    for item in seq:
+                        try:
+                            out.append(float(item))
+                        except (TypeError, ValueError):
+                            out.append(float('nan'))
+            except Exception:
+                # Last-resort safety: never let writer kill the sweep.
+                return []
+            return out
+
         for r in successful:
-            rid = r.get('replicate_id', 0)
+            try:
+                rid = int(r.get('replicate_id', 0) or 0)
+            except (TypeError, ValueError):
+                rid = 0
             seed = r.get('seed', '')
             stopped = r.get('stopped_reason', '')
             time_points = r.get('time_points') or []
-            place_data = r.get('place_data', {})
+            place_data = r.get('place_data', {}) or {}
 
-            # Build per-row data — each place's series is a flat list of
-            # values aligned with time_points. Some engines store tuples
-            # (t, v); flatten transparently.
-            def _flat(series: Any) -> List[float]:
-                if not series:
-                    return []
-                if isinstance(series[0], tuple):
-                    return [float(v) for (_, v) in series]
-                return [float(v) for v in series]
+            try:
+                cols = {pid: _flat(place_data.get(pid, [])) for pid in place_ids}
+                col_lens = [len(c) for c in cols.values()]
+                n_samples = min([len(time_points)] + col_lens) if col_lens else 0
+            except Exception as _exc:
+                # Skip just this replicate, keep going with the rest.
+                import logging as _lg_traj
+                _lg_traj.getLogger(__name__).warning(
+                    "G4 trajectory: skipping replicate %s in %s: %s",
+                    rid, cond_dir.name, _exc,
+                )
+                continue
 
-            cols = {pid: _flat(place_data.get(pid, [])) for pid in place_ids}
-            n_samples = min([len(time_points)] + [len(c) for c in cols.values()] or [0])
+            csv_path = traj_dir / f'run_{rid + 1:03d}.csv'
+            try:
+                with open(csv_path, 'w', newline='', encoding='utf-8') as fh:
+                    fh.write(f"# condition_dir: {cond_dir.name}\n")
+                    fh.write(f"# replicate_id: {rid}\n")
+                    fh.write(f"# seed: {seed}\n")
+                    fh.write(f"# stopped_reason: {stopped}\n")
+                    fh.write(f"# n_samples_raw: {n_samples}\n")
+                    if thin_dt > 0:
+                        fh.write(f"# thin_dt_seconds: {thin_dt}\n")
+                    fh.write(f"# columns: time,{','.join(col_names)}\n")
 
-            csv_path = traj_dir / f'run_{int(rid) + 1:03d}.csv'
-            with open(csv_path, 'w', newline='', encoding='utf-8') as fh:
-                fh.write(f"# condition_dir: {cond_dir.name}\n")
-                fh.write(f"# replicate_id: {rid}\n")
-                fh.write(f"# seed: {seed}\n")
-                fh.write(f"# stopped_reason: {stopped}\n")
-                fh.write(f"# n_samples_raw: {n_samples}\n")
-                if thin_dt > 0:
-                    fh.write(f"# thin_dt_seconds: {thin_dt}\n")
-                fh.write(f"# columns: time,{','.join(col_names)}\n")
+                    writer = csv.writer(fh)
+                    writer.writerow(['time'] + col_names)
 
-                writer = csv.writer(fh)
-                writer.writerow(['time'] + col_names)
-
-                last_kept = -float('inf')
-                for i in range(n_samples):
-                    t = float(time_points[i])
-                    if thin_dt > 0 and t < last_kept + thin_dt and i != n_samples - 1:
-                        continue
-                    last_kept = t
-                    row = [f"{t:.6g}"]
-                    for pid in place_ids:
-                        row.append(f"{cols[pid][i]:.6g}")
-                    writer.writerow(row)
+                    last_kept = -float('inf')
+                    for i in range(n_samples):
+                        try:
+                            t = float(time_points[i])
+                        except (TypeError, ValueError):
+                            continue
+                        if thin_dt > 0 and t < last_kept + thin_dt and i != n_samples - 1:
+                            continue
+                        last_kept = t
+                        row = [f"{t:.6g}"]
+                        for pid in place_ids:
+                            try:
+                                row.append(f"{cols[pid][i]:.6g}")
+                            except (IndexError, ValueError, TypeError):
+                                row.append('')
+                        writer.writerow(row)
+            except OSError as _exc:
+                import logging as _lg_traj
+                _lg_traj.getLogger(__name__).warning(
+                    "G4 trajectory: write failed for replicate %s in %s: %s",
+                    rid, cond_dir.name, _exc,
+                )
 
     # ── G5 — covariance / correlation over per-replicate finals ──────
 

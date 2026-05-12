@@ -545,6 +545,7 @@ class ExperimentManager:
         events: list = None,
         output_tier: str = 'G3',
         fixed_overrides: dict = None,
+        trajectory_thin_seconds: float = None,
     ):
         """Export a CLI-ready sweep configuration JSON.
 
@@ -615,8 +616,16 @@ class ExperimentManager:
                 ) from exc
         # Output granularity: only emit when non-default to keep configs tidy.
         # Read by SweepConfig.from_dict → OutputOptions; gates worker writes.
-        if output_tier and output_tier != 'G3':
-            config['output'] = {'tier': output_tier}
+        # When G4+ is selected, also propagate trajectory_thin_seconds so
+        # the worker decimates per-replicate CSVs at the requested step.
+        if (output_tier and output_tier != 'G3') or trajectory_thin_seconds:
+            out_block: dict = {}
+            if output_tier and output_tier != 'G3':
+                out_block['tier'] = output_tier
+            if trajectory_thin_seconds is not None and float(trajectory_thin_seconds) > 0:
+                out_block['trajectory_thin_seconds'] = float(trajectory_thin_seconds)
+            if out_block:
+                config['output'] = out_block
 
         config['exported_from'] = 'viability_panel'
         config['exported_date'] = datetime.now().isoformat()

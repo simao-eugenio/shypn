@@ -93,6 +93,12 @@ class WidgetParamCollector:
         if tier:
             sp.output_tier = tier
 
+        # G4+ trajectory thinning (seconds). Empty entry → None (keep all).
+        v_flt = _read(sweep_builder, 'trajectory_thin_entry', float,
+                      validate=lambda v: v >= 0)
+        if v_flt is not None and v_flt > 0:
+            sp.trajectory_thin_seconds = v_flt
+
         # Solver
         v_flt = _read(sweep_builder, 'sweep_tau_epsilon_entry', float,
                       validate=lambda v: 0 < v <= 1)

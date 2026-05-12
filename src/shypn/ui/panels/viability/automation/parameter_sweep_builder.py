@@ -309,8 +309,8 @@ class ParameterSweepBuilder(Gtk.Box):
         self.output_tier_combo.append("G1", "G1 — + endpoint scalars")
         self.output_tier_combo.append("G2", "G2 — + endpoint stats")
         self.output_tier_combo.append("G3", "G3 — + per-step stats (default)")
-        self.output_tier_combo.append("G4", "G4 — + trajectories (reserved)")
-        self.output_tier_combo.append("G5", "G5 — + covariance (reserved)")
+        self.output_tier_combo.append("G4", "G4 — + per-replicate trajectories")
+        self.output_tier_combo.append("G5", "G5 — + covariance matrix")
         self.output_tier_combo.set_active_id("G3")
         self.output_tier_combo.set_tooltip_text(
             "Disk-footprint tier per condition.\n"
@@ -318,9 +318,28 @@ class ParameterSweepBuilder(Gtk.Box):
             "G1: + replicates.csv with per-replicate endpoint scalars.\n"
             "G2: + statistics.json with endpoint-only stats.\n"
             "G3: + statistics.json with full per-step time series (default).\n"
-            "G4/G5: reserved for trajectories and covariance."
+            "G4: + replicates_trajectories/run_NNN.csv per replicate "
+            "(use 'Thin (s)' below to decimate).\n"
+            "G5: + covariance.json over per-replicate final-state values."
         )
         top_grid.attach(self.output_tier_combo, 5, 0, 1, 1)
+
+        # G4 thinning interval — only meaningful when tier ≥ G4. Empty/0
+        # = keep every recorded sample. Typical values: 1.0 s (smooth
+        # plots, small files), 0.1 s (fine transients), 5.0 s (coarse).
+        top_grid.attach(Gtk.Label(label="Thin (s):", xalign=0), 6, 0, 1, 1)
+        self.trajectory_thin_entry = Gtk.Entry()
+        self.trajectory_thin_entry.set_text("")
+        self.trajectory_thin_entry.set_width_chars(5)
+        self.trajectory_thin_entry.set_placeholder_text("0=all")
+        self.trajectory_thin_entry.set_tooltip_text(
+            "G4+ trajectory decimation step in seconds.\n"
+            "Empty or 0 → keep every recorded sample (largest files).\n"
+            "Example: 1.0 → keep first sample per ≥1 s window "
+            "(matches default recording_time_interval).\n"
+            "Ignored when Output tier < G4."
+        )
+        top_grid.attach(self.trajectory_thin_entry, 7, 0, 1, 1)
 
         top_grid.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
         self.termination_combo = Gtk.ComboBoxText()

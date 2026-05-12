@@ -587,8 +587,9 @@ class RemoteSweepDispatcher:
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
+                f"export PYTHONUNBUFFERED=1 && "
                 f"exec setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
-                f"{remote_venv} -m shypn.cli.sweep "
+                f"{remote_venv} -u -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
