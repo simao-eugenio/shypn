@@ -2061,8 +2061,8 @@
       "earliest_time": 1.0,
       "latest_time": 1.0,
       "properties": {
-        "rate_function_display": "4.4 * Nutrients / (10 + Nutrients)",
-        "rate_function": "4.4 * Nutrients / (10 + Nutrients)",
+        "rate_function_display": "4.4 * k_thermo_factor * Nutrients / (10 + Nutrients)",
+        "rate_function": "4.4 * k_thermo_factor * Nutrients / (10 + Nutrients)",
         "guard_function": "1",
         "earliest_time": 1.0,
         "latest_time": 1.0
@@ -3212,7 +3212,7 @@
       "name": "A36",
       "label": "",
       "object_type": "curved_arc",
-      "arc_type": "curved_arc",
+      "arc_type": "normal",
       "source_id": "T20",
       "source_type": "transition",
       "target_id": "P1",
