@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-12T16:31:26.539229",
+    "created": "2026-05-12T17:39:39.024229",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -12,9 +12,9 @@
     }
   },
   "view_state": {
-    "zoom": 0.49052397247967405,
-    "pan_x": 1687.373196979913,
-    "pan_y": -40.259392217490586,
+    "zoom": 0.5935340067004059,
+    "pan_x": 1406.3859762730126,
+    "pan_y": -235.71808496896597,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1407,9 +1407,9 @@
         "rate_function": "0.08 * Spo0F_P * Spo0A * Spo0B / (5 + Spo0B)"
       },
       "signal_places": [
-        "P8",
+        "P9",
         "P10",
-        "P9"
+        "P8"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1527,10 +1527,10 @@
         "rate_function": "0.005 * SigmaH**2 * Cell_density * ATP_pool / (200 + ATP_pool) * GTP_pool / (100 + GTP_pool)"
       },
       "signal_places": [
-        "P4",
-        "P13",
         "P1",
-        "P2"
+        "P4",
+        "P2",
+        "P13"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1609,9 +1609,9 @@
         "rate_function": "0.02 * SigmaF * Septum * GTP_pool / (50 + GTP_pool)"
       },
       "signal_places": [
-        "P2",
+        "P15",
         "P14",
-        "P15"
+        "P2"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1650,8 +1650,8 @@
         "rate_function": "0.01 * SigmaE * SigmaF * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P16",
         "P1",
+        "P16",
         "P15"
       ],
       "is_environment_aware": true,
@@ -1691,8 +1691,8 @@
         "rate_function": "0.008 * SigmaF * SigmaE * ATP_pool / (150 + ATP_pool)"
       },
       "signal_places": [
-        "P16",
         "P1",
+        "P16",
         "P15"
       ],
       "is_environment_aware": true,
@@ -1732,8 +1732,8 @@
         "rate_function": "0.008 * SigmaE * ATP_pool / (150 + ATP_pool)"
       },
       "signal_places": [
-        "P16",
-        "P1"
+        "P1",
+        "P16"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1773,8 +1773,8 @@
       },
       "signal_places": [
         "P1",
-        "P14",
-        "P15"
+        "P15",
+        "P14"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1813,8 +1813,8 @@
         "rate_function": "0.01 * SigmaE * Septum * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P16",
         "P1",
+        "P16",
         "P14"
       ],
       "is_environment_aware": true,
@@ -1899,10 +1899,10 @@
         "guard_function": "1"
       },
       "signal_places": [
+        "P1",
         "P20",
-        "P18",
         "P2",
-        "P1"
+        "P18"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1943,9 +1943,9 @@
         "guard_function": "1"
       },
       "signal_places": [
+        "P2",
         "P18",
-        "P22",
-        "P2"
+        "P22"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1984,9 +1984,9 @@
         "rate_function": "0.05 * Cortex * Outer_coat * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
-        "P21",
         "P1",
-        "P23"
+        "P23",
+        "P21"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -2138,44 +2138,6 @@
       "guard": 1,
       "properties": {
         "rate_function": "0.01"
-      },
-      "is_environment_aware": false,
-      "adaptive_filter": null,
-      "volume_threshold": null,
-      "prefer_continuous": null
-    },
-    {
-      "id": "T23",
-      "name": "Source_ATP_stationary",
-      "label": "Source_ATP_stationary",
-      "object_type": "transition",
-      "x": 180.0,
-      "y": 850.0,
-      "width": 40.0,
-      "height": 20.0,
-      "horizontal": true,
-      "enabled": true,
-      "fill_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "border_width": 3.0,
-      "transition_type": "continuous",
-      "priority": 1,
-      "firing_policy": "race",
-      "is_source": false,
-      "is_sink": false,
-      "guard": "1",
-      "properties": {
-        "rate_function_display": "0.5 * (1 - Nutrients/5) * capacity",
-        "rate_function": "0.5 * max(0, 1 - Nutrients / 5) * max(0, 1 - ATP_pool / (k_ATP_target + 0.5 * ADP_pool))",
-        "guard_function": "1"
       },
       "is_environment_aware": false,
       "adaptive_filter": null,
@@ -2475,9 +2437,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A2",
@@ -2607,9 +2567,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A8",
@@ -2651,9 +2609,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A10",
@@ -2715,9 +2671,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A13",
@@ -2799,9 +2753,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A17",
@@ -2841,9 +2793,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A19",
@@ -2883,9 +2833,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A21",
@@ -2927,9 +2875,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A23",
@@ -2969,9 +2915,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A25",
@@ -3013,9 +2957,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A27",
@@ -3055,9 +2997,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A29",
@@ -3161,9 +3101,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A34",
@@ -3212,7 +3150,7 @@
       "name": "A36",
       "label": "",
       "object_type": "curved_arc",
-      "arc_type": "normal",
+      "arc_type": "curved_arc",
       "source_id": "T20",
       "source_type": "transition",
       "target_id": "P1",
@@ -3289,9 +3227,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A40",
@@ -3311,9 +3247,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A41",
@@ -3333,9 +3267,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A42",
@@ -3355,9 +3287,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A43",
@@ -3377,9 +3307,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A44",
@@ -3399,9 +3327,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A45",
@@ -3421,9 +3347,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A46",
@@ -3443,9 +3367,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A47",
@@ -3465,9 +3387,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A48",
@@ -3487,9 +3407,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A49",
@@ -3509,9 +3427,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A50",
@@ -3531,9 +3447,7 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A51",
@@ -4224,68 +4138,6 @@
         0.0
       ],
       "width": 3.0,
-      "control_points": []
-    },
-    {
-      "id": "A84",
-      "name": "A84",
-      "label": "",
-      "object_type": "curved_arc",
-      "arc_type": "curved_opposite_signal_flow",
-      "source_id": "T23",
-      "source_type": "transition",
-      "target_id": "P1",
-      "target_type": "place",
-      "weight": 40.0,
-      "threshold": null,
-      "color": [
-        0.7,
-        0.7,
-        0.7
-      ],
-      "width": 3.0000000000000018,
-      "control_points": []
-    },
-    {
-      "id": "A85",
-      "name": "A85",
-      "label": "",
-      "object_type": "arc",
-      "arc_type": "normal",
-      "source_id": "P25",
-      "source_type": "place",
-      "target_id": "T23",
-      "target_type": "transition",
-      "weight": 40.0,
-      "threshold": 0,
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 1.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
-    },
-    {
-      "id": "A86",
-      "name": "A86",
-      "label": "",
-      "object_type": "curved_inhibitor_arc",
-      "arc_type": "curved_inhibitor_arc",
-      "source_id": "P1",
-      "source_type": "place",
-      "target_id": "T23",
-      "target_type": "transition",
-      "weight": 1.0,
-      "threshold": "4800 + 0.5 * ADP_pool",
-      "color": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "width": 3.0000000000000018,
       "control_points": []
     },
     {
