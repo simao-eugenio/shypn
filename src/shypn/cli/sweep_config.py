@@ -91,6 +91,11 @@ class ParameterSpec:
 OUTPUT_TIERS = ('G0', 'G1', 'G2', 'G3', 'G4', 'G5')
 DEFAULT_OUTPUT_TIER = 'G3'
 
+# Numeric level per tier — use this instead of lexicographic comparison
+# (`'G10' < 'G2'` lexicographically, which would silently misroute writes
+# if the ladder ever grows past 9). Single source of truth.
+_TIER_LEVEL: Dict[str, int] = {t: i for i, t in enumerate(OUTPUT_TIERS)}
+
 
 @dataclass(frozen=True)
 class OutputOptions:
@@ -120,12 +125,16 @@ class OutputOptions:
 
     # Convenience predicates the worker uses to gate writes.
     @property
+    def _level(self) -> int:
+        return _TIER_LEVEL.get(self.tier, _TIER_LEVEL[DEFAULT_OUTPUT_TIER])
+
+    @property
     def write_replicates_csv(self) -> bool:
-        return self.tier >= 'G1'
+        return self._level >= _TIER_LEVEL['G1']
 
     @property
     def write_statistics_json(self) -> bool:
-        return self.tier >= 'G2'
+        return self._level >= _TIER_LEVEL['G2']
 
     @property
     def statistics_endpoint_only(self) -> bool:
@@ -134,12 +143,12 @@ class OutputOptions:
     @property
     def write_per_replicate_trajectories(self) -> bool:
         """G4+ — one CSV per replicate under replicates_trajectories/."""
-        return self.tier >= 'G4'
+        return self._level >= _TIER_LEVEL['G4']
 
     @property
     def write_covariance(self) -> bool:
         """G5+ — covariance.json over per-replicate final-state values."""
-        return self.tier >= 'G5'
+        return self._level >= _TIER_LEVEL['G5']
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {'tier': self.tier}

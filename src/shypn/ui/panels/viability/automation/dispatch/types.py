@@ -32,6 +32,9 @@ class SimulationParams:
     termination: str = 'time_only'
     seed_base: int = 42
     output_tier: str = 'G3'
+    # G4+ trajectory decimation step (seconds). None/0 = keep every sample.
+    # Honoured by SweepOutputManager._write_per_replicate_trajectories.
+    trajectory_thin_seconds: Optional[float] = None
 
     # Solver
     use_tau_leaping: bool = True   # τ-leaping is the only stochastic engine
@@ -58,6 +61,7 @@ class SimulationParams:
             'max_tau': self.max_tau,
             'time_step': self.time_step,
             'output_tier': self.output_tier,
+            'trajectory_thin_seconds': self.trajectory_thin_seconds,
         }
 
 

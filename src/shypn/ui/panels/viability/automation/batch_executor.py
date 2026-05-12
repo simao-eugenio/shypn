@@ -576,6 +576,7 @@ class BatchExecutor:
         compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
         output_tier: str = 'G3',
+        trajectory_thin_seconds: Optional[float] = None,
     ):
         """Run batch of experiments asynchronously.
         
@@ -602,6 +603,8 @@ class BatchExecutor:
         # in _on_experiment_result can read it without plumbing through every
         # callback.
         self._output_tier = output_tier
+        # G4+ trajectory decimation step (seconds). None/0 = keep every sample.
+        self._trajectory_thin_seconds = trajectory_thin_seconds
 
         self.is_running = True
         self.is_cancelled = False
