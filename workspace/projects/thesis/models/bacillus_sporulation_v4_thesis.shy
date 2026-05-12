@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-05-12T12:00:25.803940",
+    "created": "2026-05-12T16:31:26.539229",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
@@ -12,9 +12,9 @@
     }
   },
   "view_state": {
-    "zoom": 0.5395763697276462,
-    "pan_x": 1385.403684287684,
-    "pan_y": -291.6421888262712,
+    "zoom": 0.49052397247967405,
+    "pan_x": 1687.373196979913,
+    "pan_y": -40.259392217490586,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1286,8 +1286,8 @@
         "rate_function": "0.01 * KinA_kinase * (1 / (1 + Nutrients**2)) * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
-        "P3",
         "P1",
+        "P3",
         "P5"
       ],
       "is_environment_aware": true,
@@ -1327,8 +1327,8 @@
         "rate_function": "0.1 * KinA_P * Spo0F / (10 + Spo0F)"
       },
       "signal_places": [
-        "P7",
-        "P6"
+        "P6",
+        "P7"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1367,8 +1367,8 @@
         "rate_function": "0.05 * Spo0F_P * RapA / (5 + RapA)"
       },
       "signal_places": [
-        "P12",
-        "P8"
+        "P8",
+        "P12"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1407,8 +1407,8 @@
         "rate_function": "0.08 * Spo0F_P * Spo0A * Spo0B / (5 + Spo0B)"
       },
       "signal_places": [
-        "P10",
         "P8",
+        "P10",
         "P9"
       ],
       "is_environment_aware": true,
@@ -1487,8 +1487,8 @@
         "rate_function": "0.01 * Spo0A_P**4 / (50 + Spo0A_P**4) * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P11",
-        "P1"
+        "P1",
+        "P11"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1527,10 +1527,10 @@
         "rate_function": "0.005 * SigmaH**2 * Cell_density * ATP_pool / (200 + ATP_pool) * GTP_pool / (100 + GTP_pool)"
       },
       "signal_places": [
+        "P4",
         "P13",
         "P1",
-        "P2",
-        "P4"
+        "P2"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1569,8 +1569,8 @@
         "rate_function": "0.02 * Septum * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
-        "P14",
-        "P1"
+        "P1",
+        "P14"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1609,8 +1609,8 @@
         "rate_function": "0.02 * SigmaF * Septum * GTP_pool / (50 + GTP_pool)"
       },
       "signal_places": [
-        "P14",
         "P2",
+        "P14",
         "P15"
       ],
       "is_environment_aware": true,
@@ -1650,9 +1650,9 @@
         "rate_function": "0.01 * SigmaE * SigmaF * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P15",
+        "P16",
         "P1",
-        "P16"
+        "P15"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1691,9 +1691,9 @@
         "rate_function": "0.008 * SigmaF * SigmaE * ATP_pool / (150 + ATP_pool)"
       },
       "signal_places": [
-        "P15",
+        "P16",
         "P1",
-        "P16"
+        "P15"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1732,8 +1732,8 @@
         "rate_function": "0.008 * SigmaE * ATP_pool / (150 + ATP_pool)"
       },
       "signal_places": [
-        "P1",
-        "P16"
+        "P16",
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1772,8 +1772,8 @@
         "rate_function": "0.01 * SigmaF * Septum * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P14",
         "P1",
+        "P14",
         "P15"
       ],
       "is_environment_aware": true,
@@ -1813,9 +1813,9 @@
         "rate_function": "0.01 * SigmaE * Septum * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
-        "P14",
+        "P16",
         "P1",
-        "P16"
+        "P14"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1857,8 +1857,8 @@
       },
       "signal_places": [
         "P19",
-        "P1",
-        "P17"
+        "P17",
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1899,10 +1899,10 @@
         "guard_function": "1"
       },
       "signal_places": [
-        "P1",
+        "P20",
         "P18",
         "P2",
-        "P20"
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1943,9 +1943,9 @@
         "guard_function": "1"
       },
       "signal_places": [
+        "P18",
         "P22",
-        "P2",
-        "P18"
+        "P2"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -2032,7 +2032,7 @@
     },
     {
       "id": "T20",
-      "name": "Source_ATP_regen",
+      "name": "T_ATP_regen",
       "label": "Source_ATP_regen",
       "object_type": "transition",
       "x": -100.0,
@@ -2043,12 +2043,12 @@
       "enabled": true,
       "fill_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_color": [
         0.0,
-        0.8,
+        0.0,
         0.0
       ],
       "border_width": 3.0,
@@ -2062,7 +2062,7 @@
       "latest_time": 1.0,
       "properties": {
         "rate_function_display": "4.4 * Nutrients / (10 + Nutrients)",
-        "rate_function": "4.4 * k_thermo_factor * Nutrients / (10 + Nutrients)",
+        "rate_function": "4.4 * Nutrients / (10 + Nutrients)",
         "guard_function": "1",
         "earliest_time": 1.0,
         "latest_time": 1.0
@@ -3212,7 +3212,7 @@
       "name": "A36",
       "label": "",
       "object_type": "curved_arc",
-      "arc_type": "curved_opposite_signal_flow",
+      "arc_type": "curved_arc",
       "source_id": "T20",
       "source_type": "transition",
       "target_id": "P1",
@@ -3220,9 +3220,9 @@
       "weight": 40.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
       "control_points": []
@@ -4191,7 +4191,7 @@
       "name": "A82",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P25",
       "source_type": "place",
       "target_id": "T20",
@@ -4199,14 +4199,12 @@
       "weight": 40.0,
       "threshold": 0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
-      "control_points": [],
-      "consumes": true,
-      "produces": true
+      "control_points": []
     },
     {
       "id": "A83",
