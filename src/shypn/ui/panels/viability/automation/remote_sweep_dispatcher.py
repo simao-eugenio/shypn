@@ -591,8 +591,14 @@ class RemoteSweepDispatcher:
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"export PYTHONUNBUFFERED=1 && "
-                f"SWEEP_LOG=$(mktemp /tmp/shypn_sweep_XXXX.log) && "
+                f"export PYTHONUNBUFFERED=1; "
+                # NOTE: use ';' (not '&&') between the mktemp assignment,
+                # the setsid background launch, and the echos.  In bash,
+                # '&&' binds tighter than '&': 'A && B & C' is parsed as
+                # '(A && B) & C', putting the assignment into a subshell so
+                # $SWEEP_LOG is invisible to the parent. With ';' all
+                # commands run sequentially in the same shell.
+                f"SWEEP_LOG=$(mktemp /tmp/shypn_sweep_XXXXXX); "
                 f"setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
                 f"{remote_venv} -u -m shypn.cli.sweep "
                 f"--project {project_rel} "
@@ -600,9 +606,9 @@ class RemoteSweepDispatcher:
                 f"{workers_flag} "
                 f"--verbose "
                 f"> \"$SWEEP_LOG\" 2>&1 & "
-                f"SWEEP_PID=$! && "
-                f"echo \"[SWEEP_PID] $SWEEP_PID\" && "
-                f"echo \"[SWEEP_LOG] $SWEEP_LOG\" && "
+                f"SWEEP_PID=$!; "
+                f"echo \"[SWEEP_PID] $SWEEP_PID\"; "
+                f"echo \"[SWEEP_LOG] $SWEEP_LOG\"; "
                 f"tail -f --pid=$SWEEP_PID \"$SWEEP_LOG\" 2>/dev/null; "
                 f"wait $SWEEP_PID 2>/dev/null; "
                 f"EXIT=$?; "
