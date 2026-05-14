@@ -925,11 +925,16 @@ class RemoteSweepDispatcher:
         # the forked SSH process sometimes fails to bind the socket.
         # Running without -f keeps sshpass holding the pipe open.
         try:
+            # Inherit the full environment so SSH_AUTH_SOCK (ssh-agent
+            # socket) and SSH_AGENT_PID are visible to the subprocess.
+            # Without this, the ControlMaster process cannot reach the
+            # agent and pubkey auth fails with "Permission denied".
             self._ctl_proc = subprocess.Popen(
                 argv,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.DEVNULL,
+                env=os.environ.copy(),
             )
         except Exception as e:
             logger.warning("ControlMaster launch failed (%s), falling back "

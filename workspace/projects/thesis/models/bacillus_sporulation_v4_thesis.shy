@@ -9,7 +9,9 @@
       "transitions": 28,
       "arcs": 91,
       "modules": 0
-    }
+    },
+    "token_unit": "µM",
+    "token_unit_rationale": "1 token = 1 µM; ATP_pool M0=5000 → 5 mM, Spo0A_P peak ≈ 8 µM, SigmaH peak ≈ 2 µM, Michaelis constants 5–200 µM. Structural places (Mature_spore, Forespore, Outer_coat, …) are dimensionless counts."
   },
   "view_state": {
     "zoom": 0.5935340067004059,
@@ -4364,12 +4366,12 @@
         "k_thermo_factor": "2.0 ** ((TEMPERATURE_K - 310.15) / 10.0)"
       },
       "metadata": {
-        "purpose": "Pattern A bridge: parameter places \u2192 spatial signals"
+        "purpose": "Pattern A bridge: parameter places → spatial signals"
       }
     },
     {
       "id": "evt_apply_initial_nutrients",
-      "name": "Project INITIAL_NUTRIENTS \u25a2 onto Nutrients \u25cb",
+      "name": "Project INITIAL_NUTRIENTS ▢ onto Nutrients ○",
       "trigger": "t > 0",
       "delay": 0.0,
       "use_values_from_trigger_time": true,
@@ -4378,7 +4380,7 @@
         "Nutrients": "INITIAL_NUTRIENTS"
       },
       "metadata": {
-        "purpose": "Sweep entrypoint: vary INITIAL_NUTRIENTS \u25a2, Nutrients \u25cb inherits at t=0"
+        "purpose": "Sweep entrypoint: vary INITIAL_NUTRIENTS ▢, Nutrients ○ inherits at t=0"
       }
     }
   ]
