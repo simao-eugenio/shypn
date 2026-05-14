@@ -724,7 +724,25 @@ class ExperimentAutomationCategory:
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
             use_parallel = self.queue_view.parallel_checkbox.get_active()
-        
+
+        output_tier = 'G3'
+        if hasattr(self.sweep_builder, 'output_tier_combo'):
+            try:
+                output_tier = self.sweep_builder.output_tier_combo.get_active_id() or 'G3'
+            except Exception as e:
+                print(f"[WARNING] Failed to read output_tier: {e}, using default G3")
+
+        trajectory_thin_seconds = None
+        if hasattr(self.sweep_builder, 'trajectory_thin_entry'):
+            try:
+                text = self.sweep_builder.trajectory_thin_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val > 0:
+                        trajectory_thin_seconds = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read trajectory_thin_seconds: {e}, using None")
+
         # Zombie-detection threshold is computed by the batch executor itself
         # from the simulation duration. No computation estimate is needed here.
         
@@ -772,6 +790,8 @@ class ExperimentAutomationCategory:
                 compressor_epsilon=compressor_epsilon,
                 compressor_min_gap=compressor_min_gap,
                 compressor_max_gap=compressor_max_gap,
+                output_tier=output_tier,
+                trajectory_thin_seconds=trajectory_thin_seconds,
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
