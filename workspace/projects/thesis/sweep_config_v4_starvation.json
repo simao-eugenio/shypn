@@ -2,7 +2,7 @@
   "model_path": "models/bacillus_sporulation_v4_thesis.shy",
   "mode": "factorial",
   "replicates": 16,
-  "duration": 21600.0,
+  "duration": 43200.0,
   "termination": "time_only",
   "seed_base": 42,
   "tau_epsilon": 0.03,
@@ -13,9 +13,10 @@
       "type": "places",
       "path": "INITIAL_NUTRIENTS.initial_marking",
       "values": [
-        10.0,
-        100.0,
-        300.0
+        1.0,
+        3.0,
+        5.0,
+        10.0
       ]
     },
     {

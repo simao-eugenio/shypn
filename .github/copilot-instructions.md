@@ -331,6 +331,56 @@ python -m shypn.cli.sweep --project … --sweep … --output <abs-or-rel-path>
 - Per-condition resource metrics land in `summary.csv` and
   `resource_usage.json` inside each run dir.
 
+### Token-to-concentration convention (STRICT, 2026-05-14)
+
+**Default:** 1 token = 1 mM.  All `initial_marking` values, rate-function
+parameters, and `θ_eff` thresholds are expressed in mM unless a model-level
+override is declared.
+
+**Known exception — bacillus sporulation models** (`bacillus_sporulation_v*.shy`):
+these are calibrated at **µM** (1 token = 1 µM): ATP_pool = 5000 µM = 5 mM,
+Spo0A~P peak ≈ 8 µM, SigmaH peak ≈ 2 µM, Michaelis constants 5–200 µM.  Their
+`metadata.token_unit` is `"µM"`.  Do **not** label their molecular axes as mM.
+
+**Model-level scale declaration (MANDATORY for every new model):**
+Every `.shy` file MUST declare its concentration scale in the top-level
+`metadata` object:
+```json
+"metadata": {
+  "token_unit": "mM",          // "mM" | "µM" | "nM" | "count" | "dimensionless"
+  "token_unit_rationale": "1 token = 1 mM; ATP_pool M0=5 → 5 mM"
+}
+```
+- Agents creating or patching a model MUST read `metadata.token_unit` first
+  and use it consistently in all rate functions, captions, and axis labels.
+- If `metadata.token_unit` is absent in an existing model, treat it as `"mM"`
+  (default) and add the field on the next programmatic patch.
+- **Never silently assume a unit.** If the unit is ambiguous, ask before writing.
+
+**Place-type carve-outs — two ontologies coexist in every cell model:**
+
+| Place category | Examples | Correct unit |
+|---|---|---|
+| Chemical/molecular species | ATP, Spo0A_P, sigma factors, RapA | `token_unit` of the model |
+| Discrete cell/structure counts | Mature_spore, Forespore, Outer_coat, Septum | `"count"` (dimensionless integer) |
+| Parameter / environmental | Temperature, SIGMA_HALFLIFE_MIN | native SI or defined in `parameter_units` |
+
+Structural/morphological places that represent cell-scale objects (spores,
+layers, compartments) are **inherently dimensionless counts** regardless of the
+model's `token_unit`.  Label them as "count" or "estruturas" in figure axes —
+never as mM/µM.
+
+**Axis label rule for figures and tables:**
+- Molecular species axes → use `token_unit` (e.g. "ATP (mM)")
+- Cell/structure count axes → "esporos", "células", or "estruturas (contagem)"
+- Mixed figures → annotate each species with its own unit inline
+
+**`compartment_volume` override:**
+If `compartment_volume` (fL) is set on a place, the engine converts tokens to
+concentration via `C = N / (Nₐ × V)`.  When using this path the
+`token_unit` declared in metadata no longer applies to that place; add an
+explicit comment to the rate function explaining the unit.
+
 ### Low-copy / sub-µM caveats (audit 2026-04-29)
 
 Reference: [`doc/engine_stability_audit.md`](../doc/engine_stability_audit.md).

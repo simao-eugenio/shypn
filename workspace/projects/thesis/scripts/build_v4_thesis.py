@@ -12,19 +12,19 @@ Two goals:
        (SigmaH/F/E/G/K) so accumulation no longer grows monotonically.
 
   2. Expose the four-carrier formalism (○ ⬡ ◇ ▢):
-     - Add 4 parameter places ▢ (Initial_Nutrients, Temperature_K,
-       ATP_setpoint, Sigma_halflife_min) — read by events only, never by Φ.
+     - Add 4 parameter places ▢ (INITIAL_NUTRIENTS, TEMPERATURE_K,
+       ATP_SETPOINT, SIGMA_HALFLIFE_MIN) — read by events only, never by Φ.
      - Add 3 spatial signal places ◇ (k_ATP_target, k_sigma_decay,
        k_thermo_factor) — is_signal_place=true, signal_type='spatial',
        no F_s arcs, referenced by Φ.
      - Add 2 events implementing the canonical ▢ + event → ◇ → Φ bridge:
          evt_init_kinetics      — populates the 3 ◇ places at t > 0
-         evt_apply_initial_nuts — copies Initial_Nutrients ▢ into Nutrients ○
+         evt_apply_initial_nuts — copies INITIAL_NUTRIENTS ▢ into Nutrients ○
      - Rewrite the rate functions of T20 (Source_ATP_regen),
        T23 (Source_ATP_stationary), and the new sigma-decay transitions
        to read from ◇ places instead of hardcoded constants.
 
-The result: sweeping Initial_Nutrients (▢) drives Nutrients (○) at t=0
+The result: sweeping INITIAL_NUTRIENTS (▢) drives Nutrients (○) at t=0
 through the event bridge — exactly the experiment-plan-vs-object-net
 discipline from AGENT_RULES.md, fully demonstrated in one model.
 """
@@ -167,10 +167,10 @@ def build():
     # ------------------------------------------------------------------
     PARAMS_X = 1850.0
     params = [
-        ("Initial_Nutrients",  100.0,  "nutrient",     "tokens"),
-        ("Temperature_K",      310.15, "environment",  "K"),
-        ("ATP_setpoint",       4800.0, "homeostasis",  "tokens"),
-        ("Sigma_halflife_min", 120.0,  "kinetics",     "min"),
+        ("INITIAL_NUTRIENTS",  100.0,  "nutrient",     "tokens"),
+        ("TEMPERATURE_K",      310.15, "environment",  "K"),
+        ("ATP_SETPOINT",       4800.0, "homeostasis",  "tokens"),
+        ("SIGMA_HALFLIFE_MIN", 120.0,  "kinetics",     "min"),
     ]
     new_params = []
     for i, (name, M0, kind, units) in enumerate(params):
@@ -191,9 +191,9 @@ def build():
     # ------------------------------------------------------------------
     # 2. SPATIAL SIGNAL PLACES ◇  (no F_s arcs; referenced by Φ only)
     # ------------------------------------------------------------------
-    # k_sigma_decay = ln(2) / Sigma_halflife_min  ≈ 0.005776
+    # k_sigma_decay = ln(2) / SIGMA_HALFLIFE_MIN  ≈ 0.005776
     # k_thermo_factor = Q10**((T - 310.15)/10),  Q10=2  (=> 1.0 at default T)
-    # k_ATP_target = ATP_setpoint  (separates kinetic scalar from ▢)
+    # k_ATP_target = ATP_SETPOINT  (separates kinetic scalar from ▢)
     spatials = [
         ("k_ATP_target",      4800.0,                              ),
         ("k_sigma_decay",     math.log(2.0) / 120.0                ),
@@ -290,9 +290,9 @@ def build():
             "priority": 10,
             "assignments": {
                 # ◇ := f(▢...) — RHS reads parameter places only
-                "k_ATP_target":    "ATP_setpoint",
-                "k_sigma_decay":   "0.6931471805599453 / Sigma_halflife_min",
-                "k_thermo_factor": "2.0 ** ((Temperature_K - 310.15) / 10.0)",
+                "k_ATP_target":    "ATP_SETPOINT",
+                "k_sigma_decay":   "0.6931471805599453 / SIGMA_HALFLIFE_MIN",
+                "k_thermo_factor": "2.0 ** ((TEMPERATURE_K - 310.15) / 10.0)",
             },
             "metadata": {
                 "purpose": "Pattern A bridge: parameter places → spatial signals",
@@ -300,16 +300,16 @@ def build():
         },
         {
             "id": "evt_apply_initial_nutrients",
-            "name": "Project Initial_Nutrients ▢ onto Nutrients ○",
+            "name": "Project INITIAL_NUTRIENTS ▢ onto Nutrients ○",
             "trigger": "t > 0",
             "delay": 0.0,
             "use_values_from_trigger_time": True,
             "priority": 5,
             "assignments": {
-                "Nutrients": "Initial_Nutrients",
+                "Nutrients": "INITIAL_NUTRIENTS",
             },
             "metadata": {
-                "purpose": "Sweep entrypoint: vary Initial_Nutrients ▢, "
+                "purpose": "Sweep entrypoint: vary INITIAL_NUTRIENTS ▢, "
                            "Nutrients ○ inherits at t=0",
             },
         },
@@ -402,9 +402,9 @@ def build():
     init = m2["events"][0]
     assert init["id"] == "evt_init_kinetics"
     assert set(init["assignments"]) == {"k_ATP_target", "k_sigma_decay", "k_thermo_factor"}
-    assert "ATP_setpoint" in init["assignments"]["k_ATP_target"]
+    assert "ATP_SETPOINT" in init["assignments"]["k_ATP_target"]
     nuts = m2["events"][1]
-    assert nuts["assignments"] == {"Nutrients": "Initial_Nutrients"}
+    assert nuts["assignments"] == {"Nutrients": "INITIAL_NUTRIENTS"}
 
     print(f"✓ v4 written to {DST.name}")
     print(f"  places:      {len(m2['places'])}  (was {len(m['places'])-len(new_params)-len(new_spatials)})")

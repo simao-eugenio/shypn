@@ -38,10 +38,10 @@ def load_run(root, cond_dirs):
 
 V4_CONDS = {
     'Baseline':         'condition_Baseline',
-    'Nut_eq_10':        'condition_[param]_Initial_Nutrients_eq_10',
-    'Nut_eq_30':        'condition_[param]_Initial_Nutrients_eq_30',
-    'Nut_eq_100':       'condition_[param]_Initial_Nutrients_eq_100',
-    'Nut_eq_300':       'condition_[param]_Initial_Nutrients_eq_300',
+    'Nut_eq_10':        'condition_[param]_INITIAL_NUTRIENTS_eq_10',
+    'Nut_eq_30':        'condition_[param]_INITIAL_NUTRIENTS_eq_30',
+    'Nut_eq_100':       'condition_[param]_INITIAL_NUTRIENTS_eq_100',
+    'Nut_eq_300':       'condition_[param]_INITIAL_NUTRIENTS_eq_300',
 }
 V3_CONDS = {
     'Baseline':         'condition_Baseline',
@@ -154,13 +154,13 @@ for sigma in ['SigmaH', 'SigmaF', 'SigmaE', 'SigmaG', 'SigmaK']:
         print(f'  {c:<14}{v3_end:>10.1f}{peak:>10.1f}{t_peak:>10.1f}{v4_end:>10.1f}{kept*100:>10.1f}%{ok:>10}')
 
 # ---------------------------------------------------------------------------
-# GATE F3 — Bridge wiring: Initial_Nutrients ▢ → Nutrients ⬡ at t=0
+# GATE F3 — Bridge wiring: INITIAL_NUTRIENTS ▢ → Nutrients ⬡ at t=0
 # ---------------------------------------------------------------------------
 
 print()
 print('='*100)
 print('GATE F3 — Event bridge: evt_apply_initial_nutrients projects ▢ onto ⬡')
-print('  PASS: Nutrients(t≈1 min) within ±2 of Initial_Nutrients ▢ value')
+print('  PASS: Nutrients(t≈1 min) within ±2 of INITIAL_NUTRIENTS ▢ value')
 print('='*100)
 print(f'  {"Cond":<14}{"target":>10}{"Nut(t=5s)":>12}{"Nut(t=60s)":>12}{"verdict":>10}')
 expected = {'Nut_eq_10': 10, 'Nut_eq_30': 30, 'Baseline': 100, 'Nut_eq_100': 100, 'Nut_eq_300': 300}
