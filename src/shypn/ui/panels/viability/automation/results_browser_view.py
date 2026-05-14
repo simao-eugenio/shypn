@@ -1627,22 +1627,44 @@ class ResultsBrowserView(BaseResultsView):
                 - status or error indicator
         """
         name = result_data.get('name', 'Unknown')
-        
-        # Extract info
-        statistics = result_data.get('statistics', {})
-        n_replicates = statistics.get('n_replicates', 0)
-        
-        # Use mean elapsed time per replicate if available, else batch duration
+
+        # Extract info — support two producer schemas:
+        #   (a) BatchExecutor-style: statistics={n_replicates,
+        #       mean_elapsed_time}, duration=<batch wall>.
+        #   (b) Sweep summary.csv loaders (local + remote scan):
+        #       replicates=<ok>, errors=<err>, wall_seconds=<cond wall>.
+        statistics = result_data.get('statistics', {}) or {}
+        n_replicates = statistics.get('n_replicates')
+        if n_replicates is None:
+            n_replicates = int(result_data.get('replicates', 0) or 0)
+
         mean_elapsed = statistics.get('mean_elapsed_time')
         if mean_elapsed is not None and mean_elapsed > 0:
             duration_str = f"{mean_elapsed:.3f}s"
         else:
-            # Fallback to total duration
-            duration = result_data.get('duration', 0.0)
-            duration_str = f"{duration:.2f}s"
-        
+            # Fallback to per-condition wall (summary.csv) or batch duration
+            wall = result_data.get('wall_seconds')
+            if wall is None:
+                wall = result_data.get('duration', 0.0)
+            try:
+                duration_str = f"{float(wall):.2f}s"
+            except (TypeError, ValueError):
+                duration_str = "—"
+
         error_msg = result_data.get('error', '')
-        status = "✗ Error" if error_msg else "✓ Completed"
+        n_errors = int(result_data.get('errors', 0) or 0)
+        if error_msg:
+            status = "✗ Error"
+        elif n_errors > 0 and n_replicates == 0:
+            status = "✗ Error"
+            error_msg = f"{n_errors} replicate(s) failed"
+        elif n_errors > 0:
+            status = f"⚠ {n_replicates} ok / {n_errors} err"
+        elif n_replicates == 0:
+            # No replicates yet → not completed; treat as pending.
+            status = "… Pending"
+        else:
+            status = "✓ Completed"
 
         # Primary observables (optional, computed by the loader)
         from shypn.ui.panels.viability.automation.primary_observables import (
