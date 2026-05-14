@@ -567,33 +567,47 @@ class RemoteSweepDispatcher:
             # Pass user-specified workers as a ceiling hint; the server's
             # _compute_safe_workers() will cap it to a memory-safe value.
             workers_flag = f"--workers {workers}" if workers > 0 else ""
-            # setsid: detach the sweep from the SSH controlling tty so
-            # client disconnect (UI close, network drop, laptop sleep)
-            # does NOT propagate SIGHUP and kill the parent. Without
-            # this the previous design relied on PR_SET_PDEATHSIG to
-            # cascade-kill workers when the parent died, but in spawn
-            # mode workers exec a fresh interpreter and lose the prctl
-            # — leaving 10 sleeping zombies and zero output (observed
-            # 2026-05-08, run_20260508_133221).
+            # Design: the sweep runs in the background with stdout/stderr
+            # redirected to a temp log file, completely decoupled from the
+            # SSH channel.  `tail -f --pid=$SWEEP_PID` then streams the log
+            # back to the client.
             #
-            # exec: Python replaces the bash process so the sweep PID
-            # is sshd's grandchild via setsid (not buried under bash).
+            # This solves the SIGPIPE problem: previously the sweep wrote
+            # directly to the SSH channel (stdout). When the client closed
+            # the connection the SSH channel died and Python's next print()
+            # call got BrokenPipeError → process exited after only 1 of 25
+            # conditions (observed run_20260514_191917).
             #
-            # nice -n 19 + ionice -c 3: lowest CPU/IO priority so sshd
-            # gets scheduled promptly under heavy sweep load.
+            # With the log-file approach:
+            #   • SSH closes → tail gets SIGPIPE → tail exits
+            #   • sweep is still writing to the log file → keeps running
+            #   • all 25 conditions complete and write results to disk
             #
-            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving 0-3
-            # (first 2 P-cores on i9-14900K) for sshd/system.
+            # setsid: detach from the SSH controlling tty so SIGHUP on
+            # client disconnect does NOT propagate to the sweep process.
+            #
+            # nice -n 19 + ionice -c 3: lowest CPU/IO priority.
+            # taskset -c 4-31: pin sweep to CPUs 4-31.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
                 f"export PYTHONUNBUFFERED=1 && "
-                f"exec setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
+                f"SWEEP_LOG=$(mktemp /tmp/shypn_sweep_XXXX.log) && "
+                f"setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
                 f"{remote_venv} -u -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
-                f"--verbose"
+                f"--verbose "
+                f"> \"$SWEEP_LOG\" 2>&1 & "
+                f"SWEEP_PID=$! && "
+                f"echo \"[SWEEP_PID] $SWEEP_PID\" && "
+                f"echo \"[SWEEP_LOG] $SWEEP_LOG\" && "
+                f"tail -f --pid=$SWEEP_PID \"$SWEEP_LOG\" 2>/dev/null; "
+                f"wait $SWEEP_PID 2>/dev/null; "
+                f"EXIT=$?; "
+                f"[ $EXIT -ne 0 ] && echo \"[SWEEP_EXIT] $EXIT\"; "
+                f"rm -f \"$SWEEP_LOG\""
             )
 
             stdout = self._ssh_stream(
