@@ -417,7 +417,7 @@ class SweepOutputManager:
             pdata = r.get('place_data', {})
             for ci, pid in enumerate(place_ids):
                 series = pdata.get(pid)
-                if not series:
+                if series is None or len(series) == 0:
                     continue
                 last = series[-1]
                 finals[ri, ci] = float(last[1] if isinstance(last, tuple) else last)
