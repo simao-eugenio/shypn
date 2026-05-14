@@ -3168,7 +3168,7 @@
       "name": "A35",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P3",
       "source_type": "place",
       "target_id": "T19",
@@ -3176,9 +3176,9 @@
       "weight": 1.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
       "control_points": [],
@@ -4185,7 +4185,7 @@
       "name": "A87",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P13",
       "source_type": "place",
       "target_id": "T24",
@@ -4193,9 +4193,9 @@
       "weight": 1.0,
       "threshold": 0.0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
       "control_points": [],
@@ -4207,7 +4207,7 @@
       "name": "A88",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P15",
       "source_type": "place",
       "target_id": "T25",
@@ -4215,9 +4215,9 @@
       "weight": 1.0,
       "threshold": 0.0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
       "control_points": [],
@@ -4229,7 +4229,7 @@
       "name": "A89",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P16",
       "source_type": "place",
       "target_id": "T26",
@@ -4237,9 +4237,9 @@
       "weight": 1.0,
       "threshold": 0.0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
       "control_points": [],
@@ -4251,7 +4251,7 @@
       "name": "A90",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P17",
       "source_type": "place",
       "target_id": "T27",
@@ -4259,9 +4259,9 @@
       "weight": 1.0,
       "threshold": 0.0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
       "control_points": [],
@@ -4273,7 +4273,7 @@
       "name": "A91",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P18",
       "source_type": "place",
       "target_id": "T28",
@@ -4281,9 +4281,9 @@
       "weight": 1.0,
       "threshold": 0.0,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 2.0,
       "control_points": [],
