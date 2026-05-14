@@ -1348,20 +1348,25 @@ class ParameterSweepBuilder(Gtk.Box):
             values = self._compute_parameter_values_from_config(range_config)
             n = len(values)
             
+            def _fmt(v):
+                """Format with enough precision to distinguish close values."""
+                s = f"{v:.6g}"
+                return s
+
             if mode == 'linear':
                 start = range_config['start']
                 stop = range_config['stop']
-                cell.set_property('text', f"{start:.3g} to {stop:.3g} ({n} values)")
+                cell.set_property('text', f"{_fmt(start)} to {_fmt(stop)} ({n} values)")
             elif mode == 'list':
                 if n <= 4:
-                    vals_str = ', '.join([f"{v:.3g}" for v in values])
+                    vals_str = ', '.join([_fmt(v) for v in values])
                     cell.set_property('text', vals_str)
                 else:
-                    cell.set_property('text', f"{values[0]:.3g}, {values[1]:.3g}, ... ({n} values)")
+                    cell.set_property('text', f"{_fmt(values[0])}, {_fmt(values[1])}, ... ({n} values)")
             elif mode == 'percent':
                 baseline = range_config.get('baseline', 1.0)
                 percent = range_config.get('percent', 20.0)
-                cell.set_property('text', f"{baseline:.3g} ± {percent}% ({n} values)")
+                cell.set_property('text', f"{_fmt(baseline)} ± {percent}% ({n} values)")
             else:
                 cell.set_property('text', f"{n} values")
         except Exception as e:
