@@ -429,6 +429,82 @@ When a sweep returns bit-identical downstream values across a
 substrate gradient, suspect F1 + F5 + F7 *before* re-checking the
 topology.
 
+## Transition type selection — biological behaviour vs τ-leaping (STRICT, 2026-05-15)
+
+Derived from bacillus_sporulation_v4→v5 audit. Applies to every Bio-PN model.
+
+### The core rule
+
+**Transition type must reflect the biological regime of the process, not modelling
+convenience.**  The τ-leaping engine only samples Poisson distributions for
+`stochastic` and `adaptive` transitions.  Assigning `stochastic` to a
+high-throughput process where the token pool ≫ expected firings per step
+generates Poisson over-sampling (F3), inflating truncation fractions to
+65–99 % and silently destroying variance while barely affecting means.
+
+### Decision table (apply at design time)
+
+| Biological regime | Examples | Transition type |
+|---|---|---|
+| **Rare / discrete event** — one-time or low-probability commitment; input place routinely < 50 tokens | KinA activation, asymmetric division (septation), phage lysis decision | `stochastic` |
+| **Low-copy signalling cascade** — phosphorelay, small-molecule second messenger; input places 1–20 tokens; noise is the mechanism | Spo0F/Spo0A phosphorylation, dephosphorylation via phosphatase | `stochastic` |
+| **High-throughput gene expression** — transcription/translation driven by σ-factor pools that routinely exceed 20–500 tokens; Michaelis-Menten kinetics | σH/σF/σE/σG/σK transcription, σ-factor feedback loops | `continuous` |
+| **Structural / morphological assembly** — coat synthesis, compartment formation, maturation; bulk polymer/crystal assembly at µM scale | forespore formation, cortex/inner-coat/outer-coat synthesis, spore maturation | `continuous` |
+| **Metabolic bookkeeping** — ATP/GTP regeneration, σ-factor decay, nutrient depletion, cell-density source | already `continuous` in most models; never reclassify to `stochastic` | `continuous` |
+| **Adaptive (rare)** — genuinely switches regime based on copy number at runtime; requires `compartment_volume` on at least one input place (else silently falls back — F1) | sub-µM species that could be either low- or high-copy depending on condition | `adaptive` |
+
+### τ-leaping coupling / decoupling rule
+
+The engine auto-couples `max_tau` to `dt` **only when `max_tau == 0.1`
+(the default)**.  Condition: `if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU`.
+
+- **Setting any explicit value ≠ 0.1 in the viability panel disables
+  auto-coupling.**  The engine comment confirms: *"Numeric overrides
+  (max_tau ≠ 0.1) are honoured literally."*
+- Auto-coupling from 0.1 s → 1.0 s saves ~10× inner-loop iterations but
+  raises Poisson means proportionally, worsening truncation in models
+  with low-copy stochastic transitions.
+- **Recommended `max_tau` for models with low-copy stochastic transitions
+  (< 50 tokens):** `0.01` s.  Slower (~100× more inner iterations) but
+  truncation drops from 97 % to ~20 % for typical bacillus-scale models.
+  Consider `0.001` s for sub-10-token commitment transitions.
+- **If truncation fraction > 5 %** (logged as `RuntimeWarning`), variance
+  and percentile data are unreliable.  Means are approximately usable.
+  Bimodality / CV metrics MUST be discarded from that run.
+
+### Canonical split — bacillus sporulation model (v5, 2026-05-15)
+
+After the v4→v5 reclassification, the model has two clearly separated layers:
+
+**Layer 1 — Commitment decision (stochastic, 6 transitions):**
+`T_KinA_activation`, `T_Spo0F_phosphorylation`, `T_Spo0F_dephos`,
+`T_Spo0A_phosphorylation`, `T_Spo0A_dephosphorylation`, `T_septation`.
+These involve KinA_P (peak ~1.5 µM), Spo0A_P (peak ~7.5 µM), SigmaH
+(peak ~0.7 µM) — genuinely low-copy.  Noise here IS the bet-hedging
+mechanism.
+
+**Layer 2 — Execution programme (continuous, 12 transitions):**
+`T_sigmaH_transcription`, `T_sigmaF_activation`, `T_sigmaE_activation`,
+`T_sigmaE_feedback`, `T_sigmaG_transcription`, `T_sigmaK_transcription`,
+`T_forespore_formation`, `T_mother_cell_formation`, `T_cortex_synthesis`,
+`T_inner_coat_synthesis`, `T_outer_coat_synthesis`, `T_spore_maturation`.
+These reference SigmaE (peak ~500 µM), ATP (5000 µM), GTP (5000 µM) —
+high-throughput, ODE regime.
+
+### Forbidden patterns
+
+- **F-T1 — High-throughput transition as `stochastic`**: generates
+  Poisson over-sampling (F3).  Truncation fraction > 50 % on first
+  replicate is the diagnostic.  The fix is `continuous`, not smaller
+  `max_tau`.
+- **F-T2 — Low-copy commitment as `continuous`**: ODE path hides the
+  noise that drives bimodality.  If bet-hedging CV disappears or
+  bimodal zone collapses to unimodal after a type change, suspect this.
+- **F-T3 — `adaptive` without `compartment_volume`**: silently falls
+  back to continuous or stochastic depending on `prefer_continuous`
+  flag (F1 failure mode).  Always set `compartment_volume` or use an
+  explicit type.
+
 ## Formalism (13-tuple Bio-PN, Simão 2025)
 
 Reference: `manuscript/main_plos_one.tex`. Full audit:
