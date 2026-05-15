@@ -120,8 +120,9 @@ except (ImportError, ValueError):
 
 from gi.repository import Gtk, Gdk, GLib
 
-# Initialize Gdk early to avoid initialization issues in imports
-Gdk.init(sys.argv)
+# NOTE: Do NOT call Gdk.init() here. Gtk.Application.run() owns GDK initialization.
+# Calling Gdk.init() before app.run() on WSLg/Wayland causes GDK to latch onto the
+# wrong display backend (XWayland vs Wayland compositor), producing a dead window.
 
 # WAYLAND FIX: Suppress Wayland Error 71 protocol messages via environ
 # GDK prints these directly to stderr before our log handler can catch them
@@ -180,7 +181,21 @@ def main(argv=None):
 		file_to_open = os.path.abspath(argv[1])
 
 	def on_activate(a):
-		
+
+		# Re-activation guard: if a window already exists (second launch of the
+		# same app hits D-Bus single-instance), just present it and return.
+		# Without this guard on_activate rebuilds the entire UI on top of the
+		# running instance, which silently fails and leaves the user with nothing.
+		existing = a.get_windows()
+		if existing:
+			for w in existing:
+				try:
+					w.deiconify()
+					w.present()
+				except Exception:
+					pass
+			return
+
 		# Load workspace settings
 		from shypn.workspace_settings import WorkspaceSettings
 		workspace_settings = WorkspaceSettings()
@@ -214,6 +229,13 @@ def main(argv=None):
 		if window is None:
 			logging.getLogger(__name__).error('`main_window` object not found in UI file.')
 			sys.exit(3)
+		
+		# CRITICAL: Register window with the application immediately so GDK/GTK
+		# associates the window surface with the correct compositor connection.
+		# Deferring set_application() until after 400 lines of setup leaves the
+		# GtkApplicationWindow in an undefined state and breaks WSLg window mapping.
+		if isinstance(window, Gtk.ApplicationWindow):
+			window.set_application(a)
 		
 		# Setup menu actions (File, Edit, View, Help)
 		from shypn.ui.menu_actions import MenuActions
@@ -616,13 +638,29 @@ def main(argv=None):
 		
 		# WAYLAND FIX: Present window AFTER all widgets are added
 		# This ensures everything is in place before window realization
-		if isinstance(window, Gtk.ApplicationWindow):
-			window.set_application(a)
-			window.show_all()  # Show all widgets including MasterPalette
-		else:
-			w = Gtk.ApplicationWindow(application=a)
-			w.add(window)  # GTK3 uses add() instead of set_child()
-			window.show_all()  # Show all widgets including MasterPalette
+		# NOTE: set_application(a) was already called immediately after builder load.
+		window.show_all()  # Show all widgets including MasterPalette
+
+		# WSLg / Wayland focus fix: present() must be deferred until AFTER the
+		# GTK main loop is running and the compositor has mapped the window.
+		# WSLg (Windows Subsystem for Linux GUI) iconizes windows launched from
+		# VS Code terminal because there is no activation token.  A single
+		# GLib.idle_add is not enough on WSLg — the window gets mapped, then
+		# WSLg processes the RDP frame and iconizes it ~100 ms later.
+		# Fix: schedule present() at PRIORITY_DEFAULT_IDLE (low, runs after all
+		# pending events), then schedule a second present() 300 ms later via
+		# GLib.timeout_add to catch the post-RDP-frame iconization window.
+		def _force_present():
+			try:
+				window.present()
+				window.deiconify()
+			except Exception:
+				pass
+			return False  # do not repeat
+
+		GLib.idle_add(_force_present)
+		GLib.timeout_add(300, _force_present)
+		GLib.timeout_add(800, _force_present)
 		
 		# CRITICAL: Hide panels AFTER window.show_all()
 		# show_all() reveals everything, so we must explicitly hide panels that start hidden
