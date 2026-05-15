@@ -958,8 +958,13 @@ class OdeSystemAccelerator:
 
         # Pre-index arcs by target for producer discovery
         arcs_by_target_place: Dict[str, List[Any]] = {}
+        # Collect arcs that produce into signal places.  Both straight
+        # signal_flow and curved_opposite_signal_flow are output arcs from
+        # transitions that carry signal tokens; either can be the producer
+        # arc in a PreemptionCheck chain.
+        _SIGNAL_FLOW_ARC_TYPES = ("signal_flow", "curved_opposite_signal_flow")
         for arc in getattr(model, "arcs", []) or []:
-            if getattr(arc, "arc_type", "normal") != "signal_flow":
+            if getattr(arc, "arc_type", "normal") not in _SIGNAL_FLOW_ARC_TYPES:
                 continue
             tgt = getattr(arc, "target_id", None)
             if tgt in seen_sp:

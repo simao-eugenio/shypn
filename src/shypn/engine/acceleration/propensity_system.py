@@ -489,14 +489,12 @@ class PropensityAccelerator:
             _tid = getattr(_target, "id", None)
             if _tid is None:
                 continue
-            # Skip test and inhibitor arcs (they don't consume tokens)
-            _kind = (
-                getattr(_arc, "kind", None)
-                or (getattr(_arc, "properties", None) or {}).get("kind", "normal")
-                or "normal"
-            )
-            _arc_type = getattr(_arc, "arc_type", "normal")
-            if _kind != "normal" or _arc_type in ("inhibitor", "test"):
+            # Skip non-consuming arcs (test, inhibitor, and all curved
+            # variants).  Arc.consumes_tokens() is the single source of truth
+            # per the 13-tuple Bio-PN formalism (workspace instructions §
+            # "Consumption semantics by arc type") — using it here is
+            # generic and correct for any current or future arc subclass.
+            if not _arc.consumes_tokens():
                 continue
             _source = getattr(_arc, "source", None)
             if _source is None or not hasattr(_source, "tokens"):
@@ -515,13 +513,10 @@ class PropensityAccelerator:
         _S = np.zeros((self._n_places, self._n_transitions), dtype=np.float64)
         _out_tbl: Dict[str, List[Tuple[Any, float]]] = {}
         for _arc in getattr(model, "arcs", []):
-            _kind = (
-                getattr(_arc, "kind", None)
-                or (getattr(_arc, "properties", None) or {}).get("kind", "normal")
-                or "normal"
-            )
-            _arc_type = getattr(_arc, "arc_type", "normal")
-            if _kind != "normal" or _arc_type in ("inhibitor", "test"):
+            # Skip non-consuming arcs (test, inhibitor, curved_inhibitor_arc,
+            # etc.).  Arc.consumes_tokens() is the single source of truth per
+            # the 13-tuple Bio-PN formalism — generic for any arc subclass.
+            if not _arc.consumes_tokens():
                 continue
             _src = getattr(_arc, "source", None)
             _tgt = getattr(_arc, "target", None)

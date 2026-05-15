@@ -380,9 +380,19 @@ class TauLeapingEngine:
                     self.use_parallel = False
 
             if self._parallel_scheduler:
-                return self._parallel_scheduler.sample_parallel(
+                # Apply inhibitor-arc constraints after parallel sampling.
+                # The parallel path samples all transitions independently;
+                # without this step any transition with a curved_inhibitor_arc
+                # (or any inhibitor arc variant) runs unconstrained — the
+                # inhibitor check must be applied regardless of the sampling
+                # path used.
+                firings_map = self._parallel_scheduler.sample_parallel(
                     transitions, propensities, tau
                 )
+                firings_map = self._apply_inhibitor_constraints(
+                    firings_map, transitions
+                )
+                return firings_map
         
         # Sequential sampling with Skellam support for reversible reactions
         firings_map = {}
