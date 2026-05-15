@@ -1186,6 +1186,21 @@ class ExperimentAutomationCategory:
         grid.attach(workers_spin, 1, row, 1, 1)
 
         row += 1
+        grid.attach(Gtk.Label(label="GPU:", xalign=0), 0, row, 1, 1)
+        gpu_combo = Gtk.ComboBoxText()
+        gpu_options = [('auto', 'auto — use GPU when batch ≥ 16 reps'),
+                       ('force', 'force — always use GPU'),
+                       ('off', 'off — CPU only')]
+        active_idx = 0
+        for i, (val, label) in enumerate(gpu_options):
+            gpu_combo.append(val, label)
+            if val == settings.use_gpu:
+                active_idx = i
+        gpu_combo.set_active(active_idx)
+        gpu_combo.set_tooltip_text("GPU replicate parallelism policy (passed as --use-gpu to remote CLI)")
+        grid.attach(gpu_combo, 1, row, 1, 1)
+
+        row += 1
         grid.attach(Gtk.Label(label="Password:", xalign=0), 0, row, 1, 1)
         password_entry = Gtk.Entry()
         password_entry.set_visibility(False)  # mask input
@@ -1220,6 +1235,7 @@ class ExperimentAutomationCategory:
             settings.remote_repo = repo_entry.get_text().strip()
             settings.remote_venv = venv_entry.get_text().strip()
             settings.workers = int(workers_spin.get_value())
+            settings.use_gpu = gpu_combo.get_active_id() or 'auto'
             ssh_password = password_entry.get_text()  # never persisted
 
         dialog.destroy()

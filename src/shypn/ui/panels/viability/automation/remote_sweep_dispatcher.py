@@ -80,6 +80,7 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
+        'use_gpu': 'auto',  # 'auto' | 'force' | 'off'
         'fetch_mode': 'summary_only',  # 'full' or 'summary_only'
     }
 
@@ -122,6 +123,16 @@ class RemoteSweepSettings:
     @workers.setter
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
+
+    @property
+    def use_gpu(self) -> str:
+        return self._section.get('use_gpu', 'auto')
+
+    @use_gpu.setter
+    def use_gpu(self, v: str):
+        if v not in ('auto', 'force', 'off'):
+            raise ValueError(f"use_gpu must be 'auto'|'force'|'off'; got {v!r}")
+        self._section['use_gpu'] = v
 
     @property
     def fetch_mode(self) -> FetchMode:
@@ -567,6 +578,7 @@ class RemoteSweepDispatcher:
             # Pass user-specified workers as a ceiling hint; the server's
             # _compute_safe_workers() will cap it to a memory-safe value.
             workers_flag = f"--workers {workers}" if workers > 0 else ""
+            gpu_flag = f"--use-gpu {self.settings.use_gpu}"
             # Design: the sweep runs in the background with stdout/stderr
             # redirected to a temp log file, completely decoupled from the
             # SSH channel.  `tail -f --pid=$SWEEP_PID` then streams the log
@@ -604,6 +616,7 @@ class RemoteSweepDispatcher:
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
+                f"{gpu_flag} "
                 f"--verbose "
                 f"> \"$SWEEP_LOG\" 2>&1 & "
                 f"SWEEP_PID=$!; "
