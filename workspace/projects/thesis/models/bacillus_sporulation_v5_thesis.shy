@@ -3046,7 +3046,7 @@
       "name": "A29",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P2",
       "source_type": "place",
       "target_id": "T16",
@@ -3054,9 +3054,9 @@
       "weight": 20.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
       "control_points": [],
@@ -3088,7 +3088,7 @@
       "name": "A31",
       "label": "",
       "object_type": "arc",
-      "arc_type": "signal_flow",
+      "arc_type": "normal",
       "source_id": "P2",
       "source_type": "place",
       "target_id": "T17",
@@ -3096,9 +3096,9 @@
       "weight": 50.0,
       "threshold": null,
       "color": [
-        0.7,
-        0.7,
-        0.7
+        0.0,
+        0.0,
+        0.0
       ],
       "width": 3.0,
       "control_points": [],
