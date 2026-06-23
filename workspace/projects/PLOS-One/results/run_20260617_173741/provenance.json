@@ -1,0 +1,18 @@
+{
+  "parameter_sources": {
+    "NaturalPath_N1440_DOSE0_SinR12": {}
+  },
+  "timescale_audit": {
+    "NaturalPath_N1440_DOSE0_SinR12": {
+      "critical_transitions": [],
+      "dt": 0.1,
+      "n_eval_errors": 0,
+      "n_transitions_assessed": 29,
+      "recommended_dt": 0.621875,
+      "safety_factor": 0.1,
+      "stiffness_ratio": 3565.6543587502733,
+      "tau_max": 22173.91304347826,
+      "tau_min": 6.218749999999999
+    }
+  }
+}

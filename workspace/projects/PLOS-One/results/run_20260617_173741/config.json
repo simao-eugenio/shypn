@@ -1,0 +1,54 @@
+{
+  "sweep_config": {
+    "replicates": 50,
+    "duration": 21600.0,
+    "termination": "time_only",
+    "seed_base": 42,
+    "tau_epsilon": 0.03,
+    "max_tau": 0.1,
+    "time_step": null,
+    "events": [
+      {
+        "id": "evt_init_kinetics",
+        "name": "Initialise kinetic scalars",
+        "trigger": "t > 0",
+        "delay": 0.0,
+        "use_values_from_trigger_time": true,
+        "priority": 10,
+        "assignments": {
+          "k_ATP_target": "ATP_SETPOINT",
+          "k_sigma_decay": "0.6931471805599453 / SIGMA_HALFLIFE_MIN",
+          "k_thermo_factor": "2.0 ** ((TEMPERATURE_K - 310.15) / 10.0)"
+        }
+      },
+      {
+        "id": "evt_apply_initial_nutrients",
+        "name": "Project INITIAL_NUTRIENTS onto Nutrients",
+        "trigger": "t > 0",
+        "delay": 0.0,
+        "use_values_from_trigger_time": true,
+        "priority": 5,
+        "assignments": {
+          "Nutrients": "INITIAL_NUTRIENTS"
+        }
+      }
+    ],
+    "mode": "snapshots",
+    "snapshots": [
+      {
+        "name": "NaturalPath_N1440_DOSE0_SinR12",
+        "notes": "Reference condition for fig 4.2: N0=1440 \u00b5M, no Spo0A* pulse, SinR=12 \u00b5M",
+        "place_markings": {
+          "P27": 1440.0,
+          "P37": 0.0,
+          "P39": 12.0
+        },
+        "arc_weights": {},
+        "transition_rates": {},
+        "property_overrides": {}
+      }
+    ]
+  },
+  "model_path": "/home/simao/projetos/shypn/workspace/projects/thesis/models/bacillus_sporulation_v9_thesis.shy",
+  "timestamp": "2026-06-17T17:37:41.159461+00:00"
+}
