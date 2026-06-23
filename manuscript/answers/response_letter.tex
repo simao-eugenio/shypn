@@ -403,6 +403,20 @@ does not. $\Phi$ is a kinetic substrate inherited from Bio-PN; SHPN's
 contribution is the $G_S$ layer and the structural theorems its topology
 enables.
 
+A second, limiting argument seals the point. Consider a Petri net in which all
+regulation is encoded in $\Phi$ and \emph{no arcs exist at all}. Such a net has
+no token flow: every transition fires but consumes and produces nothing, so the
+marking $M$ never departs from $M_0$. $\Phi$ reads the same static values
+forever. The model is a system of rate equations evaluated at fixed initial
+conditions --- trivially solvable, biologically inert, structurally vacuous.
+The moment a signal flow arc is added, tokens are consumed on firing, the
+marking changes irreversibly, and the basin boundary $M_{\text{commit}} =
+\theta + W_s$ becomes computable from the arc topology alone. $\Phi$ expresses
+what a transition \emph{reads}; only $F_s$ arcs determine what it
+\emph{destroys}. It is destruction --- irreversible token consumption ---
+that creates the one-way barrier, and that is precisely what $\Phi$ cannot
+do regardless of how rich its function class is.
+
 We therefore regard the two frameworks as formally dual and genuinely
 complementary: most-permissive semantics establishes the ceiling of what can
 happen; $G_S$ commitment establishes the floor of what has been permanently
@@ -491,5 +505,45 @@ R2-P6: hybrid-PN contradiction & Contributions bullet~3 rewritten & Sec.~4.1 \\
 \hline
 \end{tabular}
 \end{center}
+
+%% ============================================================
+\section*{Working note: $\Gamma = (K, n, \varepsilon)$ and $\theta_{\mathrm{eff}}$ --- epistemic status (draft, not submitted)}
+%% ============================================================
+
+This note records the two-level epistemic structure of the ``not fitted'' claim,
+for integration into a future revision round if a reviewer raises the question.
+
+\textbf{What $\Gamma = (K, n, \varepsilon)$ is.}
+Each signal flow arc carries a kinetic constraint tuple with three components:
+$K$ (Michaelis constant, same units as marking), $n$ (Hill coefficient), and
+$\varepsilon \in [0,1)$ (suppression floor fraction).
+The effective basin floor is
+$\theta_{\mathrm{eff}} = K \cdot (\varepsilon / (1 - \varepsilon))^{1/n}$.
+When $\varepsilon = 0$ (default), $\theta_{\mathrm{eff}} = 0$.
+
+\textbf{Two-level epistemic structure.}
+\begin{enumerate}
+\item \emph{Cross-domain grounding:} $\Gamma$ IS fitted --- to molecular kinetics
+  data from BRENDA and published biochemical measurements. These parameters
+  describe enzyme--substrate binding at the molecular level, a different
+  experimental domain from the sporulation fraction being predicted.
+\item \emph{Analytical derivation:} $\theta_{\mathrm{eff}}$ and $M_{\mathrm{commit}}$
+  are NOT fitted to any cellular-level observation. The formula is applied once,
+  with no adjustment targeting the Fujita fractions.
+\end{enumerate}
+
+\textbf{Precise claim:} Molecular-scale kinetic constants, sourced independently from BRENDA,
+predict a cell-population-scale commitment threshold without any intermediate fitting step
+targeting the predicted outcome. This is \emph{cross-domain grounding}, which is stronger
+than ``fitted'' (no free parameter targeting the outcome) but not ``parameter-free''
+(enzyme kinetics have been measured by others).
+
+\textbf{Current manuscript state (2026-06-23):}
+\begin{itemize}
+\item $\Gamma = (K, n, \varepsilon)$ appears 5 times but was never formally defined.
+\item $\theta_{\mathrm{eff}}$ had 0 occurrences.
+\item The formula $\theta_{\mathrm{eff}} = K \cdot (\varepsilon/(1-\varepsilon))^{1/n}$ was absent.
+\item Remark added to \S6.1.3 (Corollary: Threshold Predictability) in this revision session.
+\end{itemize}
 
 \end{document}
