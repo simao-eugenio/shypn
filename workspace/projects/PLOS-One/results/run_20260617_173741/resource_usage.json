@@ -1,0 +1,31 @@
+{
+  "wall_seconds": 1899.25,
+  "workers": 2,
+  "n_conditions": 1,
+  "parent_peak_rss_mib": 1177.7,
+  "children_peak_rss_mib": 178.9,
+  "children_cpu_user_seconds": 3787.28,
+  "children_cpu_sys_seconds": 1.84,
+  "sum_condition_cpu_seconds": 3786.39,
+  "max_condition_peak_rss_mib": 0.0,
+  "cpu_efficiency_percent": 99.7,
+  "gpu": {
+    "available": false,
+    "period_ms": 500,
+    "duration_seconds": 1899.07,
+    "reason": "nvidia-smi unavailable"
+  },
+  "per_condition": [
+    {
+      "condition": "NaturalPath_N1440_DOSE0_SinR12",
+      "replicates_ok": 50,
+      "replicates_error": 0,
+      "wall_seconds": 1897.02,
+      "cpu_seconds": 3786.39,
+      "peak_rss_mib": 0.0,
+      "tmd_critical_count": 0,
+      "tmd_stiffness_ratio": 3565.6543587502733,
+      "tmd_recommended_dt": 0.621875
+    }
+  ]
+}
