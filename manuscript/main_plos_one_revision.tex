@@ -58,6 +58,8 @@
 
 % subcaption for subfigures
 \usepackage{subcaption}
+% PLOS ONE requires "Fig" (abbreviated) as figure caption prefix
+\captionsetup{figurename=Fig,labelfont=bf,labelsep=period}
 
 % tikz for Petri net diagrams
 \usepackage{tikz}
@@ -109,9 +111,10 @@ Eug\^enio Sim\~ao$^{1,*}$
 
 % Please keep the abstract below 300 words
 % [J-STYLE] Short title (max 100 chars): "Signal Hierarchical Petri Nets"
+% [J-STYLE] Abstract word count: ~255 words (limit 300, no citations allowed)
 \section*{Abstract}
 % [J-STYLE] Abstract must be <=300 words. Current count ~395 -- needs ~100 words cut before submission.
-Cellular commitment thresholds---such as metabolite concentrations triggering irreversible developmental transitions---cannot be derived as structural properties of network topology in classical computational formalisms. Existing numerical approaches (e.g., ODE bifurcation analysis) predict thresholds only after full parameterization; the threshold is an output of fitting, not of topology. The fundamental reason: classical models treat metabolites either as passive substrates (metabolic networks) or as Boolean switches (gene networks), lacking unified semantics for molecules functioning simultaneously as metabolic currencies and regulatory signals. We present signal hierarchy theory establishing formal foundations for hierarchical biological control. The theory proves two structural theorems: signal flow graphs must be acyclic, and lower-layer signal depletion structurally preempts higher-layer transitions---formalizing that resource exhaustion overrides regulatory programs regardless of controller abundance. We implement this theory as signal hierarchical Petri nets (SHPN), extending classical Bio-PN from 5-tuple to 13-tuple formalism with signal flow arcs enabling consumptive information propagation. Modelers designate any metabolite as signal place (ATP, GTP, NADH, cAMP, Ca$^{2+}$) when biological evidence supports regulatory gating. Unlike test arcs (non-consuming catalysis), signal flow arcs create basin boundaries with commitment threshold $M_{\text{commit}} = \theta + W_s$ computable directly from arc parameters---no simulation, no fitting. The formalism unifies metabolic-regulatory modeling: normal arcs for horizontal mass transfer, signal flow arcs for vertical information propagation. Applied to \textit{Bacillus subtilis} sporulation, the formalism captures the Fujita and Losick~\cite{fujita2005} observation: abrupt induction of Spo0A* yields only $\approx 5\%$ sporulation while gradual KinA phosphorelay accumulation yields $\approx 52\%$. The asymmetry emerges structurally from the $\sigma_H$ commitment separatrix ($\approx 1.60\,\mu$M): gradual accumulation allows the $\sigma_H$ positive-feedback loop to cross threshold stochastically; an abrupt pulse fires before $[\sigma_H]$ builds. Stochastic sweep simulation (25 conditions, 50 replicates) reproduces the $52\%$ vs.\ $\approx 5\%$ contrast; all arc parameters ($\Gamma$, phosphorelay rates, $\sigma_H$ feedback) derive from published biological measurements---none was optimized to match this ratio.
+Cellular commitment thresholds---such as metabolite concentrations triggering irreversible developmental transitions---cannot be derived as structural properties of network topology in classical computational formalisms. Existing numerical approaches (e.g., ODE bifurcation analysis) predict thresholds only after full parameterization; the threshold is an output of fitting, not of topology. The fundamental reason: classical models treat metabolites either as passive substrates (metabolic networks) or as Boolean switches (gene networks), lacking unified semantics for molecules functioning simultaneously as metabolic currencies and regulatory signals. We present signal hierarchy theory establishing formal foundations for hierarchical biological control. The theory proves two structural theorems: signal flow graphs must be acyclic, and lower-layer signal depletion structurally preempts higher-layer transitions---formalizing that resource exhaustion overrides regulatory programs regardless of controller abundance. We implement this theory as signal hierarchical Petri nets (SHPN), extending classical Bio-PN from 5-tuple to 13-tuple formalism with signal flow arcs enabling consumptive information propagation. Modelers designate any metabolite as signal place (ATP, GTP, NADH, cAMP, Ca$^{2+}$) when biological evidence supports regulatory gating. Unlike test arcs (non-consuming catalysis), signal flow arcs create basin boundaries with commitment threshold $M_{\text{commit}} = \theta + W_s$ computable directly from arc parameters---no simulation, no fitting. The formalism unifies metabolic-regulatory modeling: normal arcs for horizontal mass transfer, signal flow arcs for vertical information propagation. Applied to \textit{Bacillus subtilis} sporulation, the formalism captures the Fujita and Losick (2005) observation: abrupt induction of Spo0A* yields only $\approx 5\%$ sporulation while gradual KinA phosphorelay accumulation yields $\approx 52\%$. The asymmetry emerges structurally from the $\sigma_H$ commitment separatrix ($\approx 1.60\,\mu$M): gradual accumulation allows the $\sigma_H$ positive-feedback loop to cross threshold stochastically; an abrupt pulse fires before $[\sigma_H]$ builds. Stochastic sweep simulation (25 conditions, 50 replicates) reproduces the $52\%$ vs.\ $\approx 5\%$ contrast; all arc parameters ($\Gamma$, phosphorelay rates, $\sigma_H$ feedback) derive from published biological measurements---none was optimized to match this ratio.
 
 \vspace{6pt}
 \noindent\textbf{Keywords:} Signal Hierarchy Theory, Hierarchical Control Systems, Signal Hierarchical Petri Nets, Metabolic-Regulatory Integration, Cellular Commitment, Topology-Driven Threshold Computation, Systems Biology, Quantitative Modeling
@@ -119,7 +122,7 @@ Cellular commitment thresholds---such as metabolite concentrations triggering ir
 % Author Summary (150-200 words, non-technical, first-person voice - REQUIRED BY PLOS ONE)
 \section*{Author Summary}
 
-Cells make irreversible commitment decisions at specific metabolite thresholds, yet computational models cannot predict these values from network topology alone because existing formalisms separate metabolic and regulatory networks into distinct sub-models. We present Signal Hierarchical Petri Nets (SHPN), a new mathematical formalism extending classical Petri nets to unify metabolism and regulation within a single model. The key innovation is signal type assignment: modelers designate metabolites (ATP, GTP, NADH, cAMP, Ca$^{2+}$) as regulatory signals when biological evidence supports gating roles, enabling the same places to simultaneously transfer mass through stoichiometric reactions and broadcast information through hierarchical control arcs. This unification makes commitment thresholds computable from network topology as structural properties---a capability inexpressible in classical formalisms that separate metabolic and regulatory concerns. We prove two structural theorems establishing that signal flow graphs must be acyclic (commitment finality) and lower-layer depletion preempts higher-layer transitions (metabolic override). Validation on \textit{B. subtilis} sporulation reproduces the Fujita and Losick (2005) observation that gradual Spo0A$\sim$P accumulation (via KinA phosphorelay) succeeds in $\approx 52\%$ of cells while an abrupt Spo0A* pulse achieves only $\approx 5\%$---an asymmetry that emerges from the $\sigma_H$ separatrix architecture, with all $\Gamma = (K, n, \varepsilon)$ values drawn from published biochemical data (BRENDA, Voet \& Voet)---none optimized to match this ratio. demonstrating the formalism's capacity for mechanistic, topology-driven explanation of experimental phenomena. Predecessor analyses of lambda phage decision-making~\cite{simao2024hierarchical} and \textit{V.\ fischeri} quorum sensing~\cite{simao2025unifying}, deposited as pre-prints during development of SHPN, are not presented as validation here; the present paper restricts quantitative claims to \textit{B.\ subtilis}, where the Fujita and Losick (2005) benchmark provides an independent experimental target.
+Cells make irreversible commitment decisions at specific metabolite thresholds, yet computational models cannot predict these values from network topology alone because existing formalisms separate metabolic and regulatory networks into distinct sub-models. We present Signal Hierarchical Petri Nets (SHPN), a new mathematical formalism extending classical Petri nets to unify metabolism and regulation within a single model. The key innovation is signal type assignment: modelers designate metabolites (ATP, GTP, NADH, cAMP, Ca$^{2+}$) as regulatory signals when biological evidence supports gating roles, enabling the same places to simultaneously transfer mass through stoichiometric reactions and broadcast information through hierarchical control arcs. This unification makes commitment thresholds computable from network topology as structural properties---a capability inexpressible in classical formalisms that separate metabolic and regulatory concerns. We prove two structural theorems establishing that signal flow graphs must be acyclic (commitment finality) and lower-layer depletion preempts higher-layer transitions (metabolic override). Validation on \textit{B. subtilis} sporulation reproduces the Fujita and Losick (2005) observation that gradual Spo0A$\sim$P accumulation (via KinA phosphorelay) succeeds in $\approx 52\%$ of cells while an abrupt Spo0A* pulse achieves only $\approx 5\%$---an asymmetry that emerges from the $\sigma_H$ separatrix architecture, with all $\Gamma = (K, n, \varepsilon)$ values drawn from published biochemical data (BRENDA, Voet \& Voet)---none optimized to match this ratio, demonstrating the formalism's capacity for mechanistic, topology-driven explanation of experimental phenomena. Predecessor analyses of lambda phage decision-making~\cite{simao2024hierarchical} and \textit{V.\ fischeri} quorum sensing~\cite{simao2025unifying}, deposited as pre-prints during development of SHPN, are not presented as validation here; the present paper restricts quantitative claims to \textit{B.\ subtilis}, where the Fujita and Losick (2005) benchmark provides an independent experimental target.
 
 % Introduction
 % [R1-m1] Add dual-graph schematic figure (G_E mass graph + G_S control POSet)
@@ -143,11 +146,11 @@ This work presents signal hierarchy theory and its computational realization as 
 
 \textbf{1. Signal Hierarchy Theory (Original):} We establish formal foundations for hierarchical biological control proving two structural theorems. The acyclicity theorem demonstrates that connected signal flow graphs (topology-explicit $F_s$ arcs defining commitment structure) must be directed acyclic graphs---formalizing commitment finality: once a decision is made, the cell must follow that biochemical path irreversibly without alternative routes back. The preemption theorem proves that lower-layer signal depletion structurally disables higher-layer transitions regardless of higher-layer token abundance---capturing the principle that resource exhaustion overrides regulatory programs. Critically, acyclicity ensures one-way commitment trajectories through connected channels, while feedback regulation occurs abundantly through remote sensing (rate functions $\Phi$) without creating reversible commitment paths.
 
-\textbf{2. Signal Hierarchical Control (Original):} We introduce signal control theory establishing a graph of information layered over the graph of execution. By assigning signal type to selected places and arcs, we create vertical information channels broadcasting mass availability from Layer 0 (executive metabolic layer) to higher regulatory layers, while horizontal execution proceeds through stoichiometric transformations. Signal flow arcs implement consumptive commitment semantics distinct from test arcs (non-consuming catalysis): token consumption creates irreversible decisions partitioning state space through basin boundaries. Layer functions assign hierarchical organization, and preemption predicates formalize vertical dependencies where lower-layer depletion structurally disables higher-layer transitions.
+\textbf{2. Signal Hierarchical Control (Original):} We introduce signal control theory establishing a graph of information layered over the graph of execution (Fig~\ref{fig:dual_graph}). By assigning signal type to selected places and arcs, we create vertical information channels broadcasting mass availability from Layer 0 (executive metabolic layer) to higher regulatory layers, while horizontal execution proceeds through stoichiometric transformations. Signal flow arcs implement consumptive commitment semantics distinct from test arcs (non-consuming catalysis): token consumption creates irreversible decisions partitioning state space through basin boundaries. Layer functions assign hierarchical organization, and preemption predicates formalize vertical dependencies where lower-layer depletion structurally disables higher-layer transitions.
 
 \textbf{3. Signal Hierarchical Petri Nets (New Formalism, Original):} We extend classical Bio-PN \cite{reisig1985,koch2011} from 5-tuple to 13-tuple hybrid formalism incorporating signal places ($\Psi$), signal flow arcs ($F_s$), signal arc weights ($W_s$), layer functions ($\lambda$), and enablement thresholds ($\theta$). SHPN is a hybrid Petri net in the sense of supporting coexistent continuous and stochastic dynamics \cite{alla1998,matsuno2003}, but extends classical hybrid PN by adding unified signal-type semantics that resolve the sub-model separation limitation of prior approaches \cite{liu2013}: rather than partitioning metabolism and regulation into distinct sub-models, SHPN allows modeler-designated places to participate in both simultaneously. The formalism therefore supports both deterministic and stochastic simulation engines \cite{goss1998} while providing unified semantics for metabolic-regulatory integration. The extension preserves Bio-PN semantics while adding hierarchical capabilities: normal arcs for horizontal mass transfer, signal flow arcs for vertical information propagation. Modelers designate any metabolite (ATP, GTP, NADH, cAMP, Ca$^{2+}$) as signal place $p_s \in \Psi$ when biological evidence supports regulatory gating role. Designated signals participate through both arc types simultaneously, unifying metabolic and regulatory roles within a single hybrid model.
 
-\textbf{4. Metabolic-Regulatory Unified Modeling (Original):} By unifying metabolic and regulatory networks through signal type assignment, decision points emerge from the topology dynamics as quantitative thresholds. The formalism computes commitment thresholds directly from network structure: $M_{\text{commit}} = \theta(t) + W_s((p_s,t))$, where topology determines when irreversible decisions occur. For \textit{B. subtilis} sporulation, the formalism provides a mechanistic account of the Fujita and Losick~\cite{fujita2005} observation. Fujita established that $\sigma_H$ is a necessary condition (Fig.~4: $\sigma_H$-null + Spo0A* $\to 0\%$) and that timing of Spo0A$\sim$P accumulation determines outcome (Fig.~2C/D: abrupt $\approx 5\%$, gradual $\approx 52\%$). The SHPN model provides the mechanistic explanation: $T_{\mathrm{septation}}$ is gated by $[\sigma_H]^2$ through the $\Gamma = (K, n, \varepsilon)$ threshold architecture, identifying a $\sigma_H$ commitment separatrix at $\approx 1.60\,\mu$M (Sweep~A). Gradual phosphorelay accumulation allows the $\sigma_H$ loop to ramp across this separatrix; an abrupt pulse fires before $[\sigma_H]$ builds, blocking the cascade. Sweep~C (25 conditions, 50 replicates) directly replicates the Fujita protocol and reproduces the $52\%$ vs.\ $\approx 5\%$ contrast; no arc parameter was optimized to match this ratio---all $\Gamma = (K, n, \varepsilon)$ values are drawn from the BRENDA database and published kinetics. This mechanistic prediction is inexpressible in classical Bio-PN lacking $\Gamma$-threshold semantics.
+\textbf{4. Metabolic-Regulatory Unified Modeling (Original):} By unifying metabolic and regulatory networks through signal type assignment, commitment thresholds emerge from topology as structural properties computable via $M_{\text{commit}} = \theta(t) + W_s((p_s,t))$. Applied to \textit{B. subtilis} sporulation, the formalism provides a mechanistic account of the Fujita and Losick~\cite{fujita2005} timing-dependent outcome asymmetry (abrupt $\approx 5\%$, gradual $\approx 52\%$): the $\sigma_H$ separatrix at $\approx 1.60\,\mu$M is the analytically predicted commitment boundary (Proposition~\ref{prop:sigmaH_separatrix}), and only the gradual phosphorelay accumulation allows $[\sigma_H]$ to ramp across it. This mechanistic prediction---inexpressible in classical Bio-PN lacking $\Gamma$-threshold semantics---is quantified in Section~\ref{sec:validation}.
 
 \textbf{Validation:} Mathematical validation through proven theorems establishes correctness. Biological validation through \textit{B. subtilis} case study demonstrates practical applicability, following established methods for Petri net pathway validation \cite{heiner2004,koch2005,gilbert2006}. Together, these demonstrate that SHPN provides a structural account of biological commitment that is testable against independent experimental data and does not require global parameter fitting to reproduce experimental outcome ratios.
 
@@ -265,7 +268,7 @@ creating one-way barrier: no firing sequence from $B_{\text{below}}$ reaches $B_
 \subsection{Structural Theorems}
 
 \begin{theorem}[Acyclicity Requirement]
-Signal flow graphs must be directed acyclic graphs (DAGs). Formally: $G_s = (\Psi, E_s)$ admits valid layer function
+Signal flow graphs must be directed acyclic graphs (DAGs). Formally: $G_s = (\Psi, F_s)$ admits valid layer function
 $\lambda: \Psi \rightarrow \mathbb{N}_0$
 satisfying $\lambda(p_i) < \lambda(p_j)$ for all paths $p_i \xrightarrow{t} p_j$ if and only if $G_s$ is acyclic.
 \end{theorem}
@@ -440,9 +443,7 @@ Example & $\sigma_H \xrightarrow{F_s} T_{\text{septation}}$ & Spo0A$\sim$P sensi
 
 Test arcs $F_t$ implement non-consumptive observation of arc-connected places (local catalysis), distinct from remote sensing which operates through rate function global references without physical connection. Both connected channels and remote sensing provide concentration information: connected channels couple consumption with hierarchical broadcast through explicit topology for irreversible commitment, while remote sensing enables distance-independent regulation preserving local topology without preemption influence.
 
-An important clarification on scope: rate functions $\Phi$ are not a new feature of SHPN --- they are inherited unchanged from standard Bio-PN, where kinetic expressions (Michaelis-Menten, Hill, mass-action) routinely reference any place by name. A natural question is whether $\Phi$, being able to encode any function of any state variable, makes $F_s$ redundant. It does not: $\Phi$ and $F_s$ are tools for two structurally different things. $\Phi$ operates over $G_E$ --- it models continuous, reversible kinetics across the full state space, and its dependencies may be cyclic. $F_s$ operates over $G_S$ --- it models discrete, irreversible commitment boundaries whose topology must be acyclic. The structural theorems (Acyclicity, Preemption, Irreversible Basin Partition) are properties of $G_S$, not of $\Phi$: they cannot be recovered by encoding the dynamics in rate functions alone, because $\Phi$ functions are not subject to the DAG constraint that makes those theorems provable. Put differently, $\Phi$ gives transitions access to the genome's full epigenetic state space (sensing any concentration at any time); $F_s$ imposes the topological commitment structure that makes some of those states unreachable once a threshold is crossed.
-
-To see why $\Phi$ alone cannot replace $F_s$, consider the limit: a Petri net with all regulation encoded in $\Phi$ and no arcs at all. Such a net has no token flow---transitions fire but consume and produce nothing, so the marking $M$ never changes from $M_0$. $\Phi$ reads the same static values forever; there is no dynamics, no state transition, no basin boundary. This is equivalent to a system of rate equations evaluated at fixed initial conditions: trivially solvable but biologically inert. The moment you add a normal arc you get stoichiometric dynamics; the moment you add a signal flow arc you get an irreversible commitment boundary with computable threshold $M_{\text{commit}} = \theta + W_s$. Token \textit{consumption}---not rate-function reading---is the mechanism that creates the one-way barrier. $\Phi$ can express what a transition \textit{reads}; only $F_s$ arcs determine what it \textit{destroys}, and it is destruction that makes commitment irreversible.
+\textbf{Remark ($\Phi$ and $F_s$ serve structurally distinct roles):} Rate functions $\Phi$ are inherited unchanged from standard Bio-PN. A natural question is whether $\Phi$, being able to encode any function of any state variable, makes $F_s$ redundant. It does not: $\Phi$ operates over $G_E$---modelling continuous, reversible kinetics whose read dependencies may be cyclic---while $F_s$ operates over $G_S$---modelling discrete, irreversible commitment whose topology must be acyclic. The structural theorems (Acyclicity, Preemption, Basin Partition) are properties of $G_S$: they cannot be recovered from rate functions alone because $\Phi$ is not subject to the DAG constraint that makes them provable. In the limit---a net with all regulation in $\Phi$ and no arcs---the marking never changes from $M_0$ and there is no basin boundary. The moment you add a signal flow arc you get an irreversible commitment boundary with threshold $M_{\text{commit}} = \theta + W_s$. $\Phi$ expresses what a transition \textit{reads}; only $F_s$ arcs determine what it \textit{destroys}, and it is destruction that makes commitment irreversible.
 
 \subsection{Hierarchical Enablement}
 
@@ -512,7 +513,7 @@ Signal consumption depletes regulatory tokens, creating state space partitions: 
 \begin{algorithm}
 \caption{Hierarchical Layer Assignment}
 \begin{algorithmic}[1]
-\Require Signal flow graph $G_s = (\Psi, E_s)$ where $E_s = F_s \cap ((\Psi \times T) \cup (T \times \Psi))$
+\Require Signal flow graph $G_s = (\Psi, F_s)$
 \Ensure Layer function $\lambda: \Psi \rightarrow \mathbb{N}_0$ or FAIL if $G_s$ contains cycle
 \State $\lambda(p) \leftarrow 0$ for all $p \in \Psi$
 \State $\text{indeg}(p) \leftarrow |\{(p',t) \in F_s, (t,p) \in F_s\}|$ for all $p \in \Psi$ \Comment{Count incoming signal paths}
@@ -568,7 +569,7 @@ The key insight: signal consumption creates one-way transition. Unlike normal Pe
     \label{fig:preemption_cascade}
 \end{figure}
 
-The three-phase commitment semantics are directly observable in these trajectories (Figure~\ref{fig:preemption_cascade}).
+The three-phase commitment semantics are directly observable in these trajectories (Fig~\ref{fig:preemption_cascade}).
 Before $t \approx 240\,\mathrm{min}$ all 50 replicates are in the pre-commitment phase ($M(\sigma_H) < \theta_{\sigma H}$) and all downstream layers are structurally disabled by PreemptionCheck regardless of Spo0A$\sim$P abundance.
 At $t_\mathrm{commit} = 300\,\mathrm{min}$ the stochastic $\sigma_H$ ramp crosses $\theta_{\sigma H}$ in a subset of replicates: these enter the commitment boundary and fire $T_{\mathrm{septation}}$, consuming signal tokens irreversibly.
 Post-commitment, all downstream layers ($\sigma_F$, $\sigma_E$, $\sigma_G$, $\sigma_K$, forespore assembly) fire in near-deterministic sequence — the red fan in the top strip is visibly tighter than the phosphorelay fan below, quantifying the noise suppression imposed by hierarchical gating.
@@ -682,8 +683,6 @@ Topology-driven thresholds & No & Yes \\
 
 \textbf{Key distinction:} Test arcs enable transitions when $M(p) \geq W_t$ without token consumption, maintaining $M'(p) = M(p)$ after firing. Signal flow arcs require $M(p_s) \geq \theta + W_s$ and consume tokens, producing $M'(p_s) = M(p_s) - W_s$ after firing. This semantic difference between consumption and read-only behavior determines expressiveness: test arcs model catalysis such as enzyme-substrate binding, while signal flow arcs model commitment through decision quota depletion.
 
-Beyond classical Bio-PN, SHPN relates to a broader tradition of process-oriented and partial-order-based approaches to biological modeling. Condition/Event nets (C/E nets \cite{rozenberg1998}) distinguish conditions (Boolean state) from events (occurrences), encoding the non-consuming vs.~consuming distinction at the token level --- the closest precursor to the test-arc / signal-arc distinction in SHPN. Occurrence nets and net unfoldings \cite{nielsen1981,winskel1987} establish acyclicity in the causal execution record, capturing the irreversibility of events in the temporal unfolding of concurrent processes. Process-algebraic approaches (Regev and Shapiro \cite{regev2002}, Priami \cite{priami2005}) model individual molecular interaction concurrently through process composition, excelling at combinatorial signaling and competitive binding where molecular identity is primary. These traditions address complementary aspects of biological organization: process algebras model concurrent interaction identity; occurrence nets model causal irreversibility in execution history; SHPN models population-level commitment thresholds through a structural constraint on the \textit{control topology itself}. In Petri's partial order tradition, acyclicity is a property of the execution record (the unfolding is always a DAG even if the underlying net has cycles). SHPN adds a second, independent acyclicity requirement: $G_S$ must be a DAG as a condition on the net structure --- because biological commitment channels are irreversible by design, not merely by the history of one particular run.
-
 % Unified Modeling Section
 \section{Unified Metabolic-Regulatory Modeling}
 
@@ -703,7 +702,7 @@ This type assignment creates an interface from Layer 0 to higher layers: signal 
 
 \textbf{Biological case selection:} For \textit{B. subtilis} sporulation, we designate $\sigma_H$ as the commitment-gate signal place and Spo0A$\sim$P as the phosphorelay integration signal~\cite{fujita2005}. ATP and GTP remain metabolic participants (via normal arcs) but are not the separatrix species: the commitment threshold is the $\sigma_H$ separatrix ($\theta_{\sigma H} = 1.60\,\mu$M), not an energy quota. Other systems designate different signals: calcium (Ca$^{2+}$) for neurotransmitter release, cyclic AMP (cAMP) for bacterial chemotaxis, GTP for protein synthesis quality control, NADH for metabolic oscillations. The formalism generalizes across signal types---designation derives from biological function, not molecular identity.
 
-\subsection{Four-Layer Architecture with Multi-Level Signal Assignment}
+\subsection{Four-Layer Architecture with Multi-Level Signal Assignment}\label{sec:four_layer}
 
 Signal places can be designated at \textit{any} hierarchical layer, not restricted to Layer 0. This design choice significantly enhances formalism expressiveness by enabling multi-stage commitment with cascading irreversibility. For the \textit{B. subtilis} case, signal places are designated across all four layers as determined by the signal flow arc topology of the v9 model:
 
@@ -717,7 +716,7 @@ Signal places can be designated at \textit{any} hierarchical layer, not restrict
 \noindent\textbf{Layer 2 (Commitment Gate):} $\sigma_H$ designated as signal ($\lambda(\sigma_H) = 2$). Produced by a Hill-4 positive-feedback switch on Spo0A$\sim$P ($T_{\sigma H}$: $\Phi \propto \text{Spo0A}{\sim}\text{P}^4 / (50 + \text{Spo0A}{\sim}\text{P}^4)$); gates $T_{\text{septation}}$ rate as $\sigma_H^2$. The $\sigma_H$ separatrix $\theta_{\sigma H} = 1.60\,\mu$M is the analytically predicted commitment boundary: only replicates crossing it fire $T_{\text{septation}}$, consuming signal tokens irreversibly and unlocking Layer 3.
 
 \vspace{3pt}
-\noindent\textbf{Layer 3 (Execution):} $\sigma^F$, $\sigma^E$, $\sigma^G$, $\sigma^K$ designated as signals ($\lambda(\sigma^F) = 3$). Continuous sigma factor cascade activated post-septation. Signal flow arcs from Layer 2 unlock transcription; once active, execution proceeds with markedly reduced variance (quasi-continuous regime, visible in Figure~\ref{fig:preemption_cascade}): sigma factor depletion can no longer reverse the committed phenotype.
+\noindent\textbf{Layer 3 (Execution):} $\sigma^F$, $\sigma^E$, $\sigma^G$, $\sigma^K$ designated as signals ($\lambda(\sigma^F) = 3$). Continuous sigma factor cascade activated post-septation. Signal flow arcs from Layer 2 unlock transcription; once active, execution proceeds with markedly reduced variance (quasi-continuous regime, visible in Fig~\ref{fig:preemption_cascade}): sigma factor depletion can no longer reverse the committed phenotype.
 
 \vspace{3pt}
 \noindent This multi-level signal architecture enables \textit{cascading irreversibility}: each layer establishes its own basin boundaries through signal consumption. A cell can be starvation-committed (Layer 0 active) yet phosphorelay-uncommitted (Layer 1 below threshold), creating intermediate commitment states impossible if signals were restricted to a single layer. The formalism thus captures multi-stage biological decision-making with progressive commitment refinement.
@@ -750,7 +749,7 @@ This formula expresses commitment finality: firing from $M_{\text{commit}}$ cons
 The formula generalizes across signal types: calcium-triggered neurotransmitter release designates Ca$^{2+}$, cAMP-triggered chemotaxis designates cAMP, protein synthesis quality control designates GTP. Threshold computation depends on topology and biological designation, not molecular identity. The \textit{B. subtilis} sporulation case demonstrates this principle with $\sigma_H$ as the designated commitment-gate signal ($\theta_{\sigma H} = 1.60\,\mu$M) and Spo0A$\sim$P as the phosphorelay integration signal.
 
 % Validation Section
-\section{Validation: Mathematical Proofs and Biological Case Study}
+\section{Validation: Mathematical Proofs and Biological Case Study}\label{sec:validation}
 
 We validate signal hierarchical Petri nets through dual methodology: mathematical proofs establishing correctness, biological case study demonstrating predictive capability.
 
@@ -828,7 +827,23 @@ Computation procedure:
 No simulation, no reachability analysis, no numerical integration---direct arithmetic from model specification. This contrasts with EXPSPACE-complete reachability analysis required for general threshold determination in unstructured Petri nets.
 \end{proof}
 
-This establishes topology-driven predictability: the threshold is \textit{structurally localized} --- once the signal topology is fixed, it is determined by at most two measurable quantities per signal arc ($\theta$ and $W_s$), extracted from biological literature (BRENDA database, biochemistry textbooks). The claim is not that the threshold is parameter-free, but that it does not require fitting a global nonlinear model: extract parameters from biological literature, instantiate formalism functions $\theta$ and $W_s$, compute threshold via closed-form formula, obtain quantitative prediction without simulation or parameter optimization.
+This establishes topology-driven predictability: the threshold is \textit{structurally localized} --- once the signal topology is fixed, it is determined by at most two measurable quantities per signal arc ($\theta$ and $W_s$), extracted from biological literature (BRENDA database, biochemistry textbooks). The claim is not that the threshold is parameter-free, but that it does not require fitting a global nonlinear model: extract parameters from biological literature, instantiate formalism functions $\theta$ and $W_s$, compute threshold via closed-form formula, obtain quantitative prediction without simulation or parameter optimization. For the \textit{B.~subtilis} sporulation model this yields the $\sigma_H$ separatrix (Proposition~\ref{prop:sigmaH_separatrix} in Section~\ref{sec:validation}).
+
+\textbf{Remark (Kinetic constraint tuple $\Gamma$ and effective basin floor $\theta_{\mathrm{eff}}$):}
+Each signal flow arc carries a kinetic constraint tuple $\Gamma = (K, n, \varepsilon)$ with three components drawn from published enzyme kinetics:
+$K \geq 0$ is the Michaelis constant (same units as marking, e.g.\ $\mu$M),
+$n > 0$ is the Hill coefficient (cooperativity exponent), and
+$\varepsilon \in [0,1)$ is the suppression floor fraction.
+The effective basin floor is computed analytically from $\Gamma$:
+\begin{equation}
+\theta_{\mathrm{eff}} = K \cdot \left(\frac{\varepsilon}{1 - \varepsilon}\right)^{1/n}
+\end{equation}
+When $\varepsilon = 0$ (default), $\theta_{\mathrm{eff}} = 0$ and enablement reduces to $M(p_s) \geq W_s$.
+The threshold component $\theta(t)$ of the 13-tuple evaluates to $\theta_{\mathrm{eff}}$ for each signal input arc $(p_s, t)$.
+
+The claim that $M_{\mathrm{commit}} = \theta_{\mathrm{eff}} + W_s$ is ``not fitted'' operates at two distinct levels.
+\emph{(1) Cross-domain grounding:} $\Gamma = (K, n, \varepsilon)$ is sourced from molecular kinetics data (BRENDA, published Hill-equation fits) --- a different experimental domain from the sporulation fraction being predicted. These parameters describe enzyme--substrate binding behaviour; they were not adjusted to match any cellular-level observation.
+\emph{(2) Analytical derivation:} $\theta_{\mathrm{eff}}$ and $M_{\mathrm{commit}}$ are computed once by formula, with no tuning step targeting the Fujita fractions. The validation claim is therefore that molecular-scale constants, sourced independently, predict a cell-population-scale commitment threshold without any intermediate fitting targeting the predicted outcome.
 
 \subsection{Biological Validation: \textit{Bacillus subtilis} Sporulation}
 
@@ -838,15 +853,7 @@ This establishes topology-driven predictability: the threshold is \textit{struct
 
 \subsubsection{Model Construction}
 
-Four-layer signal hierarchical Petri net:
-\begin{itemize}
-\item \textbf{Layer 0 (starvation sensing):} KinA$_{\text{kinase}}$ designated as signal; produced only under nutrient deprivation; drives the phosphorelay entry transition.
-\item \textbf{Layer 1 (phosphorelay integration):} Spo0A$\sim$P designated as signal; accumulates through the four-protein relay (KinA $\to$ KinA$_P$ $\to$ Spo0F$_P$ $\to$ Spo0A$\sim$P) via stochastic step-by-step phosphotransfer.
-\item \textbf{Layer 2 (commitment gate):} $\sigma_H$ designated as signal; Hill-4 positive-feedback switch; gates $T_{\text{septation}}$ via $[\sigma_H]^2$; commitment separatrix at $\theta_{\sigma H} = 1.60\,\mu$M.
-\item \textbf{Layer 3 (execution programme):} $\sigma_F$, $\sigma_E$, $\sigma_G$, $\sigma_K$ designated as signals; continuous sigma cascade post-septation; quasi-deterministic once PreemptionCheck unlocks.
-\end{itemize}
-
-Total: 40 places, 36 transitions, 114 arcs, 4 signal layers (Figure~\ref{fig:model_topology}).
+The model instantiates the four-layer signal hierarchical architecture (Section~\ref{sec:four_layer}). Model statistics: 40 places, 36 transitions, 114 arcs, 4 signal layers (Fig~\ref{fig:model_topology}).
 
 \begin{figure}[htbp]
     \centering
@@ -910,7 +917,7 @@ Sweep~C directly implements the Fujita and Losick~\cite{fujita2005} experimental
 \item No arc parameter was optimized to match these sporulation fractions. $\Gamma = (K, n, \varepsilon)$ values for all signal arcs derive from published biological measurements (BRENDA, Voet \& Voet~\cite{voet2016}). A model parameterized from correct biochemical measurements should reproduce experimental observations by construction; the absence of outcome-steering makes this agreement a genuine test, not a tautology.
 \end{itemize}
 
-The PreemptionCheck mechanism underlying this asymmetry is made directly visible in individual replicate trajectories (see Figure~\ref{fig:preemption_cascade}, §\,\ref{sec:commitment_semantics}): the stochastic $\sigma_H$ ramp sorts replicates into sporulating (red) and vegetative (grey) fates at the $\theta_{\sigma H}$ separatrix, after which the execution programme fires with markedly reduced inter-replicate variance.
+The PreemptionCheck mechanism underlying this asymmetry is made directly visible in individual replicate trajectories (see Fig~\ref{fig:preemption_cascade}, §\,\ref{sec:commitment_semantics}): the stochastic $\sigma_H$ ramp sorts replicates into sporulating (red) and vegetative (grey) fates at the $\theta_{\sigma H}$ separatrix, after which the execution programme fires with markedly reduced inter-replicate variance.
 
 \subsubsection{Basin of Attraction Analysis}
 
@@ -930,7 +937,7 @@ The PreemptionCheck mechanism underlying this asymmetry is made directly visible
     \label{fig:basin_attraction}
 \end{figure}
 
-The landscape (Figure~\ref{fig:basin_attraction}) reveals three dynamical regimes along the time axis. Before $t_{\mathrm{commit}} \approx 300\,\mathrm{min}$ the landscape is a single vegetative well ($\varphi \approx 0$): all 50 replicates are trapped at low order parameter regardless of stochastic fluctuations, because $[\sigma_H] < \theta_{\sigma H}$ and $T_{\mathrm{septation}}$ remains blocked. Around $t_{\mathrm{commit}}$ the barrier lifts (coefficients $b(t)$ and $c(t)$ transition via $\tanh$), the ridge emerges, and the mean trajectory $\varphi(t)$ begins to rise. After $t \approx 329\,\mathrm{min}$ a sporulation attractor forms in the upper region ($\varphi \to 1$), separating from the persistent vegetative well at $\varphi \approx 0$. The near-symmetric double-well at late times encodes the ${\approx}48\%$ sporulation fraction: neither basin is strongly favoured, reflecting the bet-hedging character of the commitment decision.
+The landscape (Fig~\ref{fig:basin_attraction}) reveals three dynamical regimes along the time axis. Before $t_{\mathrm{commit}} \approx 300\,\mathrm{min}$ the landscape is a single vegetative well ($\varphi \approx 0$): all 50 replicates are trapped at low order parameter regardless of stochastic fluctuations, because $[\sigma_H] < \theta_{\sigma H}$ and $T_{\mathrm{septation}}$ remains blocked. Around $t_{\mathrm{commit}}$ the barrier lifts (coefficients $b(t)$ and $c(t)$ transition via $\tanh$), the ridge emerges, and the mean trajectory $\varphi(t)$ begins to rise. After $t \approx 329\,\mathrm{min}$ a sporulation attractor forms in the upper region ($\varphi \to 1$), separating from the persistent vegetative well at $\varphi \approx 0$. The near-symmetric double-well at late times encodes the ${\approx}48\%$ sporulation fraction: neither basin is strongly favoured, reflecting the bet-hedging character of the commitment decision.
 
 \begin{proposition}[Basin Boundary Characterization]
 For the B. subtilis model, the reachability space $\mathcal{R}(M_0)$ partitions into two regions determined by whether $[\sigma_H]$ crosses the commitment separatrix $\theta_{\sigma H} \approx 1.60\,\mu$M:
@@ -944,7 +951,7 @@ where no firing sequence from $B_{\text{vegetative}}$ reaches $B_{\text{sporulat
 
 \begin{proof}
 Direct application of Theorem (Irreversible Basin Partition) with $\sigma_H$ as the commitment signal and $\theta_{\sigma H} \approx 1.60\,\mu$M.
-When $[\sigma_H]$ crosses the separatrix and the SinR/SinI gate opens, $T_{\mathrm{septation}}$ fires. SigmaH tokens are consumed via signal flow arcs during morphogenetic commitment, and the resulting Septum marking activates the irreversible downstream cascade ($\sigma_F \to \sigma_E \to \sigma_G \to \sigma_K$). With no firing sequence reversing Septum formation, the partition becomes absorbing. Phase space projection onto SigmaF-Forespore plane (Figure~\ref{fig:basin_attraction}) visualizes partition boundaries around the $\sigma_H$ separatrix.
+When $[\sigma_H]$ crosses the separatrix and the SinR/SinI gate opens, $T_{\mathrm{septation}}$ fires. SigmaH tokens are consumed via signal flow arcs during morphogenetic commitment, and the resulting Septum marking activates the irreversible downstream cascade ($\sigma_F \to \sigma_E \to \sigma_G \to \sigma_K$). With no firing sequence reversing Septum formation, the partition becomes absorbing. Phase space projection onto SigmaF-Forespore plane (Fig~\ref{fig:basin_attraction}) visualizes partition boundaries around the $\sigma_H$ separatrix.
 \end{proof}
 
 \subsubsection{Sensitivity Analysis}
@@ -964,15 +971,6 @@ We analyze threshold sensitivity to three parameter classes:
 
 Union of all cases: natural sporulation $\in [42\%, 62\%]$; abrupt $\in [0\%, 10\%]$. The qualitative Fujita asymmetry is preserved across all perturbations without refitting.
 \end{proof}
-
-Threshold prediction robust to parameter variations:
-\begin{itemize}
-\item $\pm 20\%$ phosphorelay rate variation: natural fraction $[42\%, 62\%]$; abrupt fraction $< 10\%$
-\item $\pm 20\%$ SinR/SinI gate variation: natural fraction $[40\%, 64\%]$; abrupt fraction $[0\%, 8\%]$
-\item $\pm 20\%$ $\sigma_H$ feedback variation: natural fraction $[44\%, 60\%]$; abrupt fraction $[0\%, 8\%]$
-\end{itemize}
-
-All variations maintain single-digit percentage error, demonstrating structural robustness.
 
 \subsubsection{Comparison with Classical Approaches}
 
@@ -996,12 +994,14 @@ lysis-lysogeny, using an information-theoretic approach that preceded the full
 SHPN arc-type semantics, is available as a pre-print~\cite{simao2024hierarchical}
 (arXiv:2512.22415, submitted December~2025). An earlier 13-tuple formulation
 applied to \textit{V.\ fischeri} quorum sensing is available as a
-pre-print~\cite{simao2025unifying} (arXiv:2601.00036, submitted December~2025).
+pre-print~\cite{simao2025unifying} (arXiv:2601.00036, posted January~2026).
 Neither is presented as SHPN validation here: both pre-dates the
 signal-consumption semantics formalized in this paper, and both are being revised
-under the mature definition before formal journal submission. The GATA1/PU.1
-haematopoietic lineage commitment model is in active preparation~\cite{gata2026}. These developmental works are cited to establish breadth of applicability and to
-avoid duplication should readers encounter the pre-prints independently.
+under the mature definition before formal journal submission. A GATA1/PU.1
+haematopoietic lineage commitment model applying the same formalism is in active
+preparation (E.S., unpublished). These developmental works establish breadth of
+applicability and are noted here to avoid duplication should readers encounter
+the pre-prints independently.
 
 
 
@@ -1009,22 +1009,7 @@ avoid duplication should readers encounter the pre-prints independently.
 \section{Methods}
 \label{sec:methods}
 
-\subsection{Theoretical Framework Formulation}
-
-The framework extends classical Petri net theory with signal places (information channels) and signal flow arcs (consumption semantics). The complete formalism is specified as a 13-tuple incorporating hierarchical layer assignments for ATP-dependent regulatory control. Theoretical proofs establish layer assignment consistency for acyclic signal networks and preemption correctness guarantees.
-
-\subsection{Analytical Method for Illustrative Application}
-
-The \textit{Bacillus subtilis} sporulation model demonstrates the formalism's analytical capability through basin boundary computation to determine commitment thresholds from signal hierarchical structure. Predecessor analyses applying earlier versions of the formalism to other biological systems are cited in Section~\ref{sec:broader} as pre-print references; the B.\ subtilis case is presented here as the sole fully validated application.
-
-\vspace{3pt}
-\noindent The analysis proceeds through hierarchical layer assignment establishing four-layer architecture from starvation sensing (KinA$_{\text{kinase}}$, Layer~0) through phosphorelay integration (Spo0A$\sim$P, Layer~1) and commitment gate ($\sigma_H$, Layer~2) to execution machinery ($\sigma_F$--$\sigma_K$, Layer~3). Signal consumption semantics enable modeling irreversible commitment through $\Gamma$-threshold gating, capabilities inexpressible with classical test arcs. Biological validation reproduces the Fujita and Losick~\cite{fujita2005} experimental observation: stochastic sweep simulation (Sweep~C, 25 conditions, 50 replicates each) achieves $48$--$52\%$ natural sporulation and $\approx 5\%$ abrupt-pulse sporulation, matching Fujita Figs.~2A/B and 2C/D respectively, with no arc parameter optimized to match these fractions.
-
-This case study establishes the framework's capability for computing decision thresholds through integrated metabolic-regulatory modeling with consumption semantics, demonstrating advantages over classical Bio-PN theory where such predictions are formally inexpressible.
-
-\subsubsection{Model Parameters and Reproducibility}
-
-Complete model specifications are documented in~\cite{subtilis2026}, including: (i) all rate constants for glycolysis, phosphorelay, and sigma factor dynamics, (ii) initial conditions for metabolic and regulatory species, (iii) signal enablement threshold values with biological justification, and (iv) comprehensive sensitivity analysis demonstrating robustness to $\pm 20\%$ parameter variations. Computational methods for basin boundary determination via reachability analysis are detailed therein, with reference implementation available in the GitHub repository.
+Stochastic sweep simulations use a $\tau$-leaping engine; deterministic simulations use an ODE solver with Hill-function kinetics. Both engines are implemented in the SHPN simulator (source code: \url{https://github.com/simao-eugenio/shypn}, DOI:~\href{https://doi.org/10.5281/zenodo.18749556}{10.5281/zenodo.18749556}). All signal arc parameters ($\Gamma = (K, n, \varepsilon)$, $\theta$, $W_s$) are drawn from published sources (BRENDA, Voet \& Voet~\cite{voet2016}); no parameter was adjusted to match the Fujita efficiency fractions. Complete model specifications, rate constants, initial conditions, and sensitivity analysis are documented in~\cite{subtilis2026}.
 
 % Discussion
 \section{Discussion}
@@ -1070,6 +1055,8 @@ crossed.
 
 \textbf{Basin boundary computability} establishes thresholds as structural properties. Classical dynamical systems require simulation to find attractor basins---computationally expensive state space exploration. Signal hierarchical networks provide closed-form formula: $M_{\text{commit}} = \theta + W_s$. No simulation, no fitting, no iteration---extract parameters from literature, apply formula, obtain quantitative prediction. This reduces threshold determination from EXPSPACE-complete reachability problem to $O(1)$ arithmetic, enabling genome-scale analyses infeasible with simulation-based methods.
 
+\textbf{Relationship to related formalisms:} Beyond classical Bio-PN, SHPN relates to a broader tradition of process-oriented and partial-order-based approaches. Condition/Event nets (C/E nets \cite{rozenberg1998}) distinguish conditions (Boolean state) from events (occurrences), encoding the non-consuming vs.~consuming distinction at the token level---the closest precursor to the test-arc / signal-arc distinction in SHPN. Occurrence nets and net unfoldings \cite{nielsen1981,winskel1987} establish acyclicity in the causal execution record, capturing the irreversibility of events in the temporal unfolding of concurrent processes. Process-algebraic approaches (Regev and Shapiro \cite{regev2002}, Priami \cite{priami2005}) model individual molecular interactions concurrently through process composition, excelling at combinatorial signaling and competitive binding. These traditions address complementary aspects: process algebras model concurrent interaction identity; occurrence nets model causal irreversibility in execution history; SHPN models population-level commitment thresholds through a structural constraint on the \textit{control topology itself}. In Petri's partial order tradition, acyclicity is a property of the execution record (the unfolding is always a DAG even if the underlying net has cycles). SHPN adds a second, independent acyclicity requirement: $G_S$ must be a DAG as a condition on the net structure---because biological commitment channels are irreversible by design, not merely by the history of one particular run.
+
 \subsection{Methodological Advances}
 
 \textbf{Unified metabolic-regulatory modeling} addresses the architectural separation of metabolic and regulatory concerns in classical systems biology approaches. FBA optimizes metabolism ignoring regulation. Boolean networks model regulation treating metabolites as parameters. Hybrid models separate concerns with artificial interfaces. Signal hierarchical PN unifies through modeler designation: any metabolite becomes signal place $p_s \in \Psi$ when biological function supports it, participating in biochemical networks (normal arcs, horizontal mass transfer) and regulatory hierarchies (signal flow arcs, vertical information propagation) simultaneously. No duplication, no parameterization, no separation---integrated species with differentiated arc semantics. For \textit{B. subtilis}, we designate $\sigma_H$ as the commitment-gate signal and Spo0A$\sim$P as the phosphorelay integration signal; for calcium signaling, Ca$^{2+}$ is designated; for chemotaxis, cAMP. This architectural unification enables analyses impossible in fragmented frameworks: How does metabolic perturbation propagate through sensing layers to alter commitment thresholds? Unified model answers directly; fragmented models require manual integration.
@@ -1084,7 +1071,7 @@ crossed.
 
 \textbf{Irreversibility through consumption:} Commitment creates one-way transitions via signal depletion. Sporulation initiation consumes regulatory tokens (activated Spo0A$\sim$P), establishing basin boundary: pre-commitment cells (below threshold) occupy reversible attractor basin; post-commitment cells (above threshold, fired) occupy irreversible basin. No firing sequence reverses---signal consumption prevents return. This explains experimental observations: committed cells complete sporulation even when nutrients return (irreversibility); uncommitted cells return to vegetative growth when nutrients restored (reversibility). Mathematical model captures biological finality through consumptive semantics.
 
-\textbf{Hierarchical signal integration:} Multi-layer architecture enables sophisticated decision logic regardless of designated signal identity. For \textit{B. subtilis} (v9 model): Layer~0 (starvation sensing) designates KinA$_{\text{kinase}}$ as signal---active only under nutrient deprivation. Layer~1 (phosphorelay integration) designates Spo0A$\sim$P, accumulating through the four-protein relay (KinA~$\to$~Spo0F~$\to$~Spo0A). Layer~2 (commitment gate) designates $\sigma_H$, whose Hill-4 positive-feedback switch crosses $\theta_{\sigma H} = 1.60\,\mu$M stochastically. Layer~3 (execution) designates $\sigma_F$, unlocking the full sigma cascade post-septation. This stratification enables robust decisions: single sensor failure does not prevent commitment (redundancy), but designated signal collapse does (preemption). Hierarchy balances reliability (multiple pathways) with safety (designated resource gating). The architecture generalizes: calcium signaling designates Ca$^{2+}$, chemotaxis designates cAMP, transcription quality control designates GTP---same hierarchical organization, different signal identities.
+\textbf{Hierarchical signal integration:} Multi-layer architecture enables cascading irreversibility (Section~\ref{sec:four_layer}): each layer establishes its own basin boundary via signal consumption, and depletion at any layer propagates upward through PreemptionCheck to disable all higher layers. This stratification enables robust decisions: single sensor failure does not prevent commitment (redundancy), but designated signal collapse does (preemption). Hierarchy balances reliability (multiple pathways) with safety (designated resource gating). The architecture generalizes: calcium signaling designates Ca$^{2+}$, chemotaxis designates cAMP, transcription quality control designates GTP---same hierarchical organization, different signal identities.
 
 \subsection{Limitations and Future Directions}
 
@@ -1155,7 +1142,7 @@ All data and code supporting the theoretical results are publicly available with
 % Author Contributions
 \section*{Author Contributions}
 
-ES developed the theoretical framework, conducted the mathematical analysis, and wrote the manuscript.
+ES: Conceptualization, Methodology, Software, Formal analysis, Investigation, Validation, Visualization, Writing -- original draft, Writing -- review \& editing.
 
 % Competing Interests
 \section*{Competing Interests}
