@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use this software, please cite both the software and the paper."
 type: software
 title: "SHYpn: Signal Hierarchical Petri Nets for Systems Biology"
-version: 2.6.1
-date-released: 2026-02-23
+version: 2.7.0
+date-released: 2026-06-24
 url: "https://github.com/simao-eugenio/shypn"
 repository-code: "https://github.com/simao-eugenio/shypn"
 license: MIT

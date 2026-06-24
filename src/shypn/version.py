@@ -9,16 +9,16 @@ Usage:
 """
 
 # Main package version (semantic versioning: MAJOR.MINOR.PATCH)
-__version__ = "2.6.1"
+__version__ = "2.7.0"
 
 # Version metadata
-__version_name__ = "Simulation Path Consistency & Remote Execution"
-__version_date__ = "2026-04-19"
+__version_name__ = "Ubuntu Installer & Console Entry Point"
+__version_date__ = "2026-06-24"
 
 # API version for compatibility checking (MAJOR.MINOR)
 # Increment MAJOR when breaking API changes occur
 # Increment MINOR when backward-compatible features are added
-__api_version__ = "2.6"
+__api_version__ = "2.7"
 
 # Required submodule versions
 __required_engine_version__ = "1.0.0"
@@ -27,6 +27,7 @@ __required_crossfetch_version__ = "1.0.0"
 # Version history
 __version_history__ = """
 Version History:
+2.7.0 (Jun 24, 2026): Ubuntu Installer & Console Entry Point - install_ubuntu.sh one-script setup, shypn console command, python -m shypn --check headless verify, CI matrix Ubuntu 22.04/24.04
 2.6.1 (Apr 19, 2026): Simulation Path Consistency & Remote Execution - Arc weight/marking fixes, SSH hardening, CPU parallel replicates, GPU engine, hybrid CPU+GPU mode
 2.6.0 (Feb 23, 2026): GATA Project & DTO Editing Infrastructure - Event-driven cache, model-independent editing
 2.5.9 (Feb 17, 2026): Property Sweep & Batch Automation - Enhanced batch execution
