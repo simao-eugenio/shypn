@@ -7,23 +7,42 @@ Get from zero to a running simulation in under 5 minutes.
 ## Prerequisites
 
 Before cloning, install the GTK3 system libraries for your OS.
-Full details in [INSTALL.md](INSTALL.md). Short version:
+
+**Fastest path on Ubuntu 22.04 / 24.04** — the installer script handles everything:
 
 ```bash
-# Ubuntu / Debian
+git clone https://github.com/simao-eugenio/shypn.git
+cd shypn
+bash install_ubuntu.sh
+```
+
+Skip to [Step 2](#step-2--launch-shypn) after the script completes.
+
+**Manual prerequisites (Ubuntu):**
+
+```bash
+# Ubuntu 22.04
 sudo apt install -y python3 python3-venv python3-gi python3-gi-cairo \
     gir1.2-gtk-3.0 libgtk-3-dev libcairo2-dev libgirepository1.0-dev pkg-config
+
+# Ubuntu 24.04 (package name differs)
+sudo apt install -y python3 python3-venv python3-gi python3-gi-cairo \
+    gir1.2-gtk-3.0 libgtk-3-dev libcairo2-dev libgirepository-1.0-dev pkg-config
 ```
+
+Full details in [INSTALL.md](INSTALL.md).
 
 ---
 
 ## Step 1 — Clone and install
 
+If you didn't use `install_ubuntu.sh`, run these steps manually:
+
 ```bash
 git clone https://github.com/simao-eugenio/shypn.git
 cd shypn
 python3 -m venv .venv
-source .venv/bin/activate      # Windows WSL2 / Linux / macOS
+source .venv/bin/activate
 pip install --upgrade pip
 pip install -e .
 ```
@@ -33,7 +52,9 @@ pip install -e .
 ## Step 2 — Launch SHYpn
 
 ```bash
-python src/shypn.py
+source .venv/bin/activate   # if not already active
+shypn
+# or: python src/shypn.py
 ```
 
 The main window opens with three panels:
