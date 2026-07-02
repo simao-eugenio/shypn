@@ -80,6 +80,7 @@ class RemoteSweepSettings:
         'remote_repo': '/home/simao/shypn',
         'remote_venv': '.venv/bin/python',
         'workers': 0,  # 0 = auto
+        'use_gpu': 'auto',  # 'auto' | 'force' | 'off'
         'fetch_mode': 'summary_only',  # 'full' or 'summary_only'
     }
 
@@ -122,6 +123,16 @@ class RemoteSweepSettings:
     @workers.setter
     def workers(self, v: int):
         self._section['workers'] = max(0, int(v))
+
+    @property
+    def use_gpu(self) -> str:
+        return self._section.get('use_gpu', 'auto')
+
+    @use_gpu.setter
+    def use_gpu(self, v: str):
+        if v not in ('auto', 'force', 'off'):
+            raise ValueError(f"use_gpu must be 'auto'|'force'|'off'; got {v!r}")
+        self._section['use_gpu'] = v
 
     @property
     def fetch_mode(self) -> FetchMode:
@@ -200,6 +211,7 @@ class RemoteSweepDispatcher:
         complete_cb: Optional[Callable[[bool, str, str], None]] = None,
         ssh_password: Optional[str] = None,
         events: Optional[list] = None,
+        fixed_overrides: Optional[dict] = None,
     ):
         """Launch the remote sweep pipeline on a background thread.
 
@@ -231,7 +243,8 @@ class RemoteSweepDispatcher:
             target=self._run_pipeline,
             args=(model_filepath, project_folder, experiment_manager,
                   sim_params, progress_cb, complete_cb, ssh_password,
-                  list(events) if events else []),
+                  list(events) if events else [],
+                  dict(fixed_overrides) if fixed_overrides else None),
             daemon=True,
         )
         self._thread.start()
@@ -247,6 +260,7 @@ class RemoteSweepDispatcher:
         complete_cb,
         ssh_password: Optional[str] = None,
         events: Optional[list] = None,
+        fixed_overrides: Optional[dict] = None,
     ):
         staging = None
         host = self.settings.ssh_host
@@ -313,6 +327,7 @@ class RemoteSweepDispatcher:
                 filepath=str(config_path),
                 model_path=model_rel_to_project,
                 events=events or None,
+                fixed_overrides=fixed_overrides or None,
                 **sim_params,
             )
             # Audit log: dump event count + ids straight from the file
@@ -563,29 +578,55 @@ class RemoteSweepDispatcher:
             # Pass user-specified workers as a ceiling hint; the server's
             # _compute_safe_workers() will cap it to a memory-safe value.
             workers_flag = f"--workers {workers}" if workers > 0 else ""
-            # Use 'exec' so Python replaces the bash process, becoming
-            # sshd's direct child.  Combined with process_guard's
-            # PR_SET_PDEATHSIG + watchdog, this ensures the process dies
-            # cleanly when the SSH connection drops (no orphan zombies).
+            gpu_flag = f"--use-gpu {self.settings.use_gpu}"
+            # Design: the sweep runs in the background with stdout/stderr
+            # redirected to a temp log file, completely decoupled from the
+            # SSH channel.  `tail -f --pid=$SWEEP_PID` then streams the log
+            # back to the client.
             #
-            # nice -n 19 + ionice -c 3: run at lowest CPU and I/O
-            # priority so sshd (nice 0) always gets scheduled promptly,
-            # preventing the "banner exchange timeout" that locks the
-            # server out during heavy sweeps.
+            # This solves the SIGPIPE problem: previously the sweep wrote
+            # directly to the SSH channel (stdout). When the client closed
+            # the connection the SSH channel died and Python's next print()
+            # call got BrokenPipeError → process exited after only 1 of 25
+            # conditions (observed run_20260514_191917).
             #
-            # taskset -c 4-31: pin sweep to CPUs 4-31, reserving CPUs
-            # 0-3 (first 2 P-cores on i9-14900K) exclusively for
-            # sshd/system tasks.  This guarantees SSH remains responsive
-            # even under full sweep load.
+            # With the log-file approach:
+            #   • SSH closes → tail gets SIGPIPE → tail exits
+            #   • sweep is still writing to the log file → keeps running
+            #   • all 25 conditions complete and write results to disk
+            #
+            # setsid: detach from the SSH controlling tty so SIGHUP on
+            # client disconnect does NOT propagate to the sweep process.
+            #
+            # nice -n 19 + ionice -c 3: lowest CPU/IO priority.
+            # taskset -c 4-31: pin sweep to CPUs 4-31.
             remote_cmd = (
                 f"cd {remote_repo} && "
                 f"export PYTHONPATH=$PWD/src && "
-                f"exec nice -n 19 ionice -c 3 taskset -c 4-31 "
-                f"{remote_venv} -m shypn.cli.sweep "
+                f"export PYTHONUNBUFFERED=1; "
+                # NOTE: use ';' (not '&&') between the mktemp assignment,
+                # the setsid background launch, and the echos.  In bash,
+                # '&&' binds tighter than '&': 'A && B & C' is parsed as
+                # '(A && B) & C', putting the assignment into a subshell so
+                # $SWEEP_LOG is invisible to the parent. With ';' all
+                # commands run sequentially in the same shell.
+                f"SWEEP_LOG=$(mktemp /tmp/shypn_sweep_XXXXXX); "
+                f"setsid nice -n 19 ionice -c 3 taskset -c 4-31 "
+                f"{remote_venv} -u -m shypn.cli.sweep "
                 f"--project {project_rel} "
                 f"--sweep sweep_config.json "
                 f"{workers_flag} "
-                f"--verbose"
+                f"{gpu_flag} "
+                f"--verbose "
+                f"> \"$SWEEP_LOG\" 2>&1 & "
+                f"SWEEP_PID=$!; "
+                f"echo \"[SWEEP_PID] $SWEEP_PID\"; "
+                f"echo \"[SWEEP_LOG] $SWEEP_LOG\"; "
+                f"tail -f --pid=$SWEEP_PID \"$SWEEP_LOG\" 2>/dev/null; "
+                f"wait $SWEEP_PID 2>/dev/null; "
+                f"EXIT=$?; "
+                f"[ $EXIT -ne 0 ] && echo \"[SWEEP_EXIT] $EXIT\"; "
+                f"rm -f \"$SWEEP_LOG\""
             )
 
             stdout = self._ssh_stream(
@@ -917,11 +958,16 @@ class RemoteSweepDispatcher:
         # the forked SSH process sometimes fails to bind the socket.
         # Running without -f keeps sshpass holding the pipe open.
         try:
+            # Inherit the full environment so SSH_AUTH_SOCK (ssh-agent
+            # socket) and SSH_AGENT_PID are visible to the subprocess.
+            # Without this, the ControlMaster process cannot reach the
+            # agent and pubkey auth fails with "Permission denied".
             self._ctl_proc = subprocess.Popen(
                 argv,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.DEVNULL,
+                env=os.environ.copy(),
             )
         except Exception as e:
             logger.warning("ControlMaster launch failed (%s), falling back "

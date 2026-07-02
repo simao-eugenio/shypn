@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shypn"
-version = "2.6.1"
+version = "2.7.0"
 description = "Signal Hierarchical Petri Nets (SHYpn) - Extended Biological Petri Net Framework with Signal Hierarchy Theory for Systems Biology Modeling and Analysis"
 authors = [
     { name="Simão Eugénio", email="simao-eugenio@github.com" }
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -68,6 +68,9 @@ where = ["src"]
 include = ["shypn*", "shypn.api*"]
 
 [project.scripts]
+# Main GUI entry point
+shypn = "shypn.__main__:main"
+
 # Experimental validation tools
 shypn-setup-experiment = "cli.experimental.setup_experiment:main"
 shypn-run-replicates = "cli.experimental.run_replicates:main"

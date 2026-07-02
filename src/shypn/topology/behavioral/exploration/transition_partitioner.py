@@ -177,6 +177,17 @@ class TransitionPartitioner:
             if is_signal_flow and target_id == trans_id:
                 # Signal place → Transition
                 if source_id in self._signal_place_ids:
+                    # SPATIAL signal places are environmental scalars, NOT in the
+                    # biological cascade — they must not contribute to the POSet
+                    # layer assignment (per HPN doc §3, spatial vs biological split).
+                    src_place = getattr(arc, 'source', None)
+                    try:
+                        from shypn.netobjs.signal_type import SignalType
+                        if (src_place is not None
+                                and getattr(src_place, 'signal_type', None) == SignalType.SPATIAL):
+                            continue
+                    except ImportError:
+                        pass
                     signal_inputs.add(source_id)
         
         return signal_inputs

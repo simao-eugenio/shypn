@@ -138,5 +138,19 @@
     "path": "/home/simao/projetos/shypn/workspace/projects/Test_Project",
     "created_date": "2026-04-18T15:48:28.532281",
     "modified_date": "2026-04-18T15:48:28.532281"
+  },
+  "c59c4d63-adb1-49c8-949a-33e2c5f7a8e7": {
+    "id": "c59c4d63-adb1-49c8-949a-33e2c5f7a8e7",
+    "name": "models",
+    "path": "/home/simao/projetos/shypn/workspace/projects/canabidiol/models",
+    "created_date": "2026-05-02T20:56:44.030015",
+    "modified_date": "2026-05-02T20:56:44.030015"
+  },
+  "c965cbf3-10b5-4422-bdb5-5577932e9399": {
+    "id": "c965cbf3-10b5-4422-bdb5-5577932e9399",
+    "name": "Biochemical-Examples",
+    "path": "/home/simao/projetos/shypn/workspace/projects/Biochemical-Examples",
+    "created_date": "2026-05-03T10:57:10.276999",
+    "modified_date": "2026-05-03T10:57:10.276999"
   }
 }

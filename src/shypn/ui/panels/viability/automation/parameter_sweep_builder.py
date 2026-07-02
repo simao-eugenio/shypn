@@ -115,7 +115,20 @@ class ParameterSweepBuilder(Gtk.Box):
         self.type_combo.set_active(0)
         self.type_combo.connect("changed", self._on_type_changed)
         type_box.pack_start(self.type_combo, True, True, 0)
-        
+
+        # Manual refresh button — re-pulls parameter names + current values
+        # from the loaded model. Use after editing places/transitions on
+        # the canvas without reloading the file (e.g. tweaking an
+        # initial_marking) so the sweep builder picks up the new values.
+        self.refresh_button = Gtk.Button(label="\u21bb")
+        self.refresh_button.set_tooltip_text(
+            "Refresh parameter list and current values from the loaded model.\n"
+            "Use after editing places/transitions on the canvas."
+        )
+        self.refresh_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.refresh_button.connect("clicked", self._on_refresh_clicked)
+        type_box.pack_start(self.refresh_button, False, False, 0)
+
         selection_box.pack_start(type_box, False, False, 0)
         self.type_box = type_box  # Store reference for show/hide
         
@@ -287,13 +300,63 @@ class ParameterSweepBuilder(Gtk.Box):
         self.duration_entry.set_tooltip_text("Maximum simulation time in seconds (can stop earlier if condition met)")
         top_grid.attach(self.duration_entry, 3, 0, 1, 1)
 
+        # Output granularity (G0…G5) — controls per-condition disk footprint.
+        # Plumbing: writes through to sweep_config.json `output.tier`,
+        # gated in the worker by sweep_runner._run_single_condition.
+        top_grid.attach(Gtk.Label(label="Output:", xalign=0), 4, 0, 1, 1)
+        self.output_tier_combo = Gtk.ComboBoxText()
+        self.output_tier_combo.append("G0", "G0 — summary only")
+        self.output_tier_combo.append("G1", "G1 — + endpoint scalars")
+        self.output_tier_combo.append("G2", "G2 — + endpoint stats")
+        self.output_tier_combo.append("G3", "G3 — + per-step stats (default)")
+        self.output_tier_combo.append("G4", "G4 — + per-replicate trajectories")
+        self.output_tier_combo.append("G5", "G5 — + covariance matrix")
+        self.output_tier_combo.set_active_id("G3")
+        self.output_tier_combo.set_tooltip_text(
+            "Disk-footprint tier per condition.\n"
+            "G0: summary.csv only (run-level).\n"
+            "G1: + replicates.csv with per-replicate endpoint scalars.\n"
+            "G2: + statistics.json with endpoint-only stats.\n"
+            "G3: + statistics.json with full per-step time series (default).\n"
+            "G4: + replicates_trajectories/run_NNN.csv per replicate "
+            "(use 'Thin (s)' below to decimate).\n"
+            "G5: + covariance.json over per-replicate final-state values."
+        )
+        top_grid.attach(self.output_tier_combo, 5, 0, 1, 1)
+
+        # G4 thinning interval — only meaningful when tier ≥ G4. Empty/0
+        # = keep every recorded sample. Typical values: 1.0 s (smooth
+        # plots, small files), 0.1 s (fine transients), 5.0 s (coarse).
+        top_grid.attach(Gtk.Label(label="Thin (s):", xalign=0), 6, 0, 1, 1)
+        self.trajectory_thin_entry = Gtk.Entry()
+        self.trajectory_thin_entry.set_text("")
+        self.trajectory_thin_entry.set_width_chars(5)
+        self.trajectory_thin_entry.set_placeholder_text("0=all")
+        self.trajectory_thin_entry.set_tooltip_text(
+            "G4+ trajectory decimation step in seconds.\n"
+            "Empty or 0 → keep every recorded sample (largest files).\n"
+            "Example: 1.0 → keep first sample per ≥1 s window "
+            "(matches default recording_time_interval).\n"
+            "Ignored when Output tier < G4."
+        )
+        top_grid.attach(self.trajectory_thin_entry, 7, 0, 1, 1)
+
         top_grid.attach(Gtk.Label(label="Stop condition:", xalign=0), 0, 1, 1, 1)
         self.termination_combo = Gtk.ComboBoxText()
         self.termination_combo.append("time_only", "Time limit only")
         self.termination_combo.append("deadlock", "Deadlock or time limit")
         self.termination_combo.append("steady_state", "Steady state or time limit")
-        self.termination_combo.set_active_id("deadlock")
-        self.termination_combo.set_tooltip_text("When to stop the simulation")
+        # Default = time_only: long-horizon biological sweeps should run
+        # for the full configured duration regardless of transient empty
+        # states.  Deadlock-stopping was the previous default and silently
+        # truncated the canabidiol 7-d sweep run_20260504_163215 (it was
+        # luck the model did not deadlock first).
+        self.termination_combo.set_active_id("time_only")
+        self.termination_combo.set_tooltip_text(
+            "When to stop the simulation. Default 'Time limit only' is the safe "
+            "choice for protocol-driven biological sweeps; pick 'Deadlock' only "
+            "when the net is expected to terminate before the time horizon."
+        )
         top_grid.attach(self.termination_combo, 1, 1, 3, 1)
 
         sim_outer_vbox.pack_start(top_grid, False, False, 0)
@@ -439,7 +502,15 @@ class ParameterSweepBuilder(Gtk.Box):
         sim_outer_vbox.pack_start(subgroups_hbox, False, False, 0)
         sim_frame.add(sim_outer_vbox)
         self.pack_start(sim_frame, False, False, 0)
-        
+
+        # === FIXED ENVIRONMENT VALUES (▢ parameter places) ===========
+        # Sweep-wide constants applied to every condition before the swept
+        # axis layers on.  The legitimate channel for the use case that
+        # used to be smuggled in via top-level ``property_overrides`` (the
+        # silent-drop bug that wasted the Q1 sweep, run_20260430_135106).
+        # See SweepConfig.fixed_overrides on the engine side.
+        self._build_fixed_overrides_section()
+
         # === PREVIEW AND ACTIONS ===
         action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         action_box.set_margin_top(6)
@@ -461,8 +532,20 @@ class ParameterSweepBuilder(Gtk.Box):
         self.generate_button.connect("clicked", self._on_generate_clicked)
         action_box.pack_end(self.generate_button, False, False, 0)
         
-        # Clear button
-        clear_button = Gtk.Button(label="Clear")
+        # Clear button — full wipe of the sweep plan (single + factorial
+        # lists, design mode, solver settings, generated queue, activity log).
+        # The queue-view's "Clear Completed" / "Reset All" buttons remain
+        # available for finer-grained operations on a partially-run plan.
+        clear_button = Gtk.Button(label="Clear Sweep Plan")
+        clear_button.set_tooltip_text(
+            "Reset the entire sweep plan to a clean state:\n"
+            "  • clears single + factorial parameter lists\n"
+            "  • resets design mode to single, solver settings to defaults\n"
+            "  • empties the experiment queue (any leftover from a previous\n"
+            "    or cancelled sweep is removed)\n"
+            "  • clears the activity log\n"
+            "Use this before starting a new sweep to guarantee no carry-over."
+        )
         clear_button.connect("clicked", self._on_clear_clicked)
         action_box.pack_end(clear_button, False, False, 0)
         
@@ -486,7 +569,24 @@ class ParameterSweepBuilder(Gtk.Box):
         self.parameter_type = combo.get_active_id()
         # Note: Parameter list will be populated by category's refresh_parameters()
         # when it detects the type change
-    
+
+    def _on_refresh_clicked(self, button):
+        """Manual refresh: re-pull parameter names + values from the model.
+
+        Delegates to the parent category's ``refresh_parameters`` (which
+        re-reads the loaded ``DocumentModel`` via the viability panel) so
+        edits made on the canvas — e.g. tweaking a place's
+        ``initial_marking`` — show up in the sweep builder without
+        forcing a model reload.
+        """
+        cat = getattr(self, 'parent_category', None)
+        if cat is not None and hasattr(cat, 'refresh_parameters'):
+            try:
+                cat.refresh_parameters()
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+
     def _on_single_set_parameter_clicked(self, button):
         """Add/update parameter in single parameter mode."""
         param_id = self.name_combo.get_active_id()
@@ -568,19 +668,26 @@ class ParameterSweepBuilder(Gtk.Box):
             if row[2] == param_id:  # Check ID column
                 return
         
-        # Check limit (max 3 parameters for factorial)
-        if len(self.factorial_list) >= 3:
+        # Soft warning when factorial design grows large (>=4 params).
+        # The CLI accepts arbitrary N; the cap was removed so protocols like
+        # P1 (severity × loading × maint × interval) can be configured here.
+        if len(self.factorial_list) >= 4:
             dialog = Gtk.MessageDialog(
                 transient_for=self.get_toplevel(),
                 flags=0,
                 message_type=Gtk.MessageType.WARNING,
-                buttons=Gtk.ButtonsType.OK,
-                text="Maximum 3 parameters for factorial design"
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=f"Adding a {len(self.factorial_list) + 1}\u1d57\u02b0 parameter to the factorial design"
             )
-            dialog.format_secondary_text("Factorial designs become very large with >3 parameters. For more parameters, consider fractional factorial designs or sequential optimization.")
-            dialog.run()
+            dialog.format_secondary_text(
+                "Full factorial designs grow as the product of all level counts "
+                "(condition_count = \u220f |levels_i|). Make sure the resulting "
+                "sweep size is what you intend, or consider a fractional/screening design."
+            )
+            response = dialog.run()
             dialog.destroy()
-            return
+            if response != Gtk.ResponseType.OK:
+                return
         
         # Detect parameter type from ID prefix
         if param_id.startswith('T'):
@@ -623,7 +730,7 @@ class ParameterSweepBuilder(Gtk.Box):
     def _update_factorial_preview(self):
         """Update preview for factorial design with example combinations."""
         if len(self.factorial_list) == 0:
-            self.preview_label.set_markup("<i>Add 2-3 parameters for factorial design</i>")
+            self.preview_label.set_markup("<i>Add 2 or more parameters for factorial design</i>")
             self.generate_button.set_sensitive(False)
             return
         
@@ -1004,17 +1111,72 @@ class ParameterSweepBuilder(Gtk.Box):
         self.on_generate_callback(factorial_config)
     
     def _on_clear_clicked(self, button):
-        """Clear all inputs and notify parent to clear queue."""
-        # Clear single parameter list
+        """Full wipe of the sweep plan — no leftovers from a previous or
+        cancelled sweep are allowed to survive.
+
+        Resets:
+          - single parameter list and factorial parameter list (incl. their
+            per-row range_config dicts)
+          - design mode → 'single'
+          - simulation settings (replicates, duration, termination, output tier)
+          - solver settings (dt mode → auto, ε, max τ, seed)
+          - parameter type combo and parameter-name combo
+          - preview label / generate button enabled state
+        Then calls ``on_clear_callback`` so the parent category can wipe the
+        experiment queue (and the queue-view's activity log).
+        """
+        # 1. Parameter lists (both modes — wipe both regardless of current mode
+        #    so a stale factorial plan can't survive a clear made from single).
         self.single_list.clear()
-        
+        if hasattr(self, 'factorial_list'):
+            self.factorial_list.clear()
+
+        # 2. Design mode back to single (re-show single box, hide factorial).
+        if hasattr(self, 'single_radio'):
+            self.single_radio.set_active(True)
+        self.design_mode = 'single'
+        if hasattr(self, 'single_param_box'):
+            self.single_param_box.show_all()
+        if hasattr(self, 'factorial_box'):
+            self.factorial_box.hide()
+
+        # 3. Simulation settings (top grid).
         self.replicates_entry.set_text("3")
         self.duration_entry.set_text("60.0")
         self.termination_combo.set_active_id("deadlock")
+        if hasattr(self, 'output_tier_combo'):
+            self.output_tier_combo.set_active_id("G3")
+
+        # 4. Solver settings.
+        if hasattr(self, 'sweep_dt_auto_radio'):
+            self.sweep_dt_auto_radio.set_active(True)
+        if hasattr(self, 'sweep_dt_manual_entry'):
+            self.sweep_dt_manual_entry.set_text("0.01")
+            self.sweep_dt_manual_entry.set_sensitive(False)
+        if hasattr(self, 'sweep_tau_epsilon_entry'):
+            self.sweep_tau_epsilon_entry.set_text("0.03")
+        if hasattr(self, 'sweep_max_tau_entry'):
+            self.sweep_max_tau_entry.set_text("0.1")
+        if hasattr(self, 'sweep_seed_entry'):
+            self.sweep_seed_entry.set_text("42")
+
+        # 5. Parameter selectors (drop any stale highlight).
+        if hasattr(self, 'name_combo'):
+            try:
+                self.name_combo.set_active(-1)
+            except Exception:
+                pass
+        if hasattr(self, 'factorial_add_combo'):
+            try:
+                self.factorial_add_combo.set_active(-1)
+            except Exception:
+                pass
+
+        # 6. Preview / generate state.
         self.preview_label.set_markup("<i>Configure parameters and click Preview</i>")
         self.generate_button.set_sensitive(False)
-        
-        # Notify parent to clear the experiment queue
+
+        # 7. Notify parent — wipes queue + activity log.
         if self.on_clear_callback:
             self.on_clear_callback()
     
@@ -1186,20 +1348,25 @@ class ParameterSweepBuilder(Gtk.Box):
             values = self._compute_parameter_values_from_config(range_config)
             n = len(values)
             
+            def _fmt(v):
+                """Format with enough precision to distinguish close values."""
+                s = f"{v:.6g}"
+                return s
+
             if mode == 'linear':
                 start = range_config['start']
                 stop = range_config['stop']
-                cell.set_property('text', f"{start:.3g} to {stop:.3g} ({n} values)")
+                cell.set_property('text', f"{_fmt(start)} to {_fmt(stop)} ({n} values)")
             elif mode == 'list':
                 if n <= 4:
-                    vals_str = ', '.join([f"{v:.3g}" for v in values])
+                    vals_str = ', '.join([_fmt(v) for v in values])
                     cell.set_property('text', vals_str)
                 else:
-                    cell.set_property('text', f"{values[0]:.3g}, {values[1]:.3g}, ... ({n} values)")
+                    cell.set_property('text', f"{_fmt(values[0])}, {_fmt(values[1])}, ... ({n} values)")
             elif mode == 'percent':
                 baseline = range_config.get('baseline', 1.0)
                 percent = range_config.get('percent', 20.0)
-                cell.set_property('text', f"{baseline:.3g} ± {percent}% ({n} values)")
+                cell.set_property('text', f"{_fmt(baseline)} ± {percent}% ({n} values)")
             else:
                 cell.set_property('text', f"{n} values")
         except Exception as e:
@@ -1425,6 +1592,298 @@ class ParameterSweepBuilder(Gtk.Box):
             self.factorial_add_combo.append("none", placeholder_msg)
             self.factorial_add_combo.set_active(0)
     
+    # ── Fixed-overrides section (▢ parameter places) ─────────────────
+
+    def _build_fixed_overrides_section(self):
+        """Build the collapsible 'Fixed environment values' section.
+
+        Lists every place flagged ``is_parameter_place=True`` (the ▢
+        carrier in the formalism) with an editable numeric entry.  Values
+        entered here become the ``fixed_overrides`` block of the exported
+        sweep config and are applied to every condition before the swept
+        axis layers on (engine: SweepConfig.fixed_overrides).
+
+        The section is hidden by default (Gtk.Expander collapsed) so it
+        does not crowd the existing UI.  Empty when the model has no
+        parameter places.
+        """
+        self._fixed_override_rows = []  # list of (place_id, place_name, Gtk.Entry, baseline_str)
+
+        self.fixed_expander = Gtk.Expander()
+        self.fixed_expander.set_label('Fixed environment values (▢ parameter places)')
+        self.fixed_expander.set_tooltip_text(
+            'Sweep-wide constants applied to every condition before the\n'
+            'swept axis layers on. Use this for protocol metadata that is\n'
+            'shared across all conditions (e.g. Disease_Severity, Age,\n'
+            'Temperature). Lists every ▢ place — leave entries blank to\n'
+            "keep the model's static value."
+        )
+        self.fixed_expander.set_expanded(False)
+        self.fixed_expander.set_margin_top(6)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        outer.set_margin_start(12)
+        outer.set_margin_end(12)
+        outer.set_margin_top(4)
+        outer.set_margin_bottom(4)
+
+        self._fixed_overrides_grid = Gtk.Grid()
+        self._fixed_overrides_grid.set_column_spacing(8)
+        self._fixed_overrides_grid.set_row_spacing(4)
+        outer.pack_start(self._fixed_overrides_grid, False, False, 0)
+
+        self._fixed_overrides_empty_label = Gtk.Label(
+            label='(no parameter places ▢ in the current model)'
+        )
+        self._fixed_overrides_empty_label.set_xalign(0)
+        self._fixed_overrides_empty_label.set_sensitive(False)
+        outer.pack_start(self._fixed_overrides_empty_label, False, False, 0)
+
+        self.fixed_expander.add(outer)
+        self.pack_start(self.fixed_expander, False, False, 0)
+
+    def refresh_fixed_overrides(self):
+        """Re-populate the fixed-overrides section from the current model.
+
+        Idempotent: safe to call from the parent category whenever the
+        model changes.  Preserves user-entered values that still match a
+        live parameter place by id.
+        """
+        if not hasattr(self, '_fixed_overrides_grid'):
+            return
+        # Capture any currently-typed values so we don't clobber user input
+        # on a refresh triggered by a topology change.
+        prior = {pid: entry.get_text().strip()
+                 for (pid, _name, entry, _base) in self._fixed_override_rows}
+
+        for child in list(self._fixed_overrides_grid.get_children()):
+            self._fixed_overrides_grid.remove(child)
+        self._fixed_override_rows = []
+
+        model = None
+        if self.viability_panel is not None:
+            canvas = getattr(self.viability_panel, 'canvas', None)
+            if canvas is not None:
+                model = getattr(canvas, 'model', None)
+        places = getattr(model, 'places', None) or []
+        param_places = [p for p in places
+                        if getattr(p, 'is_parameter_place', False)]
+
+        if not param_places:
+            self._fixed_overrides_empty_label.show()
+            return
+        self._fixed_overrides_empty_label.hide()
+
+        # Header
+        for col, txt in enumerate(('Place (▢)', 'Baseline', 'Override value')):
+            lbl = Gtk.Label()
+            lbl.set_markup(f'<b>{txt}</b>')
+            lbl.set_xalign(0)
+            self._fixed_overrides_grid.attach(lbl, col, 0, 1, 1)
+
+        for row_idx, place in enumerate(param_places, start=1):
+            pid = getattr(place, 'id', '')
+            pname = getattr(place, 'name', '') or pid
+            baseline = getattr(place, 'tokens', None)
+            if baseline is None:
+                baseline = getattr(place, 'initial_marking', 0.0)
+            try:
+                baseline_f = float(baseline)
+            except (TypeError, ValueError):
+                baseline_f = 0.0
+            baseline_str = f'{baseline_f:g}'
+
+            name_lbl = Gtk.Label(label=pname)
+            name_lbl.set_xalign(0)
+            name_lbl.set_tooltip_text(f'{pid} (initial_marking)')
+            self._fixed_overrides_grid.attach(name_lbl, 0, row_idx, 1, 1)
+
+            base_lbl = Gtk.Label(label=baseline_str)
+            base_lbl.set_xalign(0)
+            base_lbl.set_sensitive(False)
+            self._fixed_overrides_grid.attach(base_lbl, 1, row_idx, 1, 1)
+
+            entry = Gtk.Entry()
+            entry.set_width_chars(10)
+            entry.set_placeholder_text(baseline_str)
+            entry.set_tooltip_text(
+                'Numeric override applied to every sweep condition.\n'
+                "Leave blank to keep the model's baseline."
+            )
+            # Restore prior user input on refresh.
+            if pid in prior and prior[pid]:
+                entry.set_text(prior[pid])
+            self._fixed_overrides_grid.attach(entry, 2, row_idx, 1, 1)
+
+            self._fixed_override_rows.append((pid, pname, entry, baseline_str))
+
+        self._fixed_overrides_grid.show_all()
+
+    def get_fixed_overrides(self) -> dict:
+        """Return ``{path: float}`` for non-blank fixed-override entries.
+
+        Path is canonical ``<place_id>.initial_marking`` (matching what
+        the engine's ``_apply_snapshot`` expects).  Skips rows whose entry
+        equals the baseline string (would be a redundant override flagged
+        by the engine validator).  Raises ``ValueError`` on a non-numeric
+        entry — surface as a dialog before dispatch.
+        """
+        if not getattr(self, '_fixed_override_rows', None):
+            return {}
+        out = {}
+        for pid, pname, entry, baseline_str in self._fixed_override_rows:
+            txt = entry.get_text().strip()
+            if not txt or txt == baseline_str:
+                continue
+            try:
+                out[f'{pid}.initial_marking'] = float(txt)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Fixed override for {pname} ({pid}) "
+                    f"is not numeric: {txt!r}"
+                ) from exc
+        return out
+
+    # ── Sweep / event collision detector ─────────────────────────────
+
+    def detect_sweep_event_collisions(
+        self,
+        snapshots,
+        events,
+        fixed_overrides,
+    ):
+        """Walk the planned sweep + events and report collisions.
+
+        Returns a list of dicts ``{severity, code, message}`` where
+        severity is ``'error'`` (R1 — sweep target == event assignment
+        target, hard-blocks dispatch unless the operator explicitly opts
+        into superposition) or ``'warning'`` (R3, R4 — soft).
+
+        - **R1** (error): a swept parameter targets the same place that an
+          event also writes to.  Two writers ⇒ unintended superposition.
+        - **R3** (warning): an event is disabled (``enabled=False``) but
+          a sweep targets one of its fields.  Sweep value is silently
+          unused.
+        - **R4** (warning): two events assign to the same place **at
+          the same scheduled time** (same ``trigger`` string and same
+          ``delay``).  Distinct trigger times are a legitimate dosing /
+          perturbation schedule (loading + maintenance doses) and are
+          NOT flagged.
+        """
+        issues = []
+
+        # Collect every sweep-target path (snapshots + fixed overrides).
+        sweep_paths = set()
+        sweep_meta = {}
+        for snap in snapshots or []:
+            sp = getattr(snap, 'swept_parameter', None) or {}
+            pid = sp.get('id') or sp.get('path')
+            if pid:
+                sweep_paths.add(pid)
+                sweep_meta.setdefault(pid, sp)
+        # Fixed overrides also count as writers for collision purposes.
+        for path in (fixed_overrides or {}):
+            sweep_paths.add(path)
+            sweep_meta.setdefault(path, {'type': 'places', 'id': path,
+                                        'source': 'fixed_override'})
+
+        # Walk events.  Capture trigger + delay so we can distinguish a
+        # legitimate dose schedule (same target, different times) from a
+        # genuine duplicate writer (same target, same trigger+delay).
+        # event_targets[target] = list of (event_id, enabled, trigger, delay)
+        event_targets = {}
+        for evt in events or []:
+            evt_id = evt.get('id') or '?'
+            enabled = evt.get('enabled', True)
+            trigger = (evt.get('trigger') or '').strip()
+            delay = float(evt.get('delay') or 0.0)
+            assignments = evt.get('assignments') or {}
+            for tgt in assignments:
+                event_targets.setdefault(tgt, []).append(
+                    (evt_id, enabled, trigger, delay)
+                )
+
+        # R1: sweep target collides with any event assignment target.
+        for path in sweep_paths:
+            head = path.split('.', 1)[0]
+            if head in event_targets:
+                writers = ', '.join(
+                    eid for (eid, _en, _tr, _dl) in event_targets[head]
+                )
+                issues.append({
+                    'severity': 'error',
+                    'code': 'R1',
+                    'path': path,
+                    'message': (
+                        f"Sweep / fixed-override targets '{head}' which is "
+                        f"also written by event(s): {writers}. Dispatching "
+                        "as-is would silently superimpose two writers; the "
+                        "engine has no defined precedence between them."
+                    ),
+                })
+
+        # R3: event field swept but event is disabled.
+        for path in sweep_paths:
+            head = path.split('.', 1)[0]
+            if head.startswith('evt_'):
+                # Look up the event by id
+                target_evt = next(
+                    (e for e in (events or []) if e.get('id') == head),
+                    None,
+                )
+                if target_evt and not target_evt.get('enabled', True):
+                    issues.append({
+                        'severity': 'warning',
+                        'code': 'R3',
+                        'path': path,
+                        'message': (
+                            f"Sweep targets event field '{path}' but event "
+                            f"'{head}' is disabled — values will not affect "
+                            "the run."
+                        ),
+                    })
+                if target_evt is None:
+                    issues.append({
+                        'severity': 'error',
+                        'code': 'R3b',
+                        'path': path,
+                        'message': (
+                            f"Sweep targets unknown event id '{head}'. "
+                            "Did the event get deleted?"
+                        ),
+                    })
+
+        # R4: two events writing the same target *at the same time*.
+        # A dose schedule (loading + maintenance doses) writes the same
+        # target at distinct times — that is the entire point and must
+        # NOT trigger this warning.  Group writers by (trigger, delay)
+        # and only warn on a duplicate within a single time-bucket.
+        for tgt, writers in event_targets.items():
+            buckets: Dict[tuple, List[str]] = {}
+            for (eid, _enabled, trigger, delay) in writers:
+                buckets.setdefault((trigger, delay), []).append(eid)
+            for (trigger, delay), eids in buckets.items():
+                if len(eids) < 2:
+                    continue
+                ids_str = ', '.join(eids)
+                trig_desc = (f"trigger={trigger!r}, delay={delay}"
+                             if trigger else f"delay={delay}")
+                issues.append({
+                    'severity': 'warning',
+                    'code': 'R4',
+                    'path': tgt,
+                    'message': (
+                        f"Events {ids_str} all write to '{tgt}' at the "
+                        f"same scheduled time ({trig_desc}). Last event "
+                        "in execution order wins; if that is not "
+                        "intentional, disable or remove the duplicates. "
+                        "(Distinct trigger times — e.g. loading vs. "
+                        "maintenance doses — are NOT flagged here.)"
+                    ),
+                })
+
+        return issues
+
     def set_generate_callback(self, callback):
         """Set callback for generate button.
         

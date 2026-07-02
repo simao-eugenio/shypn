@@ -177,32 +177,51 @@ class SweepRunner:
         workers: Optional[int] = None,
         verbose: bool = False,
         config_path: Optional[Path] = None,
+        use_gpu: str = 'auto',
     ) -> None:
         self.model_path = model_path
         self.config = config
         self.config_path = config_path
         self.output_dir = output_dir
-        safe = self._compute_safe_workers()
+        # Pass duration to the worker-cap heuristic so long horizons get
+        # a more conservative per-worker memory budget.
+        _duration_s = float(getattr(self.config.sim_params, 'duration', 0.0) or 0.0)
+        safe = self._compute_safe_workers(duration_seconds=_duration_s)
         # User value acts as ceiling; never exceed memory-safe auto cap
         self.workers = min(workers, safe) if workers else safe
         self.verbose = verbose
+        if use_gpu not in ('auto', 'force', 'off'):
+            raise ValueError(f"use_gpu must be 'auto'|'force'|'off'; got {use_gpu!r}")
+        self._gpu_mode = use_gpu
 
     @staticmethod
-    def _compute_safe_workers() -> int:
+    def _compute_safe_workers(duration_seconds: float = 0.0) -> int:
         """Compute max workers from CPU and memory constraints.
 
-        Policy:
-          - CPU: use *physical* cores minus a reserve of 8 threads for
-            system/sshd.  On hybrid CPUs (e.g. i9-14900K: 8P+16E = 24
-            physical cores, 32 threads) this prevents all-core saturation
-            that causes SSH banner-exchange timeouts.
-          - Memory: estimate per-worker RSS (~8 GB for complex models),
-            cap to fit in available RAM + swap minus a 10 GB system reserve.
-            NVMe swap is fast enough for simulation workloads.
-          - Final worker count = min(cpu_cap, mem_cap, hard_max=24)
+        Policy (recalibrated 2026-04-28 against measured RSS on remote-gpu
+        — 16 workers running canabidiol-phase-1 averaged ~0.9 GB / 1.6 GB
+        peak per worker, total 14 GB out of 49 GB available):
+          - CPU: use *physical* cores minus a reserve of 4 threads for
+            sshd / journald / system. Earlier 8-thread reserve was a
+            workaround for SSH lockout that turned out to be a memory
+            (swap-thrashing) problem, not a CPU-starvation problem.
+          - Memory: estimate per-worker peak RSS at 1.5 GB (measured
+            peak ~1.6 GB on the largest CBD-AD condition, with ~67%
+            headroom). Cap to fit in available RAM minus a 12 GB
+            system / page-cache / parent-process reserve.
+            Swap is intentionally *not* counted — swap thrashing
+            collapses throughput (~5× slowdown observed previously).
+          - Final worker count = min(cpu_cap, mem_cap, hard_max)
 
-        This prevents memory exhaustion that causes swap thrashing,
-        OOM kills, and SSH lockout.
+        Bug-fix 2026-05-05: ``duration_seconds`` is now consulted.  A
+        7-day × 60-rep × 10-cond sweep (run_20260505_014609) silently
+        OOM-thrashed on remote-gpu at the previous flat 1.5 GB / worker
+        estimate (real per-worker peak ≈ 10 GB pre-decimation).  Even
+        with the data-collector decimation now in place (replicate_runner
+        ~5 000 records / replicate), long horizons still grow C-side
+        propensity-accelerator state and intermediate Python objects,
+        so we apply a duration-tier multiplier to ``per_worker_gb`` and
+        a tighter ``hard_max``.
         """
         # Detect physical cores (not logical threads)
         _logical = os.cpu_count() or 4
@@ -223,9 +242,12 @@ class SweepRunner:
         except Exception:
             physical = _logical
 
-        # Reserve 8 threads for system/sshd to prevent SSH lockout
-        _reserved = 8
-        cpu_cap = max(1, min(physical - _reserved, int(physical * 0.70)))
+        # Reserve 4 threads for sshd / system services. The earlier
+        # 8-thread reserve was over-conservative — the real cause of
+        # SSH lockout under load was memory-driven swap thrashing,
+        # not CPU starvation.
+        _reserved = 4
+        cpu_cap = max(1, min(physical - _reserved, int(physical * 0.85)))
 
         # Memory-based cap
         try:
@@ -266,19 +288,35 @@ class SweepRunner:
             # Reserve 12 GB for OS, sshd, page cache, kernel buffers,
             # and the parent process (which holds model metadata + IPC).
             usable_gb = max(1.0, mem_available_gb - 12.0)
-            # Estimate per-worker peak RSS.  With worker-side disk flush
-            # (results written to disk in worker, then freed), peak is
-            # 1 condition's trajectory: 30 replicates × ~15 MB each for
-            # a 34-place/45-transition model at 60k steps ≈ 500 MB active
-            # data + ~300 MB model/controller/accelerator overhead ≈ 1 GB.
-            # Use 3 GB as safety margin for Python heap fragmentation and
-            # larger models.
-            per_worker_gb = 3.0
+            # Per-worker peak RSS estimate, calibrated against measured
+            # values on remote-gpu running canabidiol-phase-1 (32 cores,
+            # 42 places, 45 transitions, 30 replicates × 4 h horizon):
+            # observed peak 1.6 GB, mean 0.9 GB. 1.5 GB gives ~67%
+            # headroom for Python heap fragmentation and larger models
+            # while still allowing 24 workers on a 49 GB-available host.
+            per_worker_gb = 1.5
+            # Duration-tier multiplier (2026-05-05): long horizons grow
+            # propensity-accelerator C state and intermediate float
+            # arrays even after data-collector decimation.
+            #     ≤  4 h  → 1.0×  (calibration regime)
+            #     ≤ 24 h  → 1.5×
+            #     ≤ 72 h  → 2.0×
+            #     >  72 h → 3.0×
+            _h = (duration_seconds or 0.0) / 3600.0
+            if _h > 72.0:
+                per_worker_gb *= 3.0
+            elif _h > 24.0:
+                per_worker_gb *= 2.0
+            elif _h > 4.0:
+                per_worker_gb *= 1.5
             mem_cap = max(1, int(usable_gb / per_worker_gb))
         except Exception:
             mem_cap = cpu_cap  # If memory detection fails, trust CPU cap
 
-        workers = min(cpu_cap, mem_cap, 24)
+        # Hard ceiling: 24 workers on short runs, 12 on long-horizon runs
+        # (limit IPC pickling + GC contention from the parent process).
+        _hard_max = 12 if (duration_seconds or 0.0) > 24 * 3600 else 24
+        workers = min(cpu_cap, mem_cap, _hard_max)
         return workers
 
     # ── public API ───────────────────────────────────────────────────
@@ -331,6 +369,39 @@ class SweepRunner:
                 f"{n_conditions * sim.replicates} total simulations"
             )
             print(f"Workers: {self.workers} (cpu_count={os.cpu_count()})")
+            # GPU policy summary so operators see the effective decision
+            # basis up-front (no need to grep for late warnings).
+            # NOTE: the dispatcher will route via 'condition-batch' (one
+            # work unit = R reps) when the condition-mode rule fires,
+            # so reps are batched on the GPU rather than shredded across
+            # CPU workers.
+            _gpu_hint: str
+            _will_batch = (
+                self._gpu_mode == 'force'
+                or (self._gpu_mode == 'auto'
+                    and self.workers <= n_conditions)
+            )
+            if self._gpu_mode == 'off':
+                _gpu_hint = "disabled (--use-gpu off) → flat-dispatch"
+            elif self._gpu_mode == 'force':
+                _gpu_hint = (
+                    "forced (--use-gpu force) → condition-batch "
+                    "(R reps per work unit)"
+                )
+            else:
+                if _will_batch:
+                    _gpu_hint = (
+                        f"auto → condition-batch "
+                        f"(workers={self.workers} ≤ conditions={n_conditions}; "
+                        f"R={sim.replicates} reps batched on GPU)"
+                    )
+                else:
+                    _gpu_hint = (
+                        f"auto → flat-dispatch "
+                        f"(workers={self.workers} > conditions={n_conditions}; "
+                        f"CPU parallelism wins)"
+                    )
+            print(f"GPU policy: {_gpu_hint}")
             # Show memory info for diagnostics
             try:
                 with open('/proc/meminfo', 'r') as f:
@@ -382,120 +453,314 @@ class SweepRunner:
         except OSError as _exc:
             print(f"WARNING: could not snapshot provenance: {_exc}")
 
-        # 4. Dispatch conditions in bounded batches across worker processes.
-        #    Each worker loads its own model copy — no shared mutable state.
-        #    Workers write results directly to disk and return only a light
-        #    summary payload, preventing IPC memory pressure from full
-        #    trajectory data being pickled back to the parent.
+        # 4. Flat replicate dispatch (Strategy A — May 2026).
         #
-        #    Sliding-window dispatch: at most `n_workers` conditions are
-        #    in-flight simultaneously.  As each finishes, the next is
-        #    submitted immediately — no straggler idle time.  Workers
-        #    flush results to disk before returning, so parent memory
-        #    stays bounded.
+        #    A single ProcessPool of `self.workers` processes consumes a
+        #    flat queue of (condition, replicate) work units. Each worker
+        #    loads the baseline model exactly once via the pool
+        #    initialiser; per-work-unit cost is from_dict(baseline) +
+        #    apply_snapshot + run one replicate.
+        #
+        #    Why: under the legacy outer/inner two-tier design, an outer
+        #    pool of `min(workers, n_conditions)` was the bottleneck
+        #    when workers > n_conditions (e.g. 26 workers / 8 conditions
+        #    pinned to 8 outer slots, each running 30 reps sequentially
+        #    in a single subprocess). Flat dispatch saturates all cores
+        #    for any C × R ≥ workers and removes the brittle nested-pool
+        #    plumbing entirely.
+        #
+        #    Memory bound (main process buffer): up to C × R full
+        #    per-replicate trajectory dicts during the worst case — but
+        #    a condition is finalised the moment its R-th replicate
+        #    arrives, so its buffer is freed promptly. Round-robin
+        #    submission (r=0 across all C, then r=1, ...) keeps
+        #    conditions advancing together so they finalise in clusters
+        #    near the end of the sweep.
         _apply_cpu_affinity()
         import gc
+        import time as _time_mod
+        from collections import defaultdict
         from dataclasses import asdict
         sim_dict = asdict(sim)
+        events_list = list(getattr(self.config, 'events', []) or [])
+        # SimulationParams has no time_units field — sweeps assume seconds
+        # (matches ReplicateRunner.run_replicates' default). The enum
+        # value is a tuple ('seconds', 's', 1.0); pass it verbatim so the
+        # worker can rehydrate via TimeUnits(value).
+        from shypn.utils.time_utils import TimeUnits as _TU
+        time_units_value = _TU.SECONDS.value
 
         summary_rows: List[Optional[Dict[str, Any]]] = [None] * n_conditions
-        n_workers = min(self.workers, n_conditions)
+        # Layer D: aggregate per-condition parameter_sources for provenance.
+        sources_by_condition: Dict[str, Dict[str, Any]] = {}
+        # TMD-1: aggregate per-condition timescale_audit profile for provenance
+        # + summary.csv. Profile is identical across replicates of one
+        # condition (deterministic on M₀); we capture the first non-empty.
+        timescale_by_condition: Dict[str, Dict[str, Any]] = {}
+        # Per-condition main-process buffer of replicate result dicts.
+        results_by_cond: Dict[int, List[dict]] = defaultdict(list)
+        # Per-condition wall-clock window (start = first rep submitted,
+        # end = R-th rep arrived).
+        cond_t0: Dict[int, float] = {}
+        # Pre-serialise snapshots once.
+        snapshot_dicts = [_snapshot_to_dict(s) for s in snapshots]
+        # ── Dispatch-mode selection ──────────────────────────────────
+        # 'flat'      → R reps shred into R work units; saturates many
+        #               CPU cores; bypasses GPU.
+        # 'condition' → all R reps batched per condition into one work
+        #               unit; routes through ReplicateRunner.run_replicates
+        #               which can dispatch the whole batch to GPU.
+        #
+        # Selection rule (2026-05-09):
+        #   gpu_mode == 'off' or 'auto' with workers > n_conditions
+        #     → flat (CPU parallelism dominates)
+        #   gpu_mode == 'force' or 'auto' with workers ≤ n_conditions
+        #     → condition (GPU batching pays off; no parallelism lost)
+        if self._gpu_mode == 'off':
+            _dispatch_mode = 'flat'
+        elif self._gpu_mode == 'force':
+            _dispatch_mode = 'condition'
+        else:  # 'auto'
+            _dispatch_mode = (
+                'condition' if self.workers <= n_conditions else 'flat'
+            )
+
+        if _dispatch_mode == 'condition':
+            n_workers = min(self.workers, n_conditions)
+            n_units = n_conditions
+            _unit_label = "condition-batch"
+        else:
+            n_workers = min(self.workers, n_conditions * sim.replicates)
+            n_units = n_conditions * sim.replicates
+            _unit_label = "flat-dispatch"
+        if self.verbose:
+            print(
+                f"[{_unit_label}] {n_conditions} cond × {sim.replicates} reps "
+                f"= {n_units} work units, pool={n_workers}"
+            )
 
         # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
         gpu_sampler = _GpuSampler.start(period_ms=500)
 
         with ProcessPoolExecutor(
             max_workers=n_workers,
-            initializer=_worker_init,
+            initializer=_replicate_pool_init,
+            initargs=(str(self.model_path), int(n_workers), self._gpu_mode),
         ) as pool:
-            # Sliding window: submit up to n_workers, then for each
-            # completion, submit the next pending condition.
-            futures_map: Dict[Any, int] = {}
-            next_idx = 0  # index of the next condition to submit
+            futures_map: Dict[Any, tuple] = {}
 
-            def _submit_one(idx: int) -> None:
-                snapshot = snapshots[idx]
-                if self.verbose:
+            if _dispatch_mode == 'condition':
+                # One work unit per condition: all R reps batched.
+                for c in range(n_conditions):
+                    cond_t0[c] = _time_mod.monotonic()
+                    if self.verbose:
+                        print(
+                            f"[{c + 1}/{n_conditions}] {snapshots[c].name} "
+                            f"({sim.replicates} replicates, batched)...",
+                            flush=True,
+                        )
+                    fut = pool.submit(
+                        _run_one_condition_batch,
+                        cond_idx=c,
+                        cond_name=snapshots[c].name,
+                        baseline_dict_inline=None,
+                        snapshot_dict=snapshot_dicts[c],
+                        sim_params=sim_dict,
+                        events=events_list,
+                        time_units_value=time_units_value,
+                    )
+                    futures_map[fut] = (c, -1)  # rep=-1 sentinel for batch
+            else:
+                # Submit all (cond, rep) work units in round-robin order so
+                # every condition has reps in flight from t=0. Pool queues
+                # the surplus internally; only n_workers run concurrently.
+                for r in range(sim.replicates):
+                    for c in range(n_conditions):
+                        if r == 0:
+                            cond_t0[c] = _time_mod.monotonic()
+                            if self.verbose:
+                                print(
+                                    f"[{c + 1}/{n_conditions}] "
+                                    f"{snapshots[c].name} "
+                                    f"({sim.replicates} replicates)...",
+                                    flush=True,
+                                )
+                        fut = pool.submit(
+                            _run_one_replicate,
+                            cond_idx=c,
+                            rep_idx=r,
+                            cond_name=snapshots[c].name,
+                            baseline_dict_inline=None,
+                            snapshot_dict=snapshot_dicts[c],
+                            sim_params=sim_dict,
+                            events=events_list,
+                            time_units_value=time_units_value,
+                        )
+                        futures_map[fut] = (c, r)
+
+            # Process replicate completions; finalise each condition
+            # the moment its R-th replicate arrives.
+            for fut in as_completed(futures_map):
+                c, r = futures_map.pop(fut)
+                label = snapshots[c].name
+                try:
+                    payload = fut.result()
+                    if 'results' in payload:
+                        # Condition-batch payload: R results in one shot.
+                        for _res in payload['results']:
+                            results_by_cond[c].append(_res)
+                    else:
+                        # Flat-dispatch payload: one result.
+                        results_by_cond[c].append(payload['result'])
+                    if 'param_sources' in payload:
+                        sources_by_condition[label] = payload['param_sources']
+                    # TMD-1: capture timescale_audit (first replicate carries it).
+                    if label not in timescale_by_condition:
+                        # Look in either shape (flat: 'result'; batch: 'results'[0]).
+                        _probe = payload.get('result') or (
+                            payload.get('results', [None])[0]
+                        )
+                        if _probe:
+                            _tmd = (_probe.get('engine_stats', {})
+                                    .get('timescale_audit'))
+                            if _tmd:
+                                timescale_by_condition[label] = _tmd
+                except Exception as exc:
+                    logger.exception(
+                        "Condition %d (%s) replicate %d failed",
+                        c, label, r,
+                    )
+                    # Inject synthetic error result(s) so the condition
+                    # still finalises with the right replicate count.
+                    # In condition-batch mode (r=-1) the entire batch
+                    # failed → backfill all R reps as errors.
+                    if r < 0:
+                        for _r in range(sim.replicates):
+                            results_by_cond[c].append({
+                                'replicate_id': _r,
+                                'seed': sim_dict['seed_base'] + _r,
+                                'elapsed_time': 0.0,
+                                'error': str(exc),
+                            })
+                    else:
+                        results_by_cond[c].append({
+                            'replicate_id': r,
+                            'seed': sim_dict['seed_base'] + r,
+                            'elapsed_time': 0.0,
+                            'error': str(exc),
+                        })
+
+                # Has this condition completed?
+                if len(results_by_cond[c]) < sim.replicates:
+                    continue
+
+                cond_results = results_by_cond.pop(c)
+                n_ok = sum(1 for x in cond_results if 'error' not in x)
+                n_err = len(cond_results) - n_ok
+                cond_wall = _time_mod.monotonic() - cond_t0.get(c, _time_mod.monotonic())
+                # Sum of per-replicate elapsed times approximates per-condition
+                # CPU; not strictly process_time but a useful aggregate.
+                cond_cpu = sum(float(x.get('elapsed_time', 0.0))
+                               for x in cond_results)
+
+                # Finalise: compute statistics + write per-condition outputs.
+                # We need a model instance for compute_statistics + writers;
+                # load lazily and reuse across remaining finalisations.
+                if not hasattr(self, '_finalise_model'):
+                    from shypn.data.canvas.document_model import DocumentModel
+                    self._finalise_model = DocumentModel.load_from_file(
+                        str(self.model_path))
+                # Isolate per-condition finalisation: a writer crash here
+                # (e.g. malformed trajectory data on G4, disk full, etc.)
+                # MUST NOT abort the remaining conditions or skip the
+                # final summary.csv / resource_usage.json writes. Any
+                # exception is logged loudly and the condition is marked
+                # with replicates_error += R; sweep continues.
+                _finalize_failed = False
+                try:
+                    _finalize_condition(
+                        model=self._finalise_model,
+                        snapshot=snapshots[c],
+                        cond_results=cond_results,
+                        output_run_dir=output.run_dir,
+                        output_options=self.config.output.to_dict(),
+                    )
+                except Exception as _fin_exc:
+                    _finalize_failed = True
+                    logger.exception(
+                        "Finalisation failed for condition %d (%s); "
+                        "sweep will continue with remaining conditions",
+                        c, label,
+                    )
                     print(
-                        f"[{idx + 1}/{n_conditions}] {snapshot.name} "
-                        f"({sim.replicates} replicates)...",
+                        f"[ERROR finalise {c + 1}/{n_conditions}] "
+                        f"{label}: {type(_fin_exc).__name__}: {_fin_exc}",
                         flush=True,
                     )
-                fut = pool.submit(
-                    _run_single_condition,
-                    model_path=str(self.model_path),
-                    baseline_dict=_snapshot_to_dict(baseline),
-                    snapshot_dict=_snapshot_to_dict(snapshot),
-                    sim_params=sim_dict,
-                    condition_index=idx,
-                    n_conditions=n_conditions,
-                    output_dir=str(output.run_dir),
-                    verbose=self.verbose,
-                    events=list(getattr(self.config, 'events', []) or []),
-                )
-                futures_map[fut] = idx
 
-            # Fill the initial window
-            while next_idx < min(n_workers, n_conditions):
-                _submit_one(next_idx)
-                next_idx += 1
-
-            # Process completions and refill the window
-            while futures_map:
-                # Wait for the next completion
-                done_iter = as_completed(futures_map)
-                fut = next(done_iter)
-                idx = futures_map.pop(fut)
-                label = snapshots[idx].name
-
+                # Persist parameter_sources alongside statistics.
                 try:
-                    result_payload = fut.result()
-                    cond_elapsed = result_payload['wall_seconds']
-                    n_ok = result_payload['replicates_ok']
-                    n_err = result_payload['replicates_error']
-                    cpu_s = result_payload.get('cpu_seconds', 0.0)
-                    peak_mib = result_payload.get('peak_rss_mib', 0.0)
+                    import json as _json_ps
+                    safe_name = _sanitise_condition_name(label)
+                    cond_dir = output.run_dir / f"condition_{safe_name}"
+                    with open(cond_dir / 'parameter_sources.json', 'w') as _psf:
+                        _json_ps.dump({
+                            'condition': label,
+                            'sources': sources_by_condition.get(label, {}),
+                        }, _psf, indent=2, sort_keys=True)
+                except OSError as _exc:
+                    logger.warning(
+                        "Failed to write parameter_sources.json for %s: %s",
+                        label, _exc,
+                    )
 
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': n_ok,
-                        'replicates_error': n_err,
-                        'wall_seconds': round(cond_elapsed, 2),
-                        'cpu_seconds': round(cpu_s, 2),
-                        'peak_rss_mib': round(peak_mib, 1),
-                    }
-
-                    if self.verbose:
-                        cpu_pct = (cpu_s / cond_elapsed * 100.0) if cond_elapsed > 0 else 0.0
-                        print(
-                            f"  done in {cond_elapsed:.1f}s "
-                            f"({n_ok} ok, {n_err} errors) "
-                            f"[cpu={cpu_s:.0f}s {cpu_pct:.0f}%, rss={peak_mib:.0f} MiB]",
-                            flush=True,
+                summary_rows[c] = {
+                    'condition': label,
+                    'replicates_ok': 0 if _finalize_failed else n_ok,
+                    'replicates_error': (n_ok + n_err) if _finalize_failed else n_err,
+                    'wall_seconds': round(cond_wall, 2),
+                    'cpu_seconds': round(cond_cpu, 2),
+                    # peak_rss is a per-process metric; the flat pool
+                    # makes it ill-defined per-condition. Report 0.0 here
+                    # and rely on resource_usage.json's children_peak_rss
+                    # for the true aggregate.
+                    'peak_rss_mib': 0.0,
+                    # TMD-1 surface (always present; zero/empty when audit
+                    # disabled or no continuous transitions).
+                    'tmd_critical_count': len(
+                        (timescale_by_condition.get(label) or {}).get(
+                            'critical_transitions', []
                         )
-                except Exception as exc:
-                    logger.exception("Condition %d (%s) failed", idx, label)
-                    summary_rows[idx] = {
-                        'condition': label,
-                        'replicates_ok': 0,
-                        'replicates_error': sim.replicates,
-                        'wall_seconds': 0.0,
-                        'cpu_seconds': 0.0,
-                        'peak_rss_mib': 0.0,
-                    }
-                    if self.verbose:
-                        print(
-                            f"  done in 0.0s (0 ok, {sim.replicates} errors) — {exc}",
-                            flush=True,
+                    ),
+                    'tmd_stiffness_ratio': float(
+                        (timescale_by_condition.get(label) or {}).get(
+                            'stiffness_ratio', 0.0
+                        ) or 0.0
+                    ),
+                    'tmd_recommended_dt': (
+                        (timescale_by_condition.get(label) or {}).get(
+                            'recommended_dt'
                         )
+                    ),
+                }
 
-                # Submit next condition if any remain
-                if next_idx < n_conditions:
-                    _submit_one(next_idx)
-                    next_idx += 1
+                if self.verbose:
+                    cpu_pct = (cond_cpu / cond_wall * 100.0) if cond_wall > 0 else 0.0
+                    print(
+                        f"[done {c + 1}/{n_conditions}] {label} "
+                        f"in {cond_wall:.1f}s "
+                        f"({n_ok} ok, {n_err} errors) "
+                        f"[cpu={cond_cpu:.0f}s {cpu_pct:.0f}%]",
+                        flush=True,
+                    )
 
-                # Incremental GC: reclaim IPC deserialization overhead
+                del cond_results
                 gc.collect()
+
+        # Drop the lazy finalisation model
+        if hasattr(self, '_finalise_model'):
+            del self._finalise_model
+            gc.collect()
 
         # 5. Summary
         output.write_summary([r for r in summary_rows if r is not None])
@@ -554,6 +819,41 @@ class SweepRunner:
         except Exception as _exc:
             logger.warning("Failed to write resource_usage.json: %s", _exc)
 
+        # ── Layer D: parameter_sources audit ─────────────────────────
+        # Persist per-condition source map so analysts (and the
+        # 'reload-and-rerun' path) can confirm at a glance which knobs
+        # actually moved away from the model defaults. Augments
+        # provenance.json if it was uploaded; otherwise written
+        # standalone next to it. Keys in the per-condition dict are
+        # full property paths (e.g. "P38.initial_marking"); each value
+        # is {source: 'sweep'|'fixed_override'|'event'|'snapshot',
+        #     value: applied, prior: model-default}.
+        try:
+            import json as _json_ps2
+            prov_file = output.run_dir / 'provenance.json'
+            if prov_file.is_file():
+                with open(prov_file, 'r') as _pf:
+                    prov_doc = _json_ps2.load(_pf)
+            else:
+                prov_doc = {}
+            prov_doc['parameter_sources'] = sources_by_condition
+            # TMD-1: persist per-condition timescale audit profiles so the
+            # 'reload-and-rerun' / analyst path can detect dt vs τ mismatches
+            # without re-running anything. Empty dict means audit disabled
+            # or no continuous transitions in the model.
+            prov_doc['timescale_audit'] = timescale_by_condition
+            with open(prov_file, 'w') as _pf:
+                _json_ps2.dump(prov_doc, _pf, indent=2, sort_keys=True)
+            if self.verbose:
+                n_overrides = sum(len(v) for v in sources_by_condition.values())
+                print(
+                    f"Provenance: parameter_sources written "
+                    f"({len(sources_by_condition)} conditions, "
+                    f"{n_overrides} overrides total)"
+                )
+        except Exception as _exc:
+            logger.warning("Failed to augment provenance.json: %s", _exc)
+
         if self.verbose:
             print(f"\nSweep complete in {wall_total:.1f}s")
             print(f"Results: {output.run_dir}")
@@ -589,8 +889,20 @@ class SweepRunner:
         model: Any,
         snapshot: ExperimentSnapshot,
         baseline: ExperimentSnapshot,
-    ) -> None:
-        """Apply a snapshot's overrides to the live model."""
+    ) -> Dict[str, Any]:
+        """Apply a snapshot's overrides to the live model.
+
+        Returns:
+            ``parameter_sources``: dict mapping each property path that
+            differs from the model default to the metadata needed for
+            provenance — origin tag (``'sweep'`` / ``'fixed_override'`` /
+            ``'snapshot'`` / ``'event'``), the applied value, and the
+            prior model value.  Written into ``provenance.json`` alongside
+            ``model_sha256`` so every run can be audited for which knobs
+            actually moved.  See instructions §"Sweep \u2194 model
+            superposition rule" (Layer D of the 2026-04-30 sweep-pipeline
+            audit).
+        """
         # First restore baseline so previous condition's overrides don't leak
         for p in model.places:
             p.tokens = baseline.place_markings.get(p.id, p.tokens)
@@ -615,13 +927,53 @@ class SweepRunner:
             if a.id in snapshot.arc_weights:
                 a.weight = float(snapshot.arc_weights[a.id])
 
-        # Apply property overrides (takes precedence)
+        # ── Apply property_overrides (highest precedence) ─────────────
+        # Tracks each applied override so the worker can write
+        # parameter_sources into provenance.json.  An override is tagged
+        # 'sweep' if its path matches snapshot.swept_parameter, otherwise
+        # 'fixed_override' for sweep-wide constants or 'snapshot' for
+        # bespoke per-condition values from mode:snapshots.
+        param_sources: Dict[str, Any] = {}
+        swept_path: Optional[str] = None
+        swept_meta = getattr(snapshot, 'swept_parameter', None)
+        if isinstance(swept_meta, dict):
+            swept_id = swept_meta.get('id', '')
+            # factorial uses '; '-joined ids; record each separately
+            swept_path = swept_id
+
         for prop_path, value in getattr(snapshot, 'property_overrides', {}).items():
+            origin = (
+                'sweep'
+                if swept_path and (
+                    prop_path == swept_path
+                    or (isinstance(swept_path, str) and prop_path in swept_path)
+                )
+                else 'fixed_override'
+            )
             try:
-                obj_id, prop_name = parse_property_path(prop_path)
-                obj = resolve_object(model, obj_id)
-                if obj is not None:
+                if _is_event_path(prop_path):
+                    prior = _apply_event_override(model, prop_path, value)
+                    origin = 'event'  # event-field sweeps are still 'event'-typed
+                else:
+                    obj_id, prop_name = parse_property_path(prop_path)
+                    obj = resolve_object(model, obj_id)
+                    if obj is None:
+                        logger.warning(
+                            "Override target %s not found in model", prop_path
+                        )
+                        continue
+                    prior = _read_property(obj, prop_name)
                     apply_property_to_object(obj, prop_name, value)
+                logger.info(
+                    "[override] %s = %s (was %s, source=%s)",
+                    prop_path, value, prior, origin,
+                )
+                param_sources[prop_path] = {
+                    'source': origin,
+                    'value': float(value)
+                              if isinstance(value, (int, float)) else value,
+                    'prior': prior,
+                }
             except Exception as exc:
                 logger.warning("Failed to apply %s=%s: %s", prop_path, value, exc)
 
@@ -633,6 +985,8 @@ class SweepRunner:
                 p.initial_tokens = p.tokens
             if hasattr(p, 'initial_marking'):
                 p.initial_marking = p.tokens
+
+        return param_sources
 
     @staticmethod
     def _restore_baseline(model: Any, baseline: ExperimentSnapshot) -> None:
@@ -670,6 +1024,70 @@ def _dict_to_snapshot(d: dict) -> ExperimentSnapshot:
     return snap
 
 
+# ── Event-field override helpers (Layer B+) ──────────────────────────
+# A path is treated as an event-field override iff its first dotted
+# component matches an event id present on the model.  Supported fields
+# (the second component) are listed in _EVENT_SWEEPABLE_FIELDS.  All
+# other event fields raise to keep the sweep error-loud.
+#
+# Canonical "sweep an event payload value" pattern: do **not** sweep an
+# assignment expression directly — instead introduce a ▢ parameter place
+# that the assignment RHS reads (Pattern A bridge per AGENT_RULES.md),
+# and sweep that ▢ place's initial_marking.  This keeps event RHS
+# deterministic and biologically-meaningful.
+_EVENT_SWEEPABLE_FIELDS = frozenset({'delay', 'priority'})
+
+
+def _is_event_path(prop_path: str) -> bool:
+    """Heuristic: treat any path whose head starts with 'evt_' as an event override.
+
+    The dispatcher / UI uses a stable ``evt_*`` prefix on every event id
+    (see ui/panels/environment/events_category). Anything else falls
+    through to the place/transition/arc resolver.
+    """
+    head = prop_path.split('.', 1)[0]
+    return head.startswith('evt_')
+
+
+def _apply_event_override(model: Any, prop_path: str, value: Any) -> Any:
+    """Mutate one field on a ``model.events`` entry; return the prior value.
+
+    Raises:
+        ValueError: if the event id or field is unknown / unsupported.
+    """
+    parts = prop_path.split('.', 1)
+    if len(parts) != 2:
+        raise ValueError(
+            f"event override path must be '<evt_id>.<field>', got {prop_path!r}"
+        )
+    evt_id, field = parts
+    if field not in _EVENT_SWEEPABLE_FIELDS:
+        raise ValueError(
+            f"event field {field!r} is not sweepable; "
+            f"supported fields: {sorted(_EVENT_SWEEPABLE_FIELDS)}. "
+            f"For payload-value sweeps, sweep a ▢ parameter place that "
+            f"the event RHS reads (Pattern A bridge)."
+        )
+    events = getattr(model, 'events', None) or []
+    target = next((e for e in events if getattr(e, 'id', None) == evt_id), None)
+    if target is None:
+        raise ValueError(
+            f"event {evt_id!r} not found on model "
+            f"(known: {[getattr(e, 'id', '?') for e in events]})"
+        )
+    prior = getattr(target, field, None)
+    setattr(target, field, float(value) if field == 'delay' else int(value))
+    return prior
+
+
+def _read_property(obj: Any, prop_name: str) -> Any:
+    """Best-effort read of a property's prior value before override."""
+    # Mirror the alias collapse done in apply_property_to_object
+    if prop_name == 'initial_marking':
+        return getattr(obj, 'tokens', getattr(obj, 'initial_marking', None))
+    return getattr(obj, prop_name, None)
+
+
 def _sanitise_condition_name(name: str) -> str:
     """Filesystem-safe condition name (mirrors sweep_output._sanitise)."""
     return (
@@ -683,6 +1101,346 @@ def _sanitise_condition_name(name: str) -> str:
     )[:120]
 
 
+def _strip_to_endpoint(stats: dict) -> dict:
+    """Reduce per-step statistics to endpoint-only (G2 tier).
+
+    Keeps only the last time-point of each trajectory array. Cuts
+    statistics.json size by O(n_time_points) — typically ~1000×.
+    """
+    if not isinstance(stats, dict):
+        return stats
+    out: dict = {}
+    for k, v in stats.items():
+        if k == 'time_points' and isinstance(v, list) and v:
+            out[k] = [v[-1]]
+        elif k == 'species_statistics' and isinstance(v, dict):
+            new_species = {}
+            for sid, sdict in v.items():
+                if not isinstance(sdict, dict):
+                    new_species[sid] = sdict
+                    continue
+                slim = {}
+                for field_name, arr in sdict.items():
+                    if field_name == 'percentiles' and isinstance(arr, dict):
+                        slim[field_name] = {
+                            p: ([pa[-1]] if isinstance(pa, list) and pa else pa)
+                            for p, pa in arr.items()
+                        }
+                    elif isinstance(arr, list) and arr:
+                        slim[field_name] = [arr[-1]]
+                    else:
+                        slim[field_name] = arr
+                new_species[sid] = slim
+            out[k] = new_species
+        else:
+            out[k] = v
+    return out
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Flat replicate-level dispatch (Strategy A — May 2026)
+# ═════════════════════════════════════════════════════════════════════
+#
+# Previous design: ProcessPoolExecutor of size N submits one
+# `_run_single_condition` task per condition; that task internally
+# spawns a nested ProcessPool to parallelise its replicates. With
+# `workers >= n_conditions` (e.g. 26 workers / 8 conditions), the
+# outer pool was the bottleneck — only `n_conditions` workers were
+# ever active, each running its 30 reps sequentially. Measured wall
+# on the canabidiol Q1 sweep: 78 min where the theoretical lower
+# bound is ~25 min.
+#
+# Strategy A: a SINGLE flat ProcessPool of `workers` processes; the
+# unit of work is one (condition, replicate) pair. Total in-flight
+# = min(workers, C × R). For C=8, R=30, workers=26 → all 26 cores
+# saturated for the whole sweep, modulo the tail.
+#
+# - Each worker loads the baseline model exactly once via the pool
+#   initializer (`_replicate_pool_init`), caching the parsed dict in
+#   a module global. Per-replicate cost: from_dict(baseline) +
+#   apply_snapshot + run one replicate. Model-reload overhead is
+#   amortised (~ms per work unit).
+# - Worker returns the full per-replicate result dict via IPC. Main
+#   process buffers per-condition; when all R replicates for some
+#   condition arrive, it finalises (compute_statistics + write all
+#   per-condition output files) and frees the buffer.
+# - Memory bound (main process): C × R × ~trajectory_size. For
+#   canabidiol Q1 (44 places × 4 800 timepoints × 8 bytes ≈ 1.7 MiB
+#   per replicate), C=8, R=30 → ~400 MiB peak. Fine on the i9 server.
+# - Submission order: round-robin by replicate index (r=0 across all
+#   conditions, then r=1, ...). This keeps all conditions advancing
+#   together and roughly synchronises completion times.
+# - CLI emit format unchanged:
+#       [c+1/C] cond_name (R replicates)...     <- when r=0 submitted
+#       [done c+1/C] cond_name in Xs (n_ok ok, n_err errors) [...]
+#                                               <- when R-th rep arrives
+#   These pair correctly with the controller regex from
+#   dispatch/remote.py (commit a1a2d57b).
+
+
+# Module-global cache for the baseline model dict, populated by the
+# pool initialiser exactly once per worker process.
+_BASELINE_MODEL_DICT: Optional[dict] = None
+
+
+def _replicate_pool_init(
+    model_path: str,
+    pool_worker_count: int = 1,
+    gpu_mode: str = 'auto',
+) -> None:
+    """Initialiser for the flat replicate ProcessPool.
+
+    Loads the baseline model from disk one time per worker, parses to
+    a dict, and stashes the dict for reuse across the worker's many
+    `_run_one_replicate` invocations. Also installs the standard
+    process guard / nice / CPU affinity so the worker is well-behaved
+    under SSH.
+
+    Publishes pool size and GPU mode to env vars so the inner
+    replicate_runner GPU 'auto' decision can distinguish a
+    sole-worker pool (no GPU contention → use GPU) from a
+    multi-worker pool (siblings contend for one GPU → skip).
+    """
+    global _BASELINE_MODEL_DICT
+    os.environ['_SHYPN_IN_POOL_WORKER'] = '1'
+    os.environ['_SHYPN_POOL_WORKER_COUNT'] = str(int(pool_worker_count))
+    if gpu_mode in ('auto', 'force', 'off'):
+        os.environ['_SHYPN_USE_GPU'] = gpu_mode
+    os.environ.setdefault('DISPLAY', '')
+    from shypn.engine.process_guard import install_process_guard
+    install_process_guard()
+    try:
+        os.nice(19)
+    except OSError:
+        pass
+    _apply_cpu_affinity()
+    # Logging quiet
+    import logging as _logging
+    _logging.basicConfig(level=_logging.WARNING)
+    for _name in ('shypn.engine.simulation.controller',
+                  'shypn.engine.acceleration'):
+        _logging.getLogger(_name).setLevel(_logging.ERROR)
+
+    from shypn.data.canvas.document_model import DocumentModel
+    model = DocumentModel.load_from_file(model_path)
+    _BASELINE_MODEL_DICT = model.to_dict()
+
+
+def _run_one_replicate(
+    *,
+    cond_idx: int,
+    rep_idx: int,
+    cond_name: str,
+    baseline_dict_inline: Optional[dict],
+    snapshot_dict: dict,
+    sim_params: dict,
+    events: list,
+    time_units_value: str,
+) -> dict:
+    """Execute exactly one (condition, replicate) work unit.
+
+    Args:
+        cond_idx, rep_idx: addressing.
+        cond_name: condition snapshot name (passed in to avoid an extra
+            pickled object).
+        baseline_dict_inline: optional inline baseline dict for callers
+            that did not use the pool initialiser (e.g. tests). When
+            ``None``, falls back to the worker's cached
+            ``_BASELINE_MODEL_DICT``.
+        snapshot_dict: serialised ExperimentSnapshot for this condition.
+        sim_params: as ``self.config.sim_params`` (asdict).
+        events: list of event dicts to install on the model.
+        time_units_value: ``TimeUnits`` enum value string.
+
+    Returns:
+        ``{cond_idx, rep_idx, cond_name, result, param_sources?}``
+        where ``result`` is the full per-replicate result dict from
+        :func:`_run_replicate_chunk` (single element). ``param_sources``
+        is included only on the first replicate (r=0) of each condition
+        to avoid redundant IPC.
+    """
+    baseline_dict = baseline_dict_inline or _BASELINE_MODEL_DICT
+    if baseline_dict is None:
+        raise RuntimeError(
+            "Replicate worker has no baseline model dict — "
+            "_replicate_pool_init was not invoked"
+        )
+
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import _run_replicate_chunk
+
+    # Reconstruct fresh model for this work unit (no shared state across
+    # replicates within a worker — necessary for clean re-application of
+    # the snapshot and event list, which mutate the model in place).
+    model = DocumentModel.from_dict(baseline_dict)
+
+    # Build a baseline snapshot from the in-worker model (used by
+    # _apply_snapshot to reset per-id markings before applying overrides).
+    baseline_snap = SweepRunner._capture_baseline(model)
+    snapshot = _dict_to_snapshot(snapshot_dict)
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline_snap)
+
+    # Install events forwarded from the dispatcher, exactly as the
+    # legacy per-condition path did.
+    if events:
+        from shypn.data.pathway.pathway_data import Event as _Event
+        try:
+            model.events = [_Event.from_dict(e) for e in events]
+        except Exception as _exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                "Failed to install %d events: %s", len(events), _exc
+            )
+
+    # Run exactly one replicate via the existing chunk runner.
+    chunk = _run_replicate_chunk(
+        model_dict=model.to_dict(),
+        replicate_ids=[rep_idx],
+        seed_base=sim_params['seed_base'],
+        duration=sim_params['duration'],
+        use_parallel=True,
+        use_tau_leaping=True,
+        termination_condition=sim_params['termination'],
+        time_step=sim_params.get('time_step'),
+        epsilon=sim_params['tau_epsilon'],
+        max_tau=sim_params['max_tau'],
+        time_units_value=time_units_value,
+    )
+
+    payload = {
+        'cond_idx': cond_idx,
+        'rep_idx': rep_idx,
+        'cond_name': cond_name,
+        'result': chunk[0],
+    }
+    # Carry parameter_sources only once per condition (with r=0) — saves
+    # ~C × (R-1) redundant IPC sends.
+    if rep_idx == 0:
+        payload['param_sources'] = param_sources
+    return payload
+
+
+def _run_one_condition_batch(
+    *,
+    cond_idx: int,
+    cond_name: str,
+    baseline_dict_inline: Optional[dict],
+    snapshot_dict: dict,
+    sim_params: dict,
+    events: list,
+    time_units_value: str,
+) -> dict:
+    """Execute ALL R replicates of one condition in a single work unit.
+
+    Used by the GPU-aware dispatch path: when ``gpu_mode in {'force'}``
+    or ``gpu_mode == 'auto' and n_workers <= n_conditions``, we batch
+    all replicates per condition into one work unit and route through
+    :class:`ReplicateRunner.run_replicates`. That method houses the
+    GPU-vs-CPU heuristic and, when GPU is selected, dispatches the
+    full batch through the cupy hybrid engine (~100× per-replicate
+    speedup verified on canabidiol Q1, 2026-05-09).
+
+    Returns:
+        ``{cond_idx, cond_name, results, param_sources}`` where
+        ``results`` is the list of ALL R per-replicate result dicts.
+    """
+    baseline_dict = baseline_dict_inline or _BASELINE_MODEL_DICT
+    if baseline_dict is None:
+        raise RuntimeError(
+            "Condition-batch worker has no baseline model dict — "
+            "_replicate_pool_init was not invoked"
+        )
+
+    from shypn.data.canvas.document_model import DocumentModel
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    from shypn.engine.simulation.settings import SimulationSettings
+
+    model = DocumentModel.from_dict(baseline_dict)
+
+    baseline_snap = SweepRunner._capture_baseline(model)
+    snapshot = _dict_to_snapshot(snapshot_dict)
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline_snap)
+
+    if events:
+        from shypn.data.pathway.pathway_data import Event as _Event
+        try:
+            model.events = [_Event.from_dict(e) for e in events]
+        except Exception as _exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                "Failed to install %d events: %s", len(events), _exc
+            )
+
+    # Settings: pull GPU mode from env (set by _replicate_pool_init).
+    _settings = SimulationSettings()
+    _gpu_mode = os.environ.get('_SHYPN_USE_GPU', 'auto')
+    if _gpu_mode in ('auto', 'force', 'off'):
+        _settings.use_gpu = _gpu_mode  # type: ignore[assignment]
+
+    runner = ReplicateRunner(model, settings=_settings)
+    results = runner.run_replicates(
+        n=int(sim_params['replicates']),
+        use_parallel=True,
+        use_tau_leaping=True,
+        duration=sim_params['duration'],
+        termination_condition=sim_params['termination'],
+        epsilon=sim_params['tau_epsilon'],
+        max_tau=sim_params['max_tau'],
+        time_step=sim_params.get('time_step'),
+        seed_base=sim_params['seed_base'],
+        verbose=False,
+    )
+
+    return {
+        'cond_idx': cond_idx,
+        'cond_name': cond_name,
+        'results': results,
+        'param_sources': param_sources,
+    }
+
+
+def _finalize_condition(
+    *,
+    model: Any,
+    snapshot: ExperimentSnapshot,
+    cond_results: List[dict],
+    output_run_dir: Path,
+    output_options: dict,
+) -> None:
+    """Compute statistics and write per-condition outputs.
+
+    Mirrors the disk-write half of the legacy `_run_single_condition`,
+    but driven from the main process once all R replicates for a
+    condition have arrived from the flat pool.
+    """
+    from shypn.engine.simulation.replicate_runner import ReplicateRunner
+    from shypn.cli.sweep_output import SweepOutputManager
+    from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+
+    runner = ReplicateRunner(model)
+    stats = runner.compute_statistics(cond_results)
+
+    safe_name = _sanitise_condition_name(snapshot.name)
+    cond_dir = output_run_dir / f"condition_{safe_name}"
+    cond_dir.mkdir(parents=True, exist_ok=True)
+
+    _opts = _OutputOptions.from_dict(output_options)
+    if _opts.write_replicates_csv:
+        SweepOutputManager._write_replicates_csv(cond_dir, cond_results, model)
+    if _opts.write_statistics_json:
+        stats_to_write = (_strip_to_endpoint(stats)
+                          if _opts.statistics_endpoint_only else stats)
+        SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
+    if _opts.write_per_replicate_trajectories:
+        SweepOutputManager._write_per_replicate_trajectories(
+            cond_dir, cond_results, model,
+            trajectory_places=_opts.trajectory_places,
+            trajectory_thin_seconds=_opts.trajectory_thin_seconds,
+        )
+    if _opts.write_covariance:
+        SweepOutputManager._write_covariance(cond_dir, cond_results, model)
+
+
 def _run_single_condition(
     *,
     model_path: str,
@@ -694,6 +1452,8 @@ def _run_single_condition(
     output_dir: str,
     verbose: bool,
     events: list = None,
+    output_options: dict = None,
+    replicate_pool_size: int = 1,
 ) -> dict:
     """Execute one condition in a worker process.
 
@@ -724,8 +1484,8 @@ def _run_single_condition(
     baseline = _dict_to_snapshot(baseline_dict)
     snapshot = _dict_to_snapshot(snapshot_dict)
 
-    # Apply overrides
-    SweepRunner._apply_snapshot(model, snapshot, baseline)
+    # Apply overrides; capture per-path origin info for provenance (Layer D).
+    param_sources = SweepRunner._apply_snapshot(model, snapshot, baseline)
 
     # Install environment events forwarded from the dispatching client.
     # These are defined on the GUI Environment Panel and travel inside
@@ -752,8 +1512,19 @@ def _run_single_condition(
             )
 
     # Run replicates
+    # Override the pool-worker gate to grant this worker an explicit inner
+    # replicate-pool budget. _worker_init() set this to '1' (sequential),
+    # which is the right default; here we widen it only when the dispatcher
+    # has computed leftover capacity (replicate_pool_size > 1).
+    if replicate_pool_size and replicate_pool_size > 1:
+        os.environ['_SHYPN_IN_POOL_WORKER'] = str(int(replicate_pool_size))
     from shypn.engine.simulation.replicate_runner import ReplicateRunner
-    runner = ReplicateRunner(model)
+    from shypn.engine.simulation.settings import SimulationSettings
+    _settings = SimulationSettings()
+    _gpu_mode = os.environ.get('_SHYPN_USE_GPU', 'auto')
+    if _gpu_mode in ('auto', 'force', 'off'):
+        _settings.use_gpu = _gpu_mode  # type: ignore[assignment]
+    runner = ReplicateRunner(model, settings=_settings)
     results = runner.run_replicates(
         n=sim_params['replicates'],
         use_parallel=True,
@@ -786,8 +1557,41 @@ def _run_single_condition(
     cond_dir = run_dir / f"condition_{safe_name}"
     cond_dir.mkdir(parents=True, exist_ok=True)
 
-    SweepOutputManager._write_replicates_csv(cond_dir, results, model)
-    SweepOutputManager._write_statistics_json(cond_dir, stats)
+    # Output-tier gate: see OutputOptions in sweep_config.py for tier→writes.
+    from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+    _opts = _OutputOptions.from_dict(output_options)
+    if _opts.write_replicates_csv:
+        SweepOutputManager._write_replicates_csv(cond_dir, results, model)
+    if _opts.write_statistics_json:
+        if _opts.statistics_endpoint_only:
+            stats_to_write = _strip_to_endpoint(stats)
+        else:
+            stats_to_write = stats
+        SweepOutputManager._write_statistics_json(cond_dir, stats_to_write)
+    if _opts.write_per_replicate_trajectories:
+        SweepOutputManager._write_per_replicate_trajectories(
+            cond_dir, results, model,
+            trajectory_places=_opts.trajectory_places,
+            trajectory_thin_seconds=_opts.trajectory_thin_seconds,
+        )
+    if _opts.write_covariance:
+        SweepOutputManager._write_covariance(cond_dir, results, model)
+
+    # Persist parameter_sources alongside statistics for provenance.
+    # Empty dict still written so downstream tooling can rely on the
+    # file's existence as evidence the new code path ran.
+    try:
+        import json as _json_ps
+        with open(cond_dir / 'parameter_sources.json', 'w') as _psf:
+            _json_ps.dump({
+                'condition': snapshot.name,
+                'sources': param_sources,
+            }, _psf, indent=2, sort_keys=True)
+    except OSError as _exc:
+        import logging as _lg2
+        _lg2.getLogger(__name__).warning(
+            "Failed to write parameter_sources.json: %s", _exc
+        )
 
     # Free trajectory data immediately — this is the critical memory
     # reclamation point.  Without this, the worker holds ~0.5–1.5 GB
@@ -809,4 +1613,5 @@ def _run_single_condition(
         'peak_rss_mib': peak_rss_mib,
         'replicates_ok': n_ok,
         'replicates_error': n_err,
+        'parameter_sources': param_sources,
     }

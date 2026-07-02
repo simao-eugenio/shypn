@@ -85,6 +85,13 @@ class PlacePropDialogLoader(GObject.GObject):
         signal_checkbox = self.builder.get_object('signal_place_checkbox')
         if signal_checkbox:
             signal_checkbox.connect('toggled', self._on_signal_checkbox_toggled)
+        # Parameter-place checkbox lives in the Parameter tab. Wire it here
+        # too so we can enforce mutual exclusivity with the signal checkbox
+        # (a place is exactly one of: regular ○, signal ⬡/◇, parameter ▢ —
+        # see formalism doc §5.4 "one concept ↔ one carrier").
+        param_checkbox = self.builder.get_object('parameter_place_checkbox')
+        if param_checkbox:
+            param_checkbox.connect('toggled', self._on_parameter_checkbox_toggled)
 
     def _on_color_selected(self, picker, color_rgb):
         """Handle color selection from picker.
@@ -97,14 +104,37 @@ class PlacePropDialogLoader(GObject.GObject):
     
     def _on_signal_checkbox_toggled(self, checkbox):
         """Handle signal place checkbox toggle.
-        
-        Args:
-            checkbox: The signal place checkbox widget
+
+        Enables the signal_type combo and, when the user enables 'signal
+        place', force-disables the parameter_place checkbox to keep the
+        carrier categories mutually exclusive.
         """
         is_active = checkbox.get_active()
         signal_type_combo = self.builder.get_object('signal_type_combo')
         if signal_type_combo:
             signal_type_combo.set_sensitive(is_active)
+        if is_active:
+            param_cb = self.builder.get_object('parameter_place_checkbox')
+            if param_cb is not None and param_cb.get_active():
+                # Untoggle silently — the user just chose 'signal place',
+                # so the previous 'parameter place' selection is overridden.
+                param_cb.set_active(False)
+
+    def _on_parameter_checkbox_toggled(self, checkbox):
+        """Handle parameter place checkbox toggle.
+
+        Mutual-exclusivity counterpart to ``_on_signal_checkbox_toggled``:
+        enabling 'parameter place' force-disables 'signal place' (and the
+        signal_type combo with it).
+        """
+        if not checkbox.get_active():
+            return
+        sig_cb = self.builder.get_object('signal_place_checkbox')
+        if sig_cb is not None and sig_cb.get_active():
+            sig_cb.set_active(False)
+            combo = self.builder.get_object('signal_type_combo')
+            if combo is not None:
+                combo.set_sensitive(False)
 
     def _populate_fields(self):
         """Populate dialog fields with current Place properties."""
@@ -277,20 +307,36 @@ class PlacePropDialogLoader(GObject.GObject):
         if signal_checkbox:
             is_signal = signal_checkbox.get_active()
             self.place_obj.is_signal_place = is_signal
+            # Mutual exclusivity guard (see formalism doc §5.4): a place
+            # is exactly one of regular ○ / signal ⬡◇ / parameter ▢.
+            if is_signal and getattr(self.place_obj, 'is_parameter_place', False):
+                self.place_obj.is_parameter_place = False
+                # Also untick the on-screen checkbox so the Parameter tab
+                # save below doesn't re-set the flag.
+                param_cb = self.builder.get_object('parameter_place_checkbox')
+                if param_cb is not None:
+                    param_cb.set_active(False)
 
             # If enabling signal place, set signal type
             if is_signal:
                 signal_type_combo = self.builder.get_object('signal_type_combo')
+                from shypn.netobjs.signal_type import SignalType
                 if signal_type_combo:
-                    from shypn.netobjs.signal_type import SignalType
                     active_idx = signal_type_combo.get_active()
                     type_map = [SignalType.ENERGY, SignalType.REGULATORY, SignalType.QUORUM, SignalType.SPATIAL]
                     if 0 <= active_idx < len(type_map):
                         self.place_obj.signal_type = type_map[active_idx]
                     else:
                         self.place_obj.signal_type = SignalType.ENERGY  # Default
-                # Apply signal place visual schema: hexagon + blue border
-                self.place_obj.shape = 'hexagon'
+                # Visual schema: ◇ for spatial signal places, ⬡ for the rest.
+                # Spatial signal places ◇ are environmental scalars excluded
+                # from the cascade (formalism doc §5.4 carrier 3) — they get
+                # a distinct glyph so they can't be visually confused with
+                # biological signal hubs ⬡.
+                if self.place_obj.signal_type == SignalType.SPATIAL:
+                    self.place_obj.shape = 'diamond'
+                else:
+                    self.place_obj.shape = 'hexagon'
             else:
                 # Clear signal type and restore default circle shape
                 self.place_obj.signal_type = None
@@ -305,10 +351,16 @@ class PlacePropDialogLoader(GObject.GObject):
             if hasattr(self.place_obj, '_manager') and self.place_obj._manager:
                 self.place_obj._manager.mark_needs_redraw()
 
-        # AUTOMATIC ARC TRANSFORMATION: When place becomes signal place
-        # Convert all connected arcs to signal flow arcs (formalism requirement)
+        # AUTOMATIC ARC TRANSFORMATION: When a regular place becomes a
+        # BIOLOGICAL signal place, convert all connected arcs to signal-flow
+        # arcs (formalism requirement). Spatial signal places ◇ MUST NOT
+        # have F_s arcs (audit code C10), so we skip the conversion when
+        # the new signal_type is SPATIAL — the canonical pattern is
+        # ▢ + event → ◇ → Φ, no arcs touching the spatial place.
         if not was_signal_place and self.place_obj.is_signal_place:
-            self._convert_connected_arcs_to_signal_flow()
+            from shypn.netobjs.signal_type import SignalType as _ST
+            if getattr(self.place_obj, 'signal_type', None) != _ST.SPATIAL:
+                self._convert_connected_arcs_to_signal_flow()
 
         # Notify listeners that this place was modified (e.g. EnvironmentPanel)
         try:
@@ -536,7 +588,21 @@ class PlacePropDialogLoader(GObject.GObject):
         """Save the Parameter tab to the place object."""
         checkbox = self.builder.get_object('parameter_place_checkbox')
         if checkbox is not None:
-            self.place_obj.is_parameter_place = bool(checkbox.get_active())
+            new_param = bool(checkbox.get_active())
+            # Final mutual-exclusivity reconciliation. The toggle handlers
+            # already keep the two checkboxes in sync during interactive
+            # edits, but defend here too in case a programmatic flow
+            # (legacy file load, scripted update) bypasses them.
+            if new_param and getattr(self.place_obj, 'is_signal_place', False):
+                self.place_obj.is_signal_place = False
+                self.place_obj.signal_type = None
+                self.place_obj.shape = 'circle'
+                try:
+                    from shypn.utils.color_schema_manager import ColorSchemaManager
+                    ColorSchemaManager.reset_place_color(self.place_obj)
+                except Exception:
+                    pass
+            self.place_obj.is_parameter_place = new_param
 
         kind_combo = self.builder.get_object('parameter_kind_combo')
         if kind_combo is not None:

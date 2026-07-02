@@ -153,3 +153,21 @@ SIMULATION_CONTROLLER_ANALYSIS.md
 .backup_pre_refactor
 test_output/
 benchmark_results/
+
+# CSV outputs — sweep summaries, replicates, dev analyses.
+# Often very large; pushes frequently fail. Keep CSVs local; share via
+# the run dir on the GPU server / HDD store, not via git.
+*.csv
+
+# Backup files (timestamped or plain) — created by in-place model
+# patches and editor saves. Keep on disk locally; do not push.
+*.bak
+*.bak.*
+
+# UI state — recent project list, churns on every workspace open;
+# not worth tracking.
+workspace/projects/recent_projects.json
+
+# .preserved-<ts> sidecars — produced by ad-hoc cleanup scripts when
+# a file is replaced in place. Keep on disk locally; do not push.
+*.preserved-*

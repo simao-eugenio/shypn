@@ -96,7 +96,13 @@ class TauLeapingEngine:
             'mean_tau': 0.0,
             'exact_ssa_fallbacks': 0,
             'reversible_reactions': 0,  # Count of Skellam samples
-            'irreversible_reactions': 0  # Count of Poisson samples
+            'irreversible_reactions': 0,  # Count of Poisson samples
+            # S4 (engine_stability_audit 2026-04-29):
+            # Track Poisson over-sampling that gets silently clamped by the
+            # token-availability cap.  Used to surface low-copy bias.
+            'requested_firings': 0,    # Sum of Poisson/Skellam draws BEFORE clamping
+            'truncated_firings': 0,    # Sum of (requested - actual) when clamp triggered
+            'truncation_events': 0,    # Number of (transition, leap) pairs that clamped
         }
     
     def execute_step(
@@ -237,6 +243,12 @@ class TauLeapingEngine:
         # Step 4: Advance time (only if enabled - disabled for hybrid models)
         if self._advance_time:
             controller.time += tau
+
+        # S5 (engine_stability_audit 2026-04-29): expose τ so the data
+        # collector can force-record transient steps.
+        _dc = getattr(controller, 'data_collector', None)
+        if _dc is not None and hasattr(_dc, 'notify_step_size'):
+            _dc.notify_step_size(tau)
         
         # Step 4.5: Update assignment rule-defined species (Option 3)
         if getattr(controller, 'enable_assignment_rule_reevaluation', False) is True:
@@ -368,9 +380,19 @@ class TauLeapingEngine:
                     self.use_parallel = False
 
             if self._parallel_scheduler:
-                return self._parallel_scheduler.sample_parallel(
+                # Apply inhibitor-arc constraints after parallel sampling.
+                # The parallel path samples all transitions independently;
+                # without this step any transition with a curved_inhibitor_arc
+                # (or any inhibitor arc variant) runs unconstrained — the
+                # inhibitor check must be applied regardless of the sampling
+                # path used.
+                firings_map = self._parallel_scheduler.sample_parallel(
                     transitions, propensities, tau
                 )
+                firings_map = self._apply_inhibitor_constraints(
+                    firings_map, transitions
+                )
+                return firings_map
         
         # Sequential sampling with Skellam support for reversible reactions
         firings_map = {}
@@ -680,6 +702,11 @@ class TauLeapingEngine:
                 if _w > 0.0:
                     max_poss = min(max_poss, int(_p.tokens // _w))
             actual = max(0, min(num_firings, max_poss))
+            # S4: track Poisson over-sampling clamped by token availability.
+            self.stats['requested_firings'] += int(num_firings)
+            if actual < num_firings:
+                self.stats['truncated_firings'] += int(num_firings - actual)
+                self.stats['truncation_events'] += 1
             if actual == 0:
                 continue
 
@@ -793,9 +820,13 @@ class TauLeapingEngine:
             )
             
             actual_firings = min(num_firings, max_possible_firings)
-            
-            # Log if we had to cap firings due to insufficient tokens (debug level only)
+
+            # S4: track Poisson over-sampling clamped by token availability.
+            self.stats['requested_firings'] += int(num_firings)
             if actual_firings < num_firings:
+                self.stats['truncated_firings'] += int(num_firings - actual_firings)
+                self.stats['truncation_events'] += 1
+                # Log if we had to cap firings due to insufficient tokens (debug level only)
                 self.logger.debug(
                     f"τ-leaping: Capped {transition.name} firings from {num_firings} to {actual_firings} "
                     f"(insufficient tokens). Consider reducing tau or epsilon."
@@ -873,10 +904,12 @@ class TauLeapingEngine:
         max_firings = requested_firings
         
         for arc in input_arcs:
-            # Skip test arcs (don't consume tokens)
-            kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-            arc_type = getattr(arc, 'arc_type', 'normal')
-            if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+            # Per 13-tuple Bio-PN formalism + classical PN literature:
+            # test and inhibitor (incl. curved_inhibitor_arc) arcs are
+            # non-consuming presence/absence checks and therefore do NOT
+            # constrain max_firings. Use Arc.consumes_tokens() as the
+            # single source of truth (mirrors _fire_transition_multiple).
+            if not arc.consumes_tokens():
                 continue
             
             source_place = arc.source
@@ -920,18 +953,24 @@ class TauLeapingEngine:
         is_sink = getattr(transition, 'is_sink', False)
         
         # Phase 1: Consume tokens (skip if source)
+        # Per 13-tuple Bio-PN formalism: only TEST arcs are non-consuming.
+        # signal_flow and inhibitor arcs consume tokens (see SignalFlowArc
+        # docstring + immediate_behavior.py "v2.1.1: Only TEST arcs skip").
+        # Use the cached arc_type property as the single source of truth;
+        # the legacy properties['kind'] alias is intentionally NOT consulted
+        # here to avoid silent dual-source-of-truth divergence.
         if not is_source:
             for arc in input_arcs:
-                # Skip test arcs and inhibitor arcs (they don't consume)
-                kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
-                arc_type = getattr(arc, 'arc_type', 'normal')
-                if kind != 'normal' or arc_type in ('inhibitor', 'test'):
+                # Per 13-tuple Bio-PN formalism + classical PN literature:
+                # test and inhibitor (all variants) arcs are non-consuming.
+                # Use Arc.consumes_tokens() as single source of truth.
+                if not arc.consumes_tokens():
                     continue
-                
+
                 source_place = arc.source
                 if source_place is None:
                     continue
-                
+
                 amount = arc.weight * num_firings
                 source_place.set_tokens(source_place.tokens - amount)
                 consumed_map[source_place.id] = float(amount)

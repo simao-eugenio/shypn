@@ -93,6 +93,185 @@ asked.
   must NOT manually `scp` `.shy` files unless the dispatcher path
   is genuinely unavailable.
 
+## Programmatic `.shy` patching — property scope rules (STRICT)
+
+When editing `.shy` files outside the GUI (multi_replace, jq, scripts),
+agents MUST respect the **loader scope** for every field. The loaders
+in `src/shypn/netobjs/{place,transition,arc,signal_flow_arc}.py` and
+`src/shypn/data/canvas/document_model.py` decide where a JSON key is
+read from. Writing to the wrong scope is a silent no-op — the file
+saves cleanly, the next save round-trips, and the engine ignores it.
+
+### Loader-derived scope table (audited 2026-04-28 from `*.from_dict()`)
+
+#### Transition (`transition.py::Transition.from_dict`)
+
+| Field                                                                   | Read from                  | Notes                                                                 |
+|-------------------------------------------------------------------------|----------------------------|-----------------------------------------------------------------------|
+| `id`, `name`, `x`, `y`, `width`, `height`, `label`, `horizontal`        | top-level **only**         | constructor args                                                      |
+| `enabled`, `fill_color`, `border_color`, `border_width`                 | top-level **only**         |                                                                       |
+| `transition_type`, `priority`, `firing_policy`, `guard`                 | top-level **only**         |                                                                       |
+| `is_source`, `is_sink`                                                  | top-level **only**         |                                                                       |
+| `earliest_time`, `latest_time` (TPN window)                             | top-level **only**         |                                                                       |
+| `signal_places`, `is_environment_aware`, `module_id`, `compartment`     | top-level **only**         |                                                                       |
+| `kinetic_metadata`, `metadata`                                          | top-level **only**         |                                                                       |
+| `adaptive_filter`, `volume_threshold`, `prefer_continuous`              | top-level **then** `properties` | top-level wins; properties is legacy fallback                  |
+| **`rate_function`**                                                     | **`properties` only**      | top-level `rate_function` migrated **iff** `properties.rate_function` absent; once present, top-level edits are ignored |
+| `rate_forward`, `rate_reverse`                                          | **`properties` only**      | same migration rule as `rate_function`                                |
+| `rate` (deprecated numeric)                                             | top-level → migrated to `properties.rate_function` | only if no `rate_function` exists                |
+| `formula`                                                               | top-level **only**         | legacy                                                                |
+
+#### Place (`place.py::Place.from_dict`)
+
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `id`, `name`, `x`, `y`, `radius`, `label`                                          | top-level **only**         |                                                      |
+| `initial_marking` (or legacy `marking`)                                            | top-level **only**         | **see `tokens` vs `initial_marking` policy below** — `tokens` in a saved file is a corruption signature, NEVER a value source |
+| `is_catalyst`, `is_signal_place`, `is_energy_place`                                | top-level **only**         |                                                      |
+| `is_compartment_place`, `is_regulatory_place`                                      | top-level **only**         |                                                      |
+| `is_parameter_place`, `parameter_kind`, `parameter_units`                          | top-level **only**         |                                                      |
+| `capacity`, `border_color`, `border_width`                                         | top-level **only**         |                                                      |
+| `diffusion_coefficient`, `gradient_vector`, `neighbor_compartments`,`spatial_position` | top-level **only**     |                                                      |
+| `boundary_type`                                                                    | top-level **only**         |                                                      |
+| `compartment`, `metadata`                                                          | top-level **only**         |                                                      |
+| `signal_type`                                                                      | top-level **then** `properties` | top-level wins                                  |
+| `compartment_volume`                                                               | top-level **then** `properties` | top-level wins                                  |
+| `properties` (passthrough dict for thermodynamic / custom data)                    | `properties` **only**      | not interpreted by the loader; engine reads ad-hoc   |
+
+#### Arc (`arc.py::Arc.from_dict`)
+
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `id`, `name`, `arc_type`                                                           | top-level **only**         | `arc_type` selects the **subclass** (TestArc, SignalFlowArc, …) |
+| `source_id`, `target_id`, `source_type`, `target_type`                             | top-level **only**         | `*_type` inferred from ID prefix if missing          |
+| `weight`, `threshold`, `color`, `width`, `control_points`                          | top-level **only**         |                                                      |
+| `properties` dict on arcs                                                          | **NOT READ by loader**     | the loader never deserializes `arc["properties"]`. Edits there are ignored at load. The engine's *runtime* fallback chain `kind ?? properties.kind ?? arc_type` is irrelevant once `arc_type` selects the right subclass. |
+
+##### SignalFlowArc / CurvedSignalFlowArc additional fields
+
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `michaelis_K`, `hill_n`, `suppression_epsilon` (Γ tuple)                           | top-level **only**         | default 0, 1, 0                                      |
+| `activation_energy`, `reference_temperature` (Arrhenius)                           | top-level **only**         | default 0, 298.15                                    |
+
+#### DocumentModel (`document_model.py::DocumentModel.from_dict`)
+
+| Field                                                                              | Read from                  | Notes                                                |
+|------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------|
+| `places`, `transitions`, `arcs`, `modules`, `events`                               | top-level **only**         | lists at root                                        |
+| `view_state`, `thermodynamic_settings`, `compound_mappings`, `metadata`            | top-level **only**         |                                                      |
+
+### `tokens` vs `initial_marking` policy on places (STRICT)
+
+Recurring trap (audited 2026-04-30, run_20260430_154220 zero-variance
+sweep): a programmatic patch wrote `place["tokens"] = X` thinking it
+would change the basal value. The loader read `initial_marking` (still
+0), the engine started M_0 at 0, and the entire MAINT_DOSE sweep was a
+silent no-op despite Layer-D provenance reporting the override applied.
+
+Canonical policy:
+
+* **`initial_marking`** is the **only** marking field the loader reads
+  to populate $M_0$. It is the **basal value of the object-net** at
+  design time, the static reference of the model.
+* **`tokens`** is **transient runtime state** — the live value at a
+  place during a session. It is used by interactive editing to poke
+  values mid-run. **It is NEVER persisted to a `.shy` file.**
+* On save (`Place.to_dict`), `tokens` is dropped. If
+  `tokens != initial_marking` the writer logs a WARNING (the GUI
+  surfaces this divergence pre-save via a Promote/Discard/Cancel
+  dialog).
+* On load (`Place.from_dict`), the presence of a `tokens` key with
+  `tokens != initial_marking` is the **signature of a wrong-scope
+  programmatic patch** (legacy or corrupted file). The loader uses
+  `initial_marking` and logs a WARNING; in-memory `place.tokens` is
+  reconciled to `place.initial_marking`.
+* **Programmatic writers MUST use the canonical helper** —
+  `shypn.netobjs.patch.set_place_value(model, name_or_id, value)` —
+  which writes top-level `initial_marking`, mirrors `marking`, and
+  strips any stale `tokens` key. **Do NOT write `place["tokens"] = X`
+  in jq scripts, multi_replace, or anywhere else.**
+* GUI flow: when the modeller wants to persist a runtime change, the
+  pre-save dialog promotes `initial_marking := tokens` (with explicit
+  consent — never silent). This is the *only* legal path for
+  runtime → basal promotion.
+
+Quick patch idiom:
+```python
+from shypn.netobjs.patch import patch_shy_file
+patch_shy_file(
+    "workspace/projects/<proj>/models/<file>.shy",
+    {"LOADING_DOSE": 10.0, "MAINT_DOSE": 5.0},
+)
+# .shy.bak written, file rewritten with initial_marking set, tokens stripped
+```
+
+### Decision rule for any patch
+
+Before editing field `F` on object `O`:
+
+1. **Look up `F` in the table above.** If unlisted, grep `from_dict()`
+   for the source class — *do not guess*.
+2. **Apply at the loader's read scope.** Mirror to the alternate scope
+   only when the table's "Notes" column says it's a fallback (e.g.
+   `signal_type` should be set top-level; properties mirror is optional).
+3. **Run the roundtrip assertion** below before saving.
+4. **Never write to a scope the loader ignores** (e.g.
+   `arc["properties"]`, `transition["rate_function"]` when
+   `properties.rate_function` exists). These are silent no-ops.
+
+### Boilerplate validation snippet (mandatory in every patch script)
+
+```python
+# After json.dumps and write, re-read and assert at the loader's read scope.
+m2 = json.loads(path.read_text())
+
+# 1. Rate-function patches (properties-only)
+t = next(t for t in m2['transitions'] if t['name'] == NAME)
+assert t['properties']['rate_function'] == NEW_RATE, \
+    f"rate_function did not land in properties on {NAME}"
+
+# 2. Arc retyping (top-level + clear properties.kind)
+a = next(a for a in m2['arcs'] if a['id'] == ARC_ID)
+assert a['arc_type'] == NEW_TYPE
+assert a.get('properties', {}).get('kind') in (None, NEW_TYPE), \
+    f"stale properties.kind on arc {ARC_ID} disagrees with arc_type"
+
+# 3. New transition added (must have id starting 'T', properties dict)
+new_t = next(t for t in m2['transitions'] if t['id'] == NEW_TID)
+assert new_t['transition_type'] in ('continuous', 'stochastic', 'immediate', 'timed', 'adaptive')
+if new_t['transition_type'] in ('continuous', 'adaptive'):
+    assert new_t['properties'].get('rate_function'), \
+        "continuous/adaptive transition needs properties.rate_function"
+
+# 4. New arc added (top-level fields complete; do NOT add properties)
+new_a = next(a for a in m2['arcs'] if a['id'] == NEW_AID)
+for k in ('id', 'arc_type', 'source_id', 'target_id', 'weight'):
+    assert k in new_a, f"new arc missing top-level {k}"
+```
+
+### Operational rules
+
+- **`color` is GUI-only but identifies arc class on the canvas.** Update
+  it together with `arc_type`:
+  - `normal` → `[0.0, 0.0, 0.0]` (black)
+  - `test` → `[0.0, 0.0, 1.0]` (blue)
+  - `signal_flow` → `[0.7, 0.7, 0.7]` (light grey)
+  - `inhibitor` → `[1.0, 0.0, 0.0]` (red)
+
+- **The running engine reads from the in-memory model, not from disk.**
+  After a programmatic patch the GUI/CLI must reload the model
+  (File → Open, or restart `python src/shypn.py`) before the next
+  simulation. Newer `.shy` mtime is **not** sufficient evidence — only
+  changed firing counts / endpoint markers confirm the engine saw it.
+  Agents that patch a model and request a re-run MUST tell the
+  operator explicitly to reload the model first.
+
+- **Skipping the roundtrip check is how the third-round P7 sweep ran
+  against a stale model and reported zero T28 firings (2026-04-26),
+  and how the v3_p9 GSH-floor patch silently produced ROS=17 instead
+  of ROS=0 (2026-04-28).**
+
 ## Hybrid sync model (sweep dispatch)
 
 As of April 2026 the dispatcher uses a **git + SCP hybrid**:
@@ -152,6 +331,180 @@ python -m shypn.cli.sweep --project … --sweep … --output <abs-or-rel-path>
 - Per-condition resource metrics land in `summary.csv` and
   `resource_usage.json` inside each run dir.
 
+### Token-to-concentration convention (STRICT, 2026-05-14)
+
+**Default:** 1 token = 1 mM.  All `initial_marking` values, rate-function
+parameters, and `θ_eff` thresholds are expressed in mM unless a model-level
+override is declared.
+
+**Known exception — bacillus sporulation models** (`bacillus_sporulation_v*.shy`):
+these are calibrated at **µM** (1 token = 1 µM): ATP_pool = 5000 µM = 5 mM,
+Spo0A~P peak ≈ 8 µM, SigmaH peak ≈ 2 µM, Michaelis constants 5–200 µM.  Their
+`metadata.token_unit` is `"µM"`.  Do **not** label their molecular axes as mM.
+
+**Model-level scale declaration (MANDATORY for every new model):**
+Every `.shy` file MUST declare its concentration scale in the top-level
+`metadata` object:
+```json
+"metadata": {
+  "token_unit": "mM",          // "mM" | "µM" | "nM" | "count" | "dimensionless"
+  "token_unit_rationale": "1 token = 1 mM; ATP_pool M0=5 → 5 mM"
+}
+```
+- Agents creating or patching a model MUST read `metadata.token_unit` first
+  and use it consistently in all rate functions, captions, and axis labels.
+- If `metadata.token_unit` is absent in an existing model, treat it as `"mM"`
+  (default) and add the field on the next programmatic patch.
+- **Never silently assume a unit.** If the unit is ambiguous, ask before writing.
+
+**Place-type carve-outs — two ontologies coexist in every cell model:**
+
+| Place category | Examples | Correct unit |
+|---|---|---|
+| Chemical/molecular species | ATP, Spo0A_P, sigma factors, RapA | `token_unit` of the model |
+| Discrete cell/structure counts | Mature_spore, Forespore, Outer_coat, Septum | `"count"` (dimensionless integer) |
+| Parameter / environmental | Temperature, SIGMA_HALFLIFE_MIN | native SI or defined in `parameter_units` |
+
+Structural/morphological places that represent cell-scale objects (spores,
+layers, compartments) are **inherently dimensionless counts** regardless of the
+model's `token_unit`.  Label them as "count" or "estruturas" in figure axes —
+never as mM/µM.
+
+**Axis label rule for figures and tables:**
+- Molecular species axes → use `token_unit` (e.g. "ATP (mM)")
+- Cell/structure count axes → "esporos", "células", or "estruturas (contagem)"
+- Mixed figures → annotate each species with its own unit inline
+
+**`compartment_volume` override:**
+If `compartment_volume` (fL) is set on a place, the engine converts tokens to
+concentration via `C = N / (Nₐ × V)`.  When using this path the
+`token_unit` declared in metadata no longer applies to that place; add an
+explicit comment to the rate function explaining the unit.
+
+### Low-copy / sub-µM caveats (audit 2026-04-29)
+
+Reference: [`doc/engine_stability_audit.md`](../doc/engine_stability_audit.md).
+Seven failure modes (F1–F7) characterised; phased remediation S1–S7.
+Phase A (S4 + S5 + S7) implemented in this commit; **S1, S2, S3, S6
+NOT YET IMPLEMENTED** — agents must remain alert to these traps when
+debugging low-copy results.
+
+- **F1 — silent adaptive mode default:** an `adaptive` transition
+  whose connected places lack `compartment_volume` falls back to
+  `'continuous' if prefer_continuous else 'stochastic'` *without*
+  raising. Always set `compartment_volume` on at least one input place
+  for adaptive transitions, or prepare to be surprised by the default.
+- **F3 — Poisson over-sampling is silently truncated.** When sampled
+  firings exceed `floor((M − θ) / W)` they are clamped without error.
+  S4 now exposes this:
+  - `TauLeapingEngine.stats['requested_firings']`,
+    `['truncated_firings']`, `['truncation_events']`.
+  - Each replicate result dict carries `engine_stats` with
+    `truncation_fraction = truncated / requested`.
+  - Replicate-level warning fires when `truncation_fraction > 5 %`
+    (`RuntimeWarning` in chunked path; printed line in main runner).
+  - **A high truncation fraction is the canonical signature of low-copy
+    bias.** Always check it before trusting a sweep at sub-µM
+    concentrations.
+- **F4 — Skellam reversibility detector is permissive.** Triggers on
+  `' - '` substring + `kf_*` / `kr_*` naming. Rate strings of the form
+  `k * (A - K_eq)` or `0.1 * X / (50 + X) - 0.05 * Y` will be
+  misclassified as reversible and sampled with **2× variance**.
+  Inspect the engine log for `Detected reversible:` lines on any
+  unfamiliar model.
+- **F5 — operator-split cascade lag.** Per `dt`: continuous flow →
+  stochastic τ-leap → finalize. Continuous transitions read the
+  *start-of-step* marking; stochastic transitions read the
+  post-continuous marking. A `stochastic → continuous` chain therefore
+  carries a **one-step lag per cascade level**. Invisible at high
+  copy / fast equilibration; severe at low copy.
+- **F7 — coarse data-collector decimation hides transients.** Default
+  `recording_time_interval = 0.05 s`; a 4-day horizon retains <100
+  recorded points. Use S5 to capture transients:
+  `RecordingConfig(adaptive_tau_threshold=1e-3)` force-records every
+  step whose engine `τ < 1 ms` (transient regime), while leaving
+  coarse decimation intact during equilibrium phases.
+
+When a sweep returns bit-identical downstream values across a
+substrate gradient, suspect F1 + F5 + F7 *before* re-checking the
+topology.
+
+## Transition type selection — biological behaviour vs τ-leaping (STRICT, 2026-05-15)
+
+Derived from bacillus_sporulation_v4→v5 audit. Applies to every Bio-PN model.
+
+### The core rule
+
+**Transition type must reflect the biological regime of the process, not modelling
+convenience.**  The τ-leaping engine only samples Poisson distributions for
+`stochastic` and `adaptive` transitions.  Assigning `stochastic` to a
+high-throughput process where the token pool ≫ expected firings per step
+generates Poisson over-sampling (F3), inflating truncation fractions to
+65–99 % and silently destroying variance while barely affecting means.
+
+### Decision table (apply at design time)
+
+| Biological regime | Examples | Transition type |
+|---|---|---|
+| **Rare / discrete event** — one-time or low-probability commitment; input place routinely < 50 tokens | KinA activation, asymmetric division (septation), phage lysis decision | `stochastic` |
+| **Low-copy signalling cascade** — phosphorelay, small-molecule second messenger; input places 1–20 tokens; noise is the mechanism | Spo0F/Spo0A phosphorylation, dephosphorylation via phosphatase | `stochastic` |
+| **High-throughput gene expression** — transcription/translation driven by σ-factor pools that routinely exceed 20–500 tokens; Michaelis-Menten kinetics | σH/σF/σE/σG/σK transcription, σ-factor feedback loops | `continuous` |
+| **Structural / morphological assembly** — coat synthesis, compartment formation, maturation; bulk polymer/crystal assembly at µM scale | forespore formation, cortex/inner-coat/outer-coat synthesis, spore maturation | `continuous` |
+| **Metabolic bookkeeping** — ATP/GTP regeneration, σ-factor decay, nutrient depletion, cell-density source | already `continuous` in most models; never reclassify to `stochastic` | `continuous` |
+| **Adaptive (rare)** — genuinely switches regime based on copy number at runtime; requires `compartment_volume` on at least one input place (else silently falls back — F1) | sub-µM species that could be either low- or high-copy depending on condition | `adaptive` |
+
+### τ-leaping coupling / decoupling rule
+
+The engine auto-couples `max_tau` to `dt` **only when `max_tau == 0.1`
+(the default)**.  Condition: `if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU`.
+
+- **Setting any explicit value ≠ 0.1 in the viability panel disables
+  auto-coupling.**  The engine comment confirms: *"Numeric overrides
+  (max_tau ≠ 0.1) are honoured literally."*
+- Auto-coupling from 0.1 s → 1.0 s saves ~10× inner-loop iterations but
+  raises Poisson means proportionally, worsening truncation in models
+  with low-copy stochastic transitions.
+- **Recommended `max_tau` for models with low-copy stochastic transitions
+  (< 50 tokens):** `0.01` s.  Slower (~100× more inner iterations) but
+  truncation drops from 97 % to ~20 % for typical bacillus-scale models.
+  Consider `0.001` s for sub-10-token commitment transitions.
+- **If truncation fraction > 5 %** (logged as `RuntimeWarning`), variance
+  and percentile data are unreliable.  Means are approximately usable.
+  Bimodality / CV metrics MUST be discarded from that run.
+
+### Canonical split — bacillus sporulation model (v5, 2026-05-15)
+
+After the v4→v5 reclassification, the model has two clearly separated layers:
+
+**Layer 1 — Commitment decision (stochastic, 6 transitions):**
+`T_KinA_activation`, `T_Spo0F_phosphorylation`, `T_Spo0F_dephos`,
+`T_Spo0A_phosphorylation`, `T_Spo0A_dephosphorylation`, `T_septation`.
+These involve KinA_P (peak ~1.5 µM), Spo0A_P (peak ~7.5 µM), SigmaH
+(peak ~0.7 µM) — genuinely low-copy.  Noise here IS the bet-hedging
+mechanism.
+
+**Layer 2 — Execution programme (continuous, 12 transitions):**
+`T_sigmaH_transcription`, `T_sigmaF_activation`, `T_sigmaE_activation`,
+`T_sigmaE_feedback`, `T_sigmaG_transcription`, `T_sigmaK_transcription`,
+`T_forespore_formation`, `T_mother_cell_formation`, `T_cortex_synthesis`,
+`T_inner_coat_synthesis`, `T_outer_coat_synthesis`, `T_spore_maturation`.
+These reference SigmaE (peak ~500 µM), ATP (5000 µM), GTP (5000 µM) —
+high-throughput, ODE regime.
+
+### Forbidden patterns
+
+- **F-T1 — High-throughput transition as `stochastic`**: generates
+  Poisson over-sampling (F3).  Truncation fraction > 50 % on first
+  replicate is the diagnostic.  The fix is `continuous`, not smaller
+  `max_tau`.
+- **F-T2 — Low-copy commitment as `continuous`**: ODE path hides the
+  noise that drives bimodality.  If bet-hedging CV disappears or
+  bimodal zone collapses to unimodal after a type change, suspect this.
+- **F-T3 — `adaptive` without `compartment_volume`**: silently falls
+  back to continuous or stochastic depending on `prefer_continuous`
+  flag (F1 failure mode).  Always set `compartment_volume` or use an
+  explicit type.
+
 ## Formalism (13-tuple Bio-PN, Simão 2025)
 
 Reference: `manuscript/main_plos_one.tex`. Full audit:
@@ -177,7 +530,28 @@ Enabled(t,M) ≡ NormalEnabled(t,M)
              ∧ PreemptionCheck(t,M)      — single-layer, non-recursive
 ```
 
-**Firing rule:** `M'(p) = M(p) + Δ_normal(p,t) + Δ_signal(p,t)` (test arcs Δ = 0).
+**Firing rule:** `M'(p) = M(p) + Δ_normal(p,t) + Δ_signal(p,t)` (test
+arcs Δ = 0; **inhibitor arcs Δ = 0** — they are non-consuming
+presence-absence checks per classical PN semantics; SHyPN extends only
+the threshold *evaluation* — `θ` may be a runtime expression — never
+the consumption semantics).
+
+**Consumption semantics by arc type (single source of truth:
+`Arc.consumes_tokens()`):**
+
+| Arc type                                             | Consumes? | Override site                       |
+|------------------------------------------------------|-----------|-------------------------------------|
+| `normal`                                             | yes       | `Arc.consumes_tokens()` default     |
+| `signal_flow` (incl. `curved_signal_flow_arc`)       | yes       | `SignalFlowArc.consumes_tokens()`   |
+| `test`                                               | **no**    | `TestArc.consumes_tokens()`         |
+| `inhibitor`                                          | **no**    | `InhibitorArc.consumes_tokens()`    |
+| `curved_inhibitor_arc`                               | **no**    | `CurvedInhibitorArc.consumes_tokens()` |
+
+The base `Arc.consumes_tokens()` ALSO recognises the string
+`'inhibitor' in arc_type` so plain `Arc` instances loaded from a `.shy`
+file (with `_arc_type_override = 'inhibitor'` /
+`'curved_inhibitor_arc'`) yield the correct answer regardless of
+subclass instantiation.
 
 **Dual arc case** (signal place in both `F` and `F_s`):
 ```
@@ -194,17 +568,73 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
 2. **Signal flow arcs consume tokens.** Do not skip them in consumption
    loops; do not document them as "read-only" or "without mass transfer".
 
-3. **Test arcs are the only non-consuming arc type** (`arc_type='test'`).
-   All `behavior.fire()` methods must `continue` past test arcs.
+3. **Test AND inhibitor arcs are non-consuming.** Both `arc_type='test'`
+   and any `'inhibitor' in arc_type` (`inhibitor`,
+   `curved_inhibitor_arc`, future variants) skip the consumption phase
+   in every behavior (`fire()` / `_fire_transition_multiple()` /
+   `_apply_flow_to_arcs()`). The single source of truth is
+   `arc.consumes_tokens()` — call it; do not re-derive the rule
+   inline. Also: τ-leaping `_calculate_max_firings` must skip
+   non-consuming arcs (failing to skip a `curved_inhibitor_arc` whose
+   source starts at 0 silently caps `max_firings = 0` and freezes the
+   transition forever — bug audit 2026-05-08, bacillus_sporulation_v2).
 
 4. **PreemptionCheck is single-layer and non-recursive.** Lives in
    `TransitionBehavior._check_preemption()`; called from every
    `can_fire()` (immediate, stochastic, continuous, timed). Vacuously
    true for Layer-0 transitions (no signal predecessors).
 
-5. **Inhibitor arcs invert:** `tokens >= threshold → disabled`.
+5. **Inhibitor arcs invert enablement, do NOT consume.** Predicate:
+   `M(p) ≥ θ_eff(arc) → disabled`. SHyPN extension over classical PN:
+   `θ_eff` may be a runtime expression
+   (e.g. `"4800 + 0.5 * ADP_pool"`) rather than a static integer. Mass
+   transfer on firing is **always zero** (Murata 1989, ISO/IEC 15909,
+   GreatSPN, Snoopy convention). The `weight` attribute on an
+   inhibitor arc is irrelevant to firing semantics — only `threshold`
+   matters. Pinned by `tests/test_inhibitor_non_consumption.py` and
+   `tests/test_classical_arc_semantics.py`.
 
 6. **Reversible reactions** use Skellam sampler (Poisson(fwd) − Poisson(rev)).
+
+7. **Arc-type selection is not interchangeable (modeller rule, see
+   [`AGENT_RULES.md` §8](../doc/pn_formalism/AGENT_RULES.md)).**
+   Picking the wrong arc type is silent — model loads, runs, gives
+   wrong numbers. Decision table:
+
+   | Source-place role                         | Cascade-gated? | Arc type      |
+   |-------------------------------------------|----------------|---------------|
+   | Substrate (consumed)                      | no             | `normal`      |
+   | Catalyst / regulator presence (read only) | no             | `test`        |
+   | Inhibitor (presence disables)             | no             | `inhibitor`   |
+   | Regulatory signal in a hierarchy          | **yes**        | `signal_flow` |
+
+   The four canonical mistakes:
+
+   - **M1 — Catalyst as `normal`** → catalyst drains in seconds,
+     transition starves itself. (e.g. ROS oxidising Keap1 must be
+     `test`, never `normal`.)
+   - **M2 — Basal turnover/degradation as `signal_flow`** → opts the
+     sink into `PreemptionCheck`; engine silently disables it
+     whenever any upstream signal producer of the same place is
+     disabled, deadlocking the cycle. (e.g. `Nrf2_degradation` input
+     arc must be `normal`, not `signal_flow`.)
+   - **M3 — Substrate as `test`** → mass never leaves; downstream
+     products materialise from nowhere.
+   - **M4 — Inhibitor as `normal`/`test`** → consumes the inhibitor
+     or makes its presence required (opposite of intent).
+
+   Use `signal_flow` **only** when all three hold: (a) source is a ⬡
+   signal place (`is_signal_place=true`, non-spatial), (b) the
+   transition genuinely participates in a layered cascade and *should*
+   be gated by `PreemptionCheck`, (c) mass transfer of the signal
+   token is biologically meaningful. Otherwise pick `test` (sense
+   without consuming) or `normal` (consume without cascade gating).
+
+   The Phase-0 4-day audit (2026-04-29) traced an apparent "engine
+   regression" to model-side M1 + M2 misuse on Keap1↔Nrf2 cycle —
+   ROS-as-substrate (M1) drained ROS to 0; signal_flow on Nrf2
+   turnover (M2) deadlocked the cycle via PreemptionCheck. **Always
+   suspect arc-type selection before suspecting the engine.**
 
 ### Open gap
 
@@ -213,3 +643,155 @@ M'(p_s) = M(p_s) − W((p_s,t)) − W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
   beyond direct signal predecessors. Multi-layer enforcement requires
   the signal hierarchy layer-assignment infrastructure in the simulation
   context (not yet wired in).
+
+## Experiment plan vs object-net (STRICT, 2026-04-25)
+
+**READ FIRST every session that touches Φ / events / place-type flags:**
+[`doc/pn_formalism/AGENT_RULES.md`](../doc/pn_formalism/AGENT_RULES.md)
+— canonical four-carrier table (○ ⬡ ◇ ▢), Pattern A discipline,
+audit codes C1–C12, and the workflow checklist.
+
+Long-form derivation: [`doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md`](../doc/pn_formalism/EXPERIMENT_PLAN_VS_OBJECT_NET.md).
+Per Simão 2025 §"Connected vs. Remote Information Access".
+
+A `.shy` file bundles **two architecturally separate artifacts**:
+
+1. **Object-net** — biology. Reusable. Dynamics emerge **entirely** from
+   its own topology (places, transitions, arcs, intrinsic Φ over its
+   own places).
+2. **Experiment plan** — parameter places (`is_parameter_place=True`)
+   + events. Run-specific. Encodes the protocol.
+
+Parameter places (`Disease_Severity`, `Age`, `Temperature`, `pH`,
+dose knobs) belong to **neither** $G_E = (P, T, F)$ nor
+$G_s = (\Psi, F_s)$. They render as **rounded squares ▢** on the
+canvas (vs. circle ○ for biological, hexagon ⬡ for signal).
+
+### Forbidden patterns
+
+- Parameter-place name appearing in any **object-net** rate function
+  $\Phi$ (even though remote sensing is formally legal, biology rates
+  must not depend on experiment metadata — breaks reusability).
+- $F$, $F_s$, or $F_t$ arcs to/from parameter places.
+- Parameter places listed in any object-net transition's `signal_places`.
+- `is_environment_aware=True` flag and hard-coded `Q10` / `Temperature`
+  / `pH` / `Age` / `DSev` symbols inside object-net rate strings —
+  these are parameter-place backdoors.
+
+### The only legal bridge: events
+
+Events read parameter-place values and apply discrete interventions
+(set marking, add/remove tokens) to biological places at scheduled
+times. Example: `evt_install_disease` reads `DSev`, sets
+`Aβ_Monomer := DSev * 5.0` once at $t=0$.
+
+### Pattern A discipline — events MUST NOT do stateful algebra
+
+Events are discrete protocol interventions, not a back-channel for
+continuous dynamics. The only legal RHS in an event assignment
+`target := expr` is one whose variable references are a subset of
+`{target} ∪ {parameter places ▢}`. Examples:
+
+```
+✓  Aβ_Monomer        := Aβ_Monomer + Disease_Severity * 0.125
+✓  CBD_extracellular := CBD_extracellular + LOADING_DOSE
+✓  target            := f(▢, …▢)
+✗  Aβ_Monomer        := Aβ_Monomer * NFkB_p65 * 0.01    (RHS reads ○)
+✗  k_polym_eff       := k_polym_eff + dt * (Aβ - Aβ_eq) (Euler in disguise)
+```
+
+If a quantity changes during a run, it must change because
+**transitions fire** — not because an event computes the change.
+Audit code **C12** flags any event whose RHS references a non-target
+state place (○, ⬡, ◇).
+
+The "▢ + event → ◇ → Φ" bridge is legal **only** at $t=0$ or at a
+discrete protocol step (the heater switches on); for time-varying
+environmental quantities, promote to a regular ○ with its own
+producing/consuming transitions and put the algebra inside Φ.
+
+### One concept ↔ one carrier (no semantic mirroring)
+
+A conceptual quantity (`Age`, `Temperature`, `pH`, `Disease_Severity`,
+`k_polym_eff`, …) is represented by **exactly one** carrier. The four
+legal carriers are mutually exclusive per concept:
+
+1. **Pure parameter place ▢** — no arcs, never in any $\Phi$. Read by
+   events only.
+2. **Biological signal place ⬡** — in $\Psi$, has $F_s$ arcs,
+   participates in `PreemptionCheck` and the layered hierarchy
+   $\lambda$. May also be referenced in $\Phi$.
+3. **Spatial signal place ◇** — in $\Psi$ but flagged
+   `signal_type == SignalType.SPATIAL`. **No $F_s$ arcs.** Excluded
+   from `PreemptionCheck` and from POSet layering. Read remotely by
+   $\Phi$ from many transitions; written by events. The canonical home
+   for event-fed kinetic / environmental scalars
+   (`k_aggregation_eff`, `Temperature_factor`, `O2_level`, …).
+4. **Remote-sensed regular place ○** — referenced by name in $\Phi$;
+   has its own dynamics through $F$ arcs.
+
+Forbidden: two carriers for the same concept (e.g. ⬡ `Age` *and* ▢
+`Age_param`). Sweeping `X.initial_marking` of a topology-coupled
+place is **legal** — initial-condition perturbation of $M_0$, not a
+superposition violation. If you want to make a topology place
+sweepable, sweep `initial_marking` directly; do not add a parameter
+mirror.
+
+### Remote sensing requires topology membership (regular places only)
+
+A **regular ○** place's name may appear inside any $\Phi$ only if it
+has at least one $F$, $F_s$, or $F_t$ arc, or is the producer/consumer
+of the transition under that rate. A circle ○ with zero arcs that
+appears in a rate string is a backdoor — fix by adding the missing
+arc, or by reclassifying as ◇ (spatial signal) when the value is an
+event-fed scalar shared by many rates, or as ▢ when it is read by
+events only.
+
+Signal places (⬡ and ◇) are exempt from the arc requirement: $\Psi$
+membership itself declares "informational state, designed to be read
+by many transitions." Forcing a $F_t$ arc per reader to a single hub
+would create visual hairballs without adding semantics.
+
+Canonical bridge for protocol-driven kinetics — **▢ + event → ◇ → $\Phi$**:
+
+1. Keep protocol metadata as ▢ (e.g. `Temperature = 310.15 K`).
+2. Add a spatial signal place ◇ for the kinetic scalar
+   (e.g. `k_polym_eff`, `is_signal_place=true`,
+   `signal_type=SPATIAL`, no $F_s$ arcs).
+3. Reference the ◇ place — **not** the parameter — inside $\Phi$
+   (e.g. `rate = k_polym_eff * Aβ_Monomer**2`).
+4. Add an event that reads ▢ and writes ◇ at $t = 0$ (or on demand):
+   `evt_apply_thermodynamics: k_polym_eff := k_base * Q10**((Temperature-310)/10)`.
+
+The biology stays generic; only the event encodes the protocol. The
+audit code **C9 — disconnected remote sensing** flags only **regular
+○** places referenced in $\Phi$ with zero arcs; ⬡/◇ are exempt by
+design.
+
+### Diagnostic consequence
+
+If the object-net does not exhibit a desired behaviour (e.g. healthy
+fixed point at `NH=100` when initialised healthy with no events firing),
+the **topology is wrong** — add sinks, clearance arcs, rebalance
+reactions, or add the missing $F_s$ with the right $\theta$. **Never**
+patch via parameter-place multipliers or rate-function shortcuts.
+
+### Sweep ↔ model superposition rule
+
+When a sweep targets an experiment-plan object (parameter-place value
+or event field), the **sweep value is canonical for that dispatch**
+and the model's static value is **suppressed**.
+
+Required:
+- Engine logs `[override] X = sweep_value (was static_value in model)`.
+- Provenance records `parameter_sources: {X: "sweep" | "model_default"}`
+  per condition.
+- Validator emits notice on redundant override (sweep == static default).
+- Baseline cell named `ModelDefaults` to avoid confusion with swept
+  conditions.
+
+Exception: superposition allowed only when it demonstrably reduces
+simulation complexity (e.g. nested factorial sharing a fixed level)
+and is declared explicitly in sweep config:
+`"superposition_intent": "complexity_reduction"`. Without explicit
+declaration, superposition is treated as a configuration smell.

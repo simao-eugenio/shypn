@@ -242,11 +242,26 @@ class RecordingConfig:
         recording_time_interval: Model-time interval between recordings (default 0.05s = 20 Hz)
         recorded_objects: Optional set of place/transition IDs to record
                         If None or empty, records ALL objects
+        adaptive_tau_threshold: S5 (engine_stability_audit 2026-04-29).
+            When set, the data collector force-records any step whose previous
+            engine τ was below this threshold (transient regime).  Lets long
+            simulation horizons keep coarse decimation while still capturing
+            sub-second transients.  ``None`` disables (default).
+        timescale_check: TMD-1. Controls integration-step adequacy audit.
+            "off"   — no audit;
+            "warn"  — emit RuntimeWarning on critical mismatch (default);
+            "error" — raise TimescaleMismatchError on critical mismatch.
+        timescale_dt_safety_factor: TMD-1. A continuous transition is
+            flagged C20 when ``τ < safety_factor · dt``. Default 0.1 is
+            conservative and matches typical biochemistry practice.
     """
     recording_interval: int = 1
     time_based_recording: bool = True
     recording_time_interval: float = 0.05
     recorded_objects: Optional[set] = None
+    adaptive_tau_threshold: Optional[float] = None
+    timescale_check: str = "warn"
+    timescale_dt_safety_factor: float = 0.1
     
     @classmethod
     def default(cls) -> 'RecordingConfig':

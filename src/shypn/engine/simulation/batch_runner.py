@@ -298,8 +298,18 @@ class BatchSimulationRunner:
         # (the .so global constructors may interact with GTK's internal state).
         # Forcing the load here — on the main thread — makes every subsequent
         # call inside the batch worker thread a no-op (flags are already True).
-        replicate_controller._ensure_ode_accelerator()
-        replicate_controller._ensure_propensity_accelerator()
+        # Methods may be absent (e.g. after acceleration removal) — guard with
+        # hasattr() like the propensity-accelerator call site at line ~611.
+        if hasattr(replicate_controller, '_ensure_ode_accelerator'):
+            try:
+                replicate_controller._ensure_ode_accelerator()
+            except Exception:
+                pass
+        if hasattr(replicate_controller, '_ensure_propensity_accelerator'):
+            try:
+                replicate_controller._ensure_propensity_accelerator()
+            except Exception:
+                pass
 
         # Pre-create the TauLeapingEngine so that the first step in the
         # background thread does NOT allocate/initialise it.

@@ -152,6 +152,16 @@ class OdeSystemAccelerator:
         self._build_error: Optional[str] = None
         # Kinetic parameters from transition.kinetic_metadata.parameters
         self._model_kinetic_params: Dict[str, float] = {}
+        # Accelerability audit (Phase-1 formalism gate): reasons collected by
+        # _analyse_model.  Non-empty ⇒ build() returns False so caller falls
+        # back to the Python ContinuousBehavior path.
+        self._unsafe_reasons: List[str] = []
+        # PreemptionCheck specs: tid -> list of producer-predicate dicts.
+        # Populated by _analyse_model for any continuous/adaptive transition
+        # with at least one non-spatial signal_flow input.  Encoded in C by
+        # _generate_c as a multiplicative {0.0, 1.0} gate on the rate.
+        # See `_collect_preemption_specs` for structure.
+        self._preemption_specs: Dict[str, List[Dict[str, Any]]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -210,6 +220,22 @@ class OdeSystemAccelerator:
     @property
     def build_error(self) -> Optional[str]:
         return self._build_error
+
+    @property
+    def ode_transition_ids(self) -> List[str]:
+        """IDs of transitions integrated by the C ODE RHS.
+
+        For pure ``continuous`` transitions this is just their id.
+        For ``adaptive`` transitions, only those whose configured /
+        cached mode is ``continuous`` are included (i.e. they're being
+        treated as ODE flows for this build).  The complementary set —
+        adaptive transitions in stochastic mode — must be routed to the
+        τ-leap batch by the caller, and pure ``continuous`` transitions
+        must NEVER be in the τ-leap batch.
+
+        Returns an empty list before :meth:`build` succeeds.
+        """
+        return [spec.tid for spec in getattr(self, "_specs", [])]
 
     def update_thermo_params(self) -> None:
         """Refresh the params[] array from the model's thermodynamic settings.
@@ -394,6 +420,92 @@ class OdeSystemAccelerator:
             consume: List[Tuple[str, float]] = []
             produce: List[Tuple[str, float]] = []
 
+            # ── Accelerability audit (Phase-1 formalism gate) ────────
+            # The C-compiled RHS encodes only stoichiometry + the rate
+            # expression.  It does NOT honour structural disablement
+            # guards (inhibitor arcs, θ_eff floor on signal_flow,
+            # PreemptionCheck, transition guard, min_token_threshold,
+            # spatial boundary).  Any continuous transition that depends
+            # on such a guard would silently get *different* dynamics
+            # from the Python ContinuousBehavior path.  Refuse to build
+            # in that case so the caller falls back to Python.
+            for pid, w, at in arc_in.get(tid, []):
+                if "inhibitor" in at:
+                    self._unsafe_reasons.append(
+                        f"  • {t.id} ({getattr(t, 'name', '')}): "
+                        f"inhibitor arc from place {pid} — engine ignores "
+                        f"M(p) ≥ θ disablement"
+                    )
+                    break  # one reason per transition is enough for the log
+            else:
+                # signal_flow with non-zero θ_eff or temperature-dependent θ_eff
+                for pid, w, at in arc_in.get(tid, []):
+                    if at != "signal_flow":
+                        continue
+                    arc_obj = self._get_arc_by_endpoints(pid, tid)
+                    if arc_obj is None:
+                        continue
+                    theta = float(getattr(arc_obj, "theta_eff", 0.0) or 0.0)
+                    e_a   = float(getattr(arc_obj, "activation_energy", 0.0) or 0.0)
+                    if theta != 0.0 or e_a != 0.0:
+                        self._unsafe_reasons.append(
+                            f"  • {t.id} ({getattr(t, 'name', '')}): "
+                            f"signal_flow arc from {pid} has θ_eff={theta}, "
+                            f"E_a={e_a} — engine ignores basin floor"
+                        )
+                        break
+
+            # PreemptionCheck non-vacuous?  Any non-spatial signal_flow
+            # input.  We now ENCODE the check in C as a multiplicative
+            # {0.0, 1.0} gate on the rate (see _collect_preemption_specs
+            # and _generate_c).  Single-layer per the 13-tuple formalism
+            # — for each producer t' of each non-spatial signal place
+            # p_s ∈ •_s t, verify NormalEnabled ∧ TestEnabled ∧
+            # SignalEnabled.  No recursion; cascading consistency
+            # propagates naturally because each layer evaluates the same
+            # check on its own predecessors.
+            preempt_spec = self._collect_preemption_for_transition(
+                t.id, arc_in, places, model,
+            )
+            if preempt_spec:
+                self._preemption_specs[t.id] = preempt_spec
+
+            # Non-trivial transition guard?
+            guard = getattr(t, "guard", 1)
+            if not _is_trivial_guard(guard):
+                self._unsafe_reasons.append(
+                    f"  • {t.id} ({getattr(t, 'name', '')}): "
+                    f"non-trivial guard {guard!r} — engine never evaluates it"
+                )
+
+            # min_token_threshold > 0?
+            mtt = float(props.get("min_token_threshold", 0.0) or 0.0)
+            if mtt > 0.0:
+                self._unsafe_reasons.append(
+                    f"  • {t.id} ({getattr(t, 'name', '')}): "
+                    f"min_token_threshold={mtt} > 0 — engine ignores it"
+                )
+
+            # Non-trivial spatial boundary on any arc-touched place?
+            touched_pids = (
+                [p for p, _, _ in arc_in.get(tid, [])]
+                + [p for p, _, _ in arc_out.get(tid, [])]
+            )
+            for pid in touched_pids:
+                p = places.get(pid)
+                if p is None:
+                    continue
+                btype = getattr(p, "boundary_type", None)
+                btype_val = getattr(btype, "value", btype)
+                if btype_val not in (None, "", "permeable"):
+                    self._unsafe_reasons.append(
+                        f"  • {t.id} ({getattr(t, 'name', '')}): "
+                        f"place {pid} has boundary_type={btype_val!r} — "
+                        f"engine never invokes BoundaryValidator"
+                    )
+                    break
+            # ── End accelerability audit ────────────────────────────
+
             for pid, w, at in arc_in.get(tid, []):
                 # Skip inhibitor and test arcs — they don't move tokens
                 if "inhibitor" in at or at == "test":
@@ -419,6 +531,20 @@ class OdeSystemAccelerator:
                 is_sink=bool(getattr(t, "is_sink", False)),
             ))
 
+        # ── Phase-1 accelerability gate ───────────────────────────────
+        # Refuse to build if any continuous transition relies on a
+        # structural disablement guard the C path doesn't honour.
+        # Caller falls back to Python ContinuousBehavior automatically.
+        if self._unsafe_reasons:
+            n = len(self._unsafe_reasons)
+            raise RuntimeError(
+                f"ODE accelerator refuses to build: {n} formalism guard(s) "
+                f"cannot be encoded in C and would silently change dynamics:\n"
+                + "\n".join(self._unsafe_reasons)
+                + "\n  → Falling back to Python ContinuousBehavior path "
+                  "(slower but formalism-faithful)."
+            )
+
         # Assign state-vector indices (sorted for determinism)
         self._ode_place_ids = sorted(ode_place_ids_set)
         self._ode_place_index = {pid: i for i, pid in enumerate(self._ode_place_ids)}
@@ -439,6 +565,16 @@ class OdeSystemAccelerator:
                     pid = place_name_to_id.get(name)
                     if pid and pid not in self._ode_place_index:
                         extra_set.add(pid)
+
+        # PreemptionCheck predicates may reference places that are NOT
+        # in any rate expression (the input places of a producer
+        # transition).  Add them to extras so the C runtime can read
+        # their markings via extras[].
+        for plist in self._preemption_specs.values():
+            for prod in plist:
+                for (src_pid, _w, _theta, _kind) in prod['predicates']:
+                    if src_pid not in self._ode_place_index:
+                        extra_set.add(src_pid)
 
         self._extra_place_ids = sorted(extra_set)
         self._extra_place_index = {pid: i for i, pid in enumerate(self._extra_place_ids)}
@@ -592,6 +728,48 @@ class OdeSystemAccelerator:
                 lines.append(c_comment)
                 lines.append(f"    double {var} = {c_expr};")
                 lines.append(f"    if (!isfinite({var})) {var} = 0.0;")
+                # ── Single-layer PreemptionCheck gate (formalism §3.3) ──
+                # If this transition has any non-spatial signal_flow
+                # input, every producer of those signal places must
+                # satisfy NormalEnabled ∧ TestEnabled ∧ SignalEnabled at
+                # the current marking.  We encode the conjunction as a
+                # multiplicative {0.0, 1.0} gate on the rate.  Vacuous
+                # case (no producers / spatial-only) emits no gate code.
+                preempt_producers = self._preemption_specs.get(spec.tid, [])
+                if preempt_producers:
+                    gate = f"preempt_{i}"
+                    lines.append(f"    /* PreemptionCheck for {sanitized_name} */")
+                    lines.append(f"    double {gate} = 1.0;")
+                    for j, prod in enumerate(preempt_producers):
+                        prod_var = f"pp_{i}_{j}"
+                        prod_name_san = re.sub(
+                            r'[^A-Za-z0-9_]', '_', prod['producer_name'],
+                        )
+                        lines.append(
+                            f"    /* producer {prod['producer_tid']} ({prod_name_san}) */"
+                        )
+                        lines.append(f"    double {prod_var} = 1.0;")
+                        for (src_pid, weight, theta, kind) in prod['predicates']:
+                            mexpr = self._marking_c_expr(
+                                src_pid, ode_idx, extra_idx,
+                            )
+                            if kind == "test":
+                                # M(p) >= tau_t  (tau_t stored in `weight`)
+                                lines.append(
+                                    f"    if ({mexpr} < {weight!r}) "
+                                    f"{prod_var} = 0.0;"
+                                )
+                            else:
+                                # M(p) >= weight + theta_eff
+                                req = float(weight) + float(theta)
+                                lines.append(
+                                    f"    if ({mexpr} < {req!r}) "
+                                    f"{prod_var} = 0.0;"
+                                )
+                        lines.append(
+                            f"    if ({prod_var} == 0.0) {gate} = 0.0;"
+                        )
+                    lines.append(f"    {var} *= {gate};")
                 lines.append('')
 
             # Arc contribution lines
@@ -658,6 +836,185 @@ class OdeSystemAccelerator:
         self.update_thermo_params()
         self.update_extras()
 
+    # ------------------------------------------------------------------
+    # Internal: accelerability helpers (Phase-1 gate)
+    # ------------------------------------------------------------------
+
+    def _get_arc_by_endpoints(self, source_id: str, target_id: str) -> Any:
+        """Return the first model arc with matching (source_id, target_id)."""
+        for arc in getattr(self._model, "arcs", []) or []:
+            if (getattr(arc, "source_id", None) == source_id
+                    and getattr(arc, "target_id", None) == target_id):
+                return arc
+        return None
+
+    @staticmethod
+    def _marking_c_expr(
+        pid: str,
+        ode_idx: Dict[str, int],
+        extra_idx: Dict[str, int],
+    ) -> str:
+        """Return the C expression that reads marking M(p) by place id.
+
+        Used by PreemptionCheck codegen to read input markings of producer
+        transitions.  Falls back to ``0.0`` when the place is in neither
+        array (defensive — should not happen because
+        ``_analyse_model`` adds all predicate-referenced places to
+        ``extra_set``).
+        """
+        if pid in ode_idx:
+            return f"y[{ode_idx[pid]}]"
+        if pid in extra_idx:
+            return f"extras[{extra_idx[pid]}]"
+        return "0.0"
+
+    # ------------------------------------------------------------------
+    # Internal: PreemptionCheck collection (single-layer)
+    # ------------------------------------------------------------------
+
+    def _collect_preemption_for_transition(
+        self,
+        tid: str,
+        arc_in: Dict[str, List[Tuple[str, float, str]]],
+        places: Dict[str, Any],
+        model: Any,
+    ) -> List[Dict[str, Any]]:
+        """Collect single-layer PreemptionCheck producers for transition *tid*.
+
+        Mirrors :meth:`TransitionBehavior._check_preemption` /
+        :meth:`_check_three_predicates_for` but produces a static spec
+        consumable by C codegen.
+
+        Returns a list of producer specs::
+
+            [
+                {
+                    'producer_tid':  str,
+                    'producer_name': str,            # for C comment only
+                    'predicates': [
+                        (src_pid, weight, theta_eff, kind)
+                        # kind ∈ {'normal_or_signal', 'test'}
+                        # 'normal_or_signal' requires M(p) >= weight + theta_eff
+                        # 'test'             requires M(p) >= weight  (or threshold)
+                    ],
+                },
+                ...
+            ]
+
+        Empty list ⇒ no non-spatial signal_flow inputs (PreemptionCheck
+        is vacuous; no C code emitted).
+
+        Notes
+        -----
+        * Inhibitor inputs of the producer are skipped (per
+          ``_check_three_predicates_for``).
+        * theta_eff is taken from the static ``arc.theta_eff`` attribute.
+          The Phase-1 guard above already refuses to build when any
+          continuous transition has a signal_flow arc with E_a ≠ 0
+          (Arrhenius θ_eff(T)) — so the static value is safe.
+        * Producer transitions of any type (continuous, stochastic,
+          immediate, timed, adaptive) are valid; the predicate only
+          checks input arc satisfaction, never the producer's own
+          PreemptionCheck (single-layer rule).
+        """
+        # 1. Find non-spatial signal_flow input places p_s of T_i
+        signal_input_pids: List[str] = []
+        seen_sp: Set[str] = set()
+        for src_pid, _w, at in arc_in.get(tid, []):
+            if at != "signal_flow":
+                continue
+            p = places.get(src_pid)
+            if p is None:
+                continue
+            stype = getattr(p, "signal_type", None)
+            stype_val = getattr(stype, "value", stype)
+            # Spatial signal places are environmental scalars — excluded
+            # from PreemptionCheck per HPN doc §3.  None / unset is
+            # treated as "non-signal place" and skipped (these are not
+            # legal sources of signal_flow arcs anyway, but guard).
+            if stype_val in ("spatial", "SPATIAL"):
+                continue
+            if stype_val is None:
+                # Place lacks signal_type — could happen for a plain
+                # place wrongly connected via signal_flow.  The Python
+                # _check_preemption treats it as preemption-relevant
+                # (the spatial filter only excludes is_signal_place +
+                # SPATIAL).  Mirror that: include if not spatial.
+                if not getattr(p, "is_signal_place", False):
+                    continue
+            if src_pid in seen_sp:
+                continue
+            seen_sp.add(src_pid)
+            signal_input_pids.append(src_pid)
+
+        if not signal_input_pids:
+            return []
+
+        # 2. For each signal place, find every producer t' (signal_flow
+        #    arc from t' to p_s).  Build predicate list from t'
+        #    input arcs.
+        producer_specs: List[Dict[str, Any]] = []
+        seen_producer_tids: Set[str] = set()
+
+        # Pre-index arcs by target for producer discovery
+        arcs_by_target_place: Dict[str, List[Any]] = {}
+        # Collect arcs that produce into signal places.  Both straight
+        # signal_flow and curved_opposite_signal_flow are output arcs from
+        # transitions that carry signal tokens; either can be the producer
+        # arc in a PreemptionCheck chain.
+        _SIGNAL_FLOW_ARC_TYPES = ("signal_flow", "curved_opposite_signal_flow")
+        for arc in getattr(model, "arcs", []) or []:
+            if getattr(arc, "arc_type", "normal") not in _SIGNAL_FLOW_ARC_TYPES:
+                continue
+            tgt = getattr(arc, "target_id", None)
+            if tgt in seen_sp:
+                arcs_by_target_place.setdefault(tgt, []).append(arc)
+
+        for sp_id in signal_input_pids:
+            for cand_arc in arcs_by_target_place.get(sp_id, []):
+                producer_tid = getattr(cand_arc, "source_id", None)
+                if producer_tid is None:
+                    continue
+                if not _is_transition_id(producer_tid, model):
+                    continue
+                if producer_tid in seen_producer_tids:
+                    continue
+                seen_producer_tids.add(producer_tid)
+
+                producer = next(
+                    (t for t in model.transitions if t.id == producer_tid),
+                    None,
+                )
+                producer_name = (
+                    getattr(producer, "name", producer_tid)
+                    if producer is not None else producer_tid
+                )
+
+                # Collect predicates from producer's input arcs.
+                predicates: List[Tuple[str, float, float, str]] = []
+                for in_pid, in_w, in_at in arc_in.get(producer_tid, []):
+                    if "inhibitor" in in_at:
+                        continue  # inhibitor not in three-predicates
+                    arc_obj = self._get_arc_by_endpoints(in_pid, producer_tid)
+                    if in_at == "test":
+                        # tau_t = arc.threshold if not None else arc.weight
+                        thr = getattr(arc_obj, "threshold", None) if arc_obj is not None else None
+                        tau_t = float(thr) if thr is not None else float(in_w)
+                        predicates.append((in_pid, tau_t, 0.0, "test"))
+                    else:
+                        theta = 0.0
+                        if arc_obj is not None:
+                            theta = float(getattr(arc_obj, "theta_eff", 0.0) or 0.0)
+                        predicates.append((in_pid, float(in_w), theta, "normal_or_signal"))
+
+                producer_specs.append({
+                    'producer_tid':  producer_tid,
+                    'producer_name': str(producer_name),
+                    'predicates':    predicates,
+                })
+
+        return producer_specs
+
 
 # ===========================================================================
 # Helpers
@@ -693,3 +1050,19 @@ def _is_transition_id(node_id: str, model: Any) -> bool:
 
 def _short_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def _is_trivial_guard(guard: Any) -> bool:
+    """Return True if `guard` is one of the always-pass sentinel values.
+
+    Trivial guards: None, True, 1, 1.0, "", "1", "True", "true".
+    Anything else (string expression, callable, dict, …) is treated as
+    non-trivial and the C path cannot honour it.
+    """
+    if guard is None or guard is True:
+        return True
+    if isinstance(guard, (int, float)) and guard == 1:
+        return True
+    if isinstance(guard, str):
+        return guard.strip().lower() in ("", "1", "true")
+    return False

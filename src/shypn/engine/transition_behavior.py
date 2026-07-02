@@ -662,6 +662,29 @@ class TransitionBehavior(ABC):
         if not signal_input_arcs:
             return True, "preemption-vacuous"
 
+        # SPATIAL signal places are environmental scalars — they do NOT participate
+        # in the cascade preemption (per HPN doc §3, spatial vs biological signal
+        # split). Filter them out before the producer check.
+        try:
+            from shypn.netobjs.signal_type import SignalType
+            _SPATIAL = SignalType.SPATIAL
+        except ImportError:  # pragma: no cover — defensive
+            _SPATIAL = None
+
+        def _is_spatial(place: Any) -> bool:
+            return (
+                _SPATIAL is not None
+                and getattr(place, 'is_signal_place', False)
+                and getattr(place, 'signal_type', None) == _SPATIAL
+            )
+
+        signal_input_arcs = [
+            arc for arc in signal_input_arcs
+            if not _is_spatial(getattr(arc, 'source', None))
+        ]
+        if not signal_input_arcs:
+            return True, "preemption-vacuous-spatial-only"
+
         # Collect unique signal input places •_s t
         seen_sp_ids: set = set()
         for arc in signal_input_arcs:

@@ -206,20 +206,37 @@ class Arc(PetriNetObject):
     def consumes_tokens(self) -> bool:
         """Check if this arc consumes tokens during firing.
         
-        Normal arcs consume tokens (substrates, reactants).
-        Test arcs do not consume (catalysts, enzymes).
+        Per the 13-tuple Bio-PN formalism (Simão 2025) and classical PN
+        literature (Murata 1989, ISO/IEC 15909):
+          - Normal arcs                : consume (substrates / reactants)
+          - signal_flow arcs           : consume (per SHyPN extension; mass
+                                         transfer of the regulatory token)
+          - test arcs                  : do NOT consume (catalyst / presence)
+          - inhibitor arcs (all variants, incl. ``curved_inhibitor_arc``):
+            do NOT consume (presence-absence check; SHyPN extends only the
+            *threshold evaluation* — threshold may be a runtime expression —
+            never the consumption semantics)
         
-        This method should be overridden by subclasses that don't consume tokens.
+        InhibitorArc / CurvedInhibitorArc subclasses also override this method
+        to ``False`` for type-safety. This base implementation also recognises
+        the ``arc_type`` string so plain ``Arc`` instances loaded from a
+        ``.shy`` file with ``arc_type='inhibitor'`` or
+        ``arc_type='curved_inhibitor_arc'`` produce the correct answer
+        regardless of subclass.
         
         Returns:
-            bool: True for normal arcs (consuming), False for test arcs (non-consuming)
+            bool: True for consuming arcs (normal, signal_flow),
+                  False for non-consuming arcs (test, inhibitor variants).
         """
-        # Default behavior: normal arcs consume tokens
-        # TestArc overrides this to return False
-        # Check arc_type property as fallback for when arc is not a TestArc instance
         if hasattr(self, '_arc_type_override'):
-            return self._arc_type_override != 'test'
-        return self.arc_type != 'test'
+            override = self._arc_type_override
+            if override == 'test' or 'inhibitor' in str(override):
+                return False
+            return True
+        at = self.arc_type
+        if at == 'test' or 'inhibitor' in str(at):
+            return False
+        return True
     
     def get_bounding_box(self) -> dict:
         """Calculate bounding box for the arc.

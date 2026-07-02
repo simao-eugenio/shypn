@@ -575,6 +575,8 @@ class BatchExecutor:
         compressor_epsilon: float = 0.02,
         compressor_min_gap: float = 5.0,
         compressor_max_gap: float = 300.0,
+        output_tier: str = 'G3',
+        trajectory_thin_seconds: Optional[float] = None,
     ):
         """Run batch of experiments asynchronously.
         
@@ -594,7 +596,16 @@ class BatchExecutor:
         
         if replicates <= 0:
             raise ValueError(f"replicates must be >= 1, got {replicates}")
-        
+
+        # Output granularity tier (G0..G5) — consumed by the local auto-save
+        # path in experiment_automation_category._auto_save_experiment to gate
+        # which CSVs are written. Stored here so the GTK-thread snapshot block
+        # in _on_experiment_result can read it without plumbing through every
+        # callback.
+        self._output_tier = output_tier
+        # G4+ trajectory decimation step (seconds). None/0 = keep every sample.
+        self._trajectory_thin_seconds = trajectory_thin_seconds
+
         self.is_running = True
         self.is_cancelled = False
         

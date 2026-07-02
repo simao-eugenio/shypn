@@ -212,8 +212,15 @@ class Place(PetriNetObject):
         
         # Add glow effect for colored objects (CSS-like styling)
         if display_color != self.DEFAULT_BORDER_COLOR:
-            if self.is_signal_place:
-                # Hexagons only for signal places (no arcs)
+            if self.is_parameter_place:
+                # Rounded square for parameter places (experiment-plan, NOT object-net)
+                self._draw_rounded_square_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_signal_place and self._is_spatial_carrier():
+                # Diamond for SPATIAL signal places (environmental scalar,
+                # NOT in cascade preemption / POSet, may be remote-sensed via Φ)
+                self._draw_diamond_path(cr, self.x, self.y, self.radius + 2 / zoom)
+            elif self.is_signal_place:
+                # Hexagons only for biological signal places (Ψ, in cascade)
                 self._draw_hexagon_path(cr, self.x, self.y, self.radius + 2 / zoom)
             elif self.is_regulatory_place:
                 # Double circles for regulatory places (genes/resources)
@@ -226,9 +233,19 @@ class Place(PetriNetObject):
             cr.set_line_width((self.border_width + 2) / max(zoom, 1e-6))
             cr.stroke()
         
-        # Draw shape based on type
-        if self.is_signal_place:
-            # Draw hexagon ONLY for signal places (no arcs - Bio-PN Ψ)
+        # Draw shape based on type — parameter places take priority over signal places
+        # because they are NOT part of the object-net topology and must be visually
+        # distinct from any biological place (circle or hexagon).
+        if self.is_parameter_place:
+            # Rounded square for parameter places (experiment-plan metadata)
+            self._draw_rounded_square_path(cr, self.x, self.y, self.radius)
+        elif self.is_signal_place and self._is_spatial_carrier():
+            # Diamond for SPATIAL signal places: environmental/spatial scalar,
+            # outside the biological cascade (no PreemptionCheck, no POSet layer).
+            # Read remotely by Φ in many transitions, written by events.
+            self._draw_diamond_path(cr, self.x, self.y, self.radius)
+        elif self.is_signal_place:
+            # Draw hexagon for biological signal places (Ψ, in cascade)
             self._draw_hexagon_path(cr, self.x, self.y, self.radius)
         else:
             # Draw circle for all other places (including compartment places with arcs)
@@ -387,10 +404,90 @@ class Place(PetriNetObject):
         
         cr.close_path()
     
+    def _is_spatial_carrier(self) -> bool:
+        """True iff this place is a SPATIAL signal carrier.
+
+        Per HPN formalism doc §3 and the spatial-vs-biological signal split:
+        a signal place flagged as ``signal_type == SignalType.SPATIAL`` is an
+        **environmental scalar** — it carries protocol-derived (event-fed)
+        values that biology rates may remote-sense via Φ, but it does **not**
+        participate in the cascade preemption (PreemptionCheck) nor in the
+        POSet layer assignment. This distinguishes it from biological
+        signal places (NFkB_p65, Aβ_Oligomer, …) that *are* commitment
+        signals in the layered information graph G_s.
+
+        Returns:
+            bool: True if this is a signal place AND its signal_type is
+            SignalType.SPATIAL.
+        """
+        if not getattr(self, 'is_signal_place', False):
+            return False
+        try:
+            from shypn.netobjs.signal_type import SignalType
+            return getattr(self, 'signal_type', None) == SignalType.SPATIAL
+        except ImportError:
+            return False
+
+    def _draw_diamond_path(self, cr, x: float, y: float, radius: float):
+        """Draw a diamond (rotated square) path for SPATIAL signal places.
+
+        The diamond glyph marks signal places whose ``signal_type`` is
+        ``SignalType.SPATIAL`` — environmental / spatial scalars that
+        biology rates may read via Φ but that do not participate in the
+        biological cascade (no PreemptionCheck, no POSet layer). Visually
+        distinct from the hexagon ⬡ (biological signal place, in cascade)
+        and the rounded square ▢ (parameter place, outside both graphs).
+
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Distance from center to vertex (world space)
+        """
+        cr.move_to(x, y - radius)        # top
+        cr.line_to(x + radius, y)        # right
+        cr.line_to(x, y + radius)        # bottom
+        cr.line_to(x - radius, y)        # left
+        cr.close_path()
+
+    def _draw_rounded_square_path(self, cr, x: float, y: float, radius: float):
+        """Draw a rounded-square path for parameter places.
+        
+        Parameter places carry experiment-planning metadata (DSev, dose,
+        env knobs). They are NOT part of the object-net topology and must
+        not be confused with biological places (circles) or signal places
+        (hexagons). The rounded square is the visual marker that this node
+        sits outside both the execution graph G_E and the information
+        graph G_s.
+        
+        Args:
+            cr: Cairo context
+            x, y: Center position (world coords)
+            radius: Half-side of the bounding square (world space)
+        """
+        # Square inscribed in the radius bounding box, with corner radius
+        # ~25% of the side length so the rounding is clearly visible.
+        side = 2.0 * radius
+        half = radius
+        cr_corner = side * 0.25
+        
+        x0 = x - half
+        y0 = y - half
+        x1 = x + half
+        y1 = y + half
+        
+        # Trace clockwise from top-left arc end
+        cr.new_sub_path()
+        cr.arc(x0 + cr_corner, y0 + cr_corner, cr_corner, math.pi,         3 * math.pi / 2)
+        cr.arc(x1 - cr_corner, y0 + cr_corner, cr_corner, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(x1 - cr_corner, y1 - cr_corner, cr_corner, 0,               math.pi / 2)
+        cr.arc(x0 + cr_corner, y1 - cr_corner, cr_corner, math.pi / 2,     math.pi)
+        cr.close_path()
+    
     def contains_point(self, x: float, y: float) -> bool:
         """Check if a point is inside this place.
         
         For signal places (hexagons), uses approximate circular hit testing.
+        For parameter places (rounded squares), uses square bounding-box test.
         For regular places, uses exact circular hit testing.
         
         Args:
@@ -401,6 +498,15 @@ class Place(PetriNetObject):
         """
         dx = x - self.x
         dy = y - self.y
+        
+        # Parameter places: square bounding-box test (rounded square shape)
+        if self.is_parameter_place:
+            return abs(dx) <= self.radius and abs(dy) <= self.radius
+        
+        # Spatial signal places: diamond hit-test (|dx| + |dy| <= radius)
+        if self._is_spatial_carrier():
+            return abs(dx) + abs(dy) <= self.radius
+        
         distance = math.sqrt(dx * dx + dy * dy)
         
         # For hexagons, use inscribed circle for hit testing (conservative)
@@ -560,7 +666,32 @@ class Place(PetriNetObject):
     # ============================================================================
     # Serialization
     # ============================================================================
-    
+
+    def has_runtime_divergence(self) -> bool:
+        """True iff ``self.tokens`` has drifted from ``self.initial_marking``.
+
+        Used by GUI save flow to detect places whose runtime value would be
+        silently dropped on save unless promoted.
+        """
+        return float(self.tokens) != float(self.initial_marking)
+
+    def promote_runtime_tokens(self) -> None:
+        """Promote the live runtime ``tokens`` value to ``initial_marking``.
+
+        After this call the place's basal value (M_0) equals the value the
+        modeller saw at the moment of save. The next ``to_dict()`` will
+        persist that value cleanly with no warning.
+        """
+        self.initial_marking = float(self.tokens)
+
+    def discard_runtime_tokens(self) -> None:
+        """Discard runtime drift: snap ``tokens`` back to ``initial_marking``.
+
+        Use when the modeller explicitly wants to keep the design-time
+        baseline and throw away mid-session pokes.
+        """
+        self.tokens = float(self.initial_marking)
+
     def _serialize_signal_type(self) -> Optional[str]:
         """Serialize signal_type to string for persistence.
         
@@ -586,24 +717,43 @@ class Place(PetriNetObject):
     
     def to_dict(self) -> dict:
         """Serialize place to dictionary for persistence.
-        
+
+        POLICY (canonical, see copilot-instructions.md):
+            * `initial_marking` is the **only** persisted marking field. It is the
+              basal value of the object-net at design time — what the engine reads
+              into M_0 on load.
+            * `tokens` is **transient runtime state** and is **never** written to
+              the .shy file. To persist a runtime change, the modeller must first
+              promote it to `initial_marking` (GUI: confirmation dialog;
+              programmatic: ``Place.promote_runtime_tokens()`` or the
+              ``set_place_value`` helper).
+            * If ``self.tokens != self.initial_marking`` at save time, a WARNING
+              is logged and the runtime value is *dropped*. The save still
+              succeeds — the GUI catches divergence pre-save and prompts the
+              modeller; this log is the safety net for non-GUI callers.
+
         Returns:
             dict: Dictionary containing all place properties
         """
+        if float(self.tokens) != float(self.initial_marking):
+            import logging
+            logging.getLogger(__name__).warning(
+                "Place %s (%s): runtime tokens=%s diverges from initial_marking=%s; "
+                "tokens NOT persisted. Call promote_runtime_tokens() before save "
+                "to persist the runtime value.",
+                self.id, self.name, self.tokens, self.initial_marking,
+            )
         data = super().to_dict()  # Get base properties (id, name, label)
         data.update({
             "object_type": "place",  # Renamed from "type" to avoid confusion
             "x": self.x,
             "y": self.y,
             "radius": self.radius,
-            # CRITICAL DISTINCTION:
-            # - initial_marking: Static design-time baseline (used for simulation reset)
-            # - marking/tokens: Transient runtime state (may be mid-simulation)
-            # For file persistence, we save initial_marking as the canonical baseline
-            # and also save current tokens for recovery of in-progress states
-            "marking": self.initial_marking,  # Use initial_marking as canonical baseline
-            "tokens": self.tokens,  # Also save current transient state for recovery
-            "initial_marking": self.initial_marking,  # Explicit field for clarity
+            # initial_marking is the ONLY persisted marking field (see policy above).
+            # Legacy `marking` mirror retained for forward-compat with old loaders;
+            # `tokens` is intentionally absent.
+            "marking": self.initial_marking,
+            "initial_marking": self.initial_marking,
             "capacity": "Infinity" if self.capacity == float('inf') else self.capacity,  # Normalize infinity to string for JSON
             "border_color": list(self.border_color),
             "border_width": self.border_width,
@@ -688,16 +838,36 @@ class Place(PetriNetObject):
             label=str(data.get("label", ""))
         )
         
-        # Restore optional properties with CLEAR SEPARATION of static vs transient data
-        # Priority: initial_marking (design-time) > marking (legacy compatibility) > tokens (transient)
+        # Restore optional properties with CLEAR SEPARATION of static vs transient data.
+        #
+        # POLICY (canonical, see copilot-instructions.md):
+        #   * `initial_marking` is the loader's authoritative read scope. It is
+        #     the basal value of the object-net (M_0) at design time.
+        #   * `tokens` in a .shy file is a legacy / corruption indicator: modern
+        #     `Place.to_dict()` never writes it. If it appears AND diverges from
+        #     `initial_marking`, that is the signature of a programmatic patch
+        #     that wrote to the wrong scope (e.g. a script that set
+        #     `place["tokens"] = X` thinking it would change the start value).
+        #     We log a WARNING, IGNORE the tokens key, and reconcile in-memory
+        #     `place.tokens = place.initial_marking` so the runtime starts clean.
+        # Priority: initial_marking (design-time) > marking (legacy) > tokens (transient/corrupted)
         if "initial_marking" in data:
-            # Modern format: initial_marking is the authoritative baseline
             place.initial_marking = float(data["initial_marking"])
-            # Set tokens from saved transient state if available, else use initial_marking
-            place.tokens = float(data.get("tokens", place.initial_marking))
+            if "tokens" in data:
+                file_tokens = float(data["tokens"])
+                if file_tokens != place.initial_marking:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Place %s (%s): file has tokens=%s but initial_marking=%s; "
+                        "loader uses initial_marking. This is the signature of a "
+                        "programmatic patch that wrote to the wrong scope — re-save "
+                        "the model from the GUI (with Promote) or use "
+                        "shypn.netobjs.patch.set_place_value() to fix.",
+                        place_id, name, file_tokens, place.initial_marking,
+                    )
+            place.tokens = place.initial_marking
         elif "marking" in data:
             # Legacy format: marking was used for both (ambiguous)
-            # Assume marking is the baseline and use it for both
             place.initial_marking = float(data["marking"])
             place.tokens = float(data["marking"])
         else:

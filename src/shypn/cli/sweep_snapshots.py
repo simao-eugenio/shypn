@@ -36,6 +36,10 @@ class SnapshotsSweep(SweepConfig):
     - **inline**: ``snapshots`` list is embedded directly in the config.
     """
 
+    # Top-level JSON keys this mode recognises in addition to the
+    # universal set declared in sweep_config._UNIVERSAL_TOP_LEVEL_KEYS.
+    KNOWN_KEYS: frozenset = frozenset({'snapshots', 'snapshots_file'})
+
     def __init__(
         self,
         sim_params: SimulationParams,
@@ -75,7 +79,17 @@ class SnapshotsSweep(SweepConfig):
         self,
         baseline: ExperimentSnapshot,
     ) -> List[ExperimentSnapshot]:
-        return self._load_snapshots()
+        snaps = self._load_snapshots()
+        # Layer B: merge sweep-wide fixed overrides into each snapshot
+        # *before* per-snapshot property_overrides (the snapshot's own
+        # values win on collision \u2014 they are what the user explicitly
+        # designed for that condition).
+        if self.fixed_overrides:
+            for snap in snaps:
+                merged = dict(self.fixed_overrides)
+                merged.update(getattr(snap, 'property_overrides', {}) or {})
+                snap.property_overrides = merged
+        return snaps
 
     def describe(self) -> str:
         source = self.snapshots_path.name if self.snapshots_path else 'inline config'

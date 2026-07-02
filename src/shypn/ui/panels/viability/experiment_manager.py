@@ -541,7 +541,11 @@ class ExperimentManager:
         seed_base: int = 42,
         tau_epsilon: float = 0.03,
         max_tau: float = 0.1,
+        time_step: float = None,
         events: list = None,
+        output_tier: str = 'G3',
+        fixed_overrides: dict = None,
+        trajectory_thin_seconds: float = None,
     ):
         """Export a CLI-ready sweep configuration JSON.
 
@@ -565,6 +569,12 @@ class ExperimentManager:
             seed_base: Base random seed.
             tau_epsilon: Tau-leaping epsilon.
             max_tau: Maximum tau leap size.
+            time_step: Manual integrator dt (seconds). ``None`` ⇒ engine
+                auto-derives dt = duration / STEPS_TARGET, capped at
+                ``SimulationSettings.DEFAULT_DT_AUTO_CAP`` (1.0 s). Set
+                explicitly when the operator wants finer/coarser control
+                than the safety default — e.g. 5.0 s for slow signalling
+                models, 0.01 s for fast enzyme kinetics.
         """
         sim_block = {
             'replicates': replicates,
@@ -574,6 +584,12 @@ class ExperimentManager:
             'tau_epsilon': tau_epsilon,
             'max_tau': max_tau,
         }
+        if time_step is not None:
+            # Only emit the key when the user opted in to a manual dt.
+            # Absence ⇒ engine auto-dt with cap; presence ⇒ explicit
+            # override threaded all the way down to SimulationParams /
+            # SimulationSettings.
+            sim_block['time_step'] = float(time_step)
 
         config = self._infer_sweep_config(sim_block)
         if model_path:
@@ -584,6 +600,32 @@ class ExperimentManager:
             # sweep worker installs them on model.events before each run
             # so the engine's _evaluate_environment_events picks them up.
             config['events'] = list(events)
+        if fixed_overrides:
+            # Sweep-wide constants — applied to every condition before the
+            # swept axis layers on (see SweepConfig.fixed_overrides /
+            # generate_snapshots in the engine).  Coerce values to float
+            # here so a stray string from a Gtk.Entry surfaces as a
+            # dispatch-side error rather than a silent runtime no-op.
+            try:
+                config['fixed_overrides'] = {
+                    str(k): float(v) for k, v in fixed_overrides.items()
+                }
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"fixed_overrides values must be numeric: {exc}"
+                ) from exc
+        # Output granularity: only emit when non-default to keep configs tidy.
+        # Read by SweepConfig.from_dict → OutputOptions; gates worker writes.
+        # When G4+ is selected, also propagate trajectory_thin_seconds so
+        # the worker decimates per-replicate CSVs at the requested step.
+        if (output_tier and output_tier != 'G3') or trajectory_thin_seconds:
+            out_block: dict = {}
+            if output_tier and output_tier != 'G3':
+                out_block['tier'] = output_tier
+            if trajectory_thin_seconds is not None and float(trajectory_thin_seconds) > 0:
+                out_block['trajectory_thin_seconds'] = float(trajectory_thin_seconds)
+            if out_block:
+                config['output'] = out_block
 
         config['exported_from'] = 'viability_panel'
         config['exported_date'] = datetime.now().isoformat()

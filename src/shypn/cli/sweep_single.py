@@ -34,6 +34,10 @@ from shypn.ui.panels.viability.automation.property_path_parser import parse_prop
 class SingleParameterSweep(SweepConfig):
     """Sweep a single parameter across a list of values."""
 
+    # Top-level JSON keys this mode recognises in addition to the
+    # universal set declared in sweep_config._UNIVERSAL_TOP_LEVEL_KEYS.
+    KNOWN_KEYS: frozenset = frozenset({'parameter'})
+
     def __init__(
         self,
         sim_params: SimulationParams,
@@ -58,6 +62,12 @@ class SingleParameterSweep(SweepConfig):
             snap.arc_weights = baseline.arc_weights.copy()
             snap.transition_rates = baseline.transition_rates.copy()
             snap.property_overrides = getattr(baseline, 'property_overrides', {}).copy()
+            # Layer B: sweep-wide fixed overrides apply to every snapshot
+            # *before* the swept axis. Per-snapshot baseline overrides are
+            # kept too — the swept axis is the highest-precedence layer
+            # and is written last.
+            for fp, fv in self.fixed_overrides.items():
+                snap.property_overrides[fp] = fv
             snap.property_overrides[f"{obj_id}.{prop_name}"] = value
             snap.swept_parameter = {
                 'type': self.parameter.param_type,

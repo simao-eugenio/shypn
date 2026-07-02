@@ -58,6 +58,16 @@ from shypn.netobjs.curved_inhibitor_arc import CurvedInhibitorArc
 from shypn.utils.threshold_evaluator import ThresholdEvaluator
 from shypn.engine.simulation.abstract_controller import AbstractSimulationController
 
+
+class TimescaleMismatchError(RuntimeError):
+    """TMD-1: raised when ``RecordingConfig.timescale_check == "error"``
+    and the init-time audit found at least one transition with
+    ``τ < safety_factor · dt``.
+
+    See ``checkers/timescale_auditor.py`` for codes C20/C21/C22.
+    """
+
+
 class TransitionState:
     """Per-transition state tracking for time-aware behaviors.
     
@@ -285,9 +295,123 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             model.register_observer(self._on_model_changed)
         # Build place→transition index for incremental enablement checking
         self._rebuild_place_index()
+
+        # Load-time structural audit (AGENT_RULES.md §8 — arc-type misuse).
+        # Non-blocking: emits WARNING-level log entries only.
+        try:
+            from shypn.engine.simulation.checkers import audit_arc_types
+            audit_arc_types(self.model)
+        except Exception:  # pragma: no cover - audit must never break load
+            logging.getLogger(__name__).debug(
+                "arc_type audit skipped due to exception", exc_info=True
+            )
+
+        # TMD-1 init-time integration-step adequacy audit.
+        # Non-blocking unless RecordingConfig.timescale_check == "error".
+        # Last assessment is cached on ``self.last_timescale_profile`` for
+        # the UI / sweep aggregator to surface.
+        self.last_timescale_profile: Optional[Any] = None
+        self._timescale_check_mode: str = getattr(
+            recording_config, "timescale_check", "warn"
+        )
+        self._timescale_safety_factor: float = float(
+            getattr(recording_config, "timescale_dt_safety_factor", 0.1)
+        )
+        try:
+            self._run_timescale_audit()
+        except Exception:  # pragma: no cover - audit must never break load
+            logging.getLogger(__name__).debug(
+                "timescale audit skipped due to exception", exc_info=True
+            )
     
     # ==================== Lifecycle Management ====================
     
+    def _run_timescale_audit(self) -> None:
+        """TMD-1 init-time integration-step adequacy audit.
+
+        Evaluates each continuous/adaptive transition's local timescale
+        ``τ = M / (W · r(M₀))`` against the configured ``dt`` and emits
+        warnings (or raises, depending on ``recording_config.timescale_check``)
+        for transitions whose τ < ``safety_factor · dt``.
+
+        The full TimescaleProfile is cached on
+        ``self.last_timescale_profile`` for downstream consumers
+        (UI panel, sweep summary, replicate engine_stats).
+
+        Skipped silently when ``timescale_check == "off"``.
+
+        See:
+            * ``checkers/timescale_auditor.py`` for codes C20/C21/C22.
+            * ``workspace/projects/canabidiol/docs/engine_time_and_stiffness.md``
+              for the full TMD design and rationale.
+        """
+        if self._timescale_check_mode == "off":
+            return
+
+        # Resolve effective dt — settings.get_effective_dt() if available,
+        # else fall back to the conservative default.
+        try:
+            dt = float(self.settings.get_effective_dt())
+        except Exception:  # noqa: BLE001
+            dt = 1.0
+        if dt <= 0:
+            return
+
+        from shypn.engine.simulation.checkers import audit_timescales
+        profile = audit_timescales(
+            self.model, dt=dt, safety_factor=self._timescale_safety_factor
+        )
+        self.last_timescale_profile = profile
+
+        # Emit a one-shot EventBus notification so the GUI status bar /
+        # notification panel can surface a "⚠ TMD: N findings" badge
+        # without having to poll the controller. Only emit when we have
+        # a real document_id (GUI canvas path); skip for sweep / headless
+        # controllers — they run on background threads and their findings
+        # are surfaced via provenance.json + summary.csv instead.
+        if self.document_id:
+            try:
+                EventBus.emit(
+                    'simulation.timescale_audit',
+                    {
+                        'profile': profile.to_dict(),
+                        'n_findings': len(profile.findings),
+                        'critical_transitions': list(profile.critical_transitions),
+                        'mode': self._timescale_check_mode,
+                    },
+                    document_id=self.document_id,
+                )
+            except Exception:  # pragma: no cover - never break load
+                logging.getLogger(__name__).debug(
+                    "EventBus emit for timescale_audit failed", exc_info=True
+                )
+
+        critical = profile.critical_transitions
+        if not critical:
+            return
+
+        if self._timescale_check_mode == "error":
+            tids = ", ".join(critical[:5]) + ("…" if len(critical) > 5 else "")
+            raise TimescaleMismatchError(
+                f"Timescale mismatch: {len(critical)} transition(s) "
+                f"violate τ < {self._timescale_safety_factor} · dt "
+                f"({tids}). Recommended dt ≤ {profile.recommended_dt:.3g}s. "
+                f"See log for per-transition decision recipes."
+            )
+
+        # mode == "warn" (default): emit one summary RuntimeWarning so it
+        # surfaces in `python -W error`/CI without spamming per-transition.
+        # Per-transition messages are already logged by the auditor.
+        import warnings
+        warnings.warn(
+            f"[TMD] Timescale mismatch: {len(critical)} transition(s) "
+            f"violate τ < {self._timescale_safety_factor} · dt={dt:.3g}s. "
+            f"Recommended dt ≤ {profile.recommended_dt:.3g}s. See log for "
+            f"per-transition recipes.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
     def reset(self) -> None:
         """Reset controller to initial state for new model load.
         
@@ -1314,6 +1438,37 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
             trigger_expr = getattr(event, 'trigger', '')
             if not trigger_expr:
                 continue
+
+            # Footgun guard: warn once if the trigger is a constant numeric/string
+            # literal (e.g. "0.0", "1", "'true'") rather than a boolean expression.
+            # Such a trigger is constant-False (e.g. 0.0) or constant-True every
+            # step — almost always a user mistake. Edge-triggered semantics mean
+            # constant-False never fires; constant-True fires once at t=0 and
+            # never again. Suggest a real predicate like ``t < 1e-9`` for a
+            # one-shot at t=0, or ``t >= some_time`` for a delayed one-shot.
+            if not hasattr(self, '_event_trigger_warned'):
+                self._event_trigger_warned: set = set()
+            if event.id not in self._event_trigger_warned:
+                try:
+                    import ast as _ast
+                    parsed = _ast.parse(trigger_expr.strip(), mode='eval')
+                    body = parsed.body
+                    is_constant_literal = (
+                        isinstance(body, _ast.Constant)
+                        and not isinstance(body.value, bool)
+                    )
+                    if is_constant_literal:
+                        lg.warning(
+                            f"[ENV_EVENT] event {event.id!r}: trigger {trigger_expr!r} "
+                            f"is a bare constant ({body.value!r}), not a boolean expression. "
+                            f"This evaluates to {bool(body.value)} every step and will "
+                            f"{'fire once at t=0 then never again' if bool(body.value) else 'NEVER fire'}. "
+                            f"Use 't < 1e-9' for a one-shot at t=0, or 't >= <time>' for a delayed one-shot."
+                        )
+                except (SyntaxError, ValueError):
+                    pass
+                self._event_trigger_warned.add(event.id)
+
             try:
                 fired = bool(eval(trigger_expr, {"__builtins__": {}}, ns))  # noqa: S307
             except Exception as exc:
@@ -1345,6 +1500,21 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         place_by_name = {p.name: p for p in self.model.places}
         place_by_id = {str(p.id): p for p in self.model.places}
 
+        # Safe math namespace for event RHS expressions. Without this, the
+        # ``__builtins__: {}`` sandbox strips ``max``, ``min``, ``abs``,
+        # ``round`` — which are routinely used in Pattern A bridge formulas
+        # (e.g. ``max(0, 7.0 - PH)`` for ``pH_acidosis``). Numeric helpers
+        # from ``math`` are also exposed for kinetic Q10/Arrhenius formulas.
+        import math as _math
+        safe_builtins = {
+            'max': max, 'min': min, 'abs': abs, 'round': round,
+            'pow': pow, 'int': int, 'float': float, 'bool': bool,
+        }
+        for _name in ('exp', 'log', 'log10', 'sqrt', 'sin', 'cos',
+                      'tan', 'pi', 'e', 'floor', 'ceil'):
+            if hasattr(_math, _name):
+                safe_builtins[_name] = getattr(_math, _name)
+
         for target, expr in assignments.items():
             # Resolve target place
             place = place_by_name.get(target) or place_by_id.get(str(target))
@@ -1352,13 +1522,15 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                 lg.debug(f"[ENV_EVENT] assignment target {target!r} not found in model")
                 continue
             try:
-                new_val = float(eval(str(expr), {"__builtins__": {}}, ns))  # noqa: S307
+                new_val = float(eval(str(expr), {"__builtins__": safe_builtins}, ns))  # noqa: S307
                 place.tokens = new_val
                 # Update namespace so later assignments in same event see the change
                 ns[place.name] = new_val
                 ns[str(place.id)] = new_val
             except Exception as exc:
-                lg.debug(f"[ENV_EVENT] assignment eval failed for {target!r}={expr!r}: {exc}")
+                lg.warning(
+                    f"[ENV_EVENT] assignment eval failed for {target!r}={expr!r}: {exc}"
+                )
 
     def _exhaust_immediate_transitions(self) -> int:
         """Execute all enabled immediate transitions in zero time.
@@ -1463,8 +1635,11 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                         # Consume tokens from input places
                         if not is_source:
                             for arc in behavior.get_input_arcs():
-                                arc_type = getattr(arc, 'arc_type', 'normal')
-                                if arc_type == 'test':
+                                # Per 13-tuple Bio-PN formalism + classical PN literature:
+                                # test and inhibitor (incl. curved_inhibitor_arc) arcs
+                                # are non-consuming. Use Arc.consumes_tokens() as the
+                                # single source of truth.
+                                if not arc.consumes_tokens():
                                     continue
                                 source_place = self.model_adapter.places.get(arc.source_id)
                                 if source_place is not None:
@@ -1688,8 +1863,12 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                     input_arcs = behavior.get_input_arcs()
                     structurally_enabled = True
                     for arc in input_arcs:
-                        arc_type = getattr(arc, 'arc_type', 'normal')
-                        if arc_type == 'test':
+                        # Skip non-consuming arcs (test / inhibitor variants);
+                        # their enablement contribution is computed elsewhere
+                        # (TransitionBehavior.is_enabled). A token check here
+                        # would mis-classify inhibitor arcs (whose semantics
+                        # are inverted: M(p) >= θ ⇒ DISABLED).
+                        if not arc.consumes_tokens():
                             continue
                         source_place = arc.source
                         if source_place and source_place.tokens < arc.weight:
@@ -1733,31 +1912,91 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
                     self._tau_leaping_engine.execute_step(self)
                     tau_leaping_advanced_time = True
                 else:
-                    # ── F3 fix: operator splitting for hybrid models ──
-                    # Instead of clamping tau = dt (which suppresses
-                    # stochastic dynamics), let tau-leaping choose its
-                    # own adaptive tau up to the remaining dt window.
-                    # The ODE phase already advanced the continuous
-                    # state; now we let the stochastic engine advance
-                    # within the same [t, t+dt] window.
-                    original_max_tau = self._tau_leaping_engine.leap_selector.max_tau
-                    original_min_tau = self._tau_leaping_engine.leap_selector.min_tau
-                    # Cap max_tau at the ODE step size (don't overshoot)
-                    # but let min_tau stay at its configured value so
-                    # the algorithm can take sub-steps if needed.
-                    self._tau_leaping_engine.leap_selector.max_tau = time_step
-                    
-                    # Prevent tau-leaping from advancing the controller
-                    # clock — the finalize phase handles that.
-                    self._tau_leaping_engine._advance_time = False
-                    self._tau_leaping_engine.execute_step(self)
+                    # ── Hybrid operator splitting (F5 fix, 2026-05-04) ──
+                    # Old behaviour fired exactly ONE τ-leap per master dt
+                    # window, regardless of how small the chosen τ was. With
+                    # user max_tau ≪ dt (e.g. 0.1 s vs 5 s) this silently
+                    # discarded ~98 % of the stochastic time inside each
+                    # window — the documented F5 trap.
+                    #
+                    # Correct semantics (Haseltine–Rawlings / Salis–
+                    # Kaznessis hybrid): the ODE phase has already advanced
+                    # the continuous state by `time_step`. Now repeatedly
+                    # fire τ-leaps inside the same [t, t+dt] window until
+                    # the window is exhausted, no stochastic transition is
+                    # enabled, or the engine refuses to make further
+                    # progress.
+                    #
+                    # Correctness invariants:
+                    #   • The user-configured max_tau (Cao leap-validity
+                    #     bound) is preserved — never widened to dt.
+                    #   • Each inner leap is additionally capped at the
+                    #     remaining window so the loop never overshoots.
+                    #   • τ-leap advances controller.time inside the loop
+                    #     (_advance_time=True), so the finalize phase must
+                    #     NOT re-add `time_step` (signal that via
+                    #     tau_leaping_advanced_time=True).
+                    #   • Defensive guards prevent infinite loops when the
+                    #     engine returns False or selects τ ≈ 0.
+                    user_max_tau = self._tau_leaping_engine.leap_selector.max_tau
+                    t_target = self.time + time_step
+                    # 1 ns relative tolerance keeps the loop from spinning on
+                    # floating-point residue at the window boundary.
+                    eps_done = max(1e-12, 1e-9 * abs(time_step))
                     self._tau_leaping_engine._advance_time = True
-                    
-                    # Restore original tau bounds
-                    self._tau_leaping_engine.leap_selector.max_tau = original_max_tau
-                    self._tau_leaping_engine.leap_selector.min_tau = original_min_tau
-                    tau_leaping_advanced_time = False
-                
+                    n_inner_leaps = 0
+                    max_inner_leaps = max(
+                        16,
+                        int(time_step / max(user_max_tau, 1e-12)) + 8,
+                    )
+                    try:
+                        while self.time + eps_done < t_target:
+                            remaining = t_target - self.time
+                            # Cap each leap at min(user_max_tau, remaining
+                            # window). The latter prevents overshoot; the
+                            # former preserves the Cao validity bound.
+                            self._tau_leaping_engine.leap_selector.max_tau = min(
+                                user_max_tau, remaining
+                            )
+                            t_before = self.time
+                            cont = self._tau_leaping_engine.execute_step(self)
+                            n_inner_leaps += 1
+                            # Engine signalled "no stochastic transitions"
+                            # — nothing more to fire in this window.
+                            if cont is False:
+                                break
+                            # Progress guard: if τ-leap fell back to exact
+                            # SSA with no firing or otherwise stalled, give
+                            # up rather than spin.
+                            if self.time - t_before < eps_done:
+                                break
+                            # Hard cap on inner iterations as a final
+                            # safety net (should never trigger under
+                            # well-behaved propensities).
+                            if n_inner_leaps >= max_inner_leaps:
+                                if self.verbose:
+                                    self.logger.warning(
+                                        "Hybrid τ-leap inner loop hit "
+                                        "max_inner_leaps=%d at t=%.6g "
+                                        "(window dt=%.6g, user max_tau=%.6g); "
+                                        "advancing to t_target. Consider "
+                                        "raising max_tau or lowering dt.",
+                                        max_inner_leaps, self.time,
+                                        time_step, user_max_tau,
+                                    )
+                                break
+                    finally:
+                        # Always restore user max_tau, even on exception.
+                        self._tau_leaping_engine.leap_selector.max_tau = user_max_tau
+
+                    # Snap to the exact target if any residue remains. This
+                    # keeps the master clock aligned with the recording grid
+                    # and ensures the finalize phase sees a fully-consumed
+                    # window.
+                    if self.time < t_target:
+                        self.time = t_target
+                    tau_leaping_advanced_time = True
+
                 discrete_fired = True
         
         return discrete_fired, tau_leaping_advanced_time
@@ -2345,7 +2584,20 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         places_map: Dict[str, Any] = {p.id: p for p in self.model.places}
 
         # Collect every place that any member of this group touches.
+        # Bug-fix 2026-05-04: this set was previously initialised empty and
+        # never populated, so the snapshot/restore/commit phases below were
+        # all no-ops — group transitions silently fired sequentially on
+        # live state, breaking the documented parallel-reaction semantics.
         touched_ids: Set[Any] = set()
+        for _t, _beh, _in_arcs, _out_arcs in group:
+            for _arc in _in_arcs:
+                _pid = getattr(_arc, 'source_id', None)
+                if _pid is not None and _pid in places_map:
+                    touched_ids.add(_pid)
+            for _arc in _out_arcs:
+                _pid = getattr(_arc, 'target_id', None)
+                if _pid is not None and _pid in places_map:
+                    touched_ids.add(_pid)
 
         # Phase 1: snapshot
         snapshot: Dict[str, float] = {pid: places_map[pid].tokens for pid in touched_ids}
@@ -2401,6 +2653,23 @@ class SimulationController(AbstractSimulationController):  # type: ignore[misc]
         Returns:
             bool: True if started successfully, False if already running
         """
+        # TMD-1: re-run the timescale audit at simulation-start. The
+        # __init__ pass may have fired against a still-empty model
+        # (canvas constructed before the .shy load completed), leaving
+        # ``last_timescale_profile`` with ``n_transitions_assessed=0``.
+        # By the time run() is invoked the model is fully populated and
+        # the configured dt is final, so the audit produces actionable
+        # numbers and the EventBus notification reaches the activity log
+        # right when the user presses Run.
+        try:
+            self._run_timescale_audit()
+        except TimescaleMismatchError:
+            raise  # 'error' mode — propagate to caller
+        except Exception:  # pragma: no cover - audit must never break run
+            logging.getLogger(__name__).debug(
+                "pre-run timescale audit skipped due to exception", exc_info=True
+            )
+
         return bool(self._continuous_executor.run(time_step, max_steps))
 
     def _simulation_loop(self) -> bool:

@@ -56,6 +56,16 @@ def build_parser() -> argparse.ArgumentParser:
         help='Number of parallel worker processes (default: auto).',
     )
     p.add_argument(
+        '--use-gpu',
+        choices=['auto', 'force', 'off'],
+        default='auto',
+        help=(
+            "GPU policy: 'auto' (default) uses GPU when sole pool worker "
+            "or when per-worker batch >= 16 reps; 'force' always uses GPU "
+            "(error if unavailable); 'off' disables GPU."
+        ),
+    )
+    p.add_argument(
         '--dry-run',
         action='store_true',
         help='Print sweep plan without running simulations.',
@@ -137,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         workers=args.workers,
         verbose=args.verbose or args.dry_run,
         config_path=sweep_path,
+        use_gpu=args.use_gpu,
     )
 
     if args.dry_run:

@@ -77,8 +77,24 @@ class ExperimentAutomationCategory:
         # Per-run isolation: one folder created at batch start, shared by all experiments in the run
         self._current_run_folder = None  # Path | None
 
-        # Remote sweep dispatcher (lazy init)
+        # Remote sweep dispatcher (lazy init). Owns SSH/ControlMaster +
+        # the results proxy used by the lazy-fetch results browser. Set
+        # by the remote controller's ``.underlying`` after dispatch
+        # starts; kept separate from ``_controller`` so result-browsing
+        # code can keep using the SSH dispatcher even after the
+        # controller's lifecycle has completed.
         self._remote_dispatcher = None
+
+        # Active dispatch controller (local or remote). None when idle.
+        # Single source of truth for in-flight sweep state — the legacy
+        # ``_remote_dispatcher`` attribute is kept as a read-only alias
+        # below for callers that haven't migrated yet.
+        self._controller = None  # type: Optional[SweepDispatchController]
+
+        # Single source of truth for whether a sweep dispatch is in flight
+        # (local or remote). Drives Cancel button sensitivity so row-level
+        # status updates can't accidentally disable Cancel mid-sweep.
+        self._dispatch_active = False
 
         # Track pending UI updates to prevent queue overflow
         self._pending_updates = {}  # Dict: queue_index -> latest (status, progress) to process
@@ -136,7 +152,36 @@ class ExperimentAutomationCategory:
         self.sweep_builder.viability_panel = self.parent_panel  # Set reference for auto-prediction
         self.sweep_builder.parent_category = self  # Set reference for refresh callback
         self.sweep_builder.set_generate_callback(self._on_sweep_generate)
-        self.sweep_builder.set_clear_callback(lambda: self.queue_view.clear_queue())
+        # Full sweep-plan clear: empty the queue AND wipe the activity log so
+        # no leftover from a previous or cancelled sweep can mislead the next
+        # run. The sweep_builder's own _on_clear_clicked has already reset its
+        # parameter lists, design mode, and solver settings before this fires.
+        # If a remote dispatcher is still alive (running OR stuck in a stale
+        # is_running state), cancel it first so the next dispatch isn't
+        # blocked by the "previous dispatch still marked as running" dialog.
+        def _on_sweep_plan_cleared():
+            ctrl = getattr(self, '_controller', None)
+            if ctrl is not None and ctrl.is_active:
+                try:
+                    ctrl.cancel()
+                except Exception:
+                    pass
+            self._controller = None
+            disp = getattr(self, '_remote_dispatcher', None)
+            if disp is not None:
+                try:
+                    if getattr(disp, 'is_running', False):
+                        disp.cancel()
+                except Exception:
+                    pass
+                self._remote_dispatcher = None
+            self._dispatch_active = False
+            self.queue_view.clear_queue()
+            try:
+                self.queue_view.clear_status()
+            except Exception:
+                pass
+        self.sweep_builder.set_clear_callback(_on_sweep_plan_cleared)
         
         # Connect type change to parameter refresh AND clear queue
         self.sweep_builder.type_combo.connect("changed", self._on_object_type_changed)
@@ -189,22 +234,43 @@ class ExperimentAutomationCategory:
         self.results_browser = ResultsBrowserView(model=model)
         self.results_browser.set_export_callback(self._on_export_results)
         self.results_browser.set_report_callback(self._on_add_to_report)
+        self.results_browser.on_reload_callback = self._scan_local_run_dirs
         self.content_box.pack_start(self.results_browser, True, True, 0)
     
     def _on_object_type_changed(self, combo):
         """Handle object type change - clear queue and refresh parameters.
-        
-        When switching between places, transitions, arcs, the old experiments
-        are no longer valid, so clear the queue.
+
+        Only clears when the type *actually* changes. Programmatic combo
+        refreshes (e.g. after refresh_parameters()) used to fire 'changed'
+        with the same active item, silently wiping the user's queue.
+
+        Also refuses to clear while a dispatch is in flight — the user
+        cannot have switched type meaningfully under a running sweep, so
+        treat it as a spurious re-fire and skip the destructive action.
         """
+        try:
+            new_type = combo.get_active_text()
+        except Exception:
+            new_type = None
+
+        # Spurious / programmatic re-fire on the same type → no-op.
+        if new_type is not None and getattr(self, '_last_object_type', None) == new_type:
+            return
+        # Don't wipe queue mid-dispatch.
+        if getattr(self, '_dispatch_active', False):
+            self._last_object_type = new_type
+            return
+
+        self._last_object_type = new_type
+
         # Clear experiment queue
         if hasattr(self, 'queue_view'):
             self.queue_view.clear_queue()
-        
+
         # Clear results browser
         if hasattr(self, 'results_browser'):
             self.results_browser.clear_results()
-        
+
         # Refresh parameters for new object type
         self.refresh_parameters()
     
@@ -334,6 +400,18 @@ class ExperimentAutomationCategory:
             if hasattr(self.sweep_builder, 'name_combo'):
                 self.sweep_builder.name_combo.append("none", "(Load subnet via right-click transition)")
                 self.sweep_builder.name_combo.set_active(0)
+
+        # Re-populate the fixed-overrides section (▢ parameter places)
+        # whenever the model topology changes — same trigger as the main
+        # parameter list refresh.
+        if hasattr(self.sweep_builder, 'refresh_fixed_overrides'):
+            try:
+                self.sweep_builder.refresh_fixed_overrides()
+            except Exception as exc:
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "refresh_fixed_overrides failed: %s", exc
+                )
     
     def _on_sweep_generate(self, config):
         """Handle parameter sweep generation (single or factorial).
@@ -530,7 +608,7 @@ class ExperimentAutomationCategory:
         # Get replicates and duration from sweep builder
         replicates = 3
         duration = 60.0
-        termination_condition = "deadlock"  # Default
+        termination_condition = "time_only"  # Default — see parameter_sweep_builder.py rationale
         
         if hasattr(self.sweep_builder, 'replicates_entry'):
             try:
@@ -556,7 +634,7 @@ class ExperimentAutomationCategory:
         
         if hasattr(self.sweep_builder, 'termination_combo'):
             try:
-                termination_condition = self.sweep_builder.termination_combo.get_active_id() or "deadlock"
+                termination_condition = self.sweep_builder.termination_combo.get_active_id() or "time_only"
             except Exception as e:
                 print(f"[WARNING] Failed to read termination condition: {e}, using default")
                 pass
@@ -646,7 +724,25 @@ class ExperimentAutomationCategory:
         use_parallel = False
         if hasattr(self.queue_view, 'parallel_checkbox'):
             use_parallel = self.queue_view.parallel_checkbox.get_active()
-        
+
+        output_tier = 'G3'
+        if hasattr(self.sweep_builder, 'output_tier_combo'):
+            try:
+                output_tier = self.sweep_builder.output_tier_combo.get_active_id() or 'G3'
+            except Exception as e:
+                print(f"[WARNING] Failed to read output_tier: {e}, using default G3")
+
+        trajectory_thin_seconds = None
+        if hasattr(self.sweep_builder, 'trajectory_thin_entry'):
+            try:
+                text = self.sweep_builder.trajectory_thin_entry.get_text().strip()
+                if text:
+                    val = float(text)
+                    if val > 0:
+                        trajectory_thin_seconds = val
+            except Exception as e:
+                print(f"[WARNING] Failed to read trajectory_thin_seconds: {e}, using None")
+
         # Zombie-detection threshold is computed by the batch executor itself
         # from the simulation duration. No computation estimate is needed here.
         
@@ -694,6 +790,8 @@ class ExperimentAutomationCategory:
                 compressor_epsilon=compressor_epsilon,
                 compressor_min_gap=compressor_min_gap,
                 compressor_max_gap=compressor_max_gap,
+                output_tier=output_tier,
+                trajectory_thin_seconds=trajectory_thin_seconds,
             )
         except Exception as e:
             print(f"[ERROR] Failed to start batch: {e}")
@@ -716,18 +814,61 @@ class ExperimentAutomationCategory:
     def _on_queue_run_remote(self, pending_experiments):
         """Handle Run Remote button — dispatch sweep to remote server via SSH.
 
-        Shows a confirmation dialog with SSH settings, then:
-          1. Exports sweep config JSON (from ExperimentManager snapshots)
-          2. SCPs model + config to remote
-          3. SSH runs CLI sweep
-          4. SCPs results back to local project folder
-          5. Loads results into ResultsBrowserView
+        Thin orchestration: validates prerequisites, shows the SSH
+        confirmation dialog, builds a typed ``DispatchRequest``, then
+        hands off to ``RemoteSweepDispatchController``. All progress /
+        completion handling now lives in the controller + observer
+        methods (``on_status``, ``on_row_started``, ``on_row_completed``,
+        ``on_dispatch_complete``) on this class.
         """
-        from .remote_sweep_dispatcher import RemoteSweepSettings, RemoteSweepDispatcher
+        from .remote_sweep_dispatcher import RemoteSweepSettings
+        from .dispatch import (
+            RemoteSweepDispatchController,
+            DispatchRequest,
+            DispatchAlreadyActive,
+            DispatchValidationError,
+        )
 
         if self._remote_dispatcher and self._remote_dispatcher.is_running:
-            self._show_error("A remote sweep is already running.")
-            return
+            # Thread is alive — but it can be stuck (e.g. SSH fallback
+            # blocked on a password prompt that never surfaced after
+            # `ControlMaster exited early`). Offer a forced reset so
+            # the operator isn't permanently locked out without having
+            # to restart the GUI.
+            dialog = Gtk.MessageDialog(
+                transient_for=self.sweep_builder.get_toplevel(),
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.NONE,
+                text="A previous remote dispatch is still marked as running.",
+            )
+            dialog.format_secondary_text(
+                "If the server fans are silent and no progress is being\n"
+                "reported, the SSH thread is likely stuck (e.g. waiting\n"
+                "on a password prompt after a ControlMaster fallback).\n\n"
+                "Choose:\n"
+                "  • Cancel & Reset — kill the stuck dispatcher and start fresh\n"
+                "  • Wait — keep the existing dispatch (do nothing)"
+            )
+            dialog.add_button("Wait", Gtk.ResponseType.CANCEL)
+            reset_btn = dialog.add_button("Cancel & Reset", Gtk.ResponseType.OK)
+            reset_btn.get_style_context().add_class("destructive-action")
+            response = dialog.run()
+            dialog.destroy()
+            if response != Gtk.ResponseType.OK:
+                return
+            # Forced reset: ask the dispatcher to cancel (which sends a
+            # remote pkill and tears down the local SSH stream), abandon
+            # the thread reference, and reset the UI buttons.
+            try:
+                self._remote_dispatcher.cancel()
+            except Exception:
+                pass
+            self._remote_dispatcher = None
+            self._controller = None
+            self._dispatch_active = False
+            if self.queue_view:
+                self.queue_view.set_running(False)
 
         # ── Validate prerequisites ───────────────────────────────────
         project_folder = self._get_project_folder()
@@ -771,112 +912,160 @@ class ExperimentAutomationCategory:
 
         settings.save()
 
-        # ── Dispatch ─────────────────────────────────────────────────
-        self._remote_dispatcher = RemoteSweepDispatcher(settings)
+        # ── Collect events + fixed overrides + run collision detector ──
+        # Layer C: catches silent-superposition cases (sweep target ==
+        # event assignment target) before bytes leave the box.
+        try:
+            fixed_overrides = self.sweep_builder.get_fixed_overrides() \
+                if self.sweep_builder else {}
+        except ValueError as exc:
+            self._show_error(f"Invalid fixed-override value:\n\n{exc}")
+            return
 
-        # UI feedback
+        events = self._collect_model_events()
+        if self.sweep_builder is not None:
+            issues = self.sweep_builder.detect_sweep_event_collisions(
+                snapshots=self.experiment_manager.snapshots,
+                events=events,
+                fixed_overrides=fixed_overrides,
+            )
+        else:
+            issues = []
+        errors = [i for i in issues if i.get('severity') == 'error']
+        warnings = [i for i in issues if i.get('severity') == 'warning']
+        if errors or warnings:
+            allow = self._confirm_sweep_event_collisions(errors, warnings)
+            if not allow:
+                return
+
+        # ── Build typed request + hand off to controller ─────────────
+        from .dispatch import SimulationParams as _SP
+        request = DispatchRequest(
+            experiments=list(pending_experiments),
+            sim_params=_SP(**sim_params),
+            model_filepath=model_filepath,
+            project_folder=project_folder,
+            events=events or [],
+            fixed_overrides=fixed_overrides or {},
+            ssh_password=ssh_password or None,
+        )
+
+        controller = RemoteSweepDispatchController(
+            observer=self,
+            settings=settings,
+            experiment_manager=self.experiment_manager,
+        )
+        # Keep ``_remote_dispatcher`` pointing at the underlying SSH
+        # dispatcher so existing results-browser / proxy code still
+        # works unchanged.
+        self._remote_dispatcher = controller.underlying
+        self._controller = controller
+
+        # UI feedback. Use set_running() so all four buttons (Run, Run
+        # Remote, Pause, Cancel) move together; this keeps Cancel
+        # enabled regardless of subsequent row-status updates.
+        self._dispatch_active = True
         if self.queue_view:
-            self.queue_view.run_button.set_sensitive(False)
-            self.queue_view.run_remote_button.set_sensitive(False)
-            self.queue_view.cancel_button.set_sensitive(True)
+            self.queue_view.set_running(True)
             self.queue_view.status_label.set_markup(
                 "<span foreground='blue'><b>Remote sweep dispatching...</b></span>"
             )
-
-        # Mark all queue rows as "running" before dispatch
-        n_total = len(pending_experiments)
-        if self.queue_view:
-            for i in range(n_total):
+            # Mark all queue rows as 'pending' before dispatch — the
+            # controller will flip them to 'running' as the CLI emits
+            # per-condition progress lines.
+            for i in range(len(pending_experiments)):
                 self.queue_view.update_experiment_status(i, 'pending', '—')
 
-        import re as _re
+        try:
+            controller.start(request)
+        except DispatchAlreadyActive as exc:
+            self._show_error(f"Cannot start dispatch:\n\n{exc}")
+        except DispatchValidationError as exc:
+            # Controller already emitted on_dispatch_complete → idle UI restored.
+            self._show_error(f"Invalid dispatch request:\n\n{exc}")
+        except Exception as exc:
+            # Controller already emitted on_dispatch_complete → idle UI restored.
+            self._show_error(f"Remote dispatch failed to start:\n\n{exc}")
 
-        def on_progress(msg):
-            """Parse CLI progress lines and update individual queue rows.
+    # ── DispatchObserver implementation ──────────────────────────────
+    # All methods are called on the GTK main thread by the active
+    # controller. They are the *only* place the queue view gets updated
+    # in response to dispatch events — keeping this surface tight
+    # prevents the local/remote drift that bit us before.
 
-            Expected patterns from --verbose:
-              [1/4] Condition.name=50 (10 replicates)...
-                done in 7.2s (10 ok, 0 errors)
-              Sweep complete in 28.3s
-            """
-            # Match "[idx/total] condition_name ..."  → mark row as running
-            m_start = _re.match(r'^\[(\d+)/(\d+)\]\s+(.+?)\s+\(', msg)
-            if m_start:
-                cond_idx = int(m_start.group(1)) - 1  # 0-based
-                def _ui_start(idx=cond_idx):
-                    if self.queue_view and 0 <= idx < n_total:
-                        self.queue_view.update_experiment_status(
-                            idx, 'running', 'running…')
-                    return False
-                GLib.idle_add(_ui_start)
-
-            # Match "  done in Xs (N ok, M errors)" → mark previous row done
-            m_done = _re.match(
-                r'^\s*done in ([\d.]+)s\s+\((\d+)\s+ok,\s+(\d+)\s+error', msg)
-            if m_done:
-                wall = m_done.group(1)
-                ok = int(m_done.group(2))
-                errors = int(m_done.group(3))
-                # The "done" line follows the "[idx/total]" line, so find
-                # the last row that is 'running'
-                def _ui_done():
-                    if not self.queue_view:
-                        return False
-                    for i in range(n_total):
-                        try:
-                            it = self.queue_view.queue_store.get_iter(i)
-                            st = self.queue_view.queue_store.get_value(it, 1)
-                            if st == 'running':
-                                status = 'completed' if errors == 0 else 'failed'
-                                prog = f"{ok} ok, {errors} err — {wall}s"
-                                self.queue_view.update_experiment_status(
-                                    i, status, prog)
-                                break
-                        except Exception:
-                            break
-                    return False
-                GLib.idle_add(_ui_done)
-
-            # Always update the status label with the raw line
-            GLib.idle_add(
-                lambda m=msg: (
-                    self.queue_view.status_label.set_markup(
-                        f"<span foreground='blue'><b>Remote:</b> {GLib.markup_escape_text(str(m))}</span>"
-                    ) if self.queue_view else None
-                ) or False
+    def on_status(self, message: str, level: str = 'info') -> None:
+        """Activity-log line from the active controller."""
+        if not self.queue_view:
+            return
+        colour = {
+            'success': 'green',
+            'warning': '#ce5c00',
+            'error': 'red',
+        }.get(level, 'blue')
+        try:
+            self.queue_view.status_label.set_markup(
+                f"<span foreground='{colour}'><b>Sweep:</b> "
+                f"{GLib.markup_escape_text(str(message))}</span>"
             )
+        except Exception:
+            pass
 
-        def on_complete(success, local_results_dir, message):
-            def _ui():
-                if self.queue_view:
-                    self.queue_view.run_button.set_sensitive(True)
-                    self.queue_view.run_remote_button.set_sensitive(True)
-                    self.queue_view.cancel_button.set_sensitive(False)
-                if success:
-                    if self.queue_view:
-                        self.queue_view.status_label.set_markup(
-                            f"<span foreground='green'><b>✓</b> {GLib.markup_escape_text(str(message))}</span>"
-                        )
-                    # Load results into browser
-                    self._load_remote_results(local_results_dir)
-                else:
-                    if self.queue_view:
-                        self.queue_view.status_label.set_markup(
-                            f"<span foreground='red'><b>✗</b> {GLib.markup_escape_text(str(message))}</span>"
-                        )
-                return False
-            GLib.idle_add(_ui)
+    def on_row_started(self, row_index: int) -> None:
+        if self.queue_view:
+            try:
+                self.queue_view.update_experiment_status(
+                    row_index, 'running', 'running…')
+            except Exception:
+                pass
 
-        self._remote_dispatcher.dispatch(
-            model_filepath=model_filepath,
-            project_folder=project_folder,
-            experiment_manager=self.experiment_manager,
-            sim_params=sim_params,
-            progress_cb=on_progress,
-            complete_cb=on_complete,
-            ssh_password=ssh_password or None,
-            events=self._collect_model_events(),
-        )
+    def on_row_completed(
+        self, row_index: int, ok_replicates: int,
+        error_replicates: int, wall_seconds: float,
+    ) -> None:
+        if not self.queue_view:
+            return
+        status = 'completed' if error_replicates == 0 else 'failed'
+        prog = f"{ok_replicates} ok, {error_replicates} err — {wall_seconds:.1f}s"
+        try:
+            self.queue_view.update_experiment_status(row_index, status, prog)
+        except Exception:
+            pass
+
+    def on_dispatch_complete(
+        self, success: bool, results_dir, message: str,
+    ) -> None:
+        # Drop dispatch state so the next sweep can launch.
+        self._dispatch_active = False
+        self._controller = None
+        if self.queue_view:
+            self.queue_view.set_running(False)
+            # Reconcile any rows the progress parser missed (last row
+            # without a 'done in Xs' line, or local cancellation).
+            try:
+                store = self.queue_view.queue_store
+                terminal = 'completed' if success else 'failed'
+                for i in range(len(store)):
+                    it = store.get_iter(i)
+                    st = store.get_value(it, 1)
+                    if st in ('running', 'pending'):
+                        store.set_value(it, 1, terminal)
+                        if not store.get_value(it, 2):
+                            store.set_value(
+                                it, 2, 'done' if success else 'no result')
+                self.queue_view._update_status_label()
+            except Exception:
+                pass
+            try:
+                colour = 'green' if success else 'red'
+                glyph = '✓' if success else '✗'
+                self.queue_view.status_label.set_markup(
+                    f"<span foreground='{colour}'><b>{glyph}</b> "
+                    f"{GLib.markup_escape_text(str(message))}</span>"
+                )
+            except Exception:
+                pass
+        if success and results_dir:
+            self._load_remote_results(results_dir)
 
     def _collect_model_events(self) -> list:
         """Serialise the current model's environment events for dispatch.
@@ -909,54 +1098,14 @@ class ExperimentAutomationCategory:
         return payload
 
     def _collect_sim_params(self) -> dict:
-        """Read simulation parameters from sweep builder widgets."""
-        params = {
-            'replicates': 200,
-            'duration': 2000.0,
-            'termination': 'deadlock',
-            'seed_base': 42,
-            'tau_epsilon': 0.03,
-            'max_tau': 0.1,
-        }
-        if hasattr(self.sweep_builder, 'replicates_entry'):
-            try:
-                v = int(self.sweep_builder.replicates_entry.get_text().strip())
-                if v > 0:
-                    params['replicates'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'duration_entry'):
-            try:
-                v = float(self.sweep_builder.duration_entry.get_text().strip())
-                if v > 0:
-                    params['duration'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'termination_combo'):
-            try:
-                params['termination'] = self.sweep_builder.termination_combo.get_active_id() or 'deadlock'
-            except (AttributeError,):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_seed_entry'):
-            try:
-                params['seed_base'] = int(self.sweep_builder.sweep_seed_entry.get_text().strip())
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_tau_epsilon_entry'):
-            try:
-                v = float(self.sweep_builder.sweep_tau_epsilon_entry.get_text().strip())
-                if 0 < v <= 1:
-                    params['tau_epsilon'] = v
-            except (ValueError, AttributeError):
-                pass
-        if hasattr(self.sweep_builder, 'sweep_max_tau_entry'):
-            try:
-                v = float(self.sweep_builder.sweep_max_tau_entry.get_text().strip())
-                if 0 < v <= 100:
-                    params['max_tau'] = v
-            except (ValueError, AttributeError):
-                pass
-        return params
+        """Read simulation parameters from sweep builder widgets.
+
+        Thin wrapper around :class:`WidgetParamCollector` — kept for
+        backward compatibility with callers that still expect a
+        plain dict (e.g. the remote-dispatch confirmation dialog).
+        """
+        from .dispatch import WidgetParamCollector
+        return WidgetParamCollector.collect(self.sweep_builder).to_dict()
 
     def _show_remote_sweep_dialog(self, settings, sim_params, n_experiments):
         """Show a GTK dialog to confirm/edit remote sweep settings.
@@ -1037,6 +1186,21 @@ class ExperimentAutomationCategory:
         grid.attach(workers_spin, 1, row, 1, 1)
 
         row += 1
+        grid.attach(Gtk.Label(label="GPU:", xalign=0), 0, row, 1, 1)
+        gpu_combo = Gtk.ComboBoxText()
+        gpu_options = [('auto', 'auto — use GPU when batch ≥ 16 reps'),
+                       ('force', 'force — always use GPU'),
+                       ('off', 'off — CPU only')]
+        active_idx = 0
+        for i, (val, label) in enumerate(gpu_options):
+            gpu_combo.append(val, label)
+            if val == settings.use_gpu:
+                active_idx = i
+        gpu_combo.set_active(active_idx)
+        gpu_combo.set_tooltip_text("GPU replicate parallelism policy (passed as --use-gpu to remote CLI)")
+        grid.attach(gpu_combo, 1, row, 1, 1)
+
+        row += 1
         grid.attach(Gtk.Label(label="Password:", xalign=0), 0, row, 1, 1)
         password_entry = Gtk.Entry()
         password_entry.set_visibility(False)  # mask input
@@ -1071,6 +1235,7 @@ class ExperimentAutomationCategory:
             settings.remote_repo = repo_entry.get_text().strip()
             settings.remote_venv = venv_entry.get_text().strip()
             settings.workers = int(workers_spin.get_value())
+            settings.use_gpu = gpu_combo.get_active_id() or 'auto'
             ssh_password = password_entry.get_text()  # never persisted
 
         dialog.destroy()
@@ -1102,6 +1267,20 @@ class ExperimentAutomationCategory:
         proxy = (self._remote_dispatcher.results_proxy
                  if self._remote_dispatcher else None)
 
+        # Optional primary-observable reduction (config.json + model_snapshot.shy
+        # land alongside summary.csv in the run dir).
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            compute_observables, load_place_name_to_id, load_run_config,
+            load_project_observables_fallback,
+        )
+        run_cfg = load_run_config(results_path)
+        obs_cfg = (run_cfg or {}).get('primary_observables') or {}
+        if not obs_cfg:
+            obs_cfg = load_project_observables_fallback(results_path)
+        name_to_id = load_place_name_to_id(results_path) if obs_cfg else {}
+        if obs_cfg:
+            self._configure_observable_columns(obs_cfg)
+
         # Parse summary.csv and load each condition as a result entry
         import csv
         condition_names: list[str] = []
@@ -1116,6 +1295,13 @@ class ExperimentAutomationCategory:
 
                     condition_names.append(condition)
 
+                    cond_dir = (
+                        results_path /
+                        f'condition_{condition.replace("=", "_eq_")}'
+                    )
+                    obs = (compute_observables(cond_dir, obs_cfg, name_to_id)
+                           if obs_cfg else {})
+
                     # Create a minimal result dict for the browser
                     result = {
                         'name': condition,
@@ -1123,9 +1309,9 @@ class ExperimentAutomationCategory:
                         'errors': errors,
                         'wall_seconds': wall,
                         'source': 'remote',
-                        'results_dir': str(
-                            results_path / f'condition_{condition.replace("=", "_eq_")}'),
+                        'results_dir': str(cond_dir),
                         'remote_only': proxy is not None,
+                        'primary_observables': obs,
                     }
                     self.results_browser.add_result(condition, result)
 
@@ -1137,6 +1323,152 @@ class ExperimentAutomationCategory:
 
         except Exception as e:
             logger.warning("Failed to load remote results: %s", e)
+
+    # ── Local run-dir scanning ───────────────────────────────────────
+
+    def _configure_observable_columns(self, obs_cfg: dict) -> None:
+        """Push observable column titles to the Results Browser.
+
+        Idempotent — repeated calls just refresh the headers, so it is
+        safe to call once per loaded run dir.
+        """
+        if not self.results_browser:
+            return
+        ep_cfg = obs_cfg.get('endpoint_place')
+        ep_label = obs_cfg.get('endpoint_label') if ep_cfg else None
+        if ep_cfg and not ep_label:
+            ep_label = f'{ep_cfg} (final)'
+        fc_cfg = obs_cfg.get('first_crossing') or {}
+        fc_label = fc_cfg.get('label')
+        if fc_cfg and not fc_label:
+            unit = fc_cfg.get('time_unit', 's')
+            fc_label = f"t1 {fc_cfg.get('place', '?')} ({unit})"
+        try:
+            self.results_browser.set_observable_headers(ep_label, fc_label)
+        except AttributeError:
+            # Older browser without observable columns
+            pass
+
+    def _scan_local_run_dirs(self, latest_only: bool = False) -> None:
+        """Walk ``<project>/experiments/results/`` and load sweep runs into the browser.
+
+        The Results Browser is otherwise event-driven (live sweeps +
+        pending-dispatch recovery), so historical runs and manually
+        rsynced run dirs would never appear.  This method bridges that
+        gap by treating each ``run_*/summary.csv`` like a remote
+        summary and pushing condition rows through the same
+        ``_load_remote_results`` path.
+
+        Condition names are prefixed with the run-dir name so multiple
+        runs can coexist in the browser without name collisions.
+
+        Args:
+            latest_only: If True, load only the most recently modified
+                run directory (typical startup behaviour). If False,
+                load every run dir found (manual Reload).
+        """
+        if not self.results_browser:
+            return
+        try:
+            from shypn.data.project_models import get_project_manager
+            project = get_project_manager().current_project
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Local run-dir scan skipped (no project): %s", exc)
+            return
+        if project is None or not getattr(project, 'base_path', None):
+            return
+
+        results_root = Path(project.base_path) / 'experiments' / 'results'
+        if not results_root.is_dir():
+            return
+
+        run_dirs = [
+            d for d in results_root.iterdir()
+            if d.is_dir() and d.name.startswith('run_')
+            and (d / 'summary.csv').is_file()
+        ]
+        if not run_dirs:
+            logger.debug("No on-disk sweep runs under %s", results_root)
+            return
+
+        run_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+        if latest_only:
+            run_dirs = run_dirs[:1]
+
+        loaded = 0
+        for run_dir in run_dirs:
+            try:
+                self._load_local_run_dir(run_dir)
+                loaded += 1
+            except Exception as exc:
+                logger.warning("Failed to load run dir %s: %s", run_dir, exc)
+        logger.info(
+            "Local run-dir scan: loaded %d/%d run(s) from %s",
+            loaded, len(run_dirs), results_root,
+        )
+
+    def _load_local_run_dir(self, run_dir: Path) -> None:
+        """Load one ``run_*`` directory's conditions into the browser.
+
+        Reads ``summary.csv`` and registers each condition as a local
+        result whose ``results_dir`` points at the per-condition folder
+        on disk.  Condition keys are prefixed with the run-dir name so
+        multiple runs coexist without overwriting each other.
+
+        Args:
+            run_dir: Absolute path to a ``run_<timestamp>/`` directory
+                containing at minimum ``summary.csv``.
+        """
+        import csv
+
+        from shypn.ui.panels.viability.automation.primary_observables import (
+            compute_observables, load_place_name_to_id, load_run_config,
+            load_project_observables_fallback,
+        )
+
+        summary_csv = run_dir / 'summary.csv'
+        run_label = run_dir.name  # e.g. "run_20260510_002345"
+
+        run_cfg = load_run_config(run_dir)
+        obs_cfg = (run_cfg or {}).get('primary_observables') or {}
+        if not obs_cfg:
+            # Older runs were dispatched before the block existed; let
+            # the user retroactively see observables by reading from the
+            # project's live sweep_config*.json.
+            obs_cfg = load_project_observables_fallback(run_dir)
+        name_to_id = load_place_name_to_id(run_dir) if obs_cfg else {}
+        if obs_cfg:
+            self._configure_observable_columns(obs_cfg)
+
+        with summary_csv.open() as f:
+            for row in csv.DictReader(f):
+                condition = row.get('condition', 'unknown')
+                ok = int(row.get('replicates_ok') or 0)
+                errors = int(row.get('replicates_error') or 0)
+                wall = float(row.get('wall_seconds') or 0.0)
+
+                cond_dir_name = (
+                    f'condition_{condition.replace("=", "_eq_")}'
+                )
+                cond_dir = run_dir / cond_dir_name
+
+                obs = (compute_observables(cond_dir, obs_cfg, name_to_id)
+                       if obs_cfg else {})
+
+                # Composite key keeps runs disambiguated in the browser
+                browser_key = f'{run_label} / {condition}'
+                result = {
+                    'name': browser_key,
+                    'replicates': ok,
+                    'errors': errors,
+                    'wall_seconds': wall,
+                    'source': 'disk',
+                    'results_dir': str(cond_dir),
+                    'remote_only': False,
+                    'run_dir': str(run_dir),
+                    'primary_observables': obs,
+                }
+                self.results_browser.add_result(browser_key, result)
 
     # ── Pending-dispatch recovery ────────────────────────────────────
 
@@ -1246,17 +1578,31 @@ class ExperimentAutomationCategory:
         GLib.idle_add(_hydrate)
 
     def _on_queue_cancel(self):
-        """Handle queue cancel request."""
+        """Handle queue cancel request.
+
+        Routes through the active dispatch controller when one exists
+        (covers both local and remote uniformly). Falls back to legacy
+        direct-cancel paths for any controller-less code path.
+        """
+        # Preferred: ask the active controller to cancel itself. The
+        # controller will emit on_dispatch_complete(False, ...) which
+        # restores idle UI and reconciles row statuses.
+        ctrl = getattr(self, '_controller', None)
+        if ctrl is not None and ctrl.is_active:
+            ctrl.cancel()
+            return
+
+        # Legacy fallbacks (no controller in use, e.g. local dispatch
+        # not yet migrated). Cancel the SSH dispatcher and the
+        # in-process batch executor directly.
         if self._remote_dispatcher and self._remote_dispatcher.is_running:
             self._remote_dispatcher.cancel()
 
         if not self.batch_executor:
             return
-        
-        # Cancel the batch execution
+
         self.batch_executor.cancel()
-        
-        # Update UI immediately (completion callback will be called by executor)
+
         if self.queue_view:
             GLib.idle_add(lambda: self.queue_view.set_running(False) or False)
     
@@ -1421,6 +1767,11 @@ class ExperimentAutomationCategory:
                     (_xt.id, getattr(_xt, 'name', _xt.id), 'transition')
                 )
         _sem = self._auto_save_semaphore
+        # Output granularity tier (G0..G5) snapshotted on the GTK main thread
+        # so the background save thread never touches BatchExecutor live state.
+        # Default G3 preserves legacy behaviour when the executor predates the
+        # tier plumbing (defensive getattr).
+        _output_tier_snapshot = getattr(self.batch_executor, '_output_tier', 'G3')
 
         def _throttled_save():
             _sem.acquire()
@@ -1432,6 +1783,7 @@ class ExperimentAutomationCategory:
                     compressed_trajectories=_compressed_traj,
                     species_statistics_full=_ss_full,
                     time_points_full=_tp_full,
+                    output_tier=_output_tier_snapshot,
                 )
             finally:
                 _sem.release()
@@ -1455,6 +1807,7 @@ class ExperimentAutomationCategory:
         compressed_trajectories=None,
         species_statistics_full=None,
         time_points_full=None,
+        output_tier: str = 'G3',
     ):
         """Auto-save experiment results to disk — all CSV format for easy analysis.
 
@@ -1492,6 +1845,36 @@ class ExperimentAutomationCategory:
             id_to_name = {}
         if names_csv_rows is None:
             names_csv_rows = []
+
+        # Output-tier gating (G0..G5) — single canonical authority shared with
+        # the CLI / remote sweep path (shypn.cli.sweep_runner). Falls back to
+        # G3 (legacy "everything") on any malformed tier string so callers
+        # cannot accidentally lose data via a typo.
+        try:
+            from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+            _opts = _OutputOptions.from_dict({'tier': output_tier})
+        except Exception:
+            from shypn.cli.sweep_config import OutputOptions as _OutputOptions
+            _opts = _OutputOptions()  # default G3
+        _tier = _opts.tier
+        # Tier predicates for the local writer:
+        #   results.csv (full per-step mean/std trajectories) → G3+ only
+        #   replicates.csv (per-replicate scalars)            → G1+
+        #   fate_summary.csv (population fate stats)          → G1+ (paired with replicates.csv)
+        #   mean_final_state.csv (endpoint stats)             → G2+
+        #   replicates_trajectories/run_NNN.csv               → G4+
+        #   config.csv, names.csv, .complete sentinel         → always
+        _write_results_csv     = _tier >= 'G3'
+        _write_replicates_csv  = _opts.write_replicates_csv          # G1+
+        _write_endpoint_stats  = _opts.write_statistics_json         # G2+
+        _write_per_rep_traj    = _opts.write_per_replicate_trajectories  # G4+
+        _write_covariance      = _opts.write_covariance              # G5+
+
+        # Sentinel raised inside a write block to signal a tier-gated skip.
+        # Lets each existing try/except keep its current shape (the only
+        # alternative would be a wholesale 12-space reindent of every block).
+        class _TierSkip(Exception):
+            pass
 
         def _fsync(path):
             """Flush write buffers for path.  No OS-level fsync to avoid
@@ -1535,7 +1918,10 @@ class ExperimentAutomationCategory:
         save_errors = []
 
         # ── results.csv ── mean + std trajectories (mixed-format, section-aware)
+        # G3+ only: this is the full per-step time-series export.
         try:
+            if not _write_results_csv:
+                raise _TierSkip()
             # _export_csv needs the full species_statistics and time_points.
             # Both were extracted by the GTK main thread and passed in as params;
             # build a temporary enriched view of result for this call only.
@@ -1551,12 +1937,18 @@ class ExperimentAutomationCategory:
                 _result_for_export = result
             self._export_csv(str(batch_path / 'results.csv'), name, _result_for_export)
             _fsync(batch_path / 'results.csv')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'results.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save results.csv: {e}')
 
         # ── replicates.csv ── per-replicate outcomes (standard tabular)
+        # G1+ only. At G0 the entire per-replicate scalar export is skipped
+        # (along with fate_summary.csv which lives inside the same try-block).
         try:
+            if not _write_replicates_csv:
+                raise _TierSkip()
             replicate_data = result.get('replicate_data', [])
             trajectory_summary = result.get('trajectory_summary', [])
             # Use the explicitly-passed compressed_trajectories (extracted on GTK
@@ -1663,6 +2055,8 @@ class ExperimentAutomationCategory:
                 _fsync(batch_path / 'fate_summary.csv')
             except Exception as _fse:
                 print(f'[AUTO-SAVE] Warning: Failed to save fate_summary.csv: {_fse}')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'replicates.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates.csv: {e}')
@@ -1718,7 +2112,10 @@ class ExperimentAutomationCategory:
         # ── mean_final_state.csv ── flat, easily parseable final SS summary
         # Standard tabular CSV: pandas.read_csv(path, comment='#') works directly.
         # One row per species with final-timepoint mean and std.
+        # G2+ only (endpoint statistics tier).
         try:
+            if not _write_endpoint_stats:
+                raise _TierSkip()
             stats = result.get('statistics', {})
             species_stats = species_statistics_full if species_statistics_full is not None else stats.get('species_statistics', {})
             if species_stats:
@@ -1749,6 +2146,8 @@ class ExperimentAutomationCategory:
                             mean_val, std_val, min_val, max_val
                         ])
                 _fsync(batch_path / 'mean_final_state.csv')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'mean_final_state.csv: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save mean_final_state.csv: {e}')
@@ -1757,7 +2156,10 @@ class ExperimentAutomationCategory:
         # Each file is self-describing (comment header + col_schema line) so
         # analysis scripts need no external sidecar.  Skipped gracefully when
         # no compressed data is available (e.g. on error runs).
+        # G4+ only (per-replicate trajectory tier).
         try:
+            if not _write_per_rep_traj:
+                raise _TierSkip()
             compressed_trajectories_data = compressed_trajectories if compressed_trajectories is not None else []
             if compressed_trajectories_data:
                 from shypn.helpers.compressor import CompressedTrajectoryWriter
@@ -1789,9 +2191,78 @@ class ExperimentAutomationCategory:
                     # disks, causing the app to appear frozen and be killed.
                     # The OS page-cache flushes these files within seconds anyway.
                 print(f'[AUTO-SAVE] Saved {len(compressed_trajectories_data)} compressed trajectories → {traj_dir.name}/')
+        except _TierSkip:
+            pass
         except Exception as e:
             save_errors.append(f'replicates_trajectories/: {e}')
             print(f'[AUTO-SAVE] Warning: Failed to save replicates_trajectories/: {e}')
+
+        # ── covariance.json ── G5+ — mean / cov / corr over per-replicate
+        # final-state place values. Schema matches the CLI/remote writer
+        # (SweepOutputManager._write_covariance) so downstream analysis is
+        # path-agnostic. Skipped when fewer than 2 replicates have usable
+        # final values.
+        try:
+            if not _write_covariance:
+                raise _TierSkip()
+            _ct = compressed_trajectories if compressed_trajectories is not None else []
+            if len(_ct) < 2:
+                raise _TierSkip()
+            import numpy as _np
+            # Stable column order: union of keys across replicates, sorted.
+            _all_pids: set = set()
+            for _cr in _ct:
+                _all_pids.update(_cr.final_values().keys())
+            _pids = sorted(_all_pids)
+            if not _pids:
+                raise _TierSkip()
+            _N = len(_ct)
+            _P = len(_pids)
+            _finals = _np.full((_N, _P), _np.nan, dtype=float)
+            for _ri, _cr in enumerate(_ct):
+                _fv = _cr.final_values()
+                for _ci, _pid in enumerate(_pids):
+                    _v = _fv.get(_pid)
+                    if _v is not None:
+                        try:
+                            _finals[_ri, _ci] = float(_v)
+                        except (TypeError, ValueError):
+                            pass
+            _valid = ~_np.isnan(_finals).any(axis=1)
+            _clean = _finals[_valid]
+            if _clean.shape[0] < 2:
+                raise _TierSkip()
+            _mean = _clean.mean(axis=0)
+            _cov = _np.atleast_2d(_np.cov(_clean, rowvar=False, ddof=1))
+            _std = _np.sqrt(_np.diag(_cov))
+            with _np.errstate(divide='ignore', invalid='ignore'):
+                _denom = _np.outer(_std, _std)
+                _corr = _np.where(_denom > 0, _cov / _denom, _np.nan)
+
+            import json as _json_cov
+            _payload = {
+                'n_replicates': int(_clean.shape[0]),
+                'n_replicates_dropped': int((~_valid).sum()),
+                'place_ids': _pids,
+                'place_names': [
+                    (locals().get('_id_to_name_early') or id_to_name).get(_pid, _pid)
+                    for _pid in _pids
+                ],
+                'mean': [float(v) for v in _mean],
+                'covariance': [[float(v) for v in row] for row in _cov],
+                'correlation': [
+                    [None if _np.isnan(v) else float(v) for v in row]
+                    for row in _corr
+                ],
+            }
+            with open(batch_path / 'covariance.json', 'w', encoding='utf-8') as _cf:
+                _json_cov.dump(_payload, _cf, indent=2)
+            _fsync(batch_path / 'covariance.json')
+        except _TierSkip:
+            pass
+        except Exception as e:
+            save_errors.append(f'covariance.json: {e}')
+            print(f'[AUTO-SAVE] Warning: Failed to save covariance.json: {e}')
 
         # ── .complete / .partial sentinel ──────────────────────────────────
         # .complete is written ONLY when every file succeeded.
@@ -2182,6 +2653,141 @@ class ExperimentAutomationCategory:
             self.sweep_builder.preview_label.set_markup(
                 f"<span foreground='red'>Error: {message}</span>"
             )
+
+    def _confirm_sweep_event_collisions(self, errors, warnings) -> bool:
+        """Show a modal explaining sweep / event collisions.
+
+        Returns ``True`` if the operator chooses to dispatch anyway
+        (errors are demoted to a warning recorded in the config as
+        ``superposition_intent: 'complexity_reduction'``), ``False`` if
+        they cancel.
+
+        Pure errors must be acknowledged with a separate explicit
+        "Dispatch anyway" button so a casual click on "OK" cannot bypass
+        the safety check.
+
+        The detail text is rendered in a selectable, copy-able TextView
+        and **also** logged to the Python logger at WARNING level so the
+        operator can scroll back through the launching terminal even
+        after dismissing the dialog.
+        """
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
+
+        # ── Plain-text payload (logged + clipboard-copyable) ─────────
+        plain_lines = []
+        if errors:
+            plain_lines.append('ERRORS (would silently superimpose two writers):')
+            for it in errors:
+                plain_lines.append(
+                    f"  [{it.get('code', '')}] "
+                    f"path={it.get('path', '?')}: {it.get('message', '')}"
+                )
+            plain_lines.append('')
+        if warnings:
+            plain_lines.append('WARNINGS:')
+            for it in warnings:
+                plain_lines.append(
+                    f"  [{it.get('code', '')}] "
+                    f"path={it.get('path', '?')}: {it.get('message', '')}"
+                )
+            plain_lines.append('')
+        if errors:
+            plain_lines.append(
+                'Recommended actions: change the sweep target, or '
+                'remove/disable the colliding event(s).  Click '
+                "'Dispatch anyway' only if the superposition is "
+                'genuinely intentional — it will be recorded in the '
+                'sweep config.'
+            )
+        plain_text = '\n'.join(plain_lines)
+
+        # Persist to the launching terminal so the user can review later.
+        for it in errors:
+            _log.warning("[COLLISION/%s] %s",
+                         it.get('code'), it.get('message'))
+        for it in warnings:
+            _log.warning("[COLLISION/%s] %s",
+                         it.get('code'), it.get('message'))
+
+        # ── Build the dialog with a selectable TextView ──────────────
+        dialog = Gtk.Dialog(
+            title=('Sweep / event collision detected'
+                   if errors else 'Sweep / event configuration warnings'),
+            transient_for=(self.get_widget().get_toplevel()
+                           if self.get_widget() else None),
+            flags=Gtk.DialogFlags.MODAL,
+        )
+        dialog.set_default_size(640, 360)
+
+        # Header row with icon + summary
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        header.set_margin_start(12)
+        header.set_margin_end(12)
+        header.set_margin_top(12)
+        header.set_margin_bottom(6)
+        icon_name = 'dialog-error' if errors else 'dialog-warning'
+        header.pack_start(
+            Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG),
+            False, False, 0,
+        )
+        summary = Gtk.Label()
+        summary.set_xalign(0)
+        n_e, n_w = len(errors), len(warnings)
+        summary.set_markup(
+            f"<b>{n_e} error(s) and {n_w} warning(s) detected</b>\n"
+            "Details below are <i>selectable / copyable</i>; the same "
+            "text was also logged to the launching terminal."
+        )
+        summary.set_line_wrap(True)
+        header.pack_start(summary, True, True, 0)
+        dialog.get_content_area().pack_start(header, False, False, 0)
+
+        # Scrollable selectable detail view
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_margin_start(12)
+        scroller.set_margin_end(12)
+        scroller.set_hexpand(True)
+        scroller.set_vexpand(True)
+
+        text_view = Gtk.TextView()
+        text_view.set_editable(False)
+        text_view.set_cursor_visible(True)
+        text_view.set_monospace(True)
+        text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        text_view.get_buffer().set_text(plain_text)
+        scroller.add(text_view)
+        dialog.get_content_area().pack_start(scroller, True, True, 0)
+
+        # Buttons
+        copy_btn = dialog.add_button('Copy to clipboard', 1)
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        if errors:
+            dialog.add_button('Dispatch anyway', Gtk.ResponseType.OK)
+        else:
+            dialog.add_button('Continue', Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.CANCEL)
+
+        def _on_copy(_btn):
+            try:
+                from gi.repository import Gdk
+                clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+                clip.set_text(plain_text, -1)
+                copy_btn.set_label('Copied ✓')
+            except Exception as exc:
+                _log.warning("clipboard copy failed: %s", exc)
+        copy_btn.connect('clicked', _on_copy)
+
+        dialog.show_all()
+        # Loop until the user picks a non-Copy button (Copy returns 1
+        # but should not close the dialog).
+        while True:
+            response = dialog.run()
+            if response != 1:
+                break
+        dialog.destroy()
+        return response == Gtk.ResponseType.OK
     
     def get_widget(self):
         """Get the category widget for packing into parent panel.
@@ -2216,6 +2822,11 @@ class ExperimentAutomationCategory:
         # config.json so the Experiment Results browser can list it.
         # Runs in a daemon thread so the UI stays responsive.
         self._schedule_pending_dispatch_recovery()
+
+        # Auto-load the most recent on-disk sweep run so the Results
+        # browser is populated when a project is opened (without
+        # requiring a sweep to be in flight or a manual reload).
+        self._scan_local_run_dirs(latest_only=True)
     
     def set_model_canvas(self, model_canvas):
         """Update model canvas reference.

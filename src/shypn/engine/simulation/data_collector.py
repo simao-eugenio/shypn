@@ -50,6 +50,16 @@ class DataCollector:
         self.time_based_recording = config.time_based_recording
         self.recording_time_interval = config.recording_time_interval
         self._last_recorded_time: Optional[float] = None  # Track last recording time for time-based mode
+
+        # S5 (engine_stability_audit 2026-04-29): adaptive recording.
+        # When the previous engine step's τ falls below this threshold the next
+        # record_state() call is forced, regardless of time-based decimation.
+        # Captures sub-second transients on long horizons without exploding
+        # storage during coarse-step regions.  None disables.
+        self.adaptive_tau_threshold: Optional[float] = getattr(
+            config, 'adaptive_tau_threshold', None
+        )
+        self._last_step_tau: Optional[float] = None
         
         # Thermodynamic validation results (populated at simulation end)
         self.validation_results = None
@@ -145,7 +155,16 @@ class DataCollector:
         """
         if not self.is_collecting:
             return
-        
+
+        # S5: force-record transient steps (small τ indicates fast dynamics).
+        if (
+            not force
+            and self.adaptive_tau_threshold is not None
+            and self._last_step_tau is not None
+            and self._last_step_tau < self.adaptive_tau_threshold
+        ):
+            force = True
+
         # Time-based recording: guarantees consistent data density regardless of playback speed
         if self.time_based_recording and not force:
             # Always record first point
@@ -315,6 +334,15 @@ class DataCollector:
         # For now, just pass - this is used for debugging/logging
         # Could extend to store event history if needed
         pass
+
+    def notify_step_size(self, tau: float) -> None:
+        """Engine hook: report the τ of the step that just executed.
+
+        S5 (engine_stability_audit 2026-04-29): used by adaptive recording so
+        the next ``record_state`` call can decide whether to force-record a
+        transient sample.  Cheap (single attribute write); call freely.
+        """
+        self._last_step_tau = tau
     
     def record_firing(self, time: float, transition: Any, consumed: Optional[Dict[str, Any]] = None, produced: Optional[Dict[str, Any]] = None, mode: Optional[str] = None, firings: int = 1) -> None:
         """Record a transition firing event.

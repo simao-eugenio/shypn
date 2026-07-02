@@ -1,0 +1,120 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[top=1.0in,bottom=1.0in,left=1.25in,right=1.25in]{geometry}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=black,citecolor=black}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{8pt}
+
+\begin{document}
+
+\textbf{Manuscript:} PONE-D-26-05900\\
+\textbf{Title:} Signal Hierarchical Petri Nets: Formal Semantics of
+Hierarchical Regulatory Control of Biological Systems\\
+\textbf{Date:} \today\\
+\textbf{Author:} Sim\~{a}o Eug\'{e}nio
+
+\bigskip
+\hrule
+\bigskip
+
+Dear Editor,
+
+I am pleased to submit a revised version of the above manuscript in response
+to the three reviewers' reports. I am grateful to the editor and to all three
+reviewers for their careful and constructive reading. Their comments have
+genuinely improved the manuscript, and I hope the revision addresses each
+concern satisfactorily.
+
+\medskip
+\textbf{Summary of revisions.}
+The revision follows directly from the reviewers' recommendations and can be
+grouped into three categories:
+
+\textit{(i) Mechanical corrections (Reviewer~2).}
+All formal inconsistencies identified by Reviewer~2 have been resolved:
+the notation $F_s$ is now used consistently throughout in place of the earlier
+$E_s$; the set of transitions $T$ is explicitly introduced at the start of
+Definition~1; the test-arc weight convention $W_t \equiv 1$ is stated within
+the $F_t$ bullet rather than being left implicit; the Hierarchical Preemption
+theorem now opens with an explicit hypothesis on the PreemptionCheck
+predicate; and the Irreversible Basin Partition theorem now states the
+uniqueness hypothesis explicitly in its statement rather than only in its proof.
+A paragraph clarifying SHPN's relationship to classical hybrid Petri nets has
+been added, with citations to both the hybrid PN tradition and the specific
+extension SHPN introduces.
+
+\textit{(ii) Narrative clarifications (Reviewer~1).}
+The term ``first-principles prediction'' has been replaced throughout with
+\textit{topology-driven threshold computation}, which more precisely describes
+the manuscript's claim: commitment thresholds are structurally localized to at
+most two measurable quantities per signal arc, rather than emerging from a
+global nonlinear parameter fit. A dual-graph schematic figure has been added
+at the close of the Introduction to make the $G_E$\,/\,$G_S$ architecture
+visually apparent before any formal notation appears. The relationship to
+C/E~nets, occurrence nets, and process-algebraic approaches has been expanded
+in Section~4.4. The Discussion has been revised to state explicitly that
+acyclicity applies only to the signal control graph~$G_S$, while $G_E$ remains
+fully unrestricted and may contain the feedback cycles common in metabolic and
+signalling networks.
+
+\textit{(iii) Second biological system (Reviewer~1).}
+The Broader Applicability section has been substantially expanded. The
+\textit{lambda} phage lysis-lysogeny switch is analysed in detail, with a
+SHPN topology figure showing the RecA\,/\,CI\,/\,Cro commitment cascade. The
+\textit{Vibrio fischeri} quorum-sensing circuit and GATA1\,/\,PU.1
+haematopoietic commitment are discussed as further examples spanning
+prokaryotic and eukaryotic decision-making.
+
+\medskip
+\textbf{A note on the balance between Reviewers~1 and~3.}
+Reviewer~1 requested a second biological example; Reviewer~3 encouraged
+concision. These recommendations pull in opposite directions. I have tried to
+honour both: the \textit{lambda} phage analysis is self-contained (figure +
+two paragraphs), and the \textit{V.\,fischeri} and GATA1 examples are treated
+in a single paragraph each. The net change relative to the submitted version
+is approximately six pages, all attributable to the material Reviewer~1
+specifically requested. I trust the editor to judge whether this balance is
+appropriate; I am prepared to trim further on request.
+
+\medskip
+\textbf{On the scope of the formalism.}
+I wish to be explicit on one point of framing. SHPN is not presented as a
+replacement for, or improvement upon, existing Bio-PN formalisms, process
+algebras, or Boolean network approaches. Each of those traditions was designed
+for a specific problem and solves it correctly. SHPN addresses a question that
+those formalisms were not designed to answer: \textit{where, in the network
+topology, does a commitment threshold reside?} The answer --- encoded in the
+$G_S$ control graph and the acyclicity theorem --- is an addition to the
+modeller's toolkit, not a critique of existing tools. The revision makes this
+complementary relationship explicit throughout, particularly in Section~4.4
+and the revised Discussion.
+
+\medskip
+\textbf{On AI-assisted tools.}
+Reviewer~2 raised the question of AI tool usage. In the interest of full
+transparency, I used AI-assisted writing tools (GitHub Copilot) as a
+collaborative aid for drafting, editing, and formulating arguments. All
+scientific content --- the formalism, the theorems and their proofs, the
+biological interpretations, and the experimental comparisons --- originates
+entirely from my own scientific judgement. The AI tools served to sharpen
+prose, not to generate scientific ideas. An explicit disclosure statement has
+been added to the Acknowledgments section, consistent with PLOS~ONE policy.
+
+\medskip
+\textbf{Conclusion.}
+I believe the revised manuscript is substantially stronger in both formal
+rigour and biological grounding. I am grateful for the opportunity to revise
+and look forward to the editor's decision.
+
+\bigskip
+
+Yours sincerely,
+
+\bigskip\bigskip
+
+Sim\~{a}o Eug\'{e}nio\\
+\textit{Universidade Federal de Santa Catarina}
+
+\end{document}

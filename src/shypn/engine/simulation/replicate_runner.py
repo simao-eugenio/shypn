@@ -101,7 +101,41 @@ def _run_replicate_chunk(
         controller.settings.dt_manual = time_step
 
     dt = time_step if time_step else controller.settings.get_effective_dt()
+
+    # Auto-couple max_tau to dt for coarse outer steps.
+    # The hybrid loop fires ceil(dt/max_tau) inner τ-leap iterations per
+    # outer dt (Haseltine–Rawlings / Salis–Kaznessis, F5-corrected).
+    # When max_tau is at the engine default (0.1 s) and the user chose a
+    # coarse dt (e.g. 10 s for a 7-day horizon), the inner loop wastes
+    # 100× work for accuracy the user didn't ask for. Raise max_tau to
+    # min(dt, 1.0) in that case so the τ-leap step matches the recording
+    # cadence. Numeric overrides (max_tau != 0.1) are honoured literally
+    # — they signal an explicit Cao-bound choice by the user.
+    _DEFAULT_MAX_TAU = 0.1
+    if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+        coupled = min(dt, 1.0)
+        print(
+            f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+            f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+        )
+        max_tau = coupled
+        controller.settings.max_tau = max_tau
+
     max_steps = int(duration / dt)
+
+    # Auto-decimate snapshots for long horizons so the data-collector's
+    # per-step append + pre-allocated numpy buffer don't explode RAM on
+    # multi-day runs.  Mirrors the GPU hybrid path (~L1297-1313).  Default
+    # ``recording_time_interval`` is 0.05 s (20 Hz), giving ~120 M records
+    # per replicate at 7-day horizons; cap at ~5 000 records / replicate.
+    # User-customized ``recording_time_interval`` (≠ 0.05) is respected.
+    _TARGET_SNAPSHOTS = 5000
+    _dc = controller.data_collector
+    _user_rec_iv = getattr(_dc, 'recording_time_interval', 0.05)
+    if _user_rec_iv == 0.05:
+        _dc.recording_time_interval = max(dt, duration / _TARGET_SNAPSHOTS)
+    _eff_rec_iv = _dc.recording_time_interval
+    n_records_hint = int(duration / max(_eff_rec_iv, dt)) + 16
 
     initial_marking = {p.id: p.tokens for p in model.places}
 
@@ -154,7 +188,7 @@ def _run_replicate_chunk(
         # Data collection
         _use_buf = termination_condition != "steady_state"
         controller.data_collector.start_collection(
-            n_steps_hint=max_steps + 1 if _use_buf else None,
+            n_steps_hint=n_records_hint if _use_buf else None,
             skip_rate_eval=True,
         )
         controller.data_collector.record_state(controller.time)
@@ -203,6 +237,33 @@ def _run_replicate_chunk(
         controller.data_collector.stop_collection()
         rep_elapsed = _time.time() - rep_start
 
+        # S4 (engine_stability_audit 2026-04-29): capture tau-leaping engine
+        # stats so the caller can detect Poisson-truncation bias at low copy.
+        _eng = getattr(controller, '_tau_leaping_engine', None)
+        engine_stats = dict(getattr(_eng, 'stats', {})) if _eng is not None else {}
+        _req = engine_stats.get('requested_firings', 0)
+        _trunc = engine_stats.get('truncated_firings', 0)
+        engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+        # TMD-1: attach the init-time timescale audit profile (if any)
+        # so sweep aggregators can surface C20/C21/C22 in summary.csv
+        # / provenance.json. Profile is identical across replicates of
+        # one condition (deterministic on M₀), but cheap to copy.
+        _tmd = getattr(controller, 'last_timescale_profile', None)
+        if _tmd is not None:
+            try:
+                engine_stats['timescale_audit'] = _tmd.to_dict()
+            except Exception:
+                pass
+        if engine_stats['truncation_fraction'] > 0.05:
+            import warnings as _w
+            _w.warn(
+                f"[low-copy bias] replicate {i}: "
+                f"{_trunc}/{_req} requested firings truncated by token cap "
+                f"({engine_stats['truncation_fraction']:.1%}). "
+                f"Consider smaller max_tau or epsilon.",
+                RuntimeWarning, stacklevel=2,
+            )
+
         results.append({
             'replicate_id': i,
             'seed': seed_base + i,
@@ -228,6 +289,7 @@ def _run_replicate_chunk(
             },
             'stopped_reason': stopped_reason,
             'elapsed_time': rep_elapsed,
+            'engine_stats': engine_stats,
         })
 
     return results
@@ -312,9 +374,54 @@ class ReplicateRunner:
             print(f"  Duration: {duration} {time_units.value}")
         
         # ── GPU detection ────────────────────────────────────────────
+        # 'auto' policy (refined 2026-05-09):
+        #   GPU is the SIMD-over-replicates winner when one process owns
+        #   the device and has a large enough per-call batch. Skip only
+        #   when MULTIPLE sibling pool workers would contend for one GPU.
+        #
+        #   Decision matrix (env vars set by sweep_runner):
+        #     _SHYPN_IN_POOL_WORKER         — set ('1' or budget) iff inside a pool worker
+        #     _SHYPN_POOL_WORKER_COUNT      — total sibling workers in the pool (≥ 1)
+        #
+        #   auto → use GPU iff (pool_worker_count ≤ 1) OR (n_replicates ≥ GPU_BATCH_THRESHOLD)
+        #   auto → skip GPU iff inside pool with sibling_count > 1 AND n < threshold
+        #
+        #   Rationale: with sibling_count == 1 (e.g. --workers 1 or single
+        #   condition) there is no contention; GPU SIMD wins by ~100×
+        #   on canabidiol Q1 (verified 2026-05-09: 4 reps × 60s in 0.8s
+        #   GPU vs 46.4s CPU pool worker).
+        #
+        #   force → always attempt GPU (raises if unavailable).
+        #   off   → never attempt GPU.
         gpu_backend = None
         _gpu_mode = getattr(self.default_settings, 'use_gpu', 'auto')
-        if _gpu_mode != 'off':
+        _in_pool_raw_gpu = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        _in_sweep_pool = bool(_in_pool_raw_gpu)
+        try:
+            _pool_worker_count = int(os.environ.get('_SHYPN_POOL_WORKER_COUNT', '0'))
+        except (TypeError, ValueError):
+            _pool_worker_count = 0
+        # Threshold: minimum n_replicates that justifies serialising
+        # through the GPU even when sibling workers contend for it.
+        # Conservative default; can be tuned later.
+        _GPU_BATCH_THRESHOLD = 16
+        _gpu_skip_reason = None
+        if _gpu_mode == 'auto' and _in_sweep_pool:
+            # Allow GPU if we are the sole pool worker (no contention)
+            # or the per-call batch is large enough to amortise.
+            _sole_worker = _pool_worker_count <= 1
+            _large_batch = n >= _GPU_BATCH_THRESHOLD
+            if not (_sole_worker or _large_batch):
+                _gpu_skip_reason = (
+                    f"in sweep pool with {_pool_worker_count} sibling workers "
+                    f"and n={n} < threshold {_GPU_BATCH_THRESHOLD} "
+                    f"(use_gpu='force' to override)"
+                )
+        if _gpu_skip_reason:
+            logger.info("GPU auto: skipping — %s", _gpu_skip_reason)
+            if verbose:
+                print(f"  GPU skipped (auto): {_gpu_skip_reason}")
+        elif _gpu_mode != 'off':
             from shypn.engine.acceleration.gpu import detect_gpu
             gpu_backend = detect_gpu()
             if gpu_backend is not None:
@@ -350,14 +457,35 @@ class ReplicateRunner:
                 print("  GPU declined — using CPU path")
 
         # ── CPU parallel path: distribute replicates across cores ────
-        _in_pool = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        # Pool-worker gate semantics:
+        #   unset       → top-level dispatch (free to spawn full pool)
+        #   '1'         → inside an outer pool worker, sequential only
+        #   '<int> > 1' → inside an outer pool worker that has *explicitly
+        #                 granted* this worker a per-condition replicate
+        #                 budget (sweep_runner adaptive split).  Treat the
+        #                 value as the cap for the inner pool size.
+        _in_pool_raw = os.environ.get('_SHYPN_IN_POOL_WORKER')
+        try:
+            _in_pool_cap = int(_in_pool_raw) if _in_pool_raw else 0
+        except (TypeError, ValueError):
+            _in_pool_cap = 1 if _in_pool_raw else 0
+        # Treat '1' as the legacy "no nesting" sentinel.
+        _allow_nested = _in_pool_cap > 1
+        _in_pool = bool(_in_pool_raw) and not _allow_nested
         _cpu_count = os.cpu_count() or 1
         if n > 1 and not _in_pool and _cpu_count > 1:
-            # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
-            _max_workers = max(1, min(_cpu_count - 4, int(_cpu_count * 0.70)))
+            if _allow_nested:
+                # Sweep dispatcher granted us a per-condition replicate cap.
+                # Honour it verbatim — the outer cap already accounts for
+                # CPU/RAM/SSH reserve.
+                _max_workers = _in_pool_cap
+            else:
+                # Reserve at least 4 cores for SSH / system daemons (cap at 70%)
+                _max_workers = max(1, min(_cpu_count - 4, int(_cpu_count * 0.70)))
             n_workers = min(_max_workers, n)
             if verbose:
-                print(f"  CPU parallel: {n_workers} workers for {n} replicates")
+                _src = 'sweep-grant' if _allow_nested else 'auto'
+                print(f"  CPU parallel: {n_workers} workers for {n} replicates ({_src})")
 
             model_dict = self.model.to_dict()
 
@@ -436,7 +564,42 @@ class ReplicateRunner:
 
         # Pre-calculate dt / max_steps (constant across replicates)
         dt = time_step if time_step else controller.settings.get_effective_dt()
+
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105 for
+        # rationale).  Same heuristic: default max_tau (0.1) + coarse dt
+        # (>0.1) → raise max_tau to min(dt, 1.0).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
+            controller.settings.max_tau = max_tau
+
         max_steps = int(duration / dt)
+
+        # Auto-decimate snapshots for long horizons so the data-collector's
+        # per-step append + pre-allocated numpy buffer don't explode RAM on
+        # multi-day runs.  Mirrors the GPU hybrid path (~L1297-1313).
+        # Default ``recording_time_interval`` is 0.05 s (20 Hz), giving ~120 M
+        # records per replicate at 7-day horizons; cap at ~5 000 records /
+        # replicate.  User-customized rec_iv (≠ 0.05) is respected.
+        _TARGET_SNAPSHOTS = 5000
+        _user_rec_iv = getattr(controller.data_collector, 'recording_time_interval', 0.05)
+        if _user_rec_iv == 0.05:
+            controller.data_collector.recording_time_interval = max(
+                dt, duration / _TARGET_SNAPSHOTS
+            )
+        _eff_rec_iv = controller.data_collector.recording_time_interval
+        n_records_hint = int(duration / max(_eff_rec_iv, dt)) + 16
+        if verbose:
+            print(
+                f"  CPU replicates: dt={dt}, recording_interval={_eff_rec_iv:.4g}s "
+                f"→ ~{n_records_hint} records/replicate (was {max_steps + 1})"
+            )
 
         # Snapshot the initial model marking so we can restore it each replicate
         initial_marking = {p.id: p.tokens for p in self.model.places}
@@ -529,7 +692,7 @@ class ReplicateRunner:
             # finalize_buf() converts the buffer to the dict format.
             _use_buf = termination_condition != "steady_state"
             controller.data_collector.start_collection(
-                n_steps_hint=max_steps + 1 if _use_buf else None,
+                n_steps_hint=n_records_hint if _use_buf else None,
                 skip_rate_eval=True,
             )
             # Record initial state at t=0
@@ -613,7 +776,28 @@ class ReplicateRunner:
 
             # Calculate elapsed wall-clock time for this replicate
             replicate_elapsed = time.time() - replicate_start_time
-            
+
+            # S4 (engine_stability_audit 2026-04-29): capture tau-leaping engine
+            # stats so the caller can detect Poisson-truncation bias at low copy.
+            _eng = getattr(controller, '_tau_leaping_engine', None)
+            engine_stats = dict(getattr(_eng, 'stats', {})) if _eng is not None else {}
+            _req = engine_stats.get('requested_firings', 0)
+            _trunc = engine_stats.get('truncated_firings', 0)
+            engine_stats['truncation_fraction'] = (_trunc / _req) if _req > 0 else 0.0
+            # TMD-1: see _run_replicate_chunk for rationale.
+            _tmd = getattr(controller, 'last_timescale_profile', None)
+            if _tmd is not None:
+                try:
+                    engine_stats['timescale_audit'] = _tmd.to_dict()
+                except Exception:
+                    pass
+            if engine_stats['truncation_fraction'] > 0.05 and verbose:
+                print(
+                    f"  ⚠ [low-copy bias] replicate {i}: "
+                    f"{_trunc}/{_req} firings truncated "
+                    f"({engine_stats['truncation_fraction']:.1%})"
+                )
+
             # Collect results
             result = {
                 'replicate_id': i,
@@ -639,7 +823,8 @@ class ReplicateRunner:
                     for t in self.model.transitions
                 },
                 'stopped_reason': stopped_reason,
-                'elapsed_time': replicate_elapsed  # Wall-clock time in seconds
+                'elapsed_time': replicate_elapsed,  # Wall-clock time in seconds
+                'engine_stats': engine_stats,
             }
             
             results.append(result)
@@ -1002,13 +1187,22 @@ class ReplicateRunner:
             return None
 
         # ── Hybrid GPU path for ODE+stochastic models ────────────────
-        # If the model has continuous transitions, try the GPU hybrid
-        # engine that combines RK4 ODE integration with GPU τ-leaping.
-        n_continuous = sum(
+        # If the model has any ODE-eligible transitions, try the GPU
+        # hybrid engine that combines RK4 ODE integration with GPU
+        # τ-leaping.  Adaptive transitions count here too: when their
+        # configured mode is continuous they are integrated by the ODE
+        # accelerator (see OdeSystemAccelerator.build), and when they
+        # leap they ride the same GPU τ-leap batch as pure stochastic
+        # transitions (gpu_hybrid_engine includes them in
+        # `stoch_transitions`).  Counting only literal 'continuous'
+        # caused all-adaptive models to bypass this path entirely and
+        # fall onto the pure-stochastic GPUReplicateEngine with a CPU
+        # symbolic-propensity callback (~50× slower).
+        n_ode_eligible = sum(
             1 for t in self.model.transitions
-            if getattr(t, 'transition_type', '') == 'continuous'
+            if getattr(t, 'transition_type', '') in ('continuous', 'adaptive')
         )
-        if n_continuous > 0:
+        if n_ode_eligible > 0:
             hybrid_results = self._try_gpu_hybrid(
                 gpu_backend,
                 n=n, duration=duration,
@@ -1038,6 +1232,17 @@ class ReplicateRunner:
         # Compute dt
         settings = self.default_settings
         dt = time_step if time_step else settings.get_effective_dt()
+
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
 
         try:
             engine = GPUReplicateEngine(
@@ -1131,18 +1336,40 @@ class ReplicateRunner:
             if pid in place_id_to_global
         ]
 
-        # Build stochastic transition matrices
+        # Build stochastic transition matrices.
+        #
+        # Routing invariant (operator split correctness): every transition
+        # must fire through exactly ONE channel per dt.  The ODE
+        # accelerator already includes pure-continuous transitions AND
+        # adaptive transitions in continuous mode (see
+        # OdeSystemAccelerator._analyse_model).  Re-listing them in the
+        # τ-leap batch would double-fire the reaction every step
+        # (ODE consumes + stoch consumes from the post-flow marking)
+        # and pay the CPU symbolic-propensity cost twice.  So we
+        # subtract the ODE-covered set from the stochastic batch.
+        ode_covered = set(ode_accel.ode_transition_ids)
         stoch_transitions = [
             t for t in self.model.transitions
-            if getattr(t, 'transition_type', '') in ('stochastic', 'adaptive')
+            if (
+                getattr(t, 'transition_type', '') == 'stochastic'
+                or (
+                    getattr(t, 'transition_type', '') == 'adaptive'
+                    and t.id not in ode_covered
+                )
+            )
         ]
         n_stoch = len(stoch_transitions)
 
         if n_stoch == 0:
-            logger.info("GPU hybrid: no stochastic transitions — pure ODE")
+            # All ODE-eligible transitions covered by the C accelerator
+            # and no pure-stochastic transitions remain.  This is a
+            # valid pure-ODE batch — every replicate evolves the same
+            # deterministic trajectory.  GPUHybridEngine handles M=0
+            # in run_batch (phase 2 short-circuits on `if M > 0`); we
+            # just need to feed it empty stoch arrays.
             if verbose:
-                print("  GPU hybrid: no stochastic transitions (using CPU)")
-            return None
+                print("  GPU hybrid: no stochastic transitions — pure ODE batch")
+            logger.info("GPU hybrid: pure ODE batch (no stochastic transitions)")
 
         # Build stoichiometry matrix for stochastic transitions
         import numpy as _np
@@ -1196,10 +1423,42 @@ class ReplicateRunner:
         settings = self.default_settings
         dt = time_step if time_step else settings.get_effective_dt()
 
+        # Auto-couple max_tau to dt (see chunked-path comment ~L105).
+        _DEFAULT_MAX_TAU = 0.1
+        if max_tau == _DEFAULT_MAX_TAU and dt > _DEFAULT_MAX_TAU:
+            coupled = min(dt, 1.0)
+            if verbose:
+                print(
+                    f"  [auto-couple] max_tau {max_tau} -> {coupled} "
+                    f"(dt={dt}; saves ~{int(dt/max_tau)}× inner-loop iterations)"
+                )
+            max_tau = coupled
+
+        # Auto-decimate snapshots so wall time and memory don't explode on
+        # long horizons.  Target ~5 000 records per replicate regardless
+        # of duration / dt.  E.g.:
+        #   duration=86400 s, dt=0.05  → 1.73 M steps → snap every 346 → ~5000 pts
+        #   duration=  100 s, dt=0.01  → 10 000 steps → snap every  2 → ~5000 pts
+        # User-set recording_time_interval (controller.data_collector) wins
+        # if explicitly different from the engine default 0.05.
+        TARGET_SNAPSHOTS = 5000
+        rec_iv = getattr(
+            getattr(controller, "data_collector", None),
+            "recording_time_interval", 0.05,
+        )
+        if rec_iv and rec_iv != 0.05:
+            snapshot_interval = max(1, int(round(rec_iv / dt)))
+        else:
+            n_steps_total = max(1, int(duration / dt))
+            snapshot_interval = max(1, n_steps_total // TARGET_SNAPSHOTS)
+
         if verbose:
             _mode = "CPU+GPU (symbolic)" if stoch_propensity_fn else "GPU (mass-action)"
+            est_records = int(duration / dt) // snapshot_interval
             print(f"  GPU hybrid: {len(ode_place_indices)} ODE places, "
                   f"{n_stoch} stochastic transitions, dt={dt}, "
+                  f"snapshot_interval={snapshot_interval} "
+                  f"(~{est_records} records/replicate), "
                   f"propensities={_mode}")
 
         try:
@@ -1230,6 +1489,7 @@ class ReplicateRunner:
                 duration=duration,
                 dt=dt,
                 seed_base=seed_base,
+                snapshot_interval=snapshot_interval,
                 verbose=verbose,
                 progress_callback=progress_callback,
             )
@@ -1304,23 +1564,36 @@ class ReplicateRunner:
                   f"({accel._n_transitions} transitions, "
                   f"{n_places_accel} places)")
 
+        # Pre-allocated scratch for the batched C call.  Sized lazily on
+        # first use because the GPU sub-batch size is decided per dispatch.
+        _scratch = {"af": None, "ar": None, "y": None}
+
         def _propensity_fn(
             y_host: np.ndarray,   # [N, P]
             t_host: np.ndarray,   # [N]
         ) -> tuple:
             N = y_host.shape[0]
-            a_fwd_out = np.zeros((N, M), dtype=np.float64)
-            a_rev_out = np.zeros((N, M), dtype=np.float64)
-
-            for r in range(N):
-                # Copy replicate r's state into the accelerator's y[]
-                accel._y_arr[place_idx_map] = y_host[r]
-                accel.update_thermo_params()
-                a_net, a_fwd, a_rev = accel.compute(float(t_host[r]))
-                a_fwd_out[r] = a_fwd[trans_idx_map]
-                a_rev_out[r] = a_rev[trans_idx_map]
-
-            return a_fwd_out, a_rev_out
+            M_accel = accel._n_transitions
+            # Refresh thermo once per step (params are batch-invariant).
+            accel.update_thermo_params()
+            # Resize scratch on demand.
+            if _scratch["af"] is None or _scratch["af"].shape != (N, M_accel):
+                _scratch["af"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["ar"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["y"]  = np.zeros((N, n_places_accel), dtype=np.float64)
+            # Remap caller's [N, P] state into the accelerator's column
+            # order using a single vectorized fancy-index copy.
+            np.take(y_host, place_idx_map, axis=1, out=_scratch["y"])
+            # One C call evaluates all N replicates.
+            accel.compute_batch(
+                t_host.astype(np.float64, copy=False),
+                _scratch["y"],
+                _scratch["af"],
+                _scratch["ar"],
+            )
+            # Reorder columns to engine's transition order.
+            return (_scratch["af"][:, trans_idx_map],
+                    _scratch["ar"][:, trans_idx_map])
 
         return _propensity_fn
 
@@ -1379,22 +1652,29 @@ class ReplicateRunner:
             print(f"  GPU hybrid stoch: C propensity accelerator ready "
                   f"({M_stoch} stochastic transitions)")
 
+        n_places_accel = accel._n_places
+        M_accel = accel._n_transitions
+        _scratch = {"af": None, "ar": None, "y": None}
+
         def _stoch_propensity_fn(
             y_host: np.ndarray,   # [N, P]
             t_host: np.ndarray,   # [N]
         ) -> tuple:
             N = y_host.shape[0]
-            a_fwd_out = np.zeros((N, M_stoch), dtype=np.float64)
-            a_rev_out = np.zeros((N, M_stoch), dtype=np.float64)
-
-            for r in range(N):
-                accel._y_arr[place_idx_map] = y_host[r]
-                accel.update_thermo_params()
-                a_net, a_fwd, a_rev = accel.compute(float(t_host[r]))
-                a_fwd_out[r] = a_fwd[trans_idx_map]
-                a_rev_out[r] = a_rev[trans_idx_map]
-
-            return a_fwd_out, a_rev_out
+            accel.update_thermo_params()
+            if _scratch["af"] is None or _scratch["af"].shape != (N, M_accel):
+                _scratch["af"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["ar"] = np.zeros((N, M_accel), dtype=np.float64)
+                _scratch["y"]  = np.zeros((N, n_places_accel), dtype=np.float64)
+            np.take(y_host, place_idx_map, axis=1, out=_scratch["y"])
+            accel.compute_batch(
+                t_host.astype(np.float64, copy=False),
+                _scratch["y"],
+                _scratch["af"],
+                _scratch["ar"],
+            )
+            return (_scratch["af"][:, trans_idx_map],
+                    _scratch["ar"][:, trans_idx_map])
 
         return _stoch_propensity_fn
 

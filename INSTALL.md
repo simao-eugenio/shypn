@@ -1,43 +1,69 @@
 # SHYpn — Installation Guide
 
-This guide covers every step needed to run SHYpn on a freshly provisioned machine.
-SHYpn is a GTK3 desktop application; it requires both **system-level libraries** (installed
-via your OS package manager) and **Python packages** (installed via pip).
+**Primary platform: Ubuntu Linux 22.04 and 24.04 LTS.**
+
+SHYpn is a GTK3 desktop application. It requires both system-level libraries
+(installed via `apt`) and Python packages (installed via `pip`).
 
 ---
 
 ## Table of Contents
 
-1. [System Requirements](#system-requirements)
-2. [Ubuntu / Debian](#ubuntu--debian)
-3. [Fedora / RHEL / CentOS](#fedora--rhel--centos)
-4. [macOS](#macos)
-5. [Windows (WSL2)](#windows-wsl2)
-6. [Python Environment Setup](#python-environment-setup)
-7. [Optional Dependencies](#optional-dependencies)
-8. [Verifying the Installation](#verifying-the-installation)
-9. [Troubleshooting](#troubleshooting)
+1. [One-script install (recommended)](#one-script-install-recommended)
+2. [Manual install — Ubuntu 22.04 / 24.04](#manual-install--ubuntu-2204--2404)
+3. [Display environments — Wayland, X11, WSL2](#display-environments)
+4. [Optional dependencies](#optional-dependencies)
+5. [Verifying the installation](#verifying-the-installation)
+6. [Zip-archive install (no git)](#zip-archive-install-no-git)
+7. [Other platforms](#other-platforms)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
-## System Requirements
+## One-script install (recommended)
+
+The installer script handles system packages, venv creation, pip install, and
+verification automatically. It detects your Ubuntu version and uses the correct
+package names.
+
+```bash
+git clone https://github.com/simao-eugenio/shypn.git
+cd shypn
+bash install_ubuntu.sh
+```
+
+When it completes, launch SHYpn with:
+
+```bash
+source .venv/bin/activate
+shypn
+```
+
+Or without activating the venv manually:
+
+```bash
+.venv/bin/shypn
+```
+
+---
+
+## Manual install — Ubuntu 22.04 / 24.04
+
+Use this if you prefer step-by-step control or need to customise the install.
+
+### System requirements
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| Python | 3.10 | 3.11+ |
+| OS | Ubuntu 22.04 LTS | Ubuntu 24.04 LTS |
+| Python | 3.10 | 3.12 |
 | GTK | 3.24 | 3.24+ |
 | RAM | 2 GB | 8 GB (large models / sweeps) |
 | Disk | 500 MB | 2 GB |
-| OS | Linux (primary), macOS, WSL2 | Ubuntu 22.04+ |
-
-> **Note:** SHYpn is developed and tested primarily on Linux.
-> macOS and WSL2 are supported but receive less testing.
-
----
-
-## Ubuntu / Debian
 
 ### 1. System packages
+
+**Ubuntu 22.04:**
 
 ```bash
 sudo apt update
@@ -47,53 +73,28 @@ sudo apt install -y \
     gir1.2-gtk-3.0 gir1.2-glib-2.0 \
     libgtk-3-dev libcairo2-dev \
     libgirepository1.0-dev \
-    pkg-config
+    pkg-config \
+    libpango-1.0-0 libpangocairo-1.0-0 fonts-liberation
 ```
 
-On **Ubuntu 24.04+** or **Debian 13+** the package name changes slightly:
+**Ubuntu 24.04** — one package name changed (dot → hyphen before the version):
 
 ```bash
-sudo apt install -y libgirepository-1.0-dev
+sudo apt update
+sudo apt install -y \
+    python3 python3-pip python3-venv \
+    python3-gi python3-gi-cairo \
+    gir1.2-gtk-3.0 gir1.2-glib-2.0 \
+    libgtk-3-dev libcairo2-dev \
+    libgirepository-1.0-dev \
+    pkg-config \
+    libpango-1.0-0 libpangocairo-1.0-0 fonts-liberation
 ```
 
-### 2. Clone and install SHYpn
+> **Key difference**: `libgirepository1.0-dev` (22.04) vs `libgirepository-1.0-dev` (24.04).
+> Getting this wrong is the most common install failure.
 
-```bash
-git clone https://github.com/simao-eugenio/shypn.git
-cd shypn
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -e .
-```
-
-### 3. Run
-
-```bash
-python src/shypn.py
-```
-
----
-
-## Fedora / RHEL / CentOS
-
-### 1. System packages
-
-```bash
-# Fedora
-sudo dnf install -y \
-    python3 python3-pip \
-    python3-gobject python3-cairo \
-    gtk3-devel cairo-gobject-devel \
-    gobject-introspection-devel \
-    pkgconf
-
-# RHEL / CentOS (enable EPEL first)
-sudo dnf install -y epel-release
-sudo dnf install -y python3 python3-pip gtk3 gobject-introspection
-```
-
-### 2. Clone and install SHYpn
+### 2. Clone and create virtual environment
 
 ```bash
 git clone https://github.com/simao-eugenio/shypn.git
@@ -104,157 +105,180 @@ pip install --upgrade pip
 pip install -e .
 ```
 
----
-
-## macOS
-
-### 1. Install Homebrew (if not present)
+### 3. Verify
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+python -m shypn --check
 ```
 
-### 2. System packages via Homebrew
+### 4. Launch
 
 ```bash
-brew install python@3.11 gtk+3 gobject-introspection cairo pkg-config pygobject3
-```
-
-### 3. Clone and install SHYpn
-
-```bash
-git clone https://github.com/simao-eugenio/shypn.git
-cd shypn
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-# Tell pip where to find gobject-introspection headers
-PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig" pip install -e .
-```
-
-### 4. Run (XQuartz not needed — macOS uses its own backend)
-
-```bash
+shypn
+# or equivalently:
 python src/shypn.py
 ```
 
-> **Note:** macOS GTK3 rendering uses a native backend. Some UI scaling differences with
-> Linux are expected.
-
 ---
 
-## Windows (WSL2)
+## Display environments
 
-WSL2 with a graphical display is the recommended path on Windows.
+SHYpn is a desktop GUI application. It requires a graphical display server.
 
-### 1. Install WSL2 and Ubuntu 22.04
+### Native Ubuntu desktop (Wayland, X11)
 
-In an elevated PowerShell:
+On Ubuntu 22.04+ the default GNOME session is Wayland. SHYpn uses GTK3 which
+supports Wayland natively — no extra flags needed.
 
-```powershell
-wsl --install -d Ubuntu-22.04
+```bash
+shypn   # works on both Wayland and X11 GNOME sessions
 ```
 
-### 2. Install a Wayland/X11 display server
+SHYpn automatically detects `$WAYLAND_DISPLAY` (Wayland) or `$DISPLAY` (X11).
+If neither is set the application exits with a clear error message.
 
-- **Windows 11** ships WSLg (built-in display server) — no extra steps needed.
-- **Windows 10** — install [VcXsrv](https://sourceforge.net/projects/vcxsrv/) and set:
-  ```bash
-  export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
-  ```
+### WSL2 (Windows 11 with WSLg)
 
-### 3. Inside the WSL2 Ubuntu shell
+Windows 11 ships WSLg, which provides a built-in Wayland/X11 display server.
+Follow the Ubuntu manual steps inside your WSL2 shell — no extra display setup.
 
-Follow the **Ubuntu / Debian** steps above exactly.
+**Windows 10 / WSL2 without WSLg**: install
+[VcXsrv](https://sourceforge.net/projects/vcxsrv/) on Windows, then:
+
+```bash
+export DISPLAY=$(grep nameserver /etc/resolv.conf | awk '{print $2}'):0
+shypn
+```
+
+### SSH remote session (no display)
+
+SHYpn cannot run headlessly. For remote machines use X11 forwarding:
+
+```bash
+ssh -X user@remotehost
+shypn
+```
+
+You can use the command-line tools (sweep dispatch, model patch) without a
+display. The `--check` flag also works without a display:
+
+```bash
+python -m shypn --check   # no display required
+```
 
 ---
 
-## Python Environment Setup
+## Optional dependencies
 
-All Python dependencies are declared in `pyproject.toml` and installed automatically by
-`pip install -e .`.
+### Numba acceleration
 
-The key Python packages pulled in are:
+Speeds up the τ-leaping stochastic engine on large models:
 
-| Package | Purpose |
-|---------|---------|
-| `PyGObject` | GTK3 Python bindings |
-| `pycairo` | Cairo drawing (GTK canvas) |
-| `numpy` | Numerical arrays / simulation core |
-| `scipy` | ODE solvers, statistical analysis |
-| `matplotlib` | Embedded plots in the UI |
-| `networkx` | Petri net graph algorithms |
-| `weasyprint` | Report PDF generation |
-| `openpyxl` | Excel export |
-| `requests` | KEGG / BRENDA API access |
-| `platformdirs` | Cross-platform config directories |
+```bash
+pip install -e ".[acceleration]"
+```
 
-> **PyGObject / pycairo require system GTK headers** to compile.
-> If you skip the `apt`/`dnf`/`brew` step above, pip will fail with a build error.
+### GPU acceleration (CuPy + CUDA)
 
-### Development extras
+For NVIDIA GPUs. Requires CUDA 12+ and a compatible CuPy wheel:
 
-To set up a full development environment (linting, type checking, tests):
+```bash
+pip install cupy-cuda12x   # adjust for your CUDA version
+```
+
+GPU support is auto-detected at runtime.
+
+### Development tools
+
+Full linting, type checking, and test setup:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-This additionally installs: `pytest`, `mypy`, `ruff`, `pre-commit`.
-
 ---
 
-## Optional Dependencies
+## Verifying the installation
 
-### Numba acceleration
-
-Speeds up the τ-leaping stochastic engine significantly on large models:
-
-```bash
-pip install -e ".[acceleration]"
-# or
-pip install numba>=0.59.0
-```
-
-### libSBML (SBML import)
-
-SHYpn uses its own lightweight SBML parser by default.
-For extended SBML compliance you can install the official libSBML Python bindings:
+The built-in `--check` command tests all imports and reports the display
+environment. No display is required.
 
 ```bash
-pip install python-libsbml
-```
-
----
-
-## Verifying the Installation
-
-Run the built-in smoke test (no display required):
-
-```bash
-python -c "
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
-import numpy, scipy, matplotlib, networkx
-print('All imports OK')
-print('GTK version:', Gtk.get_major_version(), Gtk.get_minor_version())
-print('NumPy:', numpy.__version__)
-"
+python -m shypn --check
 ```
 
 Expected output:
 
 ```
-All imports OK
-GTK version: 3 24
-NumPy: 1.x.x
+SHYpn — installation check
+  Python                 3.12.3
+
+  numpy                  2.x.x ✓
+  scipy                  1.x.x ✓
+  matplotlib             3.x.x ✓
+  …
+
+  gi (GTK3)              3.24.x ✓
+
+  shypn.engine.simulation.controller  ✓
+  shypn.netobjs.place                 ✓
+  …
+
+  Display                :0  (GUI can start)
+
+  SHYpn 2.6.1 ✓
+
+  All checks passed.  Run 'shypn' (or 'python src/shypn.py') to launch.
 ```
 
-Then launch the application:
+---
+
+## Zip-archive install (no git)
+
+Download the zip from GitHub → **Code → Download ZIP**, extract it, then:
 
 ```bash
-python src/shypn.py
+cd shypn-main          # or whatever the extracted directory is named
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install .          # note: no -e flag for zip installs
+python -m shypn --check
+```
+
+After a zip install, `shypn` (the console command) is available in the venv.
+`python src/shypn.py` also still works from the extracted directory.
+
+---
+
+## Other platforms
+
+SHYpn is developed and tested on Ubuntu. Other platforms are community-supported.
+
+### Fedora / RHEL
+
+```bash
+sudo dnf install -y \
+    python3 python3-pip \
+    python3-gobject python3-cairo \
+    gtk3-devel cairo-gobject-devel \
+    gobject-introspection-devel pkgconf
+
+git clone https://github.com/simao-eugenio/shypn.git
+cd shypn
+python3 -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip && pip install -e .
+```
+
+### macOS
+
+```bash
+brew install python@3.11 gtk+3 gobject-introspection cairo pkg-config pygobject3
+git clone https://github.com/simao-eugenio/shypn.git
+cd shypn
+python3 -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip
+PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig" pip install -e .
 ```
 
 ---
@@ -263,49 +287,71 @@ python src/shypn.py
 
 ### `ImportError: No module named 'gi'`
 
-PyGObject is not installed or the virtual environment can't see the system-level GTK.
+PyGObject is not importable inside the venv. Install system headers then
+force-reinstall inside the venv:
 
 ```bash
-# On Ubuntu/Debian — install the apt package then reinstall PyGObject inside venv
-sudo apt install python3-gi libgirepository1.0-dev
+# Ubuntu 22.04
+sudo apt install libgirepository1.0-dev python3-gi
+pip install --force-reinstall PyGObject
+
+# Ubuntu 24.04
+sudo apt install libgirepository-1.0-dev python3-gi
 pip install --force-reinstall PyGObject
 ```
 
-### `pip install -e .` fails with `gobject-2.0` or `cairo` not found
+### `pip install` fails: `gobject-2.0` or `cairo` not found
 
-The GTK development headers are missing:
+Missing GTK development headers:
 
 ```bash
+# Ubuntu 22.04
 sudo apt install libgtk-3-dev libcairo2-dev libgirepository1.0-dev pkg-config
+
+# Ubuntu 24.04
+sudo apt install libgtk-3-dev libcairo2-dev libgirepository-1.0-dev pkg-config
 ```
 
-### `Gtk-WARNING: cannot open display` (headless server)
+### Black / invisible window on WSL2
 
-SHYpn is a desktop GUI and requires a display server.
-For remote machines, use X11 forwarding over SSH:
+GTK must not initialise GDK before `Gtk.Application.run()`. This is fixed in the
+current release. Update with `git pull` and reinstall:
 
 ```bash
-ssh -X user@server
-python src/shypn.py
+git pull && pip install -e .
 ```
 
-Or use a virtual framebuffer (for CI / automated testing only):
+### `Gtk-WARNING: cannot open display`
+
+No display server is available. Options:
+
+1. Log into a desktop session and run `shypn` from a terminal there.
+2. Enable X11 forwarding: `ssh -X user@host` then `shypn`.
+3. Headless CI / testing only — virtual framebuffer:
 
 ```bash
 sudo apt install xvfb
 Xvfb :99 -screen 0 1280x1024x24 &
-DISPLAY=:99 python src/shypn.py
+DISPLAY=:99 shypn
 ```
 
-### `weasyprint` fails to import / PDF export broken
-
-WeasyPrint has its own system dependencies:
+### `weasyprint` / PDF export broken
 
 ```bash
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf2.0-0
 ```
 
+### `libgirepository` not found (Ubuntu version mismatch)
+
+Run `lsb_release -r` to confirm your Ubuntu version, then use the matching
+package name:
+
+| Ubuntu version | Package name |
+|---|---|
+| 20.04, 22.04 | `libgirepository1.0-dev` |
+| 24.04+ | `libgirepository-1.0-dev` |
+
 ### Slow startup on first run
 
-SHYpn caches dependency graphs and GTK theme data on first launch.
+SHYpn caches GTK icon themes and dependency graphs on first launch.
 Subsequent starts are significantly faster.

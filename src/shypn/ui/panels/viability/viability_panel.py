@@ -1012,17 +1012,16 @@ class ViabilityPanel(Gtk.Box):
             # If localities selected: only show places in those localities
             # If no localities: show all places (entire model)
             # ALWAYS include:
-            #   - compartment places (Temperature, pH) — isolated but implicitly
-            #     affect rate functions via thermodynamic auto-detection,
-            #   - parameter places (is_parameter_place=True) — user-declared
+            #   - parameter places ▢ (is_parameter_place=True) — user-declared
             #     Environment-Panel knobs that must be sweepable from Viability,
             #   - event-referenced places — targets/triggers of scheduled events.
-            is_compartment = getattr(place, 'is_compartment_place', False)
+            # NOTE: ``is_compartment_place`` is metadata about which compartment
+            # a regular ○ inhabits; it is NOT a canonical carrier category and
+            # must not gate inclusion (see doc/pn_formalism/AGENT_RULES.md §1).
             is_param = getattr(place, 'is_parameter_place', False)
             is_event_ref = place.id in _event_ref_ids
             if (not show_all_places
                     and place.id not in all_place_ids
-                    and not is_compartment
                     and not is_param
                     and not is_event_ref):
                 continue

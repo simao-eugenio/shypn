@@ -124,15 +124,26 @@ class ExperimentQueueView(Gtk.Box):
         self.cancel_button.connect("clicked", self._on_cancel_clicked)
         button_box.pack_start(self.cancel_button, False, False, 0)
         
-        # Clear Completed button
+        # Clear Completed button — finer-grained: only removes already-
+        # finished rows (keeps pending + running + cancelled). For a full
+        # fresh-start use "Clear Sweep Plan" in the sweep builder above.
         clear_button = Gtk.Button(label="Clear Completed")
-        clear_button.set_tooltip_text("Remove completed experiments from queue")
+        clear_button.set_tooltip_text(
+            "Remove only completed experiments from the queue.\n"
+            "Pending, running, failed, and cancelled rows are kept.\n"
+            "For a full reset (queue + sweep plan + log), use\n"
+            "‘Clear Sweep Plan’ in the sweep builder above."
+        )
         clear_button.connect("clicked", self._on_clear_clicked)
         button_box.pack_start(clear_button, False, False, 0)
         
-        # Reset All button
+        # Reset All button — in-place restart of completed/failed rows.
         reset_button = Gtk.Button(label="⟲ Reset All")
-        reset_button.set_tooltip_text("Reset all completed/failed experiments back to pending")
+        reset_button.set_tooltip_text(
+            "Reset completed/failed experiments back to pending so they\n"
+            "can be re-run without rebuilding the sweep plan.\n"
+            "Does not remove or alter the sweep parameters."
+        )
         reset_button.connect("clicked", self._on_reset_clicked)
         button_box.pack_start(reset_button, False, False, 0)
         
@@ -160,6 +171,17 @@ class ExperimentQueueView(Gtk.Box):
         status_title.set_markup('<small><b>Activity log</b></small>')
         status_title.set_xalign(0)
         status_header.pack_start(status_title, True, True, 0)
+        # Explicit Copy button: works even if the textview never gets
+        # keyboard focus (some embedding contexts steal focus, making
+        # Ctrl+C unreliable). Copies the current selection or, if none,
+        # the entire log.
+        self._status_copy_btn = Gtk.Button(label='Copy')
+        self._status_copy_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self._status_copy_btn.set_tooltip_text(
+            'Copy selection (or full log if nothing selected) to clipboard')
+        self._status_copy_btn.connect(
+            'clicked', lambda *_: self._copy_status_to_clipboard())
+        status_header.pack_end(self._status_copy_btn, False, False, 0)
         self._status_clear_btn = Gtk.Button(label='Clear')
         self._status_clear_btn.set_relief(Gtk.ReliefStyle.NONE)
         self._status_clear_btn.set_tooltip_text('Clear the activity log')
@@ -191,7 +213,19 @@ class ExperimentQueueView(Gtk.Box):
         self._status_view.set_editable(False)
         self._status_view.set_cursor_visible(True)
         self._status_view.set_can_focus(True)
+        self._status_view.set_focus_on_click(True)
         self._status_view.connect('key-press-event', self._on_status_key_press)
+        # Force focus on click — some parent containers steal keyboard
+        # focus on tab switches, leaving the textview unfocused even
+        # after the user clicks into it. Without focus, the default
+        # GTK Ctrl+C binding cannot reach the textview.
+        self._status_view.connect(
+            'button-press-event',
+            lambda w, e: (w.grab_focus(), False)[1])
+        # Right-click → context menu with our Copy entry guaranteed
+        # to be present (the default popup may be overridden by themes).
+        self._status_view.connect(
+            'populate-popup', self._on_status_populate_popup)
         self._status_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
         self._status_view.set_left_margin(4)
         self._status_view.set_right_margin(4)
@@ -222,6 +256,92 @@ class ExperimentQueueView(Gtk.Box):
         # Keep legacy attribute name for callers that do
         # ``self.queue_view.status_label.set_markup(...)``
         self.status_label = _StatusLabelCompat(self)
+
+        # ── TMD-1 (timescale-mismatch) EventBus subscription ──────────
+        # The simulation controller emits 'simulation.timescale_audit'
+        # at construction time (see engine/simulation/controller.py
+        # ::_run_timescale_audit). Mirror those findings into the
+        # activity log so modellers see them next to dispatch events
+        # without having to scroll through stderr.
+        self._tmd_subscribed = False
+        try:
+            from shypn.events import EventBus
+            EventBus.subscribe(
+                'simulation.timescale_audit',
+                self._on_timescale_audit_event,
+            )
+            self._tmd_subscribed = True
+        except Exception:  # pragma: no cover - never break panel build
+            pass
+
+        # Disconnect on widget destroy so handlers don't fire against
+        # a dead Gtk widget after the document is closed.
+        self.connect('destroy', self._on_destroy_unsub_tmd)
+
+    def _on_destroy_unsub_tmd(self, *_args):
+        if not getattr(self, '_tmd_subscribed', False):
+            return
+        try:
+            from shypn.events import EventBus
+            EventBus.unsubscribe(
+                'simulation.timescale_audit',
+                self._on_timescale_audit_event,
+            )
+        except Exception:
+            pass
+        self._tmd_subscribed = False
+
+    def _on_timescale_audit_event(self, data):
+        """Render a TMD-1 audit event into the activity log.
+
+        The payload shape (see SimulationController._run_timescale_audit):
+            {'profile': {...}, 'n_findings': int,
+             'critical_transitions': [tid, ...], 'mode': 'warn'|'error'|'off'}
+
+        Categorisation:
+            - critical (C20) → 'error' / red
+            - warnings only  → 'event' / orange
+            - clean          → 'info'  / grey (suppressed unless dt is
+              the recommended_dt — the no-news case is just noise)
+        """
+        try:
+            n_findings = int(data.get('n_findings', 0) or 0)
+            critical = list(data.get('critical_transitions') or [])
+            profile = data.get('profile') or {}
+            dt = profile.get('dt')
+            tau_min = profile.get('tau_min')
+            stiff = profile.get('stiffness_ratio') or 0.0
+            rec_dt = profile.get('recommended_dt')
+
+            def _fmt(x, fmt='.3g'):
+                if x is None:
+                    return '?'
+                try:
+                    return format(float(x), fmt)
+                except Exception:
+                    return str(x)
+
+            if critical:
+                msg = (f"TMD C20: {len(critical)} critical "
+                       f"τ < {_fmt(0.1 * float(dt)) if dt else '?'}s "
+                       f"(τ_min={_fmt(tau_min)}s, recommended dt ≤ "
+                       f"{_fmt(rec_dt)}s)")
+                category = 'error'
+            elif n_findings:
+                msg = (f"TMD: {n_findings} finding(s) "
+                       f"stiffness={_fmt(stiff)}, τ_min={_fmt(tau_min)}s, "
+                       f"recommended dt ≤ {_fmt(rec_dt)}s")
+                category = 'event'
+            else:
+                # Clean audit — suppress to keep the log focused.
+                return
+
+            # Marshal to GTK main thread; emit() warns on cross-thread
+            # but be defensive in case a background dispatcher slips one
+            # through.
+            GLib.idle_add(self.append_status, msg, category)
+        except Exception:
+            pass
     
     def add_experiment(self, name, snapshot_index):
         """Add experiment to queue.
@@ -243,8 +363,25 @@ class ExperimentQueueView(Gtk.Box):
             self.add_experiment(name, snapshot_index)
     
     def clear_queue(self):
-        """Clear all experiments from queue."""
+        """Clear all experiments from queue.
+
+        Also restores the control buttons to a clean idle state so a new
+        sweep plan can be dispatched immediately afterwards. Without this
+        reset, ``run_remote_button`` (or ``run_button``) could remain
+        disabled if a previous dispatch error path skipped its
+        re-enable hook (see ``_on_queue_run_remote``'s ``on_complete``).
+        """
         self.queue_store.clear()
+        # Idle state: both Run paths enabled, Cancel/Pause disabled.
+        try:
+            self.run_button.set_sensitive(True)
+            self.run_remote_button.set_sensitive(True)
+            self.cancel_button.set_sensitive(False)
+            self.pause_button.set_sensitive(False)
+            self.pause_button.set_label("⏸ Pause")
+        except Exception:
+            # Defensive: if the queue view is being torn down, ignore.
+            pass
         self._update_status_label()
     
     def clear_completed(self):
@@ -328,8 +465,12 @@ class ExperimentQueueView(Gtk.Box):
             is_running: True if execution is running or paused
             is_paused: True if execution is paused (requires is_running=True)
         """
-        # Button states
+        # Button states. Both Run paths share the same gate: a sweep
+        # is either running locally OR remotely; in either case both
+        # entry buttons must stay disabled until the run finishes /
+        # is cancelled, otherwise the operator can double-dispatch.
         self.run_button.set_sensitive(not is_running)
+        self.run_remote_button.set_sensitive(not is_running)
         self.cancel_button.set_sensitive(is_running)
         self.pause_button.set_sensitive(is_running)  # Stage 3
         
@@ -567,11 +708,34 @@ class ExperimentQueueView(Gtk.Box):
             if pending:
                 self.on_run_remote_callback(pending)
             else:
+                # Surface the empty-queue case as a modal dialog rather
+                # than a one-line status message — operators commonly
+                # miss the status line and re-click Remote, then think
+                # the dialog is broken (it is the QUEUE that is empty).
                 total = len(self.queue_store)
                 if total == 0:
-                    self.status_label.set_markup("<i>Queue empty - generate experiments first</i>")
+                    msg = ("Queue is empty.\n\n"
+                           "Click 'Generate Experiments' first to build\n"
+                           "the sweep plan, then click 'Run Remote'.")
                 else:
-                    self.status_label.set_markup("<i>No pending experiments - use 'Reset All' to re-run</i>")
+                    msg = ("No pending experiments.\n\n"
+                           "All rows are completed/failed/cancelled.\n"
+                           "Use 'Reset All' to re-run them, or 'Clear\n"
+                           "Sweep Plan' to start over.")
+                d = Gtk.MessageDialog(
+                    transient_for=self.get_toplevel(),
+                    flags=0,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK,
+                    text="Cannot dispatch remote sweep",
+                )
+                d.format_secondary_text(msg)
+                d.run()
+                d.destroy()
+                # Mirror to the activity log for the audit trail.
+                self.status_label.set_markup(
+                    f"<i>{GLib.markup_escape_text(msg.splitlines()[0])}</i>"
+                )
 
     # ── Public status API ────────────────────────────────────────────
 
@@ -674,21 +838,80 @@ class ExperimentQueueView(Gtk.Box):
         self._status_view.queue_draw()
         self.append_status('Activity log cleared', category='info', tag='grey')
 
+    def _copy_status_to_clipboard(self) -> str:
+        """Copy current selection (or the whole log) to the clipboard.
+
+        Returns the text actually copied so callers / tests can inspect.
+        """
+        buf = self._status_buffer
+        if buf.get_has_selection():
+            bounds = buf.get_selection_bounds()
+            text = buf.get_text(bounds[0], bounds[1], False)
+        else:
+            text = buf.get_text(buf.get_start_iter(),
+                                buf.get_end_iter(), False)
+        if not text:
+            return ''
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(text, -1)
+        clipboard.store()
+        # Also copy to the PRIMARY (X11 middle-click) selection for
+        # convenience on Linux.
+        try:
+            primary = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
+            primary.set_text(text, -1)
+        except Exception:
+            pass
+        return text
+
+    def _copy_full_log_to_clipboard(self) -> str:
+        """Copy the entire activity log to the clipboard, ignoring selection."""
+        buf = self._status_buffer
+        text = buf.get_text(buf.get_start_iter(),
+                            buf.get_end_iter(), False)
+        if not text:
+            return ''
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(text, -1)
+        clipboard.store()
+        return text
+
+    def _on_status_populate_popup(self, textview, popup) -> None:
+        """Inject Copy / Copy all / Select all into the right-click menu.
+
+        Some GTK themes override the default popup; this guarantees the
+        copy actions are always discoverable.
+        """
+        if not isinstance(popup, Gtk.Menu):
+            return
+        sep = Gtk.SeparatorMenuItem()
+        sep.show()
+        popup.append(sep)
+        item_copy = Gtk.MenuItem(label='Copy selection')
+        item_copy.connect('activate',
+                          lambda *_: self._copy_status_to_clipboard())
+        item_copy.show()
+        popup.append(item_copy)
+        item_copy_all = Gtk.MenuItem(label='Copy entire log')
+        item_copy_all.connect(
+            'activate',
+            lambda *_: self._copy_full_log_to_clipboard())
+        item_copy_all.show()
+        popup.append(item_copy_all)
+        item_select_all = Gtk.MenuItem(label='Select all')
+        item_select_all.connect(
+            'activate',
+            lambda *_: self._status_buffer.select_range(
+                self._status_buffer.get_start_iter(),
+                self._status_buffer.get_end_iter()))
+        item_select_all.show()
+        popup.append(item_select_all)
+
     def _on_status_key_press(self, widget, event):
         """Handle Ctrl+C / Ctrl+A on the status TextView."""
         ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
         if ctrl and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
-            buf = self._status_buffer
-            if buf.get_has_selection():
-                bounds = buf.get_selection_bounds()
-                text = buf.get_text(bounds[0], bounds[1], False)
-            else:
-                # Nothing selected → copy all text
-                text = buf.get_text(buf.get_start_iter(),
-                                    buf.get_end_iter(), False)
-            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-            clipboard.set_text(text, -1)
-            clipboard.store()
+            self._copy_status_to_clipboard()
             return True  # handled
         if ctrl and event.keyval in (Gdk.KEY_a, Gdk.KEY_A):
             buf = self._status_buffer

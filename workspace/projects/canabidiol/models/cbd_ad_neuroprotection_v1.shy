@@ -1080,8 +1080,7 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
@@ -1102,7 +1101,10 @@
             "ionic_strength": 0.1
           }
         }
-      }
+      },
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "K"
     },
     {
       "id": "P29",
@@ -1123,8 +1125,7 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
@@ -1145,7 +1146,10 @@
             "ionic_strength": 0.1
           }
         }
-      }
+      },
+      "is_parameter_place": true,
+      "parameter_kind": "thermodynamic",
+      "parameter_units": "pH"
     },
     {
       "id": "P30",
@@ -1209,8 +1213,7 @@
       ],
       "border_width": 3.0,
       "is_catalyst": false,
-      "is_signal_place": true,
-      "signal_type": "spatial",
+      "is_signal_place": false,
       "is_compartment_place": true,
       "is_regulatory_place": false,
       "is_energy_place": false,
@@ -1231,7 +1234,10 @@
             "ionic_strength": 0.1
           }
         }
-      }
+      },
+      "is_parameter_place": true,
+      "parameter_kind": "demographic",
+      "parameter_units": "year"
     },
     {
       "id": "P32",
@@ -1475,10 +1481,9 @@
         "rate_function_display": "k_agg \u00d7 [A\u03b2]\u00b2"
       },
       "signal_places": [
-        "P5",
-        "P29"
+        "P5"
       ],
-      "is_environment_aware": true,
+      "is_environment_aware": false,
       "compartment": "extracellular",
       "adaptive_filter": null,
       "volume_threshold": null,

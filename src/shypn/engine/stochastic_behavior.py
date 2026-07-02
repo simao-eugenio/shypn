@@ -820,18 +820,32 @@ class StochasticBehavior(TransitionBehavior):
                             return False, f"insufficient-catalyst-{arc.source_id}"
                 else:
                     # NORMAL ARC: Check sufficient tokens for burst firing.
-                    # Hybrid PN: stochastic transitions are discrete — floor fractional tokens
-                    # so that a place with e.g. 1.5 µM contributes 1 countable token.
-                    # Signal flow arcs additionally require θ_eff tokens as basin
-                    # floor (formalism: M(ps) ≥ θ_eff + Ws·burst). θ_eff = 0 by default.
-                    # When activation_energy > 0, θ_eff is temperature-dependent.
+                    # Two semantic regimes (mirror of test-arc treatment above):
+                    #
+                    # ADAPTIVE transition in stochastic-mode fallback: tokens are
+                    # CONCENTRATIONS (mM/µM), not integer molecule counts. Use a
+                    # scale-invariant check — `floor(0.81) = 0` would wrongly block a
+                    # transition with 0.81 µM substrate, even though biochemically the
+                    # substrate is abundant (~10⁸ molecules in a typical cellular volume).
+                    #
+                    # STOCHASTIC transition (classic discrete PN semantics): tokens are
+                    # integer counts; floor fractional tokens before comparison.
+                    #
+                    # Signal flow arcs additionally require θ_eff tokens as basin floor
+                    # (formalism: M(ps) ≥ θ_eff + Ws·burst). θ_eff = 0 by default.
                     # NOTE: θ_eff is the basin floor (a single minimum, not per-firing).
                     # For n burst firings: M(ps) ≥ θ_eff + Ws·n, NOT (θ_eff + Ws)·n.
                     theta = self._get_theta_eff(arc)
                     required = arc.weight * burst + theta
-                    logger.debug(f"    → Normal: checking burst requirement={required} (θ_eff={theta})")
-                    if math.floor(source_place.tokens) < required:
-                        return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+                    trans_type = getattr(self.transition, 'transition_type', 'stochastic')
+                    if trans_type == 'adaptive':
+                        logger.debug(f"    → Normal (adaptive): scale-invariant check {source_place.tokens:.4g} >= {required} (θ_eff={theta})")
+                        if source_place.tokens < required:
+                            return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
+                    else:
+                        logger.debug(f"    → Normal (stochastic): floor({source_place.tokens:.4g}) >= {required} (θ_eff={theta})")
+                        if math.floor(source_place.tokens) < required:
+                            return False, f"insufficient-tokens-for-burst-P{arc.source_id}"
         
         # PreemptionCheck: single-layer verification of signal-producing predecessors
         preempt_ok, preempt_reason = self._check_preemption()
@@ -899,17 +913,14 @@ class StochasticBehavior(TransitionBehavior):
             # Phase 1: Consume tokens with burst multiplier (skip if source transition)
             if not is_source:
                 for arc in input_arcs:
-                    # Skip inhibitor arcs and test arcs (they don't consume)
-                    # Use defensive pattern: check kind, properties['kind'], and arc_type
-                    kind = getattr(arc, 'kind', getattr(arc, 'properties', {}).get('kind', 'normal'))
+                    # Per 13-tuple Bio-PN formalism + classical PN literature:
+                    # test and inhibitor (incl. curved_inhibitor_arc) arcs are
+                    # non-consuming. Use Arc.consumes_tokens() as single source
+                    # of truth (overridden by InhibitorArc / TestArc / etc.).
                     arc_type = getattr(arc, 'arc_type', 'normal')
-                    
-                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, kind={kind}, arc_type={arc_type}")
-                    
-                    # DEFENSIVE v2.1.1: Only TEST arcs skip consumption (pure catalysts)
-                    # Inhibitor arcs DO consume tokens when threshold permits transition to fire
-                    if arc_type == 'test':
-                        logger.debug("    → SKIP consumption (test arc - catalyst)")
+                    logger.debug(f"  Arc {arc.id}: type={type(arc).__name__}, arc_type={arc_type}")
+                    if not arc.consumes_tokens():
+                        logger.debug("    → SKIP consumption (non-consuming arc: test / inhibitor)")
                         continue
                     
                     logger.debug(f"    → CONSUMING {burst * arc.weight} tokens")
