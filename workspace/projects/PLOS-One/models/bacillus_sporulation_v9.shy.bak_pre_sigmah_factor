@@ -1560,31 +1560,6 @@
       "compartment_volume": null,
       "neighbor_compartments": [],
       "spatial_position": null
-    },
-    {
-      "id": "P41",
-      "name": "k_sigmaH_factor",
-      "label": "k_sigmaH_factor",
-      "x": -680.0,
-      "y": -180.0,
-      "radius": 30.0,
-      "initial_marking": 1.0,
-      "marking": 1.0,
-      "capacity": 0,
-      "is_parameter_place": true,
-      "is_signal_place": false,
-      "is_catalyst": false,
-      "is_energy_place": false,
-      "is_compartment_place": false,
-      "is_regulatory_place": false,
-      "is_source": false,
-      "is_sink": false,
-      "compartment": null,
-      "metadata": {
-        "purpose": "FUJITA-3: gates T_sigmaH_transcription for sigma_H-null sweep"
-      },
-      "parameter_kind": "kinetic",
-      "parameter_units": "dimensionless"
     }
   ],
   "transitions": [
@@ -1819,7 +1794,7 @@
       "is_sink": false,
       "guard": 1,
       "properties": {
-        "rate_function": "k_sigmaH_factor * (0.01 * Spo0A_P**4 / (50 + Spo0A_P**4) * ATP_pool / (100 + ATP_pool))"
+        "rate_function": "0.01 * Spo0A_P**4 / (50 + Spo0A_P**4) * ATP_pool / (100 + ATP_pool)"
       },
       "signal_places": [
         "P1",
