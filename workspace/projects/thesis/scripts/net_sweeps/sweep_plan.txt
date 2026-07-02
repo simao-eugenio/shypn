@@ -1,0 +1,362 @@
+===========================================================================
+  SWEEP PLAN — v9 model (bacillus_sporulation_v9.shy)
+  Fujita questions + NET physics tests
+  2026-07-02
+===========================================================================
+
+MODEL FILE  : workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy
+DURATION    : 21600 s (6 h)
+max_tau     : 0.01 s
+tau_epsilon : 0.03
+UNIT        : 1 token = 1 µM (all concentrations in µM unless noted)
+
+FIXED PARAMETERS (same in all sweeps unless overridden below):
+  TEMPERATURE_K         = 310.15
+  ATP_SETPOINT          = 442.0
+  SIGMA_HALFLIFE_MIN    = 120.0
+  k_syn_factor          = 1.0
+  LOADING_DOSE          = 0.0
+  INTERVENTION_TIME_S   = 99999.0   (no pulse)
+  NUTRIENTS_STEP_TARGET = 100.0
+  NUTRIENTS_STEP_TIME_S = 99999.0   (no step)
+  SinR                  = 8.0
+  SinI                  = 0.0
+
+EVENTS (built into v9 model — fire automatically):
+  evt_init_kinetics          : t > 0   → k_ATP_target = ATP_SETPOINT,
+                                         k_sigma_decay = ln(2)/SIGMA_HALFLIFE_MIN,
+                                         k_thermo_factor = 2^((T-310.15)/10)
+  evt_apply_initial_nutrients: t > 0   → Nutrients = INITIAL_NUTRIENTS
+  evt_spo0a_pulse            : t > INTERVENTION_TIME_S → Spo0A_P += LOADING_DOSE
+  evt_step_nutrients_protocol: t > NUTRIENTS_STEP_TIME_S → Nutrients = NUTRIENTS_STEP_TARGET
+
+---------------------------------------------------------------------------
+  SECTION A — FUJITA QUESTIONS
+  Purpose: Test the three biological questions raised by Fujita & Losick 2005
+---------------------------------------------------------------------------
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FUJITA-1  —  Direct Fujita replication: medium × route factorial        (Q1)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Question: Does the medium (ATP level) determine commitment, not just the
+            route of Spo0A activation?
+  Prediction: SM-like (N0=100) + abrupt pulse → high sporulation;
+              CH-like (N0=1440) + abrupt pulse → low sporulation (~5%)
+
+  Replicates per condition : 100
+  Total conditions         : 5
+
+  DIMENSION 1 — INITIAL_NUTRIENTS (P27)  [proxy for medium]
+    100   µM  →  SM-like  (nutrient-depleted, ATP will fall)
+    1440  µM  →  CH-like  (nutrient-rich, ATP stays high)
+
+  DIMENSION 2 — LOADING_DOSE (P37)  [route of Spo0A activation]
+    0     µM  →  Natural phosphorelay (no pulse)
+    27    µM  →  Abrupt Spo0A* pulse at t=1s (INTERVENTION_TIME_S=1)
+
+  CONDITIONS (name | N0 | LOADING_DOSE | INTERVENTION_TIME_S):
+    Baseline              |  100 |  0  | 99999   ← SM natural (100% sporulate)
+    SM_natural            |  100 |  0  | 99999   (same as Baseline for reference)
+    SM_abrupt             |  100 | 27  |     1   ← KEY PREDICTION: should be >>5%
+    CH_natural            | 1440 |  0  | 99999   ← ~48% sporulate
+    CH_abrupt             | 1440 | 27  |     1   ← Fujita Fig.2C/D equivalent (~5%)
+
+  Expected results:
+    SM_natural  : ~100%  (positive control)
+    SM_abrupt   : >30%   (PREDICTION — abrupt works if medium is depleted)
+    CH_natural  : ~48%   (bet-hedging, confirmed from Sweep C)
+    CH_abrupt   : ~5%    (Fujita experimental result, should be reproduced)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FUJITA-2  —  Falsifiable prediction: abrupt dose across N0 gradient     (Q1)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Question: If ATP level is the gating variable, sporulation fraction with
+            fixed abrupt pulse should DECREASE monotonically as N0 rises.
+  Prediction: clear monotonic decrease from ~>30% at N0=100 to ~5% at N0=2000
+
+  Replicates per condition : 100
+  Fixed parameters         : LOADING_DOSE=27, INTERVENTION_TIME_S=1
+  Total conditions         : 10
+
+  DIMENSION — INITIAL_NUTRIENTS (P27):
+    100, 300, 600, 900, 1200, 1440, 1600, 1800, 2000, 2200  µM
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FUJITA-3  —  σ_H gate necessity: k_syn_factor sweep                     (Q2)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Question: Does zeroing k_syn_factor (= σ_H-null equivalent) abolish
+            sporulation even when LOADING_DOSE is applied?
+  Prediction: k_syn_factor=0 → 0% sporulation in ALL conditions (Q2 answer)
+              k_syn_factor=1 → sporulation recovers in SM-like conditions
+
+  Replicates per condition : 50
+  Total conditions         : 10
+
+  DIMENSION 1 — k_syn_factor (P36):
+    0.0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0
+
+  DIMENSION 2 — LOADING_DOSE (P37):
+    0   µM  (natural route)
+    27  µM  (abrupt pulse, INTERVENTION_TIME_S=1)
+
+  Fixed: INITIAL_NUTRIENTS = 100 µM (SM-like, ensures nutrients are not the blocker)
+
+  CONDITIONS (7 k_syn_factor values × 2 routes = 14 conditions):
+    [k_syn=0.0, dose=0], [k_syn=0.0, dose=27]   ← both should give 0%
+    [k_syn=0.2, dose=0], [k_syn=0.2, dose=27]
+    [k_syn=0.4, dose=0], [k_syn=0.4, dose=27]
+    [k_syn=0.6, dose=0], [k_syn=0.6, dose=27]
+    [k_syn=0.8, dose=0], [k_syn=0.8, dose=27]
+    [k_syn=1.0, dose=0], [k_syn=1.0, dose=27]   ← natural=100%, abrupt=?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FUJITA-4  —  Bet-hedging fraction map: N0 titration                     (Q3)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Question: What is the full N0 vs sporulation fraction curve?
+            Where does the bet-hedging window (30-70%) lie?
+  Purpose : Locates the critical N0 (N_c) for NET-T4;
+            validates the ATP basin floor prediction (2.13 mM)
+
+  Replicates per condition : 200
+  Fixed: LOADING_DOSE=0 (natural route only)
+  Total conditions         : 15
+
+  DIMENSION — INITIAL_NUTRIENTS (P27):
+    100, 400, 700, 1000, 1200, 1300, 1440, 1550, 1650, 1800,
+    2000, 2160, 2300, 2500, 3000  µM
+
+  Expected shape: step function from ~100% at N0=100
+                  to ~0% at N0=2500, with bet-hedging plateau 1440-2160
+
+---------------------------------------------------------------------------
+  SECTION B — NET PHYSICS TESTS (for plos_one_how_cells_decide.tex)
+  Purpose: Five thermodynamic characterisation experiments
+---------------------------------------------------------------------------
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NET-T1  —  Landauer efficiency: SIGMA_HALFLIFE_MIN sweep
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Metric  : η_L = k_B T ln2 / (N_ATP × N_A × V × ΔG_ATP)
+  Question: Does shorter half-life (sharper gate) improve Landauer efficiency?
+  Fixed   : INITIAL_NUTRIENTS=1440, LOADING_DOSE=0
+
+  Replicates per condition : 100
+  Total conditions         : 17
+
+  DIMENSION — SIGMA_HALFLIFE_MIN (P30)  [minutes]:
+    10, 20, 30, 40, 50, 60, 75, 90, 120, 150, 200, 250, 300, 400, 500, 600
+    + Baseline (120 min)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NET-T2  —  Non-equilibrium landscape: INITIAL_NUTRIENTS sweep
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Metric  : U_eff(x) = -ln P_ss(x), bimodality coefficient BC
+  Question: Does the ATP pool show a bimodal distribution at the
+            bifurcation edge? Where is the two-basin landscape?
+  Fixed   : LOADING_DOSE=0
+
+  Replicates per condition : 100
+  Total conditions         : 13
+
+  DIMENSION — INITIAL_NUTRIENTS (P27)  [µM]:
+    100, 500, 900, 1200, 1440, 1600, 1800, 2000, 2200, 2400, 2700, 3000
+    + Baseline (100 µM)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NET-T3  —  Fluctuation theorem: nutrients step forward/reverse
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Metric  : W/k_B T  (dissipated work per replicate)
+  Question: Does W/k_B T ~ 10^8 confirm FT inapplicability?
+  Protocol: nutrient step at t=3600 s (1 h into simulation)
+
+  Replicates per condition : 200
+  Total conditions         : 5
+
+  CONDITIONS (name | N0 | NUTRIENTS_STEP_TARGET | NUTRIENTS_STEP_TIME_S):
+    Baseline_100          | 1440 |  1440 | 99999   (no step, control)
+    Baseline_200          | 2160 |  2160 | 99999   (no step, control)
+    FWD  N0=1440→2160     | 1440 |  2160 |  3600   (forward: depleted → rich)
+    REV  N0=2160→1440     | 2160 |  1440 |  3600   (reverse: rich → depleted)
+    Baseline_CTL          |  100 |   100 | 99999   (SM natural, positive control)
+
+  Note: "forward" = starts in bet-hedging zone, steps to non-sporulating zone
+        "reverse" = starts in non-sporulating zone, steps to bet-hedging zone
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NET-T4  —  Critical exponents: fine INITIAL_NUTRIENTS sweep
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Metric  : CV²(Mature_spore) vs N0, power-law fit γ± on each side of N_c
+  Requires: FUJITA-4 to locate N_c before running (use its results)
+  Fixed   : LOADING_DOSE=0
+
+  Replicates per condition : 300
+  Total conditions         : 14
+
+  DIMENSION — INITIAL_NUTRIENTS (P27)  [µM]:
+    1200, 1300, 1380, 1440, 1500, 1550, 1600, 1650, 1700,
+    1800, 1900, 2000, 2100, 2200
+
+  Note: Centre the range on the N_c found in FUJITA-4.
+        Adjust endpoints if N_c is outside 1440-2000.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NET-T5  —  Schnakenberg EPR decomposition: 3 fixed conditions
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Metric  : σ̇_ρ = J̄_ρ × ΔG_ρ  per transition (from firing counts)
+  Question: Does septation dominate EPR (>96%)? Is the decision step <4%?
+  Fixed   : LOADING_DOSE=0
+
+  Replicates per condition : 300
+  Total conditions         : 3
+
+  CONDITIONS (name | INITIAL_NUTRIENTS):
+    Sub_critical  |  100  µM   (SM, all sporulate — 100%)
+    Critical      | 1600  µM   (bet-hedging, ~50% sporulate)
+    Super_critical| 2200  µM   (CH-like, ~0% sporulate)
+
+  Required firing columns (must be in output):
+    T_KinA_activation_firings
+    T_Spo0F_phosphorylation_firings
+    T_Spo0F_dephos_firings
+    T_Spo0A_phosphorylation_firings
+    T_Spo0A_dephosphorylation_firings
+    T_septation_firings
+    T_SinI_synthesis_firings
+
+---------------------------------------------------------------------------
+  SUMMARY TABLE
+---------------------------------------------------------------------------
+
+  Sweep       Question  Reps/cond  Cond  Total reps  Key parameter
+  ----------  --------  ---------  ----  ----------  --------------------------
+  FUJITA-1    Q1            100       5        500   N0 × LOADING_DOSE 2×2
+  FUJITA-2    Q1 (ext)      100      10      1 000   LOADING_DOSE=27, N0 sweep
+  FUJITA-3    Q2             50      14        700   k_syn_factor × LOADING_DOSE
+  FUJITA-4    Q3            200      15      3 000   N0 sweep (natural route)
+  NET-T1      η_L           100      17      1 700   SIGMA_HALFLIFE_MIN
+  NET-T2      landscape     100      13      1 300   INITIAL_NUTRIENTS
+  NET-T3      FT            200       5      1 000   nutrients step protocol
+  NET-T4      γ±            300      14      4 200   INITIAL_NUTRIENTS fine
+  NET-T5      EPR           300       3        900   3 fixed conditions
+  ----------  --------  ---------  ----  ----------
+  TOTAL                              96     14 300   simulations
+
+---------------------------------------------------------------------------
+  RECOMMENDED RUN ORDER
+---------------------------------------------------------------------------
+
+  Priority 1 (fast, diagnostic — run first to verify model):
+    FUJITA-1   (500 reps, ~3 min GPU)   → confirms SM_abrupt prediction
+    FUJITA-4   (3000 reps, ~15 min GPU) → locates N_c for NET-T4
+
+  Priority 2 (Fujita paper questions):
+    FUJITA-2   (1000 reps) → falsifiable prediction curve
+    FUJITA-3   (700 reps)  → Q2 σ_H-null
+
+  Priority 3 (NET physics — need N_c from FUJITA-4 before NET-T4):
+    NET-T1, NET-T2, NET-T5 in parallel  (4900 reps, ~25 min GPU)
+    NET-T3                               (1000 reps)
+    NET-T4                               (4200 reps, ~22 min GPU) ← run last
+
+---------------------------------------------------------------------------
+  NTP STOICHIOMETRY FOR NET-T5 (Schnakenberg EPR)
+---------------------------------------------------------------------------
+
+  ΔG_ATP = ΔG_GTP = 60 kJ/mol = 23.27 k_B T  (at T = 310.15 K)
+
+  Transition               ATP/firing  GTP/firing  ΔG_ρ (k_B T/firing)
+  -----------------------  ----------  ----------  --------------------
+  T_KinA_activation              5           0          116.3
+  T_Spo0F_phosphorylation        0           0            0  (phosphotransfer)
+  T_Spo0F_dephos                 0           0            0  (phosphatase)
+  T_Spo0A_phosphorylation        0           0            0  (phosphotransfer)
+  T_Spo0A_dephosphorylation      0           0            0  (phosphatase)
+  T_septation                   32          50         1908
+
+  EPR per transition: σ̇_ρ = (n̄_ρ / t_sim) × ΔG_ρ   [k_B T / s]
+  where n̄_ρ = mean firing count over all replicates
+
+---------------------------------------------------------------------------
+  VIABILITY PANEL — COPY-PASTE REFERENCE
+  (parameter names and value lists for single/factorial UI setup)
+---------------------------------------------------------------------------
+
+All sweeps use model: workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy
+Model defaults confirmed: INTERVENTION_TIME_S=1.0, LOADING_DOSE=0.0,
+  INITIAL_NUTRIENTS=100.0, k_syn_factor=1.0, SIGMA_HALFLIFE_MIN=120.0,
+  NUTRIENTS_STEP_TIME_S=99999.0, SinR=8.0
+Note: pulse fires at t=1s whenever LOADING_DOSE > 0 (INTERVENTION_TIME_S
+  already 1.0 in model — do NOT change for abrupt pulse conditions)
+
+──────────────────────────────────────────────────────────
+FUJITA-1  (2×2 factorial, 100 reps, 4 cond + Baseline)
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  100, 1440
+  LOADING_DOSE        :  0, 27
+
+──────────────────────────────────────────────────────────
+FUJITA-2  (single axis, 100 reps, 10 cond)
+  Fix in UI: LOADING_DOSE = 27
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  100, 300, 600, 900, 1200, 1440, 1600, 1800, 2000, 2200
+
+──────────────────────────────────────────────────────────
+FUJITA-3  (2×2 factorial, 50 reps, 12 cond)
+  Fix in UI: INITIAL_NUTRIENTS = 100
+──────────────────────────────────────────────────────────
+  k_syn_factor        :  0.0, 0.2, 0.4, 0.6, 0.8, 1.0
+  LOADING_DOSE        :  0, 27
+
+──────────────────────────────────────────────────────────
+FUJITA-4  (single axis, 200 reps, 15 cond)
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  100, 400, 700, 1000, 1200, 1300, 1440, 1550, 1650,
+                         1800, 2000, 2160, 2300, 2500, 3000
+
+──────────────────────────────────────────────────────────
+NET-T1  (single axis, 100 reps, 16 cond)
+  Fix in UI: INITIAL_NUTRIENTS = 1440
+──────────────────────────────────────────────────────────
+  SIGMA_HALFLIFE_MIN  :  10, 20, 30, 40, 50, 60, 75, 90, 120, 150, 200,
+                         250, 300, 400, 500, 600
+
+──────────────────────────────────────────────────────────
+NET-T2  (single axis, 100 reps, 12 cond)
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  100, 500, 900, 1200, 1440, 1600, 1800, 2000, 2200,
+                         2400, 2700, 3000
+
+──────────────────────────────────────────────────────────
+NET-T3  (4 individual conditions, 200 reps each)
+  *** NOT a factorial — set each condition manually ***
+──────────────────────────────────────────────────────────
+  Condition       INITIAL_NUTRIENTS  NUTRIENTS_STEP_TARGET  NUTRIENTS_STEP_TIME_S
+  CTL_1440             1440               1440                   99999
+  CTL_2160             2160               2160                   99999
+  FWD  1440→2160        1440               2160                    3600
+  REV  2160→1440        2160               1440                    3600
+
+──────────────────────────────────────────────────────────
+NET-T4  (single axis, 300 reps, 14 cond)
+  *** Run FUJITA-4 first to confirm N_c, then adjust range if needed ***
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  1200, 1300, 1380, 1440, 1500, 1550, 1600, 1650,
+                         1700, 1800, 1900, 2000, 2100, 2200
+
+──────────────────────────────────────────────────────────
+NET-T5  (single axis, 300 reps, 3 cond)
+──────────────────────────────────────────────────────────
+  INITIAL_NUTRIENTS   :  100, 1600, 2200
+
+===========================================================================
+  END OF SWEEP PLAN
+===========================================================================
