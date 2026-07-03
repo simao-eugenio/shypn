@@ -79,19 +79,119 @@ asked.
    Patching scripts in `<project>/scripts/` either save a new versioned
    file (`model_v2.shy`) or perform an in-memory dispatch only.
 
-## Git workflow (recap)
+## Git workflow — dual-repository protocol (STRICT)
 
-- `private` remote → `git@github.com:simao-eugenio/shypn-dev.git`
-- `public`  remote → `git@github.com:simao-eugenio/shypn.git`
-- Active branch: `Usability-and-enhancements`
+### Repository roles
+
+| Remote | GitHub repo | Purpose |
+|--------|-------------|---------|
+| `private` | `simao-eugenio/shypn-dev` | **All development work.** Never bypassed. |
+| `public`  | `simao-eugenio/shypn`     | Public client-facing mirror. Receives only mature, curated content. |
+
+All commits happen on `private` first. `public` is **never** a direct development target.
+
 - Server alias: `remote-gpu` → `simao@150.162.232.36`, repo at `~/shypn/`
 - Server venv: `~/shypn/.venv/` (CuPy 14.0.1, CUDA 12.9, RTX 5060 Ti)
-- **Code sync (engine, scripts, configs)**: still operator-driven —
-  commit → `git push private` → SSH `git pull private --ff-only`.
-- **Model sync (`.shy` files)**: handled automatically by
-  `RemoteSweepDispatcher` (hybrid model — see next section). Agents
-  must NOT manually `scp` `.shy` files unless the dispatcher path
-  is genuinely unavailable.
+- **Code sync**: operator-driven — commit → `git push private` → SSH `git pull private --ff-only`.
+- **Model sync (`.shy` files)**: handled automatically by `RemoteSweepDispatcher`. Agents must NOT manually `scp` `.shy` files unless the dispatcher path is genuinely unavailable.
+
+### Branch merge protocol — private/main (STRICT)
+
+Feature branches must satisfy **all** of the following before merging into `private/main`:
+
+1. **Tests pass** — `pytest` exits 0 with no regressions.
+2. **No broken ODE build** — `OdeSystemAccelerator.build()` returns `True` for any model affected by the change.
+3. **Scope discipline** — changes are contained to the branch's stated purpose; no accidental edits to unrelated files.
+4. **Commit message** follows Conventional Commits (`feat:`, `fix:`, `engine:`, `model:`, `chore:`, `docs:`).
+5. Merge is operator-confirmed (PR review or explicit operator `git merge` — never an agent-initiated force-merge without confirmation).
+
+Merge command (preferred — no fast-forward so merge commit is visible):
+```bash
+git checkout main
+git merge --no-ff <branch> -m "merge(<branch>): <summary>"
+git push private main
+ssh remote-gpu "cd ~/shypn && git pull private main --ff-only"
+```
+
+### What NEVER goes to public (shypn)
+
+The following paths and patterns are **private-only** and must never be pushed to `public`:
+
+| Category | Paths / patterns |
+|---|---|
+| Research workspace | `workspace/projects/thesis/` (models, sweeps, manuscripts, scripts) |
+| Sweep results | `workspace/projects/*/experiments/results/` |
+| Development scripts | `dev/`, `archive/`, `results/` at repo root |
+| Backup files | `*.bak`, `*.bak2`, `*.bak*` |
+| Thesis branches | Any branch named `thesis/*` |
+| Debug / diagnostic | `dev/debug_*`, `dev/diagnose_*` |
+
+The `workspace/projects/PLOS-One/` directory (frozen public manuscript) **may** be included in a public release after an explicit operator decision.
+
+### Public sync protocol — shypn-dev → shypn
+
+Public sync is triggered by a **maturity decision**: a deliberate operator choice that shypn-dev has reached a stable, releasable state.
+
+#### Trigger criteria (all must hold)
+- Version bumped in `pyproject.toml`, `CITATION.cff`, `src/shypn/version.py`
+- `CHANGELOG.md` (or equivalent) updated
+- All tests pass on both local and server
+- No active debugging branches open against main
+- Operator explicitly says "ready to sync public"
+
+#### Sync procedure
+
+```bash
+# 1. Identify the clean engine + core commits to expose
+#    (exclude workspace/, dev/, archive/, thesis branches)
+git log --oneline public/main..private/main   # audit what would be new
+
+# 2. Create a public-sync branch from private/main
+git checkout -b release/<version> private/main
+
+# 3. Strip private-only content if not already gitignored
+#    (workspace/projects/thesis is already not tracked on main via .gitignore
+#     or subtree — verify before proceeding)
+git status  # confirm no thesis/sweep data staged
+
+# 4. Push the release branch to public
+git push public release/<version>:main   # fast-forward if history is clean
+# OR: open a PR on public from the release branch
+
+# 5. Tag the release on public
+git tag -a v<version> -m "Release v<version>" HEAD
+git push public v<version>
+
+# 6. Delete the release branch locally (keep main clean)
+git branch -d release/<version>
+```
+
+> **Agent rule**: agents must NEVER run `git push public` without explicit operator
+> instruction and confirmation that the public checklist above is satisfied.
+> Treat `git push public` as a destructive/shared-infrastructure action requiring
+> confirmation (same policy as `git push --force`).
+
+### Branch naming conventions (private/shypn-dev)
+
+| Pattern | Purpose |
+|---|---|
+| `main` | Integration branch — always stable, always deployable |
+| `feature/<name>` | New engine / GUI features |
+| `<Name>-and-enhancements` | Legacy enhancement branches (existing) |
+| `fix/<name>` | Bug-fix branches |
+| `thesis/<tag>` | Research snapshots — NEVER synced to public |
+| `release/<version>` | Public-sync staging branches — short-lived |
+| `model/<name>` | Model-file-only branches |
+
+### Server sync (recap)
+
+After every merge to `private/main`:
+```bash
+git push private main
+ssh remote-gpu "cd ~/shypn && git pull private main --ff-only"
+```
+
+The server **never** pulls from `public`. It always follows `private/main`.
 
 ## Programmatic `.shy` patching — property scope rules (STRICT)
 
