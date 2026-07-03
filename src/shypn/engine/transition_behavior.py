@@ -21,6 +21,40 @@ from shypn.utils.safe_eval import safe_eval_bool
 logger = logging.getLogger(__name__)
 
 
+def _output_signal_place_ids(transition: Any, all_arcs: List[Any]) -> List[str]:
+    """Return IDs of signal places written by *transition* via F_s arcs.
+
+    Used by ``_check_preemption`` to determine the output layer of a
+    candidate producer transition for λ-annotation of blocked messages.
+
+    Args:
+        transition: Any transition object with an ``id`` attribute.
+        all_arcs:   Flat list of all Arc objects in the model.
+
+    Returns:
+        List of place IDs (may be empty for Layer-0 producers).
+    """
+    t_id = getattr(transition, 'id', None)
+    result: List[str] = []
+    for arc in all_arcs:
+        if getattr(arc, 'arc_type', 'normal') != 'signal_flow':
+            continue
+        src_id = (
+            getattr(arc, 'source_id', None)
+            or getattr(getattr(arc, 'source', None), 'id', None)
+        )
+        if src_id != t_id:
+            continue
+        tgt = getattr(arc, 'target', None)
+        if tgt is None:
+            continue
+        if getattr(tgt, 'is_signal_place', False):
+            tgt_id = getattr(tgt, 'id', None)
+            if tgt_id is not None:
+                result.append(str(tgt_id))
+    return result
+
+
 class TransitionBehavior(ABC):
     """Abstract base class for transition firing behaviors.
     
@@ -685,6 +719,10 @@ class TransitionBehavior(ABC):
         if not signal_input_arcs:
             return True, "preemption-vacuous-spatial-only"
 
+        # λ map — available when model is a ModelAdapter; empty dict otherwise
+        # (safe fallback for tests and non-controller code paths).
+        lambda_map: Dict[str, int] = getattr(self.model, 'lambda_map', {})
+
         # Collect unique signal input places •_s t
         seen_sp_ids: set = set()
         for arc in signal_input_arcs:
@@ -714,7 +752,26 @@ class TransitionBehavior(ABC):
                 ok, reason = self._check_three_predicates_for(t_prime)
                 if not ok:
                     t_id = getattr(t_prime, 'id', '?')
-                    return False, f"preemption-blocked-by-{t_id}: {reason}"
+                    # λ-layer annotation: identify producer and consumer layers
+                    # for diagnostic messages and DAG-violation detection.
+                    consumer_layer = lambda_map.get(sp_id, 0)
+                    all_arcs = self._get_all_model_arcs()
+                    producer_out_ids = _output_signal_place_ids(t_prime, all_arcs)
+                    producer_layer = max(
+                        (lambda_map.get(pid, 0) for pid in producer_out_ids),
+                        default=0,
+                    )
+                    if producer_layer >= consumer_layer and lambda_map:
+                        logger.warning(
+                            "[λ-DAG-violation] producer %s writes layer %d ≥ "
+                            "consumer layer %d for signal place %s",
+                            t_id, producer_layer, consumer_layer, sp_id,
+                        )
+                    return (
+                        False,
+                        f"[λ={producer_layer}→λ={consumer_layer}] "
+                        f"preemption-blocked-by-{t_id}: {reason}",
+                    )
 
         return True, "preemption-ok"
 

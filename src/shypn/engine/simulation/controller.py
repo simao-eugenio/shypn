@@ -104,6 +104,7 @@ class ModelAdapter:
         self._places_dict: Optional[Dict[Any, Any]] = None
         self._transitions_dict: Optional[Dict[Any, Any]] = None
         self._arcs_dict: Optional[Dict[Any, Any]] = None
+        self._lambda_map: Optional[Dict[str, int]] = None
 
     @property
     def places(self) -> Dict[Any, Any]:
@@ -167,6 +168,37 @@ class ModelAdapter:
         self._places_dict = None
         self._transitions_dict = None
         self._arcs_dict = None
+        self._lambda_map = None
+
+    @property
+    def lambda_map(self) -> Dict[str, int]:
+        """Lazy λ map: {place_id: layer} for non-SPATIAL signal places.
+
+        Computed on first access via :func:`~shypn.engine.signal_hierarchy.compute_lambda_map`.
+        Warnings are emitted (``WARNING`` level) for any ordering violations
+        found by :func:`~shypn.engine.signal_hierarchy.validate_lambda_topology`.
+
+        The cache is invalidated whenever :meth:`invalidate_caches` is called
+        (i.e. when model structure changes).
+        """
+        if self._lambda_map is None:
+            from shypn.engine.signal_hierarchy import (
+                compute_lambda_map,
+                validate_lambda_topology,
+            )
+            import logging as _logging
+            _log = _logging.getLogger(__name__)
+            self._lambda_map = compute_lambda_map(self)
+            violations = validate_lambda_topology(self, self._lambda_map)
+            for v in violations:
+                _log.warning(
+                    "[λ-violation] F_s arc %s: λ(%s)=%d ≥ λ(%s)=%d — "
+                    "layer ordering constraint violated",
+                    v.arc_id,
+                    v.source_place_id, v.lambda_source,
+                    v.target_place_id, v.lambda_target,
+                )
+        return self._lambda_map
 
 # ==================== Model Accessors (Property Proxies) ====================
 

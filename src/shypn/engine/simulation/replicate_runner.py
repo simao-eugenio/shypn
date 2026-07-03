@@ -1380,11 +1380,16 @@ class ReplicateRunner:
         is_reversible = _np.zeros(n_stoch, dtype=_np.bool_)
 
         has_symbolic_rates = False
+        # inhibitor_constraints: list of (place_global_idx, threshold, trans_col_idx)
+        # Enforces the formalism predicate: M(p) >= threshold → transition disabled.
+        # Built here alongside the stoichiometry loop so the GPU engine can apply
+        # the same enablement semantics as the CPU τ-leap path.
+        inhibitor_constraints: list = []
         for j, t in enumerate(stoch_transitions):
             raw_rate = getattr(t, 'rate', 0.0)
             # Check properties.rate_function — the canonical rate store per the
             # loader scope table.  t.rate is the legacy numeric fallback (often
-            # None or 0.0 even when a real symbolic expression exists in
+            # 1.0 or 0.0 even when a real symbolic expression exists in
             # properties), so detecting symbolic-ness from t.rate alone misses
             # every Michaelis-Menten / Hill / multi-species expression and
             # silently falls back to broken mass-action kinetics on the GPU.
@@ -1407,6 +1412,19 @@ class ReplicateRunner:
                 arc_type = getattr(arc, 'arc_type', 'normal')
 
                 if 'inhibitor' in arc_type or arc_type == 'test':
+                    # Inhibitor arc: collect predicate for GPU enforcement.
+                    # Formalism: M(src) >= threshold → transition t is disabled.
+                    # arc.threshold supersedes arc.weight when set (ThresholdEvaluator
+                    # rule); fall back to weight when threshold is None.
+                    if 'inhibitor' in arc_type and tgt == t.id and src in place_id_to_global:
+                        _raw_thr = getattr(arc, 'threshold', None)
+                        try:
+                            _thr = float(_raw_thr) if _raw_thr is not None else w
+                        except (ValueError, TypeError):
+                            _thr = w  # dynamic expressions: fall back to weight
+                        inhibitor_constraints.append(
+                            (place_id_to_global[src], _thr, j)
+                        )
                     continue
 
                 if tgt == t.id and src in place_id_to_global:
@@ -1495,6 +1513,8 @@ class ReplicateRunner:
                     getattr(p, 'name', '') or p.id: i
                     for i, p in enumerate(all_places)
                 },
+                stoch_transition_ids=[t.id for t in stoch_transitions],
+                inhibitor_constraints=inhibitor_constraints,
             )
             results = engine.run_batch(
                 n_replicates=n,
@@ -1551,12 +1571,20 @@ class ReplicateRunner:
                       f"falling back to CPU")
             return None
 
-        # Build a mapping from analysis.place_ids order → accel._all_place_index
-        # so we can copy y[N, P] rows into accel._y_arr efficiently.
-        place_idx_map = np.array(
-            [accel._all_place_index[pid] for pid in analysis.place_ids],
-            dtype=np.intp,
-        )
+        # Build REVERSE mapping: accel column j → caller's y column i.
+        # np.take(y_host, place_idx_map, axis=1)[n, j] = y_host[n, place_idx_map[j]]
+        # We want that to equal y_host[n, i] where i is the position of accel's
+        # j-th place in analysis.place_ids.  So place_idx_map[j] must equal that i.
+        # The forward map place_idx_map_fwd[i] = accel._all_place_index[analysis.place_ids[i]]
+        # goes the *wrong* direction for np.take — using it would read y_host at
+        # the accel index (j) rather than the caller's index (i), scrambling all
+        # token values when the two orderings differ (which they always do because
+        # PropensityAccelerator sorts place IDs while callers use model insertion
+        # order).
+        place_idx_map = np.zeros(accel._n_places, dtype=np.intp)
+        for _i, _pid in enumerate(analysis.place_ids):
+            _j = accel._all_place_index[_pid]
+            place_idx_map[_j] = _i
 
         # Build a mapping from accel.transition_ids_order → analysis.transition_ids
         # so the output arrays are aligned with the GPU engine's column order.
@@ -1642,11 +1670,18 @@ class ReplicateRunner:
                       f"falling back to CPU")
             return None
 
-        # Build mapping: place_id_list order → accel._all_place_index
-        place_idx_map = np.array(
-            [accel._all_place_index[pid] for pid in place_id_list],
-            dtype=np.intp,
-        )
+        # Build REVERSE mapping: accel column j → GPU hybrid column i.
+        # np.take(y_host, place_idx_map, axis=1)[n, j] = y_host[n, place_idx_map[j]]
+        # We need that to equal y_host[n, i] where i is the position of the
+        # j-th accel place in place_id_list.  Using the forward map
+        # (place_idx_map[i] = accel_idx[place_id_list[i]]) reads y_host at the
+        # accel-sorted index (wrong) instead of at the GPU ordering index (correct).
+        # PropensityAccelerator always sorts place IDs; place_id_list uses model
+        # insertion order — 32 of 33 places differ in this model.
+        place_idx_map = np.zeros(accel._n_places, dtype=np.intp)
+        for _i, _pid in enumerate(place_id_list):
+            _j = accel._all_place_index[_pid]
+            place_idx_map[_j] = _i
 
         # Build mapping: stoch_transitions order → accel.transition_ids_order
         accel_tid_to_j = {

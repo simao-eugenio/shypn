@@ -108,6 +108,8 @@ class GPUHybridEngine:
         stoch_propensity_fn: Optional[Callable] = None,
         events: Optional[List[Any]] = None,
         place_name_to_index: Optional[Dict[str, int]] = None,
+        stoch_transition_ids: Optional[List[str]] = None,
+        inhibitor_constraints: Optional[List] = None,
     ) -> None:
         if not _CUPY_AVAILABLE:
             raise RuntimeError("CuPy is required for GPUHybridEngine")
@@ -137,6 +139,23 @@ class GPUHybridEngine:
         # Optional CPU propensity callback for symbolic (non-mass-action) rates.
         # Signature: (y: ndarray[N, P], t: ndarray[N]) → (a_fwd[N, M], a_rev[N, M])
         self._stoch_propensity_fn = stoch_propensity_fn
+
+        # Stochastic transition IDs in column-order of S_stoch (for total_firings)
+        self._stoch_transition_ids: List[str] = list(stoch_transition_ids or [])
+
+        # Inhibitor arc predicates: list of (place_global_idx, threshold, trans_col_idx).
+        # Enforces the formalism rule M(p) >= threshold → transition disabled,
+        # matching the CPU τ-leap path.  Stored as separate 1-D arrays for
+        # efficient GPU broadcast masking.
+        if inhibitor_constraints:
+            _inh = np.array(inhibitor_constraints, dtype=np.float64)  # [K, 3]
+            self._inh_place_idx  = cp.asarray(_inh[:, 0].astype(np.int64))  # [K]
+            self._inh_thresholds = cp.asarray(_inh[:, 1])                   # [K]
+            self._inh_trans_idx  = cp.asarray(_inh[:, 2].astype(np.int64))  # [K]
+        else:
+            self._inh_place_idx  = None
+            self._inh_thresholds = None
+            self._inh_trans_idx  = None
 
         # g_vec for tau-selection (max stoich order per place)
         g_vec = np.ones(n_places, dtype=np.float64)
@@ -404,6 +423,9 @@ class GPUHybridEngine:
 
         stopped_reasons = ["duration"] * N
 
+        # Firing count accumulator: [N, M_stoch] — incremented each τ-leap step
+        d_firings_total = cp.zeros((N, M), dtype=cp.int64)
+
         # ── Main step loop ───────────────────────────────────────────
         step = 0
         for step in range(max_steps):
@@ -471,6 +493,24 @@ class GPUHybridEngine:
 
                 d_a_net = d_a_fwd - d_a_rev  # [N, M]
 
+                # ── Inhibitor arc predicate enforcement (formalism §Enabled) ──
+                # Rule: M(p) >= threshold → transition disabled (propensity = 0)
+                # This mirrors the CPU τ-leap path and must be applied on every
+                # step so the GPU batch obeys the same enablement semantics.
+                if self._inh_place_idx is not None:
+                    # d_y shape: [N, P];  _inh_place_idx shape: [K]
+                    # tokens[n, k] = d_y[n, _inh_place_idx[k]]
+                    inh_tokens = d_y[:, self._inh_place_idx]          # [N, K]
+                    inh_disabled = inh_tokens >= self._inh_thresholds  # [N, K] bool
+                    # For each inhibitor k, zero the propensity of its transition
+                    # column.  Scatter: for each k, d_a_fwd[:, trans_idx[k]] *= ~inh_disabled[:, k]
+                    K = self._inh_place_idx.shape[0]
+                    for _k in range(K):
+                        _col = int(self._inh_trans_idx[_k].get())
+                        _mask = ~inh_disabled[:, _k]                   # [N] bool
+                        d_a_fwd[:, _col] = cp.where(_mask, d_a_fwd[:, _col], 0.0)
+                        d_a_net[:, _col] = cp.where(_mask, d_a_net[:, _col], 0.0)
+
                 # Tau selection (cap at dt to stay synchronised with ODE)
                 d_tau = self._select_tau_batch(d_y, d_a_net, d_a_fwd)
                 d_tau = cp.minimum(d_tau, dt)
@@ -481,6 +521,7 @@ class GPUHybridEngine:
                 d_lam_fwd = d_a_fwd * d_tau[:, cp.newaxis]
                 d_lam_fwd = cp.maximum(d_lam_fwd, 0.0)
                 d_k = cp.zeros((N, M), dtype=cp.int64)
+                # Accumulate firing counts (initialised once before inner loop)
 
                 irrev_mask = ~self._d_is_rev
                 if cp.any(irrev_mask):
@@ -502,6 +543,7 @@ class GPUHybridEngine:
                 d_delta = d_k.astype(cp.float64) @ self._d_S_stoch.T  # [N, P]
                 d_y += d_delta
                 cp.clip(d_y, 0.0, None, out=d_y)
+                d_firings_total += cp.maximum(d_k, 0)
 
                 # Deadlock detection (all stochastic propensities ≤ 0)
                 d_total_a = cp.sum(cp.maximum(d_a_net, 0.0), axis=1)
@@ -584,7 +626,10 @@ class GPUHybridEngine:
                 "transition_data": {},
                 "transition_rates": {},
                 "final_marking": final_marking,
-                "total_firings": {},
+                "total_firings": {
+                    tid: int(d_firings_total[r, j].get())
+                    for j, tid in enumerate(self._stoch_transition_ids)
+                } if self._stoch_transition_ids else {},
                 "stopped_reason": stopped_reasons[r],
                 "elapsed_time": elapsed / N,
             })
