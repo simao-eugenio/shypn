@@ -1382,11 +1382,23 @@ class ReplicateRunner:
         has_symbolic_rates = False
         for j, t in enumerate(stoch_transitions):
             raw_rate = getattr(t, 'rate', 0.0)
-            try:
-                rate_constants[j] = float(raw_rate) if raw_rate else 0.0
-            except (ValueError, TypeError):
-                # Non-numeric rate (symbolic expression) — need CPU propensity
+            # Check properties.rate_function — the canonical rate store per the
+            # loader scope table.  t.rate is the legacy numeric fallback (often
+            # None or 0.0 even when a real symbolic expression exists in
+            # properties), so detecting symbolic-ness from t.rate alone misses
+            # every Michaelis-Menten / Hill / multi-species expression and
+            # silently falls back to broken mass-action kinetics on the GPU.
+            _props = getattr(t, 'properties', None) or {}
+            _prop_rf = _props.get('rate_function', '') if isinstance(_props, dict) else ''
+            if _prop_rf:
+                # Symbolic rate function present — must use CPU propensity callback
                 has_symbolic_rates = True
+            else:
+                try:
+                    rate_constants[j] = float(raw_rate) if raw_rate else 0.0
+                except (ValueError, TypeError):
+                    # Non-numeric rate (symbolic expression) — need CPU propensity
+                    has_symbolic_rates = True
 
             for arc in self.model.arcs:
                 src = getattr(arc, 'source_id', None)
