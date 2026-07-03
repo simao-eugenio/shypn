@@ -455,11 +455,71 @@ FUJITA-3  (2×2 factorial, 50 reps, 12 cond)
     k_sigmaH_factor=1.0, DOSE=0 : ~100%           ← normal SM natural (confirmed)
     k_sigmaH_factor=1.0, DOSE=27: ~100%           ← normal SM abrupt (confirmed)
 
+---------------------------------------------------------------------------
+  FUJITA-3 RESULTS  (run_20260702_191849, 2026-07-02/03)
+  k_sigmaH_factor × LOADING_DOSE  |  INITIAL_NUTRIENTS=100 µM (SM)  |  50 reps
+---------------------------------------------------------------------------
+
+  k_sigmaH  DOSE    Spor%   σ_H_max    t_commit   Notes
+  ────────  ─────   ─────   ────────   ────────   ─────────────────────────
+    0.0       0     0.0%    0.000 µM   —          ← TRUE σ_H-null (Fujita Fig.4)
+    0.0      27     0.0%    0.000 µM   —          ← pulse cannot rescue without σ_H
+    0.2       0    96.0%    0.320 µM   182 min
+    0.2      27   100.0%    0.327 µM   163 min
+    0.4       0    98.0%    0.649 µM   159 min
+    0.4      27   100.0%    0.657 µM   144 min
+    0.6       0   100.0%    0.980 µM   151 min
+    0.6      27   100.0%    0.988 µM   135 min
+    0.8       0   100.0%    1.309 µM   150 min
+    0.8      27   100.0%    1.318 µM   132 min
+    1.0       0   100.0%    1.639 µM   147 min
+    1.0      27   100.0%    1.648 µM   132 min
+
+  KEY FINDINGS:
+
+  1. Q2 CONFIRMED ✅ — true σ_H-null gives 0% sporulation:
+     k_sigmaH_factor=0 → σ_H_max = 0.000 µM → 0% sporulation regardless of
+     LOADING_DOSE. A 27 µM Spo0A_P pulse cannot rescue commitment without σ_H
+     transcription. σ_H is the thermodynamic gate — not merely a downstream
+     reporter of the decision.
+
+  2. ON/OFF THRESHOLD IS EXTREMELY SHARP:
+     Transition from 0% (k_sigmaH=0) to 96% (k_sigmaH=0.2) is essentially
+     a step function. Even 20% σ_H transcription capacity is sufficient for
+     near-full commitment at N0=100 µM. The system is highly robust once
+     σ_H can be produced at all.
+
+  3. σ_H_max scales linearly with k_sigmaH:
+     0.00 → 0.32 → 0.65 → 0.98 → 1.31 → 1.64 µM (× 0 to 1).
+     But sporulation saturates above k_sigmaH=0.2 at N0=100 (fast starvation).
+     The threshold θ_σH = 1.60 µM is only crossed at k_sigmaH=1.0, yet cells
+     sporulate at 96-100% for k_sigmaH ≥ 0.2 — confirming stochastic septation
+     (not σ_H threshold crossing) drives commitment in the lower k_sigmaH range.
+
+  4. PHYSICS INTERPRETATION (Q2):
+     σ_H concentrates >96% of circuit entropy production (NET-T5).
+     σ_H-null eliminates THE thermodynamic commitment mechanism entirely —
+     not a downstream step. The ATP consumed by septation (1908 k_BT/firing)
+     requires σ_H to be present; without it the circuit dissipates no
+     commitment entropy and defaults to 0% fate allocation.
+
 ──────────────────────────────────────────────────────────
 FUJITA-4  (single axis, 200 reps, 15 cond)
+  *** MUST run with GPU engine (use_gpu = force) ***
+  *** CPU run_20260703_141443 INVALID — SinR CPU engine bug ***
 ──────────────────────────────────────────────────────────
   INITIAL_NUTRIENTS   :  100, 400, 700, 1000, 1200, 1300, 1440, 1550, 1650,
                          1800, 2000, 2160, 2300, 2500, 3000
+
+  CPU ENGINE BUG (diagnosed 2026-07-03):
+  The CPU continuous-transition conflict-group resolver incorrectly handles the
+  SinR/SinI group. T_SinR_synthesis and T_SinR_decay both reference SinR, so
+  the BFS conflict grouper places them in the same preemptive group. In the CPU
+  preemptive path, T_SinR_synthesis is suppressed while T_SinR_decay runs,
+  draining SinR 8→0 µM in ~5s (opening T_septation gate for ALL cells).
+  The GPU coupled-ODE correctly balances synthesis≈decay → SinR stable ~7.8 µM.
+  Effect: CPU gives 100% sporulation at all N0≤2000 (gate always open = wrong).
+          GPU gives 38-48% (stochastic gate = correct, matches Sweep C).
 
 ──────────────────────────────────────────────────────────
 NET-T1  (single axis, 100 reps, 16 cond)
