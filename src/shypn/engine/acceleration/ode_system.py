@@ -156,6 +156,14 @@ class OdeSystemAccelerator:
         # _analyse_model.  Non-empty ⇒ build() returns False so caller falls
         # back to the Python ContinuousBehavior path.
         self._unsafe_reasons: List[str] = []
+        # Inhibitor arc guards: tid → list of (source_place_id, threshold_expr).
+        # Threshold may be a numeric string ("1.0") or an algebraic expression
+        # ("4800 + 0.5 * ADP_pool") referencing other place names.  Encoded in
+        # C as:  if (<M(src)> >= <threshold_c>) rate = 0.0;
+        # This is semantically equivalent to the Python ContinuousBehavior path
+        # (both evaluate at discrete dt steps).  Populated by _analyse_model,
+        # consumed by _generate_c.
+        self._inhibitor_guards: Dict[str, List[Tuple[str, str]]] = {}
         # PreemptionCheck specs: tid -> list of producer-predicate dicts.
         # Populated by _analyse_model for any continuous/adaptive transition
         # with at least one non-spatial signal_flow input.  Encoded in C by
@@ -421,39 +429,41 @@ class OdeSystemAccelerator:
             produce: List[Tuple[str, float]] = []
 
             # ── Accelerability audit (Phase-1 formalism gate) ────────
-            # The C-compiled RHS encodes only stoichiometry + the rate
-            # expression.  It does NOT honour structural disablement
-            # guards (inhibitor arcs, θ_eff floor on signal_flow,
-            # PreemptionCheck, transition guard, min_token_threshold,
-            # spatial boundary).  Any continuous transition that depends
-            # on such a guard would silently get *different* dynamics
-            # from the Python ContinuousBehavior path.  Refuse to build
-            # in that case so the caller falls back to Python.
+            # Inhibitor arcs: collect as C guards (if M(p) >= θ → rate=0).
+            # This is equivalent to the Python ContinuousBehavior path which
+            # also evaluates disablement at each discrete dt step.
             for pid, w, at in arc_in.get(tid, []):
                 if "inhibitor" in at:
+                    arc_obj = self._get_arc_by_endpoints(pid, tid)
+                    # threshold may be numeric string or algebraic expression
+                    raw_thresh = None
+                    if arc_obj is not None:
+                        raw_thresh = getattr(arc_obj, "threshold", None)
+                    if raw_thresh is None:
+                        threshold_expr = "1.0"
+                    else:
+                        threshold_expr = str(raw_thresh)
+                    self._inhibitor_guards.setdefault(tid, []).append(
+                        (pid, threshold_expr)
+                    )
+
+            # signal_flow with non-zero θ_eff or Arrhenius E_a (still unsafe —
+            # basin-floor dynamics can't be inlined in the ODE C function)
+            for pid, w, at in arc_in.get(tid, []):
+                if at != "signal_flow":
+                    continue
+                arc_obj = self._get_arc_by_endpoints(pid, tid)
+                if arc_obj is None:
+                    continue
+                theta = float(getattr(arc_obj, "theta_eff", 0.0) or 0.0)
+                e_a   = float(getattr(arc_obj, "activation_energy", 0.0) or 0.0)
+                if theta != 0.0 or e_a != 0.0:
                     self._unsafe_reasons.append(
                         f"  • {t.id} ({getattr(t, 'name', '')}): "
-                        f"inhibitor arc from place {pid} — engine ignores "
-                        f"M(p) ≥ θ disablement"
+                        f"signal_flow arc from {pid} has θ_eff={theta}, "
+                        f"E_a={e_a} — engine ignores basin floor"
                     )
-                    break  # one reason per transition is enough for the log
-            else:
-                # signal_flow with non-zero θ_eff or temperature-dependent θ_eff
-                for pid, w, at in arc_in.get(tid, []):
-                    if at != "signal_flow":
-                        continue
-                    arc_obj = self._get_arc_by_endpoints(pid, tid)
-                    if arc_obj is None:
-                        continue
-                    theta = float(getattr(arc_obj, "theta_eff", 0.0) or 0.0)
-                    e_a   = float(getattr(arc_obj, "activation_energy", 0.0) or 0.0)
-                    if theta != 0.0 or e_a != 0.0:
-                        self._unsafe_reasons.append(
-                            f"  • {t.id} ({getattr(t, 'name', '')}): "
-                            f"signal_flow arc from {pid} has θ_eff={theta}, "
-                            f"E_a={e_a} — engine ignores basin floor"
-                        )
-                        break
+                    break
 
             # PreemptionCheck non-vacuous?  Any non-spatial signal_flow
             # input.  We now ENCODE the check in C as a multiplicative
@@ -575,6 +585,18 @@ class OdeSystemAccelerator:
                 for (src_pid, _w, _theta, _kind) in prod['predicates']:
                     if src_pid not in self._ode_place_index:
                         extra_set.add(src_pid)
+
+        # Inhibitor arc guards: the source place and any places referenced
+        # inside a dynamic threshold expression must be readable in C.
+        for guard_list in self._inhibitor_guards.values():
+            for src_pid, threshold_expr in guard_list:
+                if src_pid not in self._ode_place_index:
+                    extra_set.add(src_pid)
+                # Add any place names used inside the threshold expression
+                for name in collect_names(threshold_expr):
+                    ref_pid = place_name_to_id.get(name)
+                    if ref_pid and ref_pid not in self._ode_place_index:
+                        extra_set.add(ref_pid)
 
         self._extra_place_ids = sorted(extra_set)
         self._extra_place_index = {pid: i for i, pid in enumerate(self._extra_place_ids)}
@@ -728,6 +750,34 @@ class OdeSystemAccelerator:
                 lines.append(c_comment)
                 lines.append(f"    double {var} = {c_expr};")
                 lines.append(f"    if (!isfinite({var})) {var} = 0.0;")
+                # ── Inhibitor arc guards (formalism §3.3 / Arc.consumes_tokens) ──
+                # M(p_inhib) >= θ  →  transition disabled  →  rate set to 0.0
+                # Semantically equivalent to Python ContinuousBehavior path:
+                # both evaluate disablement at discrete dt steps.
+                inhib_guards = self._inhibitor_guards.get(spec.tid, [])
+                if inhib_guards:
+                    lines.append(
+                        f"    /* Inhibitor arc guard(s) for {sanitized_name} */"
+                    )
+                    for (src_pid, threshold_expr) in inhib_guards:
+                        src_c = self._marking_c_expr(
+                            src_pid, ode_idx, extra_idx
+                        )
+                        try:
+                            thresh_c = transpile_expression(
+                                threshold_expr,
+                                name_to_index=name_to_ode,
+                                extra_params=name_to_extra,
+                                thermo_locals=c_thermo,
+                            )
+                        except TranspileError:
+                            # Fallback: use raw expression string as-is;
+                            # gcc will catch genuine syntax errors at compile
+                            # time, so this is safe.
+                            thresh_c = threshold_expr
+                        lines.append(
+                            f"    if ({src_c} >= ({thresh_c})) {var} = 0.0;"
+                        )
                 # ── Single-layer PreemptionCheck gate (formalism §3.3) ──
                 # If this transition has any non-spatial signal_flow
                 # input, every producer of those signal places must
