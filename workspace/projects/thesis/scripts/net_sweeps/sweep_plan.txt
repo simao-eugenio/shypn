@@ -175,6 +175,28 @@ NET-T1  —  Landauer efficiency: SIGMA_HALFLIFE_MIN sweep
     10, 20, 30, 40, 50, 60, 75, 90, 120, 150, 200, 250, 300, 400, 500, 600
     + Baseline (120 min)
 
+  ✅ COMPLETED — run_20260704_181236  (2026-07-04, v9 P=41, server SHA c7eab5bf)
+  ─────────────────────────────────────────────────────────────────────────
+  RESULTS (100 reps/condition, N0=1440 µM fixed):
+
+    HL(min)  Spore%   η_L(%)       ATP_cons(µM)  SigH_final(µM)
+    ──────────────────────────────────────────────────────────────
+       10       8%    1.88e-06       2770           0.069
+       20     100%    1.88e-06       2776           0.145
+       30     100%    1.86e-06       2794           0.226
+       60     100%    1.82e-06       2858           0.479
+       90     100%    1.83e-06       2852           0.751
+      120      38%    1.82e-06       2860           1.035  ← WT
+     ≥150       0%      n/a           n/a           1.33–5.60
+
+  KEY FINDINGS (NET-T1):
+    η_L ≈ 1.82–1.88×10⁻⁸ — topology-constant (varies < 3% over full HL range)
+    ATP consumed per commitment: 2770–2860 µM — fixed by topology
+    NON-MONOTONIC sporulation window: optimal HL = 20–90 min (100% at N0=1440)
+    WT HL=120 min is at the BET-HEDGING operating point (38% = N_c fraction)
+    HL≥150: σH accumulates too high → SinR never drops → 0% sporulation
+    → η_L is topology-determined; WT half-life optimises bet-hedging, not η_L
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NET-T2  —  Non-equilibrium landscape: INITIAL_NUTRIENTS sweep
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

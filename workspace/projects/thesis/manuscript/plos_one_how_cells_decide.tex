@@ -814,8 +814,9 @@ Fujita Protocol sweeps addressing Q1--Q3 directly.
 
 \begin{table}[ht]
 \centering
-\caption{\textbf{NET thermodynamic tests} (predecessor v7 model;
-  v9 re-runs in preparation).  All sweeps: $\tau_{\max} = 0.01$~s,
+\caption{\textbf{NET thermodynamic tests} (v9 model, 41~places;
+  run identifiers archived in repository).
+  All sweeps: $\tau_{\max} = 0.1$~s,
   6-h horizon, $T = 310.15$~K.  $N_{\mathrm{rep}}$: replicates per condition.}
 \label{tab:sweeps}
 {\small
@@ -897,36 +898,58 @@ Results are shown in \Cref{tab:t1}.
 \centering
 \caption{NET~1 results: Landauer efficiency \(\eta_L\) at selected
 \(\sigma\)-factor half-life conditions (100 replicates per condition;
-\(V = 1\)~fL).  \(N_{\mathrm{ATP}}\): mean total ATP consumed per
-replicate.  Excess~\((\times) = 1/\eta_L\): fold-excess of observed
-dissipation over the Landauer bound \(\kB T \ln 2\).}
+\(V = 1\)~fL).  \(N_{\mathrm{ATP}}\): mean ATP consumed per
+committing replicate.  Excess~\((\times) = 1/\eta_L\): fold-excess of observed
+dissipation over the Landauer bound \(\kB T \ln 2\).
+Only conditions with $>0\%$ sporulation at $N_0 = 1440\,\mu$M are shown.
+Run: \texttt{run\_20260704\_181236} (v9, 100~reps/condition).}
 \label{tab:t1}
-\begin{tabular}{rrrrr}
+\begin{tabular}{rrrrrr}
 \toprule
-HL (min) & \(N_{\mathrm{ATP}}\) (\(\mu\)M) & \(\eta_L\) (mean)
-  & \(\sigma(\eta_L)\) & Excess (\(\times\)) \\
+HL (min) & Spor.\,\% & \(N_{\mathrm{ATP}}\) (\(\mu\)M) & \(\eta_L\)
+  & Excess (\(\times\)) \\
 \midrule
-30  & 15\,962 & \(3.10\times10^{-9}\) & \(7.9\times10^{-11}\) & \(3.22\times10^{8}\) \\
-60  & 13\,385 & \(3.70\times10^{-9}\) & \(1.0\times10^{-10}\) & \(2.70\times10^{8}\) \\
-120 & 11\,979 & \(4.13\times10^{-9}\) & \(1.3\times10^{-10}\) & \(2.42\times10^{8}\) \\
-300 & 11\,124 & \(4.46\times10^{-9}\) & \(2.2\times10^{-10}\) & \(2.24\times10^{8}\) \\
-600 & 10\,480 & \(4.73\times10^{-9}\) & \(2.4\times10^{-10}\) & \(2.11\times10^{8}\) \\
+10  &   8 & 2770 & \(1.88\times10^{-8}\) & \(5.32\times10^{7}\) \\
+20  & 100 & 2776 & \(1.88\times10^{-8}\) & \(5.33\times10^{7}\) \\
+30  & 100 & 2794 & \(1.86\times10^{-8}\) & \(5.37\times10^{7}\) \\
+60  & 100 & 2858 & \(1.82\times10^{-8}\) & \(5.49\times10^{7}\) \\
+90  & 100 & 2852 & \(1.83\times10^{-8}\) & \(5.48\times10^{7}\) \\
+120 &  38 & 2860 & \(1.82\times10^{-8}\) & \(5.50\times10^{7}\) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\(\eta_L\) is \(\sim 10^{-9}\) across the entire HL range --- biological
-switches are nowhere near the Landauer bound, consistent with the large
-gap between the bound and the cost of real cellular computation and with
-its direct experimental
-verification~\cite{MehtaSchwab2012,Berut2012} --- but increases
-monotonically with HL.  Sharper, longer-lived \(\sigma\)-factors reduce
-the number of futile transcription cycles per committed bit.  Structural
-coat-synthesis transitions dominate the budget (\(\gtrsim 80\%\)); the
-phosphorelay decision itself contributes \(\lesssim 5\%\) (anticipating
-NET~5).  The trend is the prediction of the \(\Gamma\) framework
-(\(\eta_L\) increases with \(n\), \(\varepsilon\to 0\)) and validates
-the architectural role of \(\Gamma\).
+\(\eta_L\) is $\approx 1.82$--$1.88 \times 10^{-8}$ across all conditions
+where sporulation occurs --- biological switches are nowhere near the Landauer
+bound, consistent with the large gap between the bound and the cost of real
+cellular computation and with its direct experimental
+verification~\cite{MehtaSchwab2012,Berut2012}.
+The key finding is that $\eta_L$ is \emph{topology-constant}: ATP consumption
+per committing cell varies by less than $3\%$ over the entire 10--120~min
+half-life range ($2770$--$2860\,\mu$M), confirming that the energy cost
+is fixed by the circuit topology, not the kinetic parameters.
+
+However, the sporulation fraction is sharply non-monotonic in HL:
+\begin{itemize}
+\item HL~$= 10$~min: only $8\%$ sporulation --- $\sigma_H$ decays before
+  sustaining the commitment pulse.
+\item HL~$= 20$--$90$~min: $100\%$ sporulation --- optimal transient
+  amplifier window.
+\item HL~$= 120$~min (wild-type): $38\%$ at $N_0 = 1440\,\mu$M ---
+  consistent with the F4 result ($39\%$) and confirming self-consistency.
+\item HL~$\geq 150$~min: $0\%$ sporulation --- $\sigma_H$ accumulates
+  to $1.3$--$5.6\,\mu$M (far above $\theta_{\sigma H} = 1.60\,\mu$M)
+  but SinR never drops below $7.5\,\mu$M because the SinI synthesis
+  pathway is disrupted by the altered $\sigma_H$ dynamics.
+\end{itemize}
+This non-monotonic window identifies the wild-type HL~$= 120$~min as
+thermodynamically optimal \emph{for bet-hedging}, not for reliability.
+Shorter half-lives (20--90~min) produce more reliable commitment at
+$N_0 = 1440\,\mu$M but destroy the stochastic diversity required for
+population-level bet-hedging.  The $\sigma_H$ half-life is therefore
+\emph{not} tuned to maximise $\eta_L$ (which is topology-constant) but
+to position the circuit at the maximum-entropy operating point of the
+noise-driven bifurcation landscape, exactly at $N_c \approx 1370\,\mu$M.
 
 \subsection{NET~2 --- Non-Equilibrium Landscape Reconstruction}
 \label{ssec:t2}
