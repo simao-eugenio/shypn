@@ -539,7 +539,43 @@ class SweepRunner:
                 f"= {n_units} work units, pool={n_workers}"
             )
 
-        # 4a. Optional GPU sampler (nvidia-smi). No-op if unavailable.
+        # 4a. Pre-warm the ODE accelerator cache before spawning workers.
+        #
+        # Without this, every pool worker independently generates the same
+        # C source, computes the same hash, and races to compile the same
+        # ode_rhs.c → ode_rhs.so.  N simultaneous gcc processes for the
+        # same model add pure overhead (observed: 30 min for 18 workers on
+        # the bacillus v9 model when cache was cold).
+        #
+        # Compiling once in the main process writes
+        # ~/.cache/shypn/ode_accel/<hash>/ode_rhs.so.  Every worker then
+        # finds a cache hit and skips gcc entirely.  Safe for any model:
+        # if the model has no ODE-eligible transitions, build() returns
+        # False and workers fall back to the CPU τ-leap path unchanged.
+        try:
+            from shypn.data.canvas.document_model import DocumentModel as _DM
+            from shypn.engine.acceleration import OdeSystemAccelerator as _OA
+            from shypn.engine.simulation.controller import (
+                SimulationController as _SC,
+            )
+            _precomp_model = _DM.load_from_file(str(self.model_path))
+            _precomp_ctrl = _SC(_precomp_model)
+            _precomp_accel = _OA(_precomp_model, _precomp_ctrl._get_behavior)
+            _precomp_ok = _precomp_accel.build()
+            if self.verbose:
+                if _precomp_ok:
+                    print(
+                        f"  ODE accelerator pre-compiled "
+                        f"(hash {_precomp_accel._model_hash}) — "
+                        f"workers will reuse cached .so"
+                    )
+                else:
+                    print("  ODE accelerator: no ODE transitions — workers use CPU τ-leap")
+        except Exception as _exc:
+            if self.verbose:
+                print(f"  ODE pre-compilation skipped ({_exc}); workers compile individually")
+
+        # 4b. Optional GPU sampler (nvidia-smi). No-op if unavailable.
         gpu_sampler = _GpuSampler.start(period_ms=500)
 
         with ProcessPoolExecutor(
