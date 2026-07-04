@@ -1,11 +1,11 @@
 {
   "version": "2.0",
   "metadata": {
-    "created": "2026-06-14T15:35:00.560060",
+    "created": "2026-07-04T15:07:35.971339",
     "source": "manual",
     "model_type": "Petri Net",
     "object_counts": {
-      "places": 40,
+      "places": 41,
       "transitions": 36,
       "arcs": 114,
       "modules": 0
@@ -13,8 +13,8 @@
   },
   "view_state": {
     "zoom": 0.5935340067004102,
-    "pan_x": 1121.1261483876256,
-    "pan_y": -375.57058117313295,
+    "pan_x": 1323.3049597873414,
+    "pan_y": 493.7983078456458,
     "transformations": {
       "rotation": {
         "type": "rotation",
@@ -1029,8 +1029,8 @@
       "x": -790.0,
       "y": 0.0,
       "radius": 30.0,
-      "marking": 100.0,
-      "initial_marking": 100.0,
+      "marking": 1440,
+      "initial_marking": 1440,
       "capacity": "Infinity",
       "border_color": [
         0.45,
@@ -1565,26 +1565,37 @@
       "id": "P41",
       "name": "k_sigmaH_factor",
       "label": "k_sigmaH_factor",
-      "x": -680.0,
-      "y": -180.0,
-      "radius": 30.0,
-      "initial_marking": 1.0,
-      "marking": 1.0,
-      "capacity": 0,
-      "is_parameter_place": true,
-      "is_signal_place": false,
-      "is_catalyst": false,
-      "is_energy_place": false,
-      "is_compartment_place": false,
-      "is_regulatory_place": false,
-      "is_source": false,
-      "is_sink": false,
-      "compartment": null,
       "metadata": {
         "purpose": "FUJITA-3: gates T_sigmaH_transcription for sigma_H-null sweep"
       },
+      "object_type": "place",
+      "x": -680.0,
+      "y": -180.0,
+      "radius": 30.0,
+      "marking": 1.0,
+      "initial_marking": 1.0,
+      "capacity": 0,
+      "border_color": [
+        0.45,
+        0.45,
+        0.45
+      ],
+      "border_width": 3.0,
+      "is_catalyst": false,
+      "is_signal_place": false,
+      "signal_type": null,
+      "is_compartment_place": false,
+      "is_regulatory_place": false,
+      "is_energy_place": false,
+      "is_parameter_place": true,
       "parameter_kind": "kinetic",
-      "parameter_units": "dimensionless"
+      "parameter_units": "dimensionless",
+      "diffusion_coefficient": null,
+      "boundary_type": null,
+      "gradient_vector": null,
+      "compartment_volume": null,
+      "neighbor_compartments": [],
+      "spatial_position": null
     }
   ],
   "transitions": [
@@ -1620,9 +1631,9 @@
         "rate_function": "0.01 * KinA_kinase * (1 / (1 + Nutrients**2)) * ATP_pool / (50 + ATP_pool)"
       },
       "signal_places": [
-        "P1",
         "P5",
-        "P3"
+        "P3",
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1661,8 +1672,8 @@
         "rate_function": "0.1 * KinA_P * Spo0F / (10 + Spo0F)"
       },
       "signal_places": [
-        "P7",
-        "P6"
+        "P6",
+        "P7"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
@@ -1864,8 +1875,8 @@
       "signal_places": [
         "P2",
         "P4",
-        "P1",
-        "P13"
+        "P13",
+        "P1"
       ],
       "is_environment_aware": true,
       "adaptive_filter": null,
