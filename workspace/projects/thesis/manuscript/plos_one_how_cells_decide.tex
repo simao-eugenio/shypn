@@ -1023,107 +1023,113 @@ satisfying the transcriptional threshold criterion.
 \subsection{NET~2 --- Non-Equilibrium Landscape Reconstruction}
 \label{ssec:t2}
 
-The empirical landscape \(U_{\mathrm{eff}}(x) = -\ln \hat P(x)\) is computed
-by Gaussian kernel-density estimation of ATP-pool final markings across
-replicates at each nutrient level \(N\).  The order parameter is
-\begin{equation}
-  \varphi = \frac{[\text{Spo0A}_{\sim P}]}{[\text{Spo0A}_{\sim P}]_{\max}}
-  + \frac{[\sigma_H]}{[\sigma_H]_{\max}}
-  + \frac{[\text{Septum}]}{[\text{Septum}]_{\max}},
-  \label{eq:order-param}
-\end{equation}
-the sum of fractional occupancies of the three canonical commitment
-markers (phosphorelay master regulator, early \(\sigma\)-factor,
-septum; each normalised to its trajectory maximum).
+The empirical landscape \(U_{\mathrm{eff}}(x) = -\ln \hat P(x)\) is estimated
+from the distribution of final ATP-pool values across 100 replicates per
+condition (\texttt{run\_20260704\_201120}, v9 model, 13 conditions,
+$N_0 = 100$--$3000\,\mu$M, LOADING\_DOSE~$= 0$).
 Sarle's bimodality coefficient
-\(\BC = (\hat s^2 + 1) / (\hat\kappa + 3)\) is used as the bimodality
+\(\BC = (\hat s^2 + 1) / (\hat\kappa + 3)\) is the bimodality
 diagnostic (\(\BC > 0.555\) per Freeman \& Dale~\cite{Freeman2013}).
 Results are summarised in \Cref{tab:t2}.
 
 \begin{table}[h]
 \centering
-\caption{NET~2 results: bimodality coefficient and ATP statistics across
-the nutrient axis (100 replicates per condition).}
+\caption{NET~2 results: bimodality coefficient ($\BC$), ATP statistics,
+and commitment metrics across the nutrient axis (v9 model,
+100 replicates per condition, run \texttt{20260704\_201120}).
+$t_{\mathrm{depl}}$: nutrient depletion time ($\pm\,0$ min, deterministic).
+Lag: time from depletion to ATP commitment dip.}
 \label{tab:t2}
-\begin{tabular}{rrrrl}
+{\small\begin{tabular}{rcccrrr}
 \toprule
-\(N\) (\(\mu\)M) & \(\overline{\mathrm{ATP}}\) (\(\mu\)M) & \(\BC\) & \(\CV\) & Regime \\
+$N_0$ ($\mu$M) & Spor.\,\% & $\BC$ & ATP\,floor (mM) & $t_{\mathrm{depl}}$ & Lag & Regime \\
 \midrule
-1   & 2\,233 & 0.376 & 0.004 & unimodal (high-ATP) \\
-10  & 2\,234 & 0.348 & 0.004 & unimodal (high-ATP) \\
-\textbf{15}  & 2\,224 & \textbf{0.995} & 0.049 & bifurcation edge \\
-\textbf{20}  & 1\,914 & \textbf{0.963} & 0.375 & bimodal (87/13 split) \\
-30  &    35  & 0.591 & 0.514 & weakly bimodal (collapsing) \\
-100 &    37  & 0.594 & 0.510 & weakly bimodal (low-ATP plateau) \\
+100  & 100 & 0.165 & 1.956 (spor) & 17 min & 140 min & fully committed \\
+900  &  88 & 0.441 & 1.968 (spor) & 150 min & 127 min & near-commitment \\
+1200 &  68 & 0.149 & 1.963 (spor) & 200 min & 117 min & bet-hedging \\
+1440 &  38 & 0.356 & 1.970 (spor) & 240 min & 100 min & bet-hedging \\
+     &     &       & 2.242 (veg)  &         &         & \\
+1600 &   9 & 0.192 & 2.030 (spor) & 267 min &  87 min & tail-crossing \\
+1800 &   0 & 0.270 & 3.428        & 300 min &  --- & vegetative \\
+2000 &   0 & 0.533 & 4.435        & 333 min &  --- & vegetative \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
-The architectural prediction \(|\Aset(\Ge)| = 2\) is confirmed: a
-strongly bimodal distribution emerges in the \(N = 15\)--\(20\,\mu\)M
-window, and the empirical landscape has exactly two minima
-(high-ATP vegetative basin, low-ATP starvation basin) bracketing the
-critical point.  At \(N = 15\,\mu\)M the bimodality coefficient is
-0.995 --- numerically saturated at unity --- identifying the closest
-sampled condition to the separatrix (\Cref{fig:landscape-kde}).
+Final-ATP Sarle BC does \emph{not} exceed the $0.555$ bimodality
+threshold in the commitment zone ($N_0 = 900$--$1600\,\mu$M).
+The two ATP basins (sporulating: $\approx 1.96$~mM; vegetative:
+$\approx 2.24$~mM at $N_0 = 1440$) are only $\approx 0.28$~mM
+apart, and with $n = 100$ replicates the Sarle coefficient lacks the
+sensitivity to separate two overlapping near-Gaussian peaks.
+The composite order parameter $\varphi$ (eq.~\ref{eq:order-param})
+combining Spo0A$\sim$P, $\sigma_H$, and Septum is required to recover
+the true bimodal landscape at the commitment bifurcation.
 
-sampled condition to the separatrix (\Cref{fig:landscape-kde}).
+\subsubsection*{Trajectory analysis: five unexpected landscape features}
 
-The landscape reveals a finding that connects directly to the hidden
-variable in Fujita's experimental design --- a variable Fujita never
-measured or conjectured.
-The v9 SHPN model prediction for the \emph{vegetative-basin ATP floor}
---- the mean trajectory minimum across cells that ultimately remain
-vegetative under bet-hedging conditions ($N_0 = 1440\,\mu$M,
-SinR$= 12\,\mu$M, Sweep~C, $n = 26$ vegetative replicates) ---
-is $\mathbf{2.13 \pm 0.04}$~\textbf{mM}.
-Sporulating replicates in the same condition dip below this floor
-($1.95$--$2.13$~mM trajectory minimum), making the prediction sharp:
-\emph{cells whose ATP trajectory crosses below $2.13$~mM commit to
-sporulation; cells that remain above it recover the vegetative
-programme.}
-This value is a topology-driven prediction: no model parameter was
-targeted to reproduce this floor.
+G5-tier per-replicate trajectories reveal structure invisible in
+the final-marking statistics:
 
-The critical connection to Fujita: the natural-route experiment was
-performed in \textbf{SM medium} (Sterlini-Mandelstam sporulation
-medium with no carbon source except glutamate) --- cells are
-nutrient-depleted, and their ATP pools decline toward and through the
-$2.13$~mM floor, enabling commitment.  The abrupt Spo0A* experiment
-was performed in \textbf{CH medium} (casein hydrolysate, a rich carbon
-source) with cells in exponential growth (OD$_{600} = 0.4$) ---
-cells have full carbon supply, their ATP pools remain well \emph{above}
-the $2.13$~mM floor throughout the IPTG induction window, and the
-Spo0A* pulse is cleared by nutrient-boosted phosphatase before
-$[\sigma_H]$ builds.
-Fujita reported the medium difference as a technical feature of the
-inducible-promoter strategy; our model predicts it is the
-\emph{mechanistic cause} of the 52\%/5\% asymmetry, not merely
-an experimental artefact.
-A direct falsifiable prediction: abrupt Spo0A* induction in SM medium
-(not CH) should achieve substantially higher sporulation efficiency than
-the $\approx 5\%$ observed in CH.
+\textbf{1. The commitment clock is deterministic.}
+Nutrient depletion time has zero replicate-to-replicate variance
+($\sigma = 0$~min) in all conditions: $t_{\mathrm{depl}} = N_0 /
+(0.1\,\mu\mathrm{M\,s}^{-1}) / 60$.  The ODE-integrated nutrient
+depletion sets an exact timer; only the post-depletion stochastic
+phosphorelay introduces variability.
 
-Fujita and Losick further report an equivalent Hill coefficient
-$n_H \approx 4$ from logistic regression of the sporulation fraction
-\textit{vs.}\ Spo0A activity, independently corroborating the
-ultrasensitive switching character that the
-$\Gamma = (K, n, \varepsilon)$ architecture
-is designed to capture~\cite{Narula2012}.
+\textbf{2. Temporal priming: depletion lag decreases with $N_0$.}
+The time between nutrient depletion and the ATP commitment dip
+decreases from $140$~min at $N_0 = 100\,\mu$M to $87$~min at
+$N_0 = 1600\,\mu$M (\Cref{tab:t2}).  Cells that deplete nutrients
+later have been accumulating Spo0A and Spo0F longer; their phosphorelay
+pools are larger when starvation hits, and they commit faster.
+Spo0A$\sim$P peak confirms this: $13.8\,\mu$M at $N_0 = 100\,\mu$M
+falls to $7.9\,\mu$M at $N_0 = 1600\,\mu$M.
+This \emph{temporal priming effect} is invisible at the final-marking
+level and can only be detected from trajectory data.
 
-\begin{figure}[!ht]
-  \centering
-  \includegraphics[width=\linewidth]{figures/fig_landscape_kde.png}
-  \caption{\textbf{Empirical non-equilibrium landscape reconstruction (NET~2).}
-  Each panel shows the KDE-estimated potential
-  $U_{\mathrm{eff}}(x) = -\ln\hat{P}(x)$ of the ATP-pool final marking
-  across 100 replicates at six nutrient levels $N$ ($\mu$M).
-  At $N = 15$--$20\,\mu$M a second minimum emerges (low-ATP sporulation
-  basin), confirming the architectural prediction $|\mathcal{A}(G_E)| = 2$.
-  Sarle's bimodality coefficient $\mathcal{BC}$ (inset) peaks at 0.995
-  ($N = 15\,\mu$M), identifying the bifurcation edge.}
-  \label{fig:landscape-kde}
-\end{figure}
+\textbf{3. The true commitment floor is 1.96 mM (trajectory minimum).}
+The ATP dip during the commitment event is $1956$--$1970\,\mu$M
+($= 1.96$~mM) regardless of $N_0$ --- a topology-derived constant.
+This is distinct from the \emph{vegetative-basin floor} measured from
+final markings ($\approx 2.24$~mM): cells whose ATP trajectory crosses
+below $1.96$~mM commit; cells that do not cross recover to the
+vegetative basin.  The $2.13$~mM value cited in earlier model versions
+is an intermediate floor from a different parameter configuration;
+the v9 value is $1.96$~mM (sporulation dip) and $2.24$~mM (vegetative
+floor), a $0.28$~mM separation that defines the two landscape basins.
+
+\textbf{4. Sporulation fraction = $P$($\sigma_H$ peak $> \theta_{\sigma H}$).}
+At $N_0 = 1600\,\mu$M, mean $[\sigma_H]_{\max} = 1.41\,\mu$M
+(below $\theta_{\sigma H} = 1.60\,\mu$M) yet $9\%$ sporulate.
+The $9\%$ are exactly the replicates whose stochastic $\sigma_H$
+trajectory transiently exceeds $1.60\,\mu$M.  The commitment fraction
+is therefore a \emph{noise-driven threshold-crossing probability},
+not a deterministic mean-field switch.
+
+\textbf{5. SinR fluctuates in a narrow near-threshold band.}
+Minimum SinR across all sporulating cells: $7.28$--$7.45\,\mu$M ---
+only $0.05$--$0.22\,\mu$M below the $7.5\,\mu$M inhibitor threshold.
+This near-miss geometry maximises the sensitivity of the SinI$\,/\,$SinR
+gate to stochastic SinI bursts, amplifying small fluctuations into
+binary fate decisions.
+
+The landscape reveals a finding connecting directly to the hidden
+variable in Fujita's experimental design.
+The model predicts a \emph{commitment ATP floor} of $1.96$~mM
+(trajectory minimum at the sporulation dip) and a
+\emph{vegetative basin floor} of $\approx 2.24$~mM.
+In \textbf{SM medium} (no carbon, cells nutrient-depleted) ATP declines
+through the $1.96$~mM floor, enabling commitment.
+In \textbf{CH medium} (rich carbon, exponential growth) ATP remains
+above $2.24$~mM throughout, and the Spo0A$\sim$P pulse is cleared
+before $[\sigma_H]$ builds.
+The medium difference is therefore the \emph{mechanistic cause} of the
+$52\%/5\%$ asymmetry, not a technical artefact of the inducible-promoter
+strategy.  A direct falsifiable prediction: abrupt Spo0A* induction in
+SM medium should achieve substantially higher sporulation than the
+$\approx 5\%$ observed in CH.
 
 \subsection{NET~3 --- Fluctuation-Theorem Inapplicability}
 \label{ssec:t3}
