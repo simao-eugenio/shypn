@@ -951,6 +951,75 @@ population-level bet-hedging.  The $\sigma_H$ half-life is therefore
 to position the circuit at the maximum-entropy operating point of the
 noise-driven bifurcation landscape, exactly at $N_c \approx 1370\,\mu$M.
 
+\subsubsection*{Trajectory analysis: two mechanistically distinct commitment routes}
+
+G5-tier per-replicate trajectories reveal two qualitatively different
+commitment modes depending on half-life (\Cref{tab:t1_traj}).
+
+\begin{table}[h]
+\centering
+\caption{Commitment timing from G5 trajectories (NET~1, sporulating
+replicates only).  $t_{\mathrm{SinR}}$: first time SinR $< 7.5\,\mu$M.
+$t_{\mathrm{sept}}$: first Septum$\,> 0$.
+$[\sigma_H]_{\max}$: peak $\sigma_H$ across trajectory.}
+\label{tab:t1_traj}
+{\small\begin{tabular}{rcrrcr}
+\toprule
+HL (min) & Spor.\,\% & $t_{\mathrm{SinR}}$ (min) & $t_{\mathrm{sept}}$ (min)
+  & Lag (min) & $[\sigma_H]_{\max}$ ($\mu$M) \\
+\midrule
+20  & 100 & $0.1 \pm 0.0$   & $246 \pm 4$   & $246$ & 0.265 \\
+30  & 100 & $0.1 \pm 0.0$   & $245 \pm 3$   & $245$ & 0.393 \\
+60  & 100 & $0.2 \pm 0.0$   & $245 \pm 3$   & $245$ & 0.761 \\
+90  & 100 & $0.6 \pm 0.0$   & $244 \pm 3$   & $244$ & 1.113 \\
+120 &  38 & $335 \pm 14$    & $335 \pm 14$  & $0.3$ & 1.476 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Two commitment modes emerge:
+
+\textbf{Mode~A --- passive SinR drift (HL $\leq 90$~min).}
+SinR falls below $7.5\,\mu$M within $0.1$--$0.6$~min via natural
+continuous degradation, without SinI-mediated sequestration.
+Septum firing is then delayed $\approx 244$~min until $\sigma_H$
+accumulates enough for T\textsubscript{septation} to fire stochastically
+at low propensity ($[\sigma_H] \approx 0.27$--$1.11\,\mu$M).  The
+commitment clock is set by a nutrient-depletion timer upstream of
+$\sigma_H$: despite $[\sigma_H]_{\max}$ varying $4\times$ across
+HL~$= 20$--$90$~min, T\textsubscript{septation} fires at the same time
+($244$--$246 \pm 3$~min) in all conditions.  The $\sigma_H$ concentration
+modulates the \emph{probability} of firing during each SinR excursion
+below $7.5\,\mu$M, not the \emph{timing} of the excursion.
+
+\textbf{Mode~B --- active SinI/SinR (HL $= 120$~min, wild-type).}
+SinR does not drop below $7.5\,\mu$M until $t = 335$~min, when
+stochastic SinI synthesis from Spo0A\textsubscript{$\sim$P}
+sequesters SinR below the inhibitor threshold.  Septum then fires
+within $0.3 \pm 0.3$~min --- essentially instantaneously.
+This is the classical stochastic SinI/SinR bet-hedging mechanism.
+Only $38\%$ of replicates achieve the SinI burst (the Poisson-distributed
+SinI synthesis event), producing the bet-hedging fraction directly.
+
+A prediction emerges from this separation: \emph{deleting SinI} should
+abolish Mode~B but leave Mode~A intact, shifting the sporulation
+fraction at $N_0 = 1440\,\mu$M from $38\%$ to a value determined
+solely by the passive SinR drift dynamics.  This prediction is testable
+by setting SinI~$= 0$ in the sweep and comparing the septum timing
+distribution.
+
+\textbf{Paradox at HL $\geq 150$~min: silent dead-end.}
+$\sigma_H$ accumulates above $\theta_{\sigma H} = 1.60\,\mu$M
+(peak $1.80$--$3.35\,\mu$M) --- T\textsubscript{septation} is fully
+enabled on the $\sigma_H$ axis --- yet $0\%$ sporulation.
+SinR never drops below $7.5\,\mu$M, evidently because Spo0A$\sim$P
+accumulation is suppressed under high-HL dynamics, blocking SinI
+synthesis.  The cell enters a \emph{$\sigma_H$-locked vegetative state}:
+the downstream execution programme is primed but the SinI/SinR trigger
+never fires.  This constitutes a new architectural prediction --- $\sigma_H$
+over-stabilisation creates a commitment-incompetent state despite
+satisfying the transcriptional threshold criterion.
+
 \subsection{NET~2 --- Non-Equilibrium Landscape Reconstruction}
 \label{ssec:t2}
 
