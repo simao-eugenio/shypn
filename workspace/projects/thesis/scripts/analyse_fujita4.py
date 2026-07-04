@@ -3,7 +3,7 @@
 
 Run from: ~/shypn/  with .venv activated.
 
-Analyses run_20260703_141443:
+Analyses run_20260704_163628:
   Natural route N0 titration — LOADING_DOSE=0, k_sigmaH_factor=1
   N0: 100 → 3000 µM, 200 replicates per condition, 6 h horizon.
 
@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 RUN = pathlib.Path(
-    "workspace/projects/thesis/experiments/results/run_20260703_141443"
+    "workspace/projects/thesis/experiments/results/run_20260704_163628"
 )
 
 # ── helpers ──────────────────────────────────────────────────────────────────

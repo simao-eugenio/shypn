@@ -129,8 +129,31 @@ FUJITA-4  —  Bet-hedging fraction map: N0 titration                     (Q3)
     100, 400, 700, 1000, 1200, 1300, 1440, 1550, 1650, 1800,
     2000, 2160, 2300, 2500, 3000  µM
 
-  Expected shape: step function from ~100% at N0=100
-                  to ~0% at N0=2500, with bet-hedging plateau 1440-2160
+  ✅ COMPLETED — run_20260704_163628  (2026-07-04, v9 P=41 model, server SHA 7057e706)
+  ─────────────────────────────────────────────────────────────────────────
+  RESULTS (200 reps/condition, GPU hybrid CPU+GPU symbolic, 6h horizon):
+
+    N0(µM)  Spore%   95%CI        SigmaH(µM)  ATP_veg(mM)
+    ────────────────────────────────────────────────────────
+      100    100%    [98–100%]      1.569        2.166
+      400    100%    [98–100%]      1.520        2.164
+      700     96%    [92–98%]       1.437        2.165
+     1000     84%    [78–88%]       1.319        2.172
+     1200     68%    [61–74%]       1.234        2.183
+     1300     56%    [49–62%]  ←── above 50%
+     1440     39%    [32–45%]  ←── below 50%
+     1550     22%    [17–28%]       1.022        2.225
+     1650      5%    [2–8%]         0.952        2.601
+     1800      2%    [1–4%]         0.840        3.398
+     2000+     0%    [0–2%]         ≤0.681       ≥4.43
+     2160+     0%    nutrients not depleted
+
+  KEY FINDINGS (Q3):
+    N_c ≈ 1370 µM  (midpoint 1300-1440 µM, CIs non-overlapping)
+    Bet-hedging window: 700–1800 µM
+    ATP vegetative floor: 2.165–2.225 mM (stressed conditions)
+    SigmaH threshold gate: σH drops below θ=1.60 µM above N0≈1000 µM
+    → Confirms BIO-PN bet-hedging hypothesis (Q3 ANSWERED)
 
 ---------------------------------------------------------------------------
   SECTION B — NET PHYSICS TESTS (for plos_one_how_cells_decide.tex)

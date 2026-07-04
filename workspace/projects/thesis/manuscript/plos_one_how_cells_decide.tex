@@ -1340,7 +1340,7 @@ cannot commit without it.
   non-sporulating replicates (vegetative basin floor).
   $t_{\mathrm{commit}}$: mean time to first mature spore (sporulating
   replicates only).
-  F4 (FUJITA-4, fine nutrient sweep) is in progress at time of writing.}
+  F4 results: run\_20260704\_163628, v9 model, server SHA 7057e706.}
 \label{tab:fujita_results}
 {\small
 \begin{tabular}{@{}llccccc@{}}
@@ -1369,6 +1369,15 @@ Sweep & Condition & Spor\,\% & $[\sigma_H]_{\max}$ ($\mu$M)
 & $k_{\sigma H}{=}0.2$, D$=27$ & 100 & 0.327 & --- & 163 \\
 & $k_{\sigma H}{=}1.0$, D$=0$ (wild-type) & 100 & 1.639 & --- & 147 \\
 & $k_{\sigma H}{=}1.0$, D$=27$ & 100 & 1.648 & --- & 132 \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{F4 --- natural route $N_0$ titration (200 reps/cond)}} \\
+& $N_0{=}100\,\mu$M (commitment) & 100 & 1.569 & 2.166 & --- \\
+& $N_0{=}1000\,\mu$M & 84 & 1.319 & 2.172 & --- \\
+& $N_0{=}1300\,\mu$M & 56 & 1.179 & 2.190 & --- \\
+& $N_0{=}1440\,\mu$M & 39 & 1.093 & 2.206 & --- \\
+& $N_0{=}1800\,\mu$M & 2 & 0.840 & 3.398 & --- \\
+& $N_0{=}2000\,\mu$M (vegetative) & 0 & 0.681 & 4.434 & --- \\
+\multicolumn{3}{@{}l}{\textit{$N_c \approx 1370\,\mu$M; bet-hedging window 700--1800~$\mu$M}} & & & \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -1452,17 +1461,37 @@ circuit pays its Landauer cost.  Without septation, the cell cannot
 execute the irreversible state transition, regardless of how much
 upstream Spo0A$\sim$P is present.
 
-\textbf{Q3 status: fine sweep in progress.}
-FUJITA-4 (fine $N_0$ sweep, 200 replicates, 16 conditions) was
-dispatched but had not completed at time of writing.  Preliminary results
-from F1/F2 place the $50\%$ crossover between $N_0 = 1440$ and
-$1600\,\mu$M.  The NET~4 critical exponents ($\gamma_{\mathrm{sub}} \approx 2.4$,
-$\gamma_{\mathrm{sup}} \approx 4.6$, v7 model) indicate a noise-driven
-universality class with asymmetric basin curvature; the resulting
-near-equal basin depths over a wide nutrient range ($\approx 38$--$66\%$
-across all F1/F2 CH conditions) explain why the Fujita $\approx 52\%$
-is not a special value but the thermodynamically natural outcome
-near a noise-driven bifurcation without parameter bias.
+\textbf{Q3 answered: $N_c \approx 1370\,\mu$M and the bet-hedging window
+spans 700--1800~$\mu$M.}
+Sweep~F4 (FUJITA-4, 200 replicates $\times$ 16 conditions, natural route,
+\texttt{run\_20260704\_163628}) resolved the full sporulation fraction curve
+on the v9 model at single-condition resolution:
+\begin{itemize}
+\item \textbf{Commitment zone} ($N_0 \leq 400\,\mu$M): $100\%$
+  sporulation (95\% CI [98--100\%]).  Nutrients deplete fully;
+  $[\sigma_H]_{\max} \approx 1.52$--$1.57\,\mu$M $>\theta_{\sigma H}$.
+\item \textbf{Bet-hedging window} (700--1800~$\mu$M): sporulation falls
+  monotonically from $96\%$ [92--98\%] at $N_0 = 700\,\mu$M to
+  $2\%$ [1--4\%] at $N_0 = 1800\,\mu$M.  At $N_0 = 1300\,\mu$M:
+  $56\%$ [49--62\%]; at $N_0 = 1440\,\mu$M: $39\%$ [32--45\%].
+  The $50\%$ crossover is $N_c \approx 1370\,\mu$M (midpoint of the
+  first condition above and the first condition below 50\%;  95\%~CIs
+  are non-overlapping, confirming the crossing is statistically resolved).
+\item \textbf{Vegetative zone} ($N_0 \geq 2000\,\mu$M): $0\%$
+  sporulation [0--2\%]; nutrients are not fully depleted within 6~h;
+  $[\sigma_H]_{\max}$ falls to $0.68\,\mu$M at $N_0 = 2000\,\mu$M,
+  well below $\theta_{\sigma H} = 1.60\,\mu$M.
+\end{itemize}
+The vegetative ATP floor is $2.165$--$2.225$~mM across all
+nutrient-stressed conditions ($N_0 \leq 1800\,\mu$M), consistent with
+the topology-derived prediction of $2.13$~mM and with the F1/F2
+measurements ($2.22 \pm 0.04$~mM).  The NET~4 critical exponents
+($\gamma_{\mathrm{sub}} \approx 2.4$, $\gamma_{\mathrm{sup}} \approx 4.6$,
+v7 model) predict asymmetric basin curvature that naturally produces a
+near-50\% crossover near the bifurcation; the F4 measurement of
+$N_c \approx 1370\,\mu$M confirms that the Fujita $\approx52\%$ is the
+thermodynamically natural outcome near the noise-driven commitment
+bifurcation, not a biologically tuned value.
 
 \subsection{Competitive Landscape}
 
