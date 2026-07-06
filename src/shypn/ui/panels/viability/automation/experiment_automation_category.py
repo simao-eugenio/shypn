@@ -181,6 +181,22 @@ class ExperimentAutomationCategory:
                 self.queue_view.clear_status()
             except Exception:
                 pass
+            # ── Wipe residual property_overrides from all snapshots. ──────────
+            # Without this, overrides from the previous sweep (e.g. P34=2160,
+            # P35=3600 from a NET-T3 factorial) survive the Clear and propagate
+            # silently into every condition of the next sweep via the
+            # base_snapshot.property_overrides.copy() in the snapshot generator.
+            # Clearing here is safe: intentional fixed overrides live in the
+            # sweep builder's fixed_overrides section (exported separately via
+            # config['fixed_overrides']); they are not stored in snapshot
+            # property_overrides.
+            em = getattr(self, 'experiment_manager', None)
+            if em is not None:
+                for snap in getattr(em, 'snapshots', []):
+                    try:
+                        snap.property_overrides = {}
+                    except Exception:
+                        pass
         self.sweep_builder.set_clear_callback(_on_sweep_plan_cleared)
         
         # Connect type change to parameter refresh AND clear queue
