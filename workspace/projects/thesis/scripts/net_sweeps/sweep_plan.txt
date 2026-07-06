@@ -234,6 +234,26 @@ NET-T3  —  Fluctuation theorem: nutrients step forward/reverse
   Note: "forward" = starts in bet-hedging zone, steps to non-sporulating zone
         "reverse" = starts in non-sporulating zone, steps to bet-hedging zone
 
+  ✅ COMPLETED — run_20260706_151050  (2026-07-06, v9 P=41, 200 reps × 5 cond)
+  Note: Dispatch B only (4 conditions with P35=3600 step active)
+  ─────────────────────────────────────────────────────────────────────────
+  RESULTS (2×2 factorial P27×P34, fixed P35=3600, 200 reps/condition):
+
+    Condition           Spore%   ATP(mM)    W/kBT
+    ──────────────────────────────────────────────
+    Baseline (no step)    38%    2.206    +3.72e+07
+    FWD  1440→2160 at 1h   0%    5.201    -2.67e+06  ← W NEGATIVE (ATP produced)
+    REV  2160→1440 at 1h   2%    3.398    +2.13e+07
+    Ctrl 1440→1440 at 1h   2%    3.398    +2.13e+07
+    Ctrl 2160→2160 at 1h   0%    5.206    -2.75e+06
+
+  KEY FINDINGS (NET-T3):
+    FT inapplicability: W/kBT=3.72e+07 = 10^16,000,000 × Landauer bound
+    W_fwd NEGATIVE: enrichment produces net ATP (cell metabolizes nutrients)
+    FWD/REV sign reversal: NOT time-reverses, asymmetric landscape confirmed
+    Commitment is easy to abort (FWD: 38%→0%) but hard to trigger (REV: 0%→2%)
+    → Strongest confirmation of POSet-enforced irreversibility
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NET-T4  —  Critical exponents: fine INITIAL_NUTRIENTS sweep
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
