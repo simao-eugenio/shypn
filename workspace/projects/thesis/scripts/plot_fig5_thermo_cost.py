@@ -110,10 +110,17 @@ ax2.set_ylabel(r"$W / k_B T$")
 ax2.set_title("(b) Dissipated work per condition\n(NET-T3, n=200/condition, zero replicate variance)")
 ax2.tick_params(axis='x', labelsize=8)
 ax2.grid(alpha=0.3, axis='y')
+
+# Expand y-limits with padding so value annotations stay inside the axes
+y_min = min(W_means); y_max = max(W_means)
+y_range = y_max - y_min
+ax2.set_ylim(y_min - 0.18*y_range, y_max + 0.18*y_range)
+
 for bar, val in zip(bars, W_means):
-    ax2.annotate(f"{val:.2e}", (bar.get_x()+bar.get_width()/2, val),
-                 textcoords="offset points", xytext=(0, 5 if val>=0 else -15),
-                 ha='center', fontsize=7)
+    va = 'bottom' if val >= 0 else 'top'
+    offset = 0.03*y_range if val >= 0 else -0.03*y_range
+    ax2.annotate(f"{val:.2e}", (bar.get_x()+bar.get_width()/2, val+offset),
+                 ha='center', va=va, fontsize=7)
 
 plt.tight_layout()
 OUT.parent.mkdir(parents=True, exist_ok=True)
