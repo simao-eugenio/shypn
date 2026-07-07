@@ -76,8 +76,9 @@ class TestPerDocumentPanelLoader(unittest.TestCase):
         self.assertIsNotNone(loader.panel)
         self.assertIsNotNone(loader.widget)
         
-        # Verify panel created and configured
-        self.assertTrue(loader.panel.set_no_show_all_called)
+        # Verify panel created (set_no_show_all is called during attach/detach,
+        # not during __init__ — intentional: avoids breaking matplotlib canvas)
+        self.assertFalse(loader.panel.show_all_called)  # no premature show_all
     
     def test_panel_name(self):
         """Test get_panel_name() returns correct name."""
@@ -331,11 +332,9 @@ class TestWaylandSafety(unittest.TestCase):
         mock_model = Mock()
         loader = ConcretePanelLoader(model=mock_model)
         
-        # Verify panel uses set_no_show_all (Wayland-safe)
-        self.assertTrue(loader.panel.set_no_show_all_called)
-        
-        # Verify no premature show operations
-        # (show_all_called should be False until explicitly shown)
+        # Wayland safety: set_no_show_all is called during attach/detach
+        # (not in __init__ — removed to fix matplotlib canvas rendering).
+        # Key invariant: no premature show_all before explicit visibility control.
         self.assertFalse(loader.panel.show_all_called)
     
     def test_proper_visibility_control(self):
