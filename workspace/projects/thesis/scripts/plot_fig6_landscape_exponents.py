@@ -156,15 +156,14 @@ sub_pts=[(abs(n0-Nc),d[1]) for n0,d in all_data.items() if n0<Nc and not math.is
 g_sub,i_sub,r2_sub,n_sub = fit_gamma(sorted(sub_pts))
 sup_pts=[(abs(n0-Nc),d[1]) for n0,d in all_data.items() if n0>Nc and not math.isnan(d[1]) and 0.02<d[0]<0.95]
 
-# =========================================================================
-# PLOT
-# =========================================================================
-fig = plt.figure(figsize=(13, 5.2))
-gs = fig.add_gridspec(1, 2, wspace=0.30, left=0.06, right=0.97, bottom=0.12, top=0.88)
-ax1 = fig.add_subplot(gs[0])
-ax2 = fig.add_subplot(gs[1])
+OUT_A = pathlib.Path("workspace/projects/thesis/manuscript/figures/fig6a_waddington.png")
+OUT_B = pathlib.Path("workspace/projects/thesis/manuscript/figures/fig6b_critical_exponents.png")
 
-# Panel a: Waddington landscape
+# =========================================================================
+# FIGURE 6a — Waddington landscape STANDALONE (full width)
+# =========================================================================
+fig_a, ax1 = plt.subplots(figsize=(11, 5.5))
+
 cmap_colors = [
     "#000033","#001a4d","#003399","#0055cc",
     "#3388ee","#88bbff","#ccddff","#ffffff",
@@ -177,33 +176,44 @@ levels = np.linspace(u_min, u_max, 45)
 cf = ax1.contourf(t_grid, phi_grid, U, levels=levels, cmap=cmap_basin, extend="both")
 ax1.contour(t_grid, phi_grid, U, levels=np.linspace(u_min,u_max,18),
             colors="k", linewidths=0.25, alpha=0.30)
-cbar = fig.colorbar(cf, ax=ax1, label=r"$U(\varphi, t)$", pad=0.015, fraction=0.035)
-cbar.ax.tick_params(labelsize=8)
+cbar = fig_a.colorbar(cf, ax=ax1, label=r"$U(\varphi, t)$", pad=0.015, fraction=0.03)
+cbar.ax.tick_params(labelsize=9)
 
 t_traj = np.linspace(0, min(T_MAX, time_min[-1]), 600)
 phi_t  = phi_mean_interp(t_traj)
 ax1.plot(t_traj, phi_t, color="white", lw=2.5, alpha=0.95, zorder=5)
 ax1.plot(t_traj, phi_t, color="black", lw=0.8, alpha=0.35, zorder=5)
 ax1.axvline(t_commit, color="#ff4444", lw=1.8, ls="--", alpha=0.85, zorder=4)
-ax1.scatter([t_commit],[phi_at_commit], color="#ffcc00",s=160,marker="o",
+ax1.scatter([t_commit],[phi_at_commit], color="#ffcc00",s=180,marker="o",
              edgecolors="black",linewidths=1.5,zorder=10)
-ax1.scatter([t_spore],[phi_at_spore], color="#00cc44",s=220,marker="*",
+ax1.scatter([t_spore],[phi_at_spore], color="#00cc44",s=260,marker="*",
              edgecolors="black",linewidths=1.0,zorder=10)
-ax1.text(t_commit+4, 0.97, "$t_{\\rm commit}=%.0f$ min" % t_commit,
-          color="#ff6666",fontsize=9,va="top",ha="left")
-ax1.text(100, 0.07, "Vegetative", color="white",fontsize=10,fontstyle="italic",
+ax1.text(t_commit+5, 0.97, "$t_{\\rm commit}=%.0f$ min" % t_commit,
+          color="#ff6666",fontsize=10,va="top",ha="left")
+ax1.text(100, 0.07, "Vegetative", color="white",fontsize=11,fontstyle="italic",
           fontweight="bold",ha="center",va="bottom",zorder=15)
-ax1.text(330, 0.88, "Sporulation", color="#003380",fontsize=10,fontstyle="italic",
+ax1.text(330, 0.88, "Sporulation", color="#cce0ff",fontsize=11,fontstyle="italic",
           fontweight="bold",ha="center",va="top",zorder=15)
-ax1.text(t_commit-3, 0.50, r"$\sigma_H$ separatrix",
-          color="#ffee88",fontsize=8,ha="right",va="center",rotation=90)
-ax1.set_xlabel("Time (min)", fontsize=11)
-ax1.set_ylabel(r"$\varphi$  (sporulation order parameter)", fontsize=11)
-ax1.set_title("(a) Epigenetic potential landscape at $N_0 = N_c = 1346\,\\mu$M\n"
-               "(FUJITA-4, n=200 reps, mean $\\varphi(t)$ in white)", fontsize=10)
+ax1.text(t_commit-4, 0.50, r"$\sigma_H$ separatrix",
+          color="#ffee88",fontsize=9,ha="right",va="center",rotation=90)
+ax1.set_xlabel("Time (min)", fontsize=12)
+ax1.set_ylabel(r"$\varphi$  (sporulation order parameter)", fontsize=12)
+ax1.set_title("Epigenetic potential landscape at $N_0 = N_c = 1346\\,\\mu$M\n"
+               "(FUJITA-4, run_20260704_163628, n=200 reps, mean $\\varphi(t)$ in white)",
+               fontsize=11)
 ax1.set_xlim(0, T_MAX); ax1.set_ylim(-0.02, 1.02)
 
-# Panel b: log-log CV2 + fit
+OUT_A.parent.mkdir(parents=True, exist_ok=True)
+fig_a.tight_layout()
+fig_a.savefig(OUT_A, dpi=200, bbox_inches='tight')
+print("Saved:", OUT_A)
+plt.close(fig_a)
+
+# =========================================================================
+# FIGURE 6b — Critical scaling standalone
+# =========================================================================
+fig_b, ax2 = plt.subplots(figsize=(6, 4.5))
+
 sub_d=[d for d,_ in sorted(sub_pts)]; sub_v=[v for _,v in sorted(sub_pts)]
 ax2.loglog(sub_d,sub_v,'o',color='#1f77b4',markersize=6,label='sub-critical (data)')
 if not math.isnan(g_sub):
@@ -212,16 +222,18 @@ if not math.isnan(g_sub):
                label=r"fit: $\gamma_{sub}=%.3f\pm0.044$" % g_sub)
 sup_d=[d for d,_ in sorted(sup_pts)]; sup_v=[v for _,v in sorted(sup_pts)]
 ax2.loglog(sup_d,sup_v,'s',color='#d62728',markersize=6,label='super-critical (data)')
-ax2.set_xlabel(r"$|N_0 - N_c|$ ($\mu$M)")
-ax2.set_ylabel(r"$\mathrm{CV}^2_{\mathrm{bin}}$")
-ax2.set_title("(b) Critical scaling near $N_c$\n(NET-T4 combined, n=300/condition)",
-              fontsize=10)
-ax2.legend(loc='lower right',fontsize=8)
-ax2.grid(alpha=0.3,which='both')
+ax2.set_xlabel(r"$|N_0 - N_c|$ ($\mu$M)", fontsize=11)
+ax2.set_ylabel(r"$\mathrm{CV}^2_{\mathrm{bin}}$", fontsize=11)
+ax2.set_title("Critical scaling near $N_c$\n(NET-T4 combined, n=300/condition)", fontsize=11)
+ax2.legend(loc='upper left', fontsize=9)
+ax2.grid(alpha=0.3, which='both')
 
-OUT.parent.mkdir(parents=True,exist_ok=True)
-plt.savefig(OUT,dpi=200,bbox_inches='tight')
-print("Saved:", OUT)
+fig_b.tight_layout()
+fig_b.savefig(OUT_B, dpi=200, bbox_inches='tight')
+print("Saved:", OUT_B)
+plt.close(fig_b)
+
+print()
 print("t_commit=%.0f  phi_at_commit=%.3f  t_spore=%.0f  phi_at_spore=%.3f" % (
     t_commit, phi_at_commit, t_spore, phi_at_spore))
 print("gamma_sub=%.3f R2=%.4f n=%d" % (g_sub,r2_sub,n_sub))
