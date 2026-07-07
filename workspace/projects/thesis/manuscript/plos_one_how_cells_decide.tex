@@ -1256,15 +1256,44 @@ Both results share the key feature that $\gamma \neq 1$ (mean-field is excluded)
 confirming that the commitment bifurcation is noise-driven rather than
 gradient-driven in both model versions.
 
-Trajectory analysis (G5 tier) reveals two additional features.
-\emph{Critical slowing down} is confirmed: mean commitment time peaks at
-$\approx 345\,\min$ near $N_c$ (compared to $311\,\min$ at $N_0 = 1200\,\mu$M
-and shorter for rare-event commitments at $N_0 > 1600\,\mu$M).
-\emph{Threshold-crossing mechanism}: the mean $\sigma_H$ peak is $1.50\,\mu$M
-at $N_c$ --- below the architectural threshold $\theta_{\sigma H} = 1.60\,\mu$M.
+Trajectory analysis (G5 tier, dense sub-critical sweep
+\texttt{run\_20260707\_134537}) reveals four additional features:
+
+\textbf{1. Threshold-crossing mechanism.}
+The mean $\sigma_H$ peak is $1.495$--$1.516\,\mu$M across all sub-critical
+conditions $N_0 = 1250$--$1345\,\mu$M --- uniformly \emph{below} the
+architectural threshold $\theta_{\sigma H} = 1.60\,\mu$M.
 The sporulation fraction equals the probability that a stochastic $\sigma_H$
-trajectory transiently exceeds the threshold, directly linking $N_c$ to the
-architecture of the $\Gamma$ gate.
+trajectory transiently exceeds $\theta_{\sigma H}$:
+$P_{\mathrm{spor}} = P(\sigma_H^{\mathrm{stoch}} > 1.60\,\mu\mathrm{M})$.
+As $N_0$ increases, the mean $\sigma_H$ peak decreases ($-2.4\times10^{-4}\,
+\mu$M per $\mu$M nutrient), reducing the right-tail probability and lowering
+the sporulation fraction smoothly.
+
+\textbf{2. Exclusive Mode~B commitment.}
+Every sporulating replicate at every sub-critical condition uses Mode~B
+(SinI-mediated SinR sequestration at $t \approx 317$--$330\,\min$); zero
+Mode~A events (passive early SinR degradation) were observed.
+The bet-hedging mechanism near $N_c$ is therefore exclusively the stochastic
+SinI burst --- the Mode~A pathway (which operates for shorter $\sigma_H$
+half-lives, see NET~1) is inactive at the wild-type HL~$= 120\,\min$.
+
+\textbf{3. Critical slowing down, modest magnitude.}
+Mean commitment time increases from $317\,\min$ at $N_0 = 1250\,\mu$M (96~µM
+below $N_c$) to $330\,\min$ at $N_0 = 1360\,\mu$M (14~µM above $N_c$): a
+$+13\,\min$ ($4\%$) increase over a $110\,\mu$M approach.  This is consistent
+with the weak $\gamma_{\mathrm{sub}} = 0.15$ --- the commitment clock is
+dominated by the deterministic nutrient-depletion timer ($t_{\mathrm{depl}}
+= N_0 / 0.1\,\mu\mathrm{M\,s}^{-1}$), with only a small stochastic add-on
+at the bifurcation edge.
+
+\textbf{4. Structural cascade lock-in at $N_c$.}
+The covariance matrix at $N_0 = 1345\,\mu$M shows
+$r(\sigma_G, \mathrm{Forespore}) = 0.996$, indicating that once the stochastic
+SinI/SinR gate is crossed (the only stochastic step), the late execution
+programme ($\sigma_G$ expression, forespore formation, cortex synthesis) is
+essentially deterministic.  Commitment is the sole noise source; all downstream
+structural transitions execute with near-perfect correlation.
 
 
 
