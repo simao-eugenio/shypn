@@ -188,14 +188,10 @@ ax1.scatter([t_commit],[phi_at_commit], color="#ffcc00",s=180,marker="o",
              edgecolors="black",linewidths=1.5,zorder=10)
 ax1.scatter([t_spore],[phi_at_spore], color="#00cc44",s=260,marker="*",
              edgecolors="black",linewidths=1.0,zorder=10)
-ax1.text(t_commit+5, 0.97, "$t_{\\rm commit}=%.0f$ min" % t_commit,
-          color="#ff6666",fontsize=10,va="top",ha="left")
 ax1.text(100, 0.07, "Vegetative", color="white",fontsize=11,fontstyle="italic",
           fontweight="bold",ha="center",va="bottom",zorder=15)
 ax1.text(330, 0.88, "Sporulation", color="#cce0ff",fontsize=11,fontstyle="italic",
           fontweight="bold",ha="center",va="top",zorder=15)
-ax1.text(t_commit-4, 0.50, r"$\sigma_H$ separatrix",
-          color="#ffee88",fontsize=9,ha="right",va="center",rotation=90)
 ax1.set_xlabel("Time (min)", fontsize=12)
 ax1.set_ylabel(r"$\varphi$  (sporulation order parameter)", fontsize=12)
 ax1.set_title("Epigenetic potential landscape at $N_0 = N_c = 1346\\,\\mu$M\n"
