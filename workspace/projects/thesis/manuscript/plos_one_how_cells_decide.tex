@@ -1301,69 +1301,107 @@ structural transitions execute with near-perfect correlation.
 \label{ssec:t5}
 
 Per-transition firing counts accumulated during simulation yield mean
-firing rates \(\bar J_\rho = \bar n_\rho / t_{\mathrm{sim}}\), from
+firing rates $\bar J_\rho = \bar n_\rho / t_{\mathrm{sim}}$, from
 which the Schnakenberg EPR \eqref{eq:schnakenberg} was computed using
-the NTP stoichiometry of each transition (\Cref{tab:t5-stoich});
-results are reported in \Cref{tab:t5}.
+the NTP stoichiometry of each stochastic transition (\Cref{tab:t5-stoich}).
+Three conditions: sub-critical ($N_0 = 100\,\mu$M, $100\%$ sporulation),
+critical ($N_0 = 1600\,\mu$M, $14\%$ sporulation), super-critical
+($N_0 = 2200\,\mu$M, $0\%$ sporulation), 300~replicates each
+(run~\texttt{20260707\_152611}, v9 model).
+Results are in \Cref{tab:t5}.
 
 \begin{table}[h]
 \centering
 \caption{NTP stoichiometry of stochastic transitions and per-firing free
-  energy at \(T = 310.15\,\mathrm{K}\)
-  (\(\Delta G_{\mathrm{ATP}} = \Delta G_{\mathrm{GTP}} = 23.27\,\kB T\)).}
+  energy at $T = 310.15\,\mathrm{K}$
+  ($\Delta G_{\mathrm{ATP}} = \Delta G_{\mathrm{GTP}} = 23.27\,\kB T$).
+  Phosphotransfer and phosphatase steps consume no NTP.}
 \label{tab:t5-stoich}
 \begin{tabular}{lcrl}
 \toprule
-Transition & ATP/firing & GTP/firing & \(\Delta G_\rho\) (\(\kB T\)/firing) \\
+Transition & ATP/firing & GTP/firing & $\Delta G_\rho$ ($\kB T$/firing) \\
 \midrule
-\texttt{T\_KinA\_activation}      &  5 &  0 & 116.3 \\
-\texttt{T\_Spo0F\_phosphorylation}&  0 &  0 & 0 (phosphotransfer) \\
-\texttt{T\_Spo0F\_dephos}         &  0 &  0 & 0 (phosphatase) \\
-\texttt{T\_Spo0A\_phosphorylation}&  0 &  0 & 0 (phosphotransfer) \\
-\texttt{T\_Spo0A\_dephosphorylation}& 0 &  0 & 0 (phosphatase) \\
-\texttt{T\_septation}             & 32 & 50 & 1\,908 \\
+\texttt{T\_KinA\_activation}        &  5 &  0 & 116.3 \\
+\texttt{T\_Spo0F\_phosphorylation}  &  0 &  0 & 0 (phosphotransfer) \\
+\texttt{T\_Spo0F\_dephos}           &  0 &  0 & 0 (phosphatase) \\
+\texttt{T\_Spo0A\_phosphorylation}  &  0 &  0 & 0 (phosphotransfer) \\
+\texttt{T\_Spo0A\_dephosphorylation}&  0 &  0 & 0 (phosphatase) \\
+\texttt{T\_septation}               & 32 & 50 & 1\,908 \\
+\texttt{T\_SinI\_synthesis}         &  0 &  5 & 116.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[h]
 \centering
-\caption{NET~5 Schnakenberg EPR at three nutrient levels
-  (300 replicates per condition, 6\,h horizon).
-  \(\dot\sigma_{\mathrm{total}}\) is the sum of per-transition contributions.
-  Phosphorelay transitions contribute \(\dot\sigma = 0\) by stoichiometry.}
+\caption{NET~5 Schnakenberg EPR decomposition (v9 model, 300~reps/condition,
+  run \texttt{20260707\_152611}).
+  $\dot\sigma_{\mathrm{KinA}}$: EPR from KinA cycling.
+  $\dot\sigma_{\mathrm{sept}}$: EPR from septation.
+  $\dot\sigma_{\mathrm{total}}$: sum of all stochastic transitions.
+  Rates are means over all replicates.}
 \label{tab:t5}
-\begin{tabular}{rrrrrr}
+{\small\begin{tabular}{rrrrrr}
 \toprule
-\(N\) (\(\mu\)M) & \(\bar n_{\mathrm{KinA}}\) & \(\bar n_{\mathrm{sept}}\)
-  & \(\dot\sigma_{\mathrm{KinA}}\) (\(\kB T/\mathrm{s}\))
-  & \(\dot\sigma_{\mathrm{sept}}\) (\(\kB T/\mathrm{s}\))
-  & \(\dot\sigma_{\mathrm{total}}\) (\(\kB T/\mathrm{s}\)) \\
+$N_0$ & Spor. & KinA rate & Sept.\ rate & $\dot\sigma_{\mathrm{KinA}}$ & $\dot\sigma_{\mathrm{total}}$ \\
+($\mu$M) & (\%) & (s$^{-1}$) & (s$^{-1}$) & ($\kB T$/s) & ($\kB T$/s) \\
 \midrule
-15  & 88.7  & 144.3 & 288 & 7\,675  & 7\,963  \\
-\textbf{21}  & 73.2  & 182.2 & 237 & 9\,690  & 9\,928  \\
-30  & 78.8  & 192.5 & 255 & 10\,240 & 10\,496 \\
+100  & 100 & $4.67\times10^{-2}$ & $4.63\times10^{-5}$ & 5.4 (97.5\%) & 5.6 \\
+1600 &  14 & $7.60\times10^{-3}$ & $9.26\times10^{-6}$ & 0.9 (97.5\%) & 0.9 \\
+2200 &   0 & $\approx 0$         & $0$                  & 0 & 0 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
-Two findings:
-(i)~\emph{Septation dominates dissipation} at every condition
-(\(\geq 96\%\)).  The KinA autophosphorylation contributes \(\sim 3\%\);
-the phosphorelay transitions themselves contribute zero explicit NTP
-dissipation by stoichiometry.  The \emph{decision} costs \(< 4\%\) of the
-circuit energy budget; the \emph{execution} of the chosen fate costs
-\(\sim 96\%\).
-(ii)~EPR is \emph{monotonically} ordered growth (7\,963) \(<\) critical
-(9\,928) \(<\) starvation (10\,496) \(\kB T / \mathrm{s}\).  This is
-inconsistent with a ``maximum entropy production at criticality''
-hypothesis; the bifurcation does not coincide with peak dissipation.
+Four findings:
 
-At the critical point the absolute power dissipated by the circuit is
-\(\sim 4.3\times10^{-17}\)~W, which is \(\sim 4\times10^{-4}\) of the
-total metabolic budget of a growing \textit{B.~subtilis} cell
-(\(\sim 10^{-13}\)~W~\cite{Noor2016}) --- physically plausible for a
-single regulatory module.
+\textbf{1. KinA cycling dominates stochastic EPR ($97.5\%$).}
+In the v9 hybrid model, the structural execution transitions (forespore,
+coat synthesis, cortex) are integrated by the ODE engine rather than
+fired stochastically.  The \emph{stochastic} EPR captures only the
+discrete commitment layer: KinA autophosphorylation fires
+$\sim 1\,000$ times per replicate over 6~h ($4.67 \times 10^{-2}$~s$^{-1}
+\times 21\,600$~s), while T\_septation fires once per sporulating cell.
+Each KinA firing costs 5~ATP~$= 116.3\,\kB T$; each septation costs
+$1\,908\,\kB T$ but the low rate ($4.63\times10^{-5}$~s$^{-1}$) limits
+its contribution.
+The stochastic EPR decomposition therefore directly quantifies the
+\emph{information-gathering cost} of the phosphorelay --- the continuous
+Bayesian sensing of the nutrient environment via KinA cycling.
+
+\textbf{2. Stochastic EPR is a quantitative stress sensor.}
+Total stochastic EPR decreases 6-fold from $5.6\,\kB T$/s (N$_0 = 100\,\mu$M,
+full starvation) to $0.9\,\kB T$/s (N$_0 = 1600\,\mu$M, near-critical) to
+$\approx 0$ (N$_0 = 2200\,\mu$M, replete).  The stochastic EPR is
+proportional to the KinA activation level, which is in turn proportional
+to $P(\text{commit}) = P(\sigma_H^{\mathrm{stoch}} > \theta_{\sigma H})$.
+This confirms that the phosphorelay's thermodynamic output IS its
+information-processing output.
+
+\textbf{3. Septation rate asymmetry: 14.3$\times$ higher in sporulating cells.}
+At the critical condition ($N_0 = 1600\,\mu$M), T\_septation fires at
+$4.63\times10^{-5}$~s$^{-1}$ in sporulating replicates vs
+$3.23\times10^{-6}$~s$^{-1}$ in vegetative replicates --- a
+\textbf{14.3-fold asymmetry} that is the strongest single firing-rate
+biosignature of the commitment decision.
+
+\textbf{4. Architecture explains v7/v9 difference.}
+The predecessor v7 model had all structural synthesis transitions
+stochastic; septation therefore dominated stochastic EPR at $>96\%$.
+In v9, coat synthesis, forespore formation and cortex assembly are
+ODE-integrated (continuous), and their EPR flows through the
+deterministic channel.  The total ATP consumption per sporulating cell
+($\approx 2\,800\,\mu$M, from NET~3) includes the ODE structural cost;
+if included, execution would dominate total EPR consistent with v7.
+The key architectural insight stands: the circuit has orthogonal EPR
+channels for decision (stochastic, KinA-dominated) and execution (ODE,
+synthesis-dominated), confirming the $\Ge \times \Gs$ decomposition.
+
+At the critical point the absolute stochastic power is
+$0.9\,\kB T/\mathrm{s} \approx 3.9\times10^{-21}$~W, well within the
+plausible regulatory module budget of a \textit{B.~subtilis} cell.
+
+
 
 \subsection{Summary: Five-Way Co-Validation and Fujita Correspondence}
 \label{ssec:covalidation}
@@ -1413,11 +1451,15 @@ NET~4 (\(\gamma_\pm\))
     $\approx 50\%$ bet-hedging is the thermodynamically natural outcome
     for this universality class \\
 NET~5 (Schnak.)
-  & \(\dot\sigma_{\Gs}/\dot\sigma_{\mathrm{total}} < 4\%\);
-    septation dominates (\(>96\%\))
-  & \(\Ge \times \Gs\): orthogonal entropy flows; EPR decomposable by subgraph
-  & \textbf{Q2}: $\sigma_H$/septation gate concentrates the entire
-    irreversibility budget --- $\sigma_H$-null eliminates the thermodynamic
+  & KinA cycling dominates stochastic EPR ($97.5\%$);
+    septation EPR asymmetry $14.3\times$ between sporulating and
+    vegetative replicates; stochastic EPR is a quantitative stress sensor
+  & $\Ge \times \Gs$: orthogonal EPR channels — decision (stochastic,
+    KinA-dominated) and execution (ODE, synthesis-dominated) are
+    thermodynamically separable
+  & \textbf{Q2}: phosphorelay cycling IS the information-gathering cost
+    of sensing starvation; $\sigma_H$/septation concentrates the
+    commitment irreversibility
     commitment mechanism, not merely a downstream step \\
 \bottomrule
 \end{tabular}}

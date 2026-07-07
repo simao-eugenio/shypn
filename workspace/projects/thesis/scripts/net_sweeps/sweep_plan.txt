@@ -285,8 +285,26 @@ NET-T5  —  Schnakenberg EPR decomposition: 3 fixed conditions
 
   CONDITIONS (name | INITIAL_NUTRIENTS):
     Sub_critical  |  100  µM   (SM, all sporulate — 100%)
-    Critical      | 1600  µM   (bet-hedging, ~50% sporulate)
+    Critical      | 1600  µM   (bet-hedging, ~14% sporulate)
     Super_critical| 2200  µM   (CH-like, ~0% sporulate)
+
+  ✅ COMPLETED — run_20260707_152611  (2026-07-07, v9 P=41, 300 reps × 3+baseline)
+  ─────────────────────────────────────────────────────────────────────────
+  RESULTS (EPR decomposition, stochastic transitions only):
+
+    N0(µM)  Spore%  KinA_rate/s  Sept_rate/s  EPR_KinA  EPR_total
+    ─────────────────────────────────────────────────────────────────
+      100    100%    4.67e-2      4.63e-5      5.4 kBT/s  5.6 kBT/s  (KinA=97.5%)
+     1600     14%    7.60e-3      9.26e-6      0.9 kBT/s  0.9 kBT/s  (KinA=97.5%)
+     2200      0%    ~0           0            0           0
+
+  KEY FINDINGS (NET-T5):
+    KinA cycling dominates STOCHASTIC EPR (97.5%) — NOT septation
+    Reason: KinA fires ~1000x/replicate; septation fires once
+    Stochastic EPR = information-gathering cost of phosphorelay sensing
+    Septation asymmetry: 14.3× higher rate in sporulating vs vegetative cells
+    Architecture: ODE structural synthesis (v9 execution) NOT in stochastic EPR
+    → Decision layer (stochastic) and execution layer (ODE) are EPR-separable
 
   Required firing columns (must be in output):
     T_KinA_activation_firings
