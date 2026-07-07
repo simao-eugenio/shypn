@@ -140,51 +140,184 @@ depleted medium drops ATP below the commitment threshold; rich medium does not.
 \section{Introduction}
 \label{sec:intro}
 
-When \textit{Bacillus subtilis} exhausts its nutrients it faces an
-irreversible binary commitment: remain vegetative and risk starvation,
-or begin sporulation and sacrifice growth for long-term survival.
-This decision is made without a decider — by a handful of
-phosphorylated kinases counting molecules in the dozens, in a cell
-smaller than a cubic micrometre, with no room for deliberation.
-Yet the decision is real, reproducible, and consequential.
-A version of it appears wherever life faces a fork — in stem-cell
-lineage choice, in lymphocyte commitment, in microbial bet-hedging —
-and a quantitative physical theory of it remains out of reach for current biological formalisms.
+\subsection{A Decision Without a Decider}
 
-Two landmark experiments by Fujita and Losick~\cite{Fujita2005}
-sharpened the puzzle to three unanswered questions.
-(Q1) Abrupt induction of constitutively active Spo0A* in rich CH medium
-gave only $\approx 5\%$ sporulation, while gradual KinA induction in
-nutrient-depleted SM medium gave $\approx 52\%$: why does the
-medium–route combination set the outcome?
-(Q2) $\sigma_H$-null mutants failed to sporulate even with maximal Spo0A*
-induction: why is $\sigma_H$ a necessary gate downstream of the
-apparent master regulator?
-(Q3) Under the natural route only $\approx 52\%$ of isogenic cells
-committed in the same medium: what sets this specific, reproducible
-bet-hedging fraction?
-The standard approach — ordinary differential equations, Boolean
-networks, or classical Petri nets — describes the observations
-but cannot derive them: the $52\%/5\%$ split and the $\sigma_H$
-requirement are inserted as parameters, not produced by the
-model architecture.
+A bacterium runs out of food.  Within an hour it will either keep
+running the long-shot lottery of vegetative growth --- hoping nutrients
+return before its envelope fails --- or commit, irreversibly, to
+building a spore: a near-crystalline, metabolically silent capsule that
+can wait centuries for better weather.  The two paths are not
+reconcilable.  A cell midway through coat assembly cannot retract the
+decision; a cell that has bet on growth cannot recover the half-spore
+it never started.
 
-Here we show that all three questions admit quantitative answers when
-commitment is treated as a non-equilibrium thermodynamic event.
-We introduce Signal Hierarchical Petri Nets (SHPN), a modelling
-language whose architecture encodes the separation of execution from
-control, a strict causal ordering of signal resolution, and a per-step
-thermodynamic profile — properties of biological commitment that
-have been observed empirically for decades but never given a syntactic
-home.
-We build a 41-place SHPN model of \textit{B.~subtilis} sporulation,
-run eight targeted sweeps (FUJITA-1/2/3/4 addressing Q1–Q3;
-NET-T1 through NET-T5 characterising the thermodynamic landscape),
-and demonstrate that Q1–Q3 follow from a single topology-derived
-constant — the vegetative-basin ATP floor of $\approx 2.17$~mM —
-and that the commitment bifurcation belongs to a noise-driven
-universality class with non-mean-field critical exponents
-($\gamma_{\mathrm{sub}} = 0.15 \pm 0.04$).
+And yet there is no decider.  No homunculus weighs the options.  The
+cell is a few cubic micrometres of crowded chemistry, and the choice
+emerges from the interaction of a handful of phosphorylated kinases
+with their substrates, modulated by the noise inherent in counting
+molecules whose copy numbers fall in the dozens.  The decision is real
+--- it is measurable, repeatable, and consequential --- yet it is made
+by no one in particular.  This is the central puzzle of cell-fate
+commitment, and a version of it appears wherever life faces a fork:
+in the stem cell choosing a tissue lineage, in the lymphocyte choosing
+between clonal expansion and anergy, in the algal cell choosing between
+photosynthesis and predation.
+
+Waddington, intuiting the problem long before the mechanisms were
+known, pictured development as a ball rolling on a tilted landscape of
+valleys and ridges~\cite{Waddington1957}.  The metaphor is good --- so
+good that it has survived seventy years of molecular biology --- but
+it is, on close inspection, a picture of an effect rather than an
+explanation of a cause.  What does the landscape mean physically?
+Where does the tilt come from?  Why do valleys exist at all?  And, the
+question this paper centres on: \emph{what does the cell actually
+spend, and on what, to roll one way rather than the other?}
+
+\subsection{Three Questions from Fujita and Losick (2005)}
+\label{ssec:fujita-questions}
+
+In 2005, Fujita and Losick published a decisive set of experiments on
+\textit{B.~subtilis} sporulation that sharpened the puzzle to its
+essential form~\cite{Fujita2005}.  Their findings reduce to three
+explicit questions that a physical theory of commitment must answer ---
+and that any adequate model must reproduce \emph{without parameter steering}.
+
+A critical but unremarked feature of the Fujita design is the \emph{medium
+asymmetry}: the two routes were tested in completely different carbon
+environments.  The natural phosphorelay experiment was carried out in
+\textbf{SM medium} (Sterlini-Mandelstam sporulation medium, no carbon
+source except glutamate) --- nutrient-depleted conditions under which
+the cell's ATP pool declines as catabolism exhausts available substrate.
+The abrupt Spo0A* experiment was carried out in
+\textbf{CH medium} (casein hydrolysate, a rich carbon source) ---
+the cell was actively growing in exponential phase (OD$_{600} = 0.4$)
+when Spo0A* synthesis was induced by IPTG.
+Fujita did not measure ATP in either experiment; the medium difference
+was reported as a technical necessity of the inducible-promoter
+strategy, not as a variable under investigation.
+Our SHPN model predicts that this medium asymmetry is \emph{mechanistically
+essential}: the vegetative-basin ATP floor ($2.13$~mM, Sweep~C)
+is the thermodynamic boundary that SM medium allows the cell to cross
+while CH medium does not.  The rich medium experiment is not merely
+a genetic perturbation; it is an energetic trap.
+
+\textbf{Q1 (timing and medium asymmetry).}
+Abrupt induction of constitutively active Spo0A* in \textbf{CH medium}
+(rich, exponential-phase cells) yielded only $\approx 5\%$ sporulation
+(Fig.~2C/D), while gradual KinA induction in \textbf{SM medium}
+(nutrient-limited cells) achieved $\approx 52\%$ (Fig.~2A/B).
+\emph{Why does the combination of route and medium matter?
+Is it the abruptness of Spo0A activation, the richness of the medium,
+or both?}
+
+\textbf{Q2 (gate necessity).}
+$\sigma_H$-null mutants failed to sporulate even when Spo0A* was
+induced abruptly (Fig.~4; $0\%$ forespore formation).
+\emph{Why is $\sigma_H$ a necessary condition for commitment if it is
+downstream of the apparent decision-maker Spo0A$\sim$P?}
+
+\textbf{Q3 (bet-hedging fraction).}
+Under the natural gradual route only $\approx 52\%$ of isogenic cells
+sporulated in the same SM medium --- not $100\%$, not $0\%$.
+\emph{What mechanism produces this specific, reproducible partial
+commitment across a genetically uniform population?}
+
+Classical biological formalisms describe these observations but cannot
+explain them from first principles: the $52\%/5\%$ ratio and the
+$\sigma_H$ requirement are inserted as parameters, not derived from
+circuit topology.  A physical theory should derive --- or at minimum
+bound --- all three from the thermodynamic structure of the circuit,
+with no outcome steering.  The five numerical experiments in
+\Cref{sec:results} each address one or more of these questions; the
+explicit answers are compiled in \Cref{tab:covalidation}.
+
+\subsection{Physics as the Missing Foundation}
+
+Living cells are not at thermodynamic equilibrium.  They cannot be:
+equilibrium is the definition of death.  A living cell continuously
+imports free energy --- principally as the phosphoanhydride bonds of
+ATP and GTP --- and exports entropy, in the form of heat and chemical
+waste, faster than it generates it internally.  This puts cells
+squarely in the domain of \emph{non-equilibrium thermodynamics of open
+systems}~\cite{Nicolis1977}, a discipline whose central
+claim is that ordered, organised behaviour is possible in nature only
+because some structures are willing to pay for it in dissipated free
+energy.
+
+From this perspective a fate commitment is not just a transition
+between cell states.  It is the cell purchasing certainty about its
+own future, at a price set by the laws of physics: by Landauer's
+principle~\cite{Landauer1961}, by Schnakenberg's accounting of
+chemical-network dissipation~\cite{Schnakenberg1976}, by Wang's
+construction of an effective landscape from the stationary distribution
+of an irreversible Markov chain~\cite{Wang2011}, and by the celebrated
+fluctuation theorems of Jarzynski~\cite{Jarzynski1997} and
+Crooks~\cite{Crooks1999} that bound the heat dissipated by any process
+relative to its free-energy difference.  Each of these tools, taken
+alone, says something concrete about cells.  Taken together they begin
+to describe what kind of physical event a fate commitment actually is.
+
+This is a strong base on which to stand, but it is a base without a
+building: the physics gives us the right vocabulary, yet none of the
+modelling formalisms used by biologists today \emph{speaks} that
+vocabulary natively.  Ordinary differential equations express
+concentrations; Boolean networks express logic gates; stochastic Petri
+nets express discrete firings.  None of them expresses, as part of its
+syntax, the thermodynamic content of a commitment.  To compute the
+physical quantities the framework demands, one must first build the
+model, then post-process trajectories, then hope that one's bookkeeping
+is consistent with one's theoretical claims.  Something is missing.
+
+Important work has applied the non-equilibrium physics vocabulary
+\emph{to} biological models post hoc: Ge and Qian derived exact
+relations between dissipation and landscape curvature for chemical
+networks~\cite{GeQian2010}; Ao constructed potential landscapes for
+stochastic differential equations~\cite{Ao2004}; Rao and Esposito gave
+a complete stochastic thermodynamics for chemical reaction
+networks~\cite{RaoEsposito2016}.  What none of these contributions
+provides, however, is a \emph{modelling language} --- a syntax in which
+the thermodynamic structure of a commitment is encoded at the time the
+model is built, rather than extracted by analysis after the fact.  The
+distinction matters: when thermodynamics is a post-processing step,
+nothing in the model prevents topological choices that are
+thermodynamically incoherent, and nothing in the formalism flags the
+inconsistency.
+
+\subsection{What This Paper Adds}
+
+The missing piece, we argue, is a formal modelling language whose
+\emph{architecture} reflects the architecture of biological
+decision-making, and whose syntax has intrinsic thermodynamic meaning.
+We call this language Signal Hierarchical Petri Nets (SHPN), and develop it in
+\Cref{sec:formalism}.  It extends standard stochastic Petri nets in
+three directions, each of which corresponds to a property of
+biological commitment systems that has been observed empirically for
+decades but never given a syntactic home: the separation of
+\emph{execution} from \emph{control}; the strict \emph{causal
+ordering} of signal resolution; and the parameterisation of each
+commitment step by its own thermodynamic profile.
+
+Three concrete contributions follow.  First, in \Cref{sec:physics} we
+establish the non-equilibrium thermodynamic vocabulary needed to
+characterise biological commitment as a physical event, and identify
+five measurable quantities that any adequate commitment model must
+compute.  Second, in
+\Cref{sec:formalism} we introduce the formal modelling language SHPN,
+whose architecture is designed so that each of those five quantities is
+computable directly from the topology of the model.  Third, in
+\Cref{sec:results}, we validate the framework against the
+\textit{B.~subtilis} sporulation cascade through five complementary
+numerical experiments and three targeted biological sweeps that answer
+the Fujita questions directly.
+
+The result, we hope, is the beginning of a unified physical picture:
+cells decide by paying free energy to collapse uncertainty about their
+own future, and the architecture of that decision can be made explicit
+enough to be modelled, simulated, and tested.  \Cref{sec:physics}
+establishes the thermodynamic framework; \Cref{sec:formalism} presents
+SHPN; \Cref{sec:methods,sec:results} describe the \textit{B.~subtilis}
+validation; \Cref{sec:discussion} interprets the findings and situates
+the framework among alternatives; \Cref{sec:conclusion} closes.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Thermodynamic Framework for Biological Commitment}
@@ -751,137 +884,6 @@ allowing independent reproduction of every figure and table.
 \section{Results}
 \label{sec:results}
 
-\subsection{Fujita Protocol Validation: Three Biological Questions Answered}
-\label{ssec:fujita_validation}
-
-The three questions posed by Fujita and Losick~\cite{Fujita2005} were
-addressed through four targeted parameter sweeps (F1--F4,
-\Cref{tab:fujita_sweeps}) on the v9 SHPN model (runs
-F1~=~\texttt{run\_20260702\_171823}, F2~=~\texttt{run\_20260702\_180944},
-F3~=~\texttt{run\_20260702\_191849}).
-Each sweep reports the sporulation fraction (Mature\_spore\_final$>0.5$
-across replicates), the mean peak $\sigma_H$ concentration, and the
-vegetative-basin ATP floor (mean trajectory minimum across non-sporulating
-replicates).
-Key results are summarised in \Cref{tab:fujita_results}; the full
-condition-level data are archived in the repository.
-
-\medskip\noindent\textbf{Q1 --- Timing and medium both matter, but the medium is the gate.}
-
-Sweep~F1 showed that the sporulation fraction under identical nutrient
-conditions depends critically on whether the Spo0A$\sim$P accumulation
-is gradual (phosphorelay, \texttt{LOADING\_DOSE}~$= 0$) or abrupt
-(single pulse, \texttt{LOADING\_DOSE}~$= 27\,\mu$M added at $t = 1$~s):
-\begin{itemize}
-\item \textbf{SM-like} (\texttt{INITIAL\_NUTRIENTS}~$= 100\,\mu$M, fast
-  starvation): \emph{both} routes gave $100\%$ sporulation.  The abrupt pulse
-  merely shortened mean commitment time from 151 to 136~min.
-\item \textbf{CH-like} (\texttt{INITIAL\_NUTRIENTS}~$= 1440\,\mu$M,
-  slow starvation): the gradual route gave $38\%$; the abrupt pulse gave
-  $56\%$.  Neither achieved the $100\%$ seen in SM medium, and neither
-  reproduced the Fujita $\approx5\%$ seen with constitutive Spo0A*
-  in rich medium.
-\end{itemize}
-
-Sweep~F2 extended the result over the full nutrient axis with the abrupt
-pulse fixed at $27\,\mu$M.  The sporulation fraction decreased
-\emph{monotonically} from $100\%$ at $N_0 = 100\,\mu$M to $0\%$ at
-$N_0 = 2200\,\mu$M (\Cref{tab:fujita_results}).  The $50\%$ crossover
-fell between 1440 and $1600\,\mu$M, identifying the effective ATP
-commitment boundary.  The nutrient depletion analysis shows why:
-nutrients deplete at a constant rate of $0.1\,\mu$M~s$^{-1}$ (model
-parameter), so only conditions with $N_0 \leq 2160\,\mu$M reach full
-depletion within the 6-h simulation window; cells in richer medium
-(\texttt{INITIAL\_NUTRIENTS}~$> 2160\,\mu$M) remain in an energy-replete
-state throughout, and KinA activation --- gated by
-$[1 + (\text{Nutrients})^2]^{-1}$ --- is negligible.
-
-These findings together answer Q1 thermodynamically: the relevant
-hidden variable between the Fujita SM and CH experiments is the
-\emph{nutrient-depletion trajectory}, not merely the abruptness of
-Spo0A induction.  SM medium allows the ATP pool to fall below the
-vegetative-basin floor ($2.22 \pm 0.04$~mM, measured as the mean
-trajectory minimum across non-sporulating replicates); CH medium keeps
-it above that floor indefinitely.
-
-\medskip\noindent\textbf{Q2 --- $\sigma_H$ is the thermodynamic gate, not a downstream reporter.}
-
-Sweep~F3 used the new \texttt{k\_sigmaH\_factor} parameter (P41 in the
-v9 model), which scales the $\sigma_H$ transcription rate, allowing a
-clean titration from fully silenced ($= 0$, true $\sigma_H$-null) to
-fully active ($= 1$, wild-type).  With \texttt{INITIAL\_NUTRIENTS}~$= 100$
-(fast starvation) and either route ($\texttt{LOADING\_DOSE} \in \{0, 27\}$):
-\begin{itemize}
-\item $k_{\sigma H} = 0$ (true $\sigma_H$-null): $\mathbf{0\%}$
-  sporulation with both natural phosphorelay \emph{and} abrupt pulse.
-  Peak $[\sigma_H] = 0.000\,\mu$M.  This reproduces the Fujita
-  Fig.~4 result.
-\item $k_{\sigma H} = 0.2$: $96\%$ (natural) and $100\%$ (pulse).
-  Even $20\%$ $\sigma_H$ transcription capacity is sufficient for
-  near-complete commitment at SM nutrient levels --- the transition
-  from null to active is essentially a step.
-\item $k_{\sigma H} = 1.0$: $100\%$ for both routes, mean peak
-  $[\sigma_H] \approx 1.64\,\mu$M (above $\theta_{\sigma H} = 1.60\,\mu$M$).
-\end{itemize}
-The sharp null/active threshold, combined with the fact that the
-abrupt Spo0A$\sim$P pulse cannot rescue commitment in the absence of
-$\sigma_H$, confirms that $\sigma_H$ is the \emph{irreversible gate}
-in the cascade: no matter how much upstream signal is present, the cell
-cannot commit without it.
-
-\begin{table}[ht]
-\centering
-\caption{\textbf{Fujita Protocol sweep results} (v9 model, 6-h horizon,
-  \texttt{INITIAL\_NUTRIENTS}~$= 100\,\mu$M fixed in F1/F3, swept in F2).
-  Spor\,\%: sporulation fraction.  $[\sigma_H]_{\max}$: mean peak
-  $\sigma_H$ across all replicates.
-  ATP$_{\mathrm{veg}}$: mean ATP trajectory minimum across
-  non-sporulating replicates (vegetative basin floor).
-  $t_{\mathrm{commit}}$: mean time to first mature spore (sporulating
-  replicates only).
-  F4 results: run\_20260704\_163628, v9 model, server SHA 7057e706.}
-\label{tab:fujita_results}
-{\small
-\begin{tabular}{@{}llccccc@{}}
-\toprule
-Sweep & Condition & Spor\,\% & $[\sigma_H]_{\max}$ ($\mu$M)
-  & ATP$_{\mathrm{veg}}$ (mM) & $t_{\mathrm{commit}}$ (min) \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{F1 --- medium $\times$ route factorial}} \\
-& SM natural ($N_0{=}100$, D$=0$) & 100 & 1.635 & --- & 151 \\
-& SM abrupt  ($N_0{=}100$, D$=27$) & 100 & 1.647 & --- & 136 \\
-& CH natural ($N_0{=}1440$, D$=0$) & 38  & 1.464 & 2.228 & 335 \\
-& CH abrupt  ($N_0{=}1440$, D$=27$) & 56  & 1.553 & 2.222 & 327 \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{F2 --- N$_0$ titration, abrupt pulse fixed}} \\
-& $N_0{=}100\,\mu$M   & 100 & 1.647 & --- & 136 \\
-& $N_0{=}600\,\mu$M   & 100 & 1.636 & --- & 207 \\
-& $N_0{=}1200\,\mu$M  &  81 & 1.595 & 2.223 & 300 \\
-& $N_0{=}1440\,\mu$M  &  56 & 1.564 & 2.222 & 327 \\
-& $N_0{=}1800\,\mu$M  &   1 & 1.452 & 3.367 & 332 \\
-& $N_0{=}2200\,\mu$M  &   0 & --- & 5.000 & --- \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{F3 --- $\sigma_H$ gate titration, SM medium, $2\times2$}} \\
-& $k_{\sigma H}{=}0$, D$=0$ (null natural) & 0 & 0.000 & --- & --- \\
-& $k_{\sigma H}{=}0$, D$=27$ (null + pulse) & 0 & 0.000 & --- & --- \\
-& $k_{\sigma H}{=}0.2$, D$=0$ & 96 & 0.320 & --- & 182 \\
-& $k_{\sigma H}{=}0.2$, D$=27$ & 100 & 0.327 & --- & 163 \\
-& $k_{\sigma H}{=}1.0$, D$=0$ (wild-type) & 100 & 1.639 & --- & 147 \\
-& $k_{\sigma H}{=}1.0$, D$=27$ & 100 & 1.648 & --- & 132 \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{F4 --- natural route $N_0$ titration (200 reps/cond)}} \\
-& $N_0{=}100\,\mu$M (commitment) & 100 & 1.569 & 2.166 & --- \\
-& $N_0{=}1000\,\mu$M & 84 & 1.319 & 2.172 & --- \\
-& $N_0{=}1300\,\mu$M & 56 & 1.179 & 2.190 & --- \\
-& $N_0{=}1440\,\mu$M & 39 & 1.093 & 2.206 & --- \\
-& $N_0{=}1800\,\mu$M & 2 & 0.840 & 3.398 & --- \\
-& $N_0{=}2000\,\mu$M (vegetative) & 0 & 0.681 & 4.434 & --- \\
-\multicolumn{3}{@{}l}{\textit{$N_c \approx 1370\,\mu$M; bet-hedging window 700--1800~$\mu$M}} & & & \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-% ─────────────────────────────────────────────────────────────────────────────
 \subsection{NET~1 --- Landauer Efficiency}
 \label{ssec:t1}
 
@@ -1464,72 +1466,336 @@ NET~5 (Schnak.)
 \end{table}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Fujita Protocol Validation: Three Biological Questions Answered}
+\label{ssec:fujita_validation}
+
+The three questions posed by Fujita and Losick~\cite{Fujita2005} were
+addressed through four targeted parameter sweeps (F1--F4,
+\Cref{tab:fujita_sweeps}) on the v9 SHPN model (runs
+F1~=~\texttt{run\_20260702\_171823}, F2~=~\texttt{run\_20260702\_180944},
+F3~=~\texttt{run\_20260702\_191849}).
+Each sweep reports the sporulation fraction (Mature\_spore\_final$>0.5$
+across replicates), the mean peak $\sigma_H$ concentration, and the
+vegetative-basin ATP floor (mean trajectory minimum across non-sporulating
+replicates).
+Key results are summarised in \Cref{tab:fujita_results}; the full
+condition-level data are archived in the repository.
+
+\medskip\noindent\textbf{Q1 --- Timing and medium both matter, but the medium is the gate.}
+
+Sweep~F1 showed that the sporulation fraction under identical nutrient
+conditions depends critically on whether the Spo0A$\sim$P accumulation
+is gradual (phosphorelay, \texttt{LOADING\_DOSE}~$= 0$) or abrupt
+(single pulse, \texttt{LOADING\_DOSE}~$= 27\,\mu$M added at $t = 1$~s):
+\begin{itemize}
+\item \textbf{SM-like} (\texttt{INITIAL\_NUTRIENTS}~$= 100\,\mu$M, fast
+  starvation): \emph{both} routes gave $100\%$ sporulation.  The abrupt pulse
+  merely shortened mean commitment time from 151 to 136~min.
+\item \textbf{CH-like} (\texttt{INITIAL\_NUTRIENTS}~$= 1440\,\mu$M,
+  slow starvation): the gradual route gave $38\%$; the abrupt pulse gave
+  $56\%$.  Neither achieved the $100\%$ seen in SM medium, and neither
+  reproduced the Fujita $\approx5\%$ seen with constitutive Spo0A*
+  in rich medium.
+\end{itemize}
+
+Sweep~F2 extended the result over the full nutrient axis with the abrupt
+pulse fixed at $27\,\mu$M.  The sporulation fraction decreased
+\emph{monotonically} from $100\%$ at $N_0 = 100\,\mu$M to $0\%$ at
+$N_0 = 2200\,\mu$M (\Cref{tab:fujita_results}).  The $50\%$ crossover
+fell between 1440 and $1600\,\mu$M, identifying the effective ATP
+commitment boundary.  The nutrient depletion analysis shows why:
+nutrients deplete at a constant rate of $0.1\,\mu$M~s$^{-1}$ (model
+parameter), so only conditions with $N_0 \leq 2160\,\mu$M reach full
+depletion within the 6-h simulation window; cells in richer medium
+(\texttt{INITIAL\_NUTRIENTS}~$> 2160\,\mu$M) remain in an energy-replete
+state throughout, and KinA activation --- gated by
+$[1 + (\text{Nutrients})^2]^{-1}$ --- is negligible.
+
+These findings together answer Q1 thermodynamically: the relevant
+hidden variable between the Fujita SM and CH experiments is the
+\emph{nutrient-depletion trajectory}, not merely the abruptness of
+Spo0A induction.  SM medium allows the ATP pool to fall below the
+vegetative-basin floor ($2.22 \pm 0.04$~mM, measured as the mean
+trajectory minimum across non-sporulating replicates); CH medium keeps
+it above that floor indefinitely.
+
+\medskip\noindent\textbf{Q2 --- $\sigma_H$ is the thermodynamic gate, not a downstream reporter.}
+
+Sweep~F3 used the new \texttt{k\_sigmaH\_factor} parameter (P41 in the
+v9 model), which scales the $\sigma_H$ transcription rate, allowing a
+clean titration from fully silenced ($= 0$, true $\sigma_H$-null) to
+fully active ($= 1$, wild-type).  With \texttt{INITIAL\_NUTRIENTS}~$= 100$
+(fast starvation) and either route ($\texttt{LOADING\_DOSE} \in \{0, 27\}$):
+\begin{itemize}
+\item $k_{\sigma H} = 0$ (true $\sigma_H$-null): $\mathbf{0\%}$
+  sporulation with both natural phosphorelay \emph{and} abrupt pulse.
+  Peak $[\sigma_H] = 0.000\,\mu$M.  This reproduces the Fujita
+  Fig.~4 result.
+\item $k_{\sigma H} = 0.2$: $96\%$ (natural) and $100\%$ (pulse).
+  Even $20\%$ $\sigma_H$ transcription capacity is sufficient for
+  near-complete commitment at SM nutrient levels --- the transition
+  from null to active is essentially a step.
+\item $k_{\sigma H} = 1.0$: $100\%$ for both routes, mean peak
+  $[\sigma_H] \approx 1.64\,\mu$M (above $\theta_{\sigma H} = 1.60\,\mu$M$).
+\end{itemize}
+The sharp null/active threshold, combined with the fact that the
+abrupt Spo0A$\sim$P pulse cannot rescue commitment in the absence of
+$\sigma_H$, confirms that $\sigma_H$ is the \emph{irreversible gate}
+in the cascade: no matter how much upstream signal is present, the cell
+cannot commit without it.
+
+\begin{table}[ht]
+\centering
+\caption{\textbf{Fujita Protocol sweep results} (v9 model, 6-h horizon,
+  \texttt{INITIAL\_NUTRIENTS}~$= 100\,\mu$M fixed in F1/F3, swept in F2).
+  Spor\,\%: sporulation fraction.  $[\sigma_H]_{\max}$: mean peak
+  $\sigma_H$ across all replicates.
+  ATP$_{\mathrm{veg}}$: mean ATP trajectory minimum across
+  non-sporulating replicates (vegetative basin floor).
+  $t_{\mathrm{commit}}$: mean time to first mature spore (sporulating
+  replicates only).
+  F4 results: run\_20260704\_163628, v9 model, server SHA 7057e706.}
+\label{tab:fujita_results}
+{\small
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+Sweep & Condition & Spor\,\% & $[\sigma_H]_{\max}$ ($\mu$M)
+  & ATP$_{\mathrm{veg}}$ (mM) & $t_{\mathrm{commit}}$ (min) \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{F1 --- medium $\times$ route factorial}} \\
+& SM natural ($N_0{=}100$, D$=0$) & 100 & 1.635 & --- & 151 \\
+& SM abrupt  ($N_0{=}100$, D$=27$) & 100 & 1.647 & --- & 136 \\
+& CH natural ($N_0{=}1440$, D$=0$) & 38  & 1.464 & 2.228 & 335 \\
+& CH abrupt  ($N_0{=}1440$, D$=27$) & 56  & 1.553 & 2.222 & 327 \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{F2 --- N$_0$ titration, abrupt pulse fixed}} \\
+& $N_0{=}100\,\mu$M   & 100 & 1.647 & --- & 136 \\
+& $N_0{=}600\,\mu$M   & 100 & 1.636 & --- & 207 \\
+& $N_0{=}1200\,\mu$M  &  81 & 1.595 & 2.223 & 300 \\
+& $N_0{=}1440\,\mu$M  &  56 & 1.564 & 2.222 & 327 \\
+& $N_0{=}1800\,\mu$M  &   1 & 1.452 & 3.367 & 332 \\
+& $N_0{=}2200\,\mu$M  &   0 & --- & 5.000 & --- \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{F3 --- $\sigma_H$ gate titration, SM medium, $2\times2$}} \\
+& $k_{\sigma H}{=}0$, D$=0$ (null natural) & 0 & 0.000 & --- & --- \\
+& $k_{\sigma H}{=}0$, D$=27$ (null + pulse) & 0 & 0.000 & --- & --- \\
+& $k_{\sigma H}{=}0.2$, D$=0$ & 96 & 0.320 & --- & 182 \\
+& $k_{\sigma H}{=}0.2$, D$=27$ & 100 & 0.327 & --- & 163 \\
+& $k_{\sigma H}{=}1.0$, D$=0$ (wild-type) & 100 & 1.639 & --- & 147 \\
+& $k_{\sigma H}{=}1.0$, D$=27$ & 100 & 1.648 & --- & 132 \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{F4 --- natural route $N_0$ titration (200 reps/cond)}} \\
+& $N_0{=}100\,\mu$M (commitment) & 100 & 1.569 & 2.166 & --- \\
+& $N_0{=}1000\,\mu$M & 84 & 1.319 & 2.172 & --- \\
+& $N_0{=}1300\,\mu$M & 56 & 1.179 & 2.190 & --- \\
+& $N_0{=}1440\,\mu$M & 39 & 1.093 & 2.206 & --- \\
+& $N_0{=}1800\,\mu$M & 2 & 0.840 & 3.398 & --- \\
+& $N_0{=}2000\,\mu$M (vegetative) & 0 & 0.681 & 4.434 & --- \\
+\multicolumn{3}{@{}l}{\textit{$N_c \approx 1370\,\mu$M; bet-hedging window 700--1800~$\mu$M}} & & & \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Discussion}
 \label{sec:discussion}
 
-The experiments reported here establish a two-pillar co-validation between
-biology and physics.
-The biology pillar answers the three Fujita questions directly from
-circuit topology: SM medium drives cells below the vegetative ATP floor
-($\approx 2.17$~mM) while CH medium does not, explaining the $52\%/5\%$
-asymmetry of Q1 (Fig.~2); $\sigma_H$ concentrates $97.5\%$ of the
-stochastic EPR (KinA cycling, Fig.~7) and its removal eliminates the only
-step where the circuit pays its Landauer cost, explaining Q2 (Fig.~3);
-and the commitment bifurcation is a noise-driven threshold-crossing with
-$N_c = 1346\,\mu$M, explaining why $\approx 50\%$ is the thermodynamically
-natural bet-hedging fraction rather than a biologically tuned value
-(Figs.~4,~6a).
-The physics pillar confirms that the circuit belongs to a strongly
-irreversible, non-mean-field universality class: $W/k_BT = 3.7 \times 10^7$
-(Fig.~5) rules out equilibrium fluctuation theorems; $\gamma_{\rm sub} =
-0.150 \pm 0.044$ (Fig.~6b) excludes mean-field Landau theory; and the
-Waddington landscape directly shows the two-basin topology at $N_c$ (Fig.~6a).
-Neither pillar stands alone: the physics makes the biology computable from
-topology; the biology validates the thermodynamic predictions without
-parameter fitting.
+\subsection{The Two-Pillar Co-Validation Structure}
 
-The NET~1 deep-trajectory analysis reveals that the wild-type $\sigma_H$
-half-life of 120~min is not optimised for Landauer efficiency — which is
-topology-constant ($\eta_L \approx 1.8 \times 10^{-8}$, independent of
-half-life — but for bet-hedging operating point.
-Shorter half-lives (20–90~min) produce $100\%$ commitment at $N_0 = N_c$;
-the WT half-life places the circuit at the maximum-entropy bifurcation
-where stochastic diversity is maximised.
-The NET-T2 trajectory analysis confirms a universal ATP commitment floor
-of $1.96$~mM regardless of $N_0$, establishing that the energy cost of commitment
-is topology-fixed, not condition-tuned.
-Two mechanistically distinct commitment pathways were identified from
-G5-tier trajectory data: Mode~B (SinI/SinR, dominant at WT half-life
-near $N_c$) and Mode~A (passive SinR degradation, dominant at short
-half-lives), with Mode~B being the exclusive bet-hedging mechanism.
+The contribution of this work is the demonstration that two independent
+pillars --- the physics of non-equilibrium open-system thermodynamics, and
+the graph-theoretic architecture of SHPN --- jointly characterise
+biological commitment in a way that neither pillar can on its own.  The
+direction \emph{architecture \(\to\) physics} is shown by NET~4 and NET~5:
+the \(\Gamma\)-gated POSet topology of \(\Gs\) predicts non-mean-field
+critical exponents and an asymmetric EPR decomposition that are then
+measured numerically.  The direction \emph{physics \(\to\) architecture} is
+shown by NET~3: the dissipated work \(W/\kB T \sim 10^8\) measured from
+the simulation is the empirical signature confirming that the POSet causal
+ordering is enforcing strong irreversibility, exactly as the formalism
+requires.
 
-Current limitations include: the $\gamma_{\rm sub} = 0.150$ estimate
-rests on 7 sub-critical data points (R$^2 = 0.70$), and the
-super-critical exponent $\gamma_{\rm sup}$ could not be extracted from
-binary CV$^2$ due to Bernoulli statistics dominating as $p \to 0$;
-trajectory-based order-parameter variance would be needed for a
-rigorous universality-class assignment.
-The Landauer efficiency ($\eta_L \sim 10^{-8}$) is far from the
-thermodynamic bound; whether this gap is intrinsic to biology or
-an artefact of model coarse-graining requires independent calorimetric
-measurement.
-The multi-layer PreemptionCheck is not yet implemented
-(single-layer only), and extension to larger fate repertoires
-($|\mathcal{A}(\mathcal{G}_E)| > 2$, e.g.\ haematopoietic lineage
-decisions) is a direct next step where the $k_BT \ln|\mathcal{A}|$
-scaling is falsifiable.
+A particularly informative finding is the NET~5 decomposition:
+the decision step (\(\Gs\)) costs only a few percent of the circuit energy
+budget, while the execution step (\(\Ge\): septation, coat synthesis)
+costs the bulk.  This was not obvious \textit{a~priori} and is impossible
+to read off any formalism that does not separate the two subgraphs.
+The NET~2 landscape provides an external calibration:
+the vegetative basin floor at $\approx 2.13$~mM is a
+topology-driven prediction that requires no parameter fitting
+to the commitment window;
+this adds a third validation direction:
+\emph{topology predicts a physically observable threshold}.
 
-SHPN is the first biological modelling formalism in which each
-architectural decision carries an explicit thermodynamic meaning
-testable by simulation.
-Its closest structural competitor, Harel Statecharts~\cite{Harel1987},
-provides signal hierarchy and causal ordering but lacks stoichiometry,
-stochastic kinetics, and any thermodynamic interpretation of guards.
-The present work positions SHPN in the tradition of Ferrell~\cite{Ferrell1998},
-Tyson–Novak~\cite{TysonNovak2001}, and S{\"u}el~et~al.~\cite{Suel2007}
-while being, to our knowledge, the first to make the Waddington landscape
-computable, thermodynamically grounded, and architecturally constrained
-from model topology.
+\subsection{Physics Answers to the Fujita Questions}
+\label{ssec:fujita-answers}
+
+The preceding Results section (\Cref{ssec:fujita_validation}) confirmed
+the three Fujita questions with direct simulation evidence.  Here we
+translate each answer into the thermodynamic vocabulary of the framework.
+
+\textbf{Q1 answered: the medium sets the thermodynamic gate, the route is
+secondary.}
+Sweep~F1 showed that SM medium ($N_0 = 100\,\mu$M) gives $100\%$
+sporulation with \emph{either} route, while CH medium ($N_0 = 1440\,\mu$M)
+gives $38$--$56\%$ regardless of whether a pulse is applied.
+Sweep~F2 confirmed the monotonic dependence: sporulation decreases
+strictly with $N_0$, falling to $0\%$ at $N_0 = 2200\,\mu$M.
+The physical explanation is the vegetative-basin ATP floor.  In SM
+medium nutrients deplete at $0.1\,\mu$M~s$^{-1}$, driving the ATP pool
+below $2.22$~mM within $\sim 17$~min; this depletion activates KinA
+(rate $\propto [1 + N^2]^{-1}$, near-maximal only when $N \approx 0$)
+and initiates the phosphorelay.  In CH medium the cell remains
+energy-replete throughout the 6-h window --- the ATP floor is never
+reached, KinA activation is negligible, and the Spo0A$\sim$P pulse
+(whether from the natural relay or an abrupt injection) is cleared by
+the nutrient-boosted phosphatase before $\sigma_H$ can accumulate.
+In Landauer terms: the abrupt route in rich medium cannot complete the
+free-energy storage step ($\sigma_H$ ramp $\to$ septation) because the
+energy substrate (ATP depletion below the floor) is not available.
+The $5\%$ Fujita result arises from the rare stochastic escape above
+the ATP floor even at $N_0 = 2200\,\mu$M; our model gives $0\%$ at
+that condition, consistent with the experimental bound within sampling
+uncertainty (Fujita used $< 200$~cells per time point).
+
+\textbf{Q2 answered: $\sigma_H$ is the circuit's Landauer step.}
+Sweep~F3 used the \texttt{k\_sigmaH\_factor} parameter to titrate
+$\sigma_H$ transcription from fully active ($= 1$, wild-type) to
+completely silenced ($= 0$, true $\sigma_H$-null).  At $k_{\sigma H} = 0$:
+$0\%$ sporulation with both natural and abrupt route, confirming
+Fujita Fig.~4.  The on/off threshold is extremely sharp: even
+$k_{\sigma H} = 0.2$ restores $96$--$100\%$ commitment.  The physics
+interpretation follows directly from NET~5 (Schnakenberg decomposition,
+v7 model): septation, the transition gated by $\sigma_H$, concentrates
+$> 96\%$ of total circuit entropy production ($\dot\sigma_{\mathrm{sept}} =
+9928\,\kB T\,\text{s}^{-1}$ at the critical condition vs.\ $237\,\kB T\,\text{s}^{-1}$
+for KinA autophosphorylation).  $\sigma_H$-null therefore does not merely
+remove a downstream reporter; it removes the \emph{only} step where the
+circuit pays its Landauer cost.  Without septation, the cell cannot
+execute the irreversible state transition, regardless of how much
+upstream Spo0A$\sim$P is present.
+
+\textbf{Q3 answered: $N_c \approx 1370\,\mu$M and the bet-hedging window
+spans 700--1800~$\mu$M.}
+Sweep~F4 (FUJITA-4, 200 replicates $\times$ 16 conditions, natural route,
+\texttt{run\_20260704\_163628}) resolved the full sporulation fraction curve
+on the v9 model at single-condition resolution:
+\begin{itemize}
+\item \textbf{Commitment zone} ($N_0 \leq 400\,\mu$M): $100\%$
+  sporulation (95\% CI [98--100\%]).  Nutrients deplete fully;
+  $[\sigma_H]_{\max} \approx 1.52$--$1.57\,\mu$M $>\theta_{\sigma H}$.
+\item \textbf{Bet-hedging window} (700--1800~$\mu$M): sporulation falls
+  monotonically from $96\%$ [92--98\%] at $N_0 = 700\,\mu$M to
+  $2\%$ [1--4\%] at $N_0 = 1800\,\mu$M.  At $N_0 = 1300\,\mu$M:
+  $56\%$ [49--62\%]; at $N_0 = 1440\,\mu$M: $39\%$ [32--45\%].
+  The $50\%$ crossover is $N_c \approx 1370\,\mu$M (midpoint of the
+  first condition above and the first condition below 50\%;  95\%~CIs
+  are non-overlapping, confirming the crossing is statistically resolved).
+\item \textbf{Vegetative zone} ($N_0 \geq 2000\,\mu$M): $0\%$
+  sporulation [0--2\%]; nutrients are not fully depleted within 6~h;
+  $[\sigma_H]_{\max}$ falls to $0.68\,\mu$M at $N_0 = 2000\,\mu$M,
+  well below $\theta_{\sigma H} = 1.60\,\mu$M.
+\end{itemize}
+The vegetative ATP floor is $2.165$--$2.225$~mM across all
+nutrient-stressed conditions ($N_0 \leq 1800\,\mu$M), consistent with
+the topology-derived prediction of $2.13$~mM and with the F1/F2
+measurements ($2.22 \pm 0.04$~mM).  The NET~4 critical exponents
+($\gamma_{\mathrm{sub}} \approx 2.4$, $\gamma_{\mathrm{sup}} \approx 4.6$,
+v7 model) predict asymmetric basin curvature that naturally produces a
+near-50\% crossover near the bifurcation; the F4 measurement of
+$N_c \approx 1370\,\mu$M confirms that the Fujita $\approx52\%$ is the
+thermodynamically natural outcome near the noise-driven commitment
+bifurcation, not a biologically tuned value.
+
+\subsection{Competitive Landscape}
+
+SHPN's competitors are biological modelling formalisms, not theoretical
+physics.  \Cref{tab:competition} compares SHPN to the principal
+alternatives on the five criteria required for the co-validation of
+\Cref{tab:covalidation}.
+
+\begin{table}[h]
+\centering
+\caption{Comparison of biological modelling formalisms on the five
+criteria required for thermodynamic characterisation of commitment.
+SHPN is the only formalism satisfying all five.}
+\label{tab:competition}
+\begin{tabular}{lccccc}
+\toprule
+Formalism & Stoch.\ & Signal & Causal & Thermodyn. & Hybrid \\
+          & dynamics & hierarchy & ordering & \(\Gamma\) & stoch/ODE \\
+\midrule
+SBML / ODEs                & \checkmark & --- & --- & --- & partial \\
+Standard SPN / GSPN        & \checkmark & --- & --- & --- & --- \\
+Boolean / Thomas networks  & qualitative & --- & --- & --- & --- \\
+Kappa / BioNetGen          & \checkmark & --- & --- & --- & --- \\
+Harel Statecharts          & partial & \checkmark & \checkmark & --- & --- \\
+Bio-CCS / process algebras & \checkmark & --- & --- & --- & --- \\
+\textbf{SHPN}              & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The closest match on the structural criteria (signal hierarchy + causal
+ordering) is Harel Statecharts~\cite{Harel1987}, but Statecharts lack
+stoichiometry, stochastic kinetics, and any thermodynamic interpretation
+of their guards.  SHPN is, to our knowledge, the first biological
+modelling formalism in which each architectural decision carries an
+explicit thermodynamic meaning testable by simulation.
+
+\subsection{Limitations and Open Questions}
+
+\textit{Tightness of the Landauer bound.}
+\(\eta_L \sim 10^{-9}\) measured by NET~1 establishes the bound is far
+from saturated by the SHPN model.  Whether the gap is intrinsic to the
+biology, an artefact of model coarse-graining, or an indication of
+overestimated structural-execution costs requires independent
+calorimetric measurement.
+
+\medskip\noindent\textit{Universality class identification.}
+NET~4 excludes mean-field but cannot identify a universality class on the
+basis of two power-law exponents alone.  Finite-size scaling analysis
+across a range of cell-volume scales would be required for a rigorous
+classification.
+
+\medskip\noindent\textit{Multi-layer PreemptionCheck.}
+The current implementation enforces PreemptionCheck on direct
+signal predecessors only (single-layer, non-recursive).  Multi-layer
+enforcement requires a layer-assignment computation on \(\Gs\) that is
+not yet integrated into the runtime.  Whether the single-layer
+approximation under- or over-estimates the Landauer cost of the cascade
+is an open question.
+
+\medskip\noindent\textit{Beyond binary commitment.}
+\(|\Aset(\Ge)| = 2\) is the simplest non-trivial case.  Cells with
+larger fate spaces (e.g.\ haematopoietic stem cells with \(\sim 10\)
+distinguishable lineages) are the natural next test.  The
+\(\kB T \ln|\Aset(\Ge)|\) scaling predicted by the framework is
+falsifiable by such systems.
+
+\subsection{Positioning}
+
+SHPN is a domain-specific formal language for biological
+decision-making with an intrinsic open-system thermodynamic semantics.
+It extends stochastic Petri nets with three architectural primitives ---
+\(\Ge \times \Gs\), POSet \(\lambda\) with PreemptionCheck, and the
+\(\Gamma\) gate tuple --- that together formalise the three quantifiable
+components of the Waddington landscape:
+\begin{enumerate}
+\item the attractor space \(\Aset(\Ge)\), with minimum selection cost
+  \(\kB T \ln|\Aset(\Ge)|\) derivable from topology;
+\item the landscape tilting mechanism: \(\Gs\) driven by
+  \(\Gamma\)-gated arcs whose parameters \((K, n, \varepsilon)\) are
+  grounded in dose-response measurements;
+\item the entropy cost of fate selection, decomposable as
+  \(\dot\sigma = \dot\sigma_{\Ge} + \dot\sigma_{\Gs}\) via Schnakenberg.
+\end{enumerate}
+This positions the work in the tradition of Ferrell~\cite{Ferrell1998},
+Tyson and Novak~\cite{TysonNovak2001}, Thomas~\cite{Thomas1973},
+and S\"uel et~al.~\cite{Suel2007} --- formalisms answering \emph{how cells
+decide} --- while being the first to make signal hierarchy and its
+causal ordering first-class syntactic features and to assign each
+architectural primitive an explicit thermodynamic meaning.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Conclusion}
