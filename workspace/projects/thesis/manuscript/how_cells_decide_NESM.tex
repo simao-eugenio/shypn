@@ -1062,6 +1062,91 @@ topology and stochastic rates are known --- a new measurement handle on
 the physics of cellular decision-making.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section*{Acknowledgements}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The author thanks the members of the UFSC Araranguá campus for providing
+the computational environment in which this work was carried out.
+GPU simulations were run on an NVIDIA RTX~5060~Ti workstation maintained
+by the author.
+The author is grateful to the open-source communities behind Python,
+NumPy, SciPy, Matplotlib, and \LaTeX{} whose tools underpin all
+analysis and typesetting in this manuscript.
+[{\itshape Placeholder: add collaborator acknowledgements if applicable.}]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Funding}
+% ─────────────────────────────────────────────────────────────────────────────
+
+[{\itshape Placeholder: insert grant numbers and funding agencies (CNPq,
+CAPES, FAPESC, or other) once confirmed.}]
+This study received no specific funding from commercial entities.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Author Contributions}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent E.S.: Conceptualization, Methodology, Software, Formal Analysis,
+Investigation, Data Curation, Writing --- Original Draft,
+Writing --- Review \& Editing, Visualization.
+
+All work is that of the sole author.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Competing Interests}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The author declares no competing financial or non-financial interests.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Data and Code Availability}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The SHPN simulation engine and all model files (\texttt{.shy}) used in
+this study are available at
+\url{https://github.com/simao-eugenio/shypn-dev} under the MIT licence.
+All sweep configurations, run provenance records (\texttt{provenance.json}),
+and summary CSV files are archived in the same repository under
+\texttt{workspace/projects/thesis/experiments/results/}.
+Analysis scripts are in \texttt{workspace/projects/thesis/scripts/}.
+Raw replicate trajectory data are available from the author on request.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{AI Disclosure}
+% ─────────────────────────────────────────────────────────────────────────────
+
+GitHub Copilot (Claude Sonnet~4.6, accessed via Visual Studio Code) was
+used as a coding assistant during development of the SHPN simulation
+engine and analysis scripts, and as a writing assistant during
+manuscript drafting.
+All scientific claims, mathematical derivations, simulation designs, and
+interpretations of results are the sole intellectual work of the author.
+No AI tool was used to generate or fabricate data, figures, or
+quantitative results.
+The author takes full responsibility for the accuracy and integrity of
+all content.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Supplementary Material}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{description}
+  \item[Supplementary~S1] Full 13-tuple Bio-PN firing semantics and
+    proofs (enablement, firing rule, PreemptionCheck).
+  \item[Supplementary~S2] Complete v9 model specification: 41-place,
+    36-transition, 114-arc table with rate functions, initial markings,
+    and arc types.
+  \item[Supplementary~S3] Derivation of the $\etaL$ topology-constancy
+    condition and its relation to gate co-operativity $n$.
+  \item[Supplementary~S4] Proof that $W/\kB T \gg 1$ implies
+    inapplicability of the Jarzynski equality and Crooks fluctuation
+    theorem for commitment processes.
+  \item[Supplementary~S5] Critical exponent fitting procedure:
+    bootstrap uncertainty quantification for $\gsub$, sensitivity to
+    $\Nc$ estimate, and comparison with v7 model exponent.
+\end{description}
+
+% ─────────────────────────────────────────────────────────────────────────────
 %  REFERENCES  (placeholder — replace with BibTeX)
 % ─────────────────────────────────────────────────────────────────────────────
 \begin{thebibliography}{99}
