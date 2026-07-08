@@ -98,7 +98,12 @@ provides exact trajectory-level entropy production for Markov chains of
 any size, offers a principled alternative.
 Here we introduce the Signal Hierarchical Petri Net (SHPN) formalism as the
 computational substrate for single-cell non-equilibrium statistical
-mechanics (NESM): its arc semantics map directly onto the thermodynamic
+mechanics (NESM).
+SHPN encodes a biological principle that underlies all known commitment
+circuits: the \emph{decision} is stochastic (low-copy regulatory
+molecules; noise is the mechanism) and the \emph{execution} is
+continuous (high-copy effectors; ODE regime).
+Its arc semantics map directly onto the thermodynamic
 ports of an open driven system, and five measurable thermodynamic
 quantities --- topological load $\etaL$, dimensionless work $W/\kB T$,
 critical nutrient level $\Nc$, sub-critical exponent $\gsub$, and
@@ -166,6 +171,19 @@ switches) --- within a single, formally grounded model.
 
 We propose the Signal Hierarchical Petri Net (SHPN)~\cite{Simao2025} as
 this substrate.
+SHPN is built around a biological principle that appears to be universal
+across commitment circuits: \textbf{the decision is stochastic; the
+execution is continuous.}
+Commitment events are driven by regulatory molecules present at copy numbers
+of tens to hundreds per cell (KinA, Spo0A$\sim$P, SinR, CI repressor,
+CtrA) --- the regime where Poisson fluctuations are the mechanism, not
+noise to be suppressed.
+Execution programmes operate at thousands to tens-of-thousands of molecules
+per cell ($\sigma$-factor cascades, coat proteins, caspases) --- the
+ODE regime where fluctuations are negligible.
+A formalism that conflates these two regimes --- modelling commitment with
+ODEs or execution with stochastic rates --- will systematically
+mis-attribute the thermodynamic dissipation budget.
 SHPN is a 13-tuple Bio-PN formalism in which:
 continuous ODE transitions model high-throughput processes ($\sigma$-factor
 transcription, coat synthesis);
