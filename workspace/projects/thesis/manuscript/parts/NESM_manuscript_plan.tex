@@ -1,0 +1,278 @@
+% ============================================================
+%  MANUSCRIPT PLAN: how_cells_decide_NESM.tex
+%  Stochastic Thermodynamics of Single-Cell Commitment:
+%  A Non-Equilibrium Analysis of B. subtilis Sporulation
+% ============================================================
+%
+%  Target journals: Physical Review X / eLife (physics) / PRE
+%  Framing: NESM + SHPN as the primary language; Fujita biology
+%           as validation prerequisite, not main result.
+%
+%  Session: 2026-07-08
+%  Status: PLAN — skeleton only, content to be filled part by part.
+% ============================================================
+
+% ------------------------------------------------------------
+%  FRAMING SHIFT vs. plos_one_how_cells_decide.tex
+% ------------------------------------------------------------
+%
+%  Current (PLOS ONE):
+%    Main question  — Can SHPN reproduce Fujita biology?
+%    Thermodynamics — A "framework section" before Results
+%    Abstract lead  — "how cells decide"
+%    Discussion     — Biological implications
+%
+%  NESM version:
+%    Main question  — What does NESM tell us about single-cell commitment?
+%    Biology        — Validation prerequisite (Results I, brief)
+%    Abstract lead  — "stochastic thermodynamics of commitment"
+%    Discussion     — What gamma != MF means physically; generality
+%
+% ------------------------------------------------------------
+%  PROPOSED STRUCTURE
+% ------------------------------------------------------------
+
+% 1. ABSTRACT (~ 250 words)
+%    S1: Gap — cells make irreversible commitment decisions;
+%              no thermodynamic characterisation exists at single-cell level.
+%    S2: Framework — SHPN as computational substrate for stochastic
+%              thermodynamics; five quantities derivable from topology alone.
+%    S3: Validation — B. subtilis sporulation reproduces Fujita & Losick
+%              (2005) Q1/Q2/Q3 constraints.
+%    S4: Main finding — gamma_sub = 0.150 +/- 0.044 (non-MF, non-mean-field
+%              universality class); N_c = 1346 uM; EPR cost concentrated at
+%              the sensing step (KinA 97.5%).
+%    S5: Generality — framework applies to any commitment circuit with
+%              known topology.
+
+% 2. INTRODUCTION (~ 600 words, 4 paragraphs)
+%    P1: The thermodynamic gap.
+%        Cells commit irreversibly (differentiation, sporulation, apoptosis).
+%        Classical thermodynamics cannot describe small-N, NESS systems.
+%        Stochastic thermodynamics (Seifert 2012) provides exact trajectory-
+%        level thermodynamics for Markov chains — but has never been
+%        systematically applied to regulatory commitment circuits.
+%    P2: Why a unified model is needed.
+%        Regulatory decisions involve both high-copy continuous (ODE) and
+%        low-copy discrete stochastic regimes coexisting in the same network.
+%        Separate formalisms (ODE vs. Boolean vs. CTMC) cannot address this.
+%        SHPN (Simao 2025) unifies them in a single 13-tuple formalism with
+%        a provable firing semantics.
+%    P3: B. subtilis sporulation as working model.
+%        Binary, irreversible, well-characterised (Fujita & Losick 2005).
+%        Physiological stochasticity is the mechanism (bet-hedging).
+%        Three published experimental constraints to validate against.
+%        41 places, 36 transitions — tractable but non-trivial.
+%    P4: Here we show.
+%        We construct a SHPN model, validate against Fujita constraints,
+%        then apply stochastic thermodynamics to compute the five quantities.
+%        We find gamma != 0.5 (non-mean-field), N_c = 1346 uM, and
+%        that 97.5% of the EPR cost of commitment is paid at the sensing step.
+
+% 3. THEORY I — THE SINGLE CELL AS AN OPEN NON-EQUILIBRIUM SYSTEM
+%    (~ 800 words)
+%
+%    3.1 Non-equilibrium steady states and the cell
+%        - A cell maintains steep gradients, pumps ions, consumes ATP.
+%        - It operates at a NESS, not equilibrium.
+%        - Classical thermodynamics (Gibbs, Boltzmann) applies only at
+%          equilibrium; NESM is the correct framework.
+%        - Key references: Schnakenberg 1976, Hill 1977, Seifert 2012,
+%          Rao & Esposito 2018.
+%
+%    3.2 Stochastic thermodynamics: entropy production along a trajectory
+%        - System described by a CTMC with master equation.
+%        - Three conditions for applicability:
+%          (i)  CTMC (Master equation)
+%          (ii) Local detailed balance: k+/k- = exp(Delta_mu / k_B T)
+%          (iii) Explicit driving reservoirs
+%        - Trajectory-level EPR: sigma[omega] = ln P[omega] / P[omega_tilde]
+%          (exact, not an approximation, valid for any N)
+%        - Second Law: <sigma> >= 0, equality only at equilibrium.
+%        - Key result: this is rigorous for ~10 molecules.
+%
+%    3.3 Subsystem thermodynamics and the Markovian reservoir assumption
+%        - Full cell has N >> 1 processes; we model k << N.
+%        - Esposito & Van den Broeck (2010): subsystem EPR is separable
+%          when coupling to environment is Markovian.
+%        - sigma_sub = sigma_total - sigma_rest - sigma_interface
+%        - Interface term vanishes in NESS under Markovian coupling.
+%        - For the sporulation subnetwork:
+%          * ATP pool = chemical bath (k_B T ln([ATP]/[ADP][Pi]) = driving)
+%          * INITIAL_NUTRIENTS = nutrient reservoir
+%          * Rest of cell = effective Markovian bath
+%        - Biological evidence: Fujita validation succeeds without modelling
+%          unmodelled processes -> weak coupling confirmed empirically.
+%        - Scope boundary: quantities characterise the commitment circuit
+%          during the decision window, not full cellular lifecycle.
+
+% 4. THEORY II — SHPN AS COMPUTATIONAL SUBSTRATE FOR SINGLE-CELL NESM
+%    (~ 700 words)
+%
+%    4.1 The 13-tuple Bio-PN formalism
+%        SPN = (P, T, F, W, M_0, Phi, C, F_t, Psi, F_s, W_s, lambda, theta)
+%        - Firing semantics (brief, forward to Supplementary for full proof)
+%        - Hybrid regime: stochastic (tau-leaping) + continuous (ODE)
+%          coexist in one model.
+%
+%    4.2 Why SHPN maps to stochastic thermodynamics
+%        - Stochastic transitions: tau-leaping is a Poisson approximation
+%          to the Master equation of a CTMC.
+%          -> EPR of stochastic part: exact within tau-leaping approximation.
+%        - ODE transitions: continuous flow; EPR is deterministic limit
+%          of the full stochastic EPR.
+%        - The hybrid formalism separates:
+%          Layer A (stochastic, low-copy): commitment decision — fluctuations
+%                  are the biological mechanism.
+%          Layer B (continuous, high-copy): execution programme — ODE regime.
+%
+%    4.3 Arc semantics as thermodynamic ports
+%        - Normal arcs: stoichiometric flows, contribute to EPR.
+%        - Signal-flow arcs: regulatory dissipation channels; consumptive,
+%          cascade-gated by theta_eff (basin floor = min dissipation for
+%          downstream activation).
+%        - Test arcs: zero-mass-transfer sensing; EPR = 0 for the arc,
+%          but they gate transitions that do dissipate.
+%        - Inhibitor arcs: presence-check with threshold theta; EPR = 0
+%          for arc but determines transition enabling.
+%        -> The arc graph encodes the thermodynamic topology of the circuit.
+%
+%    4.4 The five topological-thermodynamic quantities
+%        Quantity 1: eta_L (topological load factor)
+%            eta_L = |A| / (|P| * |T|)  [arc density of commitment layer]
+%            Interpretation: informational load of the cascade per
+%            place-transition pair. Topology-constant (NET-T1 result).
+%        Quantity 2: W/k_B T (dimensionless work ratio)
+%            W = integral of J * A dt along trajectory
+%            W/kBT >> 1 -> Fluctuation Theorems inapplicable (as found)
+%        Quantity 3: N_c (critical nutrient level)
+%            Order parameter transition point; found at 1346 uM.
+%        Quantity 4: gamma_sub (sub-critical exponent)
+%            CV^2_bin ~ |N_0 - N_c|^(-gamma); measures universality class.
+%        Quantity 5: EPR decomposition
+%            Per-transition dissipation budget; identifies thermodynamic
+%            bottleneck of the decision.
+
+% 5. RESULTS I — BIOLOGICAL VALIDATION (prerequisite, ~ 1.5 pages)
+%    "The subnetwork model is biologically grounded before thermodynamic
+%     analysis. Three independent experimental constraints from Fujita &
+%     Losick (2005) are reproduced."
+%
+%    Fig 2: Q1 — abrupt vs. natural route, sporulation % + ATP trajectory
+%    Fig 3: Q2 — sigma_H as irreversible gate (k=0 -> 0%)
+%    Fig 4: Q3 — N_c titration, commitment timing, sigma_H peak
+%    Table 1: Fujita protocol sweep results
+
+% 6. RESULTS II — THERMODYNAMIC CHARACTERISATION OF COMMITMENT
+%    (~ 4 pages)
+%
+%    6.1 Topological load and commitment modes (NET-T1, Fig 5 left)
+%        - eta_L ~ 1.82-1.88e-8, topology-constant over HL range 20-90 min
+%        - Two modes: Mode A (passive, short HL) vs Mode B (SinR-gated, WT)
+%        - Interpretation: the arc graph constrains the thermodynamic load
+%          independently of parameter variation.
+%
+%    6.2 Free energy landscape and work (NET-T2/T3, Fig 5 right + Fig 6a)
+%        - Waddington landscape U_eff(phi,t) = -ln P_ss(phi,t)
+%          (rigorously defined, not a metaphor)
+%        - W/kBT = 3.72e7: commitment is deep in the non-linear regime
+%          -> Fluctuation Theorems (Jarzynski/Crooks) are inapplicable
+%          -> This is a result, not a limitation
+%        - FWD perturbation (enrich nutrients): aborts sporulation 38%->0%
+%        - REV perturbation (starve more): triggers minimal 0%->2%
+%          -> Asymmetric response = signature of irreversibility
+%
+%    6.3 Critical transition and universality class (NET-T4, Fig 6b)
+%        - N_c = 1346 uM (crossover from sub- to supra-critical)
+%        - Critical slowing down: mean commitment time 317->337 min near N_c
+%        - CV^2_bin ~ |N_0 - N_c|^(-gamma_sub), gamma_sub = 0.150 +/- 0.044
+%        - Mean-field prediction: gamma_MF = 0.5
+%        - Deviation: 19 sigma below MF
+%        - Physical interpretation: the phosphorelay cascade feeding into
+%          the SinR/SinI gate introduces effective long-range correlations
+%          that suppress fluctuation amplification near N_c.
+%
+%    6.4 Entropy production decomposition (NET-T5, Fig 7)
+%        - Total EPR: 5.6 -> 0.9 -> ~0 kBT/s (tracks commitment progress)
+%        - KinA dominates stochastic EPR: 97.5%
+%          -> The thermodynamic cost of commitment is paid at the SENSING step
+%          -> Execution programme (sigma factors, coat synthesis) is cheap
+%        - Septation asymmetry: 14.3x higher EPR in sporulating vs veg cells
+%          -> Entropy production signature of the symmetry-breaking event
+%        - Biological interpretation: bet-hedging is thermodynamically
+%          inexpensive in execution but expensive in sensing.
+
+% 7. DISCUSSION (~ 700 words, 4 paragraphs)
+%
+%    P1: What gamma != MF means physically.
+%        - MF assumes uncorrelated fluctuations (each molecule decides
+%          independently near the transition).
+%        - The phosphorelay (KinA->Spo0F->Spo0A) is a 3-step cascade with
+%          positive feedback (Spo0A~P activates its own transcription).
+%        - Signal-flow arcs introduce PreemptionCheck coupling between
+%          commitment layer transitions -> effective correlation length
+%          larger than a single step -> non-MF universality.
+%        - This is the first report of a non-MF critical exponent for a
+%          biological regulatory circuit computed from its topology.
+%
+%    P2: The Markovian reservoir assumption — scope and limitations.
+%        - Valid when: sporulation timescale >> metabolic correlation time.
+%        - Breaks when: ATP depletion is fast relative to KinA response
+%          (deep starvation, starved-then-refed experiments).
+%        - Verified empirically: Fujita validation succeeds -> weak coupling.
+%        - Honest scope: thermodynamics of the commitment decision window,
+%          not the full cellular lifecycle.
+%
+%    P3: Why topology encodes thermodynamics.
+%        - eta_L is topology-constant (NET-T1): arc density does not change
+%          with half-life parameterisation.
+%        - EPR bottleneck at KinA is a structural property: the sensing step
+%          (KinA autophosphorylation) is the single irreversible input to the
+%          cascade; all downstream steps are thermodynamically downstream of it.
+%        - Connection to Thermodynamic Uncertainty Relations (Barato & Seifert
+%          2015): precision of the commitment decision is bounded below by the
+%          EPR. The bet-hedging window (700-1800 uM) is the regime where
+%          precision is deliberately sacrificed for population-level diversity.
+%
+%    P4: Generality of the framework.
+%        - The five quantities are computable for any SHPN model with:
+%          (i) known arc topology, (ii) stochastic rates, (iii) explicit
+%          chemical reservoirs.
+%        - Candidate circuits: Caulobacter cell-cycle (CtrA/DnaA), E. coli
+%          SOS response (LexA/RecA), mammalian apoptosis (Bcl-2 family).
+%        - The framework does not require new experiments; it extracts
+%          thermodynamic information from models already validated against
+%          existing data.
+
+% 8. CONCLUSION (~ 150 words)
+%    - We have established that single-cell commitment decisions have a
+%      computable thermodynamic characterisation within the NESM framework.
+%    - SHPN provides the natural computational substrate: its arc semantics
+%      map directly onto thermodynamic ports of an open CTMC system.
+%    - For B. subtilis sporulation: gamma_sub = 0.150 != MF, N_c = 1346 uM,
+%      EPR cost concentrated at the sensing step.
+%    - Five topology-derivable quantities constitute a thermodynamic
+%      fingerprint of a commitment circuit.
+%    - The Markovian reservoir assumption restricts scope to the decision
+%      window; full cellular thermodynamics is a future direction.
+
+% 9. SUPPLEMENTARY
+%    S1: Full 13-tuple Bio-PN formalism and firing semantics proofs
+%    S2: All sweep parameters, model details, v9 arc table
+%    S3: Derivation of eta_L topology-constancy condition
+%    S4: Proof that W/kBT >> 1 implies FT inapplicability for commitment
+%    S5: Critical exponent fitting procedure and uncertainty analysis
+
+% ============================================================
+%  KEY REFERENCES
+% ============================================================
+%  Seifert, U. (2012). Rep. Prog. Phys. 75, 126001.
+%  Rao, R. & Esposito, M. (2018). New J. Phys. 20, 023007.
+%  Esposito, M. & Van den Broeck, C. (2010). PRL 104, 090601.
+%  Barato, A.C. & Seifert, U. (2015). PRL 114, 158101.
+%  Schnakenberg, J. (1976). Rev. Mod. Phys. 48, 571.
+%  Jarzynski, C. (1997). PRL 78, 2690.
+%  Crooks, G. (1999). PRE 60, 2721.
+%  Fujita, M. & Losick, R. (2005). Genes Dev. 19, 2236.
+%  Simao, E. (2025). [SHPN formalism paper]
+% ============================================================

@@ -20,6 +20,9 @@ parts/
 sdist/
 var/
 *.egg-info/
+# Allow manuscript planning fragments despite the parts/ rule above
+!workspace/projects/*/manuscript/parts/
+!workspace/projects/*/manuscript/parts/**
 .installed.cfg
 *.egg
 
