@@ -455,6 +455,28 @@ commitment circuit: which flows carry mass (and thus contribute EPR),
 which carry only information (EPR-neutral), and which constrain the
 basin floor.
 
+\paragraph{The POSet $\lambda$ as an entropic ratchet.}
+The layer assignment $\lambda$ imposes a directed state space in which
+each level transition is irreversible because the free energy cost of
+ascending is consumed from the chemical bath and cannot be recovered.
+For a cascade $a \to b \to c$ ($n$ levels), the forward-to-reverse ratio
+of the full cascade is:
+\begin{equation}
+  \frac{W(0 \to n)}{W(n \to 0)}
+  = \exp\!\left(\frac{\mathcal{A}_{\mathrm{total}}}{\kB T}\right)
+  = \exp\!\left(\frac{\sum_{k=0}^{n-1} \Delta\mu_k}{\kB T}\right)
+  \label{eq:ratchet}
+\end{equation}
+With $\mathcal{A}_{\mathrm{total}} = W/\kB T = 3.72\times10^7$, the
+ratio is $\approx 10^{16{,}000{,}000}$.
+PreemptionCheck reinforces this: the reverse trajectory $\tilde\omega$
+requires $b$ to fire before $a$, but $\Phi_b(M_{\mathrm{before}\,a}) = 0$
+(PreemptionCheck fails), so $P[\tilde\omega] = 0$ under forward dynamics.
+The POSet converts a probabilistically suppressed reverse path into a
+structurally forbidden one.
+\emph{Biological commitment irreversibility is not an emergent statistical
+property --- it is structurally enforced by the cascade architecture.}
+
 \subsection{The five topological-thermodynamic quantities}
 \label{sec:five_quantities}
 
@@ -934,6 +956,22 @@ The deviation is large ($19\sigma$), confirming that the non-MF universality
 class is a structural property of the commitment cascade, not a
 finite-sample artefact.
 
+The PreemptionCheck mechanism has a direct EPR signature that makes this
+suppression transparent at the trajectory level.
+When PreemptionCheck is false, the effective propensity of the gated
+transition is zero and its EPR contribution is exactly zero: the cascade
+enters a thermodynamic silence interval.
+Because PreemptionCheck couples all Layer-A transitions through $\lambda$,
+the silence is collective --- all downstream transitions go silent
+simultaneously.
+Near $N_c$, the cascade flickers rapidly between active (EPR burst) and
+silent intervals before finally committing, generating correlated EPR
+bursts rather than the independent Poisson events assumed by mean-field.
+The variance of $\sigma[\omega]$ is thus suppressed relative to
+$\langle\sigma[\omega]\rangle$: $\mathrm{Var}[\sigma]/\langle\sigma\rangle < 1$
+near $N_c$, a direct thermodynamic fingerprint of the non-MF universality
+class enforced by the cascade topology.
+
 \subsection{The Markovian reservoir assumption: scope and limitations}
 
 The subsystem thermodynamics framework (\Cref{sec:subsystem}) requires the
@@ -954,6 +992,27 @@ faster depletion) that violates the Markovian bath assumption.
 Similarly, a starved-then-refed experiment (as in FWD perturbation, NET-T3)
 produces a rapid metabolic response that is not captured by treating ATP
 as a slowly varying reservoir.
+
+A related concern is that the ATP pool is shared with all concurrent
+cellular processes (translation, replication, membrane synthesis), not
+dedicated to the sporulation subnetwork alone, so the $\sigma_{\rm interface}$
+term in the decomposition \cref{eq:epr_decomp} is non-zero.
+Three considerations bound this concern.
+First, the signalling layer (KinA cycling) consumes only $\sim 8\,\mu$M ATP
+over 6~h --- negligible relative to the 5000~$\mu$M pool.
+Second, during the commitment window, starvation suppresses translation,
+replication, and flagellar motors, reducing competing ATP drains
+precisely when sporulation is active.
+Third, and most importantly, the structural results ($N_c$, $\gsub$, EPR
+decomposition ratios) are implicitly calibrated against the Fujita
+experiments, which were performed in real cells with all concurrent
+processes running.
+The model reproduces those fractions without parameter tuning; the ATP
+competition present in the biological experiment is therefore already
+encoded in the effective parameter regime.
+The absolute EPR values ($W/\kB T$, $\dot\sigma$ in $\kB T$~s$^{-1}$)
+remain the most sensitive to the shared-bath assumption and should be
+read as subnetwork-specific quantities, not total cellular dissipation.
 
 The computed thermodynamic quantities are therefore valid for:
 the commitment decision window (roughly from nutrient depletion to first

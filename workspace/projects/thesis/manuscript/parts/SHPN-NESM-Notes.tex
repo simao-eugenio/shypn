@@ -1,0 +1,199 @@
+% ============================================================
+%  SHPN-NESM-Notes.tex
+%  Working notes from scientific discussion — July 2026
+%  Topics: PreemptionCheck/trajectories, POSet as entropic ratchet,
+%          ATP bath concern, kBT origin, reversibility in ST,
+%          N0 sweep and Fujita calibration defence
+% ============================================================
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 1 — Reversibility in Stochastic Thermodynamics}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Reversibility is \emph{central} to stochastic thermodynamics, not an
+exception. A process is reversible iff $P[\omega] = P[\tilde\omega]$ for
+every trajectory, which implies $\sigma[\omega] = 0$ (detailed balance at
+path level). The Crooks fluctuation theorem $P_F[\omega]/P_R[\tilde\omega]
+= e^{\sigma[\omega]}$ quantifies \emph{how far} a trajectory deviates from
+reversibility. At $\sigma = 0$ (ratio $= 1$) forward and reverse are
+equally probable. The three regimes: equilibrium ($\sigma = 0$ always),
+near-equilibrium ($\sigma \ll 1$, Onsager linear response, FTs testable),
+far-from-equilibrium ($\sigma \gg 1$, FTs exact but inaccessible, NESS
+regime). Sporulation sits firmly in the third regime. ST does not
+\emph{require} reversibility; it \emph{measures} the degree of
+irreversibility. $\dot\sigma \geq 0$ is the Second Law at trajectory
+level, valid for any system.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 2 — Origin of $k_BT$ in a Single-Cell NESM System}
+% ─────────────────────────────────────────────────────────────────────────────
+
+$k_BT$ does not arise from the cell's internal temperature; it enters
+because the cell is coupled to an \emph{external thermal bath} — the
+aqueous cytoplasm in thermal equilibrium with the surrounding medium at
+$T \approx 310\,\text{K}$. Local detailed balance:
+$k^+_\rho / k^-_\rho = \exp(\Delta\mu_\rho / k_BT)$ encodes the bath
+temperature, not a cellular property. Every molecular collision and ATP
+hydrolysis event occurs in aqueous solution at $T = 310\,\text{K}$;
+the solvent is what makes reactions stochastic. The cell is
+\emph{chemically} non-equilibrium (sustained by ATP/nutrient gradients)
+but \emph{thermally} equilibrated (coupled to a large solvent bath with
+fast relaxation time $\tau_{\rm relax} \sim \text{ps}$, much faster than
+biochemical timescales). This separation is precisely what makes
+stochastic thermodynamics applicable at the single-cell level. $W/k_BT
+= 3.72\times10^7$ means commitment dissipates that many thermal energy
+quanta — not enough thermal noise exists in the bath to drive the reverse
+process spontaneously.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 3 — PreemptionCheck, Cascade EPR Silence, and $\gamma \neq$ MF}
+% ─────────────────────────────────────────────────────────────────────────────
+
+PreemptionCheck modifies the effective propensity at trajectory level:
+$\EPR_t(t) = 0$ when PreemptionCheck is false, $\Phi_t \ln(\Phi_t^+/
+\Phi_t^-)$ when true. This creates \emph{structured EPR silence intervals}
+in the trajectory — periods when the entire cascade is below threshold and
+produces no stochastic EPR. Because PreemptionCheck couples all Layer-A
+transitions through the signal hierarchy $\lambda$, when it fails for one
+transition it fails for all downstream transitions simultaneously.
+Consequence: EPR contributions from different transitions are NOT
+independent Poisson events (as in a standard CRN). They share a common
+on/off switch. Variance of total EPR is suppressed relative to the
+Poisson/mean-field prediction.
+
+This is the physical origin of $\gamma_{\rm sub} = 0.150 < 0.5$: near
+$N_c$, the cascade turns on and off collectively (joint EPR bursts),
+not transition-by-transition (independent Poisson). The variance
+suppression is structural — enforced by the cascade topology — not a
+statistical artefact.
+
+Three mechanisms contribute:
+\begin{enumerate}
+  \item \textbf{Sequential amplification} (KinA $\to$ Spo0F $\to$ Spo0A):
+    fluctuation in KinA propagates multiplicatively through the chain.
+  \item \textbf{Nonlinear inhibitor gate} (SinR $< 7.5\,\mu$M):
+    sharp threshold creates history-dependent gating.
+  \item \textbf{PreemptionCheck coupling}: Layer-A transitions are jointly
+    suppressed when the cascade is below threshold.
+\end{enumerate}
+
+Critical slowing down signature: near $N_c$, the marking of SinR
+fluctuates around $\theta_{\rm eff} = 7.5\,\mu$M. The cascade turns on
+and off rapidly (EPR flickering) before finally committing. Mean duration
+of active intervals increases as $N_0 \to N_c$. The total
+$\sigma[\omega] = \int \EPR(t)\,dt$ is the integral over active intervals
+only.
+
+Standard CRN (no hierarchy) predicts $\mathrm{Var}[\sigma[\omega]] \sim
+\langle\sigma[\omega]\rangle$ (Poisson / MF). With PreemptionCheck:
+$\mathrm{Var}/\langle\sigma\rangle < 1$ near $N_c$. This ratio is the
+thermodynamic fingerprint of the non-MF universality class, enforced by
+cascade topology.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 4 — POSet $\lambda$ as an Entropic Ratchet}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Core insight:} The POSet layer assignment encodes a directed
+state space where each level transition is irreversible because the free
+energy cost of ascending is consumed from the chemical bath and cannot
+be recovered.
+
+\textbf{Formal statement:}
+$$\frac{W(0 \to n)}{W(n \to 0)} = \prod_{k=0}^{n-1} \frac{k^+_k}{k^-_k}
+= \exp\!\left(\frac{\sum_k \Delta\mu_k}{k_BT}\right)
+= e^{\mathcal{A}_{\rm total}/k_BT}$$
+
+For $\mathcal{A}_{\rm total} = 3.72\times10^7$: forward-to-reverse ratio
+$= e^{3.72\times10^7} \approx 10^{16{,}000{,}000}$.
+
+\textbf{Cascade depth scaling:}
+$$\frac{W}{\kB T} \sim n \cdot \bar{\mathcal{A}} \cdot \bar{n}_{\rm firings}$$
+Deeper POSet $\to$ more levels $\to$ larger $W/k_BT$ $\to$ stronger
+irreversibility. Falsifiable: single-level circuits ($n=1$) should have
+$W/k_BT \sim 10^3$; three-level circuits ($n=3$) $\sim 10^7$;
+both should be \emph{structurally} irreversible beyond $n = 3$ for any
+realistic $\Delta\mu$.
+
+\textbf{Why PreemptionCheck reinforces this:}
+The reverse trajectory $\tilde\omega$ requires $c$ to fire before $b$,
+$b$ to fire before $a$. But PreemptionCheck sets $\Phi_b(M_{\rm before\,a})
+= 0$. Therefore $P[\tilde\omega] = 0$ under forward dynamics. The POSet
+converts a \emph{probabilistically suppressed} reverse path into a
+\emph{structurally forbidden} one.
+
+\textbf{Key sentence for manuscript:}
+\begin{quote}
+\emph{The POSet layer assignment $\lambda$ encodes an entropic ratchet:
+each level of the cascade consumes a fixed free energy quantum from the
+chemical bath, PreemptionCheck prevents descent without repaying that
+quantum, and the accumulated affinity $\mathcal{A}_{\rm total} =
+\sum_k \Delta\mu_k \gg k_BT$ makes the time-reversed trajectory
+thermodynamically inaccessible. Biological commitment irreversibility is
+not an emergent statistical property --- it is structurally enforced by
+the cascade architecture.}
+\end{quote}
+
+\textbf{Biological parallel:}
+Shallow circuits ($n = 1$, e.g.\ direct TF binding) have modest $W/k_BT$
+and could in principle be reversed by external perturbation. Deep circuits
+($n \geq 3$, phosphorelay + inhibitor gate) are effectively irreversible.
+The transition from reversible to irreversible commitment is quantifiable
+as a cascade depth threshold.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 5 — ATP Bath Concern: Physicist's Challenge and Response}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Challenge:} The v9 model treats ATP as a dedicated bath for the
+sporulation subnetwork. In reality other processes (translation $\sim 80\%$
+of ATP demand, replication, membrane synthesis) draw from the same pool
+concurrently. This means $\sigma_{\rm interface} \neq 0$ and the simple
+subsystem decomposition $\sigma_{\rm total} = \sigma_{\rm sub} +
+\sigma_{\rm rest} + \sigma_{\rm interface}$ is invalid.
+
+\textbf{Scale separation defence:}
+\begin{itemize}
+  \item The \emph{signalling} layer (KinA cycling) consumes $\sim 8\,\mu$M
+    ATP over 6\,h — negligible vs.\ 5000\,\mu$M pool.
+  \item During starvation (the commitment window): ribosomes hibernate,
+    replication halts, flagella downregulate. Other ATP drains are
+    suppressed precisely when sporulation is active.
+  \item The qualitative EPR decomposition (KinA 97.5\% of stochastic EPR)
+    is a \emph{relative} structural property — robust to absolute pool
+    level changes.
+\end{itemize}
+
+\textbf{N0 sweep partial answer:}
+Sweeping INITIAL\_NUTRIENTS from 100 to 2200\,$\mu$M covers the full
+range from quiescent starvation (other processes shut down, ATP
+near-dedicated to sporulation) to abundance (sporulation suppressed,
+question moot). The critical regime near $N_c = 1346\,\mu$M is where
+competition is most relevant — and also where the most important results
+originate.
+
+However: the sweep varies the \emph{trigger condition} (nutrient
+availability), not the \emph{competition intensity} (concurrent ATP
+drain). These are orthogonal axes. The sweep does not fully address the
+concern.
+
+\textbf{Fujita calibration argument (strongest response):}
+The model's $N_c = 1346\,\mu$M and sporulation fractions were
+implicitly calibrated against real biological experiments (Fujita \&
+Losick 2005) in which ALL concurrent ATP consumers were active. The
+model reproduces the experimental 38\% sporulation at CH conditions.
+Therefore the structural results ($N_c$, $\gamma_{\rm sub}$, EPR
+decomposition ratios) are empirically grounded in data that already
+includes competition — even if the mechanism is not explicitly modelled.
+
+\textbf{What remains genuinely sensitive:}
+Absolute values of $W/k_BT$ and EPR (kBT/s) would shift if background
+ATP consumption were explicitly included. These should be interpreted as
+``within the sporulation subnetwork model under starvation conditions,''
+not as total cellular thermodynamics.
+
+\textbf{Next model step:}
+Add explicit ATP regeneration transitions + background consumption sink
+scaling with $N_0$ $\to$ dynamic ATP NESS $\to$ rigorous Markovian
+reservoir for the signalling layer.
+\end{document}
