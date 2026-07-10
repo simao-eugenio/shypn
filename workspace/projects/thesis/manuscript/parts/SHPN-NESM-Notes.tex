@@ -196,4 +196,92 @@ not as total cellular thermodynamics.
 Add explicit ATP regeneration transitions + background consumption sink
 scaling with $N_0$ $\to$ dynamic ATP NESS $\to$ rigorous Markovian
 reservoir for the signalling layer.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 6 — PreemptionCheck as Artifact vs.\ Thermodynamic Emergence}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{The theoretical critique:}
+In canonical stochastic thermodynamics (Seifert, Schnakenberg) every
+reaction has a non-zero reverse rate and irreversibility emerges from
+non-zero affinities $\Delta\mu > 0$.
+PreemptionCheck sets the propensity to \emph{exactly zero} when the
+upstream cascade is inactive.
+A theorist argues: this is an architectural constraint, not a thermodynamic
+consequence.
+When $P[\tilde\omega] = 0$ exactly, the Crooks theorem is trivially
+satisfied (denominator zero) and $\sigma[\omega] \to \infty$ — not a
+meaningful thermodynamic statement but a tautology from the imposed
+disconnection.
+
+\textbf{Where the critique is valid:}
+PreemptionCheck IS an architectural constraint. A fully thermodynamically
+grounded model would have non-zero reverse propensities for every
+transition (however small), with $W/k_BT$ large because of affinities,
+not because reverse paths are set to zero.
+The $W/k_BT = 3.72 \times 10^7$ result is partly an idealisation of
+strong kinetic suppression — the physical reverse rate is very small but
+not exactly zero.
+
+\textbf{Where the critique overreaches:}
+PreemptionCheck encodes a \emph{biochemical fact}, not a modelling
+convenience:
+\begin{enumerate}
+  \item The phosphorelay is causally ordered by \emph{molecular recognition}:
+    Spo0F is phosphorylated by KinA through direct protein-protein contact.
+    Without KinA~P present, the reaction has no substrate — not just
+    thermodynamically suppressed, but biochemically impossible.
+  \item The reverse pathway (dephosphorylation) uses \emph{different enzymes}
+    (RapA, RapB, Spo0E phosphatases) with different rate constants.
+    It is not the time-reverse of the forward step — it is a
+    different molecular process.
+  \item PreemptionCheck is the idealised limit of $k^-_k \to 0$ as
+    protein specificity becomes perfect.
+    In the real system the reverse rate is very small; zero is the
+    mathematical idealisation of that limit.
+\end{enumerate}
+
+\textbf{Two independent irreversibility mechanisms:}
+\begin{center}
+\begin{tabular}{lll}
+\hline
+Mechanism & Origin & SHPN encoding \\
+\hline
+Thermodynamic driving & $\Delta\mu_k \gg k_BT$ (ATP hydrolysis) &
+  Rate functions, local detailed balance \\
+Biochemical causal ordering & Protein-protein specificity &
+  PreemptionCheck ($\Phi = 0$ when upstream inactive) \\
+\hline
+\end{tabular}
+\end{center}
+
+Neither alone is sufficient. Together they enforce irreversibility at
+both the energetic level (affinity $\mathcal{A}_{\rm total} \gg k_BT$)
+and the kinetic level (reverse pathway is a different process, not
+simply thermodynamically suppressed).
+
+\textbf{Consequence for the FWD perturbation result (NET-T3):}
+FWD aborts commitment ($38\% \to 0\%$) because the energetics are
+overridable by external perturbation.
+But you cannot restart the reverse cascade by adding nutrients —
+the biochemical specificity constraint is not energetically reversible.
+This is observable in the asymmetry: FWD completely abolishes but REV
+only weakly triggers ($0\% \to 2\%$).
+The 2\% represents the rare stochastic events where the cascade
+completes despite the reversed nutrient step; the near-zero rate is
+the thermodynamic suppression.
+The 0\% for FWD represents structural abortion (cascade already at
+high affinity toward vegetative basin, irreversible at the biochemical
+specificity level).
+
+\textbf{Manuscript statement (Theory II §4.3):}
+\begin{quote}
+\emph{Biology achieves commitment irreversibility through two independent
+mechanisms: thermodynamic driving ($\Delta\mu_k \gg k_BT$ at each
+ATP-consuming step) and biochemical causal ordering (protein specificity,
+encoded by PreemptionCheck). Biological commitment irreversibility is
+therefore doubly enforced: thermodynamically by the accumulated affinity
+of the cascade, and biochemically by the protein-specificity constraints
+that make the reverse pathway a different molecular process entirely.}
+\end{quote}
 \end{document}

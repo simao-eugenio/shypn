@@ -472,10 +472,29 @@ ratio is $\approx 10^{16{,}000{,}000}$.
 PreemptionCheck reinforces this: the reverse trajectory $\tilde\omega$
 requires $b$ to fire before $a$, but $\Phi_b(M_{\mathrm{before}\,a}) = 0$
 (PreemptionCheck fails), so $P[\tilde\omega] = 0$ under forward dynamics.
-The POSet converts a probabilistically suppressed reverse path into a
-structurally forbidden one.
-\emph{Biological commitment irreversibility is not an emergent statistical
-property --- it is structurally enforced by the cascade architecture.}
+
+This raises a legitimate theoretical concern: setting a propensity to
+exactly zero is a biochemical constraint, not a thermodynamic consequence.
+In canonical stochastic thermodynamics every reaction has a non-zero
+reverse rate; irreversibility emerges from the magnitudes of affinities,
+not from imposed architectural rules.
+PreemptionCheck should therefore be understood as the idealised limit of
+strong kinetic suppression ($k^-_k \to 0$ as protein-protein specificity
+becomes perfect), representing the biochemical fact that the phosphorelay
+is causally ordered by molecular recognition --- Spo0F cannot be
+phosphorylated without KinA~P present, not merely because it is
+energetically unfavourable but because the substrate is absent.
+Biology achieves commitment irreversibility through two independent
+mechanisms acting in concert: \emph{thermodynamic driving}
+($\Delta\mu_k \gg k_BT$ at each ATP-consuming step, encoded in rate
+functions via local detailed balance) and \emph{biochemical causal
+ordering} (protein specificity, encoded by PreemptionCheck).
+Neither alone is sufficient; together they make reversal impossible at
+both the energetic and the kinetic level.
+\emph{Biological commitment irreversibility is therefore doubly enforced:
+thermodynamically by the accumulated affinity of the cascade, and
+biochemically by the protein-specificity constraints that make the
+reverse pathway a different molecular process entirely.}
 
 \subsection{The five topological-thermodynamic quantities}
 \label{sec:five_quantities}
