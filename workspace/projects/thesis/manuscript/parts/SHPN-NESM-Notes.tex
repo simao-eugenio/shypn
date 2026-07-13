@@ -310,4 +310,119 @@ therefore doubly enforced: thermodynamically by the accumulated affinity
 of the cascade, and biochemically by the protein-specificity constraints
 that make the reverse pathway a different molecular process entirely.}
 \end{quote}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 7 — How to Categorise NESM + SHPN as a Scientific Contribution}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-13.
+The contribution sits at four levels simultaneously.
+
+\subsection*{Level 1 — A formal language (Computer Science / Theoretical Biology)}
+
+SHPN is a mathematically defined formal object: a 13-tuple with a provable
+firing semantics, typed arc grammar, and layer assignment $\lambda$.
+This places it in the tradition of Chemical Reaction Network Theory
+(Feinberg 1972), Stochastic Petri Nets (Molloy 1982), and Harel Statecharts
+(1987), but with a richer type system that handles signal hierarchy and
+hybrid stochastic/ODE dynamics.
+\begin{quote}
+\emph{Contribution: a new formal language for regulatory circuits with
+provable compositional properties.}
+\end{quote}
+
+\subsection*{Level 2 — A computational substrate for stochastic thermodynamics (Physics)}
+
+By mapping SHPN arc semantics onto thermodynamic ports (normal arcs =
+stoichiometric flows; signal-flow = regulatory dissipation channels;
+test/inhibitor = zero-EPR sensing), the formalism becomes a natural
+substrate through which the machinery of NESM (Seifert 2012,
+Rao-Esposito 2018) operates.
+The $\tau$-leaping engine is a Master equation approximation; the five
+thermodynamic quantities emerge from topology and dynamics without
+additional assumptions.
+\begin{quote}
+\emph{Contribution: a natural computational substrate for stochastic
+thermodynamics of regulatory decision circuits.}
+\end{quote}
+
+\subsection*{Level 3 — A measurement methodology (Systems Biology / Biophysics)}
+
+The five quantities ($\eta_L$, $W/k_BT$, $N_c$, $\gamma_{\rm sub}$,
+EPR decomposition) are computable from any validated SHPN model without
+new experiments.
+This provides a new measurement layer on top of existing biological models
+--- extracting thermodynamic information that was always implicitly present
+in the network topology but previously inaccessible.
+\begin{quote}
+\emph{Contribution: a methodology for computing the thermodynamic
+fingerprint of any topology-known commitment circuit.}
+\end{quote}
+
+\subsection*{Level 4 — A conceptual unification (Interdisciplinary)}
+
+\begin{center}
+\begin{tabular}{p{4cm}p{4.5cm}p{4.5cm}}
+\toprule
+Tradition & What NESM+SHPN inherits & What it adds \\
+\midrule
+NESM / stochastic thermodynamics & EPR, fluctuation theorems, NESS &
+  Biological regulatory hierarchy, hybrid dynamics \\
+Petri net formalism & Firing semantics, compositionality &
+  Thermodynamic arc types, POSet irreversibility \\
+Systems biology (ODE) & Biochemical rate functions &
+  Single-cell thermodynamics, stochastic decision layer \\
+Single-cell biology & Bet-hedging, commitment &
+  Quantitative thermodynamic characterisation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Most precise academic categorisation}
+
+\begin{quote}
+\emph{A formal computational framework that provides stochastic
+thermodynamics as a derived property of regulatory circuit topology,
+applicable to any cell-fate commitment system with known network
+architecture.}
+\end{quote}
+
+This places it in the category of \textbf{theory-enabling frameworks}:
+like Gillespie's SSA (1977) enabled stochastic kinetics simulation, or
+CRNT (Feinberg 1972) enabled stability analysis of biochemical networks,
+NESM+SHPN enables thermodynamic characterisation of regulatory circuits.
+
+\subsection*{What it is NOT}
+
+\begin{itemize}
+  \item Not a theory of cell biology (does not explain why circuits are
+    wired as they are).
+  \item Not a simulation tool (the SHPN engine is the tool; the framework
+    is the language + quantities).
+  \item Not a phenomenological model (quantities are derived, not fitted).
+\end{itemize}
+
+\subsection*{Journal framing guide}
+
+\begin{center}
+\begin{tabular}{p{3.5cm}p{3.5cm}p{5.5cm}}
+\toprule
+Target & Lead category & Framing \\
+\midrule
+Physical Review X / PRE & Computational substrate for NESM &
+  ``First formal substrate through which stochastic thermodynamics is
+  computable from biological regulatory topology'' \\
+eLife / PLOS CB & Measurement methodology &
+  ``Five topology-derivable quantities characterising the thermodynamic
+  cost of cell-fate commitment'' \\
+Cell Systems / Nature Methods & Formal language + tool &
+  ``Hybrid stochastic/ODE framework in which thermodynamic properties
+  emerge from network architecture'' \\
+Biophysical Journal & Unification &
+  ``NESM and regulatory network formalism unified, validated on
+  B.\ subtilis'' \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \end{document}
