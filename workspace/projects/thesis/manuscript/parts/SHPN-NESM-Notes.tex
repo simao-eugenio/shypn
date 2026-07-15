@@ -425,4 +425,105 @@ Biophysical Journal & Unification &
 \end{tabular}
 \end{center}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 8 — Cell Dimensions, Reaction Counts, and Genome-to-Pathway Inference}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-15.
+
+\subsection*{Single-cell dimensions (micron scale)}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Cell type & Dimensions & Volume & Notes \\
+\midrule
+\textit{B.~subtilis} (sporulating) & 2--4\,$\mu$m $\times$ 0.8--1.0\,$\mu$m & $\sim1$--2\,fL & Our model \\
+\textit{E.~coli} & 1--2\,$\mu$m $\times$ 0.5\,$\mu$m & $\sim1$\,fL & \\
+\textit{S.~cerevisiae} & 5--10\,$\mu$m diameter & $\sim100$\,fL & \\
+Mammalian cell & 10--30\,$\mu$m diameter & $\sim1$--10\,pL & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Molecule count at 1\,$\mu$M in a 1\,fL cell:
+$N = C \times N_A \times V = 1\,\mu\text{M} \times 6.022\times10^{23}
+\times 10^{-15}\,\text{L} \approx 600$ molecules.
+This confirms the stochastic regime for KinA$\sim$P ($\sim$1.5\,$\mu$M
+$\approx$ 900 molecules): Poisson fluctuations $\sim 3\%$ of mean,
+sufficient to drive bet-hedging.
+
+\subsection*{Number of reactions in a single cell}
+
+\begin{center}
+\begin{tabular}{lrrl}
+\toprule
+Organism & Metabolic reactions & Protein-coding genes & Ratio \\
+\midrule
+\textit{E.~coli} & $\sim$2,077 & $\sim$4,400 & 0.47 \\
+\textit{B.~subtilis} & $\sim$1,200 & $\sim$4,100 & 0.29 \\
+\textit{S.~cerevisiae} & $\sim$3,500 & $\sim$6,000 & 0.58 \\
+Human cell & $\sim$13,000 & $\sim$20,000 & 0.65 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The v9 SHPN model has 36 transitions: $\sim$3\% of \textit{B.~subtilis}
+metabolic reactions.
+During sporulation starvation, $\sim$700 reactions shut down (translation
+reduced 10$\times$, replication halted), leaving $\sim$500 active ---
+so the sporulation subnetwork represents $\sim$7\% of active chemistry.
+This contextualises the Markovian reservoir assumption: the bath contains
+$\sim$500 concurrent reactions, not the full 1,200.
+
+\subsection*{Can biochemical pathways be discovered from genome data?}
+
+\textbf{Yes, routinely --- with important caveats.}
+
+\textbf{What genome sequence gives directly:}
+\begin{itemize}
+  \item Enzyme identification by homology (BLAST/HMMer vs.\ KEGG, UniProt,
+    MetaCyc): $>40\%$ amino acid identity $\to$ function inferred.
+  \item Metabolic network reconstruction (PathwayTools, ModelSEED,
+    CarveMe): automated assembly of reactions from annotated genes.
+  \item Operon structure: gene proximity $\to$ pathway co-membership
+    (bacteria).
+\end{itemize}
+
+\textbf{What cannot be inferred from sequence alone:}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Problem & Why it fails \\
+\midrule
+Novel enzymes & No homology $\to$ unknown function ($\sim$30--40\% of
+  any new genome) \\
+Enzyme promiscuity & One enzyme may catalyse multiple reactions \\
+Regulatory wiring & TF$\to$gene control requires ChIP-seq/expression data \\
+Kinetic parameters & $K_m$, $V_{\max}$, rate constants require measurement \\
+Post-translational control & Allosteric, phosphorylation effects invisible \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Modern pipeline:}
+Genome $\to$ gene calling $\to$ homology search $\to$ EC numbers $\to$
+metabolic reconstruction $\to$ gap filling $\to$ FBA predictions $\to$
+experimental validation $\to$ curated model.
+
+\textbf{Relevance to SHPN:}
+The v9 model was built from decades of targeted biochemical experiments
+(knockouts, reporter fusions, Western blots) --- not genome inference.
+Genome-scale reconstruction gives the reaction inventory; it does not
+give the causal ordering ($\lambda$ layers), inhibitor thresholds
+($\theta_{\rm eff}$), or stochastic firing rates.
+These require quantitative single-cell experiments (Fujita \& Losick
+2005).
+
+\textbf{Future opportunity:}
+Once a pathway is genome-reconstructed and kinetically validated, the
+NESM+SHPN framework provides its thermodynamic characterisation
+essentially for free from the topology --- no additional experiments
+needed.
+
 \end{document}
