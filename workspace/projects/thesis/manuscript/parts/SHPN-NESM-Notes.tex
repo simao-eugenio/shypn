@@ -632,4 +632,88 @@ transitions are active at each state); together they produce a CTMC with
 absorbing subspaces that correspond to the biological cell-fate attractors,
 and whose EPR decomposes along the $G_E / G_s$ partition.}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 10 — ``Ratchet'' Terminology: Contestable Definition}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-16.
+
+\subsection*{Three distinct ``ratchet'' concepts (often conflated)}
+
+\begin{description}
+  \item[Feynman ratchet-and-pawl (1963)] Mechanical device with a pawl.
+    Feynman proved: at thermal equilibrium this cannot produce work.
+    Only operates with a temperature gradient. \emph{Lesson: asymmetry
+    alone is insufficient; non-equilibrium driving is essential.}
+  \item[Brownian / Flashing ratchet (Ajdari \& Prost 1992, Magnasco 1993)]
+    Spatially periodic asymmetric potential that switches on/off.
+    Directed motion emerges from \emph{rectification of thermal
+    fluctuations} via spatial asymmetry.
+    Canonical modern ratchet.
+  \item[Molecular motor ratchet (Astumian 1994+)] Kinesin, myosin.
+    ATP hydrolysis creates asymmetric free energy landscape; thermal
+    fluctuations are rectified into directed stepping.
+    Genuine Brownian ratchet driven by chemical energy.
+\end{description}
+
+\subsection*{Why ``entropic ratchet'' for POSet cascade is contestable}
+
+\begin{center}
+\begin{tabular}{p{4cm}p{4cm}p{4cm}}
+\toprule
+Property & True Brownian ratchet & POSet cascade \\
+\midrule
+Source of directionality & Spatial asymmetry of fluctuating potential
+  & Accumulated affinities $\sum \Delta\mu_k$ \\
+Role of thermal fluctuations & Actively rectified (the mechanism)
+  & Present but not the primary mechanism \\
+Reverse steps & Allowed, probabilistically suppressed
+  & Forbidden structurally (PreemptionCheck) or by large $\Delta\mu$ \\
+Non-equilibrium driving & Required & ATP hydrolysis at each level \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In a Brownian ratchet, thermal fluctuations \emph{are} the mechanism.
+In the POSet cascade, the directionality comes from the free energy
+gradient; fluctuations make the process stochastic rather than
+deterministic.
+
+\subsection*{More precise description}
+
+The POSet cascade is better described as a
+\textbf{free energy cascade with absorbing barriers}: a driven directed
+walk where each step is downhill in free energy and PreemptionCheck
+creates absorbing states.
+This is closer to ``directed walk with kinetic irreversibility'' than
+to a ratchet proper.
+
+\subsection*{Where ratchet concept converges near $N_c$}
+
+Near $N_c$, the commitment moment IS ratchet-like: a stochastic SinI
+burst (genuine thermal fluctuation) is rectified into an irreversible
+fate decision by the asymmetric free energy landscape of the downstream
+execution programme.
+At this specific moment --- the threshold crossing --- the system
+behaves as a Brownian ratchet: fluctuation $\to$ rectification $\to$
+directed transition.
+The ratchet concept is most precise at the commitment moment, not for
+the cascade as a whole.
+
+\subsection*{Manuscript clarification (Theory II \S4.3 footnote)}
+
+\begin{quote}
+\emph{``We use `entropic ratchet' in the loose sense of a directed
+free-energy-consuming cascade, distinct from a Brownian ratchet
+(Ajdari \& Prost 1992, Magnasco 1993), where spatial asymmetry
+rectifies thermal fluctuations into directed motion.
+The directionality in the POSet cascade arises from accumulated
+chemical potential differences, not from spatial asymmetry of a
+fluctuating potential.
+The ratchet concept is most precise at the commitment moment itself
+(near $N_c$), where a stochastic SinI burst is rectified into an
+irreversible fate decision by the asymmetric free energy landscape
+of the downstream execution programme.''}
+\end{quote}
+
 \end{document}
