@@ -526,4 +526,110 @@ NESM+SHPN framework provides its thermodynamic characterisation
 essentially for free from the topology --- no additional experiments
 needed.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 9 — $G_E$ and $G_s$ as Markov Process Structures}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-16.
+
+\subsection*{$G_E$ as the Markov generator}
+
+$G_E = (P, T, F)$ defines the stoichiometric structure of an underlying
+continuous-time Markov chain (CTMC).
+Each transition $t \in T$ contributes to the Master equation:
+\begin{equation}
+\frac{dP(M,t)}{dt} = \sum_{t \in T}
+  \left[\Phi_t(M-\Delta_t)\,P(M-\Delta_t,t)
+       - \Phi_t(M)\,P(M,t)\right]
+\end{equation}
+where $\Delta_t$ is the stoichiometric change vector and $\Phi_t(M)$ is
+the propensity at state $M$.
+\textbf{$G_E$ is the generator matrix of the Markov process:} it defines
+which states are reachable from which and at what rates.
+
+\subsection*{$G_s$ as a conditional enabling filter}
+
+$G_s = (\Psi, F_s)$ does not define new Markov states.
+It defines a \emph{conditional structure} on the generator via
+PreemptionCheck:
+\begin{equation}
+\Phi_t^{\mathrm{eff}}(M) = \Phi_t(M)
+  \cdot \mathbf{1}[\mathrm{PreemptionCheck}(t,M)]
+\end{equation}
+where the indicator depends on whether signal places $p_s \in \Psi$
+upstream of $t$ in $G_s$ are above $\theta_{\mathrm{eff}}$.
+In probability theory terms, $G_s$ defines a \textbf{filtration} ---
+a coarsening of the state information.
+Let $M_s = \{M(p) : p \in \Psi\}$ be the signal-place substate.
+The combined $G_E \times G_s$ process is the $G_E$-process
+\emph{conditioned} on the $G_s$ state.
+
+\subsection*{Product structure and consequences}
+
+\begin{center}
+\begin{tabular}{p{3cm}p{5cm}p{5cm}}
+\toprule
+Concept & $G_E$ & $G_s$ \\
+\midrule
+Markov role & Generator matrix (stoichiometry + rates) &
+  Conditional enabling filter (PreemptionCheck) \\
+State space & Full marking $M: P \to \mathbb{N}_0$ &
+  Signal substate $M_s: \Psi \to \mathbb{N}_0$ \\
+EPR contribution & Mass flows through arcs &
+  Threshold enforcement; zero EPR for pure gating \\
+Stationarity & NESS or equilibrium of bare CRN &
+  Creates absorbing subspaces \\
+Causal role & Stoichiometric causality &
+  Hierarchical causal ordering via $\lambda$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Absorbing subspaces — commitment as Markov absorption}
+
+The most important Markov consequence of $G_s$ is the creation of
+\textbf{absorbing subspaces}.
+Before commitment: the system explores both attractor basins
+(stochastic); $M(\text{SinR}) > 7.5\,\mu$M keeps T\_septation disabled.
+Commitment event: stochastic SinI burst drops SinR below threshold;
+T\_septation fires; forespore forms.
+After commitment: the structural execution cascade (Layer B, ODE) runs
+deterministically; no $G_s$-conditioned transition can reverse it.
+
+In Markov terms: the committed state is an \textbf{absorbing class}.
+The stationary distribution $P_{\mathrm{ss}}^{E \times s}(M)$ has support
+only on the committed and vegetative attractors.
+
+\textbf{The bet-hedging fraction is the absorption probability:}
+$P(\mathrm{spor}) = P(\text{absorbed into committed class})$ from the
+pre-commitment initial condition.
+This is a classical Markov absorption problem --- the $N_0$ sweep
+computes how this absorption probability changes with initial nutrient
+marking.
+
+\subsection*{EPR decomposition in $G_E \times G_s$ terms}
+
+$G_s$ conditioning zeros propensities during PreemptionCheck-off
+intervals (EPR silence, Note 3), suppressing both $G_E$ and $G_s$
+contributions simultaneously:
+\begin{equation}
+\dot\sigma_{\mathrm{total}}
+  = \underbrace{\sum_{t \in T_E} \Phi_t^{\mathrm{eff}}
+      \ln \frac{\Phi_t^+}{\Phi_t^-}}_{\text{EPR via } G_E}
+  + \underbrace{\sum_{t \in T_s} \Phi_t^{\mathrm{eff}}
+      \ln \frac{\Phi_t^+}{\Phi_t^-}}_{\text{EPR via } G_s}
+\end{equation}
+EPR contributions from different transitions are correlated because
+they share the same $G_s$-derived on/off switch ---
+this is why $\mathrm{Var}[\sigma[\omega]] < \langle\sigma[\omega]\rangle$
+near $N_c$ (non-MF universality class, Notes 3 and 6).
+
+\subsection*{One-sentence summary}
+
+\emph{$G_E$ defines the Markov generator (what states are reachable and
+how fast); $G_s$ defines a dynamic filter on that generator (which
+transitions are active at each state); together they produce a CTMC with
+absorbing subspaces that correspond to the biological cell-fate attractors,
+and whose EPR decomposes along the $G_E / G_s$ partition.}
+
 \end{document}
