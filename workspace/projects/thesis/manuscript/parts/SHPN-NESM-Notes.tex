@@ -716,4 +716,113 @@ irreversible fate decision by the asymmetric free energy landscape
 of the downstream execution programme.''}
 \end{quote}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 11 — Time-Reversibility and PreemptionCheck Cascades}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-17.
+
+\subsection*{Definition: time-reversibility for a CTMC}
+
+A Markov process is time-reversible iff it satisfies detailed balance:
+$k(x \to y)\,P_{\mathrm{ss}}(x) = k(y \to x)\,P_{\mathrm{ss}}(y)$
+for all states $x,y$.
+Equivalently: $P[\omega] = P[\tilde\omega]$ for every trajectory ---
+$\sigma[\omega] = 0$ everywhere.
+
+\subsection*{PreemptionCheck creates absorbing states — inherently time-irreversible}
+
+PreemptionCheck drives the cascade toward absorbing subspaces.
+For an absorbing state $x^*$: $k(x^* \to y) = 0$ for all $y \neq x^*$,
+$P_{\mathrm{ss}}(x^*) > 0$, $P_{\mathrm{ss}}(x_{\mathrm{pre}}) \to 0$.
+The time-reversed rate:
+\[
+  \tilde k(y \to x) = k(x \to y)\,\frac{P_{\mathrm{ss}}(x)}{P_{\mathrm{ss}}(y)}
+\]
+For $x = x_{\mathrm{pre}}$: $P_{\mathrm{ss}}(x_{\mathrm{pre}}) \to 0$
+so $\tilde k \to 0$.
+\textbf{Absorbing states are structurally incompatible with
+time-reversibility --- a theorem, not an approximation.}
+
+\subsection*{Three nested levels of violation}
+
+\begin{description}
+  \item[Level 1 — Global: absorbing boundary.]
+    The committed state cannot be left. The time-reversed process has
+    no dynamics from the committed state. Strongest violation:
+    not just $\sigma[\omega] \gg 0$ but $P[\tilde\omega] = 0$ exactly.
+  \item[Level 2 — Local: detailed balance violation at each cascade level.]
+    $P_{\mathrm{ss}}(M_{\mathrm{pre}}) \ll P_{\mathrm{ss}}(M_{\mathrm{post}})$
+    as the system approaches the absorbing boundary.
+    Detailed balance requires $k(M_{\mathrm{post}} \to M_{\mathrm{pre}})
+    \approx 0$ even when PreemptionCheck would nominally allow it.
+  \item[Level 3 — Structural: mathematical time-reverse $\neq$ biochemical reverse.]
+    The time-reverse of ``KinA phosphorylates Spo0F'' is that reaction
+    un-happening. The biochemical reverse is ``RapA dephosphorylates Spo0F''
+    --- a different enzyme, different rates, different Markov process.
+    PreemptionCheck captures this: the reverse pathway does not satisfy
+    the same PreemptionCheck conditions as the forward path.
+\end{description}
+
+\subsection*{$N_c$ as locus of maximal quasi-reversibility}
+
+Near $N_c$, forward and backward rates become comparable (both attractors
+equally probable).
+Probability currents are most balanced --- locally minimal
+time-reversibility violation.
+Critical slowing-down: relaxation time diverges because net drift toward
+either attractor shrinks.
+$\gamma_{\mathrm{sub}} = 0.150$ (slow) means the cascade builds
+irreversibility gradually as $N_0$ decreases --- the system remains
+quasi-reversible over a wide nutrient window.
+
+\subsection*{Gallavotti-Cohen connection}
+
+\[
+  \frac{P(\sigma[\omega] = +A)}{P(\sigma[\omega] = -A)} = e^A
+\]
+For time-reversible system: ratio $= 1$.
+For committed cascade: ratio $= e^{3.72\times10^7}$.
+PreemptionCheck makes the ratio exactly $\infty$ for structurally
+forbidden paths --- discontinuous violation, not merely a large-but-finite
+one.
+
+\subsection*{Are these good or bad findings for SHPN?}
+
+\begin{center}
+\begin{tabular}{p{5.5cm}ll}
+\toprule
+Property & Assessment & Reason \\
+\midrule
+Absorbing states & Good & Correctly models biological irreversibility \\
+Three-level violation & Good & Dual (thermodynamic + specificity) enforcement \\
+$N_c$ as quasi-reversibility locus & Excellent & Non-trivial emergent prediction \\
+Cascade depth $\to$ $W/k_BT$ scaling & Good & Falsifiable cross-organism prediction \\
+Transient EPR vs.\ NESS EPR & Honest limitation & Needs explicit scope statement \\
+$P[\tilde\omega] = 0$ from PreemptionCheck & Nuanced &
+  Formally correct; outside standard Seifert domain \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The genuine technical concern:}
+Standard stochastic thermodynamics (Seifert 2012) is developed for
+\emph{NESS systems} with a well-defined stationary distribution and
+circulating probability currents.
+The sporulation cascade is an \emph{absorbing Markov chain} --- no
+finite-time stationary distribution exists.
+The EPR computed is therefore a \textbf{transient EPR} (time-averaged
+over the commitment trajectory before absorption), not a true
+steady-state EPR.
+The value $W/k_BT = 3.72\times10^7$ contains both genuine thermodynamic
+dissipation (ATP affinities) and the absorbing-boundary contribution
+(architectural PreemptionCheck).
+This is a scope-of-interpretation limitation, not a correctness flaw.
+
+\textbf{Overall verdict:}
+The framework is internally consistent and biologically correct.
+SHPN operates at the boundary of standard stochastic thermodynamics ---
+where biochemical specificity and thermodynamic driving are both essential.
+That boundary is exactly where the interesting biology lives.
+
 \end{document}
