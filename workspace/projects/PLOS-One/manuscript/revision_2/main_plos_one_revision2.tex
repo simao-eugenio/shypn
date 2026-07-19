@@ -150,7 +150,7 @@ This work presents signal hierarchy theory and its computational realization as 
 
 \textbf{3. Signal Hierarchical Petri Nets:} We extend classical Bio-PN \cite{reisig1985,koch2011} from 5-tuple to 13-tuple hybrid formalism incorporating signal places ($\Psi$), signal flow arcs ($F_s$), signal arc weights ($W_s$), layer functions ($\lambda$), and enablement thresholds ($\theta$). SHPN is a hybrid Petri net in the sense of supporting coexistent continuous and stochastic dynamics \cite{alla1998,matsuno2003}, but extends classical hybrid PN by adding unified signal-type semantics that resolve the sub-model separation limitation of prior approaches \cite{liu2013}: rather than partitioning metabolism and regulation into distinct sub-models, SHPN allows modeler-designated places to participate in both simultaneously. The formalism therefore supports both deterministic and stochastic simulation engines \cite{goss1998} while providing unified semantics for metabolic-regulatory integration. The extension preserves Bio-PN semantics while adding hierarchical capabilities: normal arcs for horizontal mass transfer, signal flow arcs for vertical information propagation. Modelers designate any metabolite (ATP, GTP, NADH, cAMP, Ca$^{2+}$) as signal place $p_s \in \Psi$ when biological evidence supports regulatory gating role. Designated signals participate through both arc types simultaneously, unifying metabolic and regulatory roles within a single hybrid model.
 
-\textbf{4. Metabolic-Regulatory Unified Modeling:} By unifying metabolic and regulatory networks through signal type assignment, commitment thresholds emerge from topology as structural properties computable via $M_{\text{commit}} = \theta(t) + W_s((p_s,t))$. Applied to \textit{B. subtilis} sporulation, the formalism provides a mechanistic account of the Fujita and Losick~\cite{fujita2005} timing-dependent outcome asymmetry (abrupt $\approx 5\%$, gradual $\approx 52\%$): the $\sigma_H$ separatrix at $\approx 1.60\,\mu$M is the analytically predicted commitment boundary (Proposition~\ref{prop:sigmaH_separatrix}), and only the gradual phosphorelay accumulation allows $[\sigma_H]$ to ramp across it. This mechanistic prediction---inexpressible in classical Bio-PN lacking $\Gamma$-threshold semantics---is quantified in Section~\ref{sec:validation}.
+\textbf{4. Metabolic-Regulatory Unified Modeling:} By unifying metabolic and regulatory networks through signal type assignment, commitment thresholds emerge from topology as structural properties computable via $M_{\text{commit}} = \theta(t) + W_s((p_s,t))$. Applied to \textit{B. subtilis} sporulation, the formalism provides a mechanistic account of the Fujita and Losick~\cite{fujita2005} timing-dependent outcome asymmetry (abrupt $\approx 5\%$, gradual $\approx 52\%$): the $\sigma_H$ effective commitment threshold at $\approx 1.60\,\mu$M is identified empirically via simulation (Proposition~\ref{prop:sigmaH_separatrix}), and only the gradual phosphorelay accumulation allows $[\sigma_H]$ to ramp across it. This mechanistic prediction---inexpressible in classical Bio-PN lacking $\Gamma$-threshold semantics---is quantified in Section~\ref{sec:validation}.
 
 \textbf{Validation:} Mathematical validation through proven theorems establishes correctness. Biological validation through \textit{B. subtilis} case study demonstrates practical applicability, following established methods for Petri net pathway validation \cite{heiner2004,koch2005,gilbert2006}. Together, these demonstrate that SHPN provides a structural account of biological commitment that is testable against independent experimental data and does not require global parameter fitting to reproduce experimental outcome ratios.
 
@@ -300,9 +300,10 @@ by construction. Hence valid layer function exists.
 
 \begin{theorem}[Hierarchical Preemption]
 Lower-layer signal depletion structurally disables higher-layer transitions,
-assuming the PreemptionCheck predicate is enforced: transition $t_j$ is enabled
+assuming the PreemptionCheck predicate is enforced: transition $t_j$ may fire
 only if every transition $t_i$ that produces its signal inputs via $F_s$ paths
-is itself enabled.
+satisfies its local enablement conditions (NormalEnabled, TestEnabled, and
+SignalEnabled).
 Formally: if $\lambda(p_i) < \lambda(p_j)$ and there exists connected path $p_i \rightsquigarrow p_j$ through signal flow arcs, then
 \[
 M(p_i) < \theta(t_i) \text{ for any } t_i \in {}^\bullet p_j \implies \neg\text{Enabled}(t_j, M) \text{ for all } t_j \in p_j^\bullet,
@@ -872,7 +873,7 @@ Computation procedure:
 No simulation, no reachability analysis, no numerical integration---direct arithmetic from model specification. This contrasts with the Ackermann-complete reachability analysis~\cite{czerwinski2021} required for general threshold determination in unstructured Petri nets.
 \end{proof}
 
-This establishes topology-driven predictability: the threshold is \textit{structurally localized} --- once the signal topology is fixed, it is determined by at most two measurable quantities per signal arc ($\theta$ and $W_s$), extracted from biological literature (BRENDA database, biochemistry textbooks). The claim is not that the threshold is parameter-free, but that it does not require fitting a global nonlinear model: extract parameters from biological literature, instantiate formalism functions $\theta$ and $W_s$, compute threshold via closed-form formula, obtain quantitative prediction without simulation or parameter optimization. For the \textit{B.~subtilis} sporulation model this yields the $\sigma_H$ separatrix (Proposition~\ref{prop:sigmaH_separatrix} in Section~\ref{sec:validation}).
+This establishes topology-driven predictability: the threshold is \textit{structurally localized} --- once the signal topology is fixed, it is determined by at most two measurable quantities per signal arc ($\theta$ and $W_s$), extracted from biological literature (BRENDA database, biochemistry textbooks). The claim is not that the threshold is parameter-free, but that it does not require fitting a global nonlinear model: extract parameters from biological literature, instantiate formalism functions $\theta$ and $W_s$, compute threshold via closed-form formula, obtain quantitative prediction without simulation or parameter optimization. For the \textit{B.~subtilis} sporulation model this yields the $\sigma_H$ effective commitment threshold, identified via simulation in Proposition~\ref{prop:sigmaH_separatrix} in Section~\ref{sec:validation}.
 
 \textbf{Remark (Kinetic constraint tuple $\Gamma$ and effective basin floor $\theta_{\mathrm{eff}}$):}
 Each signal flow arc carries a kinetic constraint tuple $\Gamma = (K, n, \varepsilon)$ with three components drawn from published enzyme kinetics:
@@ -984,19 +985,20 @@ The PreemptionCheck mechanism underlying this asymmetry is made directly visible
 
 The landscape (Fig~\ref{fig:basin_attraction}) reveals three dynamical regimes along the time axis. Before $t_{\mathrm{commit}} \approx 300\,\mathrm{min}$ the landscape is a single vegetative well ($\varphi \approx 0$): all 50 replicates are trapped at low order parameter regardless of stochastic fluctuations, because $[\sigma_H] < \theta_{\sigma H}$ and $T_{\mathrm{septation}}$ remains blocked. Around $t_{\mathrm{commit}}$ the barrier lifts (coefficients $b(t)$ and $c(t)$ transition via $\tanh$), the ridge emerges, and the mean trajectory $\varphi(t)$ begins to rise. After $t \approx 329\,\mathrm{min}$ a sporulation attractor forms in the upper region ($\varphi \to 1$), separating from the persistent vegetative well at $\varphi \approx 0$. The near-symmetric double-well at late times encodes the ${\approx}48\%$ sporulation fraction: neither basin is strongly favoured, reflecting the bet-hedging character of the commitment decision.
 
-\begin{proposition}[Basin Boundary Characterization]
-For the B. subtilis model, the reachability space $\mathcal{R}(M_0)$ partitions into two regions determined by whether $[\sigma_H]$ crosses the commitment separatrix $\theta_{\sigma H} \approx 1.60\,\mu$M:
+\begin{corollary}[Basin Boundary Characterization --- \textit{B.~subtilis}]
+For the \textit{B.~subtilis} sporulation model, the reachability space $\mathcal{R}(M_0)$ partitions into two regions. Using the notation of Theorem (Irreversible Basin Partition) with the SinR/$\sigma_H$ commitment gate:
 \begin{align*}
-B_{\text{vegetative}} &= \{M \in \mathcal{R}(M_0) : M(\sigma_H) < M_{\text{commit}}(\sigma_H)\} \\
-B_{\text{boundary}} &= \{M \in \mathcal{R}(M_0) : M(\sigma_H) = M_{\text{commit}}(\sigma_H)\} \\
-B_{\text{sporulation}} &= \{M \in \mathcal{R}(M_0) : M(\sigma_H) > M_{\text{commit}}(\sigma_H) \wedge \text{committed}\}
+B_{\text{below}} &= \{M \in \mathcal{R}(M_0) : M(\text{GTP\_pool}) < M_{\text{commit}}(\text{GTP\_pool})\} \\
+B_{\text{boundary}} &= \{M \in \mathcal{R}(M_0) : M(\text{GTP\_pool}) = M_{\text{commit}}(\text{GTP\_pool})\} \\
+B_{\text{above}} &= \{M \in \mathcal{R}(M_0) : M(\text{GTP\_pool}) > M_{\text{commit}}(\text{GTP\_pool}) \wedge T_{\text{septation}}\text{ has fired}\}
 \end{align*}
-where no firing sequence from $B_{\text{vegetative}}$ reaches $B_{\text{sporulation}}$ after commitment transition fires.
-\end{proposition}
+where GTP\_pool is the signal-flow arc input to $T_{\text{septation}}$ and $M_{\text{commit}}(\text{GTP\_pool}) = \theta(T_{\text{septation}}) + W_s((\text{GTP\_pool}, T_{\text{septation}}))$.
+The SinR inhibitor arc (threshold $7.5\,\mu$M) and the $[\sigma_H]^2$ kinetic factor constitute the complementary structural and kinetic commitment barriers. No firing sequence from $B_{\text{below}}$ reaches $B_{\text{above}}$ after $T_{\text{septation}}$ fires.
+\end{corollary}
 
 \begin{proof}
-Direct application of Theorem (Irreversible Basin Partition) with $\sigma_H$ as the commitment signal and $\theta_{\sigma H} \approx 1.60\,\mu$M.
-When $[\sigma_H]$ crosses the separatrix and the SinR/SinI gate opens, $T_{\mathrm{septation}}$ fires. SigmaH tokens are consumed via signal flow arcs during morphogenetic commitment, and the resulting Septum marking activates the irreversible downstream cascade ($\sigma_F \to \sigma_E \to \sigma_G \to \sigma_K$). With no firing sequence reversing Septum formation, the partition becomes absorbing. Phase space projection onto SigmaF-Forespore plane (Fig~\ref{fig:basin_attraction}) visualizes partition boundaries around the $\sigma_H$ separatrix.
+Direct application of Theorem (Irreversible Basin Partition) with GTP\_pool as the signal-flow arc input to $T_{\text{septation}}$.
+When the SinR/SinI gate opens and $[\sigma_H]$ is above the effective kinetic threshold, $T_{\text{septation}}$ fires from $B_{\text{boundary}}$, consuming GTP tokens via the signal-flow arc and producing Septum via the curved signal-flow arc. The resulting Septum inhibitor arc ($\text{Septum} \to T_{\text{septation}}$, curved inhibitor) then blocks re-firing, making the partition absorbing. With no $F_s$ arc regenerating GTP\_pool after consumption, $B_{\text{below}}$ is absorbing per the theorem.
 \end{proof}
 
 \subsubsection{Sensitivity Analysis}
@@ -1005,17 +1007,13 @@ When $[\sigma_H]$ crosses the separatrix and the SinR/SinI gate opens, $T_{\math
 For parameter perturbations $\delta \in [-20\%, +20\%]$ applied to model components (phosphorelay kinetics, SinR/SinI rates, $\sigma_H$ feedback strength, nutrient depletion rate), sporulation fraction (Sweep~C, $N_0=1440$, dose=0) remains within $[42\%, 62\%]$, and abrupt-pulse fraction ($N_0=2160$, dose=27) remains within $[0\%, 10\%]$, preserving the qualitative asymmetry.
 \end{proposition}
 
-\begin{proof}
-We analyze threshold sensitivity to three parameter classes:
-
-\textbf{Case 1: Phosphorelay kinetics.} Varying KinA autophosphorylation and Spo0F/Spo0B transfer rates by $\pm 20\%$ shifts peak Spo0A$\sim$P by $\approx 15\%$, which changes T32 SinI production proportionally. Empirical sweep: natural sporulation fraction varies $\pm 10\%$ around $52\%$ (range $42\text{--}62\%$). Abrupt fraction remains $< 10\%$ throughout (phosphatase dominates at $N_0=2160\,\mu$M regardless).
-
-\textbf{Case 2: SinR/SinI gate parameters.} Varying T33 sequestration rate $k_{33}$ and T34 synthesis rate $k_{34}$ by $\pm 20\%$ shifts SinR$_{\text{ss}}$ by $\pm 0.3\,\mu$M relative to the $7.5\,\mu$M threshold. Natural fraction varies $40\text{--}64\%$; the gate remains functional throughout.
-
-\textbf{Case 3: $\sigma_H$ feedback strength.} Varying k\_syn\_factor by $\pm 20\%$ shifts the time at which $[\sigma_H]$ crosses $\theta_{\sigma H}$ by $\pm 25\,\text{min}$, not the separatrix value itself. Natural fraction varies $44\text{--}60\%$ (stochastic window shifts slightly).
-
-Union of all cases: natural sporulation $\in [42\%, 62\%]$; abrupt $\in [0\%, 10\%]$. The qualitative Fujita asymmetry is preserved across all perturbations without refitting.
-\end{proof}
+\noindent\textit{Verification (empirical, not proof):} This robustness bound was verified by varying each parameter class by $\pm20\%$ in sweep simulations.
+\begin{itemize}
+\item \textbf{Phosphorelay kinetics ($\pm20\%$):} natural sporulation $42\text{--}62\%$; abrupt $< 10\%$.
+\item \textbf{SinR/SinI gate ($\pm20\%$):} natural $40\text{--}64\%$; gate remains functional.
+\item \textbf{$\sigma_H$ feedback ($\pm20\%$):} natural $44\text{--}60\%$; commitment timing shifts $\pm 25\,$min.
+\end{itemize}
+The qualitative Fujita asymmetry is preserved across all perturbations without refitting.
 
 \subsubsection{Comparison with Classical Approaches}
 
