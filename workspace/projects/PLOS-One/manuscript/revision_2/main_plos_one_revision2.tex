@@ -296,7 +296,8 @@ $\lambda(p_i) < \lambda(p_j)$
 by construction. Hence valid layer function exists.
 \end{proof}
 
-\textbf{Biological significance:} Acyclicity ensures commitment finality---once a decision is made through connected hierarchical channels, there is no alternative path back. When a cell commits to sporulation by consuming $\sigma_H$ through $(\sigma_H, T_{\text{septation}}) \in F_s$---crossing the $\theta_{\sigma H} = 1.60\,\mu$M separatrix---it must follow that biochemical program irreversibly. The cell cannot "uncommit" and return to vegetative growth through the same signal flow path that triggered commitment. However, feedback regulation occurs abundantly through remote sensing: transcription factors can sense metabolite concentrations via rate functions $\Phi$ without creating reversible commitment paths. The acyclicity constraint applies to topology-explicit connected paths (signal flow arcs $F_s$ defining irreversible commitment structure), not to equation-implicit remote observations (rate functions $\Phi$ enabling feedback without reversibility). Signal consumption creates one-way state transitions: firing from basin boundary $M_{commit}$ depletes signals, making reverse traversal impossible. This formalizes biological commitment: development proceeds forward through irreversible decisions, while metabolic feedback maintains homeostasis through remote sensing.
+\textbf{Biological significance:} Acyclicity ensures commitment finality---once a decision is made through connected hierarchical channels, there is no alternative path back.
+When a cell commits to sporulation, $\sigma_H$ rises above its effective kinetic threshold $\theta_{\sigma H} = 1.60\,\mu$M (via the rate function $\Phi(T_{\text{septation}}) \propto [\sigma_H]^2$), enabling $T_{\text{septation}}$ to fire and consume GTP tokens irreversibly via the GTP\_pool signal-flow arc---it must then follow that biochemical program irreversibly. The cell cannot "uncommit" and return to vegetative growth through the same signal flow path that triggered commitment. However, feedback regulation occurs abundantly through remote sensing: transcription factors can sense metabolite concentrations via rate functions $\Phi$ without creating reversible commitment paths. The acyclicity constraint applies to topology-explicit connected paths (signal flow arcs $F_s$ defining irreversible commitment structure), not to equation-implicit remote observations (rate functions $\Phi$ enabling feedback without reversibility). Signal consumption creates one-way state transitions: firing from basin boundary $M_{commit}$ depletes signals, making reverse traversal impossible. This formalizes biological commitment: development proceeds forward through irreversible decisions, while metabolic feedback maintains homeostasis through remote sensing.
 
 \begin{theorem}[Hierarchical Preemption]
 Lower-layer signal depletion structurally disables higher-layer transitions,
@@ -463,7 +464,7 @@ Locality & Direct connection & Any place \\
 Vertical flow & Yes (layers $\ell > k$) & No (local only) \\
 Preemption & Hierarchical disabling & No hierarchical effect \\
 Reversibility & Irreversible & Reversible \\
-Example & $\sigma_H \xrightarrow{F_s} T_{\text{septation}}$ & Spo0A$\sim$P sensing via $\Phi$ \\
+Example & GTP\_pool $\xrightarrow{F_s}$ $T_{\text{septation}}$ & $\sigma_H$ gates $T_{\text{septation}}$ via $\Phi(\sigma_H^2)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -601,14 +602,14 @@ The key insight: signal consumption creates one-way transition. Unlike normal Pe
         \textit{Bottom} — Spo0A$\sim$P: stochastic phosphorelay; both fates share indistinguishable variance until $t_\mathrm{commit}$.
         \textit{Middle} — $\sigma_H$: commitment gate; violet dashed line marks $\theta_{\sigma H} = 1.60\,\mu$M; only sporulating replicates cross it.
         \textit{Top} — $\sigma_F$: execution programme; silent in vegetative replicates; activates post-commitment with markedly reduced variance, demonstrating the quasi-continuous character of execution once PreemptionCheck unlocks.
-        The $\sigma_H$ separatrix is the basin boundary predicted analytically by the commitment semantics: once crossed, token consumption is irreversible and all downstream layers fire in lock-step.%
+        The $\sigma_H$ effective threshold ($\theta_{\sigma H} = 1.60\,\mu$M, identified via simulation) separates sporulating from vegetative replicates: once crossed, GTP tokens are consumed irreversibly via the signal-flow arc and all downstream layers fire in lock-step.%
     }
     \label{fig:preemption_cascade}
 \end{figure}
 
 The three-phase commitment semantics are directly observable in these trajectories (Fig~\ref{fig:preemption_cascade}).
 Before $t \approx 240\,\mathrm{min}$ all 50 replicates are in the pre-commitment phase ($M(\sigma_H) < \theta_{\sigma H}$) and all downstream layers are structurally disabled by PreemptionCheck regardless of Spo0A$\sim$P abundance.
-At $t_\mathrm{commit} = 300\,\mathrm{min}$ the stochastic $\sigma_H$ ramp crosses $\theta_{\sigma H}$ in a subset of replicates: these enter the commitment boundary and fire $T_{\mathrm{septation}}$, consuming signal tokens irreversibly.
+At $t_\mathrm{commit} = 300\,\mathrm{min}$ the stochastic $\sigma_H$ ramp crosses $\theta_{\sigma H}$ in a subset of replicates: these enter the commitment boundary and fire $T_{\mathrm{septation}}$, consuming GTP tokens via the signal-flow arc irreversibly.
 Post-commitment, all downstream layers ($\sigma_F$, $\sigma_E$, $\sigma_G$, $\sigma_K$, forespore assembly) fire in near-deterministic sequence — the red fan in the top strip is visibly tighter than the phosphorelay fan below, quantifying the noise suppression imposed by hierarchical gating.
 Replicates that never cross $\theta_{\sigma H}$ (grey) remain in the vegetative basin with $\sigma_F \equiv 0$ indefinitely: no alternative firing sequence can reach the sporulation attractor.
 
@@ -727,7 +728,7 @@ Topology-driven thresholds & No & Yes \\
 \end{tabular}
 \end{table}
 
-\textbf{Key distinction:} Test arcs enable transitions when $M(p) \geq W_t$ without token consumption, maintaining $M'(p) = M(p)$ after firing. Signal flow arcs require $M(p_s) \geq \theta + W_s$ and consume tokens, producing $M'(p_s) = M(p_s) - W_s$ after firing. This semantic difference between consumption and read-only behavior determines expressiveness: test arcs model catalysis such as enzyme-substrate binding, while signal flow arcs model commitment through decision quota depletion.
+\textbf{Key distinction:} Test arcs enable transitions when $M(p) > \tau_t((p,t))$ without token consumption, maintaining $M'(p) = M(p)$ after firing. Signal flow arcs require $M(p_s) \geq \theta + W_s$ and consume tokens, producing $M'(p_s) = M(p_s) - W_s$ after firing. This semantic difference between consumption and read-only behavior determines expressiveness: test arcs model catalysis such as enzyme-substrate binding, while signal flow arcs model commitment through decision quota depletion.
 
 % Unified Modeling Section
 \section{Unified Metabolic-Regulatory Modeling}
@@ -759,7 +760,7 @@ Signal places can be designated at \textit{any} hierarchical layer, not restrict
 \noindent\textbf{Layer 1 (Phosphorelay Integration):} Spo0A$\sim$P designated as signal ($\lambda(\text{Spo0A}{\sim}\text{P}) = 1$). Signal flow arcs carry the phosphoryl group through the four-protein relay (KinA$_{\text{kinase}}$ $\to$ KinA$_{\text{P}}$ $\to$ Spo0F$_{\text{P}}$ $\to$ Spo0A$\sim$P), each step stochastic. Spo0A$\sim$P broadcasts to Layer 2, creating the second commitment barrier: insufficient phosphorelay output prevents commitment-gate activation.
 
 \vspace{3pt}
-\noindent\textbf{Layer 2 (Commitment Gate):} $\sigma_H$ designated as signal ($\lambda(\sigma_H) = 2$). Produced by a Hill-4 positive-feedback switch on Spo0A$\sim$P ($T_{\sigma H}$: $\Phi \propto \text{Spo0A}{\sim}\text{P}^4 / (50 + \text{Spo0A}{\sim}\text{P}^4)$); gates $T_{\text{septation}}$ rate as $\sigma_H^2$. The $\sigma_H$ separatrix $\theta_{\sigma H} = 1.60\,\mu$M is the analytically predicted commitment boundary: only replicates crossing it fire $T_{\text{septation}}$, consuming signal tokens irreversibly and unlocking Layer 3.
+\noindent\textbf{Layer 2 (Commitment Gate):} $\sigma_H$ designated as signal ($\lambda(\sigma_H) = 2$). Produced by a Hill-4 positive-feedback switch on Spo0A$\sim$P ($T_{\sigma H}$: $\Phi \propto \text{Spo0A}{\sim}\text{P}^4 / (50 + \text{Spo0A}{\sim}\text{P}^4)$); gates $T_{\text{septation}}$ kinetically via remote sensing ($\Phi \propto \sigma_H^2$). The $\sigma_H$ effective threshold $\theta_{\sigma H} = 1.60\,\mu$M is identified via simulation (Sweep~A): only replicates crossing it fire $T_{\text{septation}}$, which consumes GTP tokens via the structural signal-flow arc, unlocking Layer~3.
 
 \vspace{3pt}
 \noindent\textbf{Layer 3 (Execution):} $\sigma^F$, $\sigma^E$, $\sigma^G$, $\sigma^K$ designated as signals ($\lambda(\sigma^F) = 3$). Continuous sigma factor cascade activated post-septation. Signal flow arcs from Layer 2 unlock transcription; once active, execution proceeds with markedly reduced variance (quasi-continuous regime, visible in Fig~\ref{fig:preemption_cascade}): sigma factor depletion can no longer reverse the committed phenotype.
@@ -931,7 +932,7 @@ Rate constants and kinetic parameters from independent biological sources; the s
 \item Phosphorelay kinetics: Biochemistry textbooks~\cite{voet2016}
 \item Transcription/translation rates: \textit{B. subtilis} genome annotations~\cite{barbe2009}
 \item $\Gamma = (K, n, \varepsilon)$ for signal arcs: BRENDA database and published Hill-equation fits; not adjusted to match Fujita fractions
-\item $\sigma_H$ separatrix $\theta_{\sigma H} \approx 1.60\,\mu$M: identified analytically via Sweep~A bifurcation (run\_20260611\_231304); confirms the structural prediction $M_{\text{commit}} = \theta + W_s$
+\item $\sigma_H$ effective threshold $\theta_{\sigma H} \approx 1.60\,\mu$M: identified empirically via Sweep~A bifurcation (run\_20260611\_231304); this is a kinetic threshold from $\Phi(T_{\text{septation}}) \propto [\sigma_H]^2$, not a structural $M_{\text{commit}} = \theta + W_s$ computation
 \item SinR/SinI gate: T32 $K_m \approx 52.9\,\mu$M calibrated to match the stochastic bimodal gate dynamics (log-log interpolation across Sweep~C, run\_20260719\_170034); calibration target was gate shape, not the 52\% fraction
 \end{itemize}
 
