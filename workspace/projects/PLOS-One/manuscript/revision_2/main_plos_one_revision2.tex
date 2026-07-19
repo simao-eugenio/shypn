@@ -596,7 +596,7 @@ The key insight: signal consumption creates one-way transition. Unlike normal Pe
         \textbf{PreemptionCheck in action: stochastic commitment collapses to quasi-continuous execution.}
         Individual trajectories of three key cascade species across 50 stochastic $\tau$-leaping replicates
         of the \textit{B.~subtilis} sporulation model
-        ($N_0 = 1440\,\mu$M, SinR $= 12\,\mu$M, run\_20260614\_123652).
+        ($N_0 = 1440\,\mu$M, SinR $= 12\,\mu$M, run\_20260719\_170034).
         Red: sporulating replicates (24/50); grey: vegetative replicates (26/50). Thick lines: fate-conditioned means.
         \textit{Bottom} — Spo0A$\sim$P: stochastic phosphorelay; both fates share indistinguishable variance until $t_\mathrm{commit}$.
         \textit{Middle} — $\sigma_H$: commitment gate; violet dashed line marks $\theta_{\sigma H} = 1.60\,\mu$M; only sporulating replicates cross it.
@@ -932,7 +932,7 @@ Rate constants and kinetic parameters from independent biological sources; the s
 \item Transcription/translation rates: \textit{B. subtilis} genome annotations~\cite{barbe2009}
 \item $\Gamma = (K, n, \varepsilon)$ for signal arcs: BRENDA database and published Hill-equation fits; not adjusted to match Fujita fractions
 \item $\sigma_H$ separatrix $\theta_{\sigma H} \approx 1.60\,\mu$M: identified analytically via Sweep~A bifurcation (run\_20260611\_231304); confirms the structural prediction $M_{\text{commit}} = \theta + W_s$
-\item SinR/SinI gate: T32 $K_m \approx 52.9\,\mu$M calibrated to match the stochastic bimodal gate dynamics (log-log interpolation across Sweep~C, run\_20260614\_123652); calibration target was gate shape, not the 52\% fraction
+\item SinR/SinI gate: T32 $K_m \approx 52.9\,\mu$M calibrated to match the stochastic bimodal gate dynamics (log-log interpolation across Sweep~C, run\_20260719\_170034); calibration target was gate shape, not the 52\% fraction
 \end{itemize}
 
 \subsubsection{Threshold Prediction}
@@ -947,7 +947,7 @@ $T_{\mathrm{septation}}$ rate $= 0.005 \cdot [\sigma_H]^2 \cdot [\text{Cell\_den
 The SinR inhibitor arc (threshold $7.5\,\mu$M) structurally blocks $T_{\mathrm{septation}}$ until the SinR/SinI gate opens stochastically (Sweep~C mechanism). The $[\sigma_H]^2$ factor ensures the rate is negligible below $\theta_{\sigma H}$: at $[\sigma_H] = 0.5\,\mu$M, rate $\propto 0.25$; at $[\sigma_H] = 1.60\,\mu$M, rate $\propto 2.56$ (10$\times$ increase). Sweep~A (run\_20260611\_231304) identifies this critical value directly from the k\_syn\_factor bifurcation: replicates below $\theta_{\sigma H}$ produce zero Septum; replicates above produce Septum $= 1.00$ at $\approx 330\,\text{min}$ post-starvation.
 \end{proof}
 
-\subsubsection{Sweep~C: Fujita Perturbation Protocol (run\_20260614\_123652)}
+\subsubsection{Sweep~C: Fujita Perturbation Protocol (run\_20260719\_170034)}
 
 Sweep~C directly implements the Fujita and Losick~\cite{fujita2005} experimental design across 25 conditions and 50 stochastic replicates each:
 
@@ -975,7 +975,7 @@ The PreemptionCheck mechanism underlying this asymmetry is made directly visible
         Analytic quasi-potential $U(\varphi,t) = a\,\varphi_c^4 - b(t)\,\varphi_c^2 + c(t)\,\varphi_c$
         ($\varphi_c = \varphi - 0.5$) with time-varying coefficients calibrated to the commitment clock ($t_{\mathrm{commit}} = 300\,\mathrm{min}$, median $\sigma_H$ crossing at $1.60\,\mu$M).
         Dark blue = low-energy attractor basins; dark red = energy barrier (Waddington ridge).
-        White line: mean sporulation order parameter $\varphi(t)$ averaged over 50 stochastic $\tau$-leaping replicates (run\_20260614\_123652, $N_0 = 1440\,\mu$M, 6-h horizon).
+        White line: mean sporulation order parameter $\varphi(t)$ averaged over 50 stochastic $\tau$-leaping replicates (run\_20260719\_170034, $N_0 = 1440\,\mu$M, 6-h horizon).
         Yellow circle ($\bullet$): commitment point at $t_{\mathrm{commit}}$; green star ($\star$): first appearance of mature spores ($t \approx 329\,\mathrm{min}$).
         Red dashed line: $\sigma_H$ separatrix.
         The landscape reproduces the bet-hedging outcome reported by Fujita \&~Losick~\cite{fujita2005}: ${\approx}48\%$ sporulation under nutrient-rich conditions ($N_0 = 1440\,\mu$M, SinR $= 12\,\mu$M, no drug pulse).%

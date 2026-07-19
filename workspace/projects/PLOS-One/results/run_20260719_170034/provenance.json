@@ -1,0 +1,470 @@
+{
+  "client": {
+    "git": {
+      "branch": "main",
+      "dirty": true,
+      "dirty_paths": [
+        " M workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy",
+        " M workspace/projects/project_index.json",
+        " M workspace/projects/thesis/manuscript/plos_one_how_cells_decide.tex",
+        "?? 0.555",
+        "?? workspace/projects/PLOS-One/manuscript/figures/fig_preemption_cascade_v3.pdf",
+        "?? workspace/projects/PLOS-One/manuscript/figures/fig_waddington_landscape.pdf",
+        "?? workspace/projects/PLOS-One/models/.shypn/",
+        "?? workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shypn",
+        "?? workspace/projects/thesis/metadata/bacillus_sporulation_v9.shypn",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy.bak2",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy.bak3",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy.bak4",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy.bak5",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v4_thesis.shy.bak6",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v8_thesis.shy.bak2",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v8_thesis.shy.bak3",
+        "?? workspace/projects/thesis/models/bacillus_sporulation_v8_thesis.shy.bak4"
+      ],
+      "head_sha": "7acf5b5028b4a83a25f53d3a34e8317314c08e66",
+      "repo_root": "/home/simao/projetos/shypn",
+      "status": "ok"
+    },
+    "hostname": "Antares",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "dispatched_at": "2026-07-19T14:00:34",
+  "model": {
+    "remote_path": "/home/simao/shypn/workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy",
+    "sha256": "539ea79e7a686ba50c44a0f255b63c18125fdcd40c0fcb78eec6ee1b2ad9235a",
+    "size_bytes": 128009,
+    "source_path": "/home/simao/projetos/shypn/workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy"
+  },
+  "parameter_sources": {
+    "Baseline": {},
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=0_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=0_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=0_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=0_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=10_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=10_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=10_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=10_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=27_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=27_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=27_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=1440_[param] LOADING_DOSE=27_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 1440.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=0_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=0_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=0_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=0_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 0.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=10_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=10_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=10_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=10_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 10.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=27_SinR=12": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 12.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=27_SinR=18": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 18.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=27_SinR=4": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 4.0
+      }
+    },
+    "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=27_SinR=6": {
+      "P27.initial_marking": {
+        "prior": 100.0,
+        "source": "fixed_override",
+        "value": 2160.0
+      },
+      "P37.initial_marking": {
+        "prior": 0.0,
+        "source": "fixed_override",
+        "value": 27.0
+      },
+      "P39.initial_marking": {
+        "prior": 8.0,
+        "source": "fixed_override",
+        "value": 6.0
+      }
+    }
+  },
+  "schema_version": 1,
+  "server": {
+    "git": {
+      "branch": "main",
+      "dirty": true,
+      "dirty_paths": [
+        " M workspace/projects/PLOS-One/models/bacillus_sporulation_v9.shy",
+        " M workspace/projects/thesis/provenance.json",
+        " M workspace/projects/thesis/sweep_config.json",
+        "?? workspace/projects/PLOS-One/sweep_config.json"
+      ],
+      "head_sha": "fbc3a2dcbc4b97c5c80ccea4f83276d2141452f6",
+      "repo_root": "/home/simao/shypn",
+      "status": "ok"
+    },
+    "host": "remote-gpu"
+  },
+  "sweep_config_sha256": "794f1168dc59d361fa69fb28ff98c495e611f7e9855b18d6b13dc5c712eac788",
+  "timescale_audit": {}
+}

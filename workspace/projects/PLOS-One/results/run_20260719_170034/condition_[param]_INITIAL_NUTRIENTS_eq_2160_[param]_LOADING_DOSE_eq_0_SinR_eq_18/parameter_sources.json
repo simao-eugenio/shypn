@@ -1,0 +1,20 @@
+{
+  "condition": "[param] INITIAL_NUTRIENTS=2160_[param] LOADING_DOSE=0_SinR=18",
+  "sources": {
+    "P27.initial_marking": {
+      "prior": 100.0,
+      "source": "fixed_override",
+      "value": 2160.0
+    },
+    "P37.initial_marking": {
+      "prior": 0.0,
+      "source": "fixed_override",
+      "value": 0.0
+    },
+    "P39.initial_marking": {
+      "prior": 8.0,
+      "source": "fixed_override",
+      "value": 18.0
+    }
+  }
+}
