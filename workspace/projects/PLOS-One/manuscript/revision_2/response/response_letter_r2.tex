@@ -89,14 +89,20 @@ requested.
 We thank Dr.\ Kolč{\'a}k for the continued and detailed technical engagement.
 We address his two major comments, followed by every specific point raised, in order.
 
-\subsection*{Major comment (1) --- $\Psi$/$\Phi$ (Rate Functions) not used
-in semantics}
+\subsection*{Major comment (1) --- Rate functions $\Phi$ absent from enabling/firing semantics}
 
 \rquote{It remains a fact that while $\Psi$ (Rate functions) are introduced
 throughout the paper, they are not used in the semantics of the model,
 making them completely useless and superfluous.}
 
-\rebuttal{This comment conflates the two standard layers of stochastic Petri
+\rebuttal{We note a notation clarification before responding: in our formalism
+$\Psi \subseteq P$ denotes the \emph{signal places set} (information channels),
+while $\Phi: T \rightarrow \text{RateFunctions}$ denotes the \emph{rate
+functions}. The reviewer's comment uses $\Psi$ where our paper uses $\Phi$;
+we respond to the intended concern about rate functions $\Phi$ not appearing
+in the Enabled predicate.
+
+This comment conflates the two standard layers of stochastic Petri
 net semantics, which are architecturally separate by design.
 In stochastic Petri nets (Goss \& Peccoud 1998; Haas 2002), the formalism
 has two distinct layers:
