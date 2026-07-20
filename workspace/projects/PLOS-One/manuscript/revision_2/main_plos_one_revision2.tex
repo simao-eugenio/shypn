@@ -415,8 +415,8 @@ The information graph operates through consumptive signal semantics distinct fro
 
 \textbf{Test arcs} ($F_t$): Model catalysis through non-consuming local observation. Require $M(p) > \tau_t((p,t))$ without token transfer, enabling rate acceleration via arc-connected catalysts.
 Test arcs are the appropriate model for catalysis on two independent grounds.
-First, they are the established formalism for read-only access in Petri nets (contextual/read arcs, \cite{baldan2001}): they are semantically distinct from loops ($W(p,t)=W(t,p)$), which consume and regenerate the same quantity of tokens, because loops contribute to the stoichiometric firing rule while test arcs leave the marking unchanged.
-Second, test arcs have zero mass transfer ($\Delta M = 0$), hence zero entropy production rate (EPR) contribution in stochastic thermodynamics; loops have non-zero mass flow and non-zero EPR. This thermodynamic distinction is essential for the formalism's physical interpretation: catalysts that enable reactions without being consumed must not contribute to the dissipation budget of the commitment decision.
+First, they are the established formalism for read-only access in Petri nets (contextual/read arcs, \cite{baldan2001}): they are semantically distinct from loops ($W(p,t)=W(t,p)$), which consume and regenerate the same quantity of tokens, because loops contribute to the stoichiometric firing rule while test arcs leave the marking unchanged --- a semantic difference independent of concurrency.
+Second, test arcs correctly model biological catalysts: enzymes that enable reactions without being consumed must not contribute to mass balance, which loops would violate by introducing a spurious consume-then-regenerate cycle in the stoichiometric record.
 
 \textbf{Signal flow arcs} ($F_s$): Model vertical information broadcast with consumptive commitment. These arcs require marking
 $M(p_s) \geq \theta(t) + W_s((p_s,t))$
@@ -479,9 +479,7 @@ This follows the two-layer architecture of stochastic Petri nets~\cite{goss1998}
 determines \emph{how fast} it fires.
 $\Phi$ therefore does not appear in the Enabled predicate or the Firing rule by
 design---this is the standard separation in stochastic PN, not a deficiency.
-$\Phi$ governs simulation dynamics (propensity for $\tau$-leaping, ODE rates)
-and enters the entropy production rate computation through the propensity
-ratio $\Phi^+(M)/\Phi^-(M)$ used in stochastic thermodynamics.
+$\Phi$ governs simulation dynamics (propensity for $\tau$-leaping, ODE rates).
 A natural question is whether $\Phi$, being able to encode any function of any state variable, makes $F_s$ redundant. It does not: $\Phi$ operates over $G_E$---modelling continuous, reversible kinetics whose read dependencies may be cyclic---while $F_s$ operates over $G_s$---modelling discrete, irreversible commitment whose topology must be acyclic. The structural theorems (Acyclicity, Preemption, Basin Partition) are properties of $G_s$: they cannot be recovered from rate functions alone because $\Phi$ is not subject to the DAG constraint that makes them provable. In the limit---a net with all regulation in $\Phi$ and no arcs---the marking never changes from $M_0$ and there is no basin boundary. The moment you add a signal flow arc you get an irreversible commitment boundary with threshold $M_{\text{commit}} = \theta + W_s$. $\Phi$ expresses what a transition \textit{reads}; only $F_s$ arcs determine what it \textit{destroys}, and it is destruction that makes commitment irreversible.
 
 \subsection{Hierarchical Enablement}
@@ -631,8 +629,7 @@ where:
 \begin{itemize}
 \item $(P, T, F, W, M_0)$ is classical 5-tuple (places, transitions, arcs, weights, initial marking)
 \item $\Phi: T \rightarrow \text{RateFunctions}$ assigns kinetic rate laws to transitions.
-  $\Phi$ governs the simulation dynamics (propensity for $\tau$-leaping, ODE rates)
-  and the entropy production rate via the propensity ratio $\Phi^+(M)/\Phi^-(M)$.
+  $\Phi$ governs the simulation dynamics (propensity for $\tau$-leaping, ODE rates).
   Following the standard two-layer architecture of stochastic Petri nets~\cite{goss1998},
   $\Phi$ does not appear in the structural Enabled predicate: enabling is topological,
   propensity is kinetic.

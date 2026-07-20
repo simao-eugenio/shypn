@@ -112,9 +112,7 @@ has two distinct layers:
     counts and arc structure. This is the layer the reviewer is examining.
   \item \emph{Kinetic propensity} ($\Phi$): the rate function determines
     \emph{how fast} an enabled transition fires, governing the simulation
-    dynamics ($\tau$-leaping propensity, ODE rates, and---crucially---the
-    entropy production rate via the propensity ratio $\Phi^+(M)/\Phi^-(M)$
-    in stochastic thermodynamics).
+    dynamics ($\tau$-leaping propensity, ODE rates).
 \end{enumerate}
 $\Phi$ is intentionally absent from the Enabled predicate and the Firing
 rule: this is the standard stochastic PN architecture, not a deficiency.
@@ -157,21 +155,18 @@ $M'(p) = M(p)$ unconditionally.
 This is a semantic difference in the single-step firing semantics,
 independent of any concurrent setting.
 
-\textbf{(b) Thermodynamic distinctness:}
-For this formalism's primary application --- the stochastic thermodynamics
-of biological commitment --- test arcs and loops are not interchangeable.
-Test arcs have zero mass transfer ($\Delta M = 0$), hence zero entropy
-production rate (EPR) contribution: catalysts that enable reactions without
-being consumed must not appear in the dissipation budget.
-Loops have non-zero mass flow (tokens are consumed then regenerated), hence
-non-zero EPR contribution.
-Using a loop to model a catalyst would spuriously inflate the EPR of the
-commitment decision and corrupt the decomposition $\dot\sigma = \sum_\rho
-J_\rho \ln(J_\rho^+/J_\rho^-)$.
-The thermodynamic distinction is not incidental; it is central to the
-paper's contribution.
+\textbf{(b) Biological correctness:}
+Test arcs correctly model biological catalysts: enzymes and co-factors
+that gate reactions without being consumed must leave the stoichiometric
+balance unchanged.
+Loops $W(p,t) = W(t,p)$ would introduce a spurious consume-then-regenerate
+cycle in the stoichiometric record --- misrepresenting the biology even
+though the net token change is zero.
+Test arcs make the read-only character explicit and verifiable in the arc
+graph, enabling formal proofs that depend on the distinction (e.g., that
+test arcs cannot create basin boundaries, whereas signal flow arcs can).
 
-We have added both justifications to the test arc paragraph
+We have updated the test arc paragraph with both justifications
 (\sref{Sec.~4.1, Test arc definition}).}
 
 \subsection*{Specific point: Page 10, Theorem 2 proof}
@@ -452,7 +447,7 @@ $\tau_t$ / test arc inconsistency & Fixed: TestEnabled changed to strict $>$ thr
 Commitment labelling ambiguity & Fixed: time-point qualifiers added & Sec.~4.2, Commitment Semantics \\
 Reachability EXPSPACE claim & Fixed: Ackermann-complete at 5 locations & Sec.~5.2, 5.3, 6, 7 \\
 $\Phi$ not in Enabled/Firing & Rebuttal: standard stochastic PN two-layer architecture & Sec.~4.1, Def.~5 remark \\
-Test arcs vs.\ loops & Rebuttal: Baldan et al.\ (his own citation) + zero-EPR argument & Sec.~4.1, test arc definition \\
+Test arcs vs.\ loops & Rebuttal: Baldan et al.\ (his own citation) + biological correctness argument & Sec.~4.1, test arc definition \\
 Def.\ 6 $\Phi$, $C$ role & Clarified: simulation propensity / ODE stoichiometry & Sec.~4.1, Def.~5 \\
 Theorem 3 scope & Clarified: applies to $G_s$, not to $G_E$ normal arcs & Sec.~2.3, Thm.~3 \\
 Fig.\ 2 threshold crossing & Clarified: stochastic crossing, not mean-field & Sec.~5.1, Fig.~2 caption \\
