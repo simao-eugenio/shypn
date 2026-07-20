@@ -341,12 +341,18 @@ The formula $M_{\mathrm{commit}} = \theta + W_s$ is retained because it
 serves a concrete predictive purpose in the biological validation.
 The reviewer's characterisation as ``trivial'' is perhaps true in the abstract,
 but the claim of the paper is not the formula itself but the capacity to
-compute $\theta$ from published kinetic constants (BRENDA, Voet \& Voet)
-without fitting to cellular-level data.
-The biological result ($\theta_{\sigma H} = 1.60\,\mu$M predicted from
-molecular Hill constants, validated against the Fujita \& Losick 52\%/5\%
-asymmetry) would be impossible without the topology-driven formula.
-A sentence has been added clarifying this predictive role. \sref{Sec.~4.3.}
+compute structural commitment thresholds directly from arc-level parameters
+$\theta$ and $W_s$ without simulation or global fitting.
+For signal-flow arc inputs (e.g., GTP\textunderscore pool gating $T_{\mathrm{septation}}$),
+$M_{\mathrm{commit}} = \theta + W_s$ yields the structural threshold from
+topology alone.
+We note that $\theta_{\sigma H} = 1.60\,\mu$M is an \emph{effective kinetic
+threshold} identified via simulation (Sweep~A), not a structural
+$M_{\mathrm{commit}}$ computation, since $\sigma_H$ gates $T_{\mathrm{septation}}$
+through the rate function $\Phi$ (remote sensing) rather than a signal-flow arc.
+The manuscript has been updated to make this distinction explicit.
+A sentence clarifying the predictive role of the structural formula has been
+added. \sref{Sec.~4.3.}
 
 \subsection*{Specific point: Page 31, Theorem 6.1.1 --- proof ``hardly necessary''}
 
