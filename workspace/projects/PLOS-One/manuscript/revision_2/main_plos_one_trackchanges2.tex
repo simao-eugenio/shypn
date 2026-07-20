@@ -1,7 +1,7 @@
 % Signal Hierarchical Petri Nets - Foundation Manuscript
 %DIF LATEXDIFF DIFFERENCE FILE
 %DIF DEL main_plos_one_revision.tex               Thu Jul  2 11:13:00 2026
-%DIF ADD revision_2/main_plos_one_revision2.tex   Mon Jul 20 12:38:59 2026
+%DIF ADD revision_2/main_plos_one_revision2.tex   Mon Jul 20 15:23:59 2026
 % PLOS ONE Format — Revision (PONE-D-26-05900)
 % Version: 2026-06-19 (revision draft)
 % Short title: Signal Hierarchical Petri Nets
@@ -214,7 +214,8 @@ Cells make irreversible commitment decisions at specific metabolite thresholds, 
 }\DIFaddend 
 
 % Introduction
-% [R1-m1] Add dual-graph schematic figure (G_E mass graph + G_S control POSet)
+%DIF <  [R1-m1] Add dual-graph schematic figure (G_E mass graph + G_S control POSet)
+%DIF >  [R1-m1] Add dual-graph schematic figure (G_E mass graph + G_s control POSet)
 % here or at start of Sec 2, before formal notation appears.
 \section{Introduction}
 
@@ -246,7 +247,78 @@ This work presents signal hierarchy theory and its computational realization as 
 % [R1-m1] Dual-graph schematic figure inserted here per R1 request.
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[
+\DIFdelbeginFL %DIFDELCMD < \begin{tikzpicture}[
+%DIFDELCMD <   %% Normal place: black circle
+%DIFDELCMD <   place/.style={circle, draw=black, thick, minimum size=1.1cm},
+%DIFDELCMD <   %% Signal place: hexagon, blue border, very light blue fill
+%DIFDELCMD <   sigplace/.style={regular polygon, regular polygon sides=6,
+%DIFDELCMD <                    draw=blue!70, very thick, minimum size=1.3cm, fill=blue!5},
+%DIFDELCMD <   %% Transition bar --- horizontal (flipped 90\textdegree)
+%DIFDELCMD <   bar/.style={rectangle, draw=black, fill=black!75,
+%DIFDELCMD <               minimum width=1.1cm, minimum height=0.28cm},
+%DIFDELCMD <   %% Normal arc: black solid, 0.8pt
+%DIFDELCMD <   arr/.style={->, >=stealth, line width=0.8pt},
+%DIFDELCMD <   %% Signal arc: light gray dashed, 0.8pt
+%DIFDELCMD <   sarr/.style={->, >=stealth, dashed, draw=gray!60, line width=0.8pt},
+%DIFDELCMD <   every label/.style={font=\scriptsize}
+%DIFDELCMD < ]
+%DIFDELCMD < 
+
+%DIFDELCMD < %% ---- LEFT PANEL: G_E (execution graph) ----
+%DIFDELCMD < \node[font=\small\bfseries] at (1.7, 6.1) {$G_E$: execution graph};
+%DIFDELCMD < \node[font=\scriptsize, text=gray, align=center] at (1.7, 5.65)
+%DIFDELCMD <      {normal arcs --- may be cyclic};
+%DIFDELCMD < 
+
+%DIFDELCMD < \node[place,    label={[font=\scriptsize]left:$p_1$}]   (p1) at (0.5, 4.3) {};
+%DIFDELCMD < \node[sigplace, label={[font=\scriptsize]above:$p_s$}]  (ps) at (3.0, 4.3) {};
+%DIFDELCMD < \node[bar]                                               (t1) at (1.7, 3.0) {};
+%DIFDELCMD < \node[place,    label={[font=\scriptsize]right:$p_2$}]  (p2) at (1.7, 1.8) {};
+%DIFDELCMD < \node[bar]                                               (t2) at (0.5, 0.5) {};
+%DIFDELCMD < 
+
+%DIFDELCMD < \draw[arr] (p1)       -- (t1);
+%DIFDELCMD < \draw[arr] (ps)       -- (t1);
+%DIFDELCMD < \draw[arr] (t1)       -- (p2);
+%DIFDELCMD < \draw[arr] (p2) -- (t2);
+%DIFDELCMD < \draw[arr] (t2) -- (p1);
+%DIFDELCMD < 
+
+%DIFDELCMD < %% ---- DIVIDER ----
+%DIFDELCMD < \draw[dashed, gray!35, thick] (4.7, 0.0) -- (4.7, 6.3);
+%DIFDELCMD < 
+
+%DIFDELCMD < %% ---- RIGHT PANEL: G_S (signal control graph) ----
+%DIFDELCMD < \node[font=\small\bfseries] at (6.9, 6.1) {$G_S$: signal control graph};
+%DIFDELCMD < \node[font=\scriptsize, text=gray, align=center] at (6.9, 5.65)
+%DIFDELCMD <      {signal arcs --- must be acyclic};
+%DIFDELCMD < 
+
+%DIFDELCMD < \node[sigplace, label={[font=\scriptsize]below left:$\lambda=0$}] (ps0) at (5.8, 4.3) {};
+%DIFDELCMD < \node[sigplace, label={[font=\scriptsize]below left:$\lambda=1$}] (ps1) at (5.8, 1.8) {};
+%DIFDELCMD < \node[bar]                                                         (tc)  at (8.0, 3.0) {};
+%DIFDELCMD < 
+
+%DIFDELCMD < \draw[sarr] (ps0) to[out=330, in=150]
+%DIFDELCMD <      node[above=2pt, font=\scriptsize, text=gray!65, pos=0.45] {$W_s,\;\theta$}
+%DIFDELCMD <      (tc);
+%DIFDELCMD < \draw[sarr] (tc) to[out=210, in=30]
+%DIFDELCMD <      (ps1);
+%DIFDELCMD < 
+
+%DIFDELCMD < \node[font=\scriptsize, text=gray!65, align=center] at (7.2, 0.5)
+%DIFDELCMD <      {$M_{\mathrm{commit}} = \theta + W_s$};
+%DIFDELCMD < 
+
+%DIFDELCMD < %% ---- BRIDGE: same signal place in both panels ----
+%DIFDELCMD < \draw[dotted, line width=0.8pt, gray!55] (ps.east) to[out=0, in=180]
+%DIFDELCMD <      node[above=2pt, font=\scriptsize, pos=0.5] {same place}
+%DIFDELCMD <      (ps0.west);
+%DIFDELCMD < 
+
+%DIFDELCMD < \end{tikzpicture}
+%DIFDELCMD < %%%
+\DIFdelendFL \DIFaddbeginFL \begin{tikzpicture}[
   %% Normal place: black circle
   place/.style={circle, draw=black, thick, minimum size=1.1cm},
   %% Signal place: hexagon, blue border, very light blue fill
@@ -282,8 +354,8 @@ This work presents signal hierarchy theory and its computational realization as 
 %% ---- DIVIDER ----
 \draw[dashed, gray!35, thick] (4.7, 0.0) -- (4.7, 6.3);
 
-%% ---- RIGHT PANEL: G_S (signal control graph) ----
-\node[font=\small\bfseries] at (6.9, 6.1) {$G_S$: signal control graph};
+%% ---- RIGHT PANEL: G_s (signal control graph) ----
+\node[font=\small\bfseries] at (6.9, 6.1) {$G_s$: signal control graph};
 \node[font=\scriptsize, text=gray, align=center] at (6.9, 5.65)
      {signal arcs --- must be acyclic};
 
@@ -306,15 +378,17 @@ This work presents signal hierarchy theory and its computational realization as 
      (ps0.west);
 
 \end{tikzpicture}
-\caption{\textbf{Dual-graph architecture of SHPN.} The execution graph $G_E$
+\DIFaddendFL \caption{\textbf{Dual-graph architecture of SHPN.} The execution graph $G_E$
 (left) carries stoichiometric mass transfer through normal arcs (solid black)
 and may contain cycles. Signal places (blue hexagons, $p_s$) participate in
-both graphs simultaneously. The signal control graph $G_S = (\Psi, F_s)$
-(right) extracts those places into a directed acyclic graph (POSet); dashed
+both graphs simultaneously. The signal control graph \DIFdelbeginFL \DIFdelFL{$G_S = (\Psi, F_s)$
+}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{$G_s = (\Psi, F_s)$
+}\DIFaddendFL (right) extracts those places into a directed acyclic graph (POSet); dashed
 arcs carry signal weight $W_s$ and basin-floor threshold $\theta$, giving the
 commitment criterion $M_{\mathrm{commit}} = \theta + W_s$. Layer depth
-$\lambda$ encodes the hierarchy of commitment decisions. Acyclicity of $G_S$
-formalizes biological irreversibility: a committed cell cannot uncommit through
+$\lambda$ encodes the hierarchy of commitment decisions. Acyclicity of \DIFdelbeginFL \DIFdelFL{$G_S$
+}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{$G_s$
+}\DIFaddendFL formalizes biological irreversibility: a committed cell cannot uncommit through
 the same hierarchical channel. Cycles in $G_E$ remain fully unrestricted.}
 \label{fig:dual_graph}
 \end{figure}
@@ -511,8 +585,8 @@ The information graph operates through consumptive signal semantics distinct fro
 \DIFaddbegin \DIFadd{Test arcs are the appropriate model for catalysis on two independent grounds.
 First, they are the established formalism for read-only access in Petri nets (contextual/read arcs, \mbox{%DIFAUXCMD
 \cite{baldan2001}}\hskip0pt%DIFAUXCMD
-): they are semantically distinct from loops ($W(p,t)=W(t,p)$), which consume and regenerate the same quantity of tokens, because loops contribute to the stoichiometric firing rule while test arcs leave the marking unchanged.
-Second, test arcs have zero mass transfer ($\Delta M = 0$), hence zero entropy production rate (EPR) contribution in stochastic thermodynamics; loops have non-zero mass flow and non-zero EPR. This thermodynamic distinction is essential for the formalism's physical interpretation: catalysts that enable reactions without being consumed must not contribute to the dissipation budget of the commitment decision.
+): they are semantically distinct from loops ($W(p,t)=W(t,p)$), which consume and regenerate the same quantity of tokens, because loops contribute to the stoichiometric firing rule while test arcs leave the marking unchanged --- a semantic difference independent of concurrency.
+Second, test arcs correctly model biological catalysts: enzymes that enable reactions without being consumed must not contribute to mass balance, which loops would violate by introducing a spurious consume-then-regenerate cycle in the stoichiometric record.
 }\DIFaddend 
 
 \textbf{Signal flow arcs} ($F_s$): Model vertical information broadcast with consumptive commitment. These arcs require marking
@@ -529,7 +603,8 @@ The information graph thus layers hierarchical control over biochemical executio
 % (2) why Phi does not make signal flow arcs redundant,
 % (3) how Phi is actually used in the case study.
 % Fix: add a paragraph scoping Phi -- what it may read (topology-reachable places
-% or designated signal places), why the structural constraint is on G_S topology
+%DIF <  or designated signal places), why the structural constraint is on G_S topology
+%DIF >  or designated signal places), why the structural constraint is on G_s topology
 % not on the rate expression, and a concrete usage example.
 \subsection{Connected vs. Remote Information Access}
 \DIFaddbegin \label{sec:unified}
@@ -544,7 +619,7 @@ $(p_{\text{remote}}, t) \in F \cup F_s \cup F_t$
 connecting them. This enables distance-independent regulation through kinetic equations
 $\Phi(t) = f(M(p_1), M(p_2), \ldots, M(p_{\text{remote}}))$
 where places $p_{\text{remote}}$ may be topologically distant. Remote sensing operates through equation-implicit references without token transfer.
-Critically, the remote-sensed place $p_{\text{remote}}$ need not belong to $\Psi$, need not carry any $F_s$ arc, and need not participate in the commitment path in any way. A Layer-3 execution sigma factor can sense a Layer-0 metabolite via $\Phi$ (feedback inhibition); a metabolic rate can depend on a downstream product (end-product inhibition); any place in $P$ may appear in any rate function. Because $\Phi$ creates no $F_s$ arc, none of these dependencies appear in $G_S$ and none can create a preemption cycle. The acyclicity constraint governs only $G_S$ topology; $\Phi$ is completely unrestricted in its read set.
+Critically, the remote-sensed place $p_{\text{remote}}$ need not belong to $\Psi$, need not carry any $F_s$ arc, and need not participate in the commitment path in any way. A Layer-3 execution sigma factor can sense a Layer-0 metabolite via $\Phi$ (feedback inhibition); a metabolic rate can depend on a downstream product (end-product inhibition); any place in $P$ may appear in any rate function. Because $\Phi$ creates no $F_s$ arc, none of these dependencies appear in \DIFdelbegin \DIFdel{$G_S$ }\DIFdelend \DIFaddbegin \DIFadd{$G_s$ }\DIFaddend and none can create a preemption cycle. The acyclicity constraint governs only \DIFdelbegin \DIFdel{$G_S$ }\DIFdelend \DIFaddbegin \DIFadd{$G_s$ }\DIFaddend topology; $\Phi$ is completely unrestricted in its read set.
 Table~\ref{tab:connected_remote} summarises the key differences between the two access modes.
 
 \begin{table}[h]
@@ -579,10 +654,8 @@ Test arcs $F_t$ implement non-consumptive observation of arc-connected places (l
 determines }\emph{\DIFadd{how fast}} \DIFadd{it fires.
 $\Phi$ therefore does not appear in the Enabled predicate or the Firing rule by
 design---this is the standard separation in stochastic PN, not a deficiency.
-$\Phi$ governs simulation dynamics (propensity for $\tau$-leaping, ODE rates)
-and enters the entropy production rate computation through the propensity
-ratio $\Phi^+(M)/\Phi^-(M)$ used in stochastic thermodynamics.
-}\DIFaddend A natural question is whether $\Phi$, being able to encode any function of any state variable, makes $F_s$ redundant. It does not: $\Phi$ operates over $G_E$---modelling continuous, reversible kinetics whose read dependencies may be cyclic---while $F_s$ operates over $G_S$---modelling discrete, irreversible commitment whose topology must be acyclic. The structural theorems (Acyclicity, Preemption, Basin Partition) are properties of $G_S$: they cannot be recovered from rate functions alone because $\Phi$ is not subject to the DAG constraint that makes them provable. In the limit---a net with all regulation in $\Phi$ and no arcs---the marking never changes from $M_0$ and there is no basin boundary. The moment you add a signal flow arc you get an irreversible commitment boundary with threshold $M_{\text{commit}} = \theta + W_s$. $\Phi$ expresses what a transition \textit{reads}; only $F_s$ arcs determine what it \textit{destroys}, and it is destruction that makes commitment irreversible.
+$\Phi$ governs simulation dynamics (propensity for $\tau$-leaping, ODE rates).
+}\DIFaddend A natural question is whether $\Phi$, being able to encode any function of any state variable, makes $F_s$ redundant. It does not: $\Phi$ operates over $G_E$---modelling continuous, reversible kinetics whose read dependencies may be cyclic---while $F_s$ operates over \DIFdelbegin \DIFdel{$G_S$}\DIFdelend \DIFaddbegin \DIFadd{$G_s$}\DIFaddend ---modelling discrete, irreversible commitment whose topology must be acyclic. The structural theorems (Acyclicity, Preemption, Basin Partition) are properties of \DIFdelbegin \DIFdel{$G_S$}\DIFdelend \DIFaddbegin \DIFadd{$G_s$}\DIFaddend : they cannot be recovered from rate functions alone because $\Phi$ is not subject to the DAG constraint that makes them provable. In the limit---a net with all regulation in $\Phi$ and no arcs---the marking never changes from $M_0$ and there is no basin boundary. The moment you add a signal flow arc you get an irreversible commitment boundary with threshold $M_{\text{commit}} = \theta + W_s$. $\Phi$ expresses what a transition \textit{reads}; only $F_s$ arcs determine what it \textit{destroys}, and it is destruction that makes commitment irreversible.
 
 \subsection{Hierarchical Enablement}
 
@@ -731,8 +804,7 @@ where:
 \begin{itemize}
 \item $(P, T, F, W, M_0)$ is classical 5-tuple (places, transitions, arcs, weights, initial marking)
 \item $\Phi: T \rightarrow \text{RateFunctions}$ assigns kinetic rate laws to transitions\DIFaddbegin \DIFadd{.
-  $\Phi$ governs the simulation dynamics (propensity for $\tau$-leaping, ODE rates)
-  and the entropy production rate via the propensity ratio $\Phi^+(M)/\Phi^-(M)$.
+  $\Phi$ governs the simulation dynamics (propensity for $\tau$-leaping, ODE rates).
   Following the standard two-layer architecture of stochastic Petri nets~\mbox{%DIFAUXCMD
 \cite{goss1998}}\hskip0pt%DIFAUXCMD
 ,
@@ -774,7 +846,7 @@ M'(p_s) = M(p_s) - W((p_s,t)) - W_s((p_s,t)) + W((t,p_s)) + W_s((t,p_s))
 
 This enables the same metabolite (e.g., ATP) to participate in biochemical reactions (glycolysis) and regulatory decisions (commitment gating) without duplication.
 
-\textbf{Design principle --- selective wiretap on the physical layer:} Signal type assignment does not introduce new arcs, new places, or new tokens. It is a \textit{selective annotation}: the modeler designates certain existing normal arcs as signal flow arcs, so that the same token-consuming event that performs biochemistry in $G_E$ simultaneously reports a commitment to the control hierarchy $G_S$. The cell does not maintain two separate copies of a molecule---one for metabolism, one for signaling. There is one token; the type annotation gives its consumption a second, hierarchical meaning. This is why the two-graph architecture is necessary: $G_E$ must be free to cycle (metabolic feedback, oscillations, reversible reactions), while $G_S$ must be acyclic (commitments are one-way). The same token stream feeds both graphs; the arc type determines which graph records the event.
+\textbf{Design principle --- selective wiretap on the physical layer:} Signal type assignment does not introduce new arcs, new places, or new tokens. It is a \textit{selective annotation}: the modeler designates certain existing normal arcs as signal flow arcs, so that the same token-consuming event that performs biochemistry in $G_E$ simultaneously reports a commitment to the control hierarchy \DIFdelbegin \DIFdel{$G_S$}\DIFdelend \DIFaddbegin \DIFadd{$G_s$}\DIFaddend . The cell does not maintain two separate copies of a molecule---one for metabolism, one for signaling. There is one token; the type annotation gives its consumption a second, hierarchical meaning. This is why the two-graph architecture is necessary: $G_E$ must be free to cycle (metabolic feedback, oscillations, reversible reactions), while \DIFdelbegin \DIFdel{$G_S$ }\DIFdelend \DIFaddbegin \DIFadd{$G_s$ }\DIFaddend must be acyclic (commitments are one-way). The same token stream feeds both graphs; the arc type determines which graph records the event.
 
 \subsection{Operational Semantics}
 
@@ -890,7 +962,7 @@ Signal flow graph $G_s$ encodes regulatory architecture through connected channe
 \end{itemize}
 Each signal place at layer $k$ can be produced/consumed via normal arcs (horizontal mass transfer within layer) and broadcast via signal flow arcs to layer $k+1$ (vertical information propagation across layers). This architecture enables \textit{cascading commitment}: depletion at any layer preempts all higher layers through hierarchical preemption, while each layer maintains its own basin boundaries.
 
-Acyclicity enforced: no connected path $\sigma^F \rightsquigarrow \text{KinA}_{\text{kinase}} \rightsquigarrow \sigma^F$ exists through signal flow arcs---execution sigma factors cannot re-activate the starvation sensor through hierarchical commitment channels. Remote sensing through rate functions $\Phi$ enables equation-implicit feedback without creating preemption cycles: $\sigma^F$ transcription can sense any place---including upstream metabolites, downstream products, or places with no $F_s$ arc at all---via $\Phi(\sigma^F) = f(M(p_{\text{remote}}))$ without physical arc connection. The remote site is not required to be in the commitment path, not required to be a member of $\Psi$, and not required to have any $F_s$ arc. Feedback therefore remains fully unrestricted (metabolic oscillations, product inhibition, allosteric regulation) while the irreversible commitment structure stays acyclic. The formalism thus captures both hierarchical stratification (acyclic $G_S$) and full feedback biology (cyclic remote dependencies in $\Phi$) independently.
+Acyclicity enforced: no connected path $\sigma^F \rightsquigarrow \text{KinA}_{\text{kinase}} \rightsquigarrow \sigma^F$ exists through signal flow arcs---execution sigma factors cannot re-activate the starvation sensor through hierarchical commitment channels. Remote sensing through rate functions $\Phi$ enables equation-implicit feedback without creating preemption cycles: $\sigma^F$ transcription can sense any place---including upstream metabolites, downstream products, or places with no $F_s$ arc at all---via $\Phi(\sigma^F) = f(M(p_{\text{remote}}))$ without physical arc connection. The remote site is not required to be in the commitment path, not required to be a member of $\Psi$, and not required to have any $F_s$ arc. Feedback therefore remains fully unrestricted (metabolic oscillations, product inhibition, allosteric regulation) while the irreversible commitment structure stays acyclic. The formalism thus captures both hierarchical stratification (acyclic \DIFdelbegin \DIFdel{$G_S$}\DIFdelend \DIFaddbegin \DIFadd{$G_s$}\DIFaddend ) and full feedback biology (cyclic remote dependencies in $\Phi$) independently.
 
 \subsection{Threshold Computation}
 
@@ -1012,9 +1084,13 @@ The claim that $M_{\mathrm{commit}} = \theta_{\mathrm{eff}} + W_s$ is ``not fitt
 
 The model instantiates the four-layer signal hierarchical architecture (Section~\ref{sec:four_layer}). Model statistics: 40 places, 36 transitions, 114 arcs, 4 signal layers (Fig~\ref{fig:model_topology}).
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/bacillus_sporulation_v9_titled.pdf}
+\DIFdelbegin %DIFDELCMD < \begin{figure}[htbp]
+%DIFDELCMD <     %%%
+\DIFdelendFL \DIFaddbeginFL \begin{figure}[p]
+    \DIFaddendFL \centering
+    \DIFaddbeginFL {\large\textbf{\DIFaddFL{Signal Hierarchical Petri Net: }\textit{\DIFaddFL{B.~subtilis}} \DIFaddFL{Sporulation (v9)}}}
+    \par\vspace{6pt}
+    \DIFaddendFL \includegraphics[width=\textwidth]{figures/bacillus_sporulation_v9_titled.pdf}
     \caption{%
         Full topology of the \textit{B.~subtilis} sporulation Signal Hierarchical Petri Net.
         Circles~(\textbullet) are biological places; hexagons~($\Psi$) are signal places;
@@ -1144,15 +1220,14 @@ For parameter perturbations $\delta \in [-20\%, +20\%]$ applied to model compone
 }%DIFDELCMD < 
 
 %DIFDELCMD < %%%
-\textbf{\DIFdel{Case 3: $\sigma_H$ feedback strength.}} %DIFAUXCMD
-\DIFdel{Varying k\_syn\_factor by $\pm 20\%$ shifts the time at which $[\sigma_H]$ crosses $\theta_{\sigma H}$ by $\pm 25\,\text{min}$, not the separatrix value itself.
-Natural fraction varies $44\text{--}60\%$ (stochastic window shifts slightly).
+\DIFdelend \DIFaddbegin \DIFadd{.
+}\item \DIFaddend \textbf{\DIFdelbegin \DIFdel{Case 3: }\DIFdelend $\sigma_H$ feedback \DIFdelbegin \DIFdel{strength.}%DIFDELCMD < \MBLOCKRIGHTBRACE %%%
+\DIFdel{Varying k\_syn\_factor by $\pm 20\%$ shifts the time at which $[\sigma_H]$ crosses $\theta_{\sigma H}$ by $\pm 25\,\text{min}$, not the separatrix value itself. Natural fraction varies $44\text{--}60\%$ (stochastic window shifts slightly).
 }%DIFDELCMD < 
 
 %DIFDELCMD < %%%
 \DIFdel{Union of all cases: natural sporulation $\in [42\%, 62\%]$; abrupt $\in [0\%, 10\%]$.
-}\DIFdelend \DIFaddbegin \DIFadd{.
-}\item \textbf{\DIFadd{$\sigma_H$ feedback ($\pm20\%$):}} \DIFadd{natural $44\text{--}60\%$; commitment timing shifts $\pm 25\,$min.
+}\DIFdelend \DIFaddbegin \DIFadd{($\pm20\%$):}} \DIFadd{natural $44\text{--}60\%$; commitment timing shifts $\pm 25\,$min.
 }\end{itemize}
 \DIFaddend The qualitative Fujita asymmetry is preserved across all perturbations without refitting.
 \DIFdelbegin %DIFDELCMD < \end{proof}
@@ -1213,9 +1288,10 @@ fundamental gap in computational biology: existing frameworks treat metabolites
 either as passive substrates or as Boolean parameters, never as
 modeler-designated species with differentiated arc semantics.
 
-% [R1-C3] Acyclicity of G_S vs cycles in G_E -- explicit clarification
+%DIF <  [R1-C3] Acyclicity of G_S vs cycles in G_E -- explicit clarification
+%DIF >  [R1-C3] Acyclicity of G_s vs cycles in G_E -- explicit clarification
 A clarification on feedback and acyclicity is warranted. The acyclicity
-requirement applies exclusively to $G_S = (\Psi, F_s)$, the signal control
+requirement applies exclusively to \DIFdelbegin \DIFdel{$G_S = (\Psi, F_s)$}\DIFdelend \DIFaddbegin \DIFadd{$G_s = (\Psi, F_s)$}\DIFaddend , the signal control
 subgraph. The execution graph $G_E = (P, T, F)$ is entirely unrestricted: it
 may contain cycles, supporting metabolic feedback inhibition, oscillatory
 dynamics, and recycling loops --- all biological realities. Feedback regulation
@@ -1230,7 +1306,7 @@ occurrence nets establish acyclicity in the \textit{causal execution record}
 establishes acyclicity in the \textit{control topology itself} --- not as a
 property of any particular execution history, but as a structural constraint
 on the commitment architecture. The genome ($G_E$) contains all possible
-epigenetic states at high entropy; the commitment topology ($G_S$) is the
+epigenetic states at high entropy; the commitment topology (\DIFdelbegin \DIFdel{$G_S$}\DIFdelend \DIFaddbegin \DIFadd{$G_s$}\DIFaddend ) is the
 irreversible selector that collapses those possibilities once a threshold is
 crossed.
 
@@ -1244,7 +1320,7 @@ crossed.
 \cite{czerwinski2021} }\hskip0pt%DIFAUXCMD
 }\DIFaddend to $O(1)$ arithmetic, enabling genome-scale analyses infeasible with simulation-based methods.
 
-\textbf{Relationship to related formalisms:} Beyond classical Bio-PN, SHPN relates to a broader tradition of process-oriented and partial-order-based approaches. Condition/Event nets (C/E nets \cite{rozenberg1998}) distinguish conditions (Boolean state) from events (occurrences), encoding the non-consuming vs.~consuming distinction at the token level---the closest precursor to the test-arc / signal-arc distinction in SHPN. Occurrence nets and net unfoldings \cite{nielsen1981,winskel1987} establish acyclicity in the causal execution record, capturing the irreversibility of events in the temporal unfolding of concurrent processes. Process-algebraic approaches (Regev and Shapiro \cite{regev2002}, Priami \cite{priami2005}) model individual molecular interactions concurrently through process composition, excelling at combinatorial signaling and competitive binding. These traditions address complementary aspects: process algebras model concurrent interaction identity; occurrence nets model causal irreversibility in execution history; SHPN models population-level commitment thresholds through a structural constraint on the \textit{control topology itself}. In Petri's partial order tradition, acyclicity is a property of the execution record (the unfolding is always a DAG even if the underlying net has cycles). SHPN adds a second, independent acyclicity requirement: $G_S$ must be a DAG as a condition on the net structure---because biological commitment channels are irreversible by design, not merely by the history of one particular run.
+\textbf{Relationship to related formalisms:} Beyond classical Bio-PN, SHPN relates to a broader tradition of process-oriented and partial-order-based approaches. Condition/Event nets (C/E nets \cite{rozenberg1998}) distinguish conditions (Boolean state) from events (occurrences), encoding the non-consuming vs.~consuming distinction at the token level---the closest precursor to the test-arc / signal-arc distinction in SHPN. Occurrence nets and net unfoldings \cite{nielsen1981,winskel1987} establish acyclicity in the causal execution record, capturing the irreversibility of events in the temporal unfolding of concurrent processes. Process-algebraic approaches (Regev and Shapiro \cite{regev2002}, Priami \cite{priami2005}) model individual molecular interactions concurrently through process composition, excelling at combinatorial signaling and competitive binding. These traditions address complementary aspects: process algebras model concurrent interaction identity; occurrence nets model causal irreversibility in execution history; SHPN models population-level commitment thresholds through a structural constraint on the \textit{control topology itself}. In Petri's partial order tradition, acyclicity is a property of the execution record (the unfolding is always a DAG even if the underlying net has cycles). SHPN adds a second, independent acyclicity requirement: \DIFdelbegin \DIFdel{$G_S$ }\DIFdelend \DIFaddbegin \DIFadd{$G_s$ }\DIFaddend must be a DAG as a condition on the net structure---because biological commitment channels are irreversible by design, not merely by the history of one particular run.
 
 \subsection{Methodological Advances}
 
