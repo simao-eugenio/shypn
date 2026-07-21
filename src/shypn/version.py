@@ -9,11 +9,11 @@ Usage:
 """
 
 # Main package version (semantic versioning: MAJOR.MINOR.PATCH)
-__version__ = "2.7.0"
+__version__ = "2.7.1"
 
 # Version metadata
-__version_name__ = "Ubuntu Installer & Console Entry Point"
-__version_date__ = "2026-06-24"
+__version_name__ = "PLOS ONE R2 — Model correction (G_s acyclicity)"
+__version_date__ = "2026-07-21"
 
 # API version for compatibility checking (MAJOR.MINOR)
 # Increment MAJOR when breaking API changes occur
@@ -27,6 +27,13 @@ __required_crossfetch_version__ = "1.0.0"
 # Version history
 __version_history__ = """
 Version History:
+2.7.1 (Jul 21, 2026): PLOS ONE R2 model correction — 4 signal_flow arcs in
+  bacillus_sporulation_v9.shy reclassified to normal arcs (enzyme-regeneration
+  steps T_Spo0F_phosphorylation->KinA_kinase, T_Spo0A_phosphorylation->Spo0F,
+  T_Spo0F_dephos->Spo0F, T_Spo0A_dephosphorylation->Spo0A). These arcs were
+  creating G_s cycles that violate the acyclicity theorem. Re-run of Sweep C
+  (run_20260719_170034) with corrected model confirms identical results:
+  natural route 48%, abrupt pulse 0-6%. All manuscript findings unchanged.
 2.7.0 (Jun 24, 2026): Ubuntu Installer & Console Entry Point - install_ubuntu.sh one-script setup, shypn console command, python -m shypn --check headless verify, CI matrix Ubuntu 22.04/24.04
 2.6.1 (Apr 19, 2026): Simulation Path Consistency & Remote Execution - Arc weight/marking fixes, SSH hardening, CPU parallel replicates, GPU engine, hybrid CPU+GPU mode
 2.6.0 (Feb 23, 2026): GATA Project & DTO Editing Infrastructure - Event-driven cache, model-independent editing
