@@ -9,7 +9,7 @@ repository-code: "https://github.com/simao-eugenio/shypn"
 license: MIT
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.18749555
+    value: 10.5281/zenodo.21478129
     description: "Zenodo DOI for this software version"
 authors:
   - family-names: "Simão"
