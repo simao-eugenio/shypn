@@ -633,9 +633,15 @@ where:
   Following the standard two-layer architecture of stochastic Petri nets~\cite{goss1998},
   $\Phi$ does not appear in the structural Enabled predicate: enabling is topological,
   propensity is kinetic.
-\item $C: F \rightarrow \text{Stoich}$ assigns stoichiometric coefficients to arcs,
-  used during ODE integration and flux computation. $C$ is redundant with $W$ for
-  discrete tokens but provides the continuous-flow analogue for ODE transitions.
+\item $C: P \rightarrow \text{Compartments}$ assigns each place to a spatial
+  compartment (default: cytoplasm), used by the simulation engine for
+  volume-based concentration conversion ($c = N / (N_A \times V_C)$) and
+  multi-compartment diffusion.
+  $C$ does not appear in the structural Enabled predicate or Firing rule:
+  compartment assignment is a simulation-level parameter, not a topological one.
+  % [NOTE for revision 3: legacy description was C: F → Stoich (stoichiometric
+  %  coefficients for ODE arcs). Corrected to match source implementation where
+  %  C: P → Compartments. The ODE stoichiometry is handled by W (arc weights).]
 \item $F_t \subseteq P \times T$ defines test arcs (catalysis, non-consuming); test arc
   enablement requires $M(p) > \tau_t((p,t))$ with default $\tau_t = 0$ (presence
   check $M(p) > 0$) --- the sensing threshold is uniformly~0 unless explicitly set

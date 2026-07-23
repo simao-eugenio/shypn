@@ -368,7 +368,8 @@ $F$ = normal arcs (stoichiometric flows);
 $W$ = arc weights;
 $M_0$ = initial marking;
 $\Phi$ = rate functions;
-$C$ = compartment assignment;
+$C: P \to \text{Compartments}$ = compartment assignment (volume-based concentration conversion, simulation engine);
+% [NOTE: C does not appear in Enabled or Firing — simulation-level parameter only]
 $F_t \subseteq (P\times T)$ = test arcs (non-consuming presence checks);
 $\Psi \subseteq P$ = signal places (regulatory hubs);
 $F_s \subseteq (\Psi \times T) \cup (T \times \Psi)$ = signal-flow arcs
