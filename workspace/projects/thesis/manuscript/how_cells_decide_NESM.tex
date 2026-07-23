@@ -584,9 +584,11 @@ In brief, it contains:
     $\thetaeff = 7.5\,\mu$M.
 \end{itemize}
 
-\begin{figure}[!ht]
+\begin{figure}[p]
   \centering
-  \includegraphics[width=0.9\linewidth]{figures/fig1_model.png}
+  {\large\textbf{SHPN v9 model of \textit{B.~subtilis} sporulation (corrected)}}
+  \par\vspace{6pt}
+  \includegraphics[width=\linewidth]{figures/bacillus_sporulation_v9_titled.pdf}
   \caption{\textbf{SHPN v9 model of \textit{B.~subtilis} sporulation.}
   Circles: biological places ($\mu$M).
   Rectangles: transitions (stochastic = dashed border; ODE = solid).
@@ -594,7 +596,10 @@ In brief, it contains:
   Arc styles: solid black = normal; dashed blue = test;
   dashed grey = signal-flow; filled-circle head = inhibitor.
   Layer~A (commitment, stochastic, upper-left cluster) and Layer~B
-  (execution, ODE, right) are structurally separated in the arc graph.}
+  (execution, ODE, right) are structurally separated in the arc graph.
+  Four enzyme-regeneration arcs (KinA/Spo0F/Spo0A recycling steps) are
+  shown as solid black (normal arcs) consistent with the corrected model
+  in which G_s is acyclic.}
   \label{fig:model}
 \end{figure}
 

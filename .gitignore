@@ -134,6 +134,7 @@ workspace/projects/My_Project/extended_biopn/
 !workspace/projects/Biochemical-Examples/2*_*/figures/*.pdf
 !workspace/projects/PLOS-One/manuscript/figures/*.pdf
 !workspace/projects/PLOS-One/figures/*.pdf
+!workspace/projects/thesis/manuscript/figures/bacillus_sporulation_v9_titled.pdf
 !workspace/projects/Biochemical-Examples/2*_*/scripts/*.pdf
 
 # Hidden files and view state (SHYpn internal)
