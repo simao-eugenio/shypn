@@ -825,4 +825,110 @@ SHPN operates at the boundary of standard stochastic thermodynamics ---
 where biochemical specificity and thermodynamic driving are both essential.
 That boundary is exactly where the interesting biology lives.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 12 — Categorising SHPN Within NESM}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Date:} 2026-07-23.
+
+\subsection*{Level 1 — Computational substrate for single-cell NESM}
+
+SHPN's stochastic transitions are $\tau$-leaping approximations of the
+Master equation of a CTMC.
+This makes SHPN the exact substrate required by Seifert's stochastic
+thermodynamics: trajectory EPR
+$\sigma[\omega] = \ln P[\omega]/P[\tilde\omega]$ is computable from firing
+counts, and NESS characterisation follows without additional assumptions.
+SHPN is not itself a thermodynamic theory; it is the \textbf{computational
+machine through which thermodynamic quantities are derived from biological
+topology}.
+
+\subsection*{Level 2 — Thermodynamically typed arc system}
+
+Generic CTMCs do not distinguish the thermodynamic role of each reaction.
+SHPN's arc type system provides this:
+
+\begin{center}
+\begin{tabular}{p{2.5cm}p{1.8cm}p{2cm}p{4.5cm}}
+\toprule
+Arc type & $\Delta M$ & EPR & Thermodynamic role \\
+\midrule
+Normal & $W \neq 0$ & Non-zero & Stoichiometric flows \\
+Signal-flow & $W_s \neq 0$ & Non-zero & Regulatory dissipation channels \\
+Test & $0$ & Zero & Pure sensing, no thermodynamic cost \\
+Inhibitor & $0$ & Zero & Structural gate, no mass coupling \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This makes SHPN a \textbf{CTMC with thermodynamically annotated transitions}
+--- enabling the per-arc EPR decomposition that a bare CTMC cannot produce.
+
+\subsection*{Level 3 — Subsystem boundary specification language}
+
+In NESM of open systems (Esposito \& Van den Broeck 2010), defining the
+thermodynamic boundary is the critical challenge.
+SHPN provides this via the $G_E/G_s$ split:
+\begin{itemize}
+  \item $G_s$ arcs (signal-flow) declare the commitment subnetwork ---
+    the thermodynamic ``inside''
+  \item $\Phi$ (rate functions, remote sensing) specifies coupling to the
+    environment --- the thermodynamic bath (``outside'')
+  \item PreemptionCheck defines the cascade structure creating the absorbing
+    boundary
+\end{itemize}
+The Markovian reservoir assumption ($\sigma_{\rm interface} = 0$) is made
+precise: the bath enters only through $\Phi$, never through $G_s$ arcs.
+This turns ``treat the rest of the cell as a bath'' into a formally
+verifiable architectural property.
+
+\subsection*{Level 4 — Theorem-generator for NESM structural properties}
+
+\begin{center}
+\begin{tabular}{p{4cm}p{7cm}}
+\toprule
+SHPN theorem & NESM consequence \\
+\midrule
+Acyclicity ($G_s$ is a DAG) & Thermodynamic irreversibility: no reverse
+  trajectory reachable via $G_s$ \\
+Hierarchical preemption & Correlated EPR silence: PreemptionCheck creates
+  collective on/off switching $\Rightarrow$ Var[$\sigma$] suppressed
+  $\Rightarrow \gamma < 0.5$ \\
+Basin partition & Absorbing states: committed CTMC has
+  $P(\text{recommit}) = 0$ \\
+Threshold computability & $M_{\rm commit} = \theta + W_s$ gives the
+  structural commitment energy barrier from topology \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Precise NESM categorisation}
+
+\begin{quote}
+\emph{SHPN is a typed stochastic Petri net whose type system implements
+the thermodynamic role classification of stochastic thermodynamics:
+stoichiometric mass flows (normal arcs), regulatory dissipation channels
+(signal-flow arcs), zero-EPR sensing elements (test arcs), and a cascade
+ordering (POSet $\lambda$ + PreemptionCheck) that structurally enforces
+the thermodynamic irreversibility of commitment.}
+\end{quote}
+
+More compactly: \textbf{SHPN is the formal language in which the stochastic
+thermodynamics of biological commitment is expressible and computationally
+tractable.}
+
+\subsection*{Why this matters for the two papers}
+
+\begin{itemize}
+  \item The \textbf{PLOS ONE paper} establishes SHPN as a formal language
+    (syntax + semantics).
+  \item The \textbf{NESM paper} establishes SHPN as a thermodynamic substrate
+    (physical interpretation).
+\end{itemize}
+
+The two papers are formally dual: one proves what the formalism CAN express;
+the other proves what the formalism CANNOT HELP BUT express thermodynamically.
+The formal properties of the arc type system (proved in PLOS ONE) are the
+structural basis for the thermodynamic properties (derived in the NESM paper).
+
 \end{document}
