@@ -931,4 +931,87 @@ the other proves what the formalism CANNOT HELP BUT express thermodynamically.
 The formal properties of the arc type system (proved in PLOS ONE) are the
 structural basis for the thermodynamic properties (derived in the NESM paper).
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 13 — $C$ as a Thermodynamic Boundary Operator}
+\label{note:C_thermodynamic}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The compartment assignment $C: P \to \text{Compartments}$ is typically
+described as a simulation-level parameter that converts token counts to
+concentrations.  This note argues it is also the \emph{thermodynamic boundary
+operator} of the formalism --- the element of the 13-tuple that determines
+where entropy is produced, how much dissipative work each firing event costs,
+and where basin boundaries are located in the free-energy landscape.
+
+\subsection*{Chemical potential through concentration scaling}
+
+The chemical potential of species $p$ in compartment $C(p)$ with volume
+$V_{C(p)}$ is
+\begin{equation}
+  \mu_p = \mu_p^\circ + k_BT \ln\!\left(\frac{M(p)}{N_A \cdot V_{C(p)}}\right).
+  \label{eq:note13_chempot}
+\end{equation}
+The same token count $M(p)$ produces different $\mu_p$ depending on which
+compartment $C$ assigns $p$ to.  $C$ therefore controls the thermodynamic
+driving force of every transition that consumes $p$ --- it is not neutral
+bookkeeping but a physical input to the propensity functions.
+
+\subsection*{Local detailed balance across compartment boundaries}
+
+For a transition $t$ moving mass from compartment $C_1$ to compartment $C_2$,
+local detailed balance requires
+\begin{equation}
+  \frac{k_t^+}{k_t^-} = \exp\!\left(-\frac{\Delta G_t}{k_BT}\right),
+\end{equation}
+where $\Delta G_t = \sum_i \nu_i \mu_i$ depends on the volumes assigned by
+$C$.  A transition spanning two compartments ($C(p_{\mathrm{in}}) \neq
+C(p_{\mathrm{out}})$) has $\Delta G_t \neq 0$ even at equal token counts ---
+compartment boundaries defined by $C$ are the \emph{structural origin of
+irreversibility}.
+
+\subsection*{Entropy production rate is compartment-sensitive}
+
+The EPR for transition $t$:
+\begin{equation}
+  \dot\sigma_t = (k_t^+ - k_t^-)\ln\frac{k_t^+}{k_t^-} \geq 0.
+\end{equation}
+Since $k_t^+/k_t^- = e^{-\Delta G_t / k_BT}$ and $\Delta G_t$ depends on
+$V_{C(p)}$ via \cref{eq:note13_chempot}, the EPR is zero only when all
+connected species are in the same compartment at equilibrium concentrations.
+A transition that spans a compartment boundary is a \emph{non-equilibrium
+steady-state driver by construction}.
+
+\subsection*{The B. subtilis case: septation changes $C$ at runtime}
+
+The septation event ($T_{\text{septation}}$) is the transition that changes
+$C$ for a subset of places at runtime --- it creates the forespore / mother-cell
+compartment split.  Before septation, $\sigma^F$ and $\sigma^E$ share a common
+volume; after, they are thermodynamically isolated.
+\begin{itemize}
+  \item \textbf{Formalism:} $C$ changes its mapping for forespore places
+    post-septation.
+  \item \textbf{Thermodynamics:} the free-energy cost of maintaining the
+    post-septation asymmetry appears as sustained EPR at the septum.
+  \item \textbf{NESM:} the Waddington basin boundary $M_{\text{commit}}$ is
+    exactly the token count at which $\Delta G_{\text{septation}} < 0$ becomes
+    irreversible --- the curvature of the free-energy landscape changes from
+    double-well to single-well at precisely this point.
+\end{itemize}
+
+\subsection*{Connection to the POSet ratchet (Note 10)}
+
+The layer function $\lambda$ defines the \emph{direction} of the ratchet
+(the hierarchy of commitment decisions).  $C$ defines the \emph{thermodynamic
+cost} of each ratchet click: the free-energy drop $-\Delta G_t$ per firing
+through a compartment boundary is the energy dissipated per commitment event.
+The ratchet is not merely structural (acyclic $G_s$) --- it is thermodynamically
+powered by the chemical potential differences that $C$ establishes.
+
+\subsection*{One-sentence summary}
+
+$C$ is the formal bridge between Petri net topology and stochastic
+thermodynamics: it converts token counts into chemical potentials, making
+compartment boundaries the structural origin of entropy production and
+irreversibility in the basin partition.
+
 \end{document}

@@ -368,8 +368,9 @@ $F$ = normal arcs (stoichiometric flows);
 $W$ = arc weights;
 $M_0$ = initial marking;
 $\Phi$ = rate functions;
-$C: P \to \text{Compartments}$ = compartment assignment (volume-based concentration conversion, simulation engine);
-% [NOTE: C does not appear in Enabled or Firing — simulation-level parameter only]
+$C: P \to \text{Compartments}$ = compartment assignment;
+% [NOTE: C does not appear in Enabled or Firing — but sets chemical potentials via mu_p = mu_0 + kT ln(M/(NA V_C(p)))]
+% C is therefore a thermodynamic boundary operator (Note 13), not merely a simulation-level parameter.
 $F_t \subseteq (P\times T)$ = test arcs (non-consuming presence checks);
 $\Psi \subseteq P$ = signal places (regulatory hubs);
 $F_s \subseteq (\Psi \times T) \cup (T \times \Psi)$ = signal-flow arcs
@@ -508,6 +509,43 @@ thermodynamically by the accumulated affinity of the cascade, and
 biochemically by the protein-specificity constraints that make the
 reverse pathway a different molecular process entirely.}
 
+\subsection{Compartment assignment as thermodynamic boundary specification}
+\label{sec:C_thermodynamic}
+
+The compartment assignment $C: P \to \text{Compartments}$ assigns each
+place $p$ to a physical volume $V_{C(p)}$.  This geometric tag enters
+stochastic thermodynamics at three levels.
+
+\paragraph{Chemical potential.}
+The chemical potential of species $p$ is
+\begin{equation}
+  \mu_p = \mu_p^\circ + k_BT \ln\!\left(\frac{M(p)}{N_A \cdot V_{C(p)}}\right).
+  \label{eq:C_chempot}
+\end{equation}
+The same token count $M(p)$ yields a different $\mu_p$ in each compartment,
+so $C$ determines the thermodynamic driving force of every transition that
+consumes $p$.  It is not neutral bookkeeping.
+
+\paragraph{Local detailed balance and EPR.}
+For a transition spanning two compartments ($C(p_{\mathrm{in}}) \neq
+C(p_{\mathrm{out}})$), local detailed balance gives
+$k_t^+ / k_t^- = \exp(-\Delta G_t / k_BT)$, where $\Delta G_t = \sum_i
+\nu_i \mu_i$ depends on the volumes via~\cref{eq:C_chempot}.  A
+cross-compartment transition therefore has $\Delta G_t \neq 0$ at equal token
+counts, producing non-zero EPR by construction --- compartment boundaries are
+the \emph{structural origin of irreversibility} in the formalism.
+
+\paragraph{Septation changes $C$ at runtime.}
+The septation event ($T_{\text{septation}}$) is the transition that
+re-assigns $C$ for forespore places, creating the forespore/mother-cell
+thermodynamic boundary.  Before septation, $\sigma^F$ and $\sigma^E$ share a
+common volume; after, they are thermodynamically isolated.  The Waddington
+basin boundary $M_{\text{commit}}$ is exactly the token count at which
+$\Delta G_{\text{septation}} < 0$ becomes irreversible --- the
+free-energy landscape changes curvature from double-well to single-well at
+this point.  See Supplementary Note~13 for the full derivation.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{The five topological-thermodynamic quantities}
 \label{sec:five_quantities}
 
