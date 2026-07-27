@@ -546,6 +546,65 @@ free-energy landscape changes curvature from double-well to single-well at
 this point.  See Supplementary Note~13 for the full derivation.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Multi-level system boundary definition}
+\label{sec:system_boundary}
+
+Applying NESM to a single cell requires declaring the \emph{system},
+\emph{bath}, \emph{boundary}, and \emph{observer} --- none of which are
+unique for a cell.  Life solved this by constructing nested thermodynamic
+boundaries: plasma membrane, nuclear envelope, mitochondrial inner membrane,
+septum.  SHPN encodes all four levels through its structural elements
+(Table~\ref{tab:boundary_levels}).
+
+\begin{table}[h]
+\centering
+\small
+\caption{Four levels of thermodynamic boundary in a SHPN model.}
+\label{tab:boundary_levels}
+\begin{tabular}{p{1.8cm}p{2.6cm}p{2.0cm}p{2.0cm}p{3.0cm}}
+\toprule
+\textbf{Level} & \textbf{SHPN element} & \textbf{System} & \textbf{Bath}
+  & \textbf{EPR location} \\
+\midrule
+Thermal & All $P$, implicit solvent & $P$ & Water, $k_BT$
+  & Unobservable (lower bound) \\
+Chemical & Source/sink transitions & Interior $P$ & ATP, nutrients
+  & All source/sink arcs \\
+Informational & $\Psi$, $F_s$ & $G_s$ & $G_E$ continuum
+  & Each $F_s$ firing ($\geq k_BT\ln 2$) \\
+Spatial & $C$ partition & Compt.\ $\alpha$ & Compt.\ $\beta$
+  & Cross-$C$ transitions \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Observer and coarse-graining.}
+The observer IS the model: it tracks $M(p)$ for each $p \in P$ and
+marginalises everything else into the thermal bath.  EPR computed from a
+model is therefore a \emph{lower bound} conditioned on $P$.  A finer-grained
+observer (larger $P$) would see higher EPR.  All results in this paper must
+be read with $P$ as specified in Section~\ref{sec:methods}.
+
+\paragraph{Informational cost of layered commitment.}
+A downstream transition observes its signal input as a binary threshold check
+($M(p_s) \geq \theta + W_s$).  By Landauer's principle each binary
+measurement-and-reset dissipates $\geq k_BT\ln 2$.  Each layer crossing in
+$G_s$ is one such gate; the $\max\lambda = 3$ layers of the sporulation model
+impose a minimum information-theoretic commitment cost of $3\,k_BT\ln 2
+\approx 2.1\,k_BT$.  Collapsing the hierarchy to a single threshold would
+underestimate this cost by two Landauer quanta.
+
+\paragraph{NESM restraints on model construction.}
+Four constraints follow from this framework:
+(1)~source/sink transitions must be declared (bath boundary);
+(2)~$C$ must be biologically grounded per membrane-bounded volume (spatial
+boundary);
+(3)~each layer in $\lambda$ carries a minimum Landauer cost (informational
+boundary);
+(4)~$P$ must be reported alongside EPR estimates (observer declaration).
+See Supplementary Note~14 for derivations and the full restraint list.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{The five topological-thermodynamic quantities}
 \label{sec:five_quantities}
 

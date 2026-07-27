@@ -1014,4 +1014,172 @@ thermodynamics: it converts token counts into chemical potentials, making
 compartment boundaries the structural origin of entropy production and
 irreversibility in the basin partition.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 14 — System, Bath, and Observer Definition in Single-Cell NESM}
+\label{note:system_boundary}
+% ─────────────────────────────────────────────────────────────────────────────
+
+In classical NESM the analysis requires three things declared upfront:
+\emph{system} (degrees of freedom tracked explicitly), \emph{bath}
+(degrees of freedom marginalized), and \emph{observer} (what can be
+measured).  For a single cell none of these are unique --- they depend on the
+question.  Life solved this problem by constructing \emph{nested}
+thermodynamic boundaries (plasma membrane, nuclear envelope, mitochondrial
+inner membrane, septum).  This note develops how SHPN encodes all four levels
+of boundary and what NESM restraints each level imposes.
+
+\subsection*{The four-level boundary hierarchy}
+
+\paragraph{Level 1 --- Thermal boundary (implicit).}
+\textbf{Bath:} water and unmodeled vibrational / rotational degrees of freedom
+at $T \approx 310\,\mathrm{K}$.
+\textbf{System:} all places $P$.
+\textbf{Boundary:} the modeller's coarse-graining decision --- every molecular
+species \emph{not} in $P$ is marginalized into the thermal bath.
+The observer \emph{is} the model: it tracks exactly $M(p)$ for $p \in P$
+and ignores everything else.
+
+\noindent Restraint: EPR computed from $P$ is a \emph{lower bound} on the
+true cellular EPR.  Hidden variables (unmodelled species) contribute hidden
+entropy production.  Every place omitted from $P$ moves dissipation into the
+invisible bath.
+
+\paragraph{Level 2 --- Chemical boundary (source/sink transitions).}
+\textbf{Bath:} chemical reservoirs --- external nutrients, ATP regeneration,
+waste sinks.
+\textbf{Boundary:} transitions flagged \texttt{is\_source} / \texttt{is\_sink}.
+These are the \emph{ports} through which the cell exchanges matter and free
+energy with the environment.  Define:
+\[
+  \partial_{\mathrm{chem}}
+    = \{(t,p) \in F : t \text{ is source or sink}\}.
+\]
+The steady-state EPR of the whole cell equals the total chemical potential
+drop across $\partial_{\mathrm{chem}}$:
+\[
+  \dot\sigma_{\mathrm{cell}}
+    = \sum_{(t,p)\in\partial_{\mathrm{chem}}}
+        J_{tp}\,\frac{\mu_p^{\mathrm{in}} - \mu_p^{\mathrm{out}}}{T}.
+\]
+ATP and GTP pools with large, slowly changing markings function as
+\emph{chemical baths}: kinetically decoupled reservoirs that maintain a
+fixed chemical potential for the rest of the network.
+
+\noindent Restraint: every SHPN model intended for NESM analysis must declare
+its chemical bath explicitly via source/sink transitions.  Without them the
+steady-state EPR is undefined (open system with no flux boundary).
+
+\paragraph{Level 3 --- Informational boundary (signal places $\Psi$ and $F_s$).}
+\textbf{Observer:} any agent that can detect the firing of a signal-flow arc.
+\textbf{Boundary:} $F_s$ arcs --- the only events where regulatory information
+is irreversibly consumed.
+\textbf{System (informational):} the signal graph $G_s = (\Psi, F_s)$.
+
+A downstream transition $t_j$ ``observes'' the state of its signal input by
+checking $M(p_s) \geq \theta + W_s$ --- a \emph{binary measurement} of a
+continuous quantity.  By Landauer's principle the minimum thermodynamic cost
+of this measurement-and-reset is
+\[
+  \Delta F_{\mathrm{Landauer}} \geq k_BT \ln 2
+  \quad \text{per binary gate per firing.}
+\]
+Every layer crossing in $G_s$ is a measurement event with an explicit
+erasure cost encoded in the signal arc consumption $W_s$.
+PreemptionCheck is therefore a \emph{Maxwell's demon cascade}: each layer
+gate measures a lower-layer signal, makes a binary decision, and dissipates
+at least $k_BT \ln 2$ per decision.
+
+\noindent Restraint: the number of layers $\max\lambda$ is a lower bound on
+the information-theoretic cost (in units of $k_BT$) of the full commitment
+decision.  Models that collapse all commitment into a single transition
+underestimate this cost by $(\max\lambda - 1) \times k_BT \ln 2$.
+
+\paragraph{Level 4 --- Spatial/compartmental boundary ($C$ partition).}
+\textbf{Subsystem $\alpha$:} all places $p$ with $C(p) = \alpha$, volume
+$V_\alpha$.
+\textbf{Boundary:} transitions $t$ where at least one input and one output
+belong to different compartments.
+\textbf{Local EPR at boundary $\alpha|\beta$:}
+\[
+  \dot\sigma_{\alpha|\beta}
+    = J_{\alpha\beta}\,\frac{\mu_\alpha - \mu_\beta}{T} \geq 0.
+\]
+The cell maintains $\mu_{\mathrm{nucleus}} \neq \mu_{\mathrm{cytoplasm}}$
+by spending EPR at all nuclear-pore transitions.
+$C$ is the formal declaration: \emph{``I am spending free energy to maintain
+this gradient.''}
+
+\noindent Restraint: merging two biologically distinct compartments into one
+in $C$ underestimates the EPR of all cross-boundary transport and wrongly
+treats the combined pool as an equilibrated reservoir.
+
+\subsection*{Summary table}
+
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\toprule
+\textbf{Level} & \textbf{SHPN element} & \textbf{System} & \textbf{Bath}
+  & \textbf{EPR location} \\
+\midrule
+Thermal      & All $P$, implicit solvent & $P$             & Water, $k_BT$
+  & Unobservable (lower bd.) \\
+Chemical     & Source/sink transitions   & Interior $P$    & ATP, nutrients
+  & All source/sink arcs \\
+Informational & $\Psi$, $F_s$           & $G_s$           & $G_E$ continuum
+  & Each $F_s$ firing $\geq k_BT\ln2$ \\
+Spatial      & $C$ partition            & Compartment $\alpha$ & Compartment $\beta$
+  & Cross-$C$ transitions \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{The septation event as a boundary-creation event}
+
+$T_{\text{septation}}$ is unique among transitions: it does not merely consume
+tokens --- it \emph{changes the topology of the boundary set}.  After firing,
+$C$ maps forespore and mother-cell places to different volumes, creating two
+Level-4 NESM subsystems from one.  The EPR spike observed at commitment
+(Results II) is partly the \emph{thermodynamic cost of boundary creation} ---
+the work of sealing the membrane and establishing the cross-septum chemical
+potential gradient that drives asymmetric sigma-factor activation.
+
+\subsection*{Four NESM restraints on SHPN model construction}
+
+\begin{enumerate}
+  \item \textbf{Declare the bath explicitly.}  Source/sink transitions +
+    parameter places $\square$ define the environment.  Without them EPR is
+    uncomputable.
+  \item \textbf{Ground $C$ in biology.}  Each compartment must correspond to
+    a real membrane-bounded volume.  Merging compartments underestimates
+    cross-boundary EPR.
+  \item \textbf{Count the Landauer cost of layers.}  Each layer in $\lambda$
+    is a binary decision gate with minimum cost $k_BT\ln2$.  The layered
+    cascade is thermodynamically expensive by design --- that cost is what
+    makes the commitment irreversible.
+  \item \textbf{Declare the observer coarse-graining.}  The set $P$ is the
+    observer's accessible information.  EPR from the model is conditioned on
+    this observer.  A finer-grained observer (larger $P$) would see higher
+    EPR.  Results must be reported with $P$ specified.
+\end{enumerate}
+
+\subsection*{Why compartmentalisation is thermodynamically rational}
+
+Life chose compartmentalisation because it enables:
+(a) different chemical potentials in different volumes --- mechanical work
+extraction from concentration gradients;
+(b) local control of reaction environments --- kinetic specialisation without
+crosstalk;
+(c) information isolation --- noise is contained within a compartment, not
+broadcast to the whole cell;
+(d) thermodynamic separation --- each compartment can approach its own local
+quasi-equilibrium between commitment events, reducing the EPR required to
+maintain the resting state.
+
+SHPN's $C$ function is therefore not a simulation convenience.  It is the
+formal statement that the cell has \emph{chosen} to pay the thermodynamic
+cost of maintaining multiple distinct chemical potentials simultaneously ---
+and that the resulting gradients are the engine that drives irreversible
+commitment.
+
 \end{document}
