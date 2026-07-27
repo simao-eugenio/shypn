@@ -430,6 +430,22 @@ regimes with a single consistent substrate:
     Mean-field ODE limit; EPR is flux-affinity product.
 \end{description}
 
+\paragraph{ST gives equalities, not just directions.}
+A critical distinction from classical thermodynamics: stochastic thermodynamics
+provides \emph{exact identities}, not only the directional inequality
+$\Delta S \geq 0$.  The integral fluctuation theorem
+$\langle e^{-\sigma[\omega]}\rangle = 1$ is exact; the Jarzynski equality
+$\langle e^{-W/k_BT}\rangle = e^{-\Delta F/k_BT}$ recovers $\Delta F$
+exactly from non-equilibrium work measurements; the thermodynamic uncertainty
+relation $\mathrm{Var}(J)/\langle J\rangle^2 \geq 2k_B/\Sigma$ gives a hard
+quantitative tradeoff between precision and dissipation.  The second law gives
+the direction; stochastic thermodynamics gives the exchange rates.
+Consequently the five quantities reported in this paper
+(Section~\ref{sec:five_quantities}) are numbers --- specific values in
+$k_BT$, $\mu$M, and $k_B\,\mathrm{s}^{-1}$ --- not directional bounds.
+See Supplementary Note~15 for the full catalogue of ST equalities and their
+comparison to classical thermodynamics.
+
 \subsection{Arc semantics as thermodynamic ports}
 
 Each arc type in the SHPN plays a distinct thermodynamic role:
@@ -696,7 +712,7 @@ In brief, it contains:
   (execution, ODE, right) are structurally separated in the arc graph.
   Four enzyme-regeneration arcs (KinA/Spo0F/Spo0A recycling steps) are
   shown as solid black (normal arcs) consistent with the corrected model
-  in which G_s is acyclic.}
+  in which $G_s$ is acyclic.}
   \label{fig:model}
 \end{figure}
 
@@ -1170,6 +1186,46 @@ They do not represent the total cellular EPR (dominated by translation and
 replication), nor the full-lifecycle thermodynamics from exponential growth
 through spore germination.
 
+\subsection{Structural vs thermodynamic irreversibility}
+\label{sec:structural_vs_thermal_irreversibility}
+
+A natural question is whether the PreemptionCheck/POSet mechanism is
+thermodynamically redundant: if stochastic thermodynamics already guarantees
+that reverse trajectories are exponentially suppressed, does the structural
+gate add anything?
+
+The answer is no --- they guarantee different things and are not equivalent.
+The Gallavotti--Cohen theorem gives
+$P(\sigma=+A)/P(\sigma=-A) = e^{A/k_B}$:
+de-commitment is exponentially suppressed but never forbidden; its probability
+is $\sim e^{-\sigma_{\text{commit}}/k_B} > 0$ always.
+Theorem~3 (Basin Partition) gives $P(\text{de-commit}) = 0$ exactly: the
+reverse arc does not exist in $G_s$, so the reverse trajectory has exactly
+zero probability regardless of $\sigma$.
+
+Four non-equivalences follow.
+(1)~\emph{Probabilistic vs absolute}: ST suppresses reversal exponentially;
+SHPN forbids it topologically.
+(2)~\emph{Temperature dependence}: at higher $T$ the ST barrier shrinks;
+PreemptionCheck is temperature-blind (the arc is absent or present
+regardless of $T$), making structural enforcement more robust under
+stress conditions (heat shock, ATP depletion).
+(3)~\emph{Equilibrium reference}: ST irreversibility is defined relative to
+an equilibrium state; structural irreversibility requires only that no
+regenerating $F_s$ arc exists --- no rate constants needed.
+(4)~\emph{Timescale}: ST gives the probability of de-commitment; Kramers
+escape gives the time.  Near $N_c$, where $\Delta G \to 0$, Kramers escape
+becomes fast and ST irreversibility collapses.  PreemptionCheck still holds.
+
+The two mechanisms are complementary by biological design.  Near $N_c$ the
+EPR is low and both basins are accessible: the cell uses ST near-reversibility
+for bet-hedging --- stochastic probing of the commitment boundary.  Once a
+trajectory crosses $M_{\text{commit}}$, PreemptionCheck fires and the
+structural gate locks the decision permanently, independently of the remaining
+EPR.  ST explains the \emph{cost} of commitment; topology explains the
+\emph{lock}.  See Supplementary Note~16 for full derivations.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Topology encodes thermodynamics}
 
 Three results converge on a single structural claim: the arc graph of

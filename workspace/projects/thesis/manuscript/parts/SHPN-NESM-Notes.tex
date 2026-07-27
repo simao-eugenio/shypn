@@ -1182,4 +1182,237 @@ cost of maintaining multiple distinct chemical potentials simultaneously ---
 and that the resulting gradients are the engine that drives irreversible
 commitment.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 15 — Stochastic Thermodynamics Gives Equalities, Not Just Directions}
+\label{note:equalities}
+% ─────────────────────────────────────────────────────────────────────────────
+
+A common misconception: stochastic thermodynamics (ST) is just the second law
+applied to small systems --- a collection of inequalities saying which way
+processes go.  This is wrong.  ST converts inequalities into exact identities
+and provides fully quantitative, trajectory-level measures.  This note
+catalogues what ST actually gives, and what that means for the five
+topological-thermodynamic quantities in the NESM manuscript.
+
+\subsection*{Classical thermodynamics: directions only}
+
+Classical macroscopic thermodynamics gives inequalities:
+\[
+  \Delta S \geq 0, \qquad \Delta G \leq 0.
+\]
+These tell you which direction a process goes --- nothing about how fast, how
+far from equilibrium, or what the fluctuations look like.  The second law is
+an ensemble statement; it says nothing about any individual trajectory.
+
+\subsection*{Stochastic thermodynamics: exact equalities}
+
+\paragraph{1. Entropy production rate --- exact number.}
+\[
+  \dot\sigma = \sum_\rho J_\rho \ln\frac{k_\rho^+}{k_\rho^-}
+  \quad [k_B\,\mathrm{s}^{-1}].
+\]
+Computable directly from fluxes and rate ratios.  A specific number per
+transition per instant, not a directional inequality.
+
+\paragraph{2. Jarzynski equality --- the second law becomes an identity.}
+Classical: $\langle W \rangle \geq \Delta F$ (direction only).
+Stochastic:
+\[
+  \bigl\langle e^{-W/k_BT} \bigr\rangle = e^{-\Delta F / k_BT} \quad \text{(exact).}
+\]
+The exact free energy difference is recoverable from non-equilibrium work
+measurements.  An inequality becomes an equality; a direction becomes a
+number.
+
+\paragraph{3. Crooks fluctuation theorem --- quantitative ratio.}
+\[
+  \frac{P_F(W)}{P_R(-W)} = e^{(W - \Delta F)/k_BT}.
+\]
+The crossing point of the forward and reverse work distributions locates
+$\Delta F$ exactly.  Quantitative, not directional.
+
+\paragraph{4. Gallavotti--Cohen symmetry --- probability of violations.}
+\[
+  \frac{P(\sigma = +A)}{P(\sigma = -A)} = e^{A/k_B}.
+\]
+Not just ``second-law violations are rare'' --- exactly how rare, as a
+function of magnitude.  A hard number.
+
+\paragraph{5. Thermodynamic uncertainty relation (TUR) --- exact precision-dissipation tradeoff.}
+\[
+  \frac{\mathrm{Var}(J)}{\langle J\rangle^2} \geq \frac{2k_B}{\Sigma}.
+\]
+To halve the noise of a molecular clock, you must quadruple the dissipation.
+Not a direction --- an exact exchange rate between precision and energy cost.
+
+\paragraph{6. Thermodynamic speed limit --- quantitative time-cost.}
+\[
+  \tau \geq \frac{L^2}{\dot\sigma}.
+\]
+Minimum time to traverse state-space distance $L$ given dissipation rate
+$\dot\sigma$.  A lower bound on commitment time given available free energy.
+
+\paragraph{7. Landauer --- exact information-work conversion.}
+\[
+  \Delta F_{\text{erase}} \geq k_BT \ln 2 \quad \text{per bit.}
+\]
+One bit of erased information costs exactly $k_BT \ln 2$ joules minimum.
+The PreemptionCheck cascade has $\max\lambda$ binary gates; their total
+Landauer cost is $\max\lambda \times k_BT \ln 2$, exactly.
+
+\subsection*{Comparison table}
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Quantity} & \textbf{Classical} & \textbf{Stochastic} \\
+\midrule
+Direction of process         & $\Delta S \geq 0$ (ineq.) & $\dot\sigma \geq 0$ (same) \\
+Rate of entropy production   & not defined               & exact: $\sum_\rho J_\rho \ln(k^+/k^-)$ \\
+Free energy from non-eq.     & $\langle W\rangle \geq \Delta F$ & exact: Jarzynski equality \\
+Fluctuations                 & averaged away             & exact distributions via FTs \\
+Time asymmetry               & direction only            & exact ratio: Gallavotti--Cohen \\
+Precision vs cost            & no statement              & exact bound: TUR \\
+Speed vs cost                & no statement              & exact bound: speed limit \\
+Information cost             & direction (Landauer ineq.)& exact: $k_BT\ln 2$ per bit \\
+Single-trajectory EPR        & not defined               & $\sigma[\omega] = \ln P[\omega]/P[\tilde\omega]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{What this means for the five quantities}
+
+All five topological-thermodynamic quantities in the NESM manuscript are
+\emph{quantitative} in the ST sense:
+\begin{itemize}
+  \item $\eta_L$ --- dimensionless number (arc density of commitment layer).
+  \item $W/k_BT$ --- how many thermal energy units the commitment dissipates;
+    computable via Jarzynski from replicate work distributions.
+  \item $N_c$ --- exact concentration in $\mu$M where $P(\text{sporulate})=0.5$;
+    a phase-transition order parameter, not a directional bound.
+  \item $\gamma_{\mathrm{sub}}$ --- a critical exponent with mean-field
+    prediction $0.5$; deviations are quantitative evidence of long-range
+    correlations.
+  \item EPR decomposition --- $k_B\,\mathrm{s}^{-1}$ per transition per
+    replicate; the budget of dissipation assigned to each biochemical event.
+\end{itemize}
+
+\subsection*{The key sentence for the manuscript}
+
+The second law becomes an equality at the trajectory level:
+$\langle e^{-\sigma[\omega]} \rangle = 1$ (integral fluctuation theorem).
+The ensemble average gives the direction ($\langle\sigma\rangle \geq 0$);
+the distribution of $\sigma[\omega]$ across replicates gives the Gallavotti--Cohen
+ratio (the quantity).  SHPN makes both computable from the same $\tau$-leaping
+output.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Note 16 — Structural vs Thermodynamic Irreversibility: Non-Equivalence}
+\label{note:structural_vs_thermal}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\textbf{Question:} If we remove the PreemptionCheck/POSet mechanism from
+SHPN, do the irreversibility theorems of stochastic thermodynamics guarantee
+the same results?
+
+\textbf{Answer: No.}  They guarantee different things and are not equivalent.
+
+\subsection*{What ST irreversibility guarantees}
+
+The Gallavotti--Cohen theorem:
+\[
+  \frac{P(\sigma = +A)}{P(\sigma = -A)} = e^{A/k_B}.
+\]
+The integral fluctuation theorem:
+\[
+  \bigl\langle e^{-\sigma[\omega]} \bigr\rangle = 1.
+\]
+Both say reverse trajectories (de-commitment) are \emph{exponentially
+suppressed} but never forbidden.  The probability of de-commitment is:
+\[
+  P(\text{de-commit}) \sim e^{-\sigma_{\text{commit}}/k_B} > 0 \quad \text{always.}
+\]
+For large $\sigma_{\text{commit}}$ this is astronomically small ---
+but mathematically non-zero at any finite temperature.
+
+\subsection*{What PreemptionCheck/POSet guarantees}
+
+Theorem~3 (Basin Partition): once below $M_{\text{commit}}$ with no regenerating
+$F_s$ arc, return to $B_{\text{above}}$ has probability \textbf{exactly 0} ---
+not exponentially small.  The structural arc is absent; the reverse transition
+cannot fire because it does not exist.
+
+\subsection*{The four non-equivalences}
+
+\paragraph{1. Probabilistic vs absolute.}
+ST: $P(\text{reverse}) = \varepsilon > 0$ (exponentially small). \\
+SHPN: $P(\text{reverse}) = 0$ (topologically forbidden). \\
+These coincide only in the limit $\sigma \to \infty$.  At any finite
+temperature and finite dissipation, ST irreversibility is approximate;
+structural irreversibility is exact.
+
+\paragraph{2. Requires equilibrium reference vs topology-only.}
+ST irreversibility is defined \emph{relative to} an equilibrium state:
+you need $k_t^-$ (the reverse rate) to compute $\sigma$.  If reverse rates
+are absent by topology, ST gives $\sigma = \infty$ (degenerate case).
+SHPN irreversibility requires only: no $F_s$ arc regenerates $p_s$.
+Readable from topology alone, no rate constants needed.
+
+\paragraph{3. Temperature-dependent vs temperature-independent.}
+At higher $T$, thermal fluctuations increase, EPR barriers shrink, and
+$P(\text{de-commit}) \sim e^{-\sigma/k_B}$ grows.
+A cell under heat stress has a less reliable ST commitment.
+PreemptionCheck is temperature-blind: the arc is absent or present
+regardless of $T$.  Structural enforcement is more robust under
+stress conditions (heat shock, ATP depletion) where $\Delta G / k_BT$ shrinks.
+
+\paragraph{4. Timescale agnosticism.}
+ST gives the probability of de-commitment; Kramers escape gives the time:
+\[
+  \tau_{\text{escape}} \sim \tau_0 \, e^{\Delta G / k_BT}.
+\]
+For $\Delta G = 50\,k_BT$: $\tau_{\text{escape}} \sim e^{50} \approx 10^{21}$
+attempt periods --- safe biologically.  But near $N_c$, $\Delta G \to 0$;
+Kramers escape becomes fast and ST irreversibility collapses on biological
+timescales.  PreemptionCheck still holds.
+
+\subsection*{Set-theoretic relationship}
+
+\[
+  \text{SHPN structural irreversibility} \;\subsetneq\; \text{ST irreversibility}.
+\]
+Every structurally irreversible system is also thermodynamically irreversible
+(positive EPR).  The converse fails: a system with large EPR but no topological
+gate can be de-committed by a sufficiently large fluctuation.
+
+\subsection*{The biological design logic}
+
+The cell uses both mechanisms in distinct phases:
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Phase} & \textbf{Dominant mechanism} & \textbf{Role} \\
+\midrule
+$N_0 > N_c$ (vegetative)   & ST (high EPR, NESS)          & Maintain vegetative state \\
+Near $N_c$ (decision zone) & Neither (low EPR, bistable)  & Bet-hedging: stochastic probing \\
+After crossing $M_{\text{commit}}$ & SHPN structural (PreemptionCheck) & Lock decision permanently \\
+Layer B (execution)        & ST (ODE-limit EPR)           & Power gene expression \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Near $N_c$ the EPR is low and ST alone cannot guarantee commitment permanence
+--- the cell IS near-reversible by design (bet-hedging).  The structural gate
+fires AFTER the fluctuation crosses the threshold, locking in the decision.
+
+\subsection*{One-sentence answer}
+
+ST guarantees commitment is unlikely to reverse (exponential suppression);
+SHPN guarantees it cannot reverse (topological impossibility).  They coincide
+only at infinite dissipation.  The cell needs both: ST for the decision cost,
+PreemptionCheck for the decision lock.
+
 \end{document}
