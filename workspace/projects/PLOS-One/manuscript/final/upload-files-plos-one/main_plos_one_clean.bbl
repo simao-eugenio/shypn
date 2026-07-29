@@ -1,0 +1,183 @@
+\begin{thebibliography}{10}
+
+\bibitem{orth2010}
+Jeffrey~D Orth, Ines Thiele, and Bernhard~{\O} Palsson.
+\newblock What is flux balance analysis?
+\newblock {\em Nature Biotechnology}, 28(3):245--248, 2010.
+
+\bibitem{kauffman1969}
+Stuart~A Kauffman.
+\newblock Metabolic stability and epigenesis in randomly constructed genetic
+  nets.
+\newblock {\em Journal of Theoretical Biology}, 22(3):437--467, 1969.
+
+\bibitem{liu2013}
+Bing Liu, Andrei Hagiescu, Sucheendra~K Palaniappan, Bhaskar Chattopadhyay,
+  Zhen Cui, Weng-Fai Wong, and P~S Thiagarajan.
+\newblock Approximate probabilistic analysis of biopathway dynamics.
+\newblock {\em Bioinformatics}, 28(11):1508--1516, 2012.
+
+\bibitem{alla1998}
+Hassane Alla and Ren{\'e} David.
+\newblock Continuous and hybrid petri nets.
+\newblock {\em Journal of Circuits, Systems, and Computers}, 8(1):159--188,
+  1998.
+
+\bibitem{petri1962}
+Carl~Adam Petri.
+\newblock Kommunikation mit automaten.
+\newblock {\em Doctoral dissertation, University of Bonn}, 1962.
+\newblock Foundational work introducing Petri nets.
+
+\bibitem{murata1989}
+Tadao Murata.
+\newblock Petri nets: Properties, analysis and applications.
+\newblock {\em Proceedings of the IEEE}, 77(4):541--580, 1989.
+
+\bibitem{reddy1993petri}
+Venkatramana~N Reddy, Michael~L Mavrovouniotis, and Michael~N Liebman.
+\newblock Petri net representations in metabolic pathways.
+\newblock In {\em Proceedings of the First International Conference on
+  Intelligent Systems for Molecular Biology (ISMB)}, volume~1, pages 328--336.
+  AAAI Press, 1993.
+
+\bibitem{heiner2008}
+Monika Heiner, David Gilbert, and Robin Donaldson.
+\newblock Petri nets for systems and synthetic biology.
+\newblock {\em Lecture Notes in Computer Science}, 5016:215--264, 2008.
+
+\bibitem{chaouiya2007petri}
+Claudine Chaouiya.
+\newblock {Petri} net modelling of biological networks.
+\newblock {\em Briefings in Bioinformatics}, 8(4):210--219, 2007.
+
+\bibitem{reisig1985}
+Wolfgang Reisig.
+\newblock {\em Petri Nets: An Introduction}.
+\newblock Springer-Verlag, Berlin, 1985.
+
+\bibitem{koch2011}
+Ina Koch, Wolfgang Reisig, and Falk Schreiber.
+\newblock {\em Modeling in Systems Biology: The Petri Net Approach}.
+\newblock Springer, London, 2011.
+
+\bibitem{matsuno2003}
+Hiroshi Matsuno, Yuki Tanaka, Hitoshi Aoshima, Atsushi Doi, Mika Matsui, and
+  Satoru Miyano.
+\newblock Biopathways representation and simulation on hybrid functional petri
+  net.
+\newblock {\em In Silico Biology}, 3(3):389--404, 2003.
+
+\bibitem{goss1998}
+Peter~JE Goss and Jean Peccoud.
+\newblock Quantitative modeling of stochastic systems in molecular biology by
+  using stochastic petri nets.
+\newblock {\em Proceedings of the National Academy of Sciences},
+  95(12):6750--6755, 1998.
+
+\bibitem{fujita2005}
+Masaya Fujita and Richard Losick.
+\newblock Evidence that entry into sporulation in \textit{Bacillus subtilis} is
+  governed by a gradual increase in the level and activity of the master
+  regulator spo0a.
+\newblock {\em Genes \& Development}, 19(18):2236--2244, 2005.
+
+\bibitem{heiner2004}
+Monika Heiner, Ina Koch, and Jacqueline Will.
+\newblock Model validation of biological pathways using petri
+  nets---demonstrated for apoptosis.
+\newblock {\em Biosystems}, 75(1-3):15--28, 2004.
+
+\bibitem{koch2005}
+Ina Koch, Bj{\"o}rn~H Junker, and Monika Heiner.
+\newblock Application of petri net theory for modelling and validation of the
+  sucrose breakdown pathway in the potato tuber.
+\newblock {\em Bioinformatics}, 21(7):1219--1226, 2005.
+
+\bibitem{gilbert2006}
+David Gilbert and Monika Heiner.
+\newblock A model checking approach to the analysis of biological systems.
+\newblock {\em Computational Methods in Systems Biology}, 4210:122--140, 2006.
+
+\bibitem{baldan2001}
+Paolo Baldan, Andrea Corradini, and Ugo Montanari.
+\newblock Contextual {P}etri nets, asymmetric event structures, and processes.
+\newblock {\em Theoretical Computer Science}, 273(1--2):223--248, 2001.
+\newblock See also \textit{Information and Computation} 171(1--2):1--49, 2001.
+
+\bibitem{czerwinski2021}
+Wojciech Czerwi{\'n}ski and {\L}ukasz Orlikowski.
+\newblock Reachability in vector addition systems is {A}ckermann-complete.
+\newblock In {\em 62nd Annual IEEE Symposium on Foundations of Computer Science
+  (FOCS)}, pages 1229--1240. IEEE, 2021.
+
+\bibitem{schomburg2004}
+Ida Schomburg, Antje Chang, Christian Ebeling, Marion Gremse, Christian Heldt,
+  Gregor Huhn, and Dietmar Schomburg.
+\newblock {BRENDA}, the enzyme database: updates and major new developments.
+\newblock {\em Nucleic Acids Research}, 32(suppl\_1):D431--D433, 2004.
+
+\bibitem{voet2016}
+Donald Voet, Judith~G Voet, and Charlotte~W Pratt.
+\newblock {\em Biochemistry}.
+\newblock Wiley, Hoboken, NJ, 5th edition, 2016.
+
+\bibitem{barbe2009}
+Val{\'e}rie Barbe, St{\'e}phane Cruveiller, Frank Kunst, Patricia Lenoble,
+  Guillaume Meurice, Agnieszka Sekowska, David Vallenet, Ting Wang, Ivan
+  Moszer, Claudine M{\'e}digue, and Antoine Danchin.
+\newblock From a consortium sequence to a unified sequence: the
+  \textit{Bacillus subtilis} 168 reference genome a decade later.
+\newblock {\em Microbiology}, 155(Pt 6):1758--1775, 2009.
+
+\bibitem{simao2024hierarchical}
+Eug{\^e}nio Sim{\~a}o.
+\newblock Hierarchical preemption: A novel information-theoretic control
+  mechanism in lambda phage decision-making.
+\newblock {\em arXiv preprint arXiv:2512.22415}, 2024.
+
+\bibitem{simao2025unifying}
+Eug{\^e}nio Sim{\~a}o.
+\newblock Unifying weak independence and signal hierarchy theory: Extended
+  biological petri net formalism with application to \textit{Vibrio fischeri}
+  quorum sensing.
+\newblock {\em arXiv preprint arXiv:2601.00036}, 2025.
+
+\bibitem{subtilis2026}
+Eug{\'e}nio Sim{\~a}o.
+\newblock Thermodynamic constraints drive hierarchical preemption in cellular
+  decision-making: A hybrid petri net framework with application to
+  \textit{Bacillus subtilis} sporulation.
+\newblock {\em arXiv preprint arXiv:2601.04335}, 2026.
+\newblock Demonstrates 16$\times$ ATP reduction in stress-induced sporulation
+  through hierarchical preemption.
+
+\bibitem{nielsen1981}
+M.~Nielsen, G.~Plotkin, and G.~Winskel.
+\newblock Petri nets, event structures and domains, part i.
+\newblock {\em Theoretical Computer Science}, 13(1):85--108, 1981.
+
+\bibitem{winskel1987}
+G.~Winskel.
+\newblock Event structures.
+\newblock In {\em Petri Nets: Applications and Relationships to Other Models of
+  Concurrency}, volume 255 of {\em Lecture Notes in Computer Science}, pages
+  325--392. Springer, 1987.
+
+\bibitem{rozenberg1998}
+G.~Rozenberg and J.~Engelfriet.
+\newblock Elementary net systems.
+\newblock In {\em Lectures on Petri Nets I: Basic Models}, volume 1491 of {\em
+  Lecture Notes in Computer Science}, pages 12--121. Springer, 1998.
+
+\bibitem{regev2002}
+A.~Regev and E.~Shapiro.
+\newblock Cells as computation.
+\newblock {\em Nature}, 419:343, 2002.
+
+\bibitem{priami2005}
+C.~Priami.
+\newblock Stochastic pi-calculus.
+\newblock {\em The Computer Journal}, 38(6):578--589, 1995.
+
+\end{thebibliography}
