@@ -152,8 +152,7 @@ This work presents signal hierarchy theory and its computational realization as 
 \textbf{Validation:} Mathematical validation through proven theorems establishes correctness. Biological validation through \textit{B. subtilis} case study demonstrates practical applicability, following established methods for Petri net pathway validation \cite{heiner2004,koch2005,gilbert2006}. Together, these demonstrate that SHPN provides a structural account of biological commitment that is testable against independent experimental data and does not require global parameter fitting to reproduce experimental outcome ratios.
 
 % [R1-m1] Dual-graph schematic figure inserted here per R1 request.
-\begin{figure}[t]
-\centering
+\begin{figure}[!h]
 \caption{\textbf{Dual-graph architecture of SHPN.} The execution graph $G_E$
 (left) carries stoichiometric mass transfer through normal arcs (solid black)
 and may contain cycles. Signal places (blue hexagons, $p_s$) participate in
@@ -526,8 +525,7 @@ Commitment occurs when transition fires from basin boundary marking:
 
 The key insight: signal consumption creates one-way transition. Unlike normal Petri nets where reverse firing can restore markings, signal depletion establishes state space partitioning---committed cells cannot uncommit through any firing sequence. Once a cell commits to sporulation by firing $t_{commit}$ from basin boundary, consuming signal tokens, there is no alternative biochemical path back to the vegetative state through the same connected hierarchy. The commitment becomes final---the cell must follow the sporulation program forward. This captures biological reality: developmental commitment proceeds irreversibly through forward-only paths, even though metabolic feedback loops maintain homeostasis through remote sensing mechanisms.
 
-\begin{figure}[H]
-    \centering
+\begin{figure}[!h]
     \caption{%
         \textbf{PreemptionCheck in action: stochastic commitment collapses to quasi-continuous execution.}
         Individual trajectories of three key cascade species across 50 stochastic $\tau$-leaping replicates
@@ -842,11 +840,9 @@ The claim that $M_{\mathrm{commit}} = \theta_{\mathrm{eff}} + W_s$ is ``not fitt
 
 The model instantiates the four-layer signal hierarchical architecture (Section~\ref{sec:four_layer}). Model statistics: 40 places, 36 transitions, 114 arcs, 4 signal layers (Fig~\ref{fig:model_topology}).
 
-\begin{figure}[p]
-    \centering
-    {\large\textbf{Signal Hierarchical Petri Net: \textit{B.~subtilis} Sporulation (v9)}}
-    \par\vspace{6pt}
+\begin{figure}[!h]
     \caption{%
+        \textbf{Signal Hierarchical Petri Net: \textit{B.~subtilis} Sporulation (v9).}
         Full topology of the \textit{B.~subtilis} sporulation Signal Hierarchical Petri Net.
         Circles~(\textbullet) are biological places; hexagons~($\Psi$) are signal places;
         diamonds~($\lozenge$) are spatial-signal places; rounded squares~($\square$) are
@@ -909,8 +905,7 @@ The PreemptionCheck mechanism underlying this asymmetry is made directly visible
 
 \subsubsection{Basin of Attraction Analysis}
 
-\begin{figure}[htbp]
-    \centering
+\begin{figure}[!h]
     \caption{%
         \textbf{Waddington epigenetic potential landscape of \textit{B.~subtilis} sporulation commitment.}
         Analytic quasi-potential $U(\varphi,t) = a\,\varphi_c^4 - b(t)\,\varphi_c^2 + c(t)\,\varphi_c$
