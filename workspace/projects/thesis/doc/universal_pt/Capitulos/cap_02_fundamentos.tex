@@ -36,7 +36,7 @@ cíclicas), \textbf{alcançabilidade} (marcações acessíveis a partir de $M_0$
 é Ackermann-completa~\cite{Czerwinski2021}. Para a biologia, as Redes de Petri clássicas apresentam
 limitações importantes: ausência de arcos regulatórios (catálise/inibição),
 dinâmicas homogêneas, falta de semântica composicional além da independência
-forte, e impossibilidade de representar a identidade elementar dos tokens.
+forte, e ausência de atribuição de compartimento termodinâmico para espécies.
 
 \subsection{Técnicas de Análise Formal}
 \label{subsec:analise-formal}
@@ -66,9 +66,9 @@ $\{\text{glicose}:5, \text{frutose}:2\}$. Guardas (predicados booleanos) e
 expressões de arco (funções) conferem expressividade computacional. As cores
 representam tipos abstratos que facilitam a verificação de protocolos e a
 modelagem de sistemas de comunicação onde o tipo da mensagem importa mais do que
-a composição bioquímica. Nenhum desses sistemas, porém, rastreia fórmulas
-elementares como \ce{C6H12O6}, o que impede a verificação estequiométrica
-automatizada.
+a composição bioquímica. Nenhum desses sistemas associa formalmente cada espécie
+a um compartimento celular (volume termodinâmico) ou rastreia fórmulas
+elementares como \ce{C6H12O6} para verificação estequiométrica automatizada.
 
 \subsection{Dinâmicas Temporais e Semântica Multi-escala}
 \label{subsec:dinamicas}
@@ -327,8 +327,9 @@ RP Híbrida           & Real      & Cont.+Disc.& Implícita & \textcolor{red}{\d
 \end{table}
 
 As colunas da Tabela~\ref{tab:matriz-capacidades} correspondem às seis
-dimensões de capacidade avaliadas. \textbf{Tokens} designa a anotação química
-via ChEBI por nome de composto (cobertura parcial; sem entrada manual de
+dimensões de capacidade avaliadas. \textbf{Tokens} designa a atribuição de compartimento ($C: P \to \mathcal{C}$,
+fronteira termodinâmica) e a anotação de identidade química via ChEBI
+por nome de composto (cobertura parcial; sem entrada manual de
 fórmulas). \textbf{Dinâmica} designa a coexistência heterogênea de modos
 contínuo, estocástico, temporizado e burst. \textbf{Habilitação} refere-se à
 habilitação consuntiva por arco de sinal com limiar termodinâmico
