@@ -147,14 +147,27 @@ propriedades de controle.
 A análise das extensões existentes revela seis lacunas que motivam a teoria
 das Redes de Petri Hierárquicas de Sinais.
 
-\textbf{Composição bioquímica dos tokens.} As
-Redes de Petri Coloridas oferecem sistemas de tipos abstratos que distinguem
-glicose de frutose, mas os tokens carecem de fórmula elementar. Nenhum formalismo
-existente rastreia cadeias como \ce{C6H12O6} para habilitar verificação
-estequiométrica automatizada ou verificações de conservação de átomos.
-A contribuição desta tese é a introdução da função de composição
-$C: P \to \mathcal{F}$ como componente formal da 13-tupla, reservando
-um campo de anotação química por lugar. Na plataforma SHYpn, esse campo
+\textbf{Atribuição de compartimento e fronteira termodinâmica.}
+As Redes de Petri clássicas tratam todos os lugares como habitantes de um único
+espaço homogêneo, sem noção de volume, membrana ou domínio termodinâmico.
+Nenhum formalismo existente associa formalmente cada espécie ao compartimento
+celular que a contém (citoplasma, núcleo, mitocôndria) para converter tokens
+em concentrações via $c = N / (N_A \cdot V_{C(p)})$ e definir as fronteiras
+onde ocorre produção de entropia.
+A contribuição desta tese é a função de atribuição de compartimento
+$C: P \to \mathcal{C}$ como componente formal da 13-tupla, que conecta
+cada espécie a um volume $V_{C(p)}$ e estabelece as fronteiras termodinâmicas
+do sistema.
+
+\textbf{Identidade química dos tokens.}
+As Redes de Petri Coloridas oferecem sistemas de tipos abstratos que distinguem
+glicose de frutose, mas os tokens carecem de fórmula elementar. Nenhum
+formalismo existente rastreia cadeias como \ce{C6H12O6} para habilitar
+verificação estequiométrica automatizada ou verificações de conservação de
+átomos. Nas SHPN, a identidade química é tratada como \textbf{metadado
+descritivo} externo à tupla formal: cada lugar é identificado pelo seu
+nome/ID, e anotações de fórmula (SMILES, InChI, ChEBI) são opcionais.
+Na plataforma SHYpn, esse campo
 é populado por consulta ao banco de dados ChEBI~\cite{ChEBI} a partir
 do nome do composto; quando a resolução é bem-sucedida, o módulo de
 conservação verifica o balanço de C, H, O, N e P. A cobertura é
