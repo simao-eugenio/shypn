@@ -1,0 +1,75 @@
+%*******************************************************
+%  Teoria de Redes de Petri Hierárquica de Sinais
+%  Eugênio Simão – UFSC, Araranguá, 2026
+%  Estilo: ClassicThesis (A. Miede) – adaptação PT-BR
+%*******************************************************
+\documentclass[
+    twoside, openright, titlepage,
+    numbers=noenddot,
+    headinclude, footinclude,
+    cleardoublepage=empty,
+    paper=a4, fontsize=11pt
+]{scrreprt}
+
+%— configuração principal (ver classicthesis-config-pt.tex)
+\input{classicthesis-config-pt}
+
+%— base de referências
+\addbibresource{referencias.bib}
+
+%— hifenação extra
+\hyphenation{sis-te-mas bio-ló-gi-cos Pe-tri hi-e-rár-qui-co}
+
+%*******************************************************
+\begin{document}
+\frenchspacing
+\raggedbottom
+\selectlanguage{brazil}
+\pagenumbering{roman}
+\pagestyle{plain}
+
+%*******************************************************
+%  Frontmatter
+%*******************************************************
+\include{FrontBackmatter/Capa}
+\include{FrontBackmatter/Tituloverso}
+\cleardoublepage\include{FrontBackmatter/FichaCatalografica}
+\cleardoublepage\include{FrontBackmatter/FolhaAprovacao}
+\cleardoublepage\include{FrontBackmatter/Dedicatoria}
+\cleardoublepage\include{FrontBackmatter/Agradecimentos}
+\cleardoublepage\include{FrontBackmatter/Epigrafe}
+\cleardoublepage\include{FrontBackmatter/Resumo}
+\cleardoublepage\include{FrontBackmatter/Conteudo}
+
+%*******************************************************
+%  Mainmatter
+%*******************************************************
+\cleardoublepage
+\pagestyle{scrheadings}
+\pagenumbering{arabic}
+
+\part{Fundamentos}
+\include{Capitulos/cap_01_introducao}
+\include{Capitulos/cap_02_fundamentos}
+\include{Capitulos/cap_03_redes_hierarquicas}
+
+\part{Validação Biológica}
+\include{Capitulos/cap_04_validacao_bacillus}
+
+\part{Implementação}
+\include{Capitulos/cap_05_implementacao}
+
+\part{Síntese}
+\include{Capitulos/cap_06_discussao}
+\include{Capitulos/cap_07_conclusao}
+
+%*******************************************************
+%  Backmatter — Bibliografia e Declarações
+%  (sem \appendix: nenhum capítulo de apêndice é incluído.
+%   Bibliografia e Declarações não devem ser numeradas como
+%   apêndices A/B.)
+%*******************************************************
+\cleardoublepage\include{FrontBackmatter/Bibliografia}
+\cleardoublepage\include{FrontBackmatter/Declaracoes}
+
+\end{document}

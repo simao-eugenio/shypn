@@ -1,0 +1,150 @@
+\chapter{Introdução}
+\label{ch:introducao}
+
+A organização multi-escala é traço distintivo dos sistemas vivos. As células
+coordenam transformações bioquímicas em escala de milissegundos por meio de
+redes metabólicas, ao mesmo tempo que controlam programas de desenvolvimento
+em escala de horas ou dias por meio de redes regulatórias. Decisões celulares
+como o crescimento versus a diferenciação, a quiescência versus a proliferação e
+a adaptação versus a decisão irreversível emergem da interação entre
+essas duas escalas operacionais. A predição quantitativa dessas decisões ---
+em especial dos \emph{limiares de decisão}, fronteiras quantitativas nas quais
+as células transitam de forma irreversível entre fenótipos --- permanece desafio
+central da biologia de sistemas computacional.
+
+A motivação imediata para este trabalho provém de medições experimentais precisas
+da esporulação de \textit{Bacillus subtilis}. \textcite{Fujita2005}
+demonstraram que a acumulação gradual de Spo0A${\sim}$P via fosforretransmissão
+--- KinA~$\to$~Spo0F~$\to$~Spo0B~$\to$~Spo0A~$\to$~Spo0A${\sim}$P ---
+produz esporulação em ${\approx}\,52\%$ das células, enquanto a indução
+constitutiva abrupta de Spo0A* produz apenas ${\approx}\,5\%$. A separatriz
+de comprometimento emerge quando $\sigma^H$ ultrapassa
+$\theta_{\sigma H} \approx 1{,}60\,\mu$M, concentração que delimita o
+cruzamento irreversível para o programa de diferenciação. Essa assimetria
+suscita questões fundamentais: por que a via gradual supera tão amplamente a
+indução abrupta? Essa fronteira de comprometimento é
+determinada pela topologia da rede regulatória, pela cinética das enzimas, pelos
+limiares das vias de sinalização ou por alguma combinação desses fatores? Qual
+o formalismo adequado para integrar informações metabolômicas e regulatórias de
+modo a calcular tais limites a partir de princípios primeiros?
+
+\section{Motivação: o Problema das Escalas Cruzadas}
+\label{sec:motivacao}
+
+As Redes de Petri~\cite{Petri1962,Murata1989} estabeleceram-se como formalismo
+canônico para modelagem de sistemas com dinâmicas concorrentes e discretas.
+Extensões posteriores --- redes coloridas, temporizadas, estocásticas e
+híbridas --- alargaram o poder expressivo para acomodar tokens tipados, semânticas
+temporais, disparo probabilístico e marcações de valor real. Contudo, uma lacuna
+persistente separa modelagem metabólica (fluxo de massa estequiométrico, cinética
+de Michaelis-Menten, redes de ocorrências) de modelagem regulatória (lógica
+Booleana, equações diferenciais ordinárias, lógica temporal). Os sistemas
+biológicos requerem simultaneamente as duas semânticas, e as abordagens
+existentes obrigam a uma escolha arquitetural que muitas vezes obscurece
+precisamente os fenômenos de interesse.
+
+Essa limitação manifesta-se concretamente nas moléculas com papéis duplos.
+O ATP funciona como substrato da glicólise (semântica de transferência de massa,
+contabilidade estequiométrica) e como sinal de controle para cascatas de
+fosforilação (semântica de transferência de informação, detecção de limiar e
+consumo de sinal). O cálcio participa da energética da contração muscular e
+desencadeia cascatas de transdução de sinal. O AMP cíclico acopla o metabolismo
+de carbono à repressão por catabólito. Forçar essas moléculas a uma única
+semântica introduz inconsistências formais que impossibilitam predições
+quantitativas. A biologia de sistemas necessita de um formalismo capaz de
+expressar a dualidade metabolito-sinal de forma matematicamente coerente.
+
+\section{Nota Metodológica}
+\label{sec:nota-metodologica}
+
+O objetivo deste trabalho é \textbf{validação de formalismo}, não descoberta
+biológica. A biologia da esporulação de \textit{B.~subtilis} é bem estabelecida;
+os parâmetros do modelo provêm de dados publicados; e o resultado esperado ---
+a assimetria entre acumulação gradual de Spo0A${\sim}$P
+(${\approx}\,52\%$ de esporulação) e indução constitutiva abrupta de Spo0A*
+(${\approx}\,5\%$)~\cite{Fujita2005} --- é conhecido antecipadamente.
+Esse enquadramento é intencional: um formalismo confiável deve reproduzir
+fenômenos conhecidos antes de ser utilizado para predizer fenômenos novos. O
+critério de êxito não é, portanto, ``descobrimos algo novo sobre
+\textit{B.~subtilis}?'', mas sim ``o formalismo prediz o fenômeno a partir de
+princípios primeiros, sem ajuste ao resultado?''. A reprodução pela simulação
+da separatriz emergente de $\sigma^H$ a $\theta_{\sigma H} \approx 1{,}60\,\mu$M
+--- que discrimina os destinos celulares gradual/abrupto sem ajuste de
+nenhum parâmetro ao dado de Fujita --- satisfaz esse critério.
+
+\section{A Teoria das Redes de Petri Hierárquicas de Sinais}
+\label{sec:teoria-shpn}
+
+Para abordar essas questões, este trabalho apresenta as \textbf{Redes de Petri
+Hierárquicas de Sinais} (\textit{Signal Hierarchical Petri Nets}, SHPN), uma
+extensão formal das Redes de Petri clássicas que acolhe transferência de massa
+e fluxo de informação regulatória dentro de uma estrutura matemática unificada.
+O formalismo distingue \emph{lugares de sinal} --- espécies moleculares que
+intermediam controle regulatório além de participar no metabolismo --- e
+introduz \emph{arcos de fluxo de sinal} que consomem tokens durante a
+avaliação de habilitação, criando fronteiras de decisão irreversíveis.
+Uma \emph{função de camada hierárquica} organiza os sinais por escala
+(metabolismo, sinalização, transcrição), garantindo que a depleção de camadas
+inferiores preempta as superiores~\cite{Simao2025HierarchicalPreemption}.
+O parâmetro termodinâmico $\Gamma = (K, n, \varepsilon)$, composto por
+constantes cinéticas mensuráveis, fundamenta os limiares de habilitação sem
+recorrer a ajuste experimental.
+A definição formal completa e as propriedades teóricas são apresentadas no
+Capítulo~\ref{ch:shpn}.
+
+\section{Limitações das Abordagens Clássicas}
+\label{sec:limitacoes-classicas}
+
+As abordagens existentes de biologia de sistemas computacional abordam a
+modelagem metabólico-regulatória com diferentes graus de expressividade, mas
+nenhuma oferece o conjunto completo de garantias necessárias à predição de
+limiares de decisão.
+
+As Redes de Petri clássicas e coloridas modelam com excelência a estequiometria
+metabólica e a concorrência discreta, mas carecem de semântica hierárquica para
+expressar controle regulatório de nível superior sobre processos metabólicos.
+Os modelos ODE (equações diferenciais ordinárias) capturam dinâmicas contínuas
+com fidelidade cinética, porém não representam explicitamente a topologia da
+rede: decisões qualitativas emergem das equações, mas nunca são verificáveis como
+propriedades formais. O SBML (\textit{Systems Biology Markup Language})~\cite{Hucka2003}
+define formato de intercâmbio, mas não formalismo de análise; a semântica
+regulatória depende do simulador subjacente. As redes Booleanas capturam a lógica
+regulatória de forma compacta, mas eliminam a cinética enzimática e a
+estequiometria metabólica, impossibilitando predições quantitativas precisas.
+Os processos estocásticos~\cite{Gillespie1977,Goss1998} tratam o ruído
+molecular, mas a variabilidade estocástica nos limiares de decisão não se deriva
+formalmente da topologia da rede. Por fim, as redes híbridas~\cite{David1992}
+combinam lugares contínuos e discretos mas exigem dois paradigmas de modelagem
+distintos, reintroduzindo a separação metabólico-regulatória que se pretende
+suprimir.
+
+A lacuna analítica é precisa: nenhum desses formalismos separa formalmente
+transferência de massa de transferência de informação, nenhum aplica semântica
+de consumo a arcos regulatórios, e nenhum deriva limiares de decisão a
+partir da estrutura da rede sem ajuste de parâmetros.
+
+\section{Roteiro do Trabalho}
+\label{sec:roteiro}
+
+A tese está organizada em quatro partes. A Parte~I (Fundamentos, Capítulos~1
+a~3) apresenta as bases teóricas: este capítulo enquadra o problema, o
+Capítulo~2 revisa os formalismos existentes e identifica as lacunas, e o
+Capítulo~3 introduz a definição formal completa das SHPN com semântica
+operacional, o parâmetro termodinâmico $\Gamma$ e resultados de complexidade.
+A Parte~II (Validação, Capítulo~4) obtém validação quantitativa com o
+modelo de esporulação de \textit{B.~subtilis}, demonstrando que o limiar de
+decisão emerge da dinâmica termodinâmica de $\Gamma$. A Parte~III
+(Implementação, Capítulo~5) descreve a plataforma SHYpn --- implementação
+computacional de referência do formalismo SHPN --- e suas integrações com as
+bases KEGG e BRENDA.
+Por fim, a Parte~IV (Síntese, Capítulos~6 e~7) contextualiza o
+formalismo no panorama da teoria de Redes de Petri, discute questões em aberto
+e enuncia as contribuições.
+
+Leitores com interesse primordialmente teórico podem percorrer os Capítulos~1,
+2 e~3 em sequência e depois consultar a síntese do Capítulo~6. Aqueles
+interessados em aplicações biológicas podem prosseguir da introdução diretamente
+para o Capítulo~4, retomando a fundamentação formal conforme necessário.
+Pesquisadores de biologia de sistemas computacional encontrarão no Capítulo~5 a
+descrição do fluxo de trabalho de modelagem automatizada integrada às bases de
+dados.
