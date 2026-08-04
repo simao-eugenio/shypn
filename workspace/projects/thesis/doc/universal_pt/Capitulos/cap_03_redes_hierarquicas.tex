@@ -44,7 +44,10 @@ em que:
   \item $C: P \to \mathcal{C}$ é a função de atribuição de compartimento
         (e.g.\ citoplasma, núcleo, mitocôndria); determina a conversão
         token$\to$concentração via $V_{C(p)}$ e a fronteira termodinâmica
-        de cada espécie;
+        de cada espécie. A identidade química das espécies (fórmulas
+        moleculares, SMILES, InChI) é tratada como metadado descritivo
+        externo à tupla formal — o lugar é identificado pelo seu nome/ID;
+        $C$ define apenas o ambiente volumétrico para conversão de unidades;
   \item $F_t \subseteq P \times T$ são os arcos de teste (clássicos, na
         linhagem de Koch~\cite{Koch2011} e Heiner~\cite{Heiner2008}). O
         conjunto $F_t$ admite \emph{refinamento de tipo de arco} interno em
@@ -113,7 +116,7 @@ rede acoplada se compromete irreversivelmente --- \emph{emerge} da simulação
 dinâmica, pois depende da interação entre regeneração de ATP, consumo pela
 cascata e inibição por produto, não sendo computável pela fórmula isoladamente.
 Essa separação entre derivação analítica por arco e emergência sistêmica torna
-a predição genuinamente \emph{ab initio}.
+a predição genuinamente \emph{orientada pela topologia}.
 
 \begin{remark}[Generalidade de $\Gamma$ além de sinais energéticos]
 \label{rem:gamma-generalidade}
@@ -564,8 +567,8 @@ Uma vez que $M(p_s)$ cruza $M_{\text{commit}}$, a trajetória do sistema fica
 comprometida com um destino de desenvolvimento específico --- propriedade
 emergente da topologia da rede, não um parâmetro ajustado.  Como todos os
 componentes de $\Gamma$ são constantes cinéticas mensuráveis \emph{in vitro},
-essa predição é genuinamente \emph{ab initio}: o limiar de comprometimento
-emerge de primeiros princípios termodinâmicos.
+essa predição é genuinamente \emph{orientada pela topologia}: o limiar de comprometimento
+emerge da topologia da rede e de parâmetros cinéticos mensuráveis \emph{in vitro}.
 
 \section{Planejamento Experimental}
 \label{sec:planejamento-experimental}

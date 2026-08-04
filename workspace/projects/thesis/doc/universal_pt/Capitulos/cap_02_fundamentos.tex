@@ -33,7 +33,7 @@ As propriedades formais incluem \textbf{P-invariantes} (conservação de tokens:
 $y^T \cdot M = \text{constante}$), \textbf{T-invariantes} (sequências de disparo
 cíclicas), \textbf{alcançabilidade} (marcações acessíveis a partir de $M_0$) e
 \textbf{vivacidade} (ausência de impasse permanente). A complexidade da análise
-é EXPSPACE-completa. Para a biologia, as Redes de Petri clássicas apresentam
+é Ackermann-completa~\cite{Czerwinski2021}. Para a biologia, as Redes de Petri clássicas apresentam
 limitações importantes: ausência de arcos regulatórios (catálise/inibição),
 dinâmicas homogêneas, falta de semântica composicional além da independência
 forte, e impossibilidade de representar a identidade elementar dos tokens.
@@ -184,7 +184,7 @@ limiares dos arcos de inibição são inteiros fixados na construção do modelo
 incapazes de representar a ultrassensibilidade cooperativa descrita pela equação
 de Hill ($n > 1$), que determina a nitidez da chave biológica.
 Os \textbf{arcos de fluxo de sinal} das SHPN formalizam essa semântica: cada arco
-carrega parâmetros $(K, n)$ derivados de $\Gamma$ que determinam o limiar efetivo
+carrega parâmetros $(K, n, \varepsilon)$ derivados de $\Gamma$ que determinam o limiar efetivo
 $\theta_{\text{eff}}$, avaliado como predicado booleano estrito
 ($M(p_s) \geq \theta_{\text{eff}} + W_s$: habilitada ou desabilitada),
 e o disparo consome os tokens de sinal ($M' = M - W_s$), criando a
