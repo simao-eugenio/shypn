@@ -48,17 +48,15 @@
     \draw[->, very thick, blue!80!black] (\x,\ytop) -- (\x,\ybot+0.1);
   }
 
-  %% Gate annotation
-  \node[align=center, font=\footnotesize] at (3.15,7.65)
-    {\textbf{Comporta de Controle}\\$M_{\mathrm{commit}} = \theta + W_s$};
-  \draw[->,thin] (3.15,7.35) -- (3.15,7.05);
+  %% Gate annotation — moved above reservoir to avoid overlapping Camada 0
+  \node[align=center, font=\footnotesize] at (1.4,6.8)
+    {\textbf{Comporta}\\$M_{\mathrm{commit}} = \theta_{\mathrm{eff}} + W_s$};
+  \draw[->,thin] (2.1,6.7) -- (2.7,6.3);
 
-  %% Reservoir level label
+  %% Reservoir level label (M(p_s) only — descriptive text removed)
   \draw[blue!70!black, dashed] (0.1,5.2) -- (2.7,5.2);
   \node[blue!80!black, anchor=east, font=\footnotesize] at (-0.05,5.2)
     {$M(p_s)$};
-  \node[blue!70!black, anchor=west, font=\scriptsize] at (0.1,5.7)
-    {nível de sinal acumulado};
 
   %% Layer labels above profile with leader lines
   \node[align=center, font=\footnotesize] at (4.65,8.35)
@@ -81,17 +79,17 @@
   \node[align=center, font=\footnotesize] at (13.6,1.85)
     {Bacia\\$B_{\mathrm{below}}$};
 
-  %% Committed state
-  \node[font=\scriptsize, anchor=west] at (14.6,0.5)
+  %% Committed state — align=center forces two-word line break
+  \node[align=center, font=\scriptsize, anchor=west] at (14.6,0.5)
     {estado\\comprometido};
 
   %% Token consumption label (bottom, isolated)
   \node[font=\scriptsize, text=blue!80!black, align=center] at (8.5,-1.0)
     {consumo $W_s$ por disparo em cada camada};
 
-  %% Basin floor theta — orange-red for contrast against gray ground
-  \draw[orange!80!red, dashed, thick] (3.5,0.02) -- (13.5,0.02);
-  \node[orange!80!red, font=\footnotesize\bfseries, anchor=east] at (3.4,-0.25)
+  %% Basin floor theta — thick visible dashed line; label above the line
+  \draw[orange!80!red, dashed, line width=1.5pt] (3.5,0.05) -- (13.5,0.05);
+  \node[orange!80!red, font=\footnotesize\bfseries, anchor=south west] at (3.6,0.12)
     {$\theta_{\mathrm{eff}}$};
 
   %% Title
