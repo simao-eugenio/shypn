@@ -204,6 +204,29 @@ de ATP cai abaixo de $\theta_{\text{eff}}$, as transições de
 fosforretransmissão são desabilitadas, interrompendo o fluxo de sinal para
 as camadas a jusante.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_cascade_weir_analogy.pdf}
+  \caption{\textbf{Analogia hidráulica da cascata de preempção SHPN.}
+    O perfil de um açude com comportas em degraus ilustra os elementos
+    centrais do mecanismo de preempção hierárquica.
+    O reservatório (esquerda) representa os tokens de sinal acumulados
+    $M(p_s)$; a comporta de controle corresponde ao limiar de comprometimento
+    $M_{\text{commit}} = \theta + W_s$.
+    Cada degrau é uma camada $\lambda$ da hierarquia: Camada~0
+    (KinA$_{\text{kinase}}$), Camada~1 (Spo0A${\sim}$P),
+    Camada~2 ($\sigma^H$), Camada~3 ($\sigma^F$/$\sigma^E$).
+    As setas indicam o consumo de tokens $W_s$ em cada disparo
+    (queda de nível), análogo ao fluxo de água passando de um degrau
+    ao seguinte.
+    A ausência de arco $F_s$ de retorno corresponde à impossibilidade
+    hidráulica de a água subir os degraus sem uma bomba externa:
+    a irreversibilidade é \emph{estrutural}, não apenas energética.
+    O patamar $\theta$ (linha tracejada inferior) é o fundo de bacia
+    que separa $B_{\text{above}}$ de $B_{\text{below}}$.}
+  \label{fig:cascade_weir_analogy}
+\end{figure}
+
 \section{Especificação Formal do Modelo}
 \label{sec:especificacao-formal}
 
