@@ -1,114 +1,106 @@
-\documentclass[tikz,border=6pt]{standalone}
+\documentclass[tikz,border=8pt]{standalone}
 \usepackage{amsmath,amssymb}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,shapes.geometric,positioning}
+\usetikzlibrary{arrows.meta}
 
 \definecolor{waterblue}{RGB}{100,180,220}
 \definecolor{stepwater}{RGB}{135,206,235}
 \definecolor{gndgray}{RGB}{185,185,185}
 \definecolor{gatecol}{RGB}{80,80,80}
 \definecolor{basinblue}{RGB}{160,215,240}
-\definecolor{layercol}{RGB}{30,100,160}
 
 \begin{document}
-\begin{tikzpicture}[font=\small, >=Stealth]
+\begin{tikzpicture}[font=\small, >=Stealth, x=1.15cm, y=1.15cm]
 
-  %% ── Ground geometry ─────────────────────────────────────────────
-  % Reservoir floor
-  \fill[gndgray] (0,-0.15) rectangle (2.6,0);
-  % Gate block
-  \fill[gatecol] (2.6,-0.15) rectangle (3.2,6.4);
-  % Stepped ground descending (4 layers + basin)
+  %% Ground
+  \fill[gndgray] (0,-0.2) rectangle (2.8, 0);
+  \fill[gatecol] (2.8,-0.2) rectangle (3.5, 7.0);
   \fill[gndgray]
-    (3.2,0) -- (3.2,4.8) -- (4.8,4.8) -- (4.8,3.5)
-    -- (6.4,3.5) -- (6.4,2.3) -- (8.0,2.3) -- (8.0,1.1)
-    -- (9.6,1.1) -- (9.6,0.5) -- (11.5,0.5) -- (11.5,0) -- cycle;
-  % River bed
-  \fill[gndgray] (11.5,-0.15) rectangle (13.5,0);
+    (3.5,0) -- (3.5,5.2) -- (5.8,5.2) -- (5.8,3.8)
+    -- (8.1,3.8) -- (8.1,2.4) -- (10.4,2.4) -- (10.4,1.2)
+    -- (12.7,1.2) -- (12.7,0.5) -- (14.5,0.5) -- (14.5,0) -- cycle;
+  \fill[gndgray] (14.5,-0.2) rectangle (16.5,0);
 
-  %% ── Reservoir water ─────────────────────────────────────────────
-  \fill[waterblue] (0,0) rectangle (2.6,4.8);
-  \draw[blue!60!black, thick] (0,4.8) -- (2.6,4.8);
-  % reservoir walls
-  \draw[thick] (0,-0.15) -- (0,5.4) (0,5.4) -- (2.6,5.4);
+  %% Reservoir water
+  \fill[waterblue] (0,0) rectangle (2.8,5.2);
+  \draw[blue!60!black, thick] (0,5.2) -- (2.8,5.2);
+  \draw[thick] (0,-0.2) -- (0,6.0);
 
-  %% ── Water on each step ──────────────────────────────────────────
-  \fill[stepwater] (3.2,4.8) rectangle (4.8,5.3);
-  \fill[stepwater] (4.8,3.5) rectangle (6.4,4.0);
-  \fill[stepwater] (6.4,2.3) rectangle (8.0,2.8);
-  \fill[stepwater] (8.0,1.1) rectangle (9.6,1.6);
-  % Dissipation basin
-  \fill[basinblue] (9.6,0) rectangle (11.5,0.5);
-  % River
-  \fill[basinblue!60] (11.5,-0.05) rectangle (13.5,0.15);
+  %% Water on each step
+  \fill[stepwater] (3.5,5.2) rectangle (5.8,5.7);
+  \fill[stepwater] (5.8,3.8) rectangle (8.1,4.3);
+  \fill[stepwater] (8.1,2.4) rectangle (10.4,2.9);
+  \fill[stepwater] (10.4,1.2) rectangle (12.7,1.7);
+  \fill[basinblue] (12.7,0) rectangle (14.5,0.5);
+  \fill[basinblue!50] (14.5,-0.05) rectangle (16.5,0.2);
 
-  %% ── Step outlines ───────────────────────────────────────────────
-  \draw[thick, gray!60]
-    (3.2,4.8) -- (4.8,4.8) -- (4.8,3.5)
-    -- (6.4,3.5) -- (6.4,2.3)
-    -- (8.0,2.3) -- (8.0,1.1)
-    -- (9.6,1.1) -- (9.6,0.5) -- (11.5,0.5) -- (11.5,0);
+  %% Step outlines
+  \draw[thick, gray!50]
+    (3.5,5.2) -- (5.8,5.2) -- (5.8,3.8)
+    -- (8.1,3.8) -- (8.1,2.4)
+    -- (10.4,2.4) -- (10.4,1.2)
+    -- (12.7,1.2) -- (12.7,0.5) -- (14.5,0.5) -- (14.5,0);
 
-  %% ── Cascade flow arrows (at each riser) ─────────────────────────
-  \foreach \x/\ytop/\ybot in {%
-    4.8/5.3/4.0,
-    6.4/4.0/2.8,
-    8.0/2.8/1.6,
-    9.6/1.6/0.5%
-  }{
-    \draw[->, very thick, blue!80!black] (\x, \ytop) -- (\x, \ybot+0.15);
+  %% Cascade arrows at each riser
+  \foreach \x/\ytop/\ybot in
+    {5.8/5.7/4.3, 8.1/4.3/2.9, 10.4/2.9/1.7, 12.7/1.7/0.5}
+  {
+    \draw[->, very thick, blue!80!black] (\x,\ytop) -- (\x,\ybot+0.1);
   }
 
-  %% ── Gate label ──────────────────────────────────────────────────
-  \node[align=center, font=\scriptsize, above] at (2.9,6.4)
-    {\textbf{Comporta de Controle}\\
-     $M_{\text{commit}} = \theta + W_s$};
+  %% Gate annotation
+  \node[align=center, font=\footnotesize] at (3.15,7.65)
+    {\textbf{Comporta de Controle}\\$M_{\mathrm{commit}} = \theta + W_s$};
+  \draw[->,thin] (3.15,7.35) -- (3.15,7.05);
 
-  %% ── Reservoir level label ───────────────────────────────────────
-  \node[blue!80!black, font=\scriptsize, anchor=east] at (-0.05,4.8)
+  %% Reservoir level label
+  \draw[blue!70!black, dashed] (0.1,5.2) -- (2.7,5.2);
+  \node[blue!80!black, anchor=east, font=\footnotesize] at (-0.05,5.2)
     {$M(p_s)$};
-  \draw[blue!80!black, dashed, thin] (0.05,4.8) -- (2.5,4.8);
-  \node[font=\scriptsize, anchor=west, text=blue!70!black] at (0.1,5.25)
-    {Nível do Reservatório\\(sinal acumulado)};
+  \node[blue!70!black, anchor=west, font=\scriptsize] at (0.1,5.7)
+    {nível de sinal acumulado};
 
-  %% ── Layer labels on each tread ──────────────────────────────────
-  \node[align=center, font=\scriptsize] at (4.0,5.75)
-    {\textbf{Camada 0}\\KinA$_{\text{kinase}}$\\$\lambda=0$};
+  %% Layer labels above profile with leader lines
+  \node[align=center, font=\footnotesize] at (4.65,8.35)
+    {\textbf{Camada 0}\\KinA$_{\mathrm{kinase}}$\\$\lambda{=}0$};
+  \draw[->,thin,gray!60] (4.65,7.95) -- (4.65,5.85);
 
-  \node[align=center, font=\scriptsize] at (5.6,4.55)
-    {\textbf{Camada 1}\\Spo0A${\sim}$P\\$\lambda=1$};
+  \node[align=center, font=\footnotesize] at (6.95,8.35)
+    {\textbf{Camada 1}\\Spo0A${\sim}$P\\$\lambda{=}1$};
+  \draw[->,thin,gray!60] (6.95,7.95) -- (6.95,4.45);
 
-  \node[align=center, font=\scriptsize] at (7.2,3.35)
-    {\textbf{Camada 2}\\$\sigma^H$\\$\lambda=2$};
+  \node[align=center, font=\footnotesize] at (9.25,8.35)
+    {\textbf{Camada 2}\\$\sigma^H$\\$\lambda{=}2$};
+  \draw[->,thin,gray!60] (9.25,7.95) -- (9.25,3.05);
 
-  \node[align=center, font=\scriptsize] at (8.8,2.15)
-    {\textbf{Camada 3}\\$\sigma^F$/$\sigma^E$\\$\lambda=3$};
+  \node[align=center, font=\footnotesize] at (11.55,8.35)
+    {\textbf{Camada 3}\\$\sigma^F$/$\sigma^E$\\$\lambda{=}3$};
+  \draw[->,thin,gray!60] (11.55,7.95) -- (11.55,1.85);
 
-  %% ── Basin / committed state ─────────────────────────────────────
-  \node[align=center, font=\scriptsize] at (10.55,1.2)
-    {Bacia de\\Dissipação\\$B_{\text{below}}$};
+  %% Basin label
+  \node[align=center, font=\footnotesize] at (13.6,1.85)
+    {Bacia\\$B_{\mathrm{below}}$};
 
-  %% ── River / fully committed ─────────────────────────────────────
-  \node[font=\scriptsize, anchor=west] at (11.6,0.4)
-    {Leito\\(estado\\comprometido)};
+  %% Committed state
+  \node[font=\scriptsize, anchor=west] at (14.6,0.5)
+    {estado\\comprometido};
 
-  %% ── Token consumption annotation ────────────────────────────────
-  \draw[blue!60, thin, ->] (7.5,4.8) -- (6.5,4.1);
-  \node[font=\scriptsize, text=blue!70!black, anchor=west] at (7.6,5.0)
-    {consumo de tokens $W_s$\\por disparo};
+  %% Token consumption label (bottom, isolated)
+  \node[font=\scriptsize, text=blue!80!black, align=center] at (8.5,-1.0)
+    {consumo $W_s$ por disparo em cada camada};
 
-  %% ── Irreversibility annotation ──────────────────────────────────
-  \draw[red!70!black, thick, ->] (12.8,3.5) -- (12.8,0.5);
-  \node[red!70!black, font=\scriptsize, rotate=90, anchor=south] at (13.1,2.0)
-    {irreversível: sem arco $F_s$ de retorno};
+  %% Irreversibility (right margin)
+  \draw[red!70,thick,->] (16.1,6.5) -- (16.1,0.7);
+  \node[red!70!black, font=\scriptsize, rotate=90, anchor=south] at (16.35,3.6)
+    {irreversível: sem $F_s$ de retorno};
 
-  %% ── Theta (basin floor) annotation ─────────────────────────────
-  \draw[gray!60, dashed, thin] (3.2,0.0) -- (11.5,0.0)
-    node[pos=0.5, below, font=\scriptsize, text=gray!80] {$\theta$ (patamar de bacia)};
+  %% Basin floor theta
+  \draw[gray!55, dashed] (3.5,0.0) -- (13.5,0.0);
+  \node[gray!70, font=\scriptsize, anchor=east] at (3.4,-0.15) {$\theta$};
 
-  %% ── Title ───────────────────────────────────────────────────────
-  \node[font=\normalsize\bfseries] at (6.5,7.1)
-    {Perfil Hidráulico: Analogia com a Cascata de Preempção SHPN};
+  %% Title
+  \node[font=\normalsize\bfseries] at (8.25,9.5)
+    {Perfil Hidr\'{a}ulico --- Analogia com a Cascata de Preemp\c{c}\~{a}o SHPN};
 
 \end{tikzpicture}
 \end{document}
