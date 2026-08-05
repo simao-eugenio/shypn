@@ -877,7 +877,27 @@ alcança o patamar necessário para acionar o interruptor de Hill-4 de $\sigma^H
 os programas de diferenciação energeticamente custosos são bloqueados,
 formalizando o Princípio~II da teoria.
 
-\subsection{Formação de Fronteiras de Bacia}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_cascade_weir_analogy.pdf}
+  \caption{\textbf{Analogia hidráulica da cascata de preempção SHPN}
+    (Seção~\ref{subsec:corretude-preempcao}).
+    O perfil de um açude com comportas em degraus ilustra os elementos
+    centrais do Teorema~\ref{thm:preempcao}.
+    O reservatório (esquerda) representa os tokens de sinal acumulados
+    $M(p_s)$; a comporta de controle corresponde ao limiar
+    $M_{\mathrm{commit}} = \theta_{\mathrm{eff}} + W_s$.
+    Cada degrau é uma camada $\lambda$: Camada~0 (KinA$_{\mathrm{kinase}}$),
+    Camada~1 (Spo0A${\sim}$P), Camada~2 ($\sigma^H$), Camada~3
+    ($\sigma^F$/$\sigma^E$).
+    As setas indicam o consumo de tokens $W_s$ em cada disparo (queda de
+    nível); a ausência de arco $F_s$ de retorno corresponde à
+    impossibilidade hidráulica de a água subir sem bomba externa ---
+    a irreversibilidade é \emph{estrutural}.
+    O patamar $\theta_{\mathrm{eff}}$ (linha tracejada) é o fundo de bacia
+    que separa $B_{\mathrm{above}}$ de $B_{\mathrm{below}}$.}
+  \label{fig:cascade_weir_analogy}
+\end{figure}
 \label{subsec:fronteiras-bacia}
 
 \begin{theorem}[Consumo de Sinal Cria Fronteiras de Bacia]
