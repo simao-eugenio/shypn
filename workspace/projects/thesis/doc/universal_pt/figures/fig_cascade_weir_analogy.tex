@@ -10,7 +10,7 @@
 \definecolor{basinblue}{RGB}{160,215,240}
 
 \begin{document}
-\begin{tikzpicture}[font=\small, >=Stealth, x=1.15cm, y=1.15cm]
+\begin{tikzpicture}[font=\small, >=Stealth, x=0.95cm, y=0.95cm]
 
   %% Ground
   \fill[gndgray] (0,-0.2) rectangle (2.8, 0);
@@ -89,14 +89,10 @@
   \node[font=\scriptsize, text=blue!80!black, align=center] at (8.5,-1.0)
     {consumo $W_s$ por disparo em cada camada};
 
-  %% Irreversibility (right margin)
-  \draw[red!70,thick,->] (16.1,6.5) -- (16.1,0.7);
-  \node[red!70!black, font=\scriptsize, rotate=90, anchor=south] at (16.35,3.6)
-    {irreversível: sem $F_s$ de retorno};
-
-  %% Basin floor theta
-  \draw[gray!55, dashed] (3.5,0.0) -- (13.5,0.0);
-  \node[gray!70, font=\scriptsize, anchor=east] at (3.4,-0.15) {$\theta$};
+  %% Basin floor theta — orange-red for contrast against gray ground
+  \draw[orange!80!red, dashed, thick] (3.5,0.02) -- (13.5,0.02);
+  \node[orange!80!red, font=\footnotesize\bfseries, anchor=east] at (3.4,-0.25)
+    {$\theta_{\mathrm{eff}}$};
 
   %% Title
   \node[font=\normalsize\bfseries] at (8.25,9.5)
