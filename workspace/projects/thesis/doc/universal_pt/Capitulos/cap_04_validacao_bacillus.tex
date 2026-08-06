@@ -57,10 +57,12 @@ A decisão de esporular é biologicamente irreversível: uma vez que
 $\sigma^F$ se torna ativo no foresporo, a célula compromete-se com o programa
 de diferenciação mesmo que as condições nutricionais melhorem
 subsequentemente.
-O limiar de $\sigma^H$ que determina o comprometimento celular
---- a separatriz que discrimina acumulação gradual de Spo0A${\sim}$P
-(${\approx}\,52\%$ de esporulação) de indução constitutiva abrupta de Spo0A*
-(${\approx}\,5\%$) --- foi identificado por \textcite{Fujita2005}.
+A assimetria entre acumulação gradual de Spo0A${\sim}$P
+(${\approx}\,52\%$ de esporulação) e indução constitutiva abrupta de Spo0A*
+(${\approx}\,5\%$) foi demonstrada experimentalmente por \textcite{Fujita2005}.
+A separatriz de comprometimento de $\sigma^H$ a
+$\theta_{\sigma H} \approx 1{,}60\,\mu$M --- que discrimina esses destinos ---
+emergiu da varredura de simulação SHPN (valor não reportado por Fujita).
 
 A Figura~\ref{fig:bacillus-sporulation-stress} apresenta a topologia completa
 do modelo SHPN de esporulação de \textit{B.~subtilis}, com todos os lugares,
@@ -180,8 +182,8 @@ A \textbf{camada de fatores sigma} ($\sigma^H$, $\sigma^F$, $\sigma^E$,
 $\sigma^G$, $\sigma^K$) ativa sequencialmente os programas transcricionais
 de esporulação.
 Os fatores sigma acumulam-se em concentrações da ordem de dezenas de
-micromolares, compatíveis com as medidas de microscopia de
-fluorescência~\cite{Fujita2005}.
+micromolares, valores biologicamente plausíveis para fatores de transcrição
+em \textit{B.~subtilis}.
 A inibição cruzada por anti-fatores sigma é modelada pelos pesos de arco de
 saída de $0{,}002$~mM por disparo, representando sequestração.
 
@@ -316,8 +318,7 @@ Os pesos de arco ($0{,}002$~mM para fatores sigma, $0{,}01$~mM para
 estruturas) modelam a sequestração por anti-fatores sigma e o custo
 energético de montagem, respectivamente.
 As taxas de montagem estrutural ($k = 0{,}5$~s$^{-1}$) são compatíveis
-com as escalas temporais medidas por microscopia de
-fluorescência~\cite{Fujita2005}.
+com as escalas temporais da esporulação reportadas por \textcite{Fujita2005}.
 \textbf{Nenhum parâmetro foi ajustado para reproduzir a assimetria experimental
 de Fujita (acumulação gradual $\approx\!52\%$ vs.\ indução abrupta $\approx\!5\%$).}
 Os limiares efetivos por arco $\theta_{\text{eff}}$ são derivados
