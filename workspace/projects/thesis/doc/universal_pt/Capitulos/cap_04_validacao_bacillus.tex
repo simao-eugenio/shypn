@@ -73,9 +73,9 @@ transições e arcos identificados por tipo.
 {\large\bfseries Rede SHPN de Esporulação de \textit{B.~subtilis} (v9)}\\[4pt]
 \includegraphics[width=\textwidth]{figures/bacillus_sporulation_v9_titled.pdf}
 \caption{Topologia completa da rede SHPN de esporulação de \textit{B.~subtilis}
-(40~lugares, 36~transições, 114~arcos).
-Círculos~($\bigcirc$): lugares biológicos regulares;
-hexágonos~($\hexagon$): lugares de sinal~$\Psi$ (hubs regulatórios hierárquicos);
+(41~lugares, 36~transições, 114~arcos).
+Hexágonos~($\hexagon$): todos os 28 lugares biológicos, todos membros de~$\Psi$
+(\texttt{is\_signal\_place=True});
 losangos~($\diamondsuit$): lugares de sinal espacial (escalares cinéticos);
 quadrados arredondados~($\square$): lugares de parâmetro do plano de experimento
 (lidos apenas por eventos).
@@ -228,16 +228,18 @@ inibição por produto empregados.
 \toprule
 \textbf{Componente} & \textbf{Valor específico para o \textit{Bacillus}} \\
 \midrule
-Lugares $P$ & 40 no total: 28 lugares de sinal biológico~$\Psi$
-             (fosforretransmissão, fatores sigma, reservatórios
+Lugares $P$ & 41 no total: 28 lugares de sinal hierárquico~$\Psi$ ($\hexagon$,
+             todos com \texttt{is\_signal\_place=True}:
+             fosforretransmissão, fatores sigma, reservatórios
              energéticos, compartimentos, estruturas e competição
-             por biofilme), 9 lugares de parâmetro~$\square$
+             por biofilme), 10 lugares de parâmetro~$\square$
              (\texttt{INITIAL\_NUTRIENTS}, \texttt{TEMPERATURE\_K},
              \texttt{ATP\_SETPOINT}, \texttt{SIGMA\_HALFLIFE\_MIN},
              \texttt{NUTRIENTS\_STEP\_TARGET},
              \texttt{NUTRIENTS\_STEP\_TIME\_S},
              \texttt{k\_syn\_factor}, \texttt{LOADING\_DOSE},
-             \texttt{INTERVENTION\_TIME\_S}, lidos por eventos apenas)
+             \texttt{INTERVENTION\_TIME\_S}, \texttt{k\_sigmaH\_factor},
+             lidos por eventos apenas)
              e 3 lugares de sinal espacial~$\diamondsuit$
              (\texttt{k\_ATP\_target}, \texttt{k\_sigma\_decay},
              \texttt{k\_thermo\_factor}, escalares cinéticos
