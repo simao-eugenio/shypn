@@ -528,7 +528,23 @@ uma consequência secundária da depleção metabólica.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_waddington_basin_2d.pdf}
-\caption{Paisagem de potencial epigenético da esporulação de
+\caption{\textbf{Paisagem de potencial epigenético da esporulação de
+\textit{B.~subtilis}.}
+Quase-potencial analítico $U(\varphi,t) = a\,\varphi_c^4 - b(t)\,\varphi_c^2 +
+c(t)\,\varphi_c$ ($\varphi_c = \varphi - 0{,}5$) com coeficientes variantes
+calibrados ao relógio de comprometimento ($t_{\mathrm{commit}} = 300$~min,
+mediana de $\sigma_H$ em $1{,}60\,\mu$M).
+Azul escuro = bacias atratoras de baixa energia; vermelho escuro = barreira
+(crista de Waddington).
+Linha branca: média do parâmetro de ordem de esporulação $\varphi(t)$ sobre
+50 réplicas estocásticas (\texttt{run\_20260719\_170034},
+$N_0=1440\,\mu$M, horizonte de 6~h).
+Círculo amarelo~($\bullet$): ponto de comprometimento $t_{\mathrm{commit}}$;
+estrela verde~($\star$): primeiro aparecimento de esporos maduros
+($t \approx 329$~min). Linha tracejada vermelha: separatriz de $\sigma_H$.
+A paisagem reproduz a assimetria gradual/abrupto reportada por
+\textcite{Fujita2005}: ${{\approx}}\,48\%$ de esporulação
+($N_0=1440\,\mu$M, SinR$=12\,\mu$M).}
 \textit{B.~subtilis}: pseudo-potencial $U(\varphi, t)$ construído a partir
 da simulação SHPN com $\Gamma$.}
 \label{fig:epigenetic-landscape}
@@ -568,7 +584,20 @@ termodinâmico~$\Gamma$, sem parâmetros de temporização explícitos.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_sporulation_cascade_stacked.pdf}
-\caption{Cascata de ativação sigma-fatores da esporulação de \textit{B.~subtilis}:
+\caption{\textbf{PreemptionCheck em ação: comprometimento estocástico colapsa
+para execução quase-contínua.}
+Trajetórias individuais de três espécies-chave da cascata ao longo de
+50 réplicas estocásticas ($\tau$-leaping)
+($N_0=1440\,\mu$M, SinR$=12\,\mu$M, \texttt{run\_20260719\_170034}).
+Vermelho: réplicas esporulantes (24/50); cinzento: réplicas vegetativas (26/50).
+Linhas grossas: médias condicionadas ao destino.
+\textit{Inferior} --- Spo0A$\sim$P: fosforretransmissão estocástica;
+ambos os destinos compartilham variância indistinguível até $t_{\mathrm{commit}}$.
+\textit{Médio} --- $\sigma^H$: portão de comprometimento; linha tracejada violeta
+marca $\theta_{\sigma H}=1{,}60\,\mu$M; apenas réplicas esporulantes a cruzam.
+\textit{Superior} --- $\sigma^F$: programa de execução; silencioso nas réplicas
+vegetativas; ativa pós-comprometimento com variância acentuadamente reduzida,
+demonstrando o caráter quase-contínuo da execução após o PreemptionCheck.}
 50~trajetórias individuais ($\tau$-leaping estocástico) sobrepostas para
 a condição de referência ($\text{N}_0=1440$~µM, DOSE$=0$, SinR$=12$~µM).
 Oito painéis, de cima para baixo:
