@@ -890,10 +890,12 @@ hidráulico em degraus.
     que \emph{separa} $B_{\mathrm{above}}$ (reservatório: $M(p_s) \geq M_{\mathrm{commit}}$)
     de $B_{\mathrm{below}}$ (região comprometida: $M(p_s) < M_{\mathrm{commit}}$).
     As setas indicam o consumo $W_s$ por disparo em cada camada.
-    A linha tracejada laranja ($\theta_{\mathrm{eff}}$) é o \emph{piso mínimo de bacia} ---
-    o nível residual mínimo dentro de $B_{\mathrm{below}}$, atingido quando o disparo
-    ocorre exatamente a partir de $M_{\mathrm{commit}}$; se $M(p_s) > M_{\mathrm{commit}}$,
-    o residual pós-disparo $M'(p_s) = M(p_s) - W_s > \theta_{\mathrm{eff}}$.
+    A linha tracejada laranja ($\theta_{\mathrm{eff}}$) representa o \emph{nível de
+    regime pós-comprometimento} --- análogo ao rio retornando às suas margens após
+    a cheia: não um leito vazio, mas o nível estável e ativo em que o sistema
+    comprometido opera.  É o mínimo residual quando o disparo ocorre a partir de
+    exatamente $M_{\mathrm{commit}}$; se $M(p_s) > M_{\mathrm{commit}}$, o residual
+    pós-disparo $M'(p_s) = M(p_s) - W_s > \theta_{\mathrm{eff}}$.
     A irreversibilidade é \emph{estrutural}: sem $F_s$ de retorno, a água não
     sobe os degraus.}
   \label{fig:cascade_weir_analogy}
@@ -918,6 +920,11 @@ impulsionado pelo gradiente de potencial químico criado pela depleção de
 tokens.  O PreemptionCheck não é uma barreira de ativação: é uma
 \textbf{válvula de sentido único} que separa o custo (Fase~1) da execução
 irreversível (Fase~2).
+
+$\theta_{\mathrm{eff}}$ não é um leito de rio vazio --- é o \textbf{nível de
+regime pós-comprometimento}: o nível estável ao qual o sinal retorna após
+a cheia de comprometimento, análogo a um rio voltando às suas margens.
+A célula nesse nível está ativa (cascata sigma em execução), não dormente.
 
 Essa assimetria explica a paisagem de Waddington: a crista corresponde à
 Fase~1 (subida custosa até $M_{\text{commit}}$); a bacia comprometida
