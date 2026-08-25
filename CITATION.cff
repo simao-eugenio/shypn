@@ -18,17 +18,15 @@ authors:
     affiliation: "Federal University of Santa Catarina (UFSC)"
 preferred-citation:
   type: article
-  title: "Thermodynamic Constraints Drive Hierarchical Preemption in Bacillus subtilis Sporulation: A Signal Hierarchical Petri Net Analysis"
+  title: "Signal Hierarchical Petri Nets: Formal Semantics of Hierarchical
+    Regulatory Control of Biological Systems"
   authors:
-    - family-names: "Simão"
-      given-names: "Eugénio"
+    - family-names: "Sim\u00e3o"
+      given-names: "Eug\u00e9nio"
   year: 2026
-  journal: "arXiv preprint"
-  identifiers:
-    - type: other
-      value: "arXiv:2501.03850"
-      description: "arXiv identifier"
-  url: "https://arxiv.org/abs/2501.03850"
+  journal: "PLOS ONE"
+  doi: "10.1371/journal.pone.0355540"
+  url: "https://doi.org/10.1371/journal.pone.0355540"
 keywords:
   - Signal Hierarchical Petri Nets
   - biological modeling
